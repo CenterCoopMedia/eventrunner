@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Operator-hosted event support
+    url: mailto:info@collaborativejournalism.org
+    about: If CCM is operating your event site, email support instead of opening an issue here.
+  - name: Start a discussion
+    url: https://github.com/CenterCoopMedia/run-of-show/discussions
+    about: Questions, ideas, and show-and-tell belong in Discussions.
+  - name: Report a vulnerability
+    url: https://github.com/CenterCoopMedia/run-of-show/security/advisories/new
+    about: Use private vulnerability reporting. Do not file a public issue.

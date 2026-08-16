@@ -1,0 +1,16 @@
+{
+  "name": "shared",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Shared config schema, lifecycle clock, and domain helpers for web + functions.",
+  "type": "commonjs",
+  "exports": {
+    ".": { "require": "./src/index.cjs", "import": "./src/index.mjs" },
+    "./config": { "require": "./src/config/index.cjs", "import": "./src/config/index.mjs" },
+    "./time": { "require": "./src/time.cjs", "import": "./src/time.mjs" },
+    "./registration": { "require": "./src/registration.cjs", "import": "./src/registration.mjs" },
+    "./badges": { "require": "./src/badges.cjs", "import": "./src/badges.mjs" },
+    "./slug": { "require": "./src/slug.cjs", "import": "./src/slug.mjs" },
+    "./urlSafety": { "require": "./src/urlSafety.cjs", "import": "./src/urlSafety.mjs" }
+  }
+}

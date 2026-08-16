@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose a change to the platform
+title: "[Feature] "
+labels: ["type:feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [roadmap](https://github.com/CenterCoopMedia/run-of-show/blob/main/docs/ROADMAP.md) and [triage record](https://github.com/CenterCoopMedia/run-of-show/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md) before filing. Features already cut from v1 need a strong case to come back.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: Who hits this, and what they cannot do today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The change
+      description: What should exist. Skip implementation detail unless it is load-bearing.
+    validations:
+      required: true
+  - type: dropdown
+    id: buyer
+    attributes:
+      label: Who this is for
+      options:
+        - Journalism / nonprofit event
+        - University or institution
+        - Agency or event producer
+        - Contributors / operators
+        - All of the above
+    validations:
+      required: true
+  - type: textarea
+    id: extras
+    attributes:
+      label: Anything else
+      description: Links to related issues, a mock, or a client who would use this.

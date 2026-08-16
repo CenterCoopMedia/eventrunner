@@ -1,0 +1,16 @@
+{
+  "name": "run-of-show",
+  "private": true,
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "White-label event CMS. Deploy-per-client, operator-run.",
+  "workspaces": [
+    "packages/shared"
+  ],
+  "scripts": {
+    "test": "node --test \"packages/shared/src/**/*.test.cjs\""
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

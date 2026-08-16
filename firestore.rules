@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Scaffold default. Feature ports replace this with the v1 rules
+    // from docs/adr/0001-event-platform-v1.md §4 and §8.5.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

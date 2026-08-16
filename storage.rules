@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Scaffold default. Feature ports replace this with the hardened
+    // owner/admin rules from spec §8.5.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

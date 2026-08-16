@@ -1,0 +1,52 @@
+name: Bug report
+description: Something in the platform is wrong
+title: "[Bug] "
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for bugs in the shared codebase. If CCM is operating your event site and the problem is configuration, access, or content, email info@collaborativejournalism.org instead.
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running it
+      options:
+        - Operator-hosted deployment (CCM runs it)
+        - My own fork or self-managed deploy
+        - Local / emulators
+        - I am looking at the repo only
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Tagged release or commit SHA.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: Name and version, or "n/a" for backend-only bugs.
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Redact emails, names, and ticket IDs. Do not paste client data.
