@@ -1,0 +1,60 @@
+name: Accessibility
+description: A keyboard, screen reader, contrast, or other access problem on a public or admin flow.
+title: "[A11y] "
+labels: ["type:bug"]
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when a person cannot complete a flow without a mouse, or when assistive tech announces the wrong thing. Do not include real names or emails.
+  - type: dropdown
+    id: role
+    attributes:
+      label: Who hits this
+      options:
+        - Attendee
+        - Event staff
+        - Either
+    validations:
+      required: true
+  - type: input
+    id: flow
+    attributes:
+      label: Page or flow
+      placeholder: Sign-in, session card, speaker wizard, CMS editor
+    validations:
+      required: true
+  - type: input
+    id: at
+    attributes:
+      label: How you checked
+      description: Keyboard only, zoom, VoiceOver, NVDA, JAWS, or another method.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happens
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Screenshot or a short description of the announcement. No PII.
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before you submit
+      options:
+        - label: This report contains no real attendee or client personal data.
+          required: true
+        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/run-of-show/blob/main/CODE_OF_CONDUCT.md).
+          required: true

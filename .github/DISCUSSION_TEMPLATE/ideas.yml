@@ -1,0 +1,40 @@
+title: "[Idea] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A wish for the **shared product**. If this is a bug, use the [bug form](https://github.com/CenterCoopMedia/run-of-show/issues/new?template=bug.yml). If you need it tracked for a release, we will turn a solid idea into an issue.
+  - type: dropdown
+    id: role
+    attributes:
+      label: I would use this as
+      options:
+        - Event staff
+        - Attendee
+        - Speaker
+        - Someone running many events
+    validations:
+      required: true
+  - type: textarea
+    id: wish
+    attributes:
+      label: What should exist
+      description: The outcome, not the implementation. "Staff should be able to embargo slides until the session ends."
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: Who is stuck without it.
+    validations:
+      required: true
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before you post
+      options:
+        - label: I looked at the [roadmap](https://github.com/CenterCoopMedia/run-of-show/blob/main/docs/ROADMAP.md) and this is not already listed.
+          required: true
+        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/run-of-show/blob/main/CODE_OF_CONDUCT.md).
+          required: true

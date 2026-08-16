@@ -4,9 +4,10 @@ A white-label event CMS for conferences and gatherings. Each client event gets i
 
 **License:** [Apache-2.0](LICENSE). The code is free. The trademark is the exclusivity lever: nobody else can market hosting under this name.
 
-**Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and in [GitHub issues](https://github.com/CenterCoopMedia/run-of-show/issues).
+**Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2).
 
 Site: [centercoopmedia.github.io/run-of-show](https://centercoopmedia.github.io/run-of-show/)
+Handbook: [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki)
 
 ## Who it is for
 
@@ -83,7 +84,14 @@ Operator-run client deployments are out of scope for public reports. Email the o
 
 ## Support
 
-- Code, bugs, and feature requests: [issues](https://github.com/CenterCoopMedia/run-of-show/issues) and [discussions](https://github.com/CenterCoopMedia/run-of-show/discussions)
-- A hosted event CCM is operating for you: email info@collaborativejournalism.org
+| You are… | Start here |
+|---|---|
+| Attendee or event staff with a how-to | [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a) |
+| An organization that wants a hosted event | [General](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=general) |
+| Reporting a product bug | [Bug form](https://github.com/CenterCoopMedia/run-of-show/issues/new?template=bug.yml) |
+| CCM already hosts your site | info@collaborativejournalism.org |
+| Changing the code | [CONTRIBUTING.md](CONTRIBUTING.md) |
+
+The [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki) is the handbook for attendees, staff, and clients. [GOVERNANCE.md](GOVERNANCE.md) is who decides.
 
 An initiative of the Center for Cooperative Media at Montclair State University.

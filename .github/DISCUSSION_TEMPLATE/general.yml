@@ -1,0 +1,40 @@
+title: "[Hosting] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this if you want the Center for Cooperative Media to run an event site for you, or you have a question about licensing.
+
+        The code is Apache-2.0. CCM sells the operated service. If CCM already hosts your event and you need day-to-day support, email info@collaborativejournalism.org instead.
+  - type: dropdown
+    id: org
+    attributes:
+      label: What kind of organization
+      options:
+        - Journalism / nonprofit
+        - University or institution
+        - Agency or event producer
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: event
+    attributes:
+      label: The event
+      description: Rough size, dates if you have them, and whether you already sell tickets somewhere. No attendee lists.
+    validations:
+      required: true
+  - type: textarea
+    id: need
+    attributes:
+      label: What you need from us
+      description: A full hosted site, a walkthrough, or a question about the license.
+    validations:
+      required: true
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before you post
+      options:
+        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/run-of-show/blob/main/CODE_OF_CONDUCT.md).
+          required: true

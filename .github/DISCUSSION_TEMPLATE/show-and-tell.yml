@@ -1,0 +1,33 @@
+title: "[Event] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Running an event on Run of Show? Tell people what you learned. No attendee lists, no private admin screens with personal data.
+  - type: input
+    id: event
+    attributes:
+      label: Event name
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Public site
+      placeholder: https://
+  - type: textarea
+    id: story
+    attributes:
+      label: What you want to share
+      description: What worked for staff, what attendees asked for, what you would change.
+    validations:
+      required: true
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before you post
+      options:
+        - label: This post does not include attendee or speaker personal data.
+          required: true
+        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/run-of-show/blob/main/CODE_OF_CONDUCT.md).
+          required: true

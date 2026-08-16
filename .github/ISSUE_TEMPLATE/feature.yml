@@ -1,0 +1,78 @@
+name: Feature
+description: A change you want in the shared product, not a one-off on a single event.
+title: "[Feature] "
+labels: ["type:feature"]
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [roadmap](https://github.com/CenterCoopMedia/run-of-show/blob/main/docs/ROADMAP.md) and the [triage record](https://github.com/CenterCoopMedia/run-of-show/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md) first. Video generation, bulk announcement email, invoicing, social feeds, and speaker chat were cut from v1 on purpose.
+
+        A how-to or a tweak for one hosted event belongs in [Discussions](https://github.com/CenterCoopMedia/run-of-show/discussions), not here.
+  - type: dropdown
+    id: role
+    attributes:
+      label: Who is asking
+      options:
+        - Event staff
+        - Organization considering a hosted event
+        - Attendee
+        - Operator / contributor
+    validations:
+      required: true
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Who this is for
+      options:
+        - Journalism / nonprofit event
+        - University or institution
+        - Agency or event producer
+        - All of the above
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: Who hits this, how often, and what they cannot do today. Write it so someone who does not know the code can understand it.
+    validations:
+      required: true
+  - type: textarea
+    id: success
+    attributes:
+      label: What done looks like
+      description: A concrete outcome. "Staff can embargo a file until the session ends" is better than "improve materials."
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What people do today
+      description: A spreadsheet, an email, or "they cannot do it."
+  - type: dropdown
+    id: cut-list
+    attributes:
+      label: Is this on the v1 cut list
+      description: If yes, say why it should come back.
+      options:
+        - No
+        - Yes — and I am making the case to reopen it
+        - I do not know
+    validations:
+      required: true
+  - type: textarea
+    id: extras
+    attributes:
+      label: Anything else
+      description: Related issues, a sketch, or another event that would use this. No client data.
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched issues and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2) and did not find this already queued.
+          required: true
+        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/run-of-show/blob/main/CODE_OF_CONDUCT.md).
+          required: true

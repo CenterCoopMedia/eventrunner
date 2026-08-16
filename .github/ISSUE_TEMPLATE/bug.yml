@@ -1,0 +1,122 @@
+name: Bug
+description: Something in the shared product is wrong. Not a how-to, and not a hosted-site outage.
+title: "[Bug] "
+labels: ["type:bug"]
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when the **shared product** misbehaves.
+
+        - How-to ("how do I bookmark a session"): [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a)
+        - CCM is operating your site and you need access or a content fix: email info@collaborativejournalism.org
+        - Security: [private report](https://github.com/CenterCoopMedia/run-of-show/security/advisories/new)
+
+        Do not paste attendee names, emails, ticket IDs, or other client data.
+  - type: dropdown
+    id: role
+    attributes:
+      label: Who is reporting
+      options:
+        - Attendee
+        - Event staff (CMS / admin)
+        - Operator (CCM)
+        - Self-managed / fork
+        - Contributor looking at the repo
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Where you saw it
+      options:
+        - A CCM-hosted event site
+        - A self-managed deploy
+        - Local / emulators
+        - I am reading the code only
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Page or URL
+      description: Path is enough (`/schedule`). Omit query strings that contain tokens.
+      placeholder: /schedule
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Tagged release, or the first 7 characters of the commit. Use `unreleased` if you do not know.
+      placeholder: unreleased
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and OS
+      description: Or `n/a` for backend-only bugs.
+      placeholder: "Firefox 141, Windows 11"
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: How bad
+      options:
+        - Blocker — cannot sign in, publish, or complete registration
+        - High — a core flow is wrong for many people
+        - Medium — a flow is wrong but there is a workaround
+        - Low — polish, copy, or a rare path
+    validations:
+      required: true
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Did this used to work
+      options:
+        - Yes — it broke after a publish or deploy
+        - No — I have only ever seen it broken
+        - I do not know
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Screenshot, console line, or function log. Redact emails, names, and ticket IDs. Prefer an upload over a paste of a full log.
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched [existing issues](https://github.com/CenterCoopMedia/run-of-show/issues) and did not find a duplicate.
+          required: true
+        - label: This report contains no real attendee, speaker, or client personal data.
+          required: true
+        - label: This is a product bug, not a request for CCM to change content on a hosted site.
+          required: true
+        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/run-of-show/blob/main/CODE_OF_CONDUCT.md).
+          required: true

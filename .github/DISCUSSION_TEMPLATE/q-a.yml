@@ -1,0 +1,57 @@
+title: "[Help] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when you are **using** an event site and cannot finish a task.
+
+        - The shared product is wrong: [open a bug](https://github.com/CenterCoopMedia/run-of-show/issues/new?template=bug.yml)
+        - CCM hosts your event and you need access or a content change: email info@collaborativejournalism.org
+        - Do not post ticket numbers, full emails, or other people's names.
+  - type: dropdown
+    id: role
+    attributes:
+      label: I am
+      options:
+        - An attendee
+        - Event staff (I edit the site)
+        - A speaker
+        - Someone else
+    validations:
+      required: true
+  - type: dropdown
+    id: task
+    attributes:
+      label: I am trying to
+      options:
+        - Sign in or get a login code
+        - Find a session or build my schedule
+        - Open session materials
+        - Edit my profile
+        - Invite or approve a speaker
+        - Publish a page or schedule change
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you need
+      description: What you tried, and where you got stuck. A path like /schedule is enough. No personal data.
+    validations:
+      required: true
+  - type: input
+    id: event
+    attributes:
+      label: Event name (optional)
+      description: Public event name only. Not a ticket ID.
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before you post
+      options:
+        - label: This post does not include real emails, ticket IDs, or other people's personal data.
+          required: true
+        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/run-of-show/blob/main/CODE_OF_CONDUCT.md).
+          required: true

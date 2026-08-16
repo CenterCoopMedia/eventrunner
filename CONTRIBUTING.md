@@ -1,6 +1,43 @@
 # Contributing
 
-Thanks for wanting to help. This repo is the public platform. The live Collaborative Journalism Summit site stays in `jamditis/cjs2026` and is not the place to send platform PRs.
+Thanks for wanting to help. This is the public platform repo. The live Collaborative Journalism Summit site stays in `jamditis/cjs2026` and is not the place to send platform PRs.
+
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). Reports go to info@collaborativejournalism.org.
+
+## Where to start
+
+Pick the path that matches what you are doing. If you are not changing code, you probably want [Discussions](https://github.com/CenterCoopMedia/run-of-show/discussions) or the [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki), not a pull request.
+
+| You are… | Do this |
+|---|---|
+| An attendee who cannot sign in, find a session, or open materials | [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a) |
+| Event staff stuck in the CMS, schedule, or speaker tools | [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a) |
+| An organization that wants CCM to run your event | [General](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=general) or email info@collaborativejournalism.org |
+| Reporting a bug in the shared product | [Bug form](https://github.com/CenterCoopMedia/run-of-show/issues/new?template=bug.yml) |
+| Asking for a product change | [Feature form](https://github.com/CenterCoopMedia/run-of-show/issues/new?template=feature.yml) |
+| Sending code or docs | Open or link an issue, then a pull request |
+
+If CCM is operating the event site for you and the problem is access, content, or your specific deployment, email info@collaborativejournalism.org. That is support, not a public ticket.
+
+## Contribution policy
+
+We take:
+
+- Bug fixes with a failing test when one can exist
+- Features that match the [roadmap](docs/ROADMAP.md) or have a linked, accepted issue
+- Docs, wiki corrections, and accessibility fixes
+- Repro cases that do not include real attendee or client data
+
+We will bounce:
+
+- Hardcoded event names, cities, hex colors, or domains
+- Personal infrastructure (hostnames, chat IDs, personal emails, private operator adapters)
+- Secrets, live-project credentials, or real PII in tests, fixtures, screenshots, or logs
+- A second queue. `ticket_sync_queue` is the only queue in the system
+- Features already cut from v1 (video generator, bulk broadcast, invoicing, social feeds, speaker chat) unless a linked issue reopens the case
+- Drive-by refactors with no product change
+
+The [governance](GOVERNANCE.md) note is the short version of who decides.
 
 ## Dev setup
 
@@ -16,19 +53,20 @@ No `.env` and no cloud credentials are required for the current suite. The Fireb
 
 ## How to send a change
 
-1. Open an issue first if the change is more than a small fix. The [roadmap](docs/ROADMAP.md) and open milestones are the queue.
-2. Branch from `main`.
-3. Keep the pull request to one logical change.
-4. Fill in the pull request template.
-5. Sign off each commit (`git commit -s`) under the [Developer Certificate of Origin](https://developercertificate.org/).
+1. Search issues and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2). The **What this is** column is the plain-language version of each title.
+2. Open an issue first if the change is more than a typo. Use the form that matches the work.
+3. Branch from `main`. One logical change per branch.
+4. Add or update tests next to the code (`*.test.cjs` beside the module).
+5. Fill in the pull request template, including how you verified the change.
+6. Sign off each commit (`git commit -s`) under the [Developer Certificate of Origin](https://developercertificate.org/).
 
-## Rules that will bounce a PR
+### Shared package
 
-- **No hardcoded event identity.** Event name, dates, venue, city, hex colors, and domains come from the config layer. A string that only makes sense for one event is a review failure.
-- **No personal infrastructure.** Hostnames, chat IDs, personal emails, and operator-private adapters do not belong in this tree. Operator sinks are a generic webhook.
-- **No live-project secrets in CI.** Checks must run on emulators so a fork PR can go green.
-- **`ticket_sync_queue` is the only queue.** Do not add another. The email path is send-and-audit, not a queue.
-- **Shared package stays CJS-first.** Add a `.mjs` re-export shim next to every new `.cjs` module in `packages/shared`.
+`packages/shared` is CommonJS first. Add a `.mjs` re-export shim next to every new `.cjs` module.
+
+### Accessibility
+
+UI changes need a keyboard path and visible focus. If you change a flow that attendees or staff use, say how you checked it (keyboard, zoom, or a screen reader). Do not rely on color alone.
 
 ## Tests
 
@@ -36,12 +74,14 @@ No `.env` and no cloud credentials are required for the current suite. The Fireb
 |---|---|
 | `npm test` | `packages/shared` unit tests (Node `--test`) |
 
-When the web app and functions land, CI will also run lint, Firestore/Storage rules tests on emulators, and Playwright against emulators. Add tests next to the code you change (`*.test.cjs` beside the module).
+When the web app and functions land, CI will also run lint, Firestore/Storage rules tests on emulators, and Playwright against emulators. Fork PRs must be able to run every check without credentials.
 
-## Code of conduct
+## Security
 
-By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). Reports go to info@collaborativejournalism.org.
+Do not open a public issue for a vulnerability. Use [private reporting](https://github.com/CenterCoopMedia/run-of-show/security) or see [SECURITY.md](SECURITY.md).
 
 ## Questions
 
-Open a [discussion](https://github.com/CenterCoopMedia/run-of-show/discussions) or an issue. If CCM is operating a deployment for you, email info@collaborativejournalism.org instead of filing a support ticket here.
+- Product and "how do I": [Discussions](https://github.com/CenterCoopMedia/run-of-show/discussions)
+- Handbook for attendees, staff, and clients: [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki)
+- Hosted-event support: info@collaborativejournalism.org

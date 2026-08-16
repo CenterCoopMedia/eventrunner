@@ -1,0 +1,12 @@
+title: "[Update] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Maintainer-only. News about the product, a release, or an operator change. If you are not a maintainer, use Q&A, Ideas, or General instead.
+  - type: textarea
+    id: body
+    attributes:
+      label: The update
+    validations:
+      required: true
