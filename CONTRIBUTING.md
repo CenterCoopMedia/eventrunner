@@ -6,7 +6,7 @@ By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). Reports
 
 ## Where to start
 
-Pick the path that matches what you are doing. If you are not changing code, you probably want [Discussions](https://github.com/CenterCoopMedia/run-of-show/discussions) or the [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki), not a pull request.
+Pick the path that matches what you are doing. If you are not changing code, you probably want [Discussions](https://github.com/CenterCoopMedia/run-of-show/discussions) or the [handbook](docs/handbook/README.md), not a pull request.
 
 | You are… | Do this |
 |---|---|
@@ -83,5 +83,5 @@ Do not open a public issue for a vulnerability. Use [private reporting](https://
 ## Questions
 
 - Product and "how do I": [Discussions](https://github.com/CenterCoopMedia/run-of-show/discussions)
-- Handbook for attendees, staff, and clients: [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki)
+- Handbook for attendees, staff, and clients: [docs/handbook](docs/handbook/README.md)
 - Hosted-event support: info@collaborativejournalism.org

@@ -7,7 +7,7 @@ A white-label event CMS for conferences and gatherings. Each client event gets i
 **Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2).
 
 Site: [centercoopmedia.github.io/run-of-show](https://centercoopmedia.github.io/run-of-show/)
-Handbook: [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki)
+Handbook: [docs/handbook](docs/handbook/README.md) (same content will live on the [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki) once that tab has its first page)
 
 ## Who it is for
 
@@ -92,6 +92,6 @@ Operator-run client deployments are out of scope for public reports. Email the o
 | CCM already hosts your site | info@collaborativejournalism.org |
 | Changing the code | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
-The [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki) is the handbook for attendees, staff, and clients. [GOVERNANCE.md](GOVERNANCE.md) is who decides.
+The [handbook](docs/handbook/README.md) is for attendees, staff, and clients. [GOVERNANCE.md](GOVERNANCE.md) is who decides.
 
 An initiative of the Center for Cooperative Media at Montclair State University.

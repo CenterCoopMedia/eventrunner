@@ -13,5 +13,5 @@ contact_links:
     url: https://github.com/CenterCoopMedia/run-of-show/security/advisories/new
     about: Private disclosure only. Do not file a public issue.
   - name: Read the handbook
-    url: https://github.com/CenterCoopMedia/run-of-show/wiki
+    url: https://github.com/CenterCoopMedia/run-of-show/blob/main/docs/handbook/README.md
     about: Attendee, staff, and client guides.
