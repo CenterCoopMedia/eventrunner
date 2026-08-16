@@ -1,6 +1,6 @@
 # Support
 
-This page is the map. The [handbook](docs/handbook/README.md) has the longer guides.
+This page is the map. The [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki) has the longer handbook.
 
 ## Attendees
 

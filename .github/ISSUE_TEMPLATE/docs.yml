@@ -7,13 +7,13 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this for the public handbook (`docs/handbook`) and contributor docs. How-to questions still belong in [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a).
+        Use this for the [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki) and contributor docs. How-to questions still belong in [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a).
   - type: dropdown
     id: surface
     attributes:
       label: Where
       options:
-        - Handbook (attendee / staff / client guides)
+        - Wiki (attendee / staff / client handbook)
         - README
         - CONTRIBUTING or GOVERNANCE
         - SECURITY or SUPPORT
