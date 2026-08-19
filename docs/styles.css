@@ -311,11 +311,17 @@ a {
   font-weight: 600;
   font-size: 0.95rem;
   text-decoration: none;
-  transition: scale 200ms ease-out, background-color 150ms ease-out;
+  transition: background-color 150ms ease-out;
 }
 
-.btn:active {
-  scale: 0.97;
+@media (prefers-reduced-motion: no-preference) {
+  .btn {
+    transition: scale 200ms ease-out, background-color 150ms ease-out;
+  }
+
+  .btn:active {
+    scale: 0.97;
+  }
 }
 
 .btn-ghost {
