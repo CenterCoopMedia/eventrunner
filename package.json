@@ -5,10 +5,24 @@
   "license": "Apache-2.0",
   "description": "White-label event CMS. Deploy-per-client, operator-run.",
   "workspaces": [
+    "apps/web",
+    "functions",
     "packages/shared"
   ],
   "scripts": {
-    "test": "node --test \"packages/shared/src/**/*.test.cjs\""
+    "lint": "eslint .",
+    "test": "node --test \"packages/shared/src/**/*.test.cjs\"",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-run-of-show \"vitest run --config vitest.rules.config.js\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "eslint": "^9.33.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "firebase": "^12.1.0",
+    "firebase-tools": "^14.11.1",
+    "globals": "^16.3.0",
+    "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=22"

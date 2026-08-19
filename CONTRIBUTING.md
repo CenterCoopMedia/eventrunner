@@ -42,14 +42,17 @@ The [governance](GOVERNANCE.md) note is the short version of who decides.
 ## Dev setup
 
 1. Fork and clone this repository.
-2. Use Node 22 or newer (`node -v`).
+2. Use Node 22 (`node -v`) — the Cloud Functions runtime pins that major, so `functions/package.json` declares `"node": "22"` and npm warns (`EBADENGINE`) on newer majors.
 3. From the repo root:
 
 ```bash
+npm install
+npm run lint
 npm test
+npm run test:rules   # needs Java 21+ for the Firebase emulators
 ```
 
-No `.env` and no cloud credentials are required for the current suite. The Firebase emulator loop lands with `apps/web` and `functions`. When it does, the command will be `npm run dev:emulators`.
+No `.env` and no cloud credentials are required for any of these — `test:rules` starts local Firestore and Storage emulators against a `demo-*` project id. The full dev loop lands with `apps/web` and `functions`; when it does, the command will be `npm run dev:emulators`.
 
 ## How to send a change
 
@@ -72,9 +75,13 @@ UI changes need a keyboard path and visible focus. If you change a flow that att
 
 | Command | What it covers |
 |---|---|
+| `npm run lint` | ESLint over every workspace, including the hex-literal ban (spec §7.6) and `react-hooks/rules-of-hooks` |
 | `npm test` | `packages/shared` unit tests (Node `--test`) |
+| `npm run test:rules` | Firestore and Storage security rules on the Firebase emulators |
 
-When the web app and functions land, CI will also run lint, Firestore/Storage rules tests on emulators, and Playwright against emulators. Fork PRs must be able to run every check without credentials.
+CI runs all three on every pull request and every push to `main`, credential-free. When the web app and functions land, CI will also run Playwright against emulators. Fork PRs must be able to run every check without credentials.
+
+One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 
 ## Security
 

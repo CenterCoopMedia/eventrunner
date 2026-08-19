@@ -1,0 +1,11 @@
+{
+  "name": "functions",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cloud Functions. Placeholder workspace — modules land under milestone M2; shared arrives via vendor/shared.tgz packing (spec §1.1).",
+  "type": "commonjs",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  }
+}
