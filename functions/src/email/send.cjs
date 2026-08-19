@@ -86,7 +86,10 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       await db.collection('sent_emails').add({
         to: toEmail,
         from: fromEmail,
-        subject: message.subject || null,
+        // The bearer-secret rule covers the subject too: a valid auth.otp
+        // override may reference {{code}} there, and sent_emails is
+        // admin-readable. templateId still identifies the mail.
+        subject: bodyStored ? (message.subject || null) : null,
         templateId: message.tag || null,
         providerMessageId: outcome.providerMessageId,
         status: outcome.status,
@@ -153,16 +156,17 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
         ?? undefined,
     };
 
-    // Footer resolution is a core duty (spec §3.1). Template-rendered mail
-    // already carries it through the layout and says so with
-    // hasLegalFooter; anything else — the operator email sink, ad-hoc
-    // callers — gets the configured legal block appended here.
+    // Footer resolution is a core duty (spec §3.1). Rendered mail carries
+    // per-body flags derived from the effective template source; any body
+    // that does not already carry the footer — an override that dropped
+    // the token, the operator email sink, ad-hoc callers — gets the
+    // configured legal block appended here.
     const postalHtml = config?.event?.legal?.postalAddressHtml;
-    if (!message.hasLegalFooter && typeof postalHtml === 'string' && postalHtml) {
-      if (typeof fullMessage.html === 'string') {
+    if (typeof postalHtml === 'string' && postalHtml) {
+      if (typeof fullMessage.html === 'string' && !message.hasLegalFooterHtml) {
         fullMessage.html += `\n<hr>\n<p>${postalHtml}</p>`;
       }
-      if (typeof fullMessage.text === 'string') {
+      if (typeof fullMessage.text === 'string' && !message.hasLegalFooterText) {
         fullMessage.text += `\n\n--\n${renderInternals.stripHtmlToText(postalHtml)}`;
       }
     }
@@ -278,13 +282,18 @@ function createDeliveryWebhookHandler({ db, provider, log = console }) {
 }
 
 /**
- * Secrets each provider's delivery ingest needs at runtime (spec §2.1).
- * Bound conditionally on the analysis-time EVENT_EMAIL_PROVIDER value —
- * binding a secret the deployment never created would fail the deploy.
- * A postmark deployment must create EMAIL_WEBHOOK_BASIC_AUTH in Secret
- * Manager before deploying this function (it IS the delivery ingest).
+ * Secrets by provider, split by duty (spec §2.1): binding a secret the
+ * deployment never created would fail the deploy, so each function binds
+ * only what its own runtime path reads. EMAIL_WEBHOOK_BASIC_AUTH exists
+ * only for postmark deployments WITH delivery ingest enabled — it belongs
+ * to the ingest endpoint, never to send-only functions.
  */
-const SECRETS_BY_PROVIDER = {
+const SEND_SECRETS_BY_PROVIDER = {
+  postmark: ['EMAIL_PROVIDER_API_KEY'],
+  webhook: ['EMAIL_WEBHOOK_URL', 'EMAIL_WEBHOOK_SECRET'],
+  console: [],
+};
+const INGEST_SECRETS_BY_PROVIDER = {
   postmark: ['EMAIL_PROVIDER_API_KEY', 'EMAIL_WEBHOOK_BASIC_AUTH'],
   webhook: ['EMAIL_WEBHOOK_URL', 'EMAIL_WEBHOOK_SECRET'],
   console: [],
@@ -295,7 +304,7 @@ function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
   const { defineSecret } = require('firebase-functions/params');
   const providerName = (process.env.EVENT_EMAIL_PROVIDER || '').trim();
-  const secrets = (SECRETS_BY_PROVIDER[providerName] || []).map(defineSecret);
+  const secrets = (INGEST_SECRETS_BY_PROVIDER[providerName] || []).map(defineSecret);
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
   return {
     emailDeliveryWebhook: onRequest({ region, secrets }, async (req, res) => {
@@ -326,5 +335,7 @@ module.exports = {
     MAX_ATTEMPTS,
     BACKOFF_MS,
     BODY_STORE_LIMIT,
+    SEND_SECRETS_BY_PROVIDER,
+    INGEST_SECRETS_BY_PROVIDER,
   },
 };

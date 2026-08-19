@@ -31,6 +31,9 @@ const text = [
   'This code expires in {{expiry_minutes}} minutes.',
   '',
   'If you did not request this code, you can ignore this email — or let us know at {{support_email}}.',
+  '',
+  '--',
+  '{{postal_address_html}}',
 ].join('\n');
 
 module.exports = {

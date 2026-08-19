@@ -183,11 +183,14 @@ test('storeRendered:false suppresses body storage (auth mail)', async () => {
     db,
     provider: { name: 'x', send: async () => ({ providerMessageId: 'id', status: 'sent', providerStatus: 200 }) },
   });
-  await c.send({ to: 'a@example.org', subject: 's', html: '<p>code 123</p>', text: 'code 123', storeRendered: false });
+  await c.send({ to: 'a@example.org', subject: 'code 123 inside', html: '<p>code 123</p>', text: 'code 123', storeRendered: false });
   const row = db.state.sentRows[0];
   assert.equal(row.bodyStored, false);
   assert.equal(row.html, null);
   assert.equal(row.text, null);
+  // The subject is redacted too: an override may reference {{code}} there.
+  assert.equal(row.subject, null);
+  assert.equal(row.templateId, null);
 });
 
 test('stored bodies are truncated at 100KB with bodyTruncated', async () => {
@@ -306,8 +309,16 @@ test('non-template mail gets the configured legal footer; rendered mail does not
   await c.send({ to: 'a@example.org', subject: 's', html: '<p>alert</p>', text: 'alert' });
   assert.ok(seen[0].html.includes('Example Org<br>1 Main St'));
   assert.ok(seen[0].text.includes('Example Org\n1 Main St'));
-  await c.send({ to: 'a@example.org', subject: 's', html: '<p>Example Org<br>1 Main St</p>', text: 'x', hasLegalFooter: true });
+  await c.send({
+    to: 'a@example.org',
+    subject: 's',
+    html: '<p>Example Org<br>1 Main St</p>',
+    text: 'x',
+    hasLegalFooterHtml: true,
+  });
   assert.equal(seen[1].html.match(/Example Org/g).length, 1);
+  // The flags are per body: text still gets the footer appended.
+  assert.ok(seen[1].text.includes('Example Org\n1 Main St'));
 });
 
 test('an EmailAddress recipient keeps its display name for the adapter', async () => {

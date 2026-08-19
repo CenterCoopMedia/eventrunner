@@ -72,6 +72,8 @@ No `.env` and no cloud credentials are required for any of these — `test:rules
 
 UI changes need a keyboard path and visible focus. If you change a flow that attendees or staff use, say how you checked it (keyboard, zoom, or a screen reader). Do not rely on color alone.
 
+The full interface bar — accessibility, typography, color tokens, motion, and microcopy — is [docs/interface-guidelines.md](docs/interface-guidelines.md). UI pull requests are reviewed against it.
+
 ## Tests
 
 | Command | What it covers |
