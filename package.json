@@ -10,15 +10,18 @@
     "packages/shared"
   ],
   "scripts": {
+    "build": "npm run build -w apps/web",
     "lint": "eslint .",
     "prepare:functions": "node scripts/prepare-functions.cjs",
     "test": "node --test \"packages/shared/src/**/*.test.cjs\" \"functions/src/**/*.test.cjs\"",
+    "test:web": "npm run test -w apps/web",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-run-of-show \"vitest run --config vitest.rules.config.js\""
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
     "@firebase/rules-unit-testing": "^5.0.0",
     "eslint": "^9.33.0",
+    "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "firebase": "^12.1.0",
     "firebase-tools": "^14.11.1",

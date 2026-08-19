@@ -1,0 +1,90 @@
+/* Base styles for every surface. Colors resolve only through theme tokens
+   (interface guidelines: Colors; spec §7.2/§7.6 — no hex outside
+   src/generated/theme.css). theme.css itself is imported through the
+   @generated alias in main.jsx so GENERATED_DIR overrides apply. */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-brand-surface font-body text-brand-ink;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;
+    text-wrap: balance;
+  }
+
+  p {
+    overflow-wrap: break-word;
+  }
+
+  /* Never remove outlines without replacing them (interface guidelines). */
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-brand-primary;
+  }
+
+  [id] {
+    scroll-margin-top: 5rem;
+  }
+
+  /* Dynamic values (timers, schedule columns) read in tabular figures. */
+  time,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Skip link: first focusable element on every page (Layout.jsx). */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-50
+      focus:rounded-brand focus:bg-brand-primary focus:px-4 focus:py-3 focus:text-brand-surface;
+  }
+
+  /* Texture treatment driven by config/theme.texture (spec §7.2). The demo
+     theme sets --texture: paper; 'flat' keeps the plain surface color. The
+     overlay is decorative, so it must never intercept the pointer. */
+  .bg-paper {
+    @apply relative bg-brand-surface;
+  }
+  .bg-paper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(
+      rgb(var(--brand-ink-rgb) / 0.04) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
+  }
+}
+
+@layer utilities {
+  /* 44px minimum touch targets (interface guidelines: Accessibility). */
+  .touch-target {
+    @apply min-h-11 min-w-11;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
