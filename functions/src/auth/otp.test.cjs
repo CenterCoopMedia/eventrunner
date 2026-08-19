@@ -19,6 +19,14 @@ function fakeDb() {
     __c: c,
     __id: id,
     async set(data) { store.set(key(c, id), data); },
+    async create(data) {
+      if (store.has(key(c, id))) {
+        const err = new Error('6 ALREADY_EXISTS');
+        err.code = 6;
+        throw err;
+      }
+      store.set(key(c, id), data);
+    },
     async delete() { store.delete(key(c, id)); },
     async get() {
       const data = store.get(key(c, id));
@@ -158,6 +166,11 @@ test('a broken auth.otp override falls back to the default and notifies the oper
   const errorRows = [...db.store.entries()].filter(([k]) => k.startsWith('system_errors/'));
   assert.equal(errorRows.length, 1);
   assert.equal(errorRows[0][1].templateId, 'auth.otp');
+  // Deduplicated: a second request against the same broken override must
+  // not mint another durable row (this runs before the rate limit).
+  await handler({ method: 'POST', body: { email: 'b@example.org' } }, fakeRes());
+  const after = [...db.store.keys()].filter((k) => k.startsWith('system_errors/'));
+  assert.equal(after.length, 1);
 });
 
 test('the send-boundary gate: unit truth table', () => {

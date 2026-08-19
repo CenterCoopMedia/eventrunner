@@ -71,8 +71,10 @@ test('normalizeEmail trims and lowercases; emailHash keys never store the addres
   assert.match(emailHash('a@example.org'), /^[0-9a-f]{64}$/);
 });
 
-test('hashCode is salted by token', () => {
-  assert.notEqual(hashCode('token-a', '123456'), hashCode('token-b', '123456'));
+test('hashCode is salted by token and async (threadpool, not event loop)', async () => {
+  const [a, b] = await Promise.all([hashCode('token-a', '123456'), hashCode('token-b', '123456')]);
+  assert.notEqual(a, b);
+  assert.equal(a, await hashCode('token-a', '123456'));
 });
 
 test('rate limit: 5 slots pass, the 6th is limited with a retry hint', async () => {
@@ -133,7 +135,7 @@ test('createChallenge stores the salted hash, never the code or raw email casing
   assert.equal(stored.kind, 'otp');
   assert.equal(stored.email, 'a@example.org');
   assert.equal(stored.attempts, 0);
-  assert.equal(stored.codeHash, hashCode(token, '123456'));
+  assert.equal(stored.codeHash, await hashCode(token, '123456'));
   assert.ok(!JSON.stringify(stored).includes('123456'));
 });
 

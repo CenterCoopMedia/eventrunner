@@ -86,7 +86,10 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       await db.collection('sent_emails').add({
         to: toEmail,
         from: fromEmail,
-        subject: message.subject || null,
+        // The bearer-secret rule covers the subject too: a valid auth.otp
+        // override may reference {{code}} there, and sent_emails is
+        // admin-readable. templateId still identifies the mail.
+        subject: bodyStored ? (message.subject || null) : null,
         templateId: message.tag || null,
         providerMessageId: outcome.providerMessageId,
         status: outcome.status,

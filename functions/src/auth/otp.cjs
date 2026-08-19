@@ -14,6 +14,7 @@
  */
 
 const crypto = require('node:crypto');
+const { isAlreadyExists } = require('../email/send.cjs').internals;
 
 const {
   takeRateLimitSlot,
@@ -85,7 +86,13 @@ function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = 
       // DURABLE system_errors row first (the notifier is best-effort and
       // may be configured to none), then the notifier.
       try {
-        await db.collection('system_errors').add({
+        // Deterministic id: one durable row per distinct broken override,
+        // not one per request — this runs before the rate limit, so an
+        // attacker must not be able to mint unbounded Firestore writes.
+        const errorId = crypto.createHash('sha256')
+          .update(`template-override-invalid:auth.otp:${rendered.overrideErrors.join('|')}`, 'utf8')
+          .digest('hex');
+        await db.collection('system_errors').doc(errorId).create({
           kind: 'template-override-invalid',
           templateId: 'auth.otp',
           errors: rendered.overrideErrors,
@@ -93,7 +100,9 @@ function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = 
           createdAt: new Date(now()),
         });
       } catch (err) {
-        log.error('system_errors write for auth.otp override fallback failed', err);
+        if (!isAlreadyExists(err)) {
+          log.error('system_errors write for auth.otp override fallback failed', err);
+        }
       }
       if (notifyOperator) {
         await notifyOperator({

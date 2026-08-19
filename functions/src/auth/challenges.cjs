@@ -59,8 +59,16 @@ function rateBucketHash(email) {
  * @param {string} token challenge id (salt) @param {string} code
  */
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+/** Async on purpose: the ~50-100ms derivation runs on libuv's threadpool,
+ * so a stream of unauthenticated guesses cannot serialize the event loop
+ * of a public verification instance. @returns {Promise<string>} */
 function hashCode(token, code) {
-  return crypto.scryptSync(String(code), `otp:${token}`, 32, SCRYPT_PARAMS).toString('hex');
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(String(code), `otp:${token}`, 32, SCRYPT_PARAMS, (err, buf) => {
+      if (err) reject(err);
+      else resolve(buf.toString('hex'));
+    });
+  });
 }
 
 /**
@@ -102,10 +110,11 @@ async function createChallenge({ db, email, code, now = Date.now }) {
   const token = crypto.randomBytes(32).toString('hex');
   const nowMs = now();
   const expiresAt = new Date(nowMs + CHALLENGE_TTL_MS);
+  const codeHash = await hashCode(token, code);
   await db.collection('auth_challenges').doc(token).set({
     kind: 'otp',
     email: normalizeEmail(email),
-    codeHash: hashCode(token, code),
+    codeHash,
     attempts: 0,
     expiresAt,
     createdAt: new Date(nowMs),
@@ -134,6 +143,9 @@ async function verifyChallenge({ db, token, email, code, now = Date.now }) {
   if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) return { ok: false };
   const ref = db.collection('auth_challenges').doc(token);
   const nowMs = now();
+  // Derived OUTSIDE the transaction: the expensive hash must run once per
+  // request, not once per transaction retry.
+  const providedHash = await hashCode(token, String(code));
 
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -150,7 +162,7 @@ async function verifyChallenge({ db, token, email, code, now = Date.now }) {
     if ((data.attempts || 0) >= MAX_ATTEMPTS) return { ok: false };
 
     const expected = Buffer.from(String(data.codeHash || ''), 'utf8');
-    const provided = Buffer.from(hashCode(token, String(code)), 'utf8');
+    const provided = Buffer.from(providedHash, 'utf8');
     const codeMatches = expected.length === provided.length &&
       crypto.timingSafeEqual(expected, provided);
     const emailMatches = data.email === normalizeEmail(email);

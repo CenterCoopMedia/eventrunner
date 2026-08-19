@@ -183,11 +183,14 @@ test('storeRendered:false suppresses body storage (auth mail)', async () => {
     db,
     provider: { name: 'x', send: async () => ({ providerMessageId: 'id', status: 'sent', providerStatus: 200 }) },
   });
-  await c.send({ to: 'a@example.org', subject: 's', html: '<p>code 123</p>', text: 'code 123', storeRendered: false });
+  await c.send({ to: 'a@example.org', subject: 'code 123 inside', html: '<p>code 123</p>', text: 'code 123', storeRendered: false });
   const row = db.state.sentRows[0];
   assert.equal(row.bodyStored, false);
   assert.equal(row.html, null);
   assert.equal(row.text, null);
+  // The subject is redacted too: an override may reference {{code}} there.
+  assert.equal(row.subject, null);
+  assert.equal(row.templateId, null);
 });
 
 test('stored bodies are truncated at 100KB with bodyTruncated', async () => {
