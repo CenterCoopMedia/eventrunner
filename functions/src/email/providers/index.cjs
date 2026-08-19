@@ -17,7 +17,11 @@ const { createPostmarkProvider } = require('./postmark.cjs');
  * @returns {{ name: 'postmark'|'webhook'|'console' }} EmailProvider
  */
 function getEmailProvider({ env = process.env, fetchImpl } = {}) {
-  const selected = env.EVENT_EMAIL_PROVIDER;
+  // validateDeployEnv and getTierA both accept a padded value; dispatching
+  // on the raw string would throw at runtime for env the build blessed.
+  const selected = typeof env.EVENT_EMAIL_PROVIDER === 'string'
+    ? env.EVENT_EMAIL_PROVIDER.trim()
+    : env.EVENT_EMAIL_PROVIDER;
   switch (selected) {
     case 'postmark':
       return createPostmarkProvider({ env, fetchImpl });

@@ -76,13 +76,47 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
    *   source?, storeRendered? }
    * @returns {Promise<object>} EmailSendResult
    */
+  /** One sent_emails row per send() call, whatever the outcome. */
+  async function writeAuditRow(message, fromEmail, toEmail, outcome) {
+    const bodyStored = message.storeRendered !== false;
+    const html = bodyStored ? truncateForAudit(message.html) : { value: null, truncated: false };
+    const text = bodyStored ? truncateForAudit(message.text) : { value: null, truncated: false };
+    try {
+      await db.collection('sent_emails').add({
+        to: toEmail,
+        from: fromEmail,
+        subject: message.subject || null,
+        templateId: message.tag || null,
+        providerMessageId: outcome.providerMessageId,
+        status: outcome.status,
+        providerStatus: outcome.providerStatus ?? null,
+        error: outcome.error ?? null,
+        retries: outcome.retries,
+        bodyStored,
+        html: html.value,
+        text: text.value,
+        bodyTruncated: html.truncated || text.truncated,
+        source: message.source || null,
+        sentAt: new Date(),
+      });
+    } catch (err) {
+      // The audit row must not turn a delivered mail into a caller-visible
+      // failure; log and continue.
+      log.error('sent_emails audit write failed', err);
+    }
+  }
+
   async function send(message) {
     const config = await getConfig();
     const sender = config?.event?.sender || {};
 
     const toEmail = typeof message.to === 'string' ? message.to : message.to?.email;
     if (!toEmail) {
-      return { providerMessageId: null, status: 'failed', error: 'no recipient', retries: 0 };
+      // Even a caller integration bug leaves an audit record — an invisible
+      // failed send is how operators lose mail-delivery incidents.
+      const outcome = { providerMessageId: null, status: 'failed', error: 'no recipient', retries: 0 };
+      await writeAuditRow(message, null, null, outcome);
+      return outcome;
     }
 
     // Send-once claim, written BEFORE the send and never rolled back —
@@ -109,6 +143,11 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       to: toEmail,
       from: message.from || { email: sender.email, name: sender.name },
       replyTo: message.replyTo || sender.replyTo || undefined,
+      // Tier B stream selection (config/providers.email.messageStream)
+      // reaches the adapter here; a per-message value wins.
+      messageStream: message.messageStream
+        ?? config?.providers?.email?.messageStream
+        ?? undefined,
     };
 
     let result = null;
@@ -139,34 +178,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       retries,
     };
 
-    // Exactly one sent_emails row per send() call, whatever the outcome.
-    const bodyStored = message.storeRendered !== false;
-    const html = bodyStored ? truncateForAudit(message.html) : { value: null, truncated: false };
-    const text = bodyStored ? truncateForAudit(message.text) : { value: null, truncated: false };
-    try {
-      await db.collection('sent_emails').add({
-        to: toEmail,
-        from: fullMessage.from?.email || null,
-        subject: message.subject || null,
-        templateId: message.tag || null,
-        providerMessageId: outcome.providerMessageId,
-        status: outcome.status,
-        providerStatus: outcome.providerStatus ?? null,
-        error: outcome.error ?? null,
-        retries,
-        bodyStored,
-        html: html.value,
-        text: text.value,
-        bodyTruncated: html.truncated || text.truncated,
-        source: message.source || null,
-        sentAt: new Date(),
-      });
-    } catch (err) {
-      // The audit row must not turn a delivered mail into a caller-visible
-      // failure; log and continue.
-      log.error('sent_emails audit write failed', err);
-    }
-
+    await writeAuditRow(message, fullMessage.from?.email || null, toEmail, outcome);
     return outcome;
   }
 
@@ -218,22 +230,51 @@ function createDeliveryWebhookHandler({ db, provider, log = console }) {
         .limit(1)
         .get();
       if (snap.empty) continue;
-      await snap.docs[0].ref.update({
-        deliveryStatus: event.type,
-        deliveryUpdatedAt: event.occurredAt || new Date().toISOString(),
-        bounceReason: event.reason || null,
+      const ref = snap.docs[0].ref;
+      const occurredAt = event.occurredAt || new Date().toISOString();
+      // Providers retry and deliver out of order; a replayed older event
+      // must not overwrite a newer bounce/complaint. The compare-and-set
+      // runs in a transaction so two concurrent deliveries cannot
+      // interleave between read and write.
+      const applied = await db.runTransaction(async (tx) => {
+        const doc = await tx.get(ref);
+        const existing = doc.data()?.deliveryUpdatedAt;
+        if (typeof existing === 'string' && existing >= occurredAt) return false;
+        tx.update(ref, {
+          deliveryStatus: event.type,
+          deliveryUpdatedAt: occurredAt,
+          bounceReason: event.reason || null,
+        });
+        return true;
       });
-      patched += 1;
+      if (applied) patched += 1;
     }
     res.status(200).json({ processed: events.length, patched });
   };
 }
 
+/**
+ * Secrets each provider's delivery ingest needs at runtime (spec §2.1).
+ * Bound conditionally on the analysis-time EVENT_EMAIL_PROVIDER value —
+ * binding a secret the deployment never created would fail the deploy.
+ * A postmark deployment must create EMAIL_WEBHOOK_BASIC_AUTH in Secret
+ * Manager before deploying this function (it IS the delivery ingest).
+ */
+const SECRETS_BY_PROVIDER = {
+  postmark: ['EMAIL_PROVIDER_API_KEY', 'EMAIL_WEBHOOK_BASIC_AUTH'],
+  webhook: ['EMAIL_WEBHOOK_URL', 'EMAIL_WEBHOOK_SECRET'],
+  console: [],
+};
+
 /** Deployable exports (spec §1.3): emailDeliveryWebhook only. */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
+  const { defineSecret } = require('firebase-functions/params');
+  const providerName = (process.env.EVENT_EMAIL_PROVIDER || '').trim();
+  const secrets = (SECRETS_BY_PROVIDER[providerName] || []).map(defineSecret);
+  const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
   return {
-    emailDeliveryWebhook: onRequest(async (req, res) => {
+    emailDeliveryWebhook: onRequest({ region, secrets }, async (req, res) => {
       const { getDb } = require('../core/firestore.cjs');
       const { getEmailProvider } = require('./providers/index.cjs');
       const handler = createDeliveryWebhookHandler({

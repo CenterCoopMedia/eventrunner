@@ -40,23 +40,23 @@ function fakeDb() {
               async get() {
                 const i = state.sentRows.findIndex((r) => r[field] === value);
                 if (i === -1) return { empty: true, docs: [] };
-                return {
-                  empty: false,
-                  docs: [{
-                    ref: {
-                      update: async (patch) => {
-                        Object.assign(state.sentRows[i], patch);
-                        state.updates.push({ index: i, patch });
-                      },
-                    },
-                  }],
-                };
+                return { empty: false, docs: [{ ref: { __index: i } }] };
               },
             }),
           }),
         };
       }
       throw new Error(`unexpected collection ${name}`);
+    },
+    async runTransaction(fn) {
+      const tx = {
+        get: async (ref) => ({ data: () => state.sentRows[ref.__index] }),
+        update: (ref, patch) => {
+          Object.assign(state.sentRows[ref.__index], patch);
+          state.updates.push({ index: ref.__index, patch });
+        },
+      };
+      return fn(tx);
     },
   };
 }
@@ -258,6 +258,58 @@ test('delivery webhook patches the matching sent_emails row', async () => {
   await handler({ method: 'POST', headers: {}, body: {} }, res);
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, { processed: 2, patched: 1 });
+  assert.equal(db.state.sentRows[0].deliveryStatus, 'bounced');
+  assert.equal(db.state.sentRows[0].bounceReason, 'mailbox full');
+});
+
+test('a send with no recipient still writes an audit row', async () => {
+  const db = fakeDb();
+  const { core: c } = core({ db, provider: { name: 'x', send: async () => { throw new Error('unreachable'); } } });
+  const result = await c.send({ subject: 's', source: 'welcome-flow' });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.error, 'no recipient');
+  assert.equal(db.state.sentRows.length, 1);
+  assert.equal(db.state.sentRows[0].to, null);
+  assert.equal(db.state.sentRows[0].source, 'welcome-flow');
+});
+
+test('the configured Tier B message stream reaches the adapter; per-message wins', async () => {
+  const seen = [];
+  const provider = { name: 'postmark', send: async (m) => { seen.push(m.messageStream); return { providerMessageId: 'id', status: 'sent', providerStatus: 200 }; } };
+  const c = createEmailCore({
+    db: fakeDb(),
+    provider,
+    getConfig: async () => ({ ...CONFIG, providers: { email: { provider: 'postmark', messageStream: 'client-a' } } }),
+    sleep: async () => {},
+    log: { error() {}, warn() {}, info() {} },
+  });
+  await c.send({ to: 'a@example.org', subject: 's' });
+  await c.send({ to: 'a@example.org', subject: 's', messageStream: 'override-stream' });
+  assert.deepEqual(seen, ['client-a', 'override-stream']);
+});
+
+test('delivery webhook ignores an event older than the stored one', async () => {
+  const db = fakeDb();
+  db.state.sentRows.push({
+    providerMessageId: 'pm-1',
+    status: 'sent',
+    deliveryStatus: 'bounced',
+    deliveryUpdatedAt: '2027-01-02T00:00:00Z',
+    bounceReason: 'mailbox full',
+  });
+  const handler = createDeliveryWebhookHandler({
+    db,
+    provider: {
+      name: 'postmark',
+      verifyDeliveryWebhook: () => true,
+      parseDeliveryEvent: () => [
+        { providerMessageId: 'pm-1', type: 'delivered', recipient: 'a@example.org', occurredAt: '2027-01-01T00:00:00Z' },
+      ],
+    },
+  });
+  const res = fakeRes();
+  await handler({ method: 'POST', headers: {}, body: {} }, res);
+  assert.deepEqual(res.body, { processed: 1, patched: 0 });
   assert.equal(db.state.sentRows[0].deliveryStatus, 'bounced');
   assert.equal(db.state.sentRows[0].bounceReason, 'mailbox full');
 });

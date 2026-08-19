@@ -18,7 +18,7 @@ const crypto = require('node:crypto');
  * @returns {{ name: 'console', send: (message: object) => Promise<object> }}
  */
 function createConsoleProvider({ env = process.env, log = console } = {}) {
-  if (env.FUNCTIONS_EMULATOR !== 'true' && env.EVENT_EMAIL_PROVIDER !== 'console') {
+  if (env.FUNCTIONS_EMULATOR !== 'true' && (env.EVENT_EMAIL_PROVIDER || '').trim() !== 'console') {
     throw new Error(
       'console email provider refuses to load outside the emulator unless ' +
       'EVENT_EMAIL_PROVIDER=console is set explicitly'

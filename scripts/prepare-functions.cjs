@@ -21,7 +21,7 @@
  */
 
 const { execFileSync } = require('node:child_process');
-const { mkdirSync, renameSync, rmSync } = require('node:fs');
+const { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
@@ -55,10 +55,31 @@ renameSync(path.join(vendorDir, writtenName), tmp);
 rmSync(target, { force: true });
 renameSync(tmp, target);
 
+// npm's --package-lock-only reuses an existing file: entry instead of
+// re-hashing the freshly packed archive, which would leave a changed
+// shared package pinned to the OLD integrity — exactly the silent skew
+// this script exists to prevent. Drop every stale shared entry first so
+// the regeneration below must re-read the tarball.
+function dropSharedEntries(lockPath) {
+  if (!existsSync(lockPath)) return;
+  const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+  for (const [key, entry] of Object.entries(lock.packages || {})) {
+    if (typeof entry?.resolved === 'string' && entry.resolved.endsWith('vendor/shared.tgz')) {
+      delete lock.packages[key];
+    }
+  }
+  writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+}
+
+dropSharedEntries(path.join(root, 'functions', 'package-lock.json'));
+dropSharedEntries(path.join(root, 'package-lock.json'));
+
 // Refresh functions/package-lock.json so it pins the tarball's integrity
-// hash without installing anything.
+// hash without installing anything, then the root workspace lockfile,
+// which pins the same tarball through the functions workspace.
 npm(['install', '--prefix', path.join(root, 'functions'), '--package-lock-only'], {
   cwd: path.join(root, 'functions'),
 });
+npm(['install', '--package-lock-only']);
 
 console.log(`prepare-functions: wrote ${path.relative(root, target)}`);

@@ -2,7 +2,7 @@ node_modules/
 .env
 .env.*
 !.env.example
-vendor/*.tgz
+**/vendor/*.tgz
 dist/
 coverage/
 .firebase/

@@ -22,8 +22,11 @@ function parseAllowedOrigins(raw) {
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @param {{ allowedOrigins: string[], methods?: string[] }} opts
- * @returns {boolean} true when the request was fully handled (preflight or
- *   disallowed origin) and the handler must return without doing work.
+ * @returns {boolean} true when the request was fully handled (a preflight)
+ *   and the handler must return without doing work. Non-preflight requests
+ *   always proceed: this helper is header-only CORS — the browser enforces
+ *   the missing allow-origin header, and endpoint auth is a separate check,
+ *   never this one.
  */
 function applyCors(req, res, { allowedOrigins, methods = ['POST'] }) {
   const origin = req.headers.origin;

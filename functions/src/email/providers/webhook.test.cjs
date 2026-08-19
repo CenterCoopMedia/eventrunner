@@ -135,17 +135,31 @@ function sign(rawBody, secret = ENV.EMAIL_WEBHOOK_SECRET) {
   return `sha256=${crypto.createHmac('sha256', secret).update(rawBody).digest('hex')}`;
 }
 
-test('verifyDeliveryWebhook accepts a valid signature over the raw body', () => {
+test('verifyDeliveryWebhook accepts a valid Bearer + signature pair', () => {
   const provider = createWebhookProvider({ env: ENV, fetchImpl: fakeFetch([]) });
   const rawBody = Buffer.from('{"providerMessageId":"m1"}');
+  const auth = 'Bearer test-secret';
   assert.equal(
-    provider.verifyDeliveryWebhook(rawBody, { 'x-signature': sign(rawBody) }),
+    provider.verifyDeliveryWebhook(rawBody, { authorization: auth, 'x-signature': sign(rawBody) }),
     true,
   );
   // Header lookup is case-insensitive.
   assert.equal(
-    provider.verifyDeliveryWebhook(rawBody, { 'X-Signature': sign(rawBody) }),
+    provider.verifyDeliveryWebhook(rawBody, { Authorization: auth, 'X-Signature': sign(rawBody) }),
     true,
+  );
+});
+
+test('verifyDeliveryWebhook rejects a valid signature without the Bearer header', () => {
+  const provider = createWebhookProvider({ env: ENV, fetchImpl: fakeFetch([]) });
+  const rawBody = Buffer.from('{"providerMessageId":"m1"}');
+  assert.equal(provider.verifyDeliveryWebhook(rawBody, { 'x-signature': sign(rawBody) }), false);
+  assert.equal(
+    provider.verifyDeliveryWebhook(rawBody, {
+      authorization: 'Bearer wrong-secret',
+      'x-signature': sign(rawBody),
+    }),
+    false,
   );
 });
 

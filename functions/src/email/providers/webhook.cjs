@@ -133,11 +133,17 @@ function createWebhookProvider({ env = process.env, fetchImpl = globalThis.fetch
   }
 
   /**
-   * Recompute the hmac over the raw body and constant-time-compare against
-   * X-Signature (spec §3.1).
+   * Inbound requests must carry the same Bearer-plus-HMAC pair this adapter
+   * sends outbound: constant-time-compare Authorization: Bearer <secret>
+   * AND the X-Signature hmac over the raw body (spec §3.1). Both checks
+   * must pass; there is no signature-only acceptance.
    * @param {Buffer|string} rawBody @param {Record<string,string>} headers
    */
   function verifyDeliveryWebhook(rawBody, headers) {
+    const authorization = header(headers, 'authorization');
+    if (typeof authorization !== 'string' || !safeEqual(authorization, `Bearer ${secret}`)) {
+      return false;
+    }
     const provided = header(headers, 'x-signature');
     if (typeof provided !== 'string' || rawBody == null) return false;
     return safeEqual(provided, `sha256=${signBody(secret, rawBody)}`);

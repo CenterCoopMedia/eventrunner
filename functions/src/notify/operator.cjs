@@ -16,7 +16,7 @@ const { createWebhookSink } = require('./sinks/webhook.cjs');
 const { createEmailSink } = require('./sinks/email.cjs');
 
 const DEDUPE_WINDOW_MS = 5 * 60 * 1000;
-const SINK_NAMES = new Set(['webhook', 'email']);
+const SINK_NAMES = new Set(['webhook', 'email', 'none']);
 
 /** dedupeKey -> last-attempt ms; per container, pruned on every check. */
 const dedupeSeen = new Map();
