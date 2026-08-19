@@ -24,10 +24,12 @@
  *   5. Replaces the doc's editable fields (plain set, no merge — removed
  *      fields go away) and stamps { updatedAt, updatedBy: email }. On
  *      config/event the verification pair is carried forward from the
- *      stored doc so a full-replace save cannot drop it.
+ *      stored doc so a full-replace save cannot drop it — and the read is
+ *      part of the write transaction, so a verify-sender-domain.cjs write
+ *      landing mid-save cannot be clobbered.
  *   6. Commits the config doc and a cmsVersionHistory-style audit row in
- *      ONE batch, then writes an admin_logs entry (best-effort — a logging
- *      outage never fails a committed mutation).
+ *      ONE transaction, then writes an admin_logs entry (best-effort — a
+ *      logging outage never fails a committed mutation).
  *
  * core/config.cjs's per-container cache is deliberately NOT reset here:
  * its 5-minute TTL is accepted staleness (a config edit may take up to
@@ -36,6 +38,7 @@
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
+const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const {
   validateEventConfig,
@@ -76,29 +79,6 @@ const STAMP_FIELDS = Object.freeze(['updatedAt', 'updatedBy']);
 
 function isPlainObject(v) {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
-}
-
-/**
- * Best-effort admin action audit (fixed contract): every admin mutation
- * writes an admin_logs entry `{ action, docPath, uid, email, at }`, and a
- * failed audit write NEVER fails the mutation it describes.
- *
- * @param {{ db: FirebaseFirestore.Firestore, action: string, docPath: string,
- *           actor: { uid: string, email: string }, now?: () => number,
- *           log?: Pick<Console, 'warn'> }} args
- */
-async function logAdminAction({ db, action, docPath, actor, now = Date.now, log = console }) {
-  try {
-    await db.collection('admin_logs').doc().set({
-      action,
-      docPath,
-      uid: actor.uid,
-      email: actor.email,
-      at: new Date(now()),
-    });
-  } catch (err) {
-    log.warn('admin_logs write failed', err);
-  }
 }
 
 /**
@@ -179,33 +159,43 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
   }
 
   const ref = db.collection('config').doc(docId);
-  if (docId === 'event') {
-    // Full replace must not drop the verification pair verify-sender-domain
-    // wrote — the payload was already proven not to carry either field.
-    const snap = await ref.get();
-    const storedSender = snap.exists && isPlainObject(snap.data().sender) ? snap.data().sender : {};
-    fields.sender = {
-      ...(isPlainObject(fields.sender) ? fields.sender : {}),
-      domainVerified: storedSender.domainVerified === true,
-      domainVerifiedAt: storedSender.domainVerifiedAt ?? null,
-    };
-  }
-
+  const historyRef = db.collection('cmsVersionHistory').doc();
   const at = new Date(now());
-  const doc = { ...fields, updatedAt: at, updatedBy: actor.email };
-  const batch = db.batch();
-  batch.set(ref, doc);
-  // cmsVersionHistory-style audit row (spec §1.3 item 4), committed
-  // atomically with the doc it describes. Config docs have no revision
-  // counter, so the row records the full written fields + stamps.
-  batch.set(db.collection('cmsVersionHistory').doc(), {
-    docPath: `config/${docId}`,
-    kind: 'config',
-    fields,
-    updatedAt: at,
-    updatedBy: actor.email,
+  // One transaction, not a batch: config/event's carry-forward read must be
+  // serialized against verify-sender-domain.cjs (the only writer of the
+  // verification pair) — a plain get() followed by a batched full replace
+  // could clobber a domainVerified=true landed between the two, silently
+  // breaking OTP delivery. The transaction body may retry, so it derives
+  // its writes from `fields` without mutating it.
+  await db.runTransaction(async (tx) => {
+    let written = fields;
+    if (docId === 'event') {
+      // Full replace must not drop the verification pair verify-sender-domain
+      // wrote — the payload was already proven not to carry either field.
+      const snap = await tx.get(ref);
+      const storedSender =
+        snap.exists && isPlainObject(snap.data().sender) ? snap.data().sender : {};
+      written = {
+        ...fields,
+        sender: {
+          ...(isPlainObject(fields.sender) ? fields.sender : {}),
+          domainVerified: storedSender.domainVerified === true,
+          domainVerifiedAt: storedSender.domainVerifiedAt ?? null,
+        },
+      };
+    }
+    tx.set(ref, { ...written, updatedAt: at, updatedBy: actor.email });
+    // cmsVersionHistory-style audit row (spec §1.3 item 4), committed
+    // atomically with the doc it describes. Config docs have no revision
+    // counter, so the row records the full written fields + stamps.
+    tx.set(historyRef, {
+      docPath: `config/${docId}`,
+      kind: 'config',
+      fields: written,
+      updatedAt: at,
+      updatedBy: actor.email,
+    });
   });
-  await batch.commit();
   return { ok: true, docPath: `config/${docId}` };
 }
 

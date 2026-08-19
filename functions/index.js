@@ -11,6 +11,7 @@ const cmsPages = require('./src/cms/pages.cjs');
 const cmsVersions = require('./src/cms/versions.cjs');
 const cmsPublish = require('./src/cms/publish.cjs');
 const cmsUpdates = require('./src/cms/updates.cjs');
+const adminConfig = require('./src/admin/config.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -20,4 +21,5 @@ module.exports = {
   ...cmsVersions.handlers,
   ...cmsPublish.handlers,
   ...cmsUpdates.handlers,
+  ...adminConfig.handlers,
 };

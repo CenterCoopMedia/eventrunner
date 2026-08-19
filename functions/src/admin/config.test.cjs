@@ -49,12 +49,24 @@ function validBadges() {
 
 /**
  * Minimal in-memory Firestore fake: doc get/set (auto-id on doc()),
- * batches, and an append-only `writes` audit. No emulator (house rule).
+ * optimistic-retry transactions, and append-only `writes` / `commits`
+ * audits. `commits` records the key group each transaction landed
+ * atomically, so tests can pin "these writes shared one commit" — a
+ * non-atomic rewrite (sequential ref.set calls) produces no group holding
+ * both keys and fails those assertions. No emulator (house rule).
  */
 function fakeDb(seed = {}) {
   const docs = new Map(Object.entries(seed));
+  const versions = new Map(); // key -> write count, for conflict detection
   const writes = [];
+  const commits = [];
   let autoId = 0;
+  const versionOf = (key) => versions.get(key) || 0;
+  function applySet(key, data) {
+    docs.set(key, data);
+    versions.set(key, versionOf(key) + 1);
+    writes.push(key);
+  }
   function docRef(col, id) {
     const key = `${col}/${id}`;
     return {
@@ -64,14 +76,17 @@ function fakeDb(seed = {}) {
         return { exists: data !== undefined, data: () => data };
       },
       async set(data) {
-        docs.set(key, data);
-        writes.push(key);
+        applySet(key, data);
       },
     };
   }
-  return {
+  const db = {
     docs,
     writes,
+    commits,
+    // Test hook, fired after a transactional read: lets a test land a
+    // concurrent write between the read and the commit attempt.
+    onTransactionRead: null,
     collection(name) {
       return {
         doc(id) {
@@ -80,21 +95,37 @@ function fakeDb(seed = {}) {
         },
       };
     },
-    batch() {
-      const ops = [];
-      return {
-        set(ref, data) {
-          ops.push({ ref, data });
-        },
-        async commit() {
-          for (const op of ops) await op.ref.set(op.data);
-        },
-      };
+    // Same optimistic model as real Firestore: buffered writes commit only
+    // if nothing read inside the transaction changed underneath it;
+    // otherwise the body re-runs against fresh data.
+    async runTransaction(fn) {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const reads = new Map();
+        const ops = [];
+        const tx = {
+          async get(ref) {
+            reads.set(ref._key, versionOf(ref._key));
+            const snap = await ref.get();
+            if (db.onTransactionRead) await db.onTransactionRead(ref._key);
+            return snap;
+          },
+          set(ref, data) {
+            ops.push({ key: ref._key, data });
+          },
+        };
+        const result = await fn(tx);
+        if ([...reads].some(([key, v]) => versionOf(key) !== v)) continue;
+        for (const op of ops) applySet(op.key, op.data);
+        commits.push(ops.map((op) => op.key));
+        return result;
+      }
+      throw new Error('transaction contention');
     },
     rows(col) {
       return [...docs.entries()].filter(([k]) => k.startsWith(`${col}/`)).map(([, v]) => v);
     },
   };
+  return db;
 }
 
 function makeDeps(seed = {}) {
@@ -314,6 +345,49 @@ test('an event write preserves the stored sender verification pair', async () =>
   assert.equal(written.sender.domainVerified, true);
   assert.equal(written.sender.domainVerifiedAt, '2026-02-02T00:00');
   assert.equal(written.sender.email, 'summit@example.org', 'editable sender fields still replace');
+});
+
+test('the config doc and its cmsVersionHistory row land in ONE atomic commit', async () => {
+  const deps = makeDeps();
+  const res = makeRes();
+  await createUpdateThemeHandler(deps)(makeReq({ theme: validTheme() }), res);
+  assert.equal(res.statusCode, 200);
+
+  const group = deps.db.commits.find((keys) => keys.includes('config/theme'));
+  assert.ok(group, 'config/theme must be written through an atomic commit, not a bare set');
+  assert.ok(
+    group.some((key) => key.startsWith('cmsVersionHistory/')),
+    'the audit row must share the config doc\'s commit — a crash between two sequential sets would leave a config change with no history',
+  );
+  assert.ok(
+    !group.some((key) => key.startsWith('admin_logs/')),
+    'admin_logs stays best-effort OUTSIDE the atomic commit',
+  );
+});
+
+test('a verify-sender-domain write landing mid-save is not clobbered (transactional carry-forward)', async () => {
+  const deps = makeDeps({
+    'config/event': { ...validEvent(), sender: { email: 'old@x.org', name: 'Old', domainVerified: false, domainVerifiedAt: null } },
+  });
+  // Simulate verify-sender-domain.cjs committing between the admin save's
+  // carry-forward read and its commit: the transaction must retry and
+  // carry the fresh pair forward, never revert it to the stale read.
+  deps.db.onTransactionRead = async (key) => {
+    if (key !== 'config/event') return;
+    deps.db.onTransactionRead = null;
+    const stored = deps.db.docs.get('config/event');
+    await deps.db.collection('config').doc('event').set({
+      ...stored,
+      sender: { ...stored.sender, domainVerified: true, domainVerifiedAt: '2026-08-19T00:00' },
+    });
+  };
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: validEvent() }), res);
+  assert.equal(res.statusCode, 200);
+  const written = deps.db.docs.get('config/event');
+  assert.equal(written.sender.domainVerified, true, 'concurrent verification must survive the save');
+  assert.equal(written.sender.domainVerifiedAt, '2026-08-19T00:00');
+  assert.equal(written.sender.email, 'summit@example.org', 'the admin\'s editable sender fields still land');
 });
 
 test('a first event write defaults the verification pair, never omits it', async () => {
