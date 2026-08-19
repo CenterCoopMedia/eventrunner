@@ -79,7 +79,7 @@ UI changes need a keyboard path and visible focus. If you change a flow that att
 | `npm test` | `packages/shared` unit tests (Node `--test`) |
 | `npm run test:rules` | Firestore and Storage security rules on the Firebase emulators |
 
-CI runs all three on every push and pull request, credential-free. When the web app and functions land, CI will also run Playwright against emulators. Fork PRs must be able to run every check without credentials.
+CI runs all three on every pull request and every push to `main`, credential-free. When the web app and functions land, CI will also run Playwright against emulators. Fork PRs must be able to run every check without credentials.
 
 One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 
