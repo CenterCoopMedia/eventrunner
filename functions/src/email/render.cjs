@@ -269,6 +269,11 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
     subject: substitute(effective.subject, 'text', values, config, warnings),
     html: substitute(effective.html, 'html', values, config, warnings),
     text: substitute(effective.text, 'text', values, config, warnings),
+    // The template's storage policy travels with the rendered result so
+    // spreading it into send() suppresses body storage without every call
+    // site re-attaching the flag — an auth.otp render must never persist
+    // the code in admin-readable sent_emails (spec §3.1, §6.1).
+    storeRendered: template.storeRendered !== false,
     usedFallback,
     overrideErrors,
     warnings,

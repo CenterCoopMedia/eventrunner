@@ -288,6 +288,44 @@ test('the configured Tier B message stream reaches the adapter; per-message wins
   assert.deepEqual(seen, ['client-a', 'override-stream']);
 });
 
+test('an EmailAddress recipient keeps its display name for the adapter', async () => {
+  const seen = [];
+  const db = fakeDb();
+  const { core: c } = core({
+    db,
+    provider: { name: 'x', send: async (m) => { seen.push(m.to); return { providerMessageId: 'id', status: 'sent', providerStatus: 200 }; } },
+  });
+  await c.send({ to: { email: 'a@example.org', name: 'Ada' }, subject: 's' });
+  assert.deepEqual(seen[0], { email: 'a@example.org', name: 'Ada' });
+  assert.equal(db.state.sentRows[0].to, 'a@example.org');
+});
+
+test('delivery webhook compares timestamps as instants, not strings', async () => {
+  const db = fakeDb();
+  db.state.sentRows.push({
+    providerMessageId: 'pm-1',
+    status: 'sent',
+    deliveryStatus: 'delivered',
+    deliveryUpdatedAt: '2027-01-01T10:00:00Z',
+  });
+  const handler = createDeliveryWebhookHandler({
+    db,
+    provider: {
+      name: 'postmark',
+      verifyDeliveryWebhook: () => true,
+      // 09:30-01:00 is 10:30Z — newer than the stored 10:00Z despite
+      // sorting lexically before it.
+      parseDeliveryEvent: () => [
+        { providerMessageId: 'pm-1', type: 'bounced', recipient: 'a@example.org', occurredAt: '2027-01-01T09:30:00-01:00', reason: 'late bounce' },
+      ],
+    },
+  });
+  const res = fakeRes();
+  await handler({ method: 'POST', headers: {}, body: {} }, res);
+  assert.deepEqual(res.body, { processed: 1, patched: 1 });
+  assert.equal(db.state.sentRows[0].deliveryStatus, 'bounced');
+});
+
 test('delivery webhook ignores an event older than the stored one', async () => {
   const db = fakeDb();
   db.state.sentRows.push({

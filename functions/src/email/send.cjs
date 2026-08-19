@@ -140,7 +140,9 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
 
     const fullMessage = {
       ...message,
-      to: toEmail,
+      // The original string-or-EmailAddress form reaches the adapter so a
+      // display name survives; toEmail is for validation and the audit row.
+      to: message.to,
       from: message.from || { email: sender.email, name: sender.name },
       replyTo: message.replyTo || sender.replyTo || undefined,
       // Tier B stream selection (config/providers.email.messageStream)
@@ -239,7 +241,13 @@ function createDeliveryWebhookHandler({ db, provider, log = console }) {
       const applied = await db.runTransaction(async (tx) => {
         const doc = await tx.get(ref);
         const existing = doc.data()?.deliveryUpdatedAt;
-        if (typeof existing === 'string' && existing >= occurredAt) return false;
+        // Compare as instants — ISO strings with different offsets do not
+        // order lexically. An unparseable incoming timestamp is skipped;
+        // an unparseable stored one is overwritten.
+        const incomingMs = Date.parse(occurredAt);
+        const existingMs = typeof existing === 'string' ? Date.parse(existing) : NaN;
+        if (Number.isNaN(incomingMs)) return false;
+        if (!Number.isNaN(existingMs) && existingMs >= incomingMs) return false;
         tx.update(ref, {
           deliveryStatus: event.type,
           deliveryUpdatedAt: occurredAt,

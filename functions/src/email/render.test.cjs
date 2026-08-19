@@ -121,6 +121,17 @@ test('valid override is used', () => {
   assert.equal(out.text, 'c=5');
 });
 
+test('render carries the template storage policy for send() composition', () => {
+  const out = render({ template: TEMPLATE, tokenValues: { first_name: 'A', code: '1' }, config: CONFIG });
+  assert.equal(out.storeRendered, true);
+  const suppressed = render({
+    template: { ...TEMPLATE, storeRendered: false },
+    tokenValues: { first_name: 'A', code: '1' },
+    config: CONFIG,
+  });
+  assert.equal(suppressed.storeRendered, false);
+});
+
 test('validateTemplateBody reports both check types at save time', () => {
   const bad = validateTemplateBody(TEMPLATE, { subject: '{{nope}}', html: 'x', text: 'y' });
   assert.equal(bad.ok, false);
