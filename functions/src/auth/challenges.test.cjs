@@ -6,7 +6,9 @@ const assert = require('node:assert/strict');
 const {
   takeRateLimitSlot,
   createChallenge,
-  verifyAndConsumeChallenge,
+  verifyChallenge,
+  finalizeChallenge,
+  releaseChallenge,
   sweepExpired,
   normalizeEmail,
   emailHash,
@@ -135,31 +137,43 @@ test('createChallenge stores the salted hash, never the code or raw email casing
   assert.ok(!JSON.stringify(stored).includes('123456'));
 });
 
-test('verify: correct code and email consumes the challenge (single use)', async () => {
+test('verify: correct code marks consumed; concurrent replay fails; finalize deletes', async () => {
   const db = fakeDb();
   const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
-  const first = await verifyAndConsumeChallenge({ db, token, email: 'a@example.org', code: '123456' });
+  const first = await verifyChallenge({ db, token, email: 'a@example.org', code: '123456' });
   assert.deepEqual(first, { ok: true, email: 'a@example.org' });
-  const replay = await verifyAndConsumeChallenge({ db, token, email: 'a@example.org', code: '123456' });
+  // Consumed but not yet finalized: a concurrent replay is blocked.
+  const replay = await verifyChallenge({ db, token, email: 'a@example.org', code: '123456' });
   assert.deepEqual(replay, { ok: false });
+  await finalizeChallenge({ db, token });
+  assert.equal(db.store.has(`auth_challenges/${token}`), false);
+});
+
+test('verify: release after a failed token issuance lets the same code retry', async () => {
+  const db = fakeDb();
+  const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+  assert.equal((await verifyChallenge({ db, token, email: 'a@example.org', code: '123456' })).ok, true);
+  await releaseChallenge({ db, token });
+  const retry = await verifyChallenge({ db, token, email: 'a@example.org', code: '123456' });
+  assert.deepEqual(retry, { ok: true, email: 'a@example.org' });
 });
 
 test('verify: wrong code fails, burns an attempt, and locks out at the cap', async () => {
   const db = fakeDb();
   const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
   for (let i = 0; i < internals.MAX_ATTEMPTS; i += 1) {
-    const miss = await verifyAndConsumeChallenge({ db, token, email: 'a@example.org', code: '000000' });
+    const miss = await verifyChallenge({ db, token, email: 'a@example.org', code: '000000' });
     assert.deepEqual(miss, { ok: false });
   }
   // Attempts exhausted: even the CORRECT code is now rejected.
-  const late = await verifyAndConsumeChallenge({ db, token, email: 'a@example.org', code: '123456' });
+  const late = await verifyChallenge({ db, token, email: 'a@example.org', code: '123456' });
   assert.deepEqual(late, { ok: false });
 });
 
 test('verify: email mismatch fails and burns an attempt', async () => {
   const db = fakeDb();
   const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
-  const miss = await verifyAndConsumeChallenge({ db, token, email: 'b@example.org', code: '123456' });
+  const miss = await verifyChallenge({ db, token, email: 'b@example.org', code: '123456' });
   assert.deepEqual(miss, { ok: false });
   assert.equal(db.store.get(`auth_challenges/${token}`).attempts, 1);
 });
@@ -169,14 +183,14 @@ test('verify: expired challenge fails even with the correct code', async () => {
   let clock = 0;
   const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456', now: () => clock });
   clock = internals.CHALLENGE_TTL_MS + 1;
-  const late = await verifyAndConsumeChallenge({ db, token, email: 'a@example.org', code: '123456', now: () => clock });
+  const late = await verifyChallenge({ db, token, email: 'a@example.org', code: '123456', now: () => clock });
   assert.deepEqual(late, { ok: false });
 });
 
 test('verify: unknown or malformed token fails without touching the store', async () => {
   const db = fakeDb();
-  assert.deepEqual(await verifyAndConsumeChallenge({ db, token: 'nope', email: 'a@example.org', code: '123456' }), { ok: false });
-  assert.deepEqual(await verifyAndConsumeChallenge({ db, token: 'f'.repeat(64), email: 'a@example.org', code: '123456' }), { ok: false });
+  assert.deepEqual(await verifyChallenge({ db, token: 'nope', email: 'a@example.org', code: '123456' }), { ok: false });
+  assert.deepEqual(await verifyChallenge({ db, token: 'f'.repeat(64), email: 'a@example.org', code: '123456' }), { ok: false });
 });
 
 test('sweepExpired deletes expired challenges and stale rate buckets only', async () => {

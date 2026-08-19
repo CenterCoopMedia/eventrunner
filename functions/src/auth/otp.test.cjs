@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createSendOtpHandler, createVerifyOtpHandler, generateOtpCode, internals } = require('./otp.cjs');
-const { createChallenge, internals: challengeInternals } = require('./challenges.cjs');
+const { createChallenge, verifyChallenge, internals: challengeInternals } = require('./challenges.cjs');
 const { resetTemplateCacheForTest } = require('../email/templates.cjs');
 
 // loadTemplate caches overrides per id for 5 minutes at module scope.
@@ -25,9 +25,18 @@ function fakeDb() {
       return { exists: data !== undefined, data: () => data };
     },
   });
+  let autoId = 0;
   return {
     store,
-    collection: (c) => ({ doc: (id) => docRef(c, id) }),
+    collection: (c) => ({
+      doc: (id) => docRef(c, id),
+      async add(data) {
+        autoId += 1;
+        const id = `auto-${autoId}`;
+        store.set(key(c, id), data);
+        return { id };
+      },
+    }),
     async runTransaction(fn) {
       return fn({
         get: async (ref) => ref.get(),
@@ -145,6 +154,10 @@ test('a broken auth.otp override falls back to the default and notifies the oper
   assert.match(sent[0].text, /\d{6}/);
   assert.equal(notices.length, 1);
   assert.match(notices[0].title, /auth\.otp override/);
+  // Durable record independent of the (best-effort) notifier.
+  const errorRows = [...db.store.entries()].filter(([k]) => k.startsWith('system_errors/'));
+  assert.equal(errorRows.length, 1);
+  assert.equal(errorRows[0][1].templateId, 'auth.otp');
 });
 
 test('the send-boundary gate: unit truth table', () => {
@@ -273,4 +286,8 @@ test('verifyOtpCode: an unexpected auth error is a 500, not user creation', asyn
   const res = fakeRes();
   await handler({ method: 'POST', body: { challengeId: token, email: 'a@example.org', code: '123456' } }, res);
   assert.equal(res.statusCode, 500);
+  // The correctly answered challenge survives the transient failure: the
+  // same code verifies again without a new email/rate slot.
+  const retry = await verifyChallenge({ db, token, email: 'a@example.org', code: '123456' });
+  assert.equal(retry.ok, true);
 });

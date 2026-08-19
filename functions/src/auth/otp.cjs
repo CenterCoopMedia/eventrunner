@@ -18,7 +18,9 @@ const crypto = require('node:crypto');
 const {
   takeRateLimitSlot,
   createChallenge,
-  verifyAndConsumeChallenge,
+  verifyChallenge,
+  finalizeChallenge,
+  releaseChallenge,
   sweepExpired,
   normalizeEmail,
   internals: challengeInternals,
@@ -77,15 +79,30 @@ function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = 
       tokenValues: { code, expiry_minutes: String(EXPIRY_MINUTES) },
       config,
     });
-    if (rendered.usedFallback && notifyOperator) {
+    if (rendered.usedFallback) {
       // The client's sign-in keeps working on the shipped copy; the
-      // operator learns the override is broken (spec §6.1 step 4).
-      await notifyOperator({
-        kind: 'warning',
-        title: 'auth.otp override failed validation; shipped default used',
-        summary: rendered.overrideErrors.join('; '),
-        dedupeKey: 'auth-otp-override-fallback',
-      });
+      // operator learns the override is broken (spec §6.1 step 4) — via a
+      // DURABLE system_errors row first (the notifier is best-effort and
+      // may be configured to none), then the notifier.
+      try {
+        await db.collection('system_errors').add({
+          kind: 'template-override-invalid',
+          templateId: 'auth.otp',
+          errors: rendered.overrideErrors,
+          resolved: false,
+          createdAt: new Date(now()),
+        });
+      } catch (err) {
+        log.error('system_errors write for auth.otp override fallback failed', err);
+      }
+      if (notifyOperator) {
+        await notifyOperator({
+          kind: 'warning',
+          title: 'auth.otp override failed validation; shipped default used',
+          summary: rendered.overrideErrors.join('; '),
+          dedupeKey: 'auth-otp-override-fallback',
+        });
+      }
     }
     if (!renderedMailCarriesCode(rendered, code)) {
       log.error('auth.otp render lacks the code in html and/or text; refusing to send');
@@ -149,26 +166,44 @@ function createVerifyOtpHandler({ db, auth, now = Date.now, log = console }) {
       return;
     }
 
-    const verdict = await verifyAndConsumeChallenge({ db, token: challengeId, email, code, now });
+    const verdict = await verifyChallenge({ db, token: challengeId, email, code, now });
     if (!verdict.ok) {
       // One failure shape for every miss — no oracle.
       res.status(401).json({ error: { code: 'invalid-code', message: 'That code is invalid or has expired. Request a new one.' } });
       return;
     }
 
-    let uid;
+    // The challenge is marked consumed (concurrent replay blocked) but not
+    // yet deleted: a transient Auth failure below releases it so the user
+    // can retry the same code instead of burning another rate slot.
+    let token;
     try {
-      uid = (await auth.getUserByEmail(verdict.email)).uid;
-    } catch (err) {
-      if (err?.code !== 'auth/user-not-found') {
-        log.error('getUserByEmail failed', err);
-        res.status(500).json({ error: { code: 'internal', message: 'Sign-in failed. Try again.' } });
-        return;
+      let uid;
+      try {
+        uid = (await auth.getUserByEmail(verdict.email)).uid;
+      } catch (err) {
+        if (err?.code !== 'auth/user-not-found') throw err;
+        uid = (await auth.createUser({ email: verdict.email, emailVerified: true })).uid;
       }
-      uid = (await auth.createUser({ email: verdict.email, emailVerified: true })).uid;
+      token = await auth.createCustomToken(uid);
+    } catch (err) {
+      log.error('token issuance failed after successful verification', err);
+      try {
+        await releaseChallenge({ db, token: challengeId });
+      } catch (releaseErr) {
+        log.error('challenge release failed', releaseErr);
+      }
+      res.status(500).json({ error: { code: 'internal', message: 'Sign-in failed. Try again.' } });
+      return;
     }
 
-    const token = await auth.createCustomToken(uid);
+    // Best-effort: a failed delete leaves a consumed challenge for the
+    // sweeper; it can never be verified again.
+    try {
+      await finalizeChallenge({ db, token: challengeId });
+    } catch (err) {
+      log.error('challenge finalize failed', err);
+    }
     res.status(200).json({ token });
   };
 }
