@@ -16,6 +16,13 @@ beforeAll(async () => {
     projectId: "demo-run-of-show",
     storage: { rules: readFileSync("storage.rules", "utf8") },
   });
+  // Seed the object the read tests target. Without it, getBytes rejects
+  // with storage/object-not-found even under allow-all rules, and
+  // assertFails accepts any rejection — the read assertions would be
+  // vacuously green.
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await uploadString(ref(context.storage(), "media/logo.png"), "seeded");
+  });
 });
 
 afterAll(async () => {
