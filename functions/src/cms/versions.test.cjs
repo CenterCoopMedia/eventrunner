@@ -147,3 +147,50 @@ test('cmsGetVersionHistory clamps a silly limit to the default', async () => {
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.entries.length, 5); // default (20) covers all rows
 });
+
+test('the (docPath ASC, revision DESC) composite index is declared for deploy', () => {
+  // The where('docPath','==')+orderBy('revision','desc') query needs this
+  // composite index in real Firestore; the in-memory fake cannot catch a
+  // missing declaration, so assert the deployed file directly.
+  const { readFileSync } = require('node:fs');
+  const { join } = require('node:path');
+  const declared = JSON.parse(
+    readFileSync(join(__dirname, '..', '..', '..', 'firestore.indexes.json'), 'utf8'),
+  );
+  const match = (declared.indexes || []).find(
+    (ix) =>
+      ix.collectionGroup === 'cmsVersionHistory' &&
+      Array.isArray(ix.fields) &&
+      ix.fields.length === 2 &&
+      ix.fields[0].fieldPath === 'docPath' &&
+      ix.fields[0].order === 'ASCENDING' &&
+      ix.fields[1].fieldPath === 'revision' &&
+      ix.fields[1].order === 'DESCENDING',
+  );
+  assert.ok(match, 'firestore.indexes.json must declare (docPath ASC, revision DESC) on cmsVersionHistory');
+});
+
+test('cmsGetVersionHistory shapes an infra query failure as a core/errors 500', async () => {
+  const throwingDb = {
+    collection() {
+      return {
+        where() { return this; },
+        orderBy() { return this; },
+        startAfter() { return this; },
+        limit() { return this; },
+        async get() {
+          throw new Error('FAILED_PRECONDITION: The query requires an index.');
+        },
+      };
+    },
+  };
+  const res = fakeRes();
+  await createGetVersionHistoryHandler({
+    db: throwingDb,
+    auth: fakeAuth(),
+    getConfig,
+    log: { error() {} },
+  })(req({ body: { docPath: 'cmsContent/hero__title' } }), res);
+  assert.equal(res.statusCode, 500);
+  assert.equal(res.body.error.code, 'internal');
+});

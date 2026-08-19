@@ -15,7 +15,7 @@
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
-const { sendError, badRequest, methodNotAllowed } = require('../core/errors.cjs');
+const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
 
 const DEFAULT_LIMIT = 20;
@@ -39,7 +39,7 @@ function isValidDocPath(docPath) {
 /**
  * @param {{ db, auth, getConfig, log?: Console }} deps
  */
-function createGetVersionHistoryHandler({ db, auth, getConfig }) {
+function createGetVersionHistoryHandler({ db, auth, getConfig, log = console }) {
   return async function cmsGetVersionHistory(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const verdict = await requireAdmin({ auth, getConfig }, req);
@@ -54,13 +54,24 @@ function createGetVersionHistoryHandler({ db, auth, getConfig }) {
       return badRequest(res, 'cursor must be a revision number from a previous page.');
     }
 
+    // (docPath ==, revision desc) requires the composite index declared in
+    // firestore.indexes.json — versions.test.cjs asserts the declaration so
+    // the query can never silently outrun the deployed indexes again.
     let query = db
       .collection('cmsVersionHistory')
       .where('docPath', '==', docPath)
       .orderBy('revision', 'desc');
     if (cursor !== undefined) query = query.startAfter(cursor);
-    // One extra row decides nextCursor without a second query.
-    const snap = await query.limit(pageSize + 1).get();
+    let snap;
+    try {
+      // One extra row decides nextCursor without a second query.
+      snap = await query.limit(pageSize + 1).get();
+    } catch (err) {
+      // Shape infra failures (e.g. FAILED_PRECONDITION on a missing index)
+      // as a core/errors body instead of an unshaped 500.
+      log.error('cmsGetVersionHistory query failed', err);
+      return internal(res, 'Version history is temporarily unavailable.');
+    }
 
     const entries = snap.docs.slice(0, pageSize).map((d) => ({ id: d.id, ...d.data() }));
     const nextCursor = snap.docs.length > pageSize ? entries[entries.length - 1].revision : null;

@@ -8,7 +8,9 @@
  *   cmsPublish             admin POST { collection, docIds } |
  *                          { all: true } (every dirty draft in every
  *                          publishable collection) | { queueId } (resume a
- *                          failed row). Creates/reuses a cmsPublishQueue
+ *                          FAILED row; a row still 'running' is a 409 so
+ *                          overlapping runs can never double-bump
+ *                          revisions). Creates/reuses a cmsPublishQueue
  *                          row, runs the chunked publish, marks the row
  *                          done or failed.
  *   cmsGetPublishQueue     admin POST { queueId? , limit? }
@@ -30,7 +32,7 @@
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed } = require('../core/errors.cjs');
 const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
-const { listDirty, publishDocs, logAdminAction } = require('./store.cjs');
+const { listDirty, publishDocs, logAdminAction, isValidDocId } = require('./store.cjs');
 
 const MAX_DOC_IDS = 2000;
 const QUEUE_LIST_DEFAULT = 20;
@@ -90,15 +92,30 @@ function createCmsPublishHandler({ db, auth, getConfig, now = Date.now, log = co
 
     let queueRef;
     let request;
-    if (typeof req.body?.queueId === 'string') {
+    if (req.body?.queueId !== undefined) {
       // Resume: the stored request is authoritative; progress on the row
       // makes the re-run skip whatever already committed.
+      if (!isValidDocId(req.body.queueId)) {
+        return badRequest(res, 'queueId must be a single publish-queue doc id.');
+      }
       queueRef = db.collection('cmsPublishQueue').doc(req.body.queueId);
       const snap = await queueRef.get();
       if (!snap.exists) return notFound(res, 'No such publish queue row.');
       const row = snap.data();
       if (row.status === 'done') {
         return res.status(200).json({ queueId: queueRef.id, status: 'done', results: row.progress || {} });
+      }
+      if (row.status === 'running') {
+        // Overlapping runs would each read the same recorded progress and
+        // live revisions, double-bumping revisions and duplicating history
+        // rows. Only a failed row is resumable; a stranded 'running' row is
+        // marked failed first via cmsUpdatePublishStatus.
+        return sendError(
+          res,
+          409,
+          'already-running',
+          'That publish is still running. If it is stranded, mark it failed via cmsUpdatePublishStatus, then resume.',
+        );
       }
       request = row.request;
       if (!request || typeof request !== 'object') {
@@ -163,7 +180,10 @@ function createGetPublishQueueHandler({ db, auth, getConfig }) {
     if (!actor) return;
 
     const { queueId, limit } = req.body || {};
-    if (typeof queueId === 'string') {
+    if (queueId !== undefined) {
+      if (!isValidDocId(queueId)) {
+        return badRequest(res, 'queueId must be a single publish-queue doc id.');
+      }
       const snap = await db.collection('cmsPublishQueue').doc(queueId).get();
       if (!snap.exists) return notFound(res, 'No such publish queue row.');
       return res.status(200).json({ rows: [{ id: snap.id, ...snap.data() }] });
@@ -189,8 +209,8 @@ function createUpdatePublishStatusHandler({ db, auth, getConfig, now = Date.now,
     if (!actor) return;
 
     const { queueId, status, note } = req.body || {};
-    if (typeof queueId !== 'string' || queueId.length === 0) {
-      return badRequest(res, 'queueId is required.');
+    if (!isValidDocId(queueId)) {
+      return badRequest(res, 'queueId must be a single publish-queue doc id.');
     }
     if (!SETTABLE_STATUSES.includes(status)) {
       return badRequest(res, `status must be one of: ${SETTABLE_STATUSES.join(', ')}.`);

@@ -323,3 +323,44 @@ test('logAdminAction never throws when the audit write fails', async () => {
   });
   assert.equal(warnings.length, 1);
 });
+
+// --- isValidDocId -------------------------------------------------------------
+
+test('isValidDocId rejects empty, slashed, dot, and oversized ids', () => {
+  const { isValidDocId } = require('./store.cjs');
+  assert.equal(isValidDocId('q-abc123'), true);
+  assert.equal(isValidDocId(''), false);
+  assert.equal(isValidDocId('a/b'), false);
+  assert.equal(isValidDocId('a/b/c'), false);
+  assert.equal(isValidDocId('.'), false);
+  assert.equal(isValidDocId('..'), false);
+  assert.equal(isValidDocId(42), false);
+  assert.equal(isValidDocId('x'.repeat(internals.MAX_DOC_ID_LENGTH + 1)), false);
+});
+
+// --- revision uniqueness across deleteBoth + recreate -------------------------
+
+test('publishDocs after deleteBoth + recreate resumes above the historical max revision', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/hero__title': { value: 'v1', section: 'hero', field: 'title', visible: true, status: 'dirty' },
+  });
+  // Two publish generations: revisions 1 and 2.
+  await publishDocs({ db, collection: 'cmsContent', docIds: ['hero__title'], actor: ACTOR, now });
+  await writeDraft({ db, collection: 'cmsContent', docId: 'hero__title', fields: { value: 'v2' }, actor: ACTOR, now });
+  await publishDocs({ db, collection: 'cmsContent', docIds: ['hero__title'], actor: ACTOR, now });
+  assert.equal(db.read('cmsContent', 'hero__title').revision, 2);
+
+  // Delete both docs; history rows survive as the audit trail.
+  await deleteBoth({ db, collection: 'cmsContent', docId: 'hero__title' });
+  assert.equal(db.ids('cmsVersionHistory').length, 2);
+
+  // Recreate and publish: the new revision continues past the old max —
+  // never back to 1 — so revisions stay unique per docPath and the
+  // versions.cjs revision cursor cannot skip or repeat entries.
+  await writeDraft({ db, collection: 'cmsContent', docId: 'hero__title', fields: { value: 'v3' }, actor: ACTOR, now });
+  await publishDocs({ db, collection: 'cmsContent', docIds: ['hero__title'], actor: ACTOR, now });
+  assert.equal(db.read('cmsContent', 'hero__title').revision, 3);
+
+  const revisions = db.ids('cmsVersionHistory').map((id) => db.read('cmsVersionHistory', id).revision).sort();
+  assert.deepEqual(revisions, [1, 2, 3]);
+});

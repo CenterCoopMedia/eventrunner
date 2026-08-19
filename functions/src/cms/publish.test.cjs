@@ -258,3 +258,31 @@ test('cmsUpdatePublishStatus: 400 on a status outside failed/done, 404 on missin
   await handler(req({ body: { queueId: 'ghost', status: 'failed' } }), res);
   assert.equal(res.statusCode, 404);
 });
+
+test('cmsPublish resume of a still-running row → 409, no writes', async () => {
+  const db = makeFakeDb({
+    'cmsPublishQueue/q1': { status: 'running', request: { cmsContent: ['a'] }, progress: {} },
+    'cmsContent_drafts/a': { value: '1', visible: true, status: 'dirty' },
+  });
+  const res = fakeRes();
+  await createCmsPublishHandler(deps(db))(req({ body: { queueId: 'q1' } }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'already-running');
+  assert.equal(db.writes.length, 0); // no revision bump, no history row
+});
+
+test('publish endpoints: 400 on a queueId the real SDK would throw on', async () => {
+  const db = makeFakeDb();
+  for (const [create, extra] of [
+    [createCmsPublishHandler, {}],
+    [createGetPublishQueueHandler, {}],
+    [createUpdatePublishStatusHandler, { status: 'failed' }],
+  ]) {
+    for (const queueId of ['', 'a/b', 'a/b/c', '.', 42]) {
+      const res = fakeRes();
+      await create(deps(db))(req({ body: { queueId, ...extra } }), res);
+      assert.equal(res.statusCode, 400, `${create.name} queueId=${JSON.stringify(queueId)}`);
+    }
+  }
+  assert.equal(db.writes.length, 0);
+});

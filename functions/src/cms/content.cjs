@@ -12,8 +12,9 @@
  *
  * cmsContent docs are keyed section+field (spec §4.1): the doc id is
  * `<section>__<field>` and both keys are stored as content fields, so a
- * (section, field) pair can never map to two docs. Other publishable
- * collections address docs by explicit docId.
+ * (section, field) pair can never map to two docs. The other GENERIC
+ * collections address docs by explicit docId; cmsPages/cmsUpdates are out
+ * of scope here (see GENERIC_COLLECTIONS).
  *
  * None of the mutation handlers ever writes a live collection — that is
  * publish's job (store.publishDocs) — so a keystroke saved to an
@@ -22,29 +23,37 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
-const { PUBLISHABLE_COLLECTIONS, draftCollectionFor } = require('./blockTypes.cjs');
-const { writeDraft, deleteBoth, logAdminAction, contentFieldsOf, internals: storeInternals } = require('./store.cjs');
+const { draftCollectionFor } = require('./blockTypes.cjs');
+const {
+  writeDraft,
+  deleteBoth,
+  logAdminAction,
+  contentFieldsOf,
+  isValidDocId,
+  internals: storeInternals,
+} = require('./store.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
-const MAX_DOC_ID_LENGTH = 300;
 
-/** @param {unknown} id @returns {boolean} usable as a Firestore doc id */
-function isValidDocId(id) {
-  return (
-    typeof id === 'string' &&
-    id.length > 0 &&
-    id.length <= MAX_DOC_ID_LENGTH &&
-    !id.includes('/') &&
-    id !== '.' &&
-    id !== '..'
-  );
-}
+/**
+ * The publishable collections these generic endpoints may write. cmsPages
+ * and cmsUpdates are deliberately EXCLUDED: their drafts must go through
+ * cmsSavePage / cmsSaveUpdate (and cmsDeletePage / cmsDeleteUpdate), whose
+ * validators enforce §5.2 BLOCK_TYPES and the updates shape — a generic
+ * writer here would let an unvalidated draft reach publish verbatim.
+ */
+const GENERIC_COLLECTIONS = Object.freeze([
+  'cmsContent',
+  'cmsSchedule',
+  'cmsOrganizations',
+  'cmsTimeline',
+]);
 
 /**
  * Resolve the target doc from a request body. cmsContent is keyed
- * section+field; every other publishable collection takes an explicit
- * docId. Returns extraFields so section/field ride along as content
- * fields on cmsContent docs.
+ * section+field; the other GENERIC_COLLECTIONS take an explicit docId.
+ * Returns extraFields so section/field ride along as content fields on
+ * cmsContent docs.
  *
  * @param {object} body
  * @returns {{ ok: true, collection: string, docId: string, extraFields: object } |
@@ -52,8 +61,16 @@ function isValidDocId(id) {
  */
 function resolveTarget(body) {
   const collection = typeof body?.collection === 'string' ? body.collection : 'cmsContent';
-  if (!PUBLISHABLE_COLLECTIONS.includes(collection)) {
-    return { ok: false, message: `Unknown collection. Publishable: ${PUBLISHABLE_COLLECTIONS.join(', ')}.` };
+  if (!GENERIC_COLLECTIONS.includes(collection)) {
+    if (collection === 'cmsPages' || collection === 'cmsUpdates') {
+      return {
+        ok: false,
+        message: collection === 'cmsPages'
+          ? 'cmsPages drafts must go through cmsSavePage / cmsDeletePage.'
+          : 'cmsUpdates drafts must go through cmsSaveUpdate / cmsDeleteUpdate.',
+      };
+    }
+    return { ok: false, message: `Unknown collection. Writable here: ${GENERIC_COLLECTIONS.join(', ')}.` };
   }
   if (collection === 'cmsContent') {
     const { section, field } = body || {};
@@ -272,5 +289,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { resolveTarget, validateFields, isValidDocId, SECTION_FIELD_RE },
+  internals: { resolveTarget, validateFields, isValidDocId, SECTION_FIELD_RE, GENERIC_COLLECTIONS },
 };

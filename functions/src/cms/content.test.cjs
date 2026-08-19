@@ -323,3 +323,16 @@ test('a failed admin_logs write never fails the mutation', async () => {
   assert.equal(res.statusCode, 200);
   assert.equal(db.read('cmsContent_drafts', 'hero__title').value, 'v');
 });
+
+test('resolveTarget routes cmsPages/cmsUpdates to their validated writers (never generic)', () => {
+  // §5.2: page and update drafts must pass BLOCK_TYPES / shape validation,
+  // which only cmsSavePage / cmsSaveUpdate run — the generic endpoints
+  // would let an unvalidated draft reach publish verbatim.
+  const pages = internals.resolveTarget({ collection: 'cmsPages', docId: 'home' });
+  assert.equal(pages.ok, false);
+  assert.match(pages.message, /cmsSavePage/);
+  const updates = internals.resolveTarget({ collection: 'cmsUpdates', docId: 'u1' });
+  assert.equal(updates.ok, false);
+  assert.match(updates.message, /cmsSaveUpdate/);
+  assert.deepEqual(internals.GENERIC_COLLECTIONS, ['cmsContent', 'cmsSchedule', 'cmsOrganizations', 'cmsTimeline']);
+});

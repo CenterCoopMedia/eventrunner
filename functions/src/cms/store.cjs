@@ -45,6 +45,28 @@ const RESERVED_FIELDS = Object.freeze([
   'publishedBy',
 ]);
 
+const MAX_DOC_ID_LENGTH = 300;
+
+/**
+ * Usable as a single Firestore doc-path segment. The real SDK throws
+ * synchronously on '' and on slash-containing ids (odd-segment paths), and
+ * a 4-segment id would silently address a subcollection doc — so every
+ * handler validates ids with this before calling `.doc()`.
+ *
+ * @param {unknown} id
+ * @returns {boolean}
+ */
+function isValidDocId(id) {
+  return (
+    typeof id === 'string' &&
+    id.length > 0 &&
+    id.length <= MAX_DOC_ID_LENGTH &&
+    !id.includes('/') &&
+    id !== '.' &&
+    id !== '..'
+  );
+}
+
 /** @param {object} data @returns {object} data minus RESERVED_FIELDS */
 function contentFieldsOf(data) {
   const out = {};
@@ -97,7 +119,9 @@ async function writeDraft({ db, collection, docId, fields, visible, actor, now =
 
 /**
  * Delete the live doc and its draft in ONE batch (spec §8.4 step 4) —
- * never one without the other.
+ * never one without the other. cmsVersionHistory rows are deliberately
+ * kept (audit trail); a later recreation of the same docId publishes above
+ * the historical max revision (see publishDocs), never back at 1.
  *
  * @param {{ db: FirebaseFirestore.Firestore, collection: string, docId: string }} args
  * @returns {Promise<{ livePath: string, draftPath: string }>}
@@ -139,6 +163,26 @@ async function listDirty({ db, collection }) {
   const draftCol = draftCollectionFor(collection);
   const snap = await db.collection(draftCol).where('status', '==', 'dirty').get();
   return snap.docs.map((d) => d.id);
+}
+
+/**
+ * Highest revision ever recorded for a docPath in cmsVersionHistory, or 0.
+ * Uses the same (docPath ==, revision desc) composite index the history
+ * endpoint declares in firestore.indexes.json.
+ *
+ * @param {{ db: FirebaseFirestore.Firestore, docPath: string }} args
+ * @returns {Promise<number>}
+ */
+async function maxHistoryRevision({ db, docPath }) {
+  const snap = await db
+    .collection('cmsVersionHistory')
+    .where('docPath', '==', docPath)
+    .orderBy('revision', 'desc')
+    .limit(1)
+    .get();
+  if (snap.empty) return 0;
+  const rev = snap.docs[0].data()?.revision;
+  return typeof rev === 'number' ? rev : 0;
 }
 
 /**
@@ -199,7 +243,14 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
       }
       const draft = draftSnaps[j].data();
       const live = liveSnaps[j].exists ? liveSnaps[j].data() : null;
-      const revision = (typeof live?.revision === 'number' ? live.revision : 0) + 1;
+      // No live doc means first publish OR a recreation after deleteBoth
+      // (whose cmsVersionHistory rows survive as the audit trail). Resume
+      // from the historical max so revisions stay unique per docPath — the
+      // invariant versions.cjs's cursor pagination depends on.
+      const baseRevision = typeof live?.revision === 'number'
+        ? live.revision
+        : await maxHistoryRevision({ db, docPath: `${collection}/${docId}` });
+      const revision = baseRevision + 1;
       const contentFields = contentFieldsOf(draft);
       const visible = draft.visible !== false;
 
@@ -272,5 +323,13 @@ module.exports = {
   publishDocs,
   logAdminAction,
   contentFieldsOf,
-  internals: { MAX_WRITES_PER_BATCH, WRITES_PER_DOC, DOCS_PER_CHUNK, RESERVED_FIELDS },
+  isValidDocId,
+  internals: {
+    MAX_WRITES_PER_BATCH,
+    WRITES_PER_DOC,
+    DOCS_PER_CHUNK,
+    RESERVED_FIELDS,
+    MAX_DOC_ID_LENGTH,
+    maxHistoryRevision,
+  },
 };
