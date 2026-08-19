@@ -285,10 +285,12 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
     // site re-attaching the flag — an auth.otp render must never persist
     // the code in admin-readable sent_emails (spec §3.1, §6.1).
     storeRendered: template.storeRendered !== false,
-    // Shipped templates carry the legal footer through the layout's
-    // {{postal_address_html}}; the send core appends one only when this
-    // flag is absent (spec §3.1 — footer resolution is a core duty).
-    hasLegalFooter: true,
+    // Footer flags are DERIVED per body from the effective (possibly
+    // overridden) source, never assumed: a valid override that drops
+    // {{postal_address_html}} must not tell the send core the footer is
+    // already there (spec §3.1 — footer resolution is a core duty).
+    hasLegalFooterHtml: referencedTokens(effective.html).has('postal_address_html'),
+    hasLegalFooterText: referencedTokens(effective.text).has('postal_address_html'),
     usedFallback,
     overrideErrors,
     warnings,

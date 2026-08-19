@@ -52,7 +52,7 @@ function renderedMailCarriesCode(rendered, code) {
  *           notifyOperator?: (e: object) => Promise<object>,
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
-function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = Date.now, log = console }) {
+function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = Date.now, log = console, renderFn = render }) {
   return async function sendOtpCode(req, res) {
     if (req.method !== 'POST') {
       res.set('Allow', 'POST');
@@ -71,7 +71,7 @@ function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = 
     // Render first — a broken override must not consume a rate-limit slot.
     const template = getDefaultTemplate('auth.otp');
     const { override } = await loadTemplate({ db, id: 'auth.otp', now });
-    const rendered = render({
+    const rendered = renderFn({
       template,
       override,
       tokenValues: { code, expiry_minutes: String(EXPIRY_MINUTES) },
@@ -95,9 +95,12 @@ function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = 
 
     const slot = await takeRateLimitSlot({ db, email, now });
     if (slot.limited) {
-      if (slot.retryAfterMs) res.set('Retry-After', String(Math.ceil(slot.retryAfterMs / 1000)));
+      const retryAfterSeconds = slot.retryAfterMs ? Math.ceil(slot.retryAfterMs / 1000) : null;
+      if (retryAfterSeconds) res.set('Retry-After', String(retryAfterSeconds));
+      // The hint rides in the body too: Retry-After is not a CORS-safelisted
+      // response header, so cross-origin JS cannot read it.
       res.status(429).json({
-        error: { code: 'rate-limited', message: 'Too many code requests. Try again later.' },
+        error: { code: 'rate-limited', message: 'Too many code requests. Try again later.', retryAfterSeconds },
       });
       return;
     }
@@ -113,7 +116,8 @@ function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = 
       tag: 'auth.otp',
       source: 'auth-otp',
       storeRendered: rendered.storeRendered,
-      hasLegalFooter: rendered.hasLegalFooter,
+      hasLegalFooterHtml: rendered.hasLegalFooterHtml,
+      hasLegalFooterText: rendered.hasLegalFooterText,
     });
     if (result.status !== 'sent') {
       res.status(502).json({ error: { code: 'send-failed', message: 'The sign-in email could not be sent. Try again.' } });
@@ -174,10 +178,19 @@ function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
   const { onSchedule } = require('firebase-functions/v2/scheduler');
   const { defineSecret } = require('firebase-functions/params');
-  const { SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+  const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
 
   const providerName = (process.env.EVENT_EMAIL_PROVIDER || '').trim();
-  const secrets = (SECRETS_BY_PROVIDER[providerName] || []).map(defineSecret);
+  // Send-path secrets only — never the delivery-ingest set (a postmark
+  // deployment without ingest has no EMAIL_WEBHOOK_BASIC_AUTH to bind).
+  // The operator webhook sink runs inside this function on a broken
+  // override, so its secrets bind here too when that notifier is selected.
+  const secretNames = new Set(SEND_SECRETS_BY_PROVIDER[providerName] || []);
+  if ((process.env.EVENT_OPERATOR_NOTIFIER || '').trim() === 'webhook') {
+    secretNames.add('OPERATOR_WEBHOOK_URL');
+    secretNames.add('OPERATOR_WEBHOOK_SECRET');
+  }
+  const secrets = [...secretNames].map(defineSecret);
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
 
   const buildDeps = () => {

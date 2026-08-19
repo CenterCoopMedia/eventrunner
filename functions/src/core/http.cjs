@@ -36,6 +36,9 @@ function applyCors(req, res, { allowedOrigins, methods = ['POST'] }) {
     res.set('Access-Control-Allow-Methods', methods.join(', '));
     res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.set('Access-Control-Max-Age', '3600');
+    // Retry-After is not CORS-safelisted; without this the browser client
+    // cannot read the 429 hint.
+    res.set('Access-Control-Expose-Headers', 'Retry-After');
   }
   if (req.method === 'OPTIONS') {
     res.status(204).send('');

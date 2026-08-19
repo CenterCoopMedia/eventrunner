@@ -32,6 +32,23 @@ function emailHash(email) {
 }
 
 /**
+ * Rate-bucket key: additionally strips a +tag from the local part, since
+ * victim+1@ and victim+2@ deliver to the same inbox — without this, sub-
+ * addressing gives an attacker a fresh 5/15min budget per tag against one
+ * victim. Challenges keep the full address; only the bucket collapses.
+ * @param {string} email @returns {string} sha256 hex
+ */
+function rateBucketHash(email) {
+  const normalized = normalizeEmail(email);
+  const at = normalized.lastIndexOf('@');
+  const local = at === -1 ? normalized : normalized.slice(0, at);
+  const domain = at === -1 ? '' : normalized.slice(at);
+  const plus = local.indexOf('+');
+  const bucketAddress = (plus === -1 ? local : local.slice(0, plus)) + domain;
+  return crypto.createHash('sha256').update(bucketAddress, 'utf8').digest('hex');
+}
+
+/**
  * Salted challenge-scoped code hash: the same code in two challenges never
  * produces the same stored hash.
  * @param {string} token challenge id @param {string} code
@@ -49,7 +66,7 @@ function hashCode(token, code) {
  * @returns {Promise<{ limited: boolean, retryAfterMs?: number }>}
  */
 async function takeRateLimitSlot({ db, email, now = Date.now }) {
-  const ref = db.collection('auth_rate_limits').doc(emailHash(email));
+  const ref = db.collection('auth_rate_limits').doc(rateBucketHash(email));
   const nowMs = now();
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -180,6 +197,7 @@ module.exports = {
   sweepExpired,
   normalizeEmail,
   emailHash,
+  rateBucketHash,
   hashCode,
   internals: { RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS, CHALLENGE_TTL_MS, MAX_ATTEMPTS },
 };

@@ -99,6 +99,22 @@ test('rate limit: slots expire after the window', async () => {
   assert.equal(slot.limited, false);
 });
 
+test('plus-addressed variants share one rate bucket; challenges keep the full address', async () => {
+  const db = fakeDb();
+  const { takeRateLimitSlot: take, rateBucketHash } = require('./challenges.cjs');
+  assert.equal(rateBucketHash('victim+1@gmail.com'), rateBucketHash('victim+2@gmail.com'));
+  assert.equal(rateBucketHash('victim+tag@gmail.com'), rateBucketHash('victim@gmail.com'));
+  assert.notEqual(rateBucketHash('victim@gmail.com'), rateBucketHash('other@gmail.com'));
+  for (let i = 0; i < internals.RATE_LIMIT_MAX; i += 1) {
+    await take({ db, email: `victim+${i}@gmail.com` });
+  }
+  const bypass = await take({ db, email: 'victim+next@gmail.com' });
+  assert.equal(bypass.limited, true);
+  // The challenge itself preserves the sub-address so mail routes correctly.
+  const { token } = await createChallenge({ db, email: 'victim+tag@gmail.com', code: '123456' });
+  assert.equal(db.store.get(`auth_challenges/${token}`).email, 'victim+tag@gmail.com');
+});
+
 test('rate limit buckets are per address', async () => {
   const db = fakeDb();
   for (let i = 0; i < internals.RATE_LIMIT_MAX; i += 1) {

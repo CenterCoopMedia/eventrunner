@@ -306,8 +306,16 @@ test('non-template mail gets the configured legal footer; rendered mail does not
   await c.send({ to: 'a@example.org', subject: 's', html: '<p>alert</p>', text: 'alert' });
   assert.ok(seen[0].html.includes('Example Org<br>1 Main St'));
   assert.ok(seen[0].text.includes('Example Org\n1 Main St'));
-  await c.send({ to: 'a@example.org', subject: 's', html: '<p>Example Org<br>1 Main St</p>', text: 'x', hasLegalFooter: true });
+  await c.send({
+    to: 'a@example.org',
+    subject: 's',
+    html: '<p>Example Org<br>1 Main St</p>',
+    text: 'x',
+    hasLegalFooterHtml: true,
+  });
   assert.equal(seen[1].html.match(/Example Org/g).length, 1);
+  // The flags are per body: text still gets the footer appended.
+  assert.ok(seen[1].text.includes('Example Org\n1 Main St'));
 });
 
 test('an EmailAddress recipient keeps its display name for the adapter', async () => {

@@ -121,6 +121,20 @@ test('valid override is used', () => {
   assert.equal(out.text, 'c=5');
 });
 
+test('footer flags derive from the effective bodies, not the shipped default', () => {
+  // The shipped fixture references postal_address_html in both bodies.
+  const base = render({ template: TEMPLATE, tokenValues: { first_name: 'A', code: '1' }, config: CONFIG });
+  assert.equal(base.hasLegalFooterHtml, true);
+  assert.equal(base.hasLegalFooterText, true);
+  // A VALID override that drops the token must report the footer missing
+  // so the send core appends it (issue #44).
+  const override = { html: '<p>c={{code}}</p>', text: 'c={{code}}' };
+  const out = render({ template: TEMPLATE, override, tokenValues: { first_name: 'A', code: '1' }, config: CONFIG });
+  assert.equal(out.usedFallback, false);
+  assert.equal(out.hasLegalFooterHtml, false);
+  assert.equal(out.hasLegalFooterText, false);
+});
+
 test('render carries the template storage policy for send() composition', () => {
   const out = render({ template: TEMPLATE, tokenValues: { first_name: 'A', code: '1' }, config: CONFIG });
   assert.equal(out.storeRendered, true);

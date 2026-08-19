@@ -126,6 +126,8 @@ test('sendOtpCode rate-limits the 6th request with Retry-After and sends no mail
   await handler({ method: 'POST', body: { email: 'a@example.org' } }, res);
   assert.equal(res.statusCode, 429);
   assert.ok(Number(res.headers['Retry-After']) > 0);
+  // The hint rides in the body too — Retry-After is unreadable cross-origin.
+  assert.ok(res.body.error.retryAfterSeconds > 0);
   assert.equal(sent.length, challengeInternals.RATE_LIMIT_MAX);
   assert.equal(db.store.size >= challengeInternals.RATE_LIMIT_MAX, true);
 });
@@ -145,13 +147,7 @@ test('a broken auth.otp override falls back to the default and notifies the oper
   assert.match(notices[0].title, /auth\.otp override/);
 });
 
-test('the send-boundary gate refuses a render lacking the code, without spending a rate slot', async () => {
-  // Force the gate by making the internals check directly observable: a
-  // rendered mail missing the code in text must 500 and record nothing.
-  const db = fakeDb();
-  const deps = sendDeps({ db });
-  // Sabotage: override loadTemplate cache is not injectable here, so assert
-  // the gate function itself plus the handler path via a code-free render.
+test('the send-boundary gate: unit truth table', () => {
   assert.equal(
     internals.renderedMailCarriesCode({ html: '<p>123456</p>', text: 'no code here' }, '123456'),
     false,
@@ -161,8 +157,31 @@ test('the send-boundary gate refuses a render lacking the code, without spending
     true,
   );
   assert.equal(internals.renderedMailCarriesCode({ html: 'x', text: 'y' }, ''), false);
-  // And the rate bucket stays untouched when the handler never reaches the slot.
-  assert.equal([...deps.db.store.keys()].filter((k) => k.startsWith('auth_rate_limits/')).length, 0);
+});
+
+test('a code-free render 500s at the handler and spends no rate slot, challenge, or mail', async () => {
+  const db = fakeDb();
+  const sent = [];
+  const handler = createSendOtpHandler({
+    db,
+    getConfig: async () => CONFIG,
+    sendEmail: async (m) => { sent.push(m); return { status: 'sent', providerMessageId: 'id', retries: 0 }; },
+    log: { error() {}, warn() {} },
+    // Injected render seam: a "valid" render whose bodies lack the code —
+    // the gate must catch it BEFORE the rate slot (spec §6.1).
+    renderFn: () => ({
+      subject: 's', html: '<p>welcome</p>', text: 'welcome',
+      usedFallback: false, overrideErrors: [], warnings: [],
+      storeRendered: false, hasLegalFooterHtml: true, hasLegalFooterText: true,
+    }),
+  });
+  const res = fakeRes();
+  await handler({ method: 'POST', body: { email: 'a@example.org' } }, res);
+  assert.equal(res.statusCode, 500);
+  assert.equal(sent.length, 0);
+  const keys = [...db.store.keys()];
+  assert.equal(keys.filter((k) => k.startsWith('auth_rate_limits/')).length, 0);
+  assert.equal(keys.filter((k) => k.startsWith('auth_challenges/')).length, 0);
 });
 
 test('sendOtpCode maps a failed provider send to 502', async () => {

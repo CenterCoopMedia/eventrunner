@@ -39,6 +39,9 @@ const text = [
   'Schedule: {{schedule_url}}',
   '',
   'You can update your details any time on your profile: {{profile_url}}',
+  '',
+  '--',
+  '{{postal_address_html}}',
 ].join('\n');
 
 module.exports = {
