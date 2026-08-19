@@ -17,5 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Three-workspace layout: `apps/web` and `functions` join `packages/shared` as npm workspaces (spec §1.1–1.2).
 - ESLint flat config with the hex-literal ban and its three-path allowlist (spec §7.6) plus `react-hooks/rules-of-hooks`.
 - Firestore and Storage security-rules tests running on the Firebase emulators, and CI lint + rules jobs — still credential-free and fork-runnable (spec §8.1).
+- CMS content endpoints under the two-revision publish model: draft-only create/update/delete, version history reads, and the chunked resumable publish pipeline over the six publishable collections and their `_drafts` siblings (spec §8.4, #12).
+- Pages-as-data and live-updates admin endpoints: `cmsSavePage`/`cmsDeletePage` against the block-type registry, `cmsSaveUpdate`/`cmsDeleteUpdate`, all writing drafts only (spec §5.2, #13).
+- Validated `config/*` writers — `updateEventConfig`, `updateFeatures`, `updateTheme`, `updateBadges` — gated by the server-only admin list, rejecting deploy-mirrored read-only fields, with audit rows on every write (spec §1.3, #14).
 
-The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Web app, Cloud Functions, and the remaining Phase 2 modules have not landed yet.
+The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Web app and the remaining Phase 2 modules have not landed yet.

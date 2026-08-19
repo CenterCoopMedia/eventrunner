@@ -32,6 +32,8 @@ const noHexLiterals = {
 export default [
   {
     ignores: [
+      // Harness-managed session state (gitignored); may hold agent worktrees.
+      ".claude/",
       "**/node_modules/",
       "**/dist/",
       "coverage/",
