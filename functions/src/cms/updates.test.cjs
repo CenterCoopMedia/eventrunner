@@ -154,7 +154,9 @@ test('cmsSaveUpdate writes the DRAFT collection only', async () => {
   const write = d.store.writes[0];
   assert.equal(write.collection, 'cmsUpdates');
   assert.equal(write.docId, 'venue-change');
-  assert.equal(write.visible, true);
+  // Omitted visible must reach the store as undefined so it preserves the
+  // prior draft/live visibility instead of resetting a hidden update.
+  assert.equal(write.visible, undefined);
   assert.deepEqual(write.actor, { uid: 'admin1', email: 'admin@example.org' });
   assert.deepEqual(Object.keys(write.fields).sort(), ['body', 'pinned', 'publishAt', 'title']);
 });
@@ -209,6 +211,15 @@ test('cmsSaveUpdate rejects non-POST and non-boolean visible', async () => {
   res = fakeRes();
   await createSaveUpdateHandler(deps())(adminReq({ update: validUpdate(), visible: 'yes' }), res);
   assert.equal(res.statusCode, 400);
+});
+
+test('cmsSaveUpdate passes an explicit visible boolean through unchanged', async () => {
+  const d = deps();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'u-hidden', update: validUpdate(), visible: false }), fakeRes());
+  assert.equal(d.store.writes[0].visible, false);
+  const d2 = deps();
+  await createSaveUpdateHandler(d2)(adminReq({ id: 'u-shown', update: validUpdate(), visible: true }), fakeRes());
+  assert.equal(d2.store.writes[0].visible, true);
 });
 
 test('cmsSaveUpdate records an admin_logs entry via the store', async () => {

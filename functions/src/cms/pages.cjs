@@ -4,7 +4,9 @@
  * Pages-as-data admin endpoints (spec §5.2, §8.4, issue #13).
  *
  *   cmsSavePage   POST { page } — validate the cmsPages doc shape and write
- *                 the DRAFT revision only (cmsPages_drafts, status 'dirty').
+ *                 the DRAFT revision only (cmsPages_drafts, status 'dirty');
+ *                 refuses to flip systemPage true -> false so the delete
+ *                 guard below cannot be laundered via save -> publish.
  *   cmsDeletePage POST { id }   — remove live + draft in one batch; refuses
  *                 to delete a systemPage (those own a dedicated React route;
  *                 deleting the doc would strand the route's content).
@@ -170,6 +172,29 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
     const page = req.body?.page;
     const verdict = validatePageDoc(page);
     if (!verdict.ok) return badRequest(res, `Invalid page: ${verdict.errors.join('; ')}`);
+
+    // systemPage may never be flipped true -> false: cmsDeletePage refuses to
+    // delete a system page, and letting a draft edit clear the flag would let
+    // save -> publish -> delete launder one into deletability (stranding its
+    // dedicated React route, §5.2). Checked against BOTH revisions, same as
+    // the delete guard.
+    if (page.systemPage === false) {
+      let isSystem;
+      try {
+        const [draftSnap, liveSnap] = await Promise.all([
+          db.collection(PAGES_DRAFTS).doc(page.id).get(),
+          db.collection(PAGES_COLLECTION).doc(page.id).get(),
+        ]);
+        isSystem = (draftSnap.exists && draftSnap.data().systemPage === true) ||
+          (liveSnap.exists && liveSnap.data().systemPage === true);
+      } catch (err) {
+        log.error('cmsSavePage systemPage check failed', err);
+        return internal(res, 'The page could not be saved.');
+      }
+      if (isSystem) {
+        return forbidden(res, 'systemPage: a system page cannot be changed into a regular page.');
+      }
+    }
 
     try {
       // The store strips reserved publish-model keys (visible/status/

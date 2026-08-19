@@ -243,6 +243,55 @@ test('cmsSavePage rejects non-POST', async () => {
   assert.equal(res.headers.Allow, 'POST');
 });
 
+test('cmsSavePage refuses to flip systemPage true -> false (live doc)', async () => {
+  const db = fakeDb({ 'cmsPages/home': { id: 'home', systemPage: true } });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(
+    adminReq({ page: validPage({ id: 'home', path: '/home', systemPage: false }) }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+  assert.ok(res.body.error.message.includes('systemPage'));
+  assert.equal(d.store.writes.length, 0);
+});
+
+test('cmsSavePage refuses the flip when only the DRAFT says systemPage', async () => {
+  const db = fakeDb({ 'cmsPages_drafts/home': { id: 'home', systemPage: true } });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(
+    adminReq({ page: validPage({ id: 'home', path: '/home', systemPage: false }) }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+  assert.equal(d.store.writes.length, 0);
+});
+
+test('cmsSavePage still allows editing a system page that stays systemPage', async () => {
+  const db = fakeDb({ 'cmsPages/home': { id: 'home', systemPage: true } });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(
+    adminReq({ page: validPage({ id: 'home', path: '/home', systemPage: true }) }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(d.store.writes.length, 1);
+});
+
+test('cmsSavePage allows systemPage:false on brand-new and non-system pages', async () => {
+  const db = fakeDb({ 'cmsPages/extra': { id: 'extra', systemPage: false } });
+  const d = deps({ db });
+  let res = fakeRes();
+  await createSavePageHandler(d)(adminReq({ page: validPage({ id: 'extra', path: '/extra' }) }), res);
+  assert.equal(res.statusCode, 200);
+  res = fakeRes();
+  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(d.store.writes.length, 2);
+});
+
 test('cmsSavePage records an admin_logs entry via the store', async () => {
   const d = deps();
   await createSavePageHandler(d)(adminReq({ page: validPage() }), fakeRes());

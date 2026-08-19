@@ -112,7 +112,11 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
         collection: UPDATES_COLLECTION,
         docId: id,
         fields: contentFields,
-        visible: visible === undefined ? true : visible,
+        // Omitted => undefined, so the store preserves the prior draft/live
+        // visibility (§8.4: visibility changes are explicit admin actions,
+        // never a side effect of editing). Forcing a default here would
+        // silently re-show an unpublished update on its next edit.
+        visible,
         actor: { uid: gate.uid, email: gate.email },
         now,
       });
