@@ -11,7 +11,8 @@
   ],
   "scripts": {
     "lint": "eslint .",
-    "test": "node --test \"packages/shared/src/**/*.test.cjs\"",
+    "prepare:functions": "node scripts/prepare-functions.cjs",
+    "test": "node --test \"packages/shared/src/**/*.test.cjs\" \"functions/src/**/*.test.cjs\"",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-run-of-show \"vitest run --config vitest.rules.config.js\""
   },
   "devDependencies": {

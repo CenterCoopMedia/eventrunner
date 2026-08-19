@@ -275,10 +275,22 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
   };
 }
 
+/**
+ * Every global token name (spec §6.2) — the vocabulary templates declare so
+ * overrides may reference any of them without tripping the unknown-token
+ * check. Derived from buildGlobalTokens plus the global `_html` resolvers.
+ */
+const GLOBAL_TOKEN_NAMES = Object.freeze([
+  ...Object.keys(buildGlobalTokens({})),
+  'postal_address_html',
+  'social_links_html',
+]);
+
 module.exports = {
   render,
   validateTemplateBody,
   buildGlobalTokens,
+  GLOBAL_TOKEN_NAMES,
   internals: {
     escapeHtml,
     stripHtmlToText,
