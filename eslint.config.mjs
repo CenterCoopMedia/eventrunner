@@ -77,7 +77,7 @@ export default [
 
   // Frontend: JSX plus the rules-of-hooks guard.
   {
-    files: ["apps/web/**/*.{js,jsx}"],
+    files: ["apps/web/**/*.{js,jsx,mjs}"],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "module",
