@@ -288,6 +288,28 @@ test('the configured Tier B message stream reaches the adapter; per-message wins
   assert.deepEqual(seen, ['client-a', 'override-stream']);
 });
 
+test('non-template mail gets the configured legal footer; rendered mail does not double it', async () => {
+  const seen = [];
+  const provider = { name: 'x', send: async (m) => { seen.push(m); return { providerMessageId: 'id', status: 'sent', providerStatus: 200 }; } };
+  const c = createEmailCore({
+    db: fakeDb(),
+    provider,
+    getConfig: async () => ({
+      event: {
+        sender: { email: 's@example.org', name: 'S' },
+        legal: { postalAddressHtml: 'Example Org<br>1 Main St' },
+      },
+    }),
+    sleep: async () => {},
+    log: { error() {}, warn() {}, info() {} },
+  });
+  await c.send({ to: 'a@example.org', subject: 's', html: '<p>alert</p>', text: 'alert' });
+  assert.ok(seen[0].html.includes('Example Org<br>1 Main St'));
+  assert.ok(seen[0].text.includes('Example Org\n1 Main St'));
+  await c.send({ to: 'a@example.org', subject: 's', html: '<p>Example Org<br>1 Main St</p>', text: 'x', hasLegalFooter: true });
+  assert.equal(seen[1].html.match(/Example Org/g).length, 1);
+});
+
 test('an EmailAddress recipient keeps its display name for the adapter', async () => {
   const seen = [];
   const db = fakeDb();

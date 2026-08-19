@@ -156,6 +156,16 @@ test('a thrown fetch error propagates (core treats throws as non-retryable)', as
   await assert.rejects(() => provider.send({ to: 'a@example.com', subject: 's' }), /ETIMEDOUT/);
 });
 
+test('formatAddress quotes display names with mailbox-special characters', () => {
+  const { formatAddress } = internals;
+  assert.equal(formatAddress({ email: 'j@example.org', name: 'Jane Doe' }), 'Jane Doe <j@example.org>');
+  assert.equal(formatAddress({ email: 'j@example.org', name: 'Doe, Jane' }), '"Doe, Jane" <j@example.org>');
+  assert.equal(
+    formatAddress({ email: 'j@example.org', name: 'Jane "JD" D\\backslash' }),
+    '"Jane \\"JD\\" D\\\\backslash" <j@example.org>',
+  );
+});
+
 // --- verifyDeliveryWebhook ---------------------------------------------------
 
 test('verifyDeliveryWebhook accepts matching Basic credentials', () => {

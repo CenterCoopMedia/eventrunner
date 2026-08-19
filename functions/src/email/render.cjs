@@ -15,6 +15,12 @@
  */
 
 const TOKEN_RE = /\{\{\s*([a-z0-9_]+)\s*\}\}/gi;
+// Any {{...}} construct, however malformed — validation flags the ones the
+// token grammar above would silently pass over ({{support-email}},
+// {{profile.url}}), which substitution would otherwise deliver as literal
+// braces.
+const PLACEHOLDER_RE = /\{\{([^{}]*)\}\}/g;
+const TOKEN_NAME_RE = /^[a-z0-9_]+$/i;
 
 /** @param {string} s */
 function escapeHtml(s) {
@@ -167,6 +173,11 @@ function validateTemplateBody(template, candidate) {
         errors.push(`${field}: unknown token {{${name}}}`);
       }
     }
+    for (const match of String(body || '').matchAll(PLACEHOLDER_RE)) {
+      if (!TOKEN_NAME_RE.test(match[1].trim())) {
+        errors.push(`${field}: malformed placeholder {{${match[1]}}}`);
+      }
+    }
   }
 
   // Required tokens must be referenced in every body that is sent — a
@@ -274,6 +285,10 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
     // site re-attaching the flag — an auth.otp render must never persist
     // the code in admin-readable sent_emails (spec §3.1, §6.1).
     storeRendered: template.storeRendered !== false,
+    // Shipped templates carry the legal footer through the layout's
+    // {{postal_address_html}}; the send core appends one only when this
+    // flag is absent (spec §3.1 — footer resolution is a core duty).
+    hasLegalFooter: true,
     usedFallback,
     overrideErrors,
     warnings,

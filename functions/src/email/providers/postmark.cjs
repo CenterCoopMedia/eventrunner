@@ -37,18 +37,37 @@ function header(headers, name) {
   return undefined;
 }
 
-/** Retry-After seconds header → ms, or undefined. @param {string|null|undefined} value */
-function retryAfterMsFrom(value) {
-  const seconds = Number.parseInt(String(value ?? ''), 10);
-  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : undefined;
+/** Retry-After (delay-seconds or HTTP-date) → ms, or undefined. @param {string|null|undefined} value */
+function retryAfterMsFrom(value, now = Date.now) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return undefined;
+  // Delay-seconds form. HTTP-dates (IMF-fixdate) never start with a digit,
+  // so a leading integer is unambiguous.
+  if (/^-?\d+$/.test(raw)) {
+    const seconds = Number.parseInt(raw, 10);
+    return seconds >= 0 ? seconds * 1000 : undefined;
+  }
+  // HTTP-date form (RFC 9110): a past date clamps to 0, unparseable is no hint.
+  const at = Date.parse(raw);
+  if (Number.isNaN(at)) return undefined;
+  return Math.max(0, at - now());
 }
 
-/** 'Name <email>' when name present. @param {string|{email:string,name?:string}|undefined} addr */
+/**
+ * 'Name <email>' when name present. A display name outside plain
+ * atom/space characters is quoted per RFC 5322 mailbox syntax — an
+ * unquoted comma ('Doe, Jane') reads as a recipient-list delimiter.
+ * @param {string|{email:string,name?:string}|undefined} addr
+ */
 function formatAddress(addr) {
   if (!addr) return undefined;
   if (typeof addr === 'string') return addr;
   if (!addr.email) return undefined;
-  return addr.name ? `${addr.name} <${addr.email}>` : addr.email;
+  if (!addr.name) return addr.email;
+  const name = /^[A-Za-z0-9 !#$%&'*+/=?^_`{|}~.-]*$/.test(addr.name) && !addr.name.includes(',')
+    ? addr.name
+    : `"${addr.name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return `${name} <${addr.email}>`;
 }
 
 /** EmailMessage → Postmark /email payload (spec §3.1). @param {object} message */

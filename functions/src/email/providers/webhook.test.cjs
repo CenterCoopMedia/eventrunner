@@ -123,6 +123,17 @@ test('send parses Retry-After seconds into retryAfterMs on 429 only', async () =
   assert.equal(noHint.retryAfterMs, undefined);
 });
 
+test('send honors an HTTP-date Retry-After on 429', async () => {
+  const future = new Date(Date.now() + 30000).toUTCString();
+  const fetchImpl = fakeFetch([
+    fakeResponse({ status: 429, textBody: 'slow down', headers: { 'Retry-After': future } }),
+  ]);
+  const provider = createWebhookProvider({ env: ENV, fetchImpl });
+  const result = await provider.send({ to: 'a@example.com', subject: 's' });
+  assert.equal(result.providerStatus, 429);
+  assert.ok(result.retryAfterMs > 0 && result.retryAfterMs <= 30000);
+});
+
 test('a thrown fetch error propagates (core treats throws as non-retryable)', async () => {
   const fetchImpl = fakeFetch([new Error('ECONNRESET')]);
   const provider = createWebhookProvider({ env: ENV, fetchImpl });

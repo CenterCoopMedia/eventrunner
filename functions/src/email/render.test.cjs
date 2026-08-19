@@ -139,6 +139,17 @@ test('validateTemplateBody reports both check types at save time', () => {
   assert.ok(bad.errors.some((e) => e.includes('missing required token')));
 });
 
+test('validateTemplateBody rejects malformed placeholders the token grammar skips', () => {
+  const bad = validateTemplateBody(TEMPLATE, {
+    subject: 'ok',
+    html: '{{code}} {{support-email}}',
+    text: '{{code}} {{profile.url}}',
+  });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.includes('malformed placeholder {{support-email}}')));
+  assert.ok(bad.errors.some((e) => e.includes('malformed placeholder {{profile.url}}')));
+});
+
 test('buildGlobalTokens derives urls, dates, and year', () => {
   const tokens = buildGlobalTokens(CONFIG, { now: () => new Date('2027-01-01T00:00:00Z') });
   assert.equal(tokens.site_url, 'https://summit.example.org');

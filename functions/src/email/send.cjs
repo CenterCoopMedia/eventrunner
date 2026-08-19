@@ -13,6 +13,7 @@
  */
 
 const crypto = require('node:crypto');
+const { internals: renderInternals } = require('./render.cjs');
 
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = [500, 2000];
@@ -152,6 +153,20 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
         ?? undefined,
     };
 
+    // Footer resolution is a core duty (spec §3.1). Template-rendered mail
+    // already carries it through the layout and says so with
+    // hasLegalFooter; anything else — the operator email sink, ad-hoc
+    // callers — gets the configured legal block appended here.
+    const postalHtml = config?.event?.legal?.postalAddressHtml;
+    if (!message.hasLegalFooter && typeof postalHtml === 'string' && postalHtml) {
+      if (typeof fullMessage.html === 'string') {
+        fullMessage.html += `\n<hr>\n<p>${postalHtml}</p>`;
+      }
+      if (typeof fullMessage.text === 'string') {
+        fullMessage.text += `\n\n--\n${renderInternals.stripHtmlToText(postalHtml)}`;
+      }
+    }
+
     let result = null;
     let attempts = 0;
     while (attempts < MAX_ATTEMPTS) {
@@ -180,7 +195,8 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       retries,
     };
 
-    await writeAuditRow(message, fullMessage.from?.email || null, toEmail, outcome);
+    // Audit what was actually handed to the adapter (footer included).
+    await writeAuditRow(fullMessage, fullMessage.from?.email || null, toEmail, outcome);
     return outcome;
   }
 

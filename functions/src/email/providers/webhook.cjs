@@ -41,10 +41,20 @@ function header(headers, name) {
   return undefined;
 }
 
-/** Retry-After seconds header → ms, or undefined. @param {string|null|undefined} value */
-function retryAfterMsFrom(value) {
-  const seconds = Number.parseInt(String(value ?? ''), 10);
-  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : undefined;
+/** Retry-After (delay-seconds or HTTP-date) → ms, or undefined. @param {string|null|undefined} value */
+function retryAfterMsFrom(value, now = Date.now) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return undefined;
+  // Delay-seconds form. HTTP-dates (IMF-fixdate) never start with a digit,
+  // so a leading integer is unambiguous.
+  if (/^-?\d+$/.test(raw)) {
+    const seconds = Number.parseInt(raw, 10);
+    return seconds >= 0 ? seconds * 1000 : undefined;
+  }
+  // HTTP-date form (RFC 9110): a past date clamps to 0, unparseable is no hint.
+  const at = Date.parse(raw);
+  if (Number.isNaN(at)) return undefined;
+  return Math.max(0, at - now());
 }
 
 const EVENT_TYPES = new Set(['delivered', 'bounced', 'complained', 'suppressed']);
