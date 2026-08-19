@@ -46,6 +46,7 @@ The [governance](GOVERNANCE.md) note is the short version of who decides.
 3. From the repo root:
 
 ```bash
+npm run prepare:functions   # packs packages/shared into functions/vendor/ — required before install
 npm install
 npm run lint
 npm test
@@ -76,7 +77,7 @@ UI changes need a keyboard path and visible focus. If you change a flow that att
 | Command | What it covers |
 |---|---|
 | `npm run lint` | ESLint over every workspace, including the hex-literal ban (spec §7.6) and `react-hooks/rules-of-hooks` |
-| `npm test` | `packages/shared` unit tests (Node `--test`) |
+| `npm test` | `packages/shared` and `functions` unit tests (Node `--test`, fakes — no emulator) |
 | `npm run test:rules` | Firestore and Storage security rules on the Firebase emulators |
 
 CI runs all three on every pull request and every push to `main`, credential-free. When the web app and functions land, CI will also run Playwright against emulators. Fork PRs must be able to run every check without credentials.

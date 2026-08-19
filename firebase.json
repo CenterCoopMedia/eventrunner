@@ -1,4 +1,10 @@
 {
+  "functions": {
+    "source": "functions",
+    "codebase": "default",
+    "predeploy": ["node \"$PROJECT_DIR/scripts/prepare-functions.cjs\""],
+    "ignore": ["node_modules", ".git", "vendor/*.tgz.tmp", "**/*.test.cjs"]
+  },
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
