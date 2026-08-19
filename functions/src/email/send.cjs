@@ -326,5 +326,6 @@ module.exports = {
     MAX_ATTEMPTS,
     BACKOFF_MS,
     BODY_STORE_LIMIT,
+    SECRETS_BY_PROVIDER,
   },
 };

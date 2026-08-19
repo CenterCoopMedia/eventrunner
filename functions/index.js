@@ -5,7 +5,9 @@
 // export is re-exported here by name.
 
 const email = require('./src/email/send.cjs');
+const auth = require('./src/auth/otp.cjs');
 
 module.exports = {
   ...email.handlers,
+  ...auth.handlers,
 };
