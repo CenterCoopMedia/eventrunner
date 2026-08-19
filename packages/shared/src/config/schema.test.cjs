@@ -89,8 +89,11 @@ test('validateEventConfig never throws on garbage', () => {
 });
 
 test('validateTheme enforces hex colors', () => {
+  // The theme validator's own test is the one place hex strings are data.
+  /* eslint-disable no-restricted-syntax */
   assert.equal(validateTheme({ colors: { primary: '#336699', ink: '#123' } }).ok, true);
   const bad = validateTheme({ colors: { primary: 'teal', accent: '#12345' } });
+  /* eslint-enable no-restricted-syntax */
   assert.equal(bad.ok, false);
   assert.ok(bad.errors.some((e) => e.includes('theme.colors.primary')));
   assert.ok(bad.errors.some((e) => e.includes('theme.colors.accent')));

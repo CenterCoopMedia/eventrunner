@@ -1,0 +1,7 @@
+{
+  "name": "web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Vite frontend. Placeholder workspace — the app lands under milestone M2.",
+  "type": "module"
+}

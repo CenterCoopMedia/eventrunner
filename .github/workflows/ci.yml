@@ -1,5 +1,7 @@
 name: CI
 
+# Credential-free by design (spec §8.1): no secrets, no Firebase project.
+# Every job must be runnable from a fork PR.
 on:
   push:
     branches: [main]
@@ -9,6 +11,20 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run ESLint
+        run: npm run lint
+
   unit:
     name: Shared package tests
     runs-on: ubuntu-latest
@@ -17,5 +33,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
       - name: Run unit tests
         run: npm test
+
+  rules:
+    name: Security rules on emulators
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install dependencies
+        run: npm ci
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: firebase-emulators-${{ runner.os }}-
+      - name: Run rules tests
+        run: npm run test:rules
