@@ -13,6 +13,19 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 
 const ADMIN_EMAIL = "admin@example.com";
 
+/**
+ * All six publishable collections from ADR §8.4 — the rules blocks are
+ * hand-duplicated per collection, so the matrix below must pin every one.
+ */
+const PUBLISHABLE = [
+  "cmsContent",
+  "cmsSchedule",
+  "cmsOrganizations",
+  "cmsTimeline",
+  "cmsUpdates",
+  "cmsPages",
+];
+
 let testEnv;
 
 /** Anonymous client. */
@@ -53,7 +66,7 @@ beforeAll(async () => {
       adminEmails: [ADMIN_EMAIL],
     });
     await setDoc(doc(db, "config/event"), { title: "Test event" });
-    for (const c of ["cmsContent", "cmsPages"]) {
+    for (const c of PUBLISHABLE) {
       await setDoc(doc(db, `${c}/pub`), {
         body: "published",
         visible: true,
@@ -104,7 +117,7 @@ describe("config", () => {
   });
 });
 
-for (const c of ["cmsContent", "cmsPages"]) {
+for (const c of PUBLISHABLE) {
   describe(`${c} two-revision model`, () => {
     it("allows anonymous read of a visible live doc", async () => {
       await assertSucceeds(getDoc(doc(anon(), `${c}/pub`)));
@@ -125,6 +138,16 @@ for (const c of ["cmsContent", "cmsPages"]) {
     it("allows admin read of hidden live docs and drafts", async () => {
       await assertSucceeds(getDoc(doc(admin(), `${c}/hidden`)));
       await assertSucceeds(getDoc(doc(admin(), `${c}_drafts/pub`)));
+    });
+
+    it("allows admin read with a mixed-case token email (rules lowercase it)", async () => {
+      const db = testEnv
+        .authenticatedContext("admin-3", {
+          email: "Admin@Example.com",
+          email_verified: true,
+        })
+        .firestore();
+      await assertSucceeds(getDoc(doc(db, `${c}_drafts/pub`)));
     });
 
     it("denies admin read when the token email is unverified", async () => {

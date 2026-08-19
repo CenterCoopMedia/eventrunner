@@ -5,14 +5,16 @@ service cloud.firestore {
     // All writes go through the Admin SDK (callable/HTTP functions);
     // clients never write Firestore directly.
 
-    // adminEmails on config/bootstrap are stored lowercase and Firebase ID
-    // tokens carry lowercase emails, so an exact hasAny() match suffices —
-    // rules cannot lowercase strings.
+    // adminEmails on config/bootstrap MUST be stored lowercase: rules can
+    // lowercase the token email (string.lower()) but cannot map over the
+    // stored list, so the lowercase-storage convention carries the other
+    // half of the case-insensitive match (server-side requireAdmin
+    // lowercases both sides).
     function isAdmin() {
       return request.auth != null
         && request.auth.token.email_verified == true
         && get(/databases/$(database)/documents/config/bootstrap)
-             .data.adminEmails.hasAny([request.auth.token.email]);
+             .data.adminEmails.hasAny([request.auth.token.email.lower()]);
     }
 
     // config/* is public runtime configuration, EXCEPT config/bootstrap,
