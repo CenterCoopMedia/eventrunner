@@ -9,7 +9,7 @@ import { MemoryRouter } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import Schedule from './Schedule.jsx';
-import { zonedDateTime } from '../lib/eventTime.js';
+import { formatSessionTimeRange, zonedDateTime } from '../lib/eventTime.js';
 
 // Non-UTC zone on purpose: America/Chicago is UTC−5 (CDT) on the fixture
 // dates, so a renderer that ignored config.timezone would be caught.
@@ -167,6 +167,29 @@ describe('SchedulePage', () => {
     // Malformed inputs fail soft, never throw.
     expect(zonedDateTime('2026-10-15', '9:05', 'America/Chicago')).toBeNull();
     expect(zonedDateTime('2026-10-15', '09:05', 'Not/AZone')).toBeNull();
+  });
+
+  it('rolls a midnight-crossing session end to the next calendar day', () => {
+    const range = formatSessionTimeRange(fixtureConfig, {
+      dayId: 'fx-day-1',
+      startTime: '23:30',
+      endTime: '00:15',
+    });
+    expect(range.startIso).toBe('2026-10-15T23:30');
+    // The end instant must be after the start instant, not ~23h before it.
+    expect(range.endIso).toBe('2026-10-16T00:15');
+    expect(range.endLabel).toBe('12:15 AM');
+  });
+
+  it('does not crash on a malformed entry in config/event.days', () => {
+    renderSchedule({
+      eventConfig: {
+        ...fixtureConfig,
+        days: [null, { id: 'fx-day-1', label: 'Day one', date: '2026-10-15' }, {}],
+      },
+    });
+    expect(screen.getByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument();
+    expect(screen.getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
   });
 
   it('is hidden behind config/features.schedule', () => {

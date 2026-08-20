@@ -98,7 +98,12 @@ export default function Schedule() {
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
 
-  const days = Array.isArray(eventConfig.days) ? eventConfig.days : [];
+  // Days are runtime config — a live config/event write could deliver a
+  // malformed entry; drop anything without a usable string id rather than
+  // let day.id/day.label dereferences below throw and blank the page.
+  const days = Array.isArray(eventConfig.days)
+    ? eventConfig.days.filter((d) => d && typeof d.id === 'string')
+    : [];
   const [selectedDayId, setSelectedDayId] = useState(null);
   // Days are runtime config — if the selected id disappears, fall back to
   // the first configured day rather than an empty view.

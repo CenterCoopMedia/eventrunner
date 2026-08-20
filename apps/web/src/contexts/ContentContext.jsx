@@ -8,15 +8,24 @@
 // (?preview=1 is convenience only, wired in App.jsx).
 //
 // Overlay semantics, per collection:
-//   - cmsContent / cmsPages: a live result with at least one doc replaces
-//     the snapshot wholesale — the published set is the truth, and merging
-//     would resurrect deleted demo blocks. An empty result or a listener
-//     error keeps the snapshot (fail soft: a fresh, unseeded project should
-//     still show the demo site, and rules-denied reads must not blank it).
+//   - cmsContent / cmsPages / cmsSchedule: a live result with at least one
+//     doc replaces the snapshot wholesale — the published set is the truth,
+//     and merging would resurrect deleted demo blocks/sessions. An empty
+//     result or a listener error keeps the snapshot (fail soft: a fresh,
+//     unseeded project should still show the demo site, and rules-denied
+//     reads must not blank it).
 //   - cmsUpdates: live-only; there is no snapshot module, so the default is
 //     an empty list.
-//   - cmsSchedule / cmsOrganizations / cmsTimeline: snapshot-only for now —
-//     their runtime overlay belongs to the schedule/orgs tranche.
+//   - cmsOrganizations / cmsTimeline: snapshot-only for now — their runtime
+//     overlay belongs to a later orgs/timeline tranche.
+//
+// `loading` is always false: the snapshot renders synchronously on first
+// paint, and the overlay above is applied fire-and-forget as onSnapshot
+// results arrive — there is never a moment where content is *unknown*, only
+// "snapshot" vs "live" (spec §2.4 fail-soft: no spinner-trap on a
+// rules-denied or slow listener). The field is kept for interface
+// stability with loading-aware consumers (e.g. Schedule's LoadingState
+// branch), which stays defensive dead code by design rather than a bug.
 import {
   createContext,
   useContext,
@@ -25,14 +34,14 @@ import {
   useState,
 } from 'react';
 import snapshotSiteContent from '@generated/siteContent.js';
-import scheduleData, { speakers } from '@generated/scheduleData.js';
+import snapshotScheduleData, { speakers } from '@generated/scheduleData.js';
 import organizationsData from '@generated/organizationsData.js';
 import snapshotPages from '@generated/pagesData.js';
 import { subscribeContentCollection } from '../lib/contentSource.js';
 
 const ContentContext = createContext(null);
 
-const RUNTIME_COLLECTIONS = ['cmsContent', 'cmsPages', 'cmsUpdates'];
+const RUNTIME_COLLECTIONS = ['cmsContent', 'cmsPages', 'cmsUpdates', 'cmsSchedule'];
 
 const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
 
@@ -43,12 +52,13 @@ export function ContentProvider({ readSource = 'published', children }) {
     cmsContent: null,
     cmsPages: null,
     cmsUpdates: null,
+    cmsSchedule: null,
   });
 
   useEffect(() => {
     // Switching between published and draft re-subscribes from scratch;
     // stale overlay from the other source must not linger.
-    setOverlay({ cmsContent: null, cmsPages: null, cmsUpdates: null });
+    setOverlay({ cmsContent: null, cmsPages: null, cmsUpdates: null, cmsSchedule: null });
     const unsubscribers = RUNTIME_COLLECTIONS.map((name) =>
       subscribeContentCollection(name, readSource, (docs) => {
         setOverlay((prev) => ({ ...prev, [name]: docs }));
@@ -71,7 +81,10 @@ export function ContentProvider({ readSource = 'published', children }) {
       .slice()
       .sort(byOrder);
     const updates = (overlay.cmsUpdates ?? []).slice().sort(byOrder);
-    const live = Boolean(overlay.cmsContent?.length || overlay.cmsPages?.length);
+    const scheduleData = overlay.cmsSchedule?.length ? overlay.cmsSchedule : snapshotScheduleData;
+    const live = Boolean(
+      overlay.cmsContent?.length || overlay.cmsPages?.length || overlay.cmsSchedule?.length,
+    );
 
     const getBlock = (section, field) => {
       const block = siteContent[`${section}__${field}`] ?? null;

@@ -21,9 +21,10 @@ vi.mock('../lib/contentSource.js', () => ({ subscribeContentCollection }));
 import { ContentProvider, useContent, usePages } from './ContentContext.jsx';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotPages from '@generated/pagesData.js';
+import snapshotScheduleData from '@generated/scheduleData.js';
 
 function Probe() {
-  const { source, getBlock, getSectionBlocks } = useContent();
+  const { source, getBlock, getSectionBlocks, scheduleData, loading } = useContent();
   const heroTitle = useContent('hero', 'title');
   const { pages, getPage } = usePages();
   return (
@@ -34,6 +35,9 @@ function Probe() {
       <span data-testid="hero-block-count">{getSectionBlocks('hero').length}</span>
       <span data-testid="page-count">{pages.length}</span>
       <span data-testid="faq-page-label">{getPage('faq')?.label ?? ''}</span>
+      <span data-testid="schedule-count">{scheduleData.length}</span>
+      <span data-testid="schedule-first-title">{scheduleData[0]?.title ?? ''}</span>
+      <span data-testid="loading">{String(loading)}</span>
     </>
   );
 }
@@ -60,11 +64,18 @@ describe('ContentProvider', () => {
     expect([...subscriptions.keys()].sort()).toEqual([
       'cmsContent',
       'cmsPages',
+      'cmsSchedule',
       'cmsUpdates',
     ]);
     for (const { readSource } of subscriptions.values()) {
       expect(readSource).toBe('published');
     }
+    expect(screen.getByTestId('schedule-count')).toHaveTextContent(
+      String(snapshotScheduleData.length),
+    );
+    // Snapshot renders synchronously; loading is never true (fail soft, no
+    // spinner-trap while the live cmsSchedule listener is still connecting).
+    expect(screen.getByTestId('loading')).toHaveTextContent('false');
   });
 
   it("readSource 'draft' points subscriptions at the draft revision", () => {
@@ -112,10 +123,40 @@ describe('ContentProvider', () => {
     act(() => {
       subscriptions.get('cmsContent').onNext([]);
       subscriptions.get('cmsPages').onNext([]);
+      subscriptions.get('cmsSchedule').onNext([]);
     });
     expect(screen.getByTestId('source')).toHaveTextContent('snapshot');
     expect(screen.getByTestId('hero-title')).toHaveTextContent(
       snapshotSiteContent.hero__title.value,
+    );
+    expect(screen.getByTestId('schedule-count')).toHaveTextContent(
+      String(snapshotScheduleData.length),
+    );
+  });
+
+  it('overlays a live published cmsSchedule set wholesale', () => {
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    act(() => {
+      subscriptions.get('cmsSchedule').onNext([
+        {
+          id: 'live-session',
+          dayId: 'day-1',
+          startTime: '09:00',
+          endTime: '09:30',
+          title: 'Live-published session',
+          visible: true,
+          order: 0,
+        },
+      ]);
+    });
+    expect(screen.getByTestId('source')).toHaveTextContent('live');
+    expect(screen.getByTestId('schedule-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('schedule-first-title')).toHaveTextContent(
+      'Live-published session',
     );
   });
 

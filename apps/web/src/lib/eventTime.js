@@ -111,7 +111,19 @@ export function formatSessionTimeRange(eventConfig, session) {
 
   const start = zonedDateTime(day.date, session.startTime, timeZone);
   if (!start) return null;
-  const end = zonedDateTime(day.date, session.endTime, timeZone);
+  let end = zonedDateTime(day.date, session.endTime, timeZone);
+  // A session ending after midnight ("23:30"–"00:15") resolves its wall
+  // clock on the *next* calendar day — roll both the instant and the ISO
+  // date forward one day so <time dateTime> never claims the session ends
+  // before it starts.
+  let endDate = day.date;
+  if (end && end <= start) {
+    const rolled = zonedDateTime(rollDateForward(day.date), session.endTime, timeZone);
+    if (rolled) {
+      end = rolled;
+      endDate = rollDateForward(day.date);
+    }
+  }
 
   const s = clockParts(start, timeZone);
   const e = end ? clockParts(end, timeZone) : null;
@@ -120,10 +132,17 @@ export function formatSessionTimeRange(eventConfig, session) {
   return {
     startIso: `${day.date}T${session.startTime}`,
     startLabel: samePeriod ? s.clock : `${s.clock} ${s.period}`.trim(),
-    endIso: end ? `${day.date}T${session.endTime}` : null,
+    endIso: end ? `${endDate}T${session.endTime}` : null,
     endLabel: e ? `${e.clock} ${e.period}`.trim() : null,
     zone: zoneLabel(timeZone, start),
   };
+}
+
+/** "YYYY-MM-DD" one calendar day later, UTC-safe (no local-timezone DST). */
+function rollDateForward(dateStr) {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const next = new Date(Date.UTC(y, mo - 1, d + 1));
+  return next.toISOString().slice(0, 10);
 }
 
 /**
