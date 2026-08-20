@@ -69,6 +69,63 @@
     );
     background-size: 24px 24px;
   }
+
+  /* Typography for the sanitized richtext subset (RichTextBlock,
+     FaqItemBlock). Only the tags sanitizeHtml allows are styled here. */
+  .rich-text {
+    @apply text-brand-ink;
+    text-wrap: pretty;
+  }
+  .rich-text p,
+  .rich-text ul,
+  .rich-text ol,
+  .rich-text blockquote,
+  .rich-text pre {
+    @apply mt-3 first:mt-0;
+  }
+  .rich-text ul {
+    @apply list-disc ps-5;
+  }
+  .rich-text ol {
+    @apply list-decimal ps-5;
+  }
+  .rich-text li {
+    @apply mt-1;
+  }
+  .rich-text h2,
+  .rich-text h3,
+  .rich-text h4 {
+    @apply mt-6 font-semibold text-brand-ink first:mt-0;
+  }
+  .rich-text h2 {
+    @apply text-2xl;
+  }
+  .rich-text h3 {
+    @apply text-xl;
+  }
+  .rich-text h4 {
+    @apply text-lg;
+  }
+  .rich-text a {
+    @apply text-brand-primary underline decoration-brand-primary/40 underline-offset-2;
+    text-underline-position: from-font;
+    text-decoration-skip-ink: auto;
+  }
+  .rich-text a:hover {
+    @apply text-brand-primary-dark;
+  }
+  .rich-text blockquote {
+    @apply border-s-4 border-brand-primary/30 ps-4 text-brand-ink-muted;
+  }
+  .rich-text code {
+    @apply rounded-brand bg-brand-ink/5 px-1 py-0.5 text-sm;
+  }
+  .rich-text pre {
+    @apply overflow-x-auto rounded-brand bg-brand-ink/5 p-4 text-sm;
+  }
+  .rich-text hr {
+    @apply my-6 border-brand-ink/10;
+  }
 }
 
 @layer utilities {
