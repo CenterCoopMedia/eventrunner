@@ -13,7 +13,7 @@ import Schedule from './pages/Schedule.jsx';
 import Speakers from './pages/Speakers.jsx';
 import Sponsors from './pages/Sponsors.jsx';
 import ContentPage from './pages/ContentPage.jsx';
-import SignIn from './pages/SignIn.jsx';
+import Login from './pages/Login.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 export function AppRoutes() {
@@ -25,7 +25,7 @@ export function AppRoutes() {
         <Route path="speakers" element={<Speakers />} />
         <Route path="sponsors" element={<Sponsors />} />
         <Route path="p/:slug" element={<ContentPage />} />
-        <Route path="signin" element={<SignIn />} />
+        <Route path="signin" element={<Login />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
