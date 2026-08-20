@@ -9,3 +9,6 @@ coverage/
 *.log
 .DS_Store
 _upstream/
+
+# Harness-managed agent worktrees and local session state
+.claude/

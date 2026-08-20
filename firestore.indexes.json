@@ -1,4 +1,13 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "cmsVersionHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "docPath", "order": "ASCENDING" },
+        { "fieldPath": "revision", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

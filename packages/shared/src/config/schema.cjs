@@ -13,6 +13,10 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HHMM_RE = /^\d{2}:\d{2}$/;
 const NAIVE_ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+// Deliberately loose (local@domain.tld) — deliverability is the sender
+// domain verification's job, not the schema's. This only refuses values
+// that cannot be a From address at all.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Every key config/features may carry (spec §2.2). Unknown keys are
 // rejected so a typo'd toggle fails loudly instead of silently defaulting.
@@ -102,6 +106,24 @@ function validateEventConfig(event) {
       if (prevDateOk && curDateOk && prev.date >= cur.date) {
         errors.push(`days[${i}].date: dates must be strictly ascending ("${cur.date}" is not after "${prev.date}")`);
       }
+    }
+  }
+
+  // sender is email/send.cjs's From-address source: a config/event without
+  // a usable sender.email silently kills OTP delivery, so the shape is
+  // required here, not left to the mail path to discover at send time.
+  const sender = event.sender;
+  if (!sender || typeof sender !== 'object' || Array.isArray(sender)) {
+    errors.push('sender: must be an object');
+  } else {
+    if (typeof sender.email !== 'string' || !EMAIL_RE.test(sender.email)) {
+      errors.push('sender.email: must be an email address');
+    }
+    if (sender.name != null && !isNonEmptyString(sender.name)) {
+      errors.push('sender.name: must be null or a nonempty string');
+    }
+    if (sender.replyTo != null && (typeof sender.replyTo !== 'string' || !EMAIL_RE.test(sender.replyTo))) {
+      errors.push('sender.replyTo: must be null or an email address');
     }
   }
 

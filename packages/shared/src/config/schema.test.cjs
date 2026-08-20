@@ -18,6 +18,7 @@ const VALID_EVENT = {
     { id: 'day-2', date: '2027-06-11', startTime: '09:00', endTime: '16:00' },
   ],
   registration: { opensAt: '2027-02-01T09:00', closesAt: '2027-06-01T00:00:00' },
+  sender: { email: 'hello@demo-summit.org', name: 'Demo Summit', replyTo: null },
 };
 
 test('validateEventConfig accepts a valid config', () => {
@@ -80,6 +81,34 @@ test('validateEventConfig rejects days[] dates that are not strictly ascending',
   });
   assert.equal(duplicateDate.ok, false);
   assert.ok(duplicateDate.errors.some((e) => e.includes('strictly ascending')));
+});
+
+test('validateEventConfig requires a usable sender (the OTP From address)', () => {
+  for (const sender of [undefined, null, 'x', []]) {
+    const result = validateEventConfig({ ...VALID_EVENT, sender });
+    assert.equal(result.ok, false, JSON.stringify(sender));
+    assert.ok(result.errors.some((e) => e.startsWith('sender: must be an object')));
+  }
+  for (const email of [undefined, '', 'not-an-email', 'a@b']) {
+    const result = validateEventConfig({ ...VALID_EVENT, sender: { email } });
+    assert.equal(result.ok, false, JSON.stringify(email));
+    assert.ok(result.errors.some((e) => e.startsWith('sender.email:')));
+  }
+  const bad = validateEventConfig({
+    ...VALID_EVENT,
+    sender: { email: 'a@b.org', name: '', replyTo: 'nope' },
+  });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.startsWith('sender.name:')));
+  assert.ok(bad.errors.some((e) => e.startsWith('sender.replyTo:')));
+
+  // name/replyTo are optional; the stored verification pair is tolerated
+  // (the panel path rejects it earlier, but stored docs carry it).
+  const minimal = validateEventConfig({
+    ...VALID_EVENT,
+    sender: { email: 'a@b.org', domainVerified: true, domainVerifiedAt: null },
+  });
+  assert.deepEqual(minimal, { ok: true, errors: [] });
 });
 
 test('validateEventConfig never throws on garbage', () => {

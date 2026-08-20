@@ -1,8 +1,119 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Scaffold default. Feature ports replace this with the v1 rules
-    // from docs/adr/0001-event-platform-v1.md §4 and §8.5.
+    // v1 rules per docs/adr/0001-event-platform-v1.md §4 and §8.4.
+    // All writes go through the Admin SDK (callable/HTTP functions);
+    // clients never write Firestore directly.
+
+    // adminEmails on config/bootstrap MUST be stored lowercase: rules can
+    // lowercase the token email (string.lower()) but cannot map over the
+    // stored list, so the lowercase-storage convention carries the other
+    // half of the case-insensitive match (server-side requireAdmin
+    // lowercases both sides).
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && get(/databases/$(database)/documents/config/bootstrap)
+             .data.adminEmails.hasAny([request.auth.token.email.lower()]);
+    }
+
+    // config/* is public runtime configuration, EXCEPT config/bootstrap,
+    // which holds the admin allowlist and is server-only: no client read,
+    // not even for admins (the token check happens server-side).
+    match /config/{docId} {
+      allow read: if docId != 'bootstrap';
+      allow write: if false;
+    }
+
+    // Publishable collections (§8.4 two-revision model): the live doc is
+    // anonymously readable only while visible; the draft sibling is never
+    // anonymously readable. Writes happen only via cmsPublish / cmsUpdate*
+    // through the Admin SDK.
+    match /cmsContent/{docId} {
+      allow read: if resource.data.visible == true;
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /cmsContent_drafts/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /cmsSchedule/{docId} {
+      allow read: if resource.data.visible == true;
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /cmsSchedule_drafts/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /cmsOrganizations/{docId} {
+      allow read: if resource.data.visible == true;
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /cmsOrganizations_drafts/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /cmsTimeline/{docId} {
+      allow read: if resource.data.visible == true;
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /cmsTimeline_drafts/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /cmsUpdates/{docId} {
+      allow read: if resource.data.visible == true;
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /cmsUpdates_drafts/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /cmsPages/{docId} {
+      allow read: if resource.data.visible == true;
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /cmsPages_drafts/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Publish bookkeeping: admin-readable for the CMS UI, written only by
+    // the Admin SDK.
+    match /cmsVersionHistory/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /cmsPublishQueue/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /admin_logs/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Server-only collections, named explicitly so a future edit cannot
+    // open them by accident via a broader match.
+    match /auth_challenges/{docId} { allow read, write: if false; }
+    match /auth_rate_limits/{docId} { allow read, write: if false; }
+    match /sent_emails/{docId} { allow read, write: if false; }
+    match /email_claims/{docId} { allow read, write: if false; }
+    match /system_errors/{docId} { allow read, write: if false; }
+    match /email_templates/{docId} { allow read, write: if false; }
+
+    // Everything not matched above stays deny-all.
     match /{document=**} {
       allow read, write: if false;
     }
