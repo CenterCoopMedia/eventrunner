@@ -20,6 +20,12 @@ const generatedDir = process.env.GENERATED_DIR
 
 export default defineConfig({
   plugins: [react()],
+  // `shared` is a linked workspace package whose ESM entries re-export CJS
+  // sources; linked deps skip prebundling by default, which would break the
+  // dev server's CJS interop. Builds and vitest handle it either way.
+  optimizeDeps: {
+    include: ['shared/time'],
+  },
   resolve: {
     alias: {
       '@generated': generatedDir,
