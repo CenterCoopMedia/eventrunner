@@ -24,11 +24,23 @@ export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   // Branding slots come from config/theme (spec §7.2 logos) — Storage-style
   // paths under branding/, served from public/ until per-event uploads land.
+  // A runtime config/theme doc is unvalidated Firestore data (§2.4 fail-soft
+  // overlay), so guard against non-string values before calling string
+  // methods on them.
   const markPath = theme?.logos?.mark;
-  const markSrc = markPath ? `/${markPath.replace(/^\/+/, '')}` : null;
+  const markSrc =
+    typeof markPath === 'string' && markPath
+      ? `/${markPath.replace(/^\/+/, '')}`
+      : null;
+  // A runtime config/event doc can replace `legal` wholesale (shallow
+  // overlay) with a partial or malformed object; fall back per-field so one
+  // bad admin write never white-screens the shell that wraps every route.
+  const legal = eventConfig?.legal || {};
+  const operatorName = legal.operatorName;
+  const supportEmail = legal.supportEmail;
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="bg-paper flex min-h-screen flex-col">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -69,16 +81,21 @@ export default function Layout() {
       </main>
       <footer className="border-t border-brand-ink/10 bg-brand-surface-alt">
         <div className="mx-auto max-w-5xl px-4 py-6 text-sm text-brand-ink-muted">
-          <p>{eventConfig.name}</p>
-          <p>
-            Operated by {eventConfig.legal.operatorName} ·{' '}
-            <a
-              href={`mailto:${eventConfig.legal.supportEmail}`}
-              className="underline underline-offset-2 hover:text-brand-ink"
-            >
-              Contact support
-            </a>
-          </p>
+          <p>{eventConfig?.name}</p>
+          {operatorName || supportEmail ? (
+            <p>
+              {operatorName ? `Operated by ${operatorName}` : null}
+              {operatorName && supportEmail ? ' · ' : null}
+              {supportEmail ? (
+                <a
+                  href={`mailto:${supportEmail}`}
+                  className="underline underline-offset-2 hover:text-brand-ink"
+                >
+                  Contact support
+                </a>
+              ) : null}
+            </p>
+          ) : null}
         </div>
       </footer>
     </div>

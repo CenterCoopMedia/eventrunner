@@ -64,6 +64,14 @@ export function EventConfigProvider({ children }) {
     const live =
       overlay.event || overlay.features || overlay.theme || overlay.badges;
     return {
+      // Shallow (one-level) overlay by design: the CMS write path always
+      // writes each config/{event,features,theme} doc in full (backend
+      // invariant — see functions/src/cms for the admin write path), so a
+      // runtime doc is expected to carry every top-level key it owns, not a
+      // sparse patch. A doc that omits a nested object (e.g. config/theme
+      // without `logos`) correctly keeps the snapshot's sibling value; a doc
+      // that includes a nested object (e.g. `logos: {...}`) is expected to
+      // include it in full, since this merge does not descend into it.
       eventConfig: overlay.event
         ? { ...snapshotEventConfig, ...overlay.event }
         : snapshotEventConfig,
@@ -73,6 +81,11 @@ export function EventConfigProvider({ children }) {
       theme: overlay.theme
         ? { ...snapshotTheme, ...overlay.theme }
         : snapshotTheme,
+      // config/badges has no synthetic snapshot counterpart (badges are a
+      // live-only feature, gated off by features.badges in M2) — overlay-only
+      // by design, so this is null until a runtime doc lands; consumers must
+      // handle null rather than assuming snapshot-first parity with the
+      // other three docs.
       badges: overlay.badges,
       source: live ? 'live' : 'snapshot',
     };
@@ -93,6 +106,13 @@ export function EventConfigProvider({ children }) {
   useEffect(() => {
     document.title = value.eventConfig.name;
   }, [value.eventConfig.name]);
+
+  // Mirror the resolved texture onto the document element so the .bg-paper
+  // rule in index.css can gate on it — CSS custom properties can't be tested
+  // for equality in a selector (spec §7.2 texture treatment).
+  useEffect(() => {
+    document.documentElement.dataset.texture = value.theme.texture;
+  }, [value.theme.texture]);
 
   return (
     <EventConfigContext.Provider value={value}>

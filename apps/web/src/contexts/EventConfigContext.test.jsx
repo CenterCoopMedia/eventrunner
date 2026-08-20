@@ -115,6 +115,21 @@ describe('EventConfigProvider', () => {
     expect(document.title).toBe('[Demo] Renamed Gathering');
     expect(screen.getByTestId('schedule-feature')).toHaveTextContent('false');
   });
+
+  it('mirrors config/theme.texture onto documentElement.dataset.texture', () => {
+    render(
+      <EventConfigProvider>
+        <Probe />
+      </EventConfigProvider>,
+    );
+    // Snapshot default (generated/eventConfig.js theme.texture = 'paper').
+    expect(document.documentElement.dataset.texture).toBe('paper');
+
+    act(() => {
+      subscriptions.get('theme')({ texture: 'flat' });
+    });
+    expect(document.documentElement.dataset.texture).toBe('flat');
+  });
 });
 
 describe('Layout nav', () => {
@@ -143,5 +158,44 @@ describe('Layout nav', () => {
     // Untouched features fall back to the snapshot and stay visible.
     expect(screen.getByRole('link', { name: 'Schedule' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument();
+  });
+
+  it('applies the bg-paper surface class on the shell', () => {
+    const { container } = renderShell();
+    expect(container.querySelector('.bg-paper')).not.toBeNull();
+  });
+
+  it('stays up under a malformed runtime config/event (fail-soft, §2.4)', () => {
+    renderShell();
+    // A shallow overlay replaces `legal` wholesale — simulate a bad admin
+    // write (null legal) that must not white-screen the shell every route
+    // wraps.
+    expect(() =>
+      act(() => {
+        subscriptions.get('event')({ legal: null });
+      }),
+    ).not.toThrow();
+    // No operator/support line renders when legal data is unusable, rather
+    // than "Operated by undefined" or a broken mailto: link.
+    expect(screen.queryByText(/Operated by/)).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Contact support' })).toBeNull();
+
+    // A partial legal object renders only the fields it actually has.
+    act(() => {
+      subscriptions.get('event')({ legal: { operatorName: '[Fixture] Org' } });
+    });
+    expect(screen.getByText(/Operated by \[Fixture\] Org/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Contact support' })).toBeNull();
+  });
+
+  it('stays up under a malformed runtime config/theme.logos.mark', () => {
+    const { container } = renderShell();
+    expect(() =>
+      act(() => {
+        subscriptions.get('theme')({ logos: { mark: { not: 'a string' } } });
+      }),
+    ).not.toThrow();
+    // Falls back to rendering no mark image rather than crashing.
+    expect(container.querySelector('img')).toBeNull();
   });
 });

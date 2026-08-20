@@ -52,9 +52,14 @@
       focus:rounded-brand focus:bg-brand-primary focus:px-4 focus:py-3 focus:text-brand-surface;
   }
 
-  /* Texture treatment driven by config/theme.texture (spec §7.2). The demo
-     theme sets --texture: paper; 'flat' keeps the plain surface color. The
-     overlay is decorative, so it must never intercept the pointer. */
+  /* Texture treatment driven by config/theme.texture (spec §7.2). CSS custom
+     properties can't be tested for equality in a selector, so
+     EventConfigProvider mirrors the resolved texture onto
+     documentElement.dataset.texture (snapshot value at first paint, runtime
+     value once config/theme lands) and this rule gates the overlay on that
+     attribute: 'paper' (the default — matches generated/theme.css) paints
+     the dot pattern, 'flat' suppresses it. The overlay is decorative, so it
+     must never intercept the pointer. */
   .bg-paper {
     @apply relative bg-brand-surface;
   }
@@ -68,6 +73,9 @@
       transparent 1px
     );
     background-size: 24px 24px;
+  }
+  :root[data-texture='flat'] .bg-paper::before {
+    content: none;
   }
 
   /* Typography for the sanitized richtext subset (RichTextBlock,
