@@ -1,0 +1,155 @@
+/* Base styles for every surface. Colors resolve only through theme tokens
+   (interface guidelines: Colors; spec §7.2/§7.6 — no hex outside
+   src/generated/theme.css). theme.css itself is imported through the
+   @generated alias in main.jsx so GENERATED_DIR overrides apply. */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-brand-surface font-body text-brand-ink;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;
+    text-wrap: balance;
+  }
+
+  p {
+    overflow-wrap: break-word;
+  }
+
+  /* Never remove outlines without replacing them (interface guidelines). */
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-brand-primary;
+  }
+
+  [id] {
+    scroll-margin-top: 5rem;
+  }
+
+  /* Dynamic values (timers, schedule columns) read in tabular figures. */
+  time,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Skip link: first focusable element on every page (Layout.jsx). */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-50
+      focus:rounded-brand focus:bg-brand-primary focus:px-4 focus:py-3 focus:text-brand-surface;
+  }
+
+  /* Texture treatment driven by config/theme.texture (spec §7.2). CSS custom
+     properties can't be tested for equality in a selector, so
+     EventConfigProvider mirrors the resolved texture onto
+     documentElement.dataset.texture (snapshot value at first paint, runtime
+     value once config/theme lands) and this rule gates the overlay on that
+     attribute: 'paper' (the default — matches generated/theme.css) paints
+     the dot pattern, 'flat' suppresses it. The overlay is decorative, so it
+     must never intercept the pointer. */
+  .bg-paper {
+    @apply relative bg-brand-surface;
+  }
+  .bg-paper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(
+      rgb(var(--brand-ink-rgb) / 0.04) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
+  }
+  :root[data-texture='flat'] .bg-paper::before {
+    content: none;
+  }
+
+  /* Typography for the sanitized richtext subset (RichTextBlock,
+     FaqItemBlock). Only the tags sanitizeHtml allows are styled here. */
+  .rich-text {
+    @apply text-brand-ink;
+    text-wrap: pretty;
+  }
+  .rich-text p,
+  .rich-text ul,
+  .rich-text ol,
+  .rich-text blockquote,
+  .rich-text pre {
+    @apply mt-3 first:mt-0;
+  }
+  .rich-text ul {
+    @apply list-disc ps-5;
+  }
+  .rich-text ol {
+    @apply list-decimal ps-5;
+  }
+  .rich-text li {
+    @apply mt-1;
+  }
+  .rich-text h2,
+  .rich-text h3,
+  .rich-text h4 {
+    @apply mt-6 font-semibold text-brand-ink first:mt-0;
+  }
+  .rich-text h2 {
+    @apply text-2xl;
+  }
+  .rich-text h3 {
+    @apply text-xl;
+  }
+  .rich-text h4 {
+    @apply text-lg;
+  }
+  .rich-text a {
+    @apply text-brand-primary underline decoration-brand-primary/40 underline-offset-2;
+    text-underline-position: from-font;
+    text-decoration-skip-ink: auto;
+  }
+  .rich-text a:hover {
+    @apply text-brand-primary-dark;
+  }
+  .rich-text blockquote {
+    @apply border-s-4 border-brand-primary/30 ps-4 text-brand-ink-muted;
+  }
+  .rich-text code {
+    @apply rounded-brand bg-brand-ink/5 px-1 py-0.5 text-sm;
+  }
+  .rich-text pre {
+    @apply overflow-x-auto rounded-brand bg-brand-ink/5 p-4 text-sm;
+  }
+  .rich-text hr {
+    @apply my-6 border-brand-ink/10;
+  }
+}
+
+@layer utilities {
+  /* 44px minimum touch targets (interface guidelines: Accessibility). */
+  .touch-target {
+    @apply min-h-11 min-w-11;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -53,7 +53,9 @@ npm test
 npm run test:rules   # needs Java 21+ for the Firebase emulators
 ```
 
-No `.env` and no cloud credentials are required for any of these — `test:rules` starts local Firestore and Storage emulators against a `demo-*` project id. The full dev loop lands with `apps/web` and `functions`; when it does, the command will be `npm run dev:emulators`.
+No `.env` and no cloud credentials are required for any of these — `test:rules` starts local Firestore and Storage emulators against a `demo-*` project id.
+
+`apps/web` has its own vitest suite (`npm run test -w apps/web`) and its own dev loop against the Functions/Firestore/Auth emulators — see [apps/web/README.md](apps/web/README.md) for the full commands, including the Playwright-driven sign-in smoke test (`scripts/dev/login-smoke.mjs`).
 
 ## How to send a change
 
@@ -81,8 +83,11 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 | `npm run lint` | ESLint over every workspace, including the hex-literal ban (spec §7.6) and `react-hooks/rules-of-hooks` |
 | `npm test` | `packages/shared` and `functions` unit tests (Node `--test`, fakes — no emulator) |
 | `npm run test:rules` | Firestore and Storage security rules on the Firebase emulators |
+| `npm run test -w apps/web` | `apps/web` component/context/lib unit tests (vitest + Testing Library, jsdom — no emulator) |
+| `npm run build -w apps/web` | Production build of `apps/web`; credential-free with dummy `VITE_FIREBASE_*` values |
+| `node scripts/dev/login-smoke.mjs` | Live Playwright smoke test of the emailed-code sign-in flow against the Functions/Firestore/Auth emulators (dev tool, not run by CI) |
 
-CI runs all three on every pull request and every push to `main`, credential-free. When the web app and functions land, CI will also run Playwright against emulators. Fork PRs must be able to run every check without credentials.
+CI runs the first five on every pull request and every push to `main`, credential-free. Fork PRs must be able to run every check without credentials.
 
 One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 

@@ -7,6 +7,7 @@
 //      must not reintroduce.
 import js from "@eslint/js";
 import globals from "globals";
+import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 
 // Matches #rgb, #rgba, #rrggbb, #rrggbbaa in string literals, template
@@ -86,12 +87,28 @@ export default [
       globals: { ...globals.browser },
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
-    plugins: { "react-hooks": reactHooks },
+    plugins: { react, "react-hooks": reactHooks },
     rules: {
       ...noHexLiterals,
+      // Without these two, components referenced only from JSX are reported
+      // as unused vars.
+      "react/jsx-uses-vars": "error",
+      "react/jsx-uses-react": "error",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
     },
+  },
+
+  // The web workspace's build/test config files run under Node, and vitest
+  // test files run in jsdom but import vitest globals explicitly.
+  {
+    files: ["apps/web/*.{js,mjs}"],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: "module",
+      globals: { ...globals.node },
+    },
+    rules: { ...noHexLiterals },
   },
 
   // Spec §7.6 allowlist: mail clients need literal hex, and the schedule PDF
