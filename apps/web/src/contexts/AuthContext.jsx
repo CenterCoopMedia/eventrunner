@@ -47,6 +47,14 @@ export function functionsOrigin() {
   if (override) return override.replace(/\/+$/, '');
   const region = import.meta.env.VITE_FIREBASE_REGION || 'us-central1';
   const project = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  if (!project) {
+    // A deploy missing this env var would otherwise silently fetch
+    // us-central1-undefined.cloudfunctions.net and surface as a mystery
+    // network error at sign-in time — fail loudly and specifically instead.
+    console.error(
+      'VITE_FIREBASE_PROJECT_ID is not set; cannot build the functions origin.',
+    );
+  }
   return `https://${region}-${project}.cloudfunctions.net`;
 }
 

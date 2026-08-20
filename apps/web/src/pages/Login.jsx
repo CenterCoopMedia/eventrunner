@@ -92,6 +92,7 @@ export default function Login() {
   const [expiresInMinutes, setExpiresInMinutes] = useState(null);
   const [expiresAt, setExpiresAt] = useState(null); // ms epoch
   const [retryAt, setRetryAt] = useState(null); // ms epoch (429 window)
+  const [rateLimitMessage, setRateLimitMessage] = useState(null); // 429 w/o a countdown hint
   const [busy, setBusy] = useState(null); // null | 'send' | 'verify' | 'google'
   const [error, setError] = useState(null); // { field: 'email'|'code'|null, message }
 
@@ -120,6 +121,7 @@ export default function Login() {
   async function requestCode(event) {
     event.preventDefault();
     setError(null);
+    setRateLimitMessage(null);
     const address = email.trim();
     if (!EMAIL_RE.test(address)) {
       setError({
@@ -136,6 +138,7 @@ export default function Login() {
       setExpiresInMinutes(result.expiresInMinutes);
       setExpiresAt(Date.now() + result.expiresInMinutes * 60_000);
       setRetryAt(null);
+      setRateLimitMessage(null);
       setCode('');
       if (step === 'code') {
         showToast('New code sent. Check your inbox.');
@@ -145,12 +148,23 @@ export default function Login() {
       }
     } catch (err) {
       if (err instanceof OtpRequestError && err.status === 429) {
-        // Friendly rate-limit copy, announced via role="status" below.
-        setRetryAt(
-          err.retryAfterSeconds ? Date.now() + err.retryAfterSeconds * 1000 : null,
-        );
+        // Friendly rate-limit copy, announced via role="status" below. When
+        // the server gives us a retry window we show a live countdown;
+        // otherwise we still surface the server's message as status copy
+        // (no countdown to show, but silence would look like nothing
+        // happened).
+        if (err.retryAfterSeconds) {
+          setRetryAt(Date.now() + err.retryAfterSeconds * 1000);
+          setRateLimitMessage(null);
+        } else {
+          setRetryAt(null);
+          setRateLimitMessage(err.message);
+        }
       } else {
-        failWith('email', err);
+        // Route to the general (field: null) error slot, which renders on
+        // both the email and code steps — a resend failure while already on
+        // the code step must still be visible.
+        failWith(null, err);
       }
     } finally {
       setBusy(null);
@@ -172,6 +186,7 @@ export default function Login() {
       navigate('/', { replace: true });
     } catch (err) {
       failWith('code', err);
+    } finally {
       setBusy(null);
     }
   }
@@ -290,12 +305,22 @@ export default function Login() {
               {busy === 'send' ? 'Sending code…' : 'Email me a code'}
             </button>
             <p role="status" className="text-sm text-brand-ink-muted">
-              {retrySeconds > 0 && (
+              {retrySeconds > 0 ? (
                 <>
                   You have requested several codes recently. You can request
                   another in{' '}
-                  <span data-numeric>{formatClock(retrySeconds)}</span>.
+                  <span aria-hidden="true" data-numeric>
+                    {formatClock(retrySeconds)}
+                  </span>
+                  <span className="sr-only">
+                    {' '}
+                    about {Math.max(1, Math.ceil(retrySeconds / 60))} minute
+                    {Math.ceil(retrySeconds / 60) === 1 ? '' : 's'}
+                  </span>
+                  .
                 </>
+              ) : (
+                rateLimitMessage
               )}
             </p>
           </form>
@@ -352,12 +377,30 @@ export default function Login() {
                 <>
                   You have requested several codes recently. You can request
                   another in{' '}
-                  <span data-numeric>{formatClock(retrySeconds)}</span>.
+                  <span aria-hidden="true" data-numeric>
+                    {formatClock(retrySeconds)}
+                  </span>
+                  <span className="sr-only">
+                    {' '}
+                    about {Math.max(1, Math.ceil(retrySeconds / 60))} minute
+                    {Math.ceil(retrySeconds / 60) === 1 ? '' : 's'}
+                  </span>
+                  .
                 </>
+              ) : rateLimitMessage ? (
+                rateLimitMessage
               ) : expirySeconds > 0 ? (
                 <>
                   Your code expires in{' '}
-                  <span data-numeric>{formatClock(expirySeconds)}</span>.
+                  <span aria-hidden="true" data-numeric>
+                    {formatClock(expirySeconds)}
+                  </span>
+                  <span className="sr-only">
+                    {' '}
+                    about {Math.max(1, Math.ceil(expirySeconds / 60))} minute
+                    {Math.ceil(expirySeconds / 60) === 1 ? '' : 's'}
+                  </span>
+                  .
                 </>
               ) : (
                 'Your code has expired. Email yourself a new one below.'
@@ -379,6 +422,8 @@ export default function Login() {
                   setError(null);
                   setChallengeId(null);
                   setExpiresAt(null);
+                  setRetryAt(null);
+                  setRateLimitMessage(null);
                   setCode('');
                 }}
                 className={linkButtonClass}

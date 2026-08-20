@@ -38,15 +38,28 @@ async function requestCode(email = 'attendee@example.org') {
 beforeEach(() => {
   vi.clearAllMocks();
   globalThis.fetch = vi.fn();
+  // Test env runs credential-free (no VITE_FIREBASE_PROJECT_ID, spec §8.1),
+  // which is the one case functionsOrigin() now logs about (see the
+  // "functions origin convention" describe block below) — expected here,
+  // so keep it out of the rest of the suite's output.
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 describe('functions origin convention', () => {
   it('builds https://<region>-<project>.cloudfunctions.net (spec §2.4)', () => {
-    // Test env has no VITE_FUNCTIONS_ORIGIN / VITE_FIREBASE_REGION override,
-    // so the default region and (undefined) project id apply — the shape is
-    // what we pin, not the project.
+    // Test env deliberately runs credential-free (spec §8.1): no
+    // VITE_FIREBASE_PROJECT_ID is set, so this pins the default-region
+    // shape only, not a real project id.
     expect(functionsOrigin()).toMatch(
       /^https:\/\/us-central1-.*\.cloudfunctions\.net$/,
+    );
+  });
+
+  it('logs a diagnosable error when the project id is missing, instead of failing silently', () => {
+    // console.error is already a vi.fn() from the top-level beforeEach.
+    functionsOrigin();
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('VITE_FIREBASE_PROJECT_ID'),
     );
   });
 });
@@ -95,11 +108,15 @@ describe('emailed-code sign-in', () => {
     });
     expect(signInWithCustomToken).toHaveBeenCalledWith({}, 'custom-token-abc');
 
-    // Success navigates to the home page.
-    await screen.findByRole('heading', { level: 1 });
+    // Success navigates to the home page — assert on content that only the
+    // home page renders (the login page's own "Sign in" h1 would otherwise
+    // satisfy a generic `heading level 1` check even with no navigation at
+    // all), and confirm the sign-in form itself is gone.
+    await screen.findByRole('region', { name: 'Event days' });
     expect(
       screen.queryByRole('button', { name: 'Sign in' }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Six-digit code')).not.toBeInTheDocument();
   });
 
   it('never blocks paste on the code input', async () => {
@@ -144,6 +161,47 @@ describe('emailed-code sign-in', () => {
     expect(screen.getByLabelText('Email address')).not.toHaveAttribute(
       'aria-invalid',
     );
+  });
+
+  it('surfaces a resend failure while already on the code step', async () => {
+    fetch
+      .mockResolvedValueOnce(
+        jsonResponse(200, { challengeId: 'chal-1', expiresInMinutes: 10 }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(502, {
+          error: { code: 'send-failed', message: 'Your code could not be sent. Try again.' },
+        }),
+      );
+    renderSignIn();
+    await requestCode();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a new code' }));
+
+    await screen.findByText(/could not be sent/);
+    // Still on the code step, with the code input intact.
+    expect(screen.getByLabelText('Six-digit code')).toBeInTheDocument();
+  });
+
+  it('shows the server message on a 429 with no retry-after hint', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse(429, {
+        error: {
+          code: 'rate-limited',
+          message: 'Too many code requests. Try again later.',
+          retryAfterSeconds: null,
+        },
+      }),
+    );
+    renderSignIn();
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'attendee@example.org' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('Too many code requests. Try again later.');
   });
 
   it('marks a rejected code aria-invalid and moves focus to the error', async () => {
