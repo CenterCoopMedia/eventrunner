@@ -81,15 +81,24 @@ function contentFieldsOf(data) {
  * for `basedOnRevision` when the draft does not exist yet (editing an
  * already-published doc forks a draft from it), but never written.
  *
+ * With `createOnly` the write uses the Firestore create() precondition, so
+ * two concurrent creates cannot both win: the loser gets an ALREADY_EXISTS
+ * rejection (see isAlreadyExistsError) instead of silently clobbering the
+ * first writer's draft. An existing draft is refused before writing.
+ *
  * @param {{ db: FirebaseFirestore.Firestore, collection: string,
  *           docId: string, fields: object, visible?: boolean,
- *           actor: { uid: string, email: string }, now?: () => number }} args
+ *           actor: { uid: string, email: string }, now?: () => number,
+ *           createOnly?: boolean }} args
  * @returns {Promise<{ docPath: string, existed: boolean }>}
  */
-async function writeDraft({ db, collection, docId, fields, visible, actor, now = Date.now }) {
+async function writeDraft({ db, collection, docId, fields, visible, actor, now = Date.now, createOnly = false }) {
   const draftCol = draftCollectionFor(collection);
   const ref = db.collection(draftCol).doc(docId);
   const draftSnap = await ref.get();
+  if (createOnly && draftSnap.exists) {
+    throw new Error(`ALREADY_EXISTS: document ${draftCol}/${docId} already exists`);
+  }
 
   let basedOnRevision = null;
   let priorVisible = true;
@@ -106,15 +115,25 @@ async function writeDraft({ db, collection, docId, fields, visible, actor, now =
     }
   }
 
-  await ref.set({
+  const payload = {
     ...contentFieldsOf(fields),
     visible: typeof visible === 'boolean' ? visible : priorVisible,
     status: 'dirty',
     basedOnRevision,
     updatedAt: new Date(now()),
     updatedBy: actor.email,
-  });
+  };
+  if (createOnly) {
+    await ref.create(payload);
+  } else {
+    await ref.set(payload);
+  }
   return { docPath: `${draftCol}/${docId}`, existed: draftSnap.exists };
+}
+
+/** True for a Firestore ALREADY_EXISTS rejection (gRPC code 6). */
+function isAlreadyExistsError(err) {
+  return err?.code === 6 || /ALREADY[-_ ]?EXISTS/i.test(String(err?.message || ''));
 }
 
 /**
@@ -185,20 +204,45 @@ async function maxHistoryRevision({ db, docPath }) {
   return typeof rev === 'number' ? rev : 0;
 }
 
+/** How often one chunk retries after losing a draft-update precondition. */
+const MAX_CHUNK_ATTEMPTS = 5;
+
+/** True for a FAILED_PRECONDITION / NOT_FOUND batch rejection (gRPC 9 / 5). */
+function isPreconditionFailure(err) {
+  if (err?.code === 9 || err?.code === 5) return true;
+  return /FAILED_PRECONDITION|NOT_FOUND/i.test(String(err?.message || ''));
+}
+
+/** Firestore Timestamp-or-fake equality for snapshot updateTimes. */
+function sameUpdateTime(a, b) {
+  if (a == null || b == null) return false;
+  return typeof a.isEqual === 'function' ? a.isEqual(b) : a === b;
+}
+
 /**
  * Publish drafts to the live collection (spec §8.4 step 3).
  *
  * Per doc, one atomic batch carries: live copy of the draft's content
  * fields with `revision = live.revision + 1` (+ visible, publishedAt,
- * publishedBy); draft update to `status: 'clean'` with the new
- * basedOnRevision; a cmsVersionHistory append. Chunked at DOCS_PER_CHUNK
- * docs so no batch exceeds 400 writes.
+ * publishedBy — the actor's UID; the email stays on the admin-only
+ * cmsVersionHistory row, never on an anonymously readable live doc); a
+ * draft update to `status: 'clean'` with the new basedOnRevision; a
+ * cmsVersionHistory append. Chunked at DOCS_PER_CHUNK docs so no batch
+ * exceeds 400 writes.
  *
- * When `queueRef` (a cmsPublishQueue doc ref) is given, each committed
- * chunk is recorded under `progress.<collection>` before the next chunk
- * starts, and docIds already listed there are skipped on entry — so
- * re-running after a mid-way failure completes the remainder without
- * double-bumping revisions.
+ * The draft update carries a { lastUpdateTime } precondition from the read
+ * snapshot: an editor save landing between the read and the commit fails
+ * the chunk, which retries and reports the changed doc as
+ * `skipped: { reason: 'conflict' }` — its draft stays dirty with the NEW
+ * content instead of being marked clean under a stale publish, so
+ * `{ all: true }` still finds it.
+ *
+ * When `queueRef` (a cmsPublishQueue doc ref) is given, the
+ * `progress.<collection>` record is written IN the same batch as the
+ * chunk's doc writes — the row and the data can never disagree, so a
+ * resume can trust it (docIds already listed are skipped on entry, and a
+ * re-run after a mid-way failure completes the remainder without
+ * double-bumping revisions).
  *
  * Throws on a failed chunk commit; everything committed so far stays
  * committed and recorded. DocIds without a draft are reported in
@@ -226,66 +270,111 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
   let chunksCommitted = 0;
 
   for (let i = 0; i < pending.length; i += DOCS_PER_CHUNK) {
-    const chunkIds = pending.slice(i, i + DOCS_PER_CHUNK);
-    const draftRefs = chunkIds.map((id) => db.collection(draftCol).doc(id));
-    const liveRefs = chunkIds.map((id) => db.collection(collection).doc(id));
-    const draftSnaps = await db.getAll(...draftRefs);
-    const liveSnaps = await db.getAll(...liveRefs);
+    let chunkIds = pending.slice(i, i + DOCS_PER_CHUNK);
+    // docId → the draft updateTime the last failed attempt was built on; a
+    // re-read that differs identifies the doc that lost its precondition.
+    const prevTimes = new Map();
 
-    const batch = db.batch();
-    const chunkPublished = [];
-    const publishedAt = new Date(now());
-    for (let j = 0; j < chunkIds.length; j += 1) {
-      const docId = chunkIds[j];
-      if (!draftSnaps[j].exists) {
-        skipped.push({ docId, reason: 'no-draft' });
-        continue;
+    for (let attempt = 1; ; attempt += 1) {
+      const draftRefs = chunkIds.map((id) => db.collection(draftCol).doc(id));
+      const liveRefs = chunkIds.map((id) => db.collection(collection).doc(id));
+      const draftSnaps = await db.getAll(...draftRefs);
+      const liveSnaps = await db.getAll(...liveRefs);
+
+      const batch = db.batch();
+      const chunkPublished = [];
+      const keptIds = [];
+      const publishedAt = new Date(now());
+      for (let j = 0; j < chunkIds.length; j += 1) {
+        const docId = chunkIds[j];
+        if (!draftSnaps[j].exists) {
+          skipped.push({ docId, reason: 'no-draft' });
+          continue;
+        }
+        if (prevTimes.has(docId) && !sameUpdateTime(prevTimes.get(docId), draftSnaps[j].updateTime)) {
+          // An editor saved between our earlier read and its failed commit.
+          // Leave the newer draft dirty rather than publishing content the
+          // editor never saw; the next publish picks it up.
+          skipped.push({ docId, reason: 'conflict' });
+          continue;
+        }
+        const draft = draftSnaps[j].data();
+        const live = liveSnaps[j].exists ? liveSnaps[j].data() : null;
+        // No live doc means first publish OR a recreation after deleteBoth
+        // (whose cmsVersionHistory rows survive as the audit trail). Resume
+        // from the historical max so revisions stay unique per docPath — the
+        // invariant versions.cjs's cursor pagination depends on.
+        const baseRevision = typeof live?.revision === 'number'
+          ? live.revision
+          : await maxHistoryRevision({ db, docPath: `${collection}/${docId}` });
+        const revision = baseRevision + 1;
+        const contentFields = contentFieldsOf(draft);
+        const visible = draft.visible !== false;
+
+        batch.set(liveRefs[j], {
+          ...contentFields,
+          visible,
+          revision,
+          publishedAt,
+          publishedBy: actor.uid,
+        });
+        batch.update(
+          draftRefs[j],
+          { status: 'clean', basedOnRevision: revision },
+          // Fails the batch if the draft changed since draftSnaps[j] was
+          // read — the guard that makes "marked clean" mean "this exact
+          // content went live".
+          { lastUpdateTime: draftSnaps[j].updateTime },
+        );
+        batch.set(db.collection('cmsVersionHistory').doc(), {
+          docPath: `${collection}/${docId}`,
+          revision,
+          fields: contentFields,
+          visible,
+          publishedAt,
+          publishedBy: actor.email,
+          publishedByUid: actor.uid,
+        });
+        keptIds.push(docId);
+        chunkPublished.push(docId);
       }
-      const draft = draftSnaps[j].data();
-      const live = liveSnaps[j].exists ? liveSnaps[j].data() : null;
-      // No live doc means first publish OR a recreation after deleteBoth
-      // (whose cmsVersionHistory rows survive as the audit trail). Resume
-      // from the historical max so revisions stay unique per docPath — the
-      // invariant versions.cjs's cursor pagination depends on.
-      const baseRevision = typeof live?.revision === 'number'
-        ? live.revision
-        : await maxHistoryRevision({ db, docPath: `${collection}/${docId}` });
-      const revision = baseRevision + 1;
-      const contentFields = contentFieldsOf(draft);
-      const visible = draft.visible !== false;
 
-      batch.set(liveRefs[j], {
-        ...contentFields,
-        visible,
-        revision,
-        publishedAt,
-        publishedBy: actor.email,
-      });
-      batch.update(draftRefs[j], { status: 'clean', basedOnRevision: revision });
-      batch.set(db.collection('cmsVersionHistory').doc(), {
-        docPath: `${collection}/${docId}`,
-        revision,
-        fields: contentFields,
-        visible,
-        publishedAt,
-        publishedBy: actor.email,
-      });
-      chunkPublished.push(docId);
-    }
+      if (queueRef) {
+        // Progress rides in the SAME batch as the doc writes: a resume can
+        // never see committed docs missing from the row (double-bump) or
+        // recorded docs that never committed.
+        batch.set(
+          queueRef,
+          {
+            progress: {
+              [collection]: {
+                published: [...published, ...chunkPublished],
+                skipped,
+                chunksCommitted: chunksCommitted + 1,
+              },
+            },
+            updatedAt: new Date(now()),
+          },
+          { merge: true },
+        );
+      }
 
-    if (chunkPublished.length > 0) await batch.commit();
-    published.push(...chunkPublished);
-    chunksCommitted += 1;
-    if (queueRef) {
-      // Recorded AFTER the chunk commits: the row never claims more than
-      // Firestore holds, so a resume can trust it.
-      await queueRef.set(
-        {
-          progress: { [collection]: { published, skipped, chunksCommitted } },
-          updatedAt: new Date(now()),
-        },
-        { merge: true },
-      );
+      try {
+        if (chunkPublished.length > 0 || queueRef) await batch.commit();
+        published.push(...chunkPublished);
+        chunksCommitted += 1;
+        break;
+      } catch (err) {
+        if (attempt >= MAX_CHUNK_ATTEMPTS || !isPreconditionFailure(err)) throw err;
+        // A draft moved under us (or was deleted). Remember what we read,
+        // re-read, and retry with only the docs we actually attempted —
+        // the changed ones classify as conflict/no-draft next pass.
+        prevTimes.clear();
+        for (let j = 0; j < chunkIds.length; j += 1) {
+          if (draftSnaps[j].exists) prevTimes.set(chunkIds[j], draftSnaps[j].updateTime);
+        }
+        chunkIds = keptIds;
+      }
     }
   }
 
@@ -324,12 +413,16 @@ module.exports = {
   logAdminAction,
   contentFieldsOf,
   isValidDocId,
+  isAlreadyExistsError,
   internals: {
     MAX_WRITES_PER_BATCH,
     WRITES_PER_DOC,
     DOCS_PER_CHUNK,
     RESERVED_FIELDS,
     MAX_DOC_ID_LENGTH,
+    MAX_CHUNK_ATTEMPTS,
     maxHistoryRevision,
+    isPreconditionFailure,
+    sameUpdateTime,
   },
 };

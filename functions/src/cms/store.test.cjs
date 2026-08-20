@@ -188,7 +188,10 @@ test('publishDocs: first publish is revision 1; live gets content fields, visibl
     visible: true,
     revision: 1,
     publishedAt: new Date(NOW),
-    publishedBy: ACTOR.email,
+    // The actor's UID, never the email: live docs are anonymously readable
+    // per the rules, so an address here would be harvestable regardless of
+    // any response filtering.
+    publishedBy: ACTOR.uid,
   });
   // Draft bookkeeping (status/updatedAt/updatedBy) never leaks onto live.
   assert.equal('status' in live, false);
@@ -203,6 +206,17 @@ test('publishDocs: first publish is revision 1; live gets content fields, visibl
   assert.equal(entry.docPath, 'cmsContent/hero__title');
   assert.equal(entry.revision, 1);
   assert.deepEqual(entry.fields, { value: 'v1', section: 'hero', field: 'title' });
+  // The email lives ONLY on the admin-only history row (rules: admin read).
+  assert.equal(entry.publishedBy, ACTOR.email);
+  assert.equal(entry.publishedByUid, ACTOR.uid);
+});
+
+test('publishDocs never writes the actor email onto an anonymously readable live doc', async () => {
+  const db = makeFakeDb({ 'cmsPages_drafts/about': { label: 'About', visible: true, status: 'dirty' } });
+  await publishDocs({ db, collection: 'cmsPages', docIds: ['about'], actor: ACTOR, now });
+  const live = db.read('cmsPages', 'about');
+  assert.equal(live.publishedBy, ACTOR.uid);
+  assert.equal(JSON.stringify(live).includes(ACTOR.email), false, 'no live field may carry the admin email');
 });
 
 test('publishDocs: republish bumps revision by exactly one from the live doc', async () => {
@@ -285,6 +299,148 @@ test('publishDocs: a mid-way batch failure leaves committed chunks recorded, and
     assert.equal(db.read('cmsSchedule', id).revision, 1); // never double-bumped
     assert.equal(db.read('cmsSchedule_drafts', id).status, 'clean');
   }
+});
+
+test('publishDocs queue progress rides IN the chunk batch, never a separate post-commit write', async () => {
+  // If the progress record were a doc-level queueRef.set() after the batch
+  // commit, a crash between the two would leave committed docs unrecorded
+  // and a resume would double-bump their revisions. Prove the progress is
+  // batched: sabotage the doc-level set and the publish must still succeed
+  // with the progress recorded.
+  const db = makeFakeDb({ 'cmsSchedule_drafts/s1': { title: 'S1', visible: true, status: 'dirty' } });
+  const queueRef = db.collection('cmsPublishQueue').doc('q1');
+  await queueRef.set({ status: 'running', request: { cmsSchedule: ['s1'] } });
+  queueRef.set = async () => {
+    throw new Error('doc-level queueRef.set must not be used for progress');
+  };
+
+  const result = await publishDocs({ db, collection: 'cmsSchedule', docIds: ['s1'], actor: ACTOR, now, queueRef });
+  assert.deepEqual(result.published, ['s1']);
+  const row = db.read('cmsPublishQueue', 'q1');
+  assert.deepEqual(row.progress.cmsSchedule.published, ['s1']);
+  assert.equal(row.progress.cmsSchedule.chunksCommitted, 1);
+});
+
+test('publishDocs: an editor save between the read and the commit is a conflict skip, never a stale publish', async () => {
+  const db = makeFakeDb({
+    'cmsContent/hero__title': { value: 'v1', visible: true, revision: 1, publishedAt: new Date(0), publishedBy: 'u' },
+    'cmsContent_drafts/hero__title': { value: 'v2', visible: true, status: 'dirty', basedOnRevision: 1 },
+  });
+  // Interleave: after publishDocs reads the draft snapshots, an editor
+  // saves v3 before the batch commits. Without the lastUpdateTime
+  // precondition, live would get the stale v2 AND the v3 draft would be
+  // marked clean — invisible to { all: true } forever.
+  const realGetAll = db.getAll.bind(db);
+  let fired = false;
+  db.getAll = async (...refs) => {
+    const snaps = await realGetAll(...refs);
+    if (!fired && refs[0]._col === 'cmsContent_drafts') {
+      fired = true;
+      await db.collection('cmsContent_drafts').doc('hero__title').set({
+        value: 'v3', visible: true, status: 'dirty', basedOnRevision: 1,
+        updatedAt: new Date(NOW), updatedBy: 'editor@example.org',
+      });
+    }
+    return snaps;
+  };
+
+  const result = await publishDocs({ db, collection: 'cmsContent', docIds: ['hero__title'], actor: ACTOR, now });
+  assert.deepEqual(result.published, []);
+  assert.deepEqual(result.skipped, [{ docId: 'hero__title', reason: 'conflict' }]);
+  // Live keeps v1 — the stale v2 snapshot never went out.
+  assert.equal(db.read('cmsContent', 'hero__title').value, 'v1');
+  assert.equal(db.read('cmsContent', 'hero__title').revision, 1);
+  // The newer draft is still dirty, so the next publish still finds it.
+  const draft = db.read('cmsContent_drafts', 'hero__title');
+  assert.equal(draft.value, 'v3');
+  assert.equal(draft.status, 'dirty');
+  assert.equal(db.ids('cmsVersionHistory').length, 0);
+});
+
+test('publishDocs conflict on one doc does not fail the chunk: the others still publish', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/a': { value: 'a1', visible: true, status: 'dirty' },
+    'cmsContent_drafts/b': { value: 'b1', visible: true, status: 'dirty' },
+  });
+  const realGetAll = db.getAll.bind(db);
+  let fired = false;
+  db.getAll = async (...refs) => {
+    const snaps = await realGetAll(...refs);
+    if (!fired && refs[0]._col === 'cmsContent_drafts') {
+      fired = true;
+      await db.collection('cmsContent_drafts').doc('a').set({ value: 'a2', visible: true, status: 'dirty' });
+    }
+    return snaps;
+  };
+
+  const queueRef = db.collection('cmsPublishQueue').doc('q1');
+  await queueRef.set({ status: 'running', request: { cmsContent: ['a', 'b'] } });
+  const result = await publishDocs({ db, collection: 'cmsContent', docIds: ['a', 'b'], actor: ACTOR, now, queueRef });
+  assert.deepEqual(result.published, ['b']);
+  assert.deepEqual(result.skipped, [{ docId: 'a', reason: 'conflict' }]);
+  assert.equal(db.read('cmsContent', 'b').value, 'b1');
+  assert.equal(db.read('cmsContent', 'a'), undefined);
+  assert.equal(db.read('cmsContent_drafts', 'a').status, 'dirty');
+  // The queue row records the conflict so the operator can see it.
+  const row = db.read('cmsPublishQueue', 'q1');
+  assert.deepEqual(row.progress.cmsContent.published, ['b']);
+  assert.deepEqual(row.progress.cmsContent.skipped, [{ docId: 'a', reason: 'conflict' }]);
+});
+
+test('publishDocs rethrows non-precondition commit failures instead of retrying them', async () => {
+  const db = makeFakeDb({ 'cmsContent_drafts/x': { value: 'v', visible: true, status: 'dirty' } });
+  db.failAtCommit = 1;
+  await assert.rejects(
+    () => publishDocs({ db, collection: 'cmsContent', docIds: ['x'], actor: ACTOR, now }),
+    /injected batch commit failure/,
+  );
+  assert.equal(db.read('cmsContent', 'x'), undefined);
+  assert.equal(db.read('cmsContent_drafts', 'x').status, 'dirty');
+});
+
+// --- writeDraft createOnly (concurrent create race) ---------------------------
+
+test('writeDraft createOnly refuses an existing draft without writing', async () => {
+  const db = makeFakeDb({ 'cmsContent_drafts/hero__title': { value: 'first', visible: true, status: 'dirty' } });
+  await assert.rejects(
+    () => writeDraft({
+      db, collection: 'cmsContent', docId: 'hero__title', fields: { value: 'second' },
+      actor: ACTOR, now, createOnly: true,
+    }),
+    (err) => require('./store.cjs').isAlreadyExistsError(err),
+  );
+  assert.equal(db.read('cmsContent_drafts', 'hero__title').value, 'first');
+  assert.equal(db.writes.length, 0);
+});
+
+test('writeDraft createOnly loses the create() race atomically — the first writer wins', async () => {
+  const db = makeFakeDb();
+  const draftRef = db.collection('cmsContent_drafts').doc('hero__title');
+  // Interleave: the second create's existence check runs before the first
+  // create's write lands (both saw "no doc"), so only the create()
+  // precondition separates them.
+  const realGet = draftRef.get.bind(draftRef);
+  let lied = false;
+  const rigged = {
+    ...draftRef,
+    get: async () => {
+      if (!lied) return realGet();
+      return { exists: false, data: () => undefined };
+    },
+  };
+  const col = db.collection.bind(db);
+  db.collection = (name) => {
+    if (name !== 'cmsContent_drafts') return col(name);
+    return { ...col(name), doc: (id) => (id === 'hero__title' ? rigged : col(name).doc(id)) };
+  };
+
+  await writeDraft({ db, collection: 'cmsContent', docId: 'hero__title', fields: { value: 'first' }, actor: ACTOR, now, createOnly: true });
+  lied = true; // the loser's existence check now reports "no doc" despite the winner's write
+  await assert.rejects(
+    () => writeDraft({ db, collection: 'cmsContent', docId: 'hero__title', fields: { value: 'second' }, actor: ACTOR, now, createOnly: true }),
+    (err) => require('./store.cjs').isAlreadyExistsError(err),
+  );
+  assert.equal(db.read('cmsContent_drafts', 'hero__title').value, 'first');
 });
 
 test('publishDocs without a queueRef works (single-doc convenience path)', async () => {

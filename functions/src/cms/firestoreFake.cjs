@@ -7,7 +7,11 @@
  * not execute it directly.
  *
  * Supports exactly what the cms modules use — doc get/set/update/delete,
- * `==` queries with orderBy/limit/startAfter, getAll, and batches — plus
+ * create (fails ALREADY_EXISTS like the Admin SDK), `==` queries with
+ * orderBy/limit/startAfter, getAll, batches with per-update
+ * { lastUpdateTime } preconditions (snapshots expose a monotonically
+ * bumped `updateTime`; a stale precondition fails the whole batch with
+ * FAILED_PRECONDITION, applying nothing, like real Firestore) — plus
  * two affordances the publish tests need:
  *
  *   db.writes      — an append-only audit of every applied write
@@ -57,8 +61,11 @@ function orderValue(v) {
 function makeFakeDb(seed = {}) {
   /** @type {Map<string, Map<string, object>>} */
   const store = new Map();
+  /** 'col/id' → monotonically increasing write counter (fake updateTime). */
+  const updateTimes = new Map();
   const writes = [];
   let commitCount = 0;
+  let writeClock = 0;
 
   function colMap(name) {
     if (!store.has(name)) store.set(name, new Map());
@@ -68,27 +75,44 @@ function makeFakeDb(seed = {}) {
   for (const [path, data] of Object.entries(seed)) {
     const slash = path.indexOf('/');
     colMap(path.slice(0, slash)).set(path.slice(slash + 1), clone(data));
+    writeClock += 1;
+    updateTimes.set(path, writeClock);
   }
 
   function applyWrite(op) {
     const docs = colMap(op.col);
+    const key = `${op.col}/${op.id}`;
     if (op.type === 'delete') {
       docs.delete(op.id);
+      updateTimes.delete(key);
+    } else if (op.type === 'create') {
+      if (docs.has(op.id)) throw new Error(`ALREADY_EXISTS: document ${key} already exists`);
+      docs.set(op.id, clone(op.data));
     } else if (op.type === 'update') {
-      if (!docs.has(op.id)) throw new Error(`NOT_FOUND: no document ${op.col}/${op.id}`);
+      if (!docs.has(op.id)) throw new Error(`NOT_FOUND: no document ${key}`);
       docs.set(op.id, mergeDeep(docs.get(op.id), op.data));
     } else if (op.merge) {
       docs.set(op.id, mergeDeep(docs.get(op.id) || {}, op.data));
     } else {
       docs.set(op.id, clone(op.data));
     }
-    writes.push({ type: op.type, path: `${op.col}/${op.id}` });
+    if (op.type !== 'delete') {
+      writeClock += 1;
+      updateTimes.set(key, writeClock);
+    }
+    writes.push({ type: op.type, path: key });
   }
 
   function snapshot(col, id) {
     const data = colMap(col).get(id);
     const exists = data !== undefined;
-    return { id, exists, data: () => (exists ? clone(data) : undefined), ref: docRef(col, id) };
+    return {
+      id,
+      exists,
+      updateTime: exists ? updateTimes.get(`${col}/${id}`) : undefined,
+      data: () => (exists ? clone(data) : undefined),
+      ref: docRef(col, id),
+    };
   }
 
   function docRef(col, id) {
@@ -101,6 +125,9 @@ function makeFakeDb(seed = {}) {
       },
       async set(data, opts = {}) {
         applyWrite({ type: 'set', col, id, data, merge: opts.merge === true });
+      },
+      async create(data) {
+        applyWrite({ type: 'create', col, id, data });
       },
       async update(data) {
         applyWrite({ type: 'update', col, id, data });
@@ -181,8 +208,8 @@ function makeFakeDb(seed = {}) {
         set(ref, data, opts = {}) {
           ops.push({ type: 'set', col: ref._col, id: ref.id, data: clone(data), merge: opts.merge === true });
         },
-        update(ref, data) {
-          ops.push({ type: 'update', col: ref._col, id: ref.id, data: clone(data) });
+        update(ref, data, precondition) {
+          ops.push({ type: 'update', col: ref._col, id: ref.id, data: clone(data), precondition });
         },
         delete(ref) {
           ops.push({ type: 'delete', col: ref._col, id: ref.id });
@@ -193,10 +220,17 @@ function makeFakeDb(seed = {}) {
             db.failAtCommit = null;
             throw new Error('injected batch commit failure');
           }
-          // Atomicity: validate updates before applying anything.
+          // Atomicity: validate updates and preconditions before applying
+          // anything — a stale precondition fails the WHOLE batch.
           for (const op of ops) {
             if (op.type === 'update' && !colMap(op.col).has(op.id)) {
               throw new Error(`NOT_FOUND: no document ${op.col}/${op.id}`);
+            }
+            if (op.type === 'update' && op.precondition?.lastUpdateTime !== undefined) {
+              const current = updateTimes.get(`${op.col}/${op.id}`);
+              if (current !== op.precondition.lastUpdateTime) {
+                throw new Error(`FAILED_PRECONDITION: document ${op.col}/${op.id} changed since it was read`);
+              }
             }
           }
           for (const op of ops) applyWrite(op);
