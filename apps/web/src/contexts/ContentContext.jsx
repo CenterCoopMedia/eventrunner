@@ -8,12 +8,15 @@
 // (?preview=1 is convenience only, wired in App.jsx).
 //
 // Overlay semantics, per collection:
-//   - cmsContent / cmsPages / cmsSchedule: a live result with at least one
-//     doc replaces the snapshot wholesale — the published set is the truth,
-//     and merging would resurrect deleted demo blocks/sessions. An empty
-//     result or a listener error keeps the snapshot (fail soft: a fresh,
-//     unseeded project should still show the demo site, and rules-denied
-//     reads must not blank it).
+//   - cmsContent / cmsPages / cmsSchedule: any successful live result —
+//     including an empty array — replaces the snapshot wholesale. The
+//     published set is the truth: once a listener has actually reported in,
+//     an empty result means staff unpublished everything and the public view
+//     must go empty too, not keep showing stale demo content. Only the
+//     *absence* of a result yet (overlay still null — no snapshot has
+//     arrived, e.g. a fresh unseeded project or a still-connecting listener)
+//     or a listener error (fail soft: rules-denied/offline reads must not
+//     blank the page) keeps the snapshot / last-known live values.
 //   - cmsUpdates: live-only; there is no snapshot module, so the default is
 //     an empty list.
 //   - cmsOrganizations / cmsTimeline: snapshot-only for now — their runtime
@@ -74,16 +77,21 @@ export function ContentProvider({ readSource = 'published', children }) {
   const value = useMemo(() => {
     // cmsContent docs are keyed `<section>__<field>` — same shape as the
     // snapshot map, so the live set drops straight in.
-    const siteContent = overlay.cmsContent?.length
-      ? Object.fromEntries(overlay.cmsContent.map((doc) => [doc.id, doc]))
-      : snapshotSiteContent;
-    const pages = (overlay.cmsPages?.length ? overlay.cmsPages : snapshotPages)
+    // != null, not `.length` — a live result has *arrived* the moment the
+    // overlay slot is no longer null, and that includes an empty array
+    // (staff unpublished the last doc). Only "no result yet" (still null)
+    // falls back to the snapshot.
+    const siteContent =
+      overlay.cmsContent != null
+        ? Object.fromEntries(overlay.cmsContent.map((doc) => [doc.id, doc]))
+        : snapshotSiteContent;
+    const pages = (overlay.cmsPages != null ? overlay.cmsPages : snapshotPages)
       .slice()
       .sort(byOrder);
     const updates = (overlay.cmsUpdates ?? []).slice().sort(byOrder);
-    const scheduleData = overlay.cmsSchedule?.length ? overlay.cmsSchedule : snapshotScheduleData;
+    const scheduleData = overlay.cmsSchedule != null ? overlay.cmsSchedule : snapshotScheduleData;
     const live = Boolean(
-      overlay.cmsContent?.length || overlay.cmsPages?.length || overlay.cmsSchedule?.length,
+      overlay.cmsContent != null || overlay.cmsPages != null || overlay.cmsSchedule != null,
     );
 
     const getBlock = (section, field) => {

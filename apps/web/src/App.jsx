@@ -4,7 +4,7 @@
 // MemoryRouter), so ContentProvider can later read search params via hooks.
 import { Route, Routes, useSearchParams } from 'react-router-dom';
 import { EventConfigProvider } from './contexts/EventConfigContext.jsx';
-import { AuthProvider } from './contexts/AuthContext.jsx';
+import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { ContentProvider } from './contexts/ContentContext.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
@@ -32,20 +32,30 @@ export function AppRoutes() {
   );
 }
 
-export default function App() {
-  // ?preview=1 is convenience only — firestore.rules decide who may actually
-  // read the *_drafts collections (spec §2.4).
+// ?preview=1 alone must not be enough to select the draft read source: an
+// admin who signs out with ?preview=1 still in the URL (a bookmarked/shared
+// link, a stale tab) must not keep seeing draft overlays. isAdmin gates it —
+// firestore.rules are still the real authorization boundary underneath, this
+// is only which collection ContentProvider *asks* for. Needs to live inside
+// AuthProvider, so it's a separate component rather than inline in App().
+function ContentGate({ children }) {
   const [searchParams] = useSearchParams();
-  const readSource = searchParams.get('preview') === '1' ? 'draft' : 'published';
+  const { isAdmin } = useAuth();
+  const readSource =
+    searchParams.get('preview') === '1' && isAdmin ? 'draft' : 'published';
 
+  return <ContentProvider readSource={readSource}>{children}</ContentProvider>;
+}
+
+export default function App() {
   return (
     <EventConfigProvider>
       <AuthProvider>
-        <ContentProvider readSource={readSource}>
+        <ContentGate>
           <ToastProvider>
             <AppRoutes />
           </ToastProvider>
-        </ContentProvider>
+        </ContentGate>
       </AuthProvider>
     </EventConfigProvider>
   );

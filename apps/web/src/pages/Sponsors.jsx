@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import { isSafeHref } from '../lib/sanitizeHtml.js';
 
 export default function Sponsors() {
   const { features } = useEventConfig();
@@ -49,14 +50,18 @@ export default function Sponsors() {
               className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
             >
               <h2 className="font-heading text-lg text-brand-ink">
-                <a
-                  href={org.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline underline-offset-2 hover:text-brand-primary-dark"
-                >
-                  {org.name}
-                </a>
+                {isSafeHref(org.url) ? (
+                  <a
+                    href={org.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2 hover:text-brand-primary-dark"
+                  >
+                    {org.name}
+                  </a>
+                ) : (
+                  org.name
+                )}
               </h2>
               <p className="mt-1 text-sm uppercase tracking-wide text-brand-ink-muted">
                 {org.tier}

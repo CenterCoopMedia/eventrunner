@@ -114,7 +114,24 @@ describe('ContentProvider', () => {
     expect(screen.getByTestId('hero-block-count')).toHaveTextContent('1');
   });
 
-  it('keeps the snapshot when the live result is empty (fail soft)', () => {
+  it('keeps the snapshot before any live result has arrived (pre-connection null)', () => {
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    // No onNext fired yet for any collection — overlay slots are still null,
+    // so the snapshot stands (fail soft: nothing has connected yet).
+    expect(screen.getByTestId('source')).toHaveTextContent('snapshot');
+    expect(screen.getByTestId('hero-title')).toHaveTextContent(
+      snapshotSiteContent.hero__title.value,
+    );
+    expect(screen.getByTestId('schedule-count')).toHaveTextContent(
+      String(snapshotScheduleData.length),
+    );
+  });
+
+  it('empties out when a live result reports zero docs — an empty publish replaces the snapshot, it does not fall back to it', () => {
     render(
       <ContentProvider>
         <Probe />
@@ -125,12 +142,40 @@ describe('ContentProvider', () => {
       subscriptions.get('cmsPages').onNext([]);
       subscriptions.get('cmsSchedule').onNext([]);
     });
-    expect(screen.getByTestId('source')).toHaveTextContent('snapshot');
-    expect(screen.getByTestId('hero-title')).toHaveTextContent(
-      snapshotSiteContent.hero__title.value,
+    // A live result arrived (even though it's empty) — that's authoritative,
+    // not a signal to keep showing stale snapshot content.
+    expect(screen.getByTestId('source')).toHaveTextContent('live');
+    expect(screen.getByTestId('hero-title')).toHaveTextContent('');
+    expect(screen.getByTestId('page-count')).toHaveTextContent('0');
+    expect(screen.getByTestId('schedule-count')).toHaveTextContent('0');
+  });
+
+  it('a listener error leaves last-known values in charge, not the snapshot, once live data was already showing', () => {
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
     );
-    expect(screen.getByTestId('schedule-count')).toHaveTextContent(
-      String(snapshotScheduleData.length),
+    act(() => {
+      subscriptions.get('cmsSchedule').onNext([
+        {
+          id: 'live-session',
+          dayId: 'day-1',
+          startTime: '09:00',
+          endTime: '09:30',
+          title: 'Live-published session',
+          visible: true,
+          order: 0,
+        },
+      ]);
+    });
+    // subscribeContentCollection never calls onNext on error (contentSource.js
+    // fails soft internally) — simulate that by simply not firing onNext
+    // again. The overlay slot keeps its last value, so nothing resets.
+    expect(screen.getByTestId('source')).toHaveTextContent('live');
+    expect(screen.getByTestId('schedule-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('schedule-first-title')).toHaveTextContent(
+      'Live-published session',
     );
   });
 
