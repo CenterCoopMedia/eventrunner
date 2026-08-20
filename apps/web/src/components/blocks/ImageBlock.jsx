@@ -1,8 +1,14 @@
 // image: an image by URL; alt is required by the registry contract
 // (BLOCK_TYPES.image). The 1px inset outline follows the interface
 // guidelines' image treatment, via the ink token at 8%.
+//
+// url is CMS-authored data (unvalidated server-side beyond reserved-key
+// checks); the same href allowlist keeps data:/attacker-controlled schemes
+// out even though javascript: is inert on <img src> in modern browsers.
+import { isSafeHref } from '../../lib/sanitizeHtml.js';
+
 export default function ImageBlock({ block }) {
-  if (!block?.url) return null;
+  if (!block?.url || !isSafeHref(block.url)) return null;
   const image = (
     <img
       src={block.url}

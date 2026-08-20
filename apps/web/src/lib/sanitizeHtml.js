@@ -87,41 +87,76 @@ export function isSafeHref(value) {
   return SAFE_HREF_PROTOCOL.test(href);
 }
 
-function cleanNode(parent) {
-  // Snapshot the child list: removal/unwrap mutates childNodes live.
-  for (const child of Array.from(parent.childNodes)) {
-    if (child.nodeType === Node.TEXT_NODE) continue;
+// Defensive cap on total elements walked. A ~1MB Firestore doc could in
+// principle nest far deeper than any legitimate editor content would; this
+// keeps a pathological document bounded instead of pegging the main thread.
+const MAX_NODES_WALKED = 20000;
+
+// Builds a *fresh* output tree rather than mutating the parsed one in
+// place. An earlier version unwrapped disallowed wrappers (div, span,
+// font…) by repeatedly doing `parent.insertBefore(child.firstChild, child)`
+// — but each such move relocates the *entire remaining nested subtree* in
+// one call, and DOM implementations do O(subtree size) bookkeeping per
+// move (rooted-document flags etc.), so a chain of n nested wrappers cost
+// O(n^2)+ overall even though the node-visitation itself was linear.
+// Nested unknown wrappers are exactly what unfiltered rich-text paste
+// produces, so that cost was reachable from ordinary CMS content.
+//
+// Building fresh avoids the problem structurally: every node we append is
+// either a brand-new (empty, or previously-appended-and-therefore-small)
+// element or a text node, so every appendChild is O(1) — nothing we ever
+// move carries an unprocessed subtree with it. Iterative (explicit stack)
+// rather than recursive so pathological depth can't blow the JS call stack.
+function cleanTree(sourceRoot, doc) {
+  const rootFragment = doc.createDocumentFragment();
+  const stack = [
+    { children: Array.from(sourceRoot.childNodes), index: 0, target: rootFragment },
+  ];
+  let walked = 0;
+  while (stack.length) {
+    const frame = stack[stack.length - 1];
+    if (frame.index >= frame.children.length) {
+      stack.pop();
+      continue;
+    }
+    if (walked++ > MAX_NODES_WALKED) return rootFragment;
+    const child = frame.children[frame.index];
+    frame.index += 1;
+
+    if (child.nodeType === Node.TEXT_NODE) {
+      frame.target.appendChild(doc.createTextNode(child.data));
+      continue;
+    }
     if (child.nodeType !== Node.ELEMENT_NODE) {
       // Comments, CDATA, processing instructions: gone.
-      child.remove();
       continue;
     }
     const tag = child.tagName.toLowerCase();
     if (DROP_WITH_CONTENT.has(tag)) {
-      child.remove();
+      // Skip entirely — don't descend, contents go with it.
       continue;
     }
     if (!ALLOWED_TAGS.has(tag)) {
-      // Unknown-but-harmless wrapper (div, span, font…): keep the children,
-      // drop the element, then re-clean them in place.
-      while (child.firstChild) parent.insertBefore(child.firstChild, child);
-      child.remove();
-      cleanNode(parent);
-      return;
+      // Unknown-but-harmless wrapper: keep its children by appending them
+      // straight into the current target, dropping the wrapper itself.
+      stack.push({ children: Array.from(child.childNodes), index: 0, target: frame.target });
+      continue;
     }
-    // Allowed element: strip every attribute except a safe href on <a>.
-    for (const attr of Array.from(child.attributes)) {
-      const name = attr.name.toLowerCase();
-      if (tag === 'a' && name === 'href' && isSafeHref(attr.value)) continue;
-      child.removeAttribute(attr.name);
+    // Allowed element: rebuild it with only the allowlisted attributes.
+    const clean = doc.createElement(tag);
+    if (tag === 'a') {
+      const href = child.getAttribute('href');
+      if (href !== null && isSafeHref(href)) {
+        clean.setAttribute('href', href);
+        // Links in body copy may point anywhere the CMS allows; sever the
+        // opener relationship either way.
+        clean.setAttribute('rel', 'noopener noreferrer');
+      }
     }
-    if (tag === 'a' && child.hasAttribute('href')) {
-      // Links in body copy may point anywhere the CMS allows; sever the
-      // opener relationship either way.
-      child.setAttribute('rel', 'noopener noreferrer');
-    }
-    cleanNode(child);
+    frame.target.appendChild(clean);
+    stack.push({ children: Array.from(child.childNodes), index: 0, target: clean });
   }
+  return rootFragment;
 }
 
 /**
@@ -130,10 +165,16 @@ function cleanNode(parent) {
  */
 export function sanitizeHtml(html) {
   if (typeof html !== 'string' || html === '') return '';
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  if (!doc?.body) return '';
-  cleanNode(doc.body);
-  return doc.body.innerHTML;
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    if (!doc?.body) return '';
+    const container = doc.createElement('div');
+    container.appendChild(cleanTree(doc.body, doc));
+    return container.innerHTML;
+  } catch {
+    // Never let a pathological document take the renderer down with it.
+    return '';
+  }
 }
 
 export default sanitizeHtml;
