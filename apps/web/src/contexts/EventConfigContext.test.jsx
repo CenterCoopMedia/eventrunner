@@ -116,6 +116,32 @@ describe('EventConfigProvider', () => {
     expect(screen.getByTestId('schedule-feature')).toHaveTextContent('false');
   });
 
+  it('treats a live config/features doc as authoritative: an omitted flag is false, not the snapshot value', () => {
+    render(
+      <EventConfigProvider>
+        <Probe />
+      </EventConfigProvider>,
+    );
+
+    // An empty live doc omits every flag; the backend contract says an
+    // omitted flag means disabled, so every snapshot-enabled feature (which
+    // is all true in the demo snapshot) must flip off rather than inherit.
+    act(() => {
+      subscriptions.get('features')({});
+    });
+    expect(screen.getByTestId('schedule-feature')).toHaveTextContent('false');
+  });
+
+  it('keeps the snapshot features until a live config/features doc actually arrives', () => {
+    render(
+      <EventConfigProvider>
+        <Probe />
+      </EventConfigProvider>,
+    );
+    // No config/features write yet — the snapshot (schedule: true) stands.
+    expect(screen.getByTestId('schedule-feature')).toHaveTextContent('true');
+  });
+
   it('mirrors config/theme.texture onto documentElement.dataset.texture', () => {
     render(
       <EventConfigProvider>
@@ -150,13 +176,14 @@ describe('Layout nav', () => {
     // Snapshot features enable all three sections.
     expect(screen.getByRole('link', { name: 'Speakers' })).toBeInTheDocument();
 
+    // A live config/features doc is authoritative: any flag it omits (here,
+    // schedule) defaults to false along with the flags it explicitly clears.
     act(() => {
       subscriptions.get('features')({ speakers: false, sponsors: false });
     });
     expect(screen.queryByRole('link', { name: 'Speakers' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Sponsors' })).toBeNull();
-    // Untouched features fall back to the snapshot and stay visible.
-    expect(screen.getByRole('link', { name: 'Schedule' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Schedule' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument();
   });
 

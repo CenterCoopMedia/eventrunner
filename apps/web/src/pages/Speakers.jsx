@@ -1,12 +1,35 @@
 // Speakers page — placeholder the speakers tranche replaces.
 // TODO(m2-speakers): speaker detail routes, headshot rendering from Storage
 // branding paths, session cross-links.
+// Feature-gated by config/features.speakers — the nav link already hides
+// when the feature is off, but the route itself must gate too, since direct
+// navigation bypasses the nav (matches the Schedule.jsx pattern).
+import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
+import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 
 export default function Speakers() {
+  const { features } = useEventConfig();
   const { speakers } = useContent();
   const visible = speakers.filter((s) => s.visible);
+
+  if (!features.speakers) {
+    return (
+      <EmptyState
+        title="This event doesn’t have a public speaker directory"
+        description="Everything else about the event is on the home page."
+        action={
+          <Link
+            to="/"
+            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
+          >
+            Go to the home page
+          </Link>
+        }
+      />
+    );
+  }
 
   return (
     <article>

@@ -44,11 +44,18 @@ function wallClockAsUtcMs(instant, timeZone) {
 
 /**
  * Resolve an event-local wall clock ("YYYY-MM-DD" + 24h "HH:MM") to the Date
- * instant it names in an IANA timezone. Returns null on any malformed input
- * or unknown zone — callers render a "to be announced" state instead.
+ * instant it names in an IANA timezone. Returns null on any malformed input,
+ * unknown zone, or a wall clock that does not exist in that zone — callers
+ * render a "to be announced" state instead.
  *
  * Two-pass offset search so wall clocks on either side of a DST transition
- * resolve with the offset actually in force at that moment.
+ * resolve with the offset actually in force at that moment. A wall clock
+ * inside a "spring forward" gap (e.g. 2:30 AM on the transition day in
+ * America/New_York, where the clock jumps from 2:00 to 3:00) has no real
+ * instant to resolve to — the search still returns *some* instant, but
+ * rendering it back in the zone yields a different wall clock than the one
+ * requested. Detect that mismatch and fail soft rather than silently
+ * returning a session at the wrong time.
  */
 export function zonedDateTime(dateStr, timeStr, timeZone) {
   if (typeof dateStr !== 'string' || !DATE_RE.test(dateStr)) return null;
@@ -63,7 +70,9 @@ export function zonedDateTime(dateStr, timeStr, timeZone) {
     // offset(t) = wallClockAsUtcMs(t) − t; find utc with utc + offset(utc) = wall.
     const guess = wallMs - (wallClockAsUtcMs(new Date(wallMs), timeZone) - wallMs);
     const utcMs = wallMs - (wallClockAsUtcMs(new Date(guess), timeZone) - guess);
-    return new Date(utcMs);
+    const resolved = new Date(utcMs);
+    if (wallClockAsUtcMs(resolved, timeZone) !== wallMs) return null;
+    return resolved;
   } catch {
     // Invalid IANA zone name in config — fail soft, never throw in render.
     return null;

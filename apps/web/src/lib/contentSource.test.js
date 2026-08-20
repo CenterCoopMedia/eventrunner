@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // subscribeContentCollection's one seam to Firestore is
 // onSnapshot(query(collection(db, ...), where(...))) for published reads and
@@ -25,11 +25,16 @@ const { subscribeContentCollection } = await import('./contentSource.js');
 
 describe('subscribeContentCollection', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     onSnapshotMock.mockReset();
     collectionMock.mockClear();
     whereMock.mockClear();
     queryMock.mockClear();
     onSnapshotMock.mockImplementation(() => vi.fn());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('published: queries the bare collection name with a visible == true where clause', () => {
@@ -90,11 +95,59 @@ describe('subscribeContentCollection', () => {
     expect(onNext).not.toHaveBeenCalled();
   });
 
-  it('returns the unsubscribe function from onSnapshot', () => {
+  it('re-attaches a fresh listener after a delay when the listener errors, and data flows again', () => {
+    let capturedSuccess;
+    let capturedError;
+    let attachCount = 0;
+    onSnapshotMock.mockImplementation((_target, onSuccess, onError) => {
+      attachCount += 1;
+      capturedSuccess = onSuccess;
+      capturedError = onError;
+      return vi.fn();
+    });
+
+    const onNext = vi.fn();
+    subscribeContentCollection('cmsContent', 'published', onNext);
+    expect(attachCount).toBe(1);
+
+    // The SDK terminates the listener on error — last-known values (nothing
+    // new from onNext) keep rendering until the retry re-attaches.
+    capturedError(new Error('stream error'));
+    expect(attachCount).toBe(1); // not yet retried
+    expect(onNext).not.toHaveBeenCalled();
+
+    vi.runOnlyPendingTimers();
+    expect(attachCount).toBe(2); // re-attached after the retry delay
+
+    capturedSuccess({ docs: [{ id: 'a', data: () => ({ title: 'A' }) }] });
+    expect(onNext).toHaveBeenCalledWith([{ id: 'a', title: 'A' }]);
+  });
+
+  it('cancels a pending retry and detaches the live listener on unsubscribe', () => {
+    let attachCount = 0;
+    const detach = vi.fn();
+    let capturedError;
+    onSnapshotMock.mockImplementation((_target, _onSuccess, onError) => {
+      attachCount += 1;
+      capturedError = onError;
+      return detach;
+    });
+
+    const unsubscribe = subscribeContentCollection('cmsContent', 'published', vi.fn());
+    capturedError(new Error('stream error'));
+    unsubscribe();
+
+    vi.runOnlyPendingTimers();
+    expect(attachCount).toBe(1); // retry was cancelled, no re-attach
+    expect(detach).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the unsubscribe function that detaches the live listener', () => {
     const detach = vi.fn();
     onSnapshotMock.mockImplementation(() => detach);
 
     const unsubscribe = subscribeContentCollection('cmsContent', 'published', vi.fn());
-    expect(unsubscribe).toBe(detach);
+    unsubscribe();
+    expect(detach).toHaveBeenCalledTimes(1);
   });
 });

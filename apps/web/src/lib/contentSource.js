@@ -13,12 +13,17 @@
 // module instead of the SDK, and the provider stays free of Firestore types.
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase.js';
+import { subscribeWithRetry } from './retrySubscription.js';
 
 /**
  * Subscribe to one published cms collection (or its _drafts sibling).
  * Calls onNext(docs) with an array of `{ id, ...data }` on every snapshot.
- * A listener error leaves the committed build-time snapshot in charge
- * (fail soft — first paint already rendered from it). Returns unsubscribe.
+ * A listener error leaves the committed build-time snapshot (or last-known
+ * live values) in charge (fail soft — first paint already rendered from it),
+ * then re-attaches a fresh listener after a delay (subscribeWithRetry) so a
+ * transient error doesn't permanently freeze content updates for the rest of
+ * the session. Returns the unsubscribe function, which also cancels any
+ * pending retry.
  *
  * @param {string} name       Publishable collection name, e.g. 'cmsContent'.
  * @param {'published'|'draft'} readSource
@@ -29,15 +34,22 @@ export function subscribeContentCollection(name, readSource, onNext) {
     readSource === 'draft'
       ? collection(db, `${name}_drafts`)
       : query(collection(db, name), where('visible', '==', true));
-  return onSnapshot(
-    target,
-    (snapshot) => {
-      onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    },
+  return subscribeWithRetry(
+    (onError) =>
+      onSnapshot(
+        target,
+        (snapshot) => {
+          onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+        },
+        onError,
+      ),
     (error) => {
-      // Fail soft: the generated snapshot keeps rendering.
+      // Fail soft: the generated snapshot (or last-known live values) keeps
+      // rendering. The SDK has already torn this listener down, so
+      // subscribeWithRetry schedules a fresh one rather than staying
+      // silently dead.
       console.warn(
-        `${name} (${readSource}) subscription failed; keeping snapshot values.`,
+        `${name} (${readSource}) subscription failed; keeping snapshot values and retrying.`,
         error,
       );
     },

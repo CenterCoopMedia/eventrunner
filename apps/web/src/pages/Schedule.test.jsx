@@ -169,6 +169,33 @@ describe('SchedulePage', () => {
     expect(zonedDateTime('2026-10-15', '09:05', 'Not/AZone')).toBeNull();
   });
 
+  it('fails soft on a wall clock inside a DST spring-forward gap', () => {
+    // 2026-03-08 is the America/New_York spring-forward day: the clock jumps
+    // from 2:00 AM straight to 3:00 AM, so 2:30 AM never happens. Resolving
+    // it must not silently render as 1:30 AM (the pre-fix behavior).
+    expect(zonedDateTime('2026-03-08', '02:30', 'America/New_York')).toBeNull();
+
+    // A normal time on the same day still resolves — 9:00 AM is after the
+    // 2:00 AM transition, so it's already EDT (UTC−4).
+    expect(
+      zonedDateTime('2026-03-08', '09:00', 'America/New_York').toISOString(),
+    ).toBe('2026-03-08T13:00:00.000Z');
+
+    // 2026-11-01 is the America/New_York fall-back day: 1:30 AM happens
+    // twice (ambiguous, not missing) and must still resolve — consistently,
+    // to one real instant rather than failing soft like the gap case.
+    const fallBack = zonedDateTime('2026-11-01', '01:30', 'America/New_York');
+    expect(fallBack).not.toBeNull();
+    expect(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      }).format(fallBack),
+    ).toBe('1:30 AM');
+  });
+
   it('rolls a midnight-crossing session end to the next calendar day', () => {
     const range = formatSessionTimeRange(fixtureConfig, {
       dayId: 'fx-day-1',

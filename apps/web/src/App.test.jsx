@@ -2,14 +2,20 @@
 // snapshot — providers nest, routes resolve, and the snapshot content
 // reaches the DOM with no Firebase connection (spec §2.4 first-paint path).
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // The smoke test needs no Firebase env or network (spec §8.1 credential-free
 // CI): stub the two provider seams that would otherwise initialize the SDK.
-// EventConfigProvider subscribes to config docs through configSource.js …
+// EventConfigProvider subscribes to config docs through configSource.js —
+// capture each docId's callback so a test can fire a live config/features
+// write and drive the feature-gated route tests below.
+const configSubscriptions = new Map();
 vi.mock('./lib/configSource.js', () => ({
-  subscribeConfigDoc: () => () => {},
+  subscribeConfigDoc: (docId, onNext) => {
+    configSubscriptions.set(docId, onNext);
+    return () => configSubscriptions.delete(docId);
+  },
 }));
 // … and AuthProvider imports firebase.js at module scope, whose getAuth()
 // throws without a real API key. Stub the instances plus the auth entry
@@ -71,5 +77,34 @@ describe('app shell', () => {
     renderAt('/definitely-not-a-page');
     expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Go to the home page' })).toBeInTheDocument();
+  });
+
+  it('gates the /speakers route behind config/features.speakers, not just the nav link', () => {
+    renderAt('/speakers');
+    // Snapshot enables speakers, so direct navigation renders the page.
+    expect(screen.getByRole('heading', { level: 1, name: 'Speakers' })).toBeInTheDocument();
+
+    act(() => {
+      configSubscriptions.get('features')({ speakers: false });
+    });
+    expect(screen.queryByRole('heading', { level: 1, name: 'Speakers' })).toBeNull();
+    expect(
+      screen.getByRole('heading', {
+        name: 'This event doesn’t have a public speaker directory',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('gates the /sponsors route behind config/features.sponsors, not just the nav link', () => {
+    renderAt('/sponsors');
+    expect(screen.getByRole('heading', { level: 1, name: 'Sponsors' })).toBeInTheDocument();
+
+    act(() => {
+      configSubscriptions.get('features')({ sponsors: false });
+    });
+    expect(screen.queryByRole('heading', { level: 1, name: 'Sponsors' })).toBeNull();
+    expect(
+      screen.getByRole('heading', { name: 'This event doesn’t have public sponsors' }),
+    ).toBeInTheDocument();
   });
 });
