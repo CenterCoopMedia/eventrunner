@@ -1,9 +1,30 @@
 // Smoke test: the app shell renders end to end from the committed synthetic
 // snapshot — providers nest, routes resolve, and the snapshot content
 // reaches the DOM with no Firebase connection (spec §2.4 first-paint path).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+
+// The smoke test needs no Firebase env or network (spec §8.1 credential-free
+// CI): stub the two provider seams that would otherwise initialize the SDK.
+// EventConfigProvider subscribes to config docs through configSource.js …
+vi.mock('./lib/configSource.js', () => ({
+  subscribeConfigDoc: () => () => {},
+}));
+// … and AuthProvider imports firebase.js at module scope, whose getAuth()
+// throws without a real API key. Stub the instances plus the auth entry
+// points AuthProvider touches on mount (signed-out stream).
+vi.mock('./firebase.js', () => ({ app: {}, auth: {}, db: {}, storage: {} }));
+vi.mock('firebase/auth', () => ({
+  GoogleAuthProvider: class {},
+  onAuthStateChanged: (_auth, next) => {
+    next(null);
+    return () => {};
+  },
+  signInWithCustomToken: vi.fn(),
+  signInWithPopup: vi.fn(),
+  signOut: vi.fn(),
+}));
 import App from './App.jsx';
 import { eventConfig } from '@generated/eventConfig.js';
 import siteContent from '@generated/siteContent.js';

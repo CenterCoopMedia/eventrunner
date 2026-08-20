@@ -21,7 +21,11 @@ function navClass({ isActive }) {
 }
 
 export default function Layout() {
-  const { eventConfig, features } = useEventConfig();
+  const { eventConfig, features, theme } = useEventConfig();
+  // Branding slots come from config/theme (spec §7.2 logos) — Storage-style
+  // paths under branding/, served from public/ until per-event uploads land.
+  const markPath = theme?.logos?.mark;
+  const markSrc = markPath ? `/${markPath.replace(/^\/+/, '')}` : null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -34,13 +38,15 @@ export default function Layout() {
             to="/"
             className="touch-target inline-flex items-center gap-2 rounded-brand font-heading text-lg font-semibold text-brand-ink"
           >
-            <img
-              src="/branding/mark.svg"
-              alt=""
-              className="h-8 w-8"
-              width="32"
-              height="32"
-            />
+            {markSrc ? (
+              <img
+                src={markSrc}
+                alt=""
+                className="h-8 w-8"
+                width="32"
+                height="32"
+              />
+            ) : null}
             {eventConfig.shortName}
           </NavLink>
           <nav aria-label="Main">
