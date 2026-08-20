@@ -21,12 +21,20 @@
  *   4. Validates shape with the shared schema validators
  *      (packages/shared/src/config/schema.cjs) — IANA timezone, unique
  *      day/badge ids, hex theme colors all live THERE, not here.
- *   5. Replaces the doc's editable fields (plain set, no merge — removed
- *      fields go away) and stamps { updatedAt, updatedBy: email }. On
+ *   5. config/event is MERGE-then-validate: the payload deep-merges over
+ *      the stored doc inside the transaction and the shared validator runs
+ *      on the RESULT — the validator only requires name/shortName/timezone/
+ *      days/sender, so a plain replace would let a partial save silently
+ *      erase venue/legal/social/seo. Unknown top-level event keys are
+ *      rejected by name (the shared validator does not). To clear an
+ *      optional nested value, send it explicitly null. features/theme/
+ *      badges stay whole-doc replaces (their validators cover the full
+ *      shape, and omitted feature flags defaulting off is the §2.2
+ *      contract). Every write stamps { updatedAt, updatedBy: email }. On
  *      config/event the verification pair is carried forward from the
- *      stored doc so a full-replace save cannot drop it — and the read is
- *      part of the write transaction, so a verify-sender-domain.cjs write
- *      landing mid-save cannot be clobbered.
+ *      stored doc so a save cannot drop it — and the read is part of the
+ *      write transaction, so a verify-sender-domain.cjs write landing
+ *      mid-save cannot be clobbered.
  *   6. Commits the config doc and a cmsVersionHistory-style audit row in
  *      ONE transaction, then writes an admin_logs entry (best-effort — a
  *      logging outage never fails a committed mutation).
@@ -38,6 +46,7 @@
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
+const { getTierA } = require('../core/config.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const {
@@ -59,16 +68,33 @@ const WRITABLE_CONFIG_DOCS = Object.freeze({
  * Top-level keys mirrored from Tier A deploy env (spec §2.1/§2.2). They
  * are read-only everywhere: the deploy pipeline is their source of truth,
  * and a Firestore copy that disagreed with it would only mislead.
+ *
+ * Derived from core/config.cjs getTierA() so the rejected-fields list can
+ * never drift from the keys the runtime actually mirrors (allowedOrigins,
+ * ticketingEventId, operatorNotifier included). `externalEventId` stays as
+ * a legacy alias some clients still send for ticketingEventId.
  */
-const TIER_A_FIELDS = Object.freeze([
-  'slug',
-  'projectId',
-  'region',
-  'publicUrl',
-  'storageBucket',
-  'emailProvider',
-  'ticketingProvider',
-  'externalEventId',
+const TIER_A_FIELDS = Object.freeze([...new Set([...Object.keys(getTierA({})), 'externalEventId'])]);
+
+/**
+ * Top-level keys an admin may write on config/event (spec §2.2 shape minus
+ * Tier A mirrors and stamps). Anything else is rejected by name here,
+ * because the shared validator deliberately ignores keys it does not know.
+ */
+const EVENT_EDITABLE_KEYS = Object.freeze([
+  'name',
+  'shortName',
+  'tagline',
+  'timezone',
+  'days',
+  'registration',
+  'venue',
+  'sender',
+  'legal',
+  'social',
+  'announcedAt',
+  'archivedAt',
+  'seo',
 ]);
 
 /** Only verify-sender-domain.cjs may set these (spec §1.3 item 3). */
@@ -125,6 +151,43 @@ function stripStamps(payload) {
 }
 
 /**
+ * Unknown top-level config/event keys, each named. Runs AFTER
+ * findReadOnlyViolations so Tier A / providers keys get their more
+ * specific "read-only" message, not a generic "unknown".
+ *
+ * @param {object} payload (stamps already stripped)
+ * @returns {string[]}
+ */
+function findUnknownEventKeys(payload) {
+  return Object.keys(payload)
+    .filter((k) => !EVENT_EDITABLE_KEYS.includes(k))
+    .map((k) => `${k}: unknown config/event field`);
+}
+
+/**
+ * Firestore-style deep merge for the config/event save: nested plain
+ * objects merge key-by-key, everything else (arrays, scalars, null)
+ * replaces. Sending null explicitly is how a payload clears a value.
+ */
+function deepMerge(base, patch) {
+  const out = isPlainObject(base) ? { ...base } : {};
+  for (const [k, v] of Object.entries(patch)) {
+    out[k] = isPlainObject(v) && isPlainObject(out[k]) ? deepMerge(out[k], v) : v;
+  }
+  return out;
+}
+
+/** Thrown inside the event transaction when the MERGED doc fails the
+ * shared validator; applyConfigWrite maps it to a 400. */
+class MergedConfigInvalidError extends Error {
+  constructor(errors) {
+    super(errors.join('; '));
+    this.name = 'MergedConfigInvalidError';
+    this.errors = errors;
+  }
+}
+
+/**
  * Validate and apply one config write. Returns a verdict instead of
  * touching `res`, so the four handlers share it and tests can drive the
  * allowlist directly (e.g. prove `bootstrap` is rejected).
@@ -153,49 +216,70 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
   }
 
   const fields = stripStamps(payload);
-  const verdict = validate(fields);
-  if (!verdict.ok) {
-    return { ok: false, status: 400, code: 'bad-request', message: verdict.errors.join('; ') };
+  if (docId === 'event') {
+    // Merge semantics make silently-carried unknown keys permanent, so the
+    // event doc rejects them by name; the shared validator does not.
+    const unknown = findUnknownEventKeys(fields);
+    if (unknown.length > 0) {
+      return { ok: false, status: 400, code: 'bad-request', message: unknown.join('; ') };
+    }
+  } else {
+    // Whole-doc replace: validate the payload itself, before any write.
+    const verdict = validate(fields);
+    if (!verdict.ok) {
+      return { ok: false, status: 400, code: 'bad-request', message: verdict.errors.join('; ') };
+    }
   }
 
   const ref = db.collection('config').doc(docId);
   const historyRef = db.collection('cmsVersionHistory').doc();
   const at = new Date(now());
-  // One transaction, not a batch: config/event's carry-forward read must be
-  // serialized against verify-sender-domain.cjs (the only writer of the
-  // verification pair) — a plain get() followed by a batched full replace
-  // could clobber a domainVerified=true landed between the two, silently
-  // breaking OTP delivery. The transaction body may retry, so it derives
-  // its writes from `fields` without mutating it.
-  await db.runTransaction(async (tx) => {
-    let written = fields;
-    if (docId === 'event') {
-      // Full replace must not drop the verification pair verify-sender-domain
-      // wrote — the payload was already proven not to carry either field.
-      const snap = await tx.get(ref);
-      const storedSender =
-        snap.exists && isPlainObject(snap.data().sender) ? snap.data().sender : {};
-      written = {
-        ...fields,
-        sender: {
-          ...(isPlainObject(fields.sender) ? fields.sender : {}),
+  // One transaction, not a batch: config/event's merge base and
+  // carry-forward read must be serialized against verify-sender-domain.cjs
+  // (the only writer of the verification pair) — a plain get() followed by
+  // a batched write could clobber a domainVerified=true landed between the
+  // two, silently breaking OTP delivery. The transaction body may retry, so
+  // it derives its writes from `fields` without mutating it.
+  try {
+    await db.runTransaction(async (tx) => {
+      let written = fields;
+      if (docId === 'event') {
+        const snap = await tx.get(ref);
+        const stored = snap.exists ? stripStamps(snap.data()) : {};
+        // MERGE the payload over the stored doc, then validate the RESULT:
+        // the validator accepts a partial shape, so validating (or writing)
+        // the payload alone would let a partial save erase venue/legal/etc.
+        written = deepMerge(stored, fields);
+        // The merge already preserves a stored verification pair (the
+        // payload was proven not to carry either field), but normalize it
+        // explicitly so a first write can never omit it.
+        const storedSender = isPlainObject(stored.sender) ? stored.sender : {};
+        written.sender = {
+          ...(isPlainObject(written.sender) ? written.sender : {}),
           domainVerified: storedSender.domainVerified === true,
           domainVerifiedAt: storedSender.domainVerifiedAt ?? null,
-        },
-      };
-    }
-    tx.set(ref, { ...written, updatedAt: at, updatedBy: actor.email });
-    // cmsVersionHistory-style audit row (spec §1.3 item 4), committed
-    // atomically with the doc it describes. Config docs have no revision
-    // counter, so the row records the full written fields + stamps.
-    tx.set(historyRef, {
-      docPath: `config/${docId}`,
-      kind: 'config',
-      fields: written,
-      updatedAt: at,
-      updatedBy: actor.email,
+        };
+        const verdict = validate(written);
+        if (!verdict.ok) throw new MergedConfigInvalidError(verdict.errors);
+      }
+      tx.set(ref, { ...written, updatedAt: at, updatedBy: actor.email });
+      // cmsVersionHistory-style audit row (spec §1.3 item 4), committed
+      // atomically with the doc it describes. Config docs have no revision
+      // counter, so the row records the full written fields + stamps.
+      tx.set(historyRef, {
+        docPath: `config/${docId}`,
+        kind: 'config',
+        fields: written,
+        updatedAt: at,
+        updatedBy: actor.email,
+      });
     });
-  });
+  } catch (err) {
+    if (err instanceof MergedConfigInvalidError) {
+      return { ok: false, status: 400, code: 'bad-request', message: err.message };
+    }
+    throw err;
+  }
   return { ok: true, docPath: `config/${docId}` };
 }
 
@@ -296,10 +380,13 @@ module.exports = {
   internals: {
     applyConfigWrite,
     findReadOnlyViolations,
+    findUnknownEventKeys,
+    deepMerge,
     stripStamps,
     createConfigWriteHandler,
     WRITABLE_CONFIG_DOCS,
     TIER_A_FIELDS,
+    EVENT_EDITABLE_KEYS,
     SENDER_VERIFICATION_FIELDS,
     STAMP_FIELDS,
   },

@@ -30,6 +30,7 @@ const {
   logAdminAction,
   contentFieldsOf,
   isValidDocId,
+  isAlreadyExistsError,
   internals: storeInternals,
 } = require('./store.cjs');
 
@@ -133,24 +134,33 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
     if (!checked.ok) return badRequest(res, checked.message);
 
     const { collection, docId, extraFields } = target;
-    const draftRef = db.collection(draftCollectionFor(collection)).doc(docId);
-    const [draftSnap, liveSnap] = await Promise.all([
-      draftRef.get(),
-      db.collection(collection).doc(docId).get(),
-    ]);
-    if (draftSnap.exists || liveSnap.exists) {
+    const liveSnap = await db.collection(collection).doc(docId).get();
+    if (liveSnap.exists) {
       return sendError(res, 409, 'already-exists', 'That document already exists; use cmsUpdateContent.');
     }
 
-    const { docPath } = await writeDraft({
-      db,
-      collection,
-      docId,
-      fields: { ...checked.fields, ...extraFields },
-      visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
-      actor,
-      now,
-    });
+    // The draft-side race is closed by the create() precondition inside
+    // writeDraft (createOnly): two concurrent creates cannot both win —
+    // the loser's ALREADY_EXISTS maps to the same 409 a pre-check would
+    // have produced, instead of clobbering the first writer's draft.
+    let docPath;
+    try {
+      ({ docPath } = await writeDraft({
+        db,
+        collection,
+        docId,
+        fields: { ...checked.fields, ...extraFields },
+        visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
+        actor,
+        now,
+        createOnly: true,
+      }));
+    } catch (err) {
+      if (isAlreadyExistsError(err)) {
+        return sendError(res, 409, 'already-exists', 'That document already exists; use cmsUpdateContent.');
+      }
+      throw err;
+    }
     await logAdminAction({ db, action: 'cms-create-content', docPath, actor, now, log });
     res.status(200).json({ docPath, docId, status: 'dirty' });
   };
@@ -217,10 +227,11 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
 
 /**
  * PUBLIC GET: the published, visible content blocks. No auth — Firestore
- * rules make these docs anonymously readable anyway (spec §8.4). The
- * response omits publishedBy so admin addresses are not trivially
- * harvestable from an unauthenticated endpoint; every other live field is
- * public by design.
+ * rules make these docs anonymously readable anyway (spec §8.4). Live docs
+ * carry publishedBy as an actor UID (never an email — store.publishDocs
+ * keeps the address on the admin-only cmsVersionHistory row); the response
+ * still omits it as a harmless belt-and-braces strip, since it is
+ * publish-model bookkeeping, not site content.
  *
  * @param {{ db, log?: Console }} deps
  */

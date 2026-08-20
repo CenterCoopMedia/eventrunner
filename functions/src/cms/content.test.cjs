@@ -165,6 +165,44 @@ test('cmsCreateContent → 409 when a draft or live doc already exists', async (
   assert.equal(res.statusCode, 409);
 });
 
+test('cmsCreateContent: two racing creates → one 200, one 409, first draft intact', async () => {
+  // Both requests pass the pre-write existence check (the second one's
+  // reads happen before the first one's write lands); only the create()
+  // precondition in writeDraft separates them.
+  const db = makeFakeDb();
+  const realCollection = db.collection.bind(db);
+  let winnerLanded = false;
+  db.collection = (name) => {
+    const col = realCollection(name);
+    if (name !== 'cmsContent_drafts' && name !== 'cmsContent') return col;
+    return {
+      ...col,
+      doc: (id) => {
+        const ref = col.doc(id);
+        return {
+          ...ref,
+          get: async () => (winnerLanded
+            ? { exists: false, data: () => undefined } // the loser's stale pre-check
+            : ref.get()),
+        };
+      },
+    };
+  };
+  const handler = createCmsCreateContentHandler(deps(db));
+  const body = { section: 'hero', field: 'title', fields: { value: 'first' } };
+
+  const res1 = fakeRes();
+  await handler(req({ body }), res1);
+  assert.equal(res1.statusCode, 200);
+
+  winnerLanded = true; // second request read "no doc" before the first wrote
+  const res2 = fakeRes();
+  await handler(req({ body: { ...body, fields: { value: 'second' } } }), res2);
+  assert.equal(res2.statusCode, 409);
+  assert.equal(res2.body.error.code, 'already-exists');
+  assert.equal(db.read('cmsContent_drafts', 'hero__title').value, 'first');
+});
+
 test('cmsCreateContent → 400 on unknown collection, bad keys, reserved fields', async () => {
   const db = makeFakeDb();
   const handler = createCmsCreateContentHandler(deps(db));

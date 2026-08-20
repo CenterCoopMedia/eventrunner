@@ -225,8 +225,23 @@ test('providers.* is rejected naming each field, on every doc', async () => {
   assert.match(res.body.error.message, /providers\.email: read-only/);
 });
 
+test('the Tier A rejected-fields list covers every getTierA() key', () => {
+  const { getTierA } = require('../core/config.cjs');
+  const { TIER_A_FIELDS } = require('./config.cjs').internals;
+  for (const key of Object.keys(getTierA({}))) {
+    assert.ok(TIER_A_FIELDS.includes(key), `${key} must be rejected as read-only`);
+  }
+  // Including the ones a stale hand-written list missed:
+  for (const key of ['allowedOrigins', 'ticketingEventId', 'operatorNotifier']) {
+    const violations = findReadOnlyViolations({ [key]: 'x' });
+    assert.equal(violations.length, 1, key);
+    assert.match(violations[0], new RegExp(`^${key}: read-only`));
+  }
+});
+
 test('Tier-A-sourced fields are rejected naming the field', async () => {
-  for (const field of ['projectId', 'region', 'publicUrl', 'externalEventId', 'slug']) {
+  for (const field of ['projectId', 'region', 'publicUrl', 'externalEventId', 'slug',
+    'allowedOrigins', 'ticketingEventId', 'operatorNotifier']) {
     const deps = makeDeps();
     const handler = createUpdateEventConfigHandler(deps);
     const res = makeRes();
@@ -388,6 +403,90 @@ test('a verify-sender-domain write landing mid-save is not clobbered (transactio
   assert.equal(written.sender.domainVerified, true, 'concurrent verification must survive the save');
   assert.equal(written.sender.domainVerifiedAt, '2026-08-19T00:00');
   assert.equal(written.sender.email, 'summit@example.org', 'the admin\'s editable sender fields still land');
+});
+
+// ------------------------------------- event merge semantics (finding 7/8)
+
+const STORED_EXTRAS = {
+  tagline: 'Collaborate!',
+  venue: {
+    name: 'Alexander Library', addressLine1: '169 College Ave', addressLine2: null,
+    city: 'New Brunswick', region: 'NJ', postalCode: '08901', country: 'US', mapUrl: null,
+  },
+  legal: {
+    operatorName: 'Center for Cooperative Media',
+    postalAddressHtml: '<p>1 Normal Ave</p>',
+    supportEmail: 'support@example.org',
+    conductEmail: 'conduct@example.org',
+    reviewRequired: true,
+  },
+};
+
+test('a partial event save deep-merges over the stored doc — venue/legal/sender survive', async () => {
+  const deps = makeDeps({
+    'config/event': {
+      ...validEvent(),
+      ...STORED_EXTRAS,
+      sender: { email: 'summit@example.org', name: 'Example Summit', replyTo: null, domainVerified: true, domainVerifiedAt: '2026-02-02T00:00' },
+      updatedAt: 'old-stamp', updatedBy: 'old@x.org',
+    },
+  });
+  const res = makeRes();
+  // The payload touches ONLY the name: everything else must survive.
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { name: 'Renamed Summit' } }), res);
+  assert.equal(res.statusCode, 200);
+  const written = deps.db.docs.get('config/event');
+  assert.equal(written.name, 'Renamed Summit');
+  assert.equal(written.shortName, 'EX2027');
+  assert.deepEqual(written.venue, STORED_EXTRAS.venue);
+  assert.deepEqual(written.legal, STORED_EXTRAS.legal);
+  assert.equal(written.sender.email, 'summit@example.org');
+  assert.equal(written.sender.domainVerified, true, 'verification pair still carried');
+  assert.equal(written.tagline, 'Collaborate!');
+  assert.equal(written.updatedBy, ADMIN_EMAIL, 'stamps are fresh, not merged-in stale ones');
+  assert.deepEqual(written.updatedAt, new Date(NOW));
+});
+
+test('a nested partial merges within the section instead of replacing it', async () => {
+  const deps = makeDeps({ 'config/event': { ...validEvent(), ...STORED_EXTRAS } });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { legal: { reviewRequired: false } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  const written = deps.db.docs.get('config/event');
+  assert.equal(written.legal.reviewRequired, false);
+  assert.equal(written.legal.operatorName, 'Center for Cooperative Media', 'sibling legal fields survive');
+});
+
+test('the shared validator runs on the MERGED result, not the partial payload', async () => {
+  // A partial payload that would corrupt the doc must be rejected even
+  // though it is "valid as far as it goes" — validation sees the result.
+  const deps = makeDeps({ 'config/event': validEvent() });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { timezone: 'Not/AZone' } }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /timezone: must be a valid IANA timezone/);
+  assert.equal(deps.db.docs.get('config/event').timezone, 'America/New_York', 'stored doc untouched');
+});
+
+test('a partial payload onto an empty store is rejected — the merged doc must be complete', async () => {
+  const deps = makeDeps();
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { name: 'Only a name' } }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /shortName: must be a nonempty string/);
+  assert.equal(deps.db.docs.get('config/event'), undefined);
+});
+
+test('unknown top-level config/event keys are rejected by name', async () => {
+  const deps = makeDeps({ 'config/event': validEvent() });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { name: 'Ok', bogusKey: 1 } }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /bogusKey: unknown config\/event field/);
+  assert.equal(deps.db.writes.length, 0);
 });
 
 test('a first event write defaults the verification pair, never omits it', async () => {
