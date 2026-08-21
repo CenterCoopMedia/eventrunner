@@ -21,6 +21,7 @@ import Speakers from './pages/Speakers.jsx';
 import Sponsors from './pages/Sponsors.jsx';
 import ContentPage from './pages/ContentPage.jsx';
 import Login from './pages/Login.jsx';
+import AdminApp from './admin/AdminApp.jsx';
 import Profile from './pages/Profile.jsx';
 import Attendees from './pages/Attendees.jsx';
 import AttendeeProfile from './pages/AttendeeProfile.jsx';
@@ -28,6 +29,12 @@ import AttendeeProfile from './pages/AttendeeProfile.jsx';
 export function AppRoutes() {
   return (
     <Routes>
+      {/* The whole authenticated admin area lives under this one subtree —
+          it brings its own shell, gate, and nested routes (admin/AdminApp).
+          It sits ABOVE the Layout branch because the admin area brings its
+          own chrome, and its 'admin' segment is reserved in
+          shared/routing so a generic cmsPages path can never claim it. */}
+      <Route path="admin/*" element={<AdminApp />} />
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="schedule" element={<Schedule />} />

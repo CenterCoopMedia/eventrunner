@@ -1,0 +1,187 @@
+// cmsPages document helpers shared by the page list and the page editor.
+//
+// The server (functions/src/cms/pages.cjs validatePageDoc) rejects unknown
+// top-level keys BY NAME, and a stored doc carries keys it will not accept
+// back: publish-model bookkeeping (status/revision/updatedAt/…) and seed
+// bookkeeping (`seeded`, `seededAt`). So a doc loaded for editing is filtered
+// down to the accepted key set before it goes back over the wire — otherwise
+// every edit of a seeded page would fail with "seeded: unknown field".
+
+/** Keys a cmsPages doc may carry (mirrors PAGE_KEYS on the server). */
+export const PAGE_KEYS = Object.freeze([
+  'id',
+  'label',
+  'path',
+  'icon',
+  'order',
+  'visible',
+  'systemPage',
+  'sections',
+]);
+
+export const SECTION_KEYS = Object.freeze([
+  'id',
+  'label',
+  'description',
+  'allowedBlocks',
+  'maxBlocks',
+  'reorderable',
+  'defaultBlocks',
+]);
+
+export const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
+
+function pick(source, keys) {
+  const out = {};
+  for (const key of keys) {
+    if (source && Object.prototype.hasOwnProperty.call(source, key)) out[key] = source[key];
+  }
+  return out;
+}
+
+/**
+ * Editable form state from a stored (live or draft) cmsPages doc: only the
+ * accepted keys, with the shape normalized so the editor's controlled inputs
+ * never receive undefined.
+ *
+ * @param {object|null} doc
+ * @returns {object}
+ */
+export function toEditablePage(doc) {
+  const base = pick(doc ?? {}, PAGE_KEYS);
+  return {
+    id: base.id ?? '',
+    label: base.label ?? '',
+    path: base.path ?? '',
+    icon: typeof base.icon === 'string' ? base.icon : null,
+    order: typeof base.order === 'number' ? base.order : 0,
+    visible: base.visible !== false,
+    systemPage: base.systemPage === true,
+    sections: Array.isArray(base.sections)
+      ? base.sections.map((section) => {
+          const s = pick(section ?? {}, SECTION_KEYS);
+          return {
+            id: s.id ?? '',
+            label: s.label ?? '',
+            description: typeof s.description === 'string' ? s.description : '',
+            allowedBlocks: Array.isArray(s.allowedBlocks) ? [...s.allowedBlocks] : [],
+            maxBlocks: Number.isInteger(s.maxBlocks) ? s.maxBlocks : 1,
+            reorderable: s.reorderable !== false,
+            defaultBlocks: Array.isArray(s.defaultBlocks)
+              ? s.defaultBlocks.map((block) => {
+                  const b = pick(block ?? {}, DEFAULT_BLOCK_KEYS);
+                  return {
+                    field: b.field ?? '',
+                    blockType: b.blockType ?? '',
+                    description: typeof b.description === 'string' ? b.description : '',
+                  };
+                })
+              : [],
+          };
+        })
+      : [],
+  };
+}
+
+/** A blank page for the create form. */
+export function blankPage() {
+  return toEditablePage({ id: '', label: '', path: '', order: 0, visible: true });
+}
+
+/** A blank section, pre-allowing the plainest two block types. */
+export function blankSection() {
+  return {
+    id: '',
+    label: '',
+    description: '',
+    allowedBlocks: ['text', 'richtext'],
+    maxBlocks: 6,
+    reorderable: true,
+    defaultBlocks: [],
+  };
+}
+
+/**
+ * The wire payload for cmsSavePage. Types are coerced where a form control
+ * can only produce strings (order, maxBlocks); `description` is sent as null
+ * when blank because the server accepts `string | null` and an empty string
+ * is not a meaningful description. Client-side coercion only — validation
+ * itself stays on the server, whose messages are surfaced verbatim.
+ *
+ * @param {object} page editable form state
+ * @returns {object} cmsPages doc
+ */
+export function toPagePayload(page) {
+  const order = Number(page.order);
+  return {
+    id: String(page.id ?? '').trim(),
+    label: page.label ?? '',
+    path: page.path ?? '',
+    icon: page.icon ? String(page.icon) : null,
+    order: Number.isFinite(order) ? order : page.order,
+    visible: Boolean(page.visible),
+    systemPage: Boolean(page.systemPage),
+    sections: (page.sections ?? []).map((section) => {
+      const maxBlocks = Number(section.maxBlocks);
+      return {
+        id: section.id ?? '',
+        label: section.label ?? '',
+        description: section.description ? section.description : null,
+        allowedBlocks: [...(section.allowedBlocks ?? [])],
+        maxBlocks: Number.isInteger(maxBlocks) ? maxBlocks : section.maxBlocks,
+        reorderable: Boolean(section.reorderable),
+        defaultBlocks: (section.defaultBlocks ?? []).map((block) => ({
+          field: block.field ?? '',
+          blockType: block.blockType ?? '',
+          description: block.description ?? '',
+        })),
+      };
+    }),
+  };
+}
+
+/**
+ * Publish state of one page, from its live doc and its draft sibling.
+ * `dirty` is the draft's own status field (store.cjs writes 'dirty' on every
+ * draft write and flips it to 'clean' at publish).
+ *
+ * @param {{ live: object|null, draft: object|null }} revisions
+ */
+export function publishStateOf({ live, draft }) {
+  if (!live && draft) return { id: 'unpublished', label: 'Never published' };
+  if (live && draft && draft.status === 'dirty') {
+    return { id: 'dirty', label: 'Unpublished changes' };
+  }
+  if (live) return { id: 'published', label: 'Published' };
+  return { id: 'unknown', label: 'Unknown' };
+}
+
+/**
+ * Merge live + draft cmsPages rows into one list, newest-editable-first
+ * fields taken from the draft (what an editor would open).
+ *
+ * @param {Array<object>|null} live
+ * @param {Array<object>|null} drafts
+ */
+export function mergePageRevisions(live, drafts) {
+  const rows = new Map();
+  for (const doc of live ?? []) {
+    rows.set(doc.id, { id: doc.id, live: doc, draft: null });
+  }
+  for (const doc of drafts ?? []) {
+    const existing = rows.get(doc.id) ?? { id: doc.id, live: null, draft: null };
+    rows.set(doc.id, { ...existing, draft: doc });
+  }
+  return [...rows.values()]
+    .map((row) => ({
+      ...row,
+      current: row.draft ?? row.live,
+      state: publishStateOf(row),
+    }))
+    .sort((a, b) => {
+      const orderA = a.current?.order ?? 0;
+      const orderB = b.current?.order ?? 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return String(a.id).localeCompare(String(b.id));
+    });
+}

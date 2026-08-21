@@ -26,6 +26,10 @@
 // the client cannot read the allowlist. It learns admin-ness by probing one
 // admin-only read (cmsContent_drafts, limit 1): the rules' isAdmin() decides,
 // the flag is UI convenience only — never an authorization boundary.
+// `adminStatus` ('unknown' | 'admin' | 'denied') is the same answer with its
+// in-flight state kept: `loading` reports the auth handshake, which finishes
+// before the probe does, so a consumer that must not render a denial
+// prematurely waits on adminStatus === 'unknown' instead.
 import {
   createContext,
   useCallback,
@@ -125,7 +129,12 @@ async function postJson(name, body) {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  // 'unknown' until the probe below answers for the current user: `loading`
+  // covers the auth handshake only, and it goes false the moment
+  // onAuthStateChanged fires — while the probe is still in flight. A gate
+  // that read isAdmin at that instant would show "not an admin" to an admin
+  // for a tick, so the tri-state is exposed alongside the boolean.
+  const [adminStatus, setAdminStatus] = useState('unknown'); // 'unknown'|'admin'|'denied'
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -139,22 +148,27 @@ export function AuthProvider({ children }) {
   // permission-denied answer simply means "not an admin".
   useEffect(() => {
     if (!user) {
-      setIsAdmin(false);
+      setAdminStatus('denied');
       return undefined;
     }
     let cancelled = false;
+    // A new user means the previous answer no longer applies; go back to
+    // 'unknown' so consumers wait rather than reusing a stale verdict.
+    setAdminStatus('unknown');
     (async () => {
       try {
         await getDocs(query(collection(db, 'cmsContent_drafts'), limit(1)));
-        if (!cancelled) setIsAdmin(true);
+        if (!cancelled) setAdminStatus('admin');
       } catch {
-        if (!cancelled) setIsAdmin(false);
+        if (!cancelled) setAdminStatus('denied');
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [user]);
+
+  const isAdmin = adminStatus === 'admin';
 
   const signInWithGoogle = useCallback(
     () => signInWithPopup(auth, new GoogleAuthProvider()),
@@ -186,13 +200,23 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       isAdmin,
+      adminStatus,
       loading,
       signInWithGoogle,
       sendOtpCode,
       verifyOtpCode,
       signOut,
     }),
-    [user, isAdmin, loading, signInWithGoogle, sendOtpCode, verifyOtpCode, signOut],
+    [
+      user,
+      isAdmin,
+      adminStatus,
+      loading,
+      signInWithGoogle,
+      sendOtpCode,
+      verifyOtpCode,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
