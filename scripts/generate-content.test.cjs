@@ -20,16 +20,31 @@ const ROOT = path.resolve(__dirname, '..');
  *           failing?: string[] }} seed
  */
 function readFake({ config = {}, collections = {}, failing = [] } = {}) {
+  const list = (name) => {
+    if (failing.includes(name)) throw new Error(`transient read failure reading ${name}`);
+    // `__id` is the document id; everything else is the stored data,
+    // which may itself contain a field named `id`.
+    return (collections[name] || []).map(({ __id, ...data }) => ({ id: __id, data: () => data }));
+  };
   return {
     collection(name) {
       return {
         doc: (id) => ({ _col: name, id }),
         async get() {
-          if (failing.includes(name)) throw new Error(`transient read failure reading ${name}`);
-          // `__id` is the document id; everything else is the stored data,
-          // which may itself contain a field named `id`.
-          const docs = (collections[name] || []).map(({ __id, ...data }) => ({ id: __id, data: () => data }));
+          const docs = list(name);
           return { docs, size: docs.length, empty: docs.length === 0 };
+        },
+        // readVisibleCollection queries `visible == true` server-side
+        // (spec §8.4 point 4) — filtered in-memory here, '==' only, which
+        // is all generate-content.cjs issues.
+        where(field, op, value) {
+          if (op !== '==') throw new Error(`readFake: unsupported operator ${op}`);
+          return {
+            async get() {
+              const docs = list(name).filter((d) => d.data()[field] === value);
+              return { docs, size: docs.length, empty: docs.length === 0 };
+            },
+          };
         },
       };
     },
@@ -99,8 +114,8 @@ test('a stored `id` field never overrides the document id', async () => {
     collections: {
       // Both documents carry a stale stored `id` of 'home'.
       cmsPages: [
-        { __id: 'faq', id: 'home', label: 'FAQ', path: '/faq' },
-        { __id: 'travel', id: 'home', label: 'Travel', path: '/travel' },
+        { __id: 'faq', id: 'home', label: 'FAQ', path: '/faq', visible: true },
+        { __id: 'travel', id: 'home', label: 'Travel', path: '/travel', visible: true },
       ],
     },
   });
@@ -116,4 +131,64 @@ test('a failing collection read fails generation instead of shipping an empty se
 test('a missing config document names itself rather than emitting a broken bundle', async () => {
   const db = readFake({ config: {} });
   await assert.rejects(() => readDeployment({ db }), /config\/event is missing/);
+});
+
+// Regression guard for the bug this section exists to catch: unpublish
+// (spec §8.4 point 4) sets `visible: false` on the LIVE doc without
+// deleting it — reading the live collection unfiltered would ship an
+// explicitly-unpublished doc into the public JS bundle.
+test('readDeployment filters every publishable collection to visible docs only', async () => {
+  const db = readFake({
+    config: CONFIG,
+    collections: {
+      cmsPages: [{ __id: 'home', path: '/', visible: true }, { __id: 'hidden', path: '/hidden', visible: false }],
+      cmsContent: [{ __id: 'a', visible: true }, { __id: 'b', visible: false }],
+      cmsSchedule: [{ __id: 's1', visible: true }, { __id: 's2', visible: false }],
+      cmsOrganizations: [{ __id: 'o1', visible: true }, { __id: 'o2', visible: false }],
+    },
+  });
+
+  const snapshot = await readDeployment({ db });
+
+  assert.deepEqual(snapshot.pages.map((d) => d.id), ['home']);
+  assert.deepEqual(snapshot.content.map((d) => d.id), ['a']);
+  assert.deepEqual(snapshot.sessions.map((d) => d.id), ['s1']);
+  assert.deepEqual(snapshot.organizations.map((d) => d.id), ['o1']);
+});
+
+test('an unpublished (visible: false) live doc never reaches the snapshot', async () => {
+  const db = readFake({
+    config: CONFIG,
+    collections: { cmsContent: [{ __id: 'secret', title: 'should never ship', visible: false }] },
+  });
+
+  const snapshot = await readDeployment({ db });
+
+  assert.deepEqual(snapshot.content, []);
+});
+
+test('speakers has no visible field and is read unfiltered', async () => {
+  const db = readFake({
+    config: CONFIG,
+    collections: { speakers: [{ __id: 's1', name: 'A' }] },
+  });
+
+  const snapshot = await readDeployment({ db });
+
+  assert.deepEqual(snapshot.speakers.map((d) => d.id), ['s1']);
+});
+
+test('--demo --check flags an unexpected extra file, not just content differences', async () => {
+  // A byte-for-byte match on the expected six files is not the whole
+  // hygiene gate — it says nothing about an EXTRA file sitting in the
+  // directory (a leaked real-deployment artifact, a stray debug file).
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gen-content-check-'));
+  await quietly(() => main(['--demo', '--out', tmp]));
+  fs.writeFileSync(path.join(tmp, 'leaked-client-data.js'), 'export const secret = 1;\n');
+
+  const { value, output } = await quietly(() => main(['--demo', '--out', tmp, '--check']));
+
+  assert.equal(value, 1);
+  assert.match(output, /unexpected file/);
+  assert.match(output, /leaked-client-data\.js/);
 });

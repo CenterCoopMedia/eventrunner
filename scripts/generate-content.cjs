@@ -96,15 +96,29 @@ async function readDeployment({ db }) {
     // be keyed wrong and two docs could collapse onto one key.
     return snap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
   };
-  // No per-collection catch: a collection that does not exist yet already
-  // returns an empty snapshot, so the only thing a catch here could
-  // swallow is a transient read failure — which would silently ship a
-  // build with no speakers rather than failing the generation.
+  // Every PUBLISHABLE_COLLECTIONS live doc (functions/src/cms/blockTypes.cjs)
+  // carries `visible` — unpublish (spec §8.4 point 4) sets it false WITHOUT
+  // deleting the live doc, so reading the live collection unfiltered would
+  // still ship an explicitly-unpublished doc into the public JS bundle. The
+  // getSiteContent HTTP endpoint filters the same way
+  // (functions/src/cms/content.cjs); this is that same filter, applied here
+  // so the build-time snapshot and the runtime read agree.
+  const readVisibleCollection = async (name) => {
+    const snap = await db.collection(name).where('visible', '==', true).get();
+    return snap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+  };
+  // speakers has no draft/publish model and no `visible` field (spec §1.3's
+  // speakers/ module is not landed on this branch) — read unconditionally,
+  // like every other collection. No per-collection catch: a collection
+  // that does not exist yet already returns an empty snapshot, so the only
+  // thing a catch here could swallow is a transient read failure — which
+  // would silently ship a build with no speakers rather than failing the
+  // generation.
   const [pages, content, sessions, organizations, speakers] = await Promise.all([
-    readCollection('cmsPages'),
-    readCollection('cmsContent'),
-    readCollection('cmsSchedule'),
-    readCollection('cmsOrganizations'),
+    readVisibleCollection('cmsPages'),
+    readVisibleCollection('cmsContent'),
+    readVisibleCollection('cmsSchedule'),
+    readVisibleCollection('cmsOrganizations'),
     readCollection('speakers'),
   ]);
 
@@ -167,11 +181,33 @@ async function main(argv) {
       const existing = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
       if (existing !== contents) differences.push(name);
     }
-    if (differences.length > 0) {
+    // A byte-for-byte match on the expected file set is not the whole
+    // hygiene gate: it says nothing about an EXTRA file sitting in the
+    // directory (a leaked real-deployment artifact, a stray debug file)
+    // that the expected-name loop above never looks at. List the
+    // directory and flag anything present that emitAll() did not produce.
+    const expected = new Set(Object.keys(files));
+    const unexpected = fs.existsSync(outDir)
+      ? fs.readdirSync(outDir).filter((entry) => !expected.has(entry))
+      : [];
+    if (differences.length > 0 || unexpected.length > 0) {
+      const lines = [];
+      if (differences.length > 0) {
+        lines.push(
+          `${differences.length} file(s) differ from ${path.relative(ROOT, outDir)}:`,
+          ...differences.map((d) => `  - ${d}`),
+        );
+      }
+      if (unexpected.length > 0) {
+        lines.push(
+          `${unexpected.length} unexpected file(s) present in ${path.relative(ROOT, outDir)}:`,
+          ...unexpected.map((d) => `  - ${d}`),
+        );
+      }
       console.error(
-        `generate-content --check: ${differences.length} file(s) differ from ${path.relative(ROOT, outDir)}:\n` +
-        differences.map((d) => `  - ${d}`).join('\n') +
-        '\n\nRegenerate with: node scripts/generate-content.cjs --demo',
+        `generate-content --check:\n${lines.join('\n')}\n\n` +
+        'Regenerate with: node scripts/generate-content.cjs --demo\n' +
+        '(an unexpected file must be removed by hand — regenerating does not delete it).',
       );
       return 1;
     }
