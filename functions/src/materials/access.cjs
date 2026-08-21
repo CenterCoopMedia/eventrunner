@@ -70,11 +70,17 @@ function canAccessMaterial({ sessionData, materialData, actor, eventConfig, now 
 }
 
 /**
+ * Load a material + its session and apply the embargo gate. Shared by
+ * `getSessionMaterialUrl` and materials/download.cjs's `downloadSessionMaterial`
+ * — both need the identical material-lookup-then-embargo-check sequence,
+ * and factoring it out is what lets the download endpoint re-run the SAME
+ * check at download time rather than trusting a URL minted earlier.
+ *
  * @param {{ db: object, materialId: string, actor: { uid: string, isAdmin: boolean, speakerId: string|null },
  *           getConfig: () => Promise<{ event: object|null }>, now?: () => Date }} args
- * @returns {Promise<{ url: string, type: string, filename: string }>}
+ * @returns {Promise<{ material: object, session: object }>}
  */
-async function getSessionMaterialUrl({ db, materialId, actor, getConfig, now = () => new Date() }) {
+async function resolveMaterialAccess({ db, materialId, actor, getConfig, now = () => new Date() }) {
   const materialSnap = await db.collection(MATERIALS).doc(materialId).get();
   if (!materialSnap.exists) throw new MaterialNotFoundError(materialId);
   const material = materialSnap.data();
@@ -93,18 +99,40 @@ async function getSessionMaterialUrl({ db, materialId, actor, getConfig, now = (
   });
   if (!allowed) throw new EmbargoedError();
 
-  const url = material.type === 'link' ? material.url : buildStoragePublicPath(material.storagePath);
-  return { url, type: material.type, filename: material.filename };
+  return { material, session };
 }
 
-/** Placeholder resolver for a file material's target. Real signed-URL
- * minting for `session-materials/{sessionId}/...` Storage objects belongs
- * to the media library work (issue #24); until then this returns the raw
- * Storage path so a caller with direct Storage access (an admin, in
- * practice) can resolve it, and every other caller is already stopped by
- * the embargo check above. */
-function buildStoragePublicPath(storagePath) {
-  return storagePath;
+/**
+ * Resolve a material for the caller, embargo-gated.
+ *
+ * A **link** material returns its real `url` directly — the client opens
+ * it, no further server round trip needed.
+ *
+ * A **file** material returns NO url at all. Handing back the raw
+ * `storagePath` (the earlier version of this function) is a dead end for
+ * the browser (storage.rules denies direct reads of
+ * `session-materials/...`, spec §8.5) and, worse, looks like a usable link
+ * while actually being an unopenable relative path. Minting a real Cloud
+ * Storage v4 signed URL is the normal fix, but the runtime service account
+ * on a fresh project has no `roles/iam.serviceAccountTokenCreator` (no
+ * `signBlob`) — see materials/download.cjs's module doc for the full
+ * reasoning. Instead: the caller re-fetches the bytes from
+ * `downloadSessionMaterial`, an authenticated POST that re-applies this
+ * SAME embargo check at download time and streams the object through the
+ * Cloud Function itself. That needs no `url` here at all — just the
+ * confirmation that the caller may proceed, which is exactly what NOT
+ * throwing already means.
+ *
+ * @param {{ db: object, materialId: string, actor: { uid: string, isAdmin: boolean, speakerId: string|null },
+ *           getConfig: () => Promise<{ event: object|null }>, now?: () => Date }} args
+ * @returns {Promise<{ type: string, filename: string, url?: string }>}
+ */
+async function getSessionMaterialUrl({ db, materialId, actor, getConfig, now = () => new Date() }) {
+  const { material } = await resolveMaterialAccess({ db, materialId, actor, getConfig, now });
+  if (material.type === 'link') {
+    return { type: 'link', filename: material.filename, url: material.url };
+  }
+  return { type: 'file', filename: material.filename };
 }
 
 /**
@@ -229,6 +257,7 @@ function buildHandlers() {
 module.exports = {
   getSessionMaterialUrl,
   listSessionMaterials,
+  resolveMaterialAccess,
   get handlers() {
     return buildHandlers();
   },

@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   getSessionMaterialUrl,
   listSessionMaterials,
+  resolveMaterialAccess,
   internals: { MaterialNotFoundError, SessionNotFoundError, EmbargoedError },
 } = require('./access.cjs');
 
@@ -147,4 +148,44 @@ test('listSessionMaterials: an unknown session rejects', async () => {
     listSessionMaterials({ db, sessionId: 'ghost', actor: { isAdmin: true, speakerId: null } }),
     SessionNotFoundError,
   );
+});
+
+// ------------------------------------------- file materials (P2 access fix)
+
+function seedWithFile() {
+  return {
+    ...seed(),
+    'session_materials/m-file-approved': {
+      sessionId: 's1', type: 'file', storagePath: 'session-materials/s1/slides.pdf',
+      filename: 'slides.pdf', reviewStatus: 'approved', submittedBySpeakerId: 'spk-1',
+    },
+  };
+}
+
+test('getSessionMaterialUrl: a file material never returns a url, even to an admin — no signed URL is minted', async () => {
+  const db = fakeDb(seedWithFile());
+  const result = await getSessionMaterialUrl({
+    db, materialId: 'm-file-approved', actor: { isAdmin: true, speakerId: null }, getConfig, now: DURING_NOW,
+  });
+  assert.deepEqual(result, { type: 'file', filename: 'slides.pdf' });
+  assert.equal('url' in result, false);
+});
+
+test('getSessionMaterialUrl: a file material still enforces the embargo before returning anything', async () => {
+  const db = fakeDb(seedWithFile());
+  await assert.rejects(
+    getSessionMaterialUrl({
+      db, materialId: 'm-file-approved', actor: { isAdmin: false, speakerId: null }, getConfig, now: DURING_NOW,
+    }),
+    EmbargoedError,
+  );
+});
+
+test('resolveMaterialAccess: returns the material and session once the embargo gate passes, for reuse by downloadSessionMaterial', async () => {
+  const db = fakeDb(seedWithFile());
+  const { material, session } = await resolveMaterialAccess({
+    db, materialId: 'm-file-approved', actor: { isAdmin: true, speakerId: null }, getConfig, now: DURING_NOW,
+  });
+  assert.equal(material.storagePath, 'session-materials/s1/slides.pdf');
+  assert.equal(session.dayId, 'day-1');
 });

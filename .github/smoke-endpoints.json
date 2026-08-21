@@ -28,6 +28,7 @@
     "deleteSessionMaterial",
     "setMaterialReviewStatus",
     "getSessionMaterialUrl",
-    "listSessionMaterials"
+    "listSessionMaterials",
+    "downloadSessionMaterial"
   ]
 }

@@ -20,6 +20,7 @@ const systemErrors = require('./src/telemetry/systemErrors.cjs');
 const materialsStore = require('./src/materials/store.cjs');
 const materialsReview = require('./src/materials/review.cjs');
 const materialsAccess = require('./src/materials/access.cjs');
+const materialsDownload = require('./src/materials/download.cjs');
 const materialsProjection = require('./src/materials/projection.cjs');
 
 module.exports = {
@@ -39,5 +40,6 @@ module.exports = {
   ...materialsStore.handlers,
   ...materialsReview.handlers,
   ...materialsAccess.handlers,
+  ...materialsDownload.handlers,
   ...materialsProjection.handlers,
 };
