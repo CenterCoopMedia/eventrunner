@@ -33,6 +33,7 @@ const {
   isAlreadyExistsError,
   internals: storeInternals,
 } = require('./store.cjs');
+const { validateSpeakerReferences } = require('../speakers/references.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
@@ -107,6 +108,36 @@ function validateFields(fields) {
   return { ok: true, fields };
 }
 
+/**
+ * Referential integrity at the session-save seam (spec §4.3 rule 1).
+ *
+ * `cmsSchedule.speakerIds[]` is a foreign key into the canonical
+ * `speakers` store, and Firestore enforces nothing: a typo'd or stale id
+ * in an admin payload would otherwise be written and only surface as a
+ * blank name on the public schedule. So every session save reads each id
+ * and REJECTS the write, naming the id, when the speaker does not exist.
+ * Rejecting is right rather than silently dropping — an id nobody meant to
+ * send is a bug to surface, not data to discard.
+ *
+ * The check runs over the RESULT of the merge, not just the payload: a
+ * session whose stored draft already names a missing speaker must not be
+ * quietly re-saved with the dangling reference intact. (deleteSpeaker
+ * unlinks drafts as well as live sessions, so that state should not arise
+ * — this is the assertion that says so.)
+ *
+ * Only cmsSchedule carries speaker references today. No block type in the
+ * §5.2 registry embeds a speaker list, so cmsSavePage has nothing to
+ * validate; when one lands, it calls the same helper.
+ *
+ * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
+ */
+async function checkSpeakerReferences({ db, collection, fields }) {
+  if (collection !== 'cmsSchedule') return { ok: true };
+  if (!Object.prototype.hasOwnProperty.call(fields, 'speakerIds')) return { ok: true };
+  const verdict = await validateSpeakerReferences({ db, value: fields.speakerIds });
+  return verdict.ok ? { ok: true } : { ok: false, message: verdict.errors.join('; ') };
+}
+
 /** Shared admin-POST preamble. Sends the response itself on failure. */
 async function gateAdminPost({ auth, getConfig }, req, res) {
   if (req.method !== 'POST') {
@@ -134,6 +165,9 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
     if (!checked.ok) return badRequest(res, checked.message);
 
     const { collection, docId, extraFields } = target;
+    const references = await checkSpeakerReferences({ db, collection, fields: checked.fields });
+    if (!references.ok) return badRequest(res, references.message);
+
     const liveSnap = await db.collection(collection).doc(docId).get();
     if (liveSnap.exists) {
       return sendError(res, 409, 'already-exists', 'That document already exists; use cmsUpdateContent.');
@@ -191,11 +225,15 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
       base = contentFieldsOf(liveSnap.data());
     }
 
+    const merged = { ...base, ...checked.fields, ...extraFields };
+    const references = await checkSpeakerReferences({ db, collection, fields: merged });
+    if (!references.ok) return badRequest(res, references.message);
+
     const { docPath } = await writeDraft({
       db,
       collection,
       docId,
-      fields: { ...base, ...checked.fields, ...extraFields },
+      fields: merged,
       visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
       actor,
       now,
@@ -300,5 +338,12 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { resolveTarget, validateFields, isValidDocId, SECTION_FIELD_RE, GENERIC_COLLECTIONS },
+  internals: {
+    resolveTarget,
+    validateFields,
+    checkSpeakerReferences,
+    isValidDocId,
+    SECTION_FIELD_RE,
+    GENERIC_COLLECTIONS,
+  },
 };

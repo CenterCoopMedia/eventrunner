@@ -374,3 +374,100 @@ test('resolveTarget routes cmsPages/cmsUpdates to their validated writers (never
   assert.match(updates.message, /cmsSaveUpdate/);
   assert.deepEqual(internals.GENERIC_COLLECTIONS, ['cmsContent', 'cmsSchedule', 'cmsOrganizations', 'cmsTimeline']);
 });
+
+// --- speakerIds referential integrity (spec §4.3 seam #1) -------------------
+
+const SPEAKERS = {
+  'speakers/s1': { firstName: 'Rae', lastName: 'Okonkwo', slug: 'rae-okonkwo', status: 'approved' },
+  'speakers/s2': { firstName: 'Sam', lastName: 'Example', slug: 'sam-example', status: 'draft' },
+};
+
+test('creating a session with a dangling speakerId is REJECTED, naming the id', async () => {
+  const db = makeFakeDb({ ...SPEAKERS });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { title: 'Panel', speakerIds: ['s1', 'ghost'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'speakerIds: no speaker exists with id "ghost"');
+  // Rejected, not silently dropped: nothing was written at all.
+  assert.equal(db.read('cmsSchedule_drafts', 'sess-1'), undefined);
+});
+
+test('creating a session whose speakerIds all resolve is accepted verbatim', async () => {
+  const db = makeFakeDb({ ...SPEAKERS });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { title: 'Panel', speakerIds: ['s1', 's2'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.read('cmsSchedule_drafts', 'sess-1').speakerIds, ['s1', 's2']);
+});
+
+test('a speaker in any pipeline status satisfies the reference — existence is the test', async () => {
+  // The seam asks "does speakers/{id} exist", not "is it published": an
+  // unapproved speaker is a legitimate session assignment, and it is the
+  // projection that decides what the public sees.
+  const db = makeFakeDb({ ...SPEAKERS });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-2', fields: { speakerIds: ['s2'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+});
+
+test('updating a session validates the MERGED speakerIds, not just the payload', async () => {
+  const db = makeFakeDb({
+    ...SPEAKERS,
+    'cmsSchedule_drafts/sess-1': { title: 'Panel', speakerIds: ['ghost'], status: 'dirty' },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { title: 'Renamed' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /no speaker exists with id "ghost"/);
+  assert.equal(db.read('cmsSchedule_drafts', 'sess-1').title, 'Panel', 'nothing was written');
+});
+
+test('an update that FIXES the dangling reference is accepted', async () => {
+  const db = makeFakeDb({
+    ...SPEAKERS,
+    'cmsSchedule_drafts/sess-1': { title: 'Panel', speakerIds: ['ghost'], status: 'dirty' },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { speakerIds: ['s1'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.read('cmsSchedule_drafts', 'sess-1').speakerIds, ['s1']);
+});
+
+test('a malformed speakerIds value is rejected before any speaker read', async () => {
+  const db = makeFakeDb({ ...SPEAKERS });
+  for (const speakerIds of ['s1', [42], ['s1', 's1']]) {
+    const res = fakeRes();
+    await createCmsCreateContentHandler(deps(db))(
+      req({ body: { collection: 'cmsSchedule', docId: 'sess-x', fields: { speakerIds } } }),
+      res,
+    );
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body.error.message, /^speakerIds: /);
+  }
+});
+
+test('collections without speaker references are untouched by the seam', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  // cmsContent has no speakers; a stray speakerIds field is ordinary content.
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'blurb', fields: { speakerIds: ['ghost'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+});
