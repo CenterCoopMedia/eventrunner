@@ -15,6 +15,8 @@ const adminConfig = require('./src/admin/config.cjs');
 const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
 const adminFeedback = require('./src/admin/feedback.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
+const schedulePdf = require('./src/schedule/pdf.cjs');
+const publicOg = require('./src/public/og.cjs');
 const scheduleReactions = require('./src/schedule/reactions.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
@@ -34,6 +36,8 @@ module.exports = {
   ...adminLiveUpdates.handlers,
   ...adminFeedback.handlers,
   ...scheduleBookmarks.handlers,
+  ...schedulePdf.handlers,
+  ...publicOg.handlers,
   ...scheduleReactions.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,

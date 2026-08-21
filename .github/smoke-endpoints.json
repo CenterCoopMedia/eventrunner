@@ -21,6 +21,8 @@
     "updateBadges",
     "emailDeliveryWebhook",
     "bookmarkSession",
+    "buildSchedulePdf",
+    "updatesMeta",
     "reactToSession",
     "logClientError",
     "listSystemErrors",

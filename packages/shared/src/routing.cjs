@@ -24,11 +24,17 @@
  * also covers system areas that exist on paper before their route does, so
  * a generic page can never squat the prefix first.
  *
+ * `updates` is the updates list/detail route (issue #27 follow-up):
+ * /updates and /updates/:id are statically mounted, and updatesMeta's
+ * self-fetched SSR OG meta links straight at that prefix — a generic page
+ * squatting it would break both the route and every previously-shared
+ * update link's unfurl.
+ *
  * Keep in sync with the static <Route path="..."> segments in App.jsx by
  * hand — there is no build-time check tying the two together.
  */
 const RESERVED_PATH_SEGMENTS = Object.freeze([
-  'schedule', 'speakers', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin',
+  'schedule', 'speakers', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin', 'updates',
 ]);
 
 /**

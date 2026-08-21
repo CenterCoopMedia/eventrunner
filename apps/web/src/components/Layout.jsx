@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: '/speakers', label: 'Speakers', feature: 'speakers' },
   { to: '/sponsors', label: 'Sponsors', feature: 'sponsors' },
   { to: '/attendees', label: 'Attendees', feature: 'attendeeDirectory' },
+  { to: '/updates', label: 'Updates', feature: 'updates' },
 ];
 
 function navClass({ isActive }) {
