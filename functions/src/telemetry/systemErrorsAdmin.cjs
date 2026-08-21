@@ -26,6 +26,25 @@
  * when absent) for the UI to show as "last seen" (falling back to
  * createdAt), and reopening keeps bumping it — see the reopen-race note on
  * resolveOne below.
+ *
+ * Pagination cursor is `{ createdAt, id }`, not a bare `createdAt` (Codex
+ * review finding, P2): `createdAt` alone is not unique — two rows created
+ * in the same millisecond straddling a page boundary would have one of
+ * them skipped by `startAfter(createdAt)` (whichever sorts second at that
+ * timestamp never appears on either page). The query orderBy explicitly
+ * adds `__name__` (document id) as a second, always-unique sort key, and
+ * the cursor carries both values as a `startAfter` pair — no
+ * firestore.indexes.json change needed: Firestore automatically appends
+ * `__name__`, in the same direction as the last declared field, to every
+ * index (single-field or composite), so the existing (resolved ASC,
+ * createdAt DESC) declaration already covers this ordering.
+ *
+ * The whole-fault-class resolve (by `kind`) is bounded per call to
+ * KIND_SWEEP_PAGE_SIZE rows (Codex review finding, P2: an unbounded sweep
+ * is an unbounded number of sequential transactions in one HTTP request).
+ * A class with more unresolved rows than that answers with `done: false`
+ * and a `cursor` (the last processed row's id) the caller passes back to
+ * resolve the next page of the same class.
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
@@ -34,6 +53,21 @@ const { sendError, badRequest, methodNotAllowed, internal } = require('../core/e
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+const KIND_SWEEP_PAGE_SIZE = 200;
+
+function isPlainObject(v) {
+  return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** A list-page cursor: `{ createdAt: number, id: string }`, both required. */
+function isValidListCursor(cursor) {
+  return (
+    isPlainObject(cursor) &&
+    Number.isFinite(cursor.createdAt) &&
+    typeof cursor.id === 'string' &&
+    cursor.id.length > 0
+  );
+}
 
 /** @param {unknown} v @returns {number|null} millis, or null if not a usable instant */
 function toMillis(v) {
@@ -77,16 +111,18 @@ function createListSystemErrorsHandler({ db, auth, getConfig, log = console }) {
 
     const { includeResolved, limit, cursor } = req.body || {};
     const pageSize = Number.isInteger(limit) && limit >= 1 && limit <= MAX_LIMIT ? limit : DEFAULT_LIMIT;
-    if (cursor !== undefined && !Number.isFinite(cursor)) {
-      return badRequest(res, 'cursor must be a createdAt timestamp (ms) from a previous page.');
+    if (cursor !== undefined && !isValidListCursor(cursor)) {
+      return badRequest(res, 'cursor must be { createdAt, id } from a previous page.');
     }
 
     // (resolved ASC, createdAt DESC) requires the composite index declared
     // in firestore.indexes.json (systemErrorsAdmin.test.cjs asserts it).
+    // The explicit __name__ tiebreaker needs no separate declaration — see
+    // the pagination-cursor note at the top of this file.
     let query = db.collection('system_errors');
     if (!includeResolved) query = query.where('resolved', '==', false);
-    query = query.orderBy('createdAt', 'desc');
-    if (cursor !== undefined) query = query.startAfter(new Date(cursor));
+    query = query.orderBy('createdAt', 'desc').orderBy('__name__', 'desc');
+    if (cursor !== undefined) query = query.startAfter(new Date(cursor.createdAt), cursor.id);
 
     let snap;
     try {
@@ -99,7 +135,8 @@ function createListSystemErrorsHandler({ db, auth, getConfig, log = console }) {
 
     const docs = snap.docs.slice(0, pageSize);
     const rows = docs.map(toRow);
-    const nextCursor = snap.docs.length > pageSize ? rows[rows.length - 1].createdAt : null;
+    const last = rows[rows.length - 1];
+    const nextCursor = snap.docs.length > pageSize ? { createdAt: last.createdAt, id: last.id } : null;
     res.status(200).json({ rows, nextCursor });
   };
 }
@@ -148,7 +185,7 @@ function createResolveSystemErrorsHandler({ db, auth, getConfig, now = Date.now,
     const gate = await requireAdmin({ auth, getConfig }, req);
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
-    const { id, kind, expectedLastSeenAt } = req.body || {};
+    const { id, kind, expectedLastSeenAt, cursor } = req.body || {};
     const actor = { uid: gate.uid, email: gate.email };
 
     if (typeof id === 'string' && id) {
@@ -169,15 +206,36 @@ function createResolveSystemErrorsHandler({ db, auth, getConfig, now = Date.now,
     }
 
     if (typeof kind === 'string' && kind) {
+      if (cursor !== undefined && !(typeof cursor === 'string' && cursor.length > 0)) {
+        return badRequest(res, 'cursor must be a document id returned by a previous resolveSystemErrors (kind) call.');
+      }
+
+      // Ordered by document id (the __name__ tiebreaker every Firestore
+      // index provides automatically) so a bounded sweep can resume exactly
+      // where the last page left off — a plain equality query has no
+      // guaranteed order to page over safely.
+      let query = db
+        .collection('system_errors')
+        .where('kind', '==', kind)
+        .where('resolved', '==', false)
+        .orderBy('__name__');
+      if (cursor !== undefined) query = query.startAfter(cursor);
+
       let snap;
       try {
-        snap = await db.collection('system_errors').where('kind', '==', kind).where('resolved', '==', false).get();
+        // One extra row decides `done` without a second query (Codex review
+        // finding, P2: an unbounded sweep is an unbounded number of
+        // sequential transactions in one request).
+        snap = await query.limit(KIND_SWEEP_PAGE_SIZE + 1).get();
       } catch (err) {
         log.error('resolveSystemErrors (kind) query failed', err);
         return internal(res, 'The error could not be resolved.');
       }
+
+      const docs = snap.docs.slice(0, KIND_SWEEP_PAGE_SIZE);
+      const done = snap.docs.length <= KIND_SWEEP_PAGE_SIZE;
       const results = [];
-      for (const doc of snap.docs) {
+      for (const doc of docs) {
         try {
           // Each row resolved in its own transaction, sequentially: one row
           // reopening mid-sweep must not abort the rest of the fault class.
@@ -199,7 +257,8 @@ function createResolveSystemErrorsHandler({ db, auth, getConfig, now = Date.now,
       } catch (err) {
         log.warn('admin_logs write failed', err);
       }
-      return res.status(200).json({ kind, results });
+      const nextCursor = done ? null : docs[docs.length - 1].id;
+      return res.status(200).json({ kind, results, done, cursor: nextCursor });
     }
 
     return badRequest(res, 'id or kind is required.');
@@ -245,5 +304,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { toRow, toMillis, resolveOne, DEFAULT_LIMIT, MAX_LIMIT },
+  internals: { toRow, toMillis, resolveOne, isValidListCursor, DEFAULT_LIMIT, MAX_LIMIT, KIND_SWEEP_PAGE_SIZE },
 };

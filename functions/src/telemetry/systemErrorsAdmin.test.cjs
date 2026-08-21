@@ -11,11 +11,17 @@ const {
 
 /**
  * Minimal in-memory Firestore fake: doc get/update, `==` queries with
- * orderBy/limit/startAfter (system_errors admin surface needs both, unlike
- * systemErrors.test.cjs's fake), and transactions with Firestore's
+ * COMPOSITE orderBy/limit/startAfter (system_errors admin surface orders
+ * by createdAt+__name__ for a deterministic pagination tiebreaker, and by
+ * __name__ alone for the bounded kind-sweep — unlike systemErrors.test.cjs's
+ * fake, which needs neither), and transactions with Firestore's
  * conflict-abort-and-retry semantics collapsed into "read the freshest
  * data" (good enough for this module — it never inspects the number of
  * transaction attempts, only the final written state).
+ *
+ * `__name__` is a real field name here (mirroring Firestore's own special
+ * FieldPath.documentId()): orderBy/startAfter treat it as the doc's id
+ * rather than a stored data field.
  */
 function makeFakeDb(seed = {}) {
   const store = new Map(); // "collection/id" -> data
@@ -50,7 +56,7 @@ function makeFakeDb(seed = {}) {
         return query(c, [...filters, { field, value }]);
       },
       orderBy(field, direction = 'asc') {
-        return queryOrdered(c, filters, { field, direction });
+        return queryOrdered(c, filters, [{ field, direction }]);
       },
       async get() {
         const docs = [...store.entries()]
@@ -62,34 +68,48 @@ function makeFakeDb(seed = {}) {
     };
   }
 
-  function queryOrdered(c, filters, order, limitN, startAfterValue) {
+  function fieldValue(row, field) {
+    return field === '__name__' ? row.id : row.data[field];
+  }
+  const orderVal = (v) => (v instanceof Date ? v.getTime() : v);
+
+  function queryOrdered(c, filters, orders, limitN, startAfterValues) {
     return {
       orderBy(field, direction = 'asc') {
-        return queryOrdered(c, filters, { field, direction }, limitN, startAfterValue);
+        return queryOrdered(c, filters, [...orders, { field, direction }], limitN, startAfterValues);
       },
       limit(n) {
-        return queryOrdered(c, filters, order, n, startAfterValue);
+        return queryOrdered(c, filters, orders, n, startAfterValues);
       },
-      startAfter(value) {
-        return queryOrdered(c, filters, order, limitN, value);
+      startAfter(...values) {
+        return queryOrdered(c, filters, orders, limitN, values);
       },
       async get() {
         let rows = [...store.entries()]
           .filter(([path]) => path.startsWith(`${c}/`))
           .filter(([, data]) => filters.every((f) => data[f.field] === f.value))
           .map(([path, data]) => ({ id: path.slice(c.length + 1), data }));
-        const orderVal = (v) => (v instanceof Date ? v.getTime() : v);
-        const dir = order.direction === 'desc' ? -1 : 1;
         rows.sort((a, b) => {
-          const av = orderVal(a.data[order.field]);
-          const bv = orderVal(b.data[order.field]);
-          return av < bv ? -dir : av > bv ? dir : 0;
+          for (const order of orders) {
+            const dir = order.direction === 'desc' ? -1 : 1;
+            const av = orderVal(fieldValue(a, order.field));
+            const bv = orderVal(fieldValue(b, order.field));
+            if (av < bv) return -dir;
+            if (av > bv) return dir;
+          }
+          return 0;
         });
-        if (startAfterValue !== undefined) {
-          const sv = orderVal(startAfterValue);
-          rows = rows.filter(({ data }) => {
-            const v = orderVal(data[order.field]);
-            return order.direction === 'desc' ? v < sv : v > sv;
+        if (startAfterValues && startAfterValues.length > 0) {
+          rows = rows.filter((row) => {
+            for (let i = 0; i < orders.length; i += 1) {
+              const order = orders[i];
+              const dir = order.direction === 'desc' ? -1 : 1;
+              const rv = orderVal(fieldValue(row, order.field));
+              const sv = orderVal(startAfterValues[i]);
+              if (rv === sv) continue; // tied on this field — the next field decides
+              return dir === 1 ? rv > sv : rv < sv;
+            }
+            return false; // equal on every ordered field — excluded, like real Firestore
           });
         }
         if (typeof limitN === 'number') rows = rows.slice(0, limitN);
@@ -105,7 +125,7 @@ function makeFakeDb(seed = {}) {
       return {
         doc: (id) => docRef(c, id ?? `gen-${(genCounter += 1)}`),
         where: (field, op, value) => query(c, []).where(field, op, value),
-        orderBy: (field, direction) => queryOrdered(c, [], { field, direction: direction ?? 'asc' }),
+        orderBy: (field, direction) => queryOrdered(c, [], [{ field, direction: direction ?? 'asc' }]),
         async get() {
           return query(c, []).get();
         },
@@ -215,13 +235,13 @@ test('listSystemErrors: includeResolved widens the set (recently-resolved rows v
   assert.deepEqual(res.body.rows.map((r) => r.id).sort(), ['e-open-1', 'e-open-2', 'e-resolved-1'].sort());
 });
 
-test('listSystemErrors paginates with a createdAt cursor', async () => {
+test('listSystemErrors paginates with a { createdAt, id } cursor', async () => {
   const db = seedRows();
   let res = fakeRes();
   await listHandler(db)(req({ body: { includeResolved: true, limit: 2 } }), res);
   assert.equal(res.body.rows.length, 2);
   assert.deepEqual(res.body.rows.map((r) => r.id), ['e-open-2', 'e-open-1']);
-  assert.equal(res.body.nextCursor, 1000); // e-open-1's createdAt
+  assert.deepEqual(res.body.nextCursor, { createdAt: 1000, id: 'e-open-1' });
 
   const nextCursor = res.body.nextCursor;
   res = fakeRes();
@@ -238,11 +258,43 @@ test('listSystemErrors: an exact-limit page has no phantom next page', async () 
   assert.equal(res.body.nextCursor, null);
 });
 
-test('listSystemErrors: 400 on a non-numeric cursor', async () => {
+test('listSystemErrors: 400 on a malformed cursor (bare number, missing id, non-object)', async () => {
   const db = seedRows();
-  const res = fakeRes();
-  await listHandler(db)(req({ body: { cursor: 'nope' } }), res);
-  assert.equal(res.statusCode, 400);
+  for (const cursor of ['nope', 1000, { createdAt: 1000 }, { id: 'x' }, { createdAt: 'x', id: 'y' }]) {
+    const res = fakeRes();
+    await listHandler(db)(req({ body: { cursor } }), res);
+    assert.equal(res.statusCode, 400, JSON.stringify(cursor));
+  }
+});
+
+test('listSystemErrors: two rows with the SAME createdAt straddling a page boundary are not skipped (id tiebreaker)', async () => {
+  // Codex review finding, P2: a createdAt-only cursor would drop whichever
+  // of these two rows sorts second at the tied timestamp.
+  const db = makeFakeDb({
+    'system_errors/tie-a': { kind: 'client-error', resolved: false, createdAt: new Date(1000) },
+    'system_errors/tie-b': { kind: 'client-error', resolved: false, createdAt: new Date(1000) },
+    'system_errors/older': { kind: 'client-error', resolved: false, createdAt: new Date(500) },
+  });
+  let res = fakeRes();
+  await listHandler(db)(req({ body: { limit: 1 } }), res);
+  assert.equal(res.body.rows.length, 1);
+  const firstId = res.body.rows[0].id;
+  assert.ok(['tie-a', 'tie-b'].includes(firstId));
+  assert.ok(res.body.nextCursor);
+
+  const seenIds = [firstId];
+  let cursor = res.body.nextCursor;
+  // Two more pages of 1 row each should recover BOTH tied rows plus the
+  // older one — nothing skipped, nothing duplicated.
+  for (let i = 0; i < 2; i += 1) {
+    res = fakeRes();
+    await listHandler(db)(req({ body: { limit: 1, cursor } }), res);
+    assert.equal(res.body.rows.length, 1);
+    seenIds.push(res.body.rows[0].id);
+    cursor = res.body.nextCursor;
+  }
+  assert.equal(cursor, null);
+  assert.deepEqual(seenIds.sort(), ['older', 'tie-a', 'tie-b']);
 });
 
 test('listSystemErrors shapes an infra query failure as a core/errors 500', async () => {
@@ -353,7 +405,7 @@ test('resolveSystemErrors: a row with no lastSeenAt at all resolves fine when ex
 
 // --- resolveSystemErrors: whole fault class ----------------------------------
 
-test('resolveSystemErrors: resolving by kind resolves every currently-unresolved row of that class', async () => {
+test('resolveSystemErrors: resolving by kind resolves every currently-unresolved row of that class (single page)', async () => {
   const db = makeFakeDb({
     'system_errors/a': { kind: 'template-override-invalid', resolved: false, createdAt: new Date(1) },
     'system_errors/b': { kind: 'template-override-invalid', resolved: false, createdAt: new Date(2) },
@@ -364,11 +416,57 @@ test('resolveSystemErrors: resolving by kind resolves every currently-unresolved
   await resolveHandler(db, () => 9000)(req({ body: { kind: 'template-override-invalid' } }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.kind, 'template-override-invalid');
+  assert.equal(res.body.done, true);
+  assert.equal(res.body.cursor, null);
   assert.deepEqual(res.body.results.map((r) => r.id).sort(), ['a', 'b']);
   assert.equal(db.store.get('system_errors/a').resolved, true);
   assert.equal(db.store.get('system_errors/b').resolved, true);
   assert.equal(db.store.get('system_errors/c').resolved, false); // different kind, untouched
   assert.equal(db.store.get('system_errors/d').resolvedAt, undefined); // was already resolved before this call
+});
+
+test('resolveSystemErrors: a whole-class sweep bigger than the page size is bounded and resumable', async () => {
+  // Codex review finding, P2: an unbounded sweep is an unbounded number of
+  // sequential transactions in one request. Seed more rows than
+  // KIND_SWEEP_PAGE_SIZE and confirm one call resolves at most a page,
+  // reporting done:false with a cursor to continue.
+  const seed = {};
+  const total = internals.KIND_SWEEP_PAGE_SIZE + 5;
+  for (let i = 0; i < total; i += 1) {
+    const id = `row-${String(i).padStart(4, '0')}`;
+    seed[`system_errors/${id}`] = { kind: 'burst', resolved: false, createdAt: new Date(i) };
+  }
+  const db = makeFakeDb(seed);
+
+  const first = fakeRes();
+  await resolveHandler(db, () => 9000)(req({ body: { kind: 'burst' } }), first);
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.body.done, false);
+  assert.equal(first.body.results.length, internals.KIND_SWEEP_PAGE_SIZE);
+  assert.ok(first.body.cursor);
+  const resolvedAfterFirst = [...db.store.entries()].filter(
+    ([path, data]) => path.startsWith('system_errors/') && data.resolved === true,
+  ).length;
+  assert.equal(resolvedAfterFirst, internals.KIND_SWEEP_PAGE_SIZE);
+
+  const second = fakeRes();
+  await resolveHandler(db, () => 9500)(req({ body: { kind: 'burst', cursor: first.body.cursor } }), second);
+  assert.equal(second.statusCode, 200);
+  assert.equal(second.body.done, true);
+  assert.equal(second.body.cursor, null);
+  assert.equal(second.body.results.length, 5);
+
+  const allResolved = [...db.store.entries()].every(
+    ([path, data]) => !path.startsWith('system_errors/') || data.resolved === true,
+  );
+  assert.ok(allResolved, 'every row of the class is resolved after continuing the sweep');
+});
+
+test('resolveSystemErrors: 400 on a malformed kind-sweep cursor', async () => {
+  const db = makeFakeDb({ 'system_errors/a': { kind: 'x', resolved: false, createdAt: new Date(1) } });
+  const res = fakeRes();
+  await resolveHandler(db)(req({ body: { kind: 'x', cursor: 42 } }), res);
+  assert.equal(res.statusCode, 400);
 });
 
 // --- audit logging ------------------------------------------------------------
