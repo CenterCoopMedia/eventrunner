@@ -11,6 +11,10 @@ vi.mock('@/firebase.js', () => ({
   auth: {},
   db: {},
   storage: {},
+  // App Check is unconfigured in a credential-free test run, which is also
+  // its production default: no site key, no attestation header.
+  appCheckEnabled: false,
+  appCheckHeaders: vi.fn(async () => ({})),
 }));
 
 vi.mock('firebase/auth', () => ({

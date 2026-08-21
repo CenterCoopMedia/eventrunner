@@ -245,9 +245,11 @@ service cloud.firestore {
     // open them by accident via a broader match.
     match /auth_challenges/{docId} { allow read, write: if false; }
     match /auth_rate_limits/{docId} { allow read, write: if false; }
+    match /auth_send_ceiling/{docId} { allow read, write: if false; }
     match /sent_emails/{docId} { allow read, write: if false; }
     match /email_claims/{docId} { allow read, write: if false; }
     match /system_errors/{docId} { allow read, write: if false; }
+    match /client_error_rate_limits/{docId} { allow read, write: if false; }
     match /email_templates/{docId} { allow read, write: if false; }
 
     // Everything not matched above stays deny-all.

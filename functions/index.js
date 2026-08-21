@@ -15,6 +15,8 @@ const adminConfig = require('./src/admin/config.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
+const clientErrors = require('./src/telemetry/clientErrors.cjs');
+const systemErrors = require('./src/telemetry/systemErrors.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -28,4 +30,6 @@ module.exports = {
   ...scheduleBookmarks.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
+  ...clientErrors.handlers,
+  ...systemErrors.handlers,
 };

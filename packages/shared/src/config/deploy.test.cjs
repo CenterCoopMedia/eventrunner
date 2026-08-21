@@ -105,3 +105,45 @@ test('never throws on garbage input', () => {
   assert.equal(validateDeployEnv(null).ok, false);
   assert.equal(validateDeployEnv({}).ok, false);
 });
+
+// --- OTP abuse controls (issue #45) -----------------------------------------
+
+test('the OTP abuse controls default off and are never reported missing', () => {
+  const result = validateDeployEnv(VALID_ENV);
+  assert.equal(result.ok, true);
+  assert.equal(result.resolved.EVENT_APP_CHECK_ENFORCED, 'false');
+  assert.equal(result.resolved.EVENT_OTP_SEND_CEILING_PER_HOUR, '500');
+  assert.equal(result.missing.includes('EVENT_APP_CHECK_ENFORCED'), false);
+  assert.equal(result.missing.includes('EVENT_OTP_SEND_CEILING_PER_HOUR'), false);
+});
+
+test('EVENT_APP_CHECK_ENFORCED=true requires a site key in the bundle', () => {
+  // Enforcement without a key in the bundle is a total sign-in outage, so
+  // it fails the build rather than the first visitor.
+  const noKey = validateDeployEnv({ ...VALID_ENV, EVENT_APP_CHECK_ENFORCED: 'true' });
+  assert.equal(noKey.ok, false);
+  assert.ok(noKey.missing.includes('VITE_FIREBASE_APP_CHECK_SITE_KEY'));
+
+  const withKey = validateDeployEnv({
+    ...VALID_ENV,
+    EVENT_APP_CHECK_ENFORCED: 'true',
+    VITE_FIREBASE_APP_CHECK_SITE_KEY: 'site-key',
+  });
+  assert.equal(withKey.ok, true);
+
+  const bad = validateDeployEnv({ ...VALID_ENV, EVENT_APP_CHECK_ENFORCED: 'yes' });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.startsWith('EVENT_APP_CHECK_ENFORCED')));
+});
+
+test('EVENT_OTP_SEND_CEILING_PER_HOUR must be a positive integer', () => {
+  assert.equal(
+    validateDeployEnv({ ...VALID_ENV, EVENT_OTP_SEND_CEILING_PER_HOUR: '50' }).ok,
+    true,
+  );
+  for (const bad of ['0', '-1', '1.5', 'lots']) {
+    const result = validateDeployEnv({ ...VALID_ENV, EVENT_OTP_SEND_CEILING_PER_HOUR: bad });
+    assert.equal(result.ok, false, `"${bad}" must fail the build`);
+    assert.ok(result.errors.some((e) => e.startsWith('EVENT_OTP_SEND_CEILING_PER_HOUR')));
+  }
+});

@@ -3,7 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { verifyAuthToken, requireAdmin, requireAttendeeAccess, internals } = require('./auth.cjs');
+const {
+  verifyAuthToken,
+  requireAdmin,
+  requireAttendeeAccess,
+  requireAppCheck,
+  internals,
+} = require('./auth.cjs');
 
 /** Minimal request fake: headers only, no Express methods. */
 function reqWithAuth(value) {
@@ -115,6 +121,62 @@ test('requireAdmin: verified email not on the list → 403', async () => {
     reqWithAuth('Bearer good'),
   );
   assert.equal(verdict.status, 403);
+});
+
+// --- App Check (issue #45) ---------------------------------------------------
+
+/** Fake admin App Check: resolves listed tokens, rejects everything else. */
+function fakeAppCheck(validTokens) {
+  return {
+    async verifyToken(t) {
+      if (validTokens.includes(t)) return { appId: 'app-1' };
+      throw new Error('app-check/invalid-argument');
+    },
+  };
+}
+
+const reqWithAppCheck = (value) =>
+  (value === undefined ? { headers: {} } : { headers: { 'x-firebase-appcheck': value } });
+
+test('requireAppCheck: unenforced deployments pass everything through untouched', async () => {
+  for (const req of [reqWithAppCheck(undefined), reqWithAppCheck('garbage')]) {
+    const verdict = await requireAppCheck({ appCheck: null, enforced: false }, req);
+    assert.deepEqual(verdict, { ok: true, enforced: false });
+  }
+});
+
+test('requireAppCheck: a valid token passes, from either request shape', async () => {
+  const appCheck = fakeAppCheck(['good']);
+  assert.deepEqual(
+    await requireAppCheck({ appCheck, enforced: true }, reqWithAppCheck('good')),
+    { ok: true, enforced: true },
+  );
+  // Express-style req.get, with the canonical header casing.
+  assert.deepEqual(
+    await requireAppCheck(
+      { appCheck, enforced: true },
+      { get: (name) => (name === 'X-Firebase-AppCheck' ? 'good' : undefined) },
+    ),
+    { ok: true, enforced: true },
+  );
+});
+
+test('requireAppCheck: missing, blank, and invalid tokens are all refused', async () => {
+  const appCheck = fakeAppCheck(['good']);
+  for (const value of [undefined, '', '   ', 'bad']) {
+    const verdict = await requireAppCheck({ appCheck, enforced: true }, reqWithAppCheck(value));
+    assert.equal(verdict.ok, false);
+  }
+});
+
+test('requireAppCheck: fails CLOSED when the App Check service is unavailable', async () => {
+  // An enforcement flag that stops enforcing because the SDK would not load
+  // is worse than no flag at all.
+  for (const appCheck of [null, undefined, {}]) {
+    const verdict = await requireAppCheck({ appCheck, enforced: true }, reqWithAppCheck('good'));
+    assert.equal(verdict.ok, false);
+    assert.equal(verdict.reason, 'app-check-unavailable');
+  }
 });
 
 test('requireAdmin: missing bootstrap doc or malformed adminEmails → 403, no throw', async () => {
