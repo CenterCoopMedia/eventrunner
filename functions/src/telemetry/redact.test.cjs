@@ -29,8 +29,11 @@ test('redacts a Bearer token', () => {
 });
 
 test('redacts a JWT-shaped string even without a Bearer prefix', () => {
+  // Two rules chain here: JWT_RE redacts the token value first, then the
+  // (now-boundary-relaxed) credential-param rule redacts the whole
+  // "token=..." pair — still safe, just the more generic placeholder wins.
   const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpM';
-  assert.equal(redactText(`token=${jwt} in body`), 'token=[redacted-token] in body');
+  assert.equal(redactText(`token=${jwt} in body`), 'token=[redacted] in body');
 });
 
 test('redacts credential-shaped query params appearing in plain text', () => {
@@ -42,6 +45,29 @@ test('redacts credential-shaped query params appearing in plain text', () => {
     redactText('...&apiKey=secret-value&other=1'),
     '...&apiKey=[redacted]&other=1',
   );
+});
+
+// Codex review finding (P1): the original regex required a leading `?`/`&`
+// before the param name, so free text with no query-string delimiter at all
+// (a plain "key: value" style message, or a param at the very start of the
+// string) passed through unredacted.
+test('redacts a credential param with no leading ?/& — free text, not a query string', () => {
+  assert.equal(redactText('request failed: token=abc123'), 'request failed: token=[redacted]');
+  assert.equal(redactText('token=abc123 in body'), 'token=[redacted] in body');
+});
+
+test('redacts a credential param at the very start of the string', () => {
+  assert.equal(redactText('auth=secret123'), 'auth=[redacted]');
+});
+
+// The other direction of the same fix: loosening the boundary must not
+// start matching PART of an unrelated identifier — "authorization" is not
+// "auth", "mytoken" is not "token", "zipcode" is not "code".
+test('does not redact an identifier that merely contains a credential param name as a substring', () => {
+  assert.equal(redactText('authorization=abcdef'), 'authorization=abcdef');
+  assert.equal(redactText('mytoken=abcdef'), 'mytoken=abcdef');
+  assert.equal(redactText('monkey=1'), 'monkey=1');
+  assert.equal(redactText('zipcode=90210'), 'zipcode=90210');
 });
 
 test('leaves ordinary text untouched', () => {

@@ -25,12 +25,20 @@ const JWT_RE = /\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g
 const BEARER_RE = /\bBearer\s+[A-Za-z0-9._-]+/gi;
 
 // Query-string / form-encoded param names that carry credentials. Matches
-// `key=value` whether the pair sits after a real `?`/`&` or just appears in
-// running text (a stack frame printing a fetch URL, for instance).
+// `key=value` wherever it sits: after a real `?`/`&`, at the very start of
+// the string, or free text like "request failed: token=abc123" — the
+// boundary is "start of string, or a non-identifier character" rather than
+// requiring a literal `?`/`&`, so a message that never went through a URL
+// still gets scrubbed. The alternation names (token, key, auth, ...) are
+// matched as whole identifiers only: the boundary is checked on BOTH sides
+// (an identifier char before the name, or after it but before the `=`,
+// blocks the match), so "authorization=abc" and "mytoken=abc" are left
+// alone — only an exact, standalone param name immediately followed by `=`
+// is redacted.
 const CREDENTIAL_PARAM_NAMES =
   '(?:token|code|key|secret|password|pass|auth|apikey|api_key|access_token|id_token|session|sig|signature)';
 const CREDENTIAL_PARAM_RE = new RegExp(
-  `([?&]${CREDENTIAL_PARAM_NAMES}=)([^&\\s"'<>]*)`,
+  `(^|[^A-Za-z0-9_])(${CREDENTIAL_PARAM_NAMES})=([^&\\s"'<>]*)`,
   'gi',
 );
 
@@ -46,7 +54,7 @@ function redactText(value) {
     .replace(EMAIL_RE, '[redacted-email]')
     .replace(BEARER_RE, 'Bearer [redacted-token]')
     .replace(JWT_RE, '[redacted-token]')
-    .replace(CREDENTIAL_PARAM_RE, '$1[redacted]');
+    .replace(CREDENTIAL_PARAM_RE, '$1$2=[redacted]');
 }
 
 /**
