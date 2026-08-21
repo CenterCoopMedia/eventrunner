@@ -2,11 +2,12 @@
 //
 // Shape mirrors published cmsPages docs. systemPage: true marks pages with a
 // dedicated React route (home, schedule, speakers, sponsors); non-system
-// pages render through the generic /p/:slug route. Section ids are generic
-// vocabulary (spec §5.3) and tie to cmsContent docs via each block's
-// `section` field. scripts/generate-content.cjs regenerates this file at
-// deploy time (out-of-tree via GENERATED_DIR); this committed copy is the
-// fictional demo event.
+// pages render at their own root-level `path` (e.g. /faq) through the
+// generic catch-all route (issue #52). Section ids are generic vocabulary
+// (spec §5.3) and tie to cmsContent docs via each block's `section` field.
+// scripts/generate-content.cjs regenerates this file at deploy time
+// (out-of-tree via GENERATED_DIR); this committed copy is the fictional
+// demo event.
 
 export const pagesData = [
   {
@@ -104,7 +105,7 @@ export const pagesData = [
   {
     id: 'faq',
     label: 'Frequently asked questions',
-    path: '/p/faq',
+    path: '/faq',
     icon: null,
     order: 4,
     visible: true,

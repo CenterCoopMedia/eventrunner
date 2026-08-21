@@ -1,6 +1,7 @@
-// Pages tests (spec §5.2): Home renders its cmsPages sections through the
-// block registry, /p/:slug renders non-system pages from the snapshot, and
-// unknown slugs get a designed 404 empty state with one next action.
+// Pages tests (spec §5.2, issue #52): Home renders its cmsPages sections
+// through the block registry, generic pages render at their own root-level
+// `path` via the catch-all route, and unknown paths get the same designed
+// 404 used everywhere else on the site.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -55,9 +56,9 @@ describe('Home', () => {
   });
 });
 
-describe('ContentPage (/p/:slug)', () => {
-  it('renders a non-system page from its sections', () => {
-    renderAt('/p/faq');
+describe('ContentPage (catch-all route)', () => {
+  it('renders a non-system page at its own root-level path', () => {
+    renderAt('/faq');
     const faqPage = pagesData.find((p) => p.id === 'faq');
     expect(
       screen.getByRole('heading', { level: 1, name: faqPage.label }),
@@ -66,20 +67,28 @@ describe('ContentPage (/p/:slug)', () => {
     expect(screen.getByText(siteContent.faq__what_is_this.question)).toBeInTheDocument();
   });
 
-  it('404s cleanly on an unknown slug', () => {
-    renderAt('/p/definitely-not-published');
+  it('404s cleanly on an unknown path', () => {
+    renderAt('/definitely-not-published');
     expect(
-      screen.getByRole('heading', { name: 'This page is not available' }),
+      screen.getByRole('heading', { name: 'Page not found' }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Go to the home page' }),
     ).toBeInTheDocument();
   });
 
-  it('404s on system page ids rather than rendering them twice', () => {
-    renderAt('/p/schedule');
+  it('the old /p/ prefix 404s — it is retired, not redirected', () => {
+    renderAt('/p/faq');
     expect(
-      screen.getByRole('heading', { name: 'This page is not available' }),
+      screen.getByRole('heading', { name: 'Page not found' }),
     ).toBeInTheDocument();
+  });
+
+  it('a system route wins over the catch-all even though both could match', () => {
+    renderAt('/schedule');
+    // Schedule is a dedicated route (spec §2.4), not routed through
+    // ContentPage — its own page renders, not a 404 and not the generic
+    // content article wrapper.
+    expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument();
   });
 });

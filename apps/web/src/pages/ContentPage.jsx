@@ -1,33 +1,27 @@
-// Generic content page for the /p/:slug route (spec §5.2): renders any
-// visible non-system cmsPages document from its sections, so a client adding
-// a page is a CMS action, not a PR. System pages have dedicated routes and
-// 404 here rather than rendering twice.
-import { Link, useParams } from 'react-router-dom';
+// Generic content page for the catch-all route (spec §5.2, issue #52):
+// renders any visible non-system cmsPages document at its own root-level
+// `path` (e.g. /scholarships), so a client adding a page is a CMS action,
+// not a PR. This route matches whatever none of the system routes in
+// App.jsx did, so a page match is resolved from the CURRENT URL, not a
+// route param — there is exactly one lookup key, the stored `path`. System
+// pages own dedicated routes matched before this catch-all ever runs, but
+// the systemPage guard below stays as defense in depth. Anything that
+// doesn't resolve to a visible, non-system page renders the same NotFound
+// used by every other unknown URL — this route IS the site's 404 path.
+import { Link, useLocation } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import NotFound from './NotFound.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 
 export default function ContentPage() {
-  const { slug } = useParams();
+  const { pathname } = useLocation();
   const { getPage, getSectionBlocks } = useContent();
 
-  const page = getPage(slug) ?? getPage(`/p/${slug}`);
+  const page = getPage(pathname);
 
   if (!page || page.systemPage) {
-    return (
-      <EmptyState
-        title="This page is not available"
-        description={`No published page exists at /p/${slug}. If you followed a link here, the page may not be published yet.`}
-        action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-6 py-3 font-semibold text-brand-surface hover:bg-brand-primary-dark"
-          >
-            Go to the home page
-          </Link>
-        }
-      />
-    );
+    return <NotFound />;
   }
 
   const sections = (page.sections ?? [])
