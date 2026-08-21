@@ -186,6 +186,16 @@ service cloud.firestore {
       allow update: if isSelf(userId)
         && editsOnlySelfProfileFields()
         && validSelfProfileValues();
+
+      // Private per-session bookmark membership (spec §4.1, §9). Every WRITE
+      // goes through the Admin SDK (bookmarkSession, functions/src/schedule/
+      // bookmarks.cjs) — the owner only ever reads their own docs here, so
+      // the "my schedule" view can subscribe directly instead of polling a
+      // callable.
+      match /bookmarks/{sessionId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
     }
 
     // The requester's OWN registration state, read from their users doc.
@@ -220,6 +230,14 @@ service cloud.firestore {
       allow read: if resource.data.profileVisibility == 'attendees_only'
         && requesterIsApprovedAttendee();
       allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Aggregate bookmark counts (spec §4.1, §9) — a plain number per
+    // session, harmless to read publicly; only bookmarkSession (Admin SDK)
+    // writes it.
+    match /sessionBookmarks/{sessionId} {
+      allow read: if true;
       allow write: if false;
     }
 

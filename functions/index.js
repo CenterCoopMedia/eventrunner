@@ -12,6 +12,7 @@ const cmsVersions = require('./src/cms/versions.cjs');
 const cmsPublish = require('./src/cms/publish.cjs');
 const cmsUpdates = require('./src/cms/updates.cjs');
 const adminConfig = require('./src/admin/config.cjs');
+const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
 
@@ -24,6 +25,7 @@ module.exports = {
   ...cmsPublish.handlers,
   ...cmsUpdates.handlers,
   ...adminConfig.handlers,
+  ...scheduleBookmarks.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
 };

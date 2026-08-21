@@ -305,6 +305,28 @@ describe("server-only collections stay deny-all", () => {
   });
 });
 
+describe("the private bookmarks subcollection under users/{uid}", () => {
+  it("allows a user to read their own bookmark membership docs, denies everyone else", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users/attendee-1/bookmarks/session-1"), {
+        bookmarkedAt: new Date(),
+      });
+    });
+    await assertSucceeds(getDoc(doc(nonAdmin(), "users/attendee-1/bookmarks/session-1")));
+    await assertFails(getDoc(doc(anon(), "users/attendee-1/bookmarks/session-1")));
+    const other = testEnv
+      .authenticatedContext("attendee-2", { email: "other@example.com", email_verified: true })
+      .firestore();
+    await assertFails(getDoc(doc(other, "users/attendee-1/bookmarks/session-1")));
+  });
+
+  it("denies all client writes to the bookmarks subcollection, owner included", async () => {
+    await assertFails(
+      setDoc(doc(nonAdmin(), "users/attendee-1/bookmarks/session-1"), { bookmarkedAt: new Date() }),
+    );
+  });
+});
+
 // The six branches issue #17 requires pinned, plus the self-read and
 // list-query shapes §3.4 calls out. The gap being closed: `attendees_only`
 // used to be readable by ANY authenticated user, so a brand-new pending
@@ -588,5 +610,23 @@ describe("users account documents (spec §3.4)", () => {
     );
     await assertFails(deleteDoc(doc(attendee("pending-1"), "users/pending-1")));
     await assertFails(deleteDoc(doc(admin(), "users/pending-1")));
+  });
+});
+
+describe("sessionBookmarks aggregate", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sessionBookmarks/session-1"), { count: 3 });
+    });
+  });
+
+  it("allows anyone, including anonymous, to read the aggregate count", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "sessionBookmarks/session-1")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "sessionBookmarks/session-1")));
+  });
+
+  it("denies all client writes, admin included", async () => {
+    await assertFails(setDoc(doc(admin(), "sessionBookmarks/session-1"), { count: 99 }));
+    await assertFails(setDoc(doc(nonAdmin(), "sessionBookmarks/session-1"), { count: 99 }));
   });
 });

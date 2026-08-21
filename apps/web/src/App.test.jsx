@@ -60,6 +60,10 @@ vi.mock('firebase/firestore', () => ({
       ? Promise.resolve({ docs: [] })
       : Promise.reject(new Error('permission denied')),
   ),
+  // AuthProvider's attendee-profile subscription (users/{uid}) — the smoke
+  // test never drives it, so a no-op unsubscribe with no snapshot is enough.
+  doc: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
 }));
 // ProfileProvider's one seam to Firebase (issue #17): capture the own-profile
 // subscription so a test can push an account document, and keep the directory

@@ -8,6 +8,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
+import AuthContext from '../contexts/AuthContext.jsx';
+import ProfileContext from '../contexts/ProfileContext.jsx';
 import Schedule from './Schedule.jsx';
 import { formatSessionTimeRange, zonedDateTime } from '../lib/eventTime.js';
 
@@ -82,25 +84,31 @@ function renderSchedule({
   features = { schedule: true },
   scheduleData = fixtureSessions,
   loading = false,
+  auth = { user: null, isAdmin: false, loading: false },
+  profile = { attendeeAccess: false },
 } = {}) {
   return render(
     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <EventConfigContext.Provider
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
-        <ContentContext.Provider
-          value={{
-            readSource: 'published',
-            siteContent: {},
-            scheduleData,
-            speakers: [],
-            organizationsData: [],
-            loading,
-            getBlock: () => null,
-          }}
-        >
-          <Schedule />
-        </ContentContext.Provider>
+        <AuthContext.Provider value={auth}>
+          <ProfileContext.Provider value={profile}>
+            <ContentContext.Provider
+              value={{
+                readSource: 'published',
+                siteContent: {},
+                scheduleData,
+                speakers: [],
+                organizationsData: [],
+                loading,
+                getBlock: () => null,
+              }}
+            >
+              <Schedule />
+            </ContentContext.Provider>
+          </ProfileContext.Provider>
+        </AuthContext.Provider>
       </EventConfigContext.Provider>
     </MemoryRouter>,
   );
