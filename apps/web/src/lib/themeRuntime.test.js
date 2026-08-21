@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildRuntimeThemeCss, hexToRgbTriple } from './themeRuntime.js';
+import {
+  buildRuntimeThemeCss,
+  hexToRgbTriple,
+  rgbTripleToHex,
+} from './themeRuntime.js';
 
 // Hex strings under test are composed at runtime so no hex color literal
 // appears in source (spec §7.6 — the ESLint sweep applies to tests too).
@@ -83,5 +87,28 @@ describe('buildRuntimeThemeCss', () => {
     expect(buildRuntimeThemeCss(null)).toBe('');
     expect(buildRuntimeThemeCss({})).toBe('');
     expect(buildRuntimeThemeCss({ radius: 'unknown', texture: 'velvet' })).toBe('');
+  });
+});
+
+// The inverse conversion, used by the admin Branding tab to seed its color
+// inputs from the build-time custom properties when config/theme carries no
+// colors map yet.
+describe('rgbTripleToHex', () => {
+  it('round-trips a hex color through the triple form', () => {
+    for (const digits of ['2a9d8f', '000000', 'ffffff', 'c84b31']) {
+      expect(rgbTripleToHex(hexToRgbTriple(hex(digits)))).toBe(hex(digits));
+    }
+  });
+
+  it('accepts the comma-separated form a browser may report', () => {
+    expect(rgbTripleToHex(' 42, 157, 143 ')).toBe(hex('2a9d8f'));
+  });
+
+  it('returns null for anything that is not three 0-255 channels', () => {
+    expect(rgbTripleToHex('')).toBeNull();
+    expect(rgbTripleToHex('42 157')).toBeNull();
+    expect(rgbTripleToHex('42 157 256')).toBeNull();
+    expect(rgbTripleToHex('42 157 abc')).toBeNull();
+    expect(rgbTripleToHex(null)).toBeNull();
   });
 });

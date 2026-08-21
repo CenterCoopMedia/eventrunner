@@ -51,6 +51,23 @@ const TEXTURES = ['paper', 'flat'];
 
 const HEX_DIGITS = '0123456789abcdef';
 
+// The admin Branding tab edits exactly these vocabularies, so they are
+// exported from here rather than duplicated: one definition of "which colors
+// exist", "which font sets are bundled", and "which textures/radii are legal"
+// serves both the runtime CSS builder and the editor that feeds it.
+/** config/theme.colors keys, in the order the Branding tab shows them. */
+export const THEME_COLOR_KEYS = Object.freeze(Object.keys(COLOR_PROPS));
+/** config/theme.colors key → the custom property it overrides. */
+export const THEME_COLOR_PROPERTIES = Object.freeze({ ...COLOR_PROPS });
+/** Bundled font-set ids (spec §7.4 allowlist). */
+export const FONT_SET_IDS = Object.freeze(Object.keys(FONT_SETS));
+/** config/theme.fonts roles. */
+export const THEME_FONT_ROLES = Object.freeze([...FONT_ROLES]);
+/** config/theme.radius ids. */
+export const RADIUS_IDS = Object.freeze(Object.keys(RADIUS_SCALES));
+/** config/theme.texture values. */
+export const TEXTURE_IDS = Object.freeze([...TEXTURES]);
+
 /**
  * Convert a hex color string (data from config/theme) to the
  * space-separated RGB triple form the theme custom properties use.
@@ -81,6 +98,31 @@ export function hexToRgbTriple(value) {
   }
   const channel = (i) => nibbles[i] * 16 + nibbles[i + 1];
   return `${channel(0)} ${channel(2)} ${channel(4)}`;
+}
+
+/**
+ * Inverse of hexToRgbTriple: turn a space- or comma-separated RGB triple (the
+ * form the theme custom properties hold) back into a hex color string. Used
+ * by the admin Branding tab to seed its color inputs from the build-time
+ * palette when config/theme carries no `colors` map yet. Returns null for
+ * anything that is not three 0-255 channels. No color literals here either —
+ * the digits are computed from the incoming numbers.
+ *
+ * @param {unknown} triple e.g. '42 157 143'
+ * @returns {string|null}
+ */
+export function rgbTripleToHex(triple) {
+  if (typeof triple !== 'string') return null;
+  const parts = triple.trim().split(/[\s,]+/).filter(Boolean);
+  if (parts.length !== 3) return null;
+  const digits = [];
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) return null;
+    const value = Number(part);
+    if (value > 255) return null;
+    digits.push(HEX_DIGITS[Math.floor(value / 16)], HEX_DIGITS[value % 16]);
+  }
+  return `#${digits.join('')}`;
 }
 
 /**
