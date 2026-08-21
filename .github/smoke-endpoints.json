@@ -21,6 +21,13 @@
     "updateBadges",
     "emailDeliveryWebhook",
     "bookmarkSession",
-    "logClientError"
+    "logClientError",
+    "addSessionMaterialLink",
+    "uploadSessionMaterial",
+    "updateSessionMaterial",
+    "deleteSessionMaterial",
+    "setMaterialReviewStatus",
+    "getSessionMaterialUrl",
+    "listSessionMaterials"
   ]
 }
