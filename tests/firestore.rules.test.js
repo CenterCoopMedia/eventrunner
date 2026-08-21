@@ -615,6 +615,78 @@ describe("users account documents (spec §3.4)", () => {
   });
 });
 
+// The canonical speaker store and its one-way projection (spec §4.3,
+// issue #20). The property under test: everything that would let a client
+// break a reference outside the transaction that owns it is denied — and
+// the canonical document's pipeline fields (email, inviteToken, uid) never
+// reach a non-admin at all.
+describe("speakers canonical store and speakers_public projection (spec §4.3)", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "speakers/spk-1"), {
+        firstName: "Demo",
+        lastName: "Speaker",
+        slug: "demo-speaker",
+        email: "speaker@example.com",
+        inviteToken: "tok_secret",
+        status: "approved",
+        uid: "speaker-1",
+        approvedAt: new Date(),
+      });
+      await setDoc(doc(db, "speakers_public/spk-1"), {
+        speakerId: "spk-1",
+        firstName: "Demo",
+        lastName: "Speaker",
+        displayName: "Demo Speaker",
+        slug: "demo-speaker",
+        bio: "",
+        headshotPath: null,
+        organization: "",
+        jobTitle: "",
+        socialHandles: {},
+      });
+    });
+  });
+
+  it("denies the canonical speaker document to anonymous and non-admin clients", async () => {
+    await assertFails(getDoc(doc(anon(), "speakers/spk-1")));
+    await assertFails(getDoc(doc(nonAdmin(), "speakers/spk-1")));
+    // Not even the linked speaker reads their own canonical record: the
+    // invite token and the users.speakerId link half live on it.
+    await assertFails(getDoc(doc(attendee("speaker-1"), "speakers/spk-1")));
+    await assertFails(getDocs(collection(anon(), "speakers")));
+  });
+
+  it("allows an admin to read speakers, for the list and the session typeahead", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "speakers/spk-1")));
+    await assertSucceeds(getDocs(collection(admin(), "speakers")));
+  });
+
+  it("denies every client write to speakers, admin included", async () => {
+    // Every write is a Cloud Function (createSpeaker / updateSpeaker /
+    // deleteSpeaker / the invite transaction) — that is what makes §4.3's
+    // seams transactional rather than advisory.
+    await assertFails(setDoc(doc(admin(), "speakers/spk-2"), { firstName: "New" }));
+    await assertFails(updateDoc(doc(admin(), "speakers/spk-1"), { status: "removed" }));
+    await assertFails(updateDoc(doc(admin(), "speakers/spk-1"), { uid: "attendee-1" }));
+    await assertFails(deleteDoc(doc(admin(), "speakers/spk-1")));
+    await assertFails(setDoc(doc(nonAdmin(), "speakers/spk-1"), { firstName: "Hijacked" }));
+  });
+
+  it("allows anyone to read the public projection", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "speakers_public/spk-1")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "speakers_public/spk-1")));
+    await assertSucceeds(getDocs(collection(anon(), "speakers_public")));
+  });
+
+  it("denies every client write to the projection, admin included", async () => {
+    await assertFails(setDoc(doc(admin(), "speakers_public/spk-1"), { displayName: "Edited" }));
+    await assertFails(setDoc(doc(anon(), "speakers_public/spk-9"), { displayName: "Injected" }));
+    await assertFails(deleteDoc(doc(admin(), "speakers_public/spk-1")));
+  });
+});
+
 describe("sessionBookmarks aggregate", () => {
   beforeAll(async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {

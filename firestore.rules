@@ -233,6 +233,38 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Canonical speakers and their public projection (spec §4.3).
+    //
+    // speakers/{speakerId} is the single source of truth. It carries the
+    // pipeline state clients must never see — `email`, `inviteToken`,
+    // `approvedAt`, and `uid`, the server-owned half of the
+    // users.speakerId ↔ speakers.uid pair — so it is NOT anonymously or
+    // attendee-readable. Admins read it (the admin speakers list and the
+    // session editor's speaker typeahead subscribe to it directly, exactly
+    // as they do to the admin-only `_drafts` collections); nobody writes
+    // it from a client. Every write is a Cloud Function: createSpeaker,
+    // updateSpeaker, deleteSpeaker, and the invite/acceptance transaction.
+    //
+    // That is what makes §4.3's three transactional seams enforceable: a
+    // client that could write either document could break a reference
+    // outside the transaction that is supposed to own it.
+    match /speakers/{speakerId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // speakers_public/{speakerId}: the one-way projection the
+    // onSpeakerWritten trigger maintains (functions/src/speakers/
+    // projection.cjs). Public by design — it drives the speaker directory
+    // and the schedule's speaker names — and carries ONLY the fields on
+    // PUBLIC_SPEAKER_FIELDS (packages/shared/src/speaker.cjs). A speaker
+    // whose status is not `approved` has no document here at all, which is
+    // what makes the soft delete (status 'removed') hide them everywhere.
+    match /speakers_public/{speakerId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Aggregate bookmark counts (spec §4.1, §9) — a plain number per
     // session, harmless to read publicly; only bookmarkSession (Admin SDK)
     // writes it.
