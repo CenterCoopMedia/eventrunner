@@ -76,6 +76,9 @@ function makeSpeakersDb(seed = {}) {
     const docs = colMap(op.col);
     if (op.type === 'delete') {
       docs.delete(op.id);
+    } else if (op.type === 'create') {
+      if (docs.has(op.id)) throw new Error(`ALREADY_EXISTS: document ${op.col}/${op.id} already exists`);
+      docs.set(op.id, clone(op.data));
     } else if (op.merge) {
       docs.set(op.id, mergeDeep(docs.get(op.id) || {}, op.data));
     } else {
@@ -164,6 +167,9 @@ function makeSpeakersDb(seed = {}) {
           if (target?._kind === 'query') return target.get();
           reads.push(target.path);
           return snapshot(target._col, target.id);
+        },
+        create(ref, data) {
+          ops.push({ type: 'create', col: ref._col, id: ref.id, data: clone(data) });
         },
         set(ref, data, opts = {}) {
           ops.push({ type: 'set', col: ref._col, id: ref.id, data: clone(data), merge: opts.merge === true });

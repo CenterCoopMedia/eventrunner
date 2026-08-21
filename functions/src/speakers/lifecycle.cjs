@@ -43,6 +43,7 @@ const { logAdminAction, isValidDocId } = require('../cms/store.cjs');
 
 const SPEAKERS = 'speakers';
 const SPEAKERS_PUBLIC = 'speakers_public';
+const SPEAKER_SLUGS = 'speaker_slugs';
 const SESSIONS = 'cmsSchedule';
 const SESSION_DRAFTS = 'cmsSchedule_drafts';
 const USERS = 'users';
@@ -55,6 +56,27 @@ const USERS = 'users';
 const MAX_TRANSACTION_WRITES = 500;
 const FIXED_WRITES = 3;
 const MAX_UNLINKED_SESSIONS = MAX_TRANSACTION_WRITES - FIXED_WRITES;
+
+/**
+ * Read the account a speaker is linked to, INSIDE `tx`, so a caller can
+ * clear both halves of the users.speakerId ↔ speakers.uid pair in the same
+ * commit (§4.3 seam #3). Returns null when the speaker has no link, or
+ * when the account document is already gone — the link is broken in that
+ * direction either way, and a missing account must not fail a removal.
+ *
+ * Separate from the write on purpose: Firestore requires every read before
+ * every write, so the read has to be visible at the call site.
+ *
+ * @param {{ tx: object, db: object, speaker: object }} args
+ * @returns {Promise<{ uid: string, ref: object }|null>}
+ */
+async function readLinkedUser({ tx, db, speaker }) {
+  const uid = typeof speaker?.uid === 'string' && speaker.uid ? speaker.uid : null;
+  if (!uid) return null;
+  const ref = db.collection(USERS).doc(uid);
+  const snap = await tx.get(ref);
+  return snap.exists ? { uid, ref } : null;
+}
 
 /** Sessions in one collection referencing `speakerId`, read in `tx`. */
 async function readReferencingSessions({ tx, db, collection, speakerId }) {
@@ -106,13 +128,33 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
 
       if (soft) {
         // The soft delete deliberately does NOT touch sessions: the whole
-        // point of the fallback is that it fits in one write. The
+        // point of the fallback is that it fits in a handful of writes. The
         // projection trigger sees `removed` and deletes speakers_public,
         // so the speaker disappears from every public surface; the
         // sessions keep a reference to a record that still exists, so
         // seam #1 stays satisfiable.
-        tx.set(speakerRef, { status: 'removed', updatedAt: at, updatedBy: actor.email }, { merge: true });
-        return { mode: 'soft', unlinkedSessions: [], unlinkedDrafts: [], clearedUid: null };
+        //
+        // It DOES clear the account link. `users.speakerId != null` is what
+        // firestore.rules reads as "this account is a speaker" — it grants
+        // attendee-level directory access on its own (§3.4) — so a removal
+        // that left it set would hide the speaker from the public site
+        // while leaving them holding speaker identity and access. Both
+        // halves go in this commit, which is exactly the seam-#3 rule: the
+        // pair is written by the invite/acceptance transaction and by the
+        // delete paths, never independently.
+        const linked = await readLinkedUser({ tx, db, speaker });
+        tx.set(
+          speakerRef,
+          { status: 'removed', uid: null, updatedAt: at, updatedBy: actor.email },
+          { merge: true },
+        );
+        if (linked) tx.set(linked.ref, { speakerId: null, updatedAt: at }, { merge: true });
+        return {
+          mode: 'soft',
+          unlinkedSessions: [],
+          unlinkedDrafts: [],
+          clearedUid: linked?.uid ?? null,
+        };
       }
 
       const linkedUid = typeof speaker.uid === 'string' && speaker.uid ? speaker.uid : null;
@@ -156,6 +198,12 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
       }
       tx.delete(publicRef);
       tx.delete(speakerRef);
+      // Release the slug reservation (see profile.cjs findSlugOwner): a
+      // hard delete frees the name for reuse. A SOFT delete deliberately
+      // does not — the record still exists and still owns its slug.
+      if (typeof speaker.slug === 'string' && speaker.slug) {
+        tx.delete(db.collection(SPEAKER_SLUGS).doc(speaker.slug));
+      }
 
       return {
         mode: 'hard',
@@ -222,9 +270,57 @@ async function writeSpeakerLink({ db, speakerId, uid, now }) {
       const refs = [...new Set([previousUid, targetUid].filter(Boolean))]
         .map((id) => [id, db.collection(USERS).doc(id)]);
       const snaps = await Promise.all(refs.map(([, ref]) => tx.get(ref)));
+      const snapFor = (id) => snaps[refs.findIndex(([candidate]) => candidate === id)] ?? null;
+
+      if (targetUid) {
+        const targetSnap = snapFor(targetUid);
+        // A link to an account document that does not exist yet must FAIL,
+        // not half-apply. The account is seeded asynchronously by the auth
+        // onCreate trigger, so during a sign-in race there is genuinely
+        // nothing to write the other half onto — and writing speakers.uid
+        // anyway would leave a permanent one-sided link that no later write
+        // repairs, because every writer of this pair assumes both halves
+        // move together. Refusing leaves the caller free to retry once the
+        // account exists.
+        if (!targetSnap?.exists) {
+          const err = new Error('LINK_TARGET_MISSING');
+          err.conflict = {
+            status: 409,
+            code: 'link-target-missing',
+            message:
+              `No account document for uid "${targetUid}" yet. Nothing was changed; ` +
+              'retry once the account has been created.',
+          };
+          throw err;
+        }
+        // The account is already claimed by a DIFFERENT speaker record.
+        // Refuse rather than steal the link: `users.speakerId` is
+        // single-valued, so taking it would silently orphan the other
+        // record (its `uid` would still name this account) or, if we
+        // cleared that too, silently revoke a third party's speaker access
+        // as a side effect of somebody accepting an invitation. Either is a
+        // data problem an operator has to resolve deliberately, and
+        // unlinkSpeakerFromUser is how they do it — so refusing loses no
+        // capability and keeps the evidence.
+        const occupant = targetSnap.data()?.speakerId;
+        if (typeof occupant === 'string' && occupant && occupant !== speakerId) {
+          const err = new Error('LINK_OCCUPIED');
+          err.conflict = {
+            status: 409,
+            code: 'link-occupied',
+            message:
+              `Account "${targetUid}" is already linked to speaker "${occupant}". ` +
+              'Nothing was changed; unlink that speaker first.',
+          };
+          throw err;
+        }
+      }
 
       snaps.forEach((snap, i) => {
         const [id, ref] = refs[i];
+        // A previous account that no longer exists needs no clearing — the
+        // link is already broken in that direction. Only the TARGET must
+        // exist, and that was checked above.
         if (!snap.exists) return;
         tx.set(ref, { speakerId: id === targetUid ? speakerId : null, updatedAt: at }, { merge: true });
       });
@@ -318,6 +414,7 @@ module.exports = {
   applyDeleteSpeaker,
   linkSpeakerToUser,
   unlinkSpeakerFromUser,
+  readLinkedUser,
   createDeleteSpeakerHandler,
   get handlers() {
     return buildHandlers();
@@ -325,6 +422,7 @@ module.exports = {
   internals: {
     SPEAKERS,
     SPEAKERS_PUBLIC,
+    SPEAKER_SLUGS,
     SESSIONS,
     SESSION_DRAFTS,
     USERS,

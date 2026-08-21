@@ -283,6 +283,11 @@ service cloud.firestore {
     match /system_errors/{docId} { allow read, write: if false; }
     match /client_error_rate_limits/{docId} { allow read, write: if false; }
     match /email_templates/{docId} { allow read, write: if false; }
+    // Slug reservations (`speaker_slugs/{slug}` → `{ speakerId }`), the
+    // deterministic-id lock that makes speaker slug uniqueness atomic
+    // (functions/src/speakers/profile.cjs). Pure bookkeeping: nothing
+    // outside those handlers reads or writes it.
+    match /speaker_slugs/{slug} { allow read, write: if false; }
 
     // Everything not matched above stays deny-all.
     match /{document=**} {

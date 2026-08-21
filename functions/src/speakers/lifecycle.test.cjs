@@ -116,8 +116,42 @@ test('the soft delete hides the speaker without touching sessions', async () => 
   // The projection is the trigger's job, not the delete's — the record
   // changing status is what makes it fire.
   assert.deepEqual(db.read('cmsSchedule', 'sess-1').speakerIds, ['s1', 's2']);
-  assert.equal(db.read('users', 'u1').speakerId, 's1');
-  assert.deepEqual(db.writes, [{ type: 'set', path: 'speakers/s1' }]);
+  // The slug reservation survives: the record still exists and still owns
+  // its slug, so the name must not become claimable by somebody else.
+  assert.equal(
+    db.writes.some((w) => w.path.startsWith('speaker_slugs/')),
+    false,
+  );
+});
+
+test('the soft delete still severs the account link, both halves', async () => {
+  // users.speakerId != null is what firestore.rules reads as "this account
+  // is a speaker" (§3.4) — a removal that left it set would hide the
+  // speaker from the public site while leaving them speaker access.
+  const db = makeSpeakersDb(baseWorld());
+  const result = await applyDeleteSpeaker({ db, speakerId: 's1', soft: true, actor: ACTOR, now: NOW });
+
+  assert.equal(result.clearedUid, 'u1');
+  assert.equal(db.read('users', 'u1').speakerId, null);
+  assert.equal(db.read('speakers', 's1').uid, null);
+});
+
+test('a soft delete of an unlinked speaker touches only the speaker', async () => {
+  const db = makeSpeakersDb({
+    'speakers/s9': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'approved', uid: null },
+  });
+  const result = await applyDeleteSpeaker({ db, speakerId: 's9', soft: true, actor: ACTOR, now: NOW });
+  assert.equal(result.clearedUid, null);
+  assert.deepEqual(db.writes, [{ type: 'set', path: 'speakers/s9' }]);
+});
+
+test('a hard delete releases the slug reservation', async () => {
+  const db = makeSpeakersDb({
+    ...baseWorld(),
+    'speaker_slugs/rae-okonkwo': { speakerId: 's1' },
+  });
+  await applyDeleteSpeaker({ db, speakerId: 's1', actor: ACTOR, now: NOW });
+  assert.equal(db.read('speaker_slugs', 'rae-okonkwo'), undefined);
 });
 
 test('deleting a speaker that does not exist is a 404', async () => {
@@ -175,6 +209,62 @@ test('linking a speaker that does not exist is a 404 and writes nothing', async 
   assert.equal(result.ok, false);
   assert.equal(result.status, 404);
   assert.deepEqual(db.writes, []);
+});
+
+test('linking to an account already claimed by another speaker is REFUSED', async () => {
+  // users.speakerId is single-valued. Stealing it would either orphan the
+  // other record (its uid still names this account) or silently revoke a
+  // third party's speaker access as a side effect of somebody accepting an
+  // invitation. Refusing keeps the evidence; unlinkSpeakerFromUser is how
+  // an operator resolves it deliberately.
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', uid: null },
+    'speakers/s2': { firstName: 'C', lastName: 'D', uid: 'u1' },
+    'users/u1': { uid: 'u1', speakerId: 's2' },
+  });
+  const result = await linkSpeakerToUser({ db, speakerId: 's1', uid: 'u1', now: NOW });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 409);
+  assert.equal(result.code, 'link-occupied');
+  assert.match(result.message, /already linked to speaker "s2"/);
+  assert.deepEqual(db.writes, [], 'a refused link must change nothing');
+  assert.equal(db.read('speakers', 's2').uid, 'u1', 'the other speaker keeps its link');
+  assert.equal(db.read('users', 'u1').speakerId, 's2');
+});
+
+test('re-linking a speaker to the account it already holds is idempotent', async () => {
+  // Retry safety: the acceptance transaction may be delivered twice.
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', uid: 'u1' },
+    'users/u1': { uid: 'u1', speakerId: 's1' },
+  });
+  assert.deepEqual(await linkSpeakerToUser({ db, speakerId: 's1', uid: 'u1', now: NOW }), { ok: true });
+  assert.equal(db.read('speakers', 's1').uid, 'u1');
+  assert.equal(db.read('users', 'u1').speakerId, 's1');
+});
+
+test('linking to an account document that does not exist yet FAILS, writing nothing', async () => {
+  // The account is seeded asynchronously by the auth onCreate trigger.
+  // Writing speakers.uid anyway would leave a permanent one-sided link
+  // that no later write repairs.
+  const db = makeSpeakersDb({ 'speakers/s1': { firstName: 'A', lastName: 'B', uid: null } });
+  const result = await linkSpeakerToUser({ db, speakerId: 's1', uid: 'not-yet', now: NOW });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 409);
+  assert.equal(result.code, 'link-target-missing');
+  assert.match(result.message, /retry once the account has been created/);
+  assert.deepEqual(db.writes, []);
+  assert.equal(db.read('speakers', 's1').uid, null);
+});
+
+test('unlink tolerates a previous account that is already gone', async () => {
+  // Only the TARGET of a link must exist; a vanished previous account
+  // means the link is already broken in that direction.
+  const db = makeSpeakersDb({ 'speakers/s1': { firstName: 'A', lastName: 'B', uid: 'ghost' } });
+  assert.deepEqual(await unlinkSpeakerFromUser({ db, speakerId: 's1', now: NOW }), { ok: true });
+  assert.equal(db.read('speakers', 's1').uid, null);
 });
 
 // --- handler ------------------------------------------------------------

@@ -29,8 +29,22 @@ const { sendError, notFound, methodNotAllowed, internal } = require('../core/err
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
 const { validateSpeaker } = require('shared/speaker');
 const { generateSpeakerSlug } = require('shared/slug');
+const { readLinkedUser } = require('./lifecycle.cjs');
 
 const SPEAKERS = 'speakers';
+/**
+ * Slug reservations: `speaker_slugs/{slug}` holds `{ speakerId }`.
+ *
+ * A `where('slug','==',x)` query inside a transaction is NOT a lock — a
+ * query that matches nothing puts nothing in the read set, so two
+ * concurrent creates of different documents can both see the slug free and
+ * both commit it. A document at a DETERMINISTIC id is the lock: Firestore
+ * tracks the non-existence of a document that was read, so the second
+ * transaction aborts, and `create()` refuses outright on the retry.
+ *
+ * Server-only (firestore.rules); nothing reads it but these handlers.
+ */
+const SPEAKER_SLUGS = 'speaker_slugs';
 
 /** Defaults a brand-new canonical record carries for every optional field. */
 function newSpeakerDefaults() {
@@ -62,14 +76,28 @@ async function gateAdminPost({ auth, getConfig }, req, res) {
 /**
  * Another speaker already holding `slug`, or null.
  *
- * Slugs address the public speaker page, so two speakers cannot share
- * one. The read runs INSIDE the caller's transaction, so two concurrent
- * saves cannot both see the slug free.
+ * Slugs address the public speaker page, so two speakers cannot share one.
+ * TWO checks, both inside the caller's transaction, because they catch
+ * different things:
+ *
+ *   1. The `speaker_slugs/{slug}` reservation document. This is the actual
+ *      lock — reading a deterministic id puts its (non-)existence in the
+ *      transaction's read set, so concurrent creates serialize.
+ *   2. A `where('slug','==',…)` query over `speakers`. This is NOT a lock
+ *      (an empty query result locks nothing), but it still catches a
+ *      record written outside these handlers — a seed script, a console
+ *      edit, anything predating reservations — which the reservation
+ *      collection knows nothing about.
  *
  * @param {{ tx: object, db: object, slug: string, exceptId?: string }} args
  * @returns {Promise<string|null>} the conflicting doc id
  */
 async function findSlugOwner({ tx, db, slug, exceptId = null }) {
+  const reservation = await tx.get(db.collection(SPEAKER_SLUGS).doc(slug));
+  if (reservation.exists) {
+    const owner = reservation.data()?.speakerId;
+    if (typeof owner === 'string' && owner && owner !== exceptId) return owner;
+  }
   const snap = await tx.get(db.collection(SPEAKERS).where('slug', '==', slug).limit(2));
   for (const doc of snap.docs) {
     if (doc.id !== exceptId) return doc.id;
@@ -136,6 +164,9 @@ async function applyCreateSpeaker({ db, speakerId, payload, actor, now = Date.no
         err.conflict = { status: 409, code: 'already-exists', message: `slug: "${doc.slug}" is already used by speaker "${owner}"` };
         throw err;
       }
+      // create(), not set(): even if two transactions somehow both read the
+      // reservation as free, only one create can land.
+      tx.create(db.collection(SPEAKER_SLUGS).doc(doc.slug), { speakerId: docId, updatedAt: at });
       tx.set(ref, doc);
     });
   } catch (err) {
@@ -197,7 +228,8 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
         );
         if (derived) patch.slug = derived;
       }
-      if (patch.slug !== undefined && patch.slug !== stored.slug) {
+      const slugMoved = patch.slug !== undefined && patch.slug !== stored.slug;
+      if (slugMoved) {
         const owner = await findSlugOwner({ tx, db, slug: patch.slug, exceptId: speakerId });
         if (owner) {
           const err = new Error('SLUG_TAKEN');
@@ -205,13 +237,34 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
           throw err;
         }
       }
-      // approvedAt is server-owned: stamped the first time a speaker
-      // enters `approved`, never rewritten by a later save that leaves the
-      // status where it already was.
-      if (patch.status === 'approved' && stored.status !== 'approved') {
+
+      // Entering `removed` severs the account link. `users.speakerId !=
+      // null` is what firestore.rules reads as "this account is a speaker"
+      // — it grants attendee-level access on its own (§3.4) — so a removal
+      // that left it set would hide the speaker from the public site while
+      // leaving them holding speaker identity and access. Both halves move
+      // in this commit, which is the seam-#3 rule: the pair is written by
+      // the invite/acceptance transaction and by the delete paths (a
+      // soft delete is one), never independently. Read before write.
+      const removing = patch.status === 'removed' && stored.status !== 'removed';
+      const linked = removing ? await readLinkedUser({ tx, db, speaker: stored }) : null;
+      if (removing) patch.uid = null;
+
+      // approvedAt is server-owned and records the FIRST approval: stamped
+      // only when there is none stored. A speaker who is removed and later
+      // re-approved keeps their original date — the field is history, and
+      // a later save is not a new fact about when they were first approved.
+      if (patch.status === 'approved' && stored.approvedAt == null) {
         patch.approvedAt = at;
       }
 
+      if (slugMoved) {
+        tx.set(db.collection(SPEAKER_SLUGS).doc(patch.slug), { speakerId, updatedAt: at });
+        if (typeof stored.slug === 'string' && stored.slug) {
+          tx.delete(db.collection(SPEAKER_SLUGS).doc(stored.slug));
+        }
+      }
+      if (linked) tx.set(linked.ref, { speakerId: null, updatedAt: at }, { merge: true });
       tx.set(ref, { ...patch, updatedAt: at, updatedBy: actor.email }, { merge: true });
     });
   } catch (err) {
@@ -319,5 +372,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { SPEAKERS, newSpeakerDefaults, findSlugOwner, gateAdminPost },
+  internals: { SPEAKERS, SPEAKER_SLUGS, newSpeakerDefaults, findSlugOwner, gateAdminPost },
 };

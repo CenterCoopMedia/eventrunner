@@ -292,6 +292,7 @@ describe("server-only collections stay deny-all", () => {
     "system_errors",
     "client_error_rate_limits",
     "email_templates",
+    "speaker_slugs",
   ]) {
     it(`denies all access to ${c}, admin included`, async () => {
       await assertFails(getDoc(doc(anon(), `${c}/d1`)));

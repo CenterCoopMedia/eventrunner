@@ -165,6 +165,113 @@ test('approvedAt is stamped on entering approved and not rewritten afterwards', 
   assert.deepEqual(db.read('speakers', 's1').approvedAt, AT);
 });
 
+test('re-approval after a removal keeps the ORIGINAL approvedAt', async () => {
+  // approvedAt is history: when this speaker was first approved. A later
+  // save is not a new fact about that.
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'draft', approvedAt: null, uid: null },
+  });
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: NOW });
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'removed' }, actor: ACTOR, now: NOW });
+
+  const later = () => Date.parse('2026-09-01T00:00:00Z');
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: later });
+  assert.deepEqual(db.read('speakers', 's1').approvedAt, AT);
+});
+
+test('setting status to removed severs both halves of the account link', async () => {
+  // A removed speaker who kept users.speakerId would keep the access that
+  // field grants in firestore.rules (§3.4) while vanishing from the site.
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'approved', uid: 'u1' },
+    'users/u1': { uid: 'u1', speakerId: 's1', registrationStatus: 'pending' },
+  });
+  const result = await applyUpdateSpeaker({
+    db, speakerId: 's1', payload: { status: 'removed' }, actor: ACTOR, now: NOW,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(db.read('users', 'u1').speakerId, null);
+  assert.equal(db.read('speakers', 's1').uid, null);
+  assert.equal(db.read('speakers', 's1').status, 'removed');
+});
+
+test('removing a speaker whose account is already gone still succeeds', async () => {
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'approved', uid: 'ghost' },
+  });
+  const result = await applyUpdateSpeaker({
+    db, speakerId: 's1', payload: { status: 'removed' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 's1').uid, null);
+});
+
+test('an unrelated edit to an already-removed speaker does not re-run the unlink', async () => {
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'removed', uid: null },
+  });
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'removed', bio: 'x' }, actor: ACTOR, now: NOW });
+  assert.deepEqual(
+    db.writes.map((w) => w.path),
+    ['speakers/s1'],
+  );
+});
+
+test('create reserves the slug, and the reservation blocks a second create', async () => {
+  // The reservation document is the lock a `where('slug','==',…)` query
+  // cannot be: an empty query result puts nothing in the read set.
+  const db = makeSpeakersDb();
+  await applyCreateSpeaker({
+    db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW,
+  });
+  assert.deepEqual(db.read('speaker_slugs', 'rae-okonkwo'), { speakerId: 'rae-okonkwo', updatedAt: AT });
+
+  const clash = await applyCreateSpeaker({
+    db, speakerId: 'other', payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(clash.ok, false);
+  assert.equal(clash.status, 409);
+  assert.match(clash.message, /^slug: "rae-okonkwo" is already used by speaker "rae-okonkwo"$/);
+  assert.equal(db.read('speakers', 'other'), undefined);
+});
+
+test('a reservation with no matching speaker record still blocks the slug', async () => {
+  // The record-level query would miss this; the reservation is what makes
+  // the check atomic, so it has to be authoritative on its own.
+  const db = makeSpeakersDb({ 'speaker_slugs/taken-name': { speakerId: 'someone' } });
+  const result = await applyCreateSpeaker({
+    db, speakerId: 'new-one', payload: { firstName: 'Taken', lastName: 'Name' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 409);
+  assert.match(result.message, /already used by speaker "someone"/);
+});
+
+test('renaming moves the reservation and releases the old slug', async () => {
+  const db = makeSpeakersDb();
+  await applyCreateSpeaker({ db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW });
+  await applyUpdateSpeaker({
+    db, speakerId: 'rae-okonkwo', payload: { lastName: 'Adeyemi' }, actor: ACTOR, now: NOW,
+  });
+
+  assert.equal(db.read('speaker_slugs', 'rae-okonkwo'), undefined);
+  assert.deepEqual(db.read('speaker_slugs', 'rae-adeyemi'), { speakerId: 'rae-okonkwo', updatedAt: AT });
+  // The freed slug is claimable again.
+  const reuse = await applyCreateSpeaker({
+    db, speakerId: 'second', payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(reuse.ok, true);
+});
+
+test('a save that does not move the slug leaves the reservation alone', async () => {
+  const db = makeSpeakersDb();
+  await applyCreateSpeaker({ db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW });
+  const before = db.writes.length;
+  await applyUpdateSpeaker({ db, speakerId: 'rae-okonkwo', payload: { bio: 'x' }, actor: ACTOR, now: NOW });
+  assert.deepEqual(db.writes.slice(before).map((w) => w.path), ['speakers/rae-okonkwo']);
+});
+
 test('updating a speaker that does not exist is a 404', async () => {
   const db = makeSpeakersDb();
   const result = await applyUpdateSpeaker({ db, speakerId: 'nope', payload: { bio: 'x' }, actor: ACTOR, now: NOW });

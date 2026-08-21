@@ -78,7 +78,11 @@ async function seedDemo({ db, store, args, now = Date.now }) {
 
   console.log(`\nseed-demo-event: ${dryRun ? 'DRY RUN — ' : ''}seeding the synthetic demo event\n`);
 
-  const configResults = await writeConfigDocs({ db, docs: demo.config, force, dryRun, now });
+  // writeConfigDocs answers { results, effective } — the per-doc decisions
+  // AND what the project now holds. Destructuring matters: iterating the
+  // wrapper object threw "configResults is not iterable" and took the whole
+  // seed run down before it reached a single collection.
+  const { results: configResults } = await writeConfigDocs({ db, docs: demo.config, force, dryRun, now });
   for (const r of configResults) console.log(`  config/${r.docId.padEnd(9)} ${r.action} (${r.reason})`);
 
   const collections = [
@@ -98,6 +102,12 @@ async function seedDemo({ db, store, args, now = Date.now }) {
   // Speakers are a plain collection, not part of the two-revision publish
   // model (§4.3: the speaker profile is its own single source of truth),
   // so they are written directly rather than through draft + publish.
+  //
+  // The matching `speaker_slugs/{slug}` reservation is written too. That
+  // collection is the lock createSpeaker takes to keep slugs unique
+  // (functions/src/speakers/profile.cjs); a seeded speaker with no
+  // reservation would leave its slug apparently free, so the demo would
+  // happily accept a second speaker claiming the same public URL.
   let speakerWrites = 0;
   for (const speaker of demo.speakers) {
     const { id, ...fields } = speaker;
@@ -105,7 +115,15 @@ async function seedDemo({ db, store, args, now = Date.now }) {
     const snap = await ref.get();
     if (snap.exists && snap.data()?.seeded !== true) continue;
     speakerWrites += 1;
-    if (!dryRun) await ref.set({ ...fields, updatedAt: new Date(now()) });
+    if (!dryRun) {
+      await ref.set({ ...fields, updatedAt: new Date(now()) });
+      if (fields.slug) {
+        await db.collection('speaker_slugs').doc(fields.slug).set({
+          speakerId: id,
+          updatedAt: new Date(now()),
+        });
+      }
+    }
   }
   console.log(`  speakers          ${speakerWrites} written`);
 
