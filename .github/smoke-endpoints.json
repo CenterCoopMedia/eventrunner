@@ -21,6 +21,8 @@
     "updateBadges",
     "emailDeliveryWebhook",
     "bookmarkSession",
-    "logClientError"
+    "logClientError",
+    "listSystemErrors",
+    "resolveSystemErrors"
   ]
 }

@@ -17,6 +17,7 @@ const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
 const systemErrors = require('./src/telemetry/systemErrors.cjs');
+const systemErrorsAdmin = require('./src/telemetry/systemErrorsAdmin.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -32,4 +33,5 @@ module.exports = {
   ...usersProjection.handlers,
   ...clientErrors.handlers,
   ...systemErrors.handlers,
+  ...systemErrorsAdmin.handlers,
 };
