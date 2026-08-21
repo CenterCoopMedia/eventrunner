@@ -231,6 +231,47 @@ test('takeClientErrorRateLimitSlot resets after the window elapses', async () =>
   assert.equal((await takeClientErrorRateLimitSlot({ db, ipHash: 'h', now: () => nowMs })).limited, false);
 });
 
+// --- client identity (Codex review finding, P1) -----------------------------------
+//
+// Cloud Functions v2 runs behind Google's front end, which APPENDS the real
+// connecting client's IP to X-Forwarded-For rather than trusting/stripping
+// whatever arrived with the request — so the platform-vetted entry is the
+// LAST one, never the first (see extractClientIp's doc comment).
+
+test('extractClientIp uses the LAST X-Forwarded-For entry, not the first', () => {
+  const req = { headers: {}, get(name) { return this.headers[name]; } };
+  req.headers['x-forwarded-for'] = '9.9.9.9, 203.0.113.7';
+  assert.equal(internals.extractClientIp(req), '203.0.113.7');
+});
+
+test('a caller cannot mint a fresh rate-limit bucket by spoofing the FIRST XFF entry', async () => {
+  const db = fakeDb();
+  const handler = createLogClientErrorHandler({ db, now: () => 0 });
+  const realClientIp = '203.0.113.7'; // the entry Cloud Run's front end appends
+
+  for (let i = 0; i < internals.RATE_LIMIT_MAX; i += 1) {
+    const spoofedFirstEntry = `10.0.0.${i}`; // caller-controlled, changes every request
+    await handler(
+      fakeReq({ body: { message: `err ${i}` }, headers: { 'x-forwarded-for': `${spoofedFirstEntry}, ${realClientIp}` } }),
+      fakeRes(),
+    );
+  }
+
+  const limitedRes = fakeRes();
+  await handler(
+    fakeReq({ body: { message: 'one too many' }, headers: { 'x-forwarded-for': `10.0.0.999, ${realClientIp}` } }),
+    limitedRes,
+  );
+  // The last (platform-appended) entry is unchanged across every request,
+  // so the shared bucket is exhausted despite the spoofed first entry.
+  assert.equal(limitedRes.statusCode, 429);
+});
+
+test('falls back to req.ip when there is no X-Forwarded-For header at all', () => {
+  assert.equal(internals.extractClientIp({ headers: {}, ip: '198.51.100.1' }), '198.51.100.1');
+  assert.equal(internals.extractClientIp({ headers: {} }), 'unknown');
+});
+
 // --- persist-fail fallback (delegated to systemErrors.cjs) -----------------------
 
 test('a persist failure still responds successfully (202) and notifies the operator', async () => {
