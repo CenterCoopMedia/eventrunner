@@ -12,12 +12,15 @@ vi.mock('../../lib/contentSource.js', () => ({ subscribeContentCollection: () =>
 vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 
 // The admin CMS reads all four revisions (cmsPages/_drafts, cmsContent/_drafts);
-// each test seeds what the listeners report per collection.
+// each test seeds what the listeners report per collection. Collections
+// listed in `silentCollections` never report — the window in which one
+// revision is known and the other is not (e.g. live arrives before drafts).
 let sources = {};
 let listenerError = null;
+let silentCollections = [];
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext, onError) => {
-    onNext(sources[name] ?? []);
+    if (!silentCollections.includes(name)) onNext(sources[name] ?? []);
     if (listenerError) onError?.(listenerError);
     return () => {};
   },
@@ -80,6 +83,24 @@ const BODY_BLOCK_DRAFT = {
   updatedAt: 'ignored',
 };
 
+// A block type NOT in the 'intro' section's allowedBlocks, loaded as an
+// existing doc — the block-type picker's "widen to show a mismatched
+// existing type" path, and the fixture for switching types (label/url/
+// external are stale once switched to e.g. 'stat').
+const CTA_BLOCK_DRAFT = {
+  id: 'intro__cta1',
+  section: 'intro',
+  field: 'cta1',
+  blockType: 'cta',
+  label: 'Apply now',
+  url: 'https://example.org/apply',
+  external: false,
+  order: 2,
+  visible: true,
+  status: 'clean',
+  revision: 1,
+};
+
 function okResponse(body = {}) {
   return { ok: true, status: 200, json: async () => body };
 }
@@ -113,6 +134,7 @@ function urlOf(callIndex) {
 beforeEach(() => {
   sources = { cmsPages: [], cmsPages_drafts: [], cmsContent: [], cmsContent_drafts: [] };
   listenerError = null;
+  silentCollections = [];
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -153,6 +175,38 @@ describe('content browsing', () => {
     await renderAt('/admin/content/scholarships/nope');
     expect(screen.getByText('No such section')).toBeInTheDocument();
   });
+
+  it('does not adopt a live-only doc while the drafts listener is still silent', async () => {
+    // If the live listener reports before cmsContent_drafts, `existingRow`
+    // is already truthy (live-only) while the real dirty draft is still in
+    // flight. Adopting from the stale live content here — and never
+    // revisiting it once the draft lands, since adoption is a one-shot —
+    // would make a later "Save draft" overwrite the operator's unpublished
+    // changes with it.
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent = [{ ...BODY_BLOCK_DRAFT, value: '<p>STALE live content</p>', status: undefined }];
+    silentCollections = ['cmsContent_drafts'];
+
+    await renderAt('/admin/content/scholarships/intro/body');
+
+    expect(screen.getByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/STALE live content/)).toBeNull();
+  });
+
+  it('keeps a field literally named "new" editable — the create route uses a different segment', async () => {
+    // A cmsContent field id may legitimately be 'new' (SECTION_FIELD_RE
+    // only requires an alnum first character); the creation route must not
+    // collide with it or this URL would always render a blank create form
+    // instead of this real field's editor.
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [{ ...BODY_BLOCK_DRAFT, id: 'intro__new', field: 'new' }];
+
+    await renderAt('/admin/content/scholarships/intro/new');
+
+    expect(screen.getByLabelText(/^value/)).toHaveValue('<p>Scholarships open in spring.</p>');
+    expect(screen.getByLabelText('Field id')).toHaveAttribute('readonly');
+    expect(screen.getByRole('button', { name: 'Delete block' })).toBeInTheDocument();
+  });
 });
 
 describe('creating and editing a block', () => {
@@ -160,7 +214,7 @@ describe('creating and editing a block', () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__body', status: 'dirty' }));
 
-    await renderAt('/admin/content/scholarships/intro/new');
+    await renderAt('/admin/content/scholarships/intro/_new');
 
     fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'body' } });
     fireEvent.change(screen.getByLabelText(/^value/), {
@@ -183,7 +237,7 @@ describe('creating and editing a block', () => {
 
   it('offers only the section’s allowed block types, driven by the registry', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
-    await renderAt('/admin/content/scholarships/intro/new');
+    await renderAt('/admin/content/scholarships/intro/_new');
 
     const picker = screen.getByLabelText('Block type');
     expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual([
@@ -196,7 +250,11 @@ describe('creating and editing a block', () => {
     fireEvent.change(picker, { target: { value: 'stat' } });
     expect(screen.getByLabelText(/^label/)).toBeInTheDocument();
     expect(screen.getByLabelText(/^value/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^order \(optional\)/)).toBeInTheDocument();
+    // stat declares its own registry 'order' field, but the editor renders
+    // exactly one shared Order control (the Block panel's) rather than a
+    // second, divergent one from the per-type value fields.
+    expect(screen.getAllByLabelText('Order')).toHaveLength(1);
+    expect(screen.queryByLabelText(/^order \(optional\)/)).toBeNull();
   });
 
   it('loads an existing draft’s value and updates it via cmsUpdateContent', async () => {
@@ -247,6 +305,50 @@ describe('creating and editing a block', () => {
     expect((await screen.findAllByText(/picks it up live/i)).length).toBeGreaterThan(0);
   });
 
+  it('blocks the save when a required registry field is left blank', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    await renderAt('/admin/content/scholarships/intro/_new');
+
+    fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'stat1' } });
+    fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'stat' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('value: is required.');
+    expect(alert).toHaveTextContent('label: is required.');
+    expect(screen.getByLabelText(/^value/)).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText(/^label/)).toHaveAttribute('aria-invalid', 'true');
+    // The server never even sees an incomplete block — this is caught
+    // client-side, since the generic content endpoints validate only
+    // reserved keys, never block shape.
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('clears the old block type’s stale fields when switching types', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [CTA_BLOCK_DRAFT];
+    fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__cta1', status: 'dirty' }));
+
+    await renderAt('/admin/content/scholarships/intro/cta1');
+    fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'stat' } });
+    fireEvent.change(screen.getByLabelText(/^value/), { target: { value: '42' } });
+    fireEvent.change(screen.getByLabelText(/^label/), { target: { value: 'Scholarships awarded' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // cta's `url`/`external` are not part of stat's fields — cmsUpdateContent
+    // merges submitted fields onto the prior draft, so without an explicit
+    // clear they would otherwise survive under the new block type forever.
+    expect(bodyOf(0).fields).toEqual({
+      blockType: 'stat',
+      order: 2, // unaffected — the shared Order control, not a per-type field
+      value: '42',
+      label: 'Scholarships awarded',
+      url: '__cms_delete_field__',
+      external: '__cms_delete_field__',
+    });
+  });
+
   it('deletes a block through cmsDeleteContent', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
@@ -268,8 +370,12 @@ describe('server errors and publish skips', () => {
       errorResponse(400, 'bad-request', 'fields may not set reserved keys: revision, status.'),
     );
 
-    await renderAt('/admin/content/scholarships/intro/new');
+    await renderAt('/admin/content/scholarships/intro/_new');
     fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'body' } });
+    // Fill the required value field so this reaches the network call at
+    // all — an empty one is caught by client-side validation first, which
+    // has its own test.
+    fireEvent.change(screen.getByLabelText(/^value/), { target: { value: '<p>Hi</p>' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');

@@ -79,8 +79,16 @@ export default function AdminApp() {
           <Route path="content" element={<AdminContentPages />} />
           <Route path="content/:pageId" element={<AdminContentSections />} />
           <Route path="content/:pageId/:sectionId" element={<AdminContentSection />} />
+          {/* '_new', not 'new': a cmsContent field id may legitimately BE
+              'new' (SECTION_FIELD_RE only requires an alnum first
+              character), which would collide with a static 'new' segment —
+              the edit route for that real field would then always resolve
+              to this blank creation form instead, making the field
+              uneditable. A leading underscore can never be a valid field
+              id (the regex requires an alnum first character), so this
+              route can never collide with one. */}
           <Route
-            path="content/:pageId/:sectionId/new"
+            path="content/:pageId/:sectionId/_new"
             element={<AdminContentBlockEditor mode="create" />}
           />
           <Route

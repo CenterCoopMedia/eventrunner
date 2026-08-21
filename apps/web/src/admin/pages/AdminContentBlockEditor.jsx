@@ -24,7 +24,14 @@ import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
 import { BLOCK_TYPE_IDS, blockTypeFor, blockTypeLabel } from '../blockTypes.js';
-import { blankContent, toContentFields, toEditableContent } from '../contentDoc.js';
+import {
+  blankContent,
+  staleFieldDeletions,
+  toContentFields,
+  toEditableContent,
+  validateRequiredContent,
+  valueFieldsOf,
+} from '../contentDoc.js';
 import { summarizePublish } from '../publishResult.js';
 import {
   CheckboxField,
@@ -41,8 +48,8 @@ import {
 
 /** One control per registry field, chosen by the field's declared type. */
 function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
-  const type = blockTypeFor(blockTypeId);
-  if (!type) {
+  const fields = valueFieldsOf(blockTypeId);
+  if (!blockTypeFor(blockTypeId)) {
     return (
       <p className="text-sm text-brand-ink-muted">
         Choose a block type above to fill in its value.
@@ -51,7 +58,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      {type.fields.map((field) => {
+      {fields.map((field) => {
         const label = `${field.id}${field.required ? '' : ' (optional)'}`;
         const value = values[field.id];
         const error = errorFor(field.id);
@@ -150,9 +157,21 @@ export default function AdminContentBlockEditor({ mode }) {
   // create form) once; later listener updates must not clobber an
   // in-progress edit.
   const loadedKeyRef = useRef(null);
+  // The block type actually persisted server-side (from the loaded doc, or
+  // the last successful save) — the reference point for clearing a PRIOR
+  // type's stale fields when the operator switches types and saves again.
+  const savedBlockTypeRef = useRef(null);
 
   useEffect(() => {
     if (mode !== 'edit') return;
+    // Wait for BOTH cmsContent revision listeners, not just whichever
+    // arrives first: if the live listener reports before the drafts one,
+    // existingRow is already truthy (live-only) while the actual dirty
+    // draft is still in flight. Adopting from the live doc here would then
+    // never be revisited once the draft lands (the key guard below is a
+    // one-shot), so a later "Save draft" would overwrite the operator's
+    // real unpublished changes with the stale published content.
+    if (contentLoading) return;
     const key = `${sectionId}__${fieldParam}`;
     if (loadedKeyRef.current === key) return;
     if (!existingRow) return;
@@ -160,7 +179,8 @@ export default function AdminContentBlockEditor({ mode }) {
     const doc = existingRow.draft ?? existingRow.live;
     setFieldId(doc?.field ?? fieldParam ?? '');
     setContent(toEditableContent(doc, doc?.blockType));
-  }, [mode, sectionId, fieldParam, existingRow]);
+    savedBlockTypeRef.current = doc?.blockType ?? null;
+  }, [mode, sectionId, fieldParam, existingRow, contentLoading]);
 
   useEffect(() => {
     // A brand-new block starts with no type chosen; once the section's
@@ -194,7 +214,12 @@ export default function AdminContentBlockEditor({ mode }) {
   }, [error]);
   const errorFor = (name) => fieldErrors.get(name);
 
-  if (mode === 'edit' && (pagesLoading || contentLoading) && !existingRow) {
+  // Show the loading state until BOTH revisions have reported AND this
+  // doc's adoption effect has actually run — not just until `existingRow`
+  // is truthy, which the live listener alone can satisfy while the dirty
+  // draft is still in flight (see the adoption effect above).
+  const adopted = loadedKeyRef.current === `${sectionId}__${fieldParam}`;
+  if (mode === 'edit' && (pagesLoading || contentLoading) && !adopted) {
     return <LoadingState label="Loading block…" />;
   }
   if (!pagesLoading && (!page || !section)) {
@@ -240,12 +265,35 @@ export default function AdminContentBlockEditor({ mode }) {
   }
 
   async function save({ publish }) {
-    setBusy(publish ? 'publish' : 'draft');
     setError(null);
     setStatus('');
     setResumeQueueId(null);
+    // The generic content endpoints validate only reserved keys, never
+    // block shape (unlike cmsSavePage's BLOCK_TYPES-aware validator for
+    // cmsPages) — so a required registry field (an image's alt text, a
+    // cta's url) would otherwise save and publish empty. Check it here,
+    // before EITHER a draft-only save or a publish, and report it the same
+    // way a server rejection would (ServerErrorSummary + per-field errors).
+    const validationErrors = validateRequiredContent(content);
+    if (validationErrors.length > 0) {
+      setError({
+        message: 'Fill in the required fields for this block type before saving.',
+        fieldErrors: validationErrors,
+        clientValidation: true,
+      });
+      return;
+    }
+    setBusy(publish ? 'publish' : 'draft');
     const endpoint = isExisting ? 'cmsUpdateContent' : 'cmsCreateContent';
-    const fields = toContentFields(content);
+    // cmsUpdateContent merges submitted fields onto the prior draft/live
+    // doc's fields (functions/src/cms/content.cjs), so switching block
+    // types here would otherwise leave the OLD type's now-stale fields
+    // (an faq_item's `answer`, a cta's `url`, …) stranded on the doc
+    // forever — explicitly mark them for deletion instead.
+    const fields = {
+      ...toContentFields(content),
+      ...staleFieldDeletions(savedBlockTypeRef.current, content.blockType),
+    };
     try {
       const response = await call(endpoint, {
         section: sectionId,
@@ -261,6 +309,7 @@ export default function AdminContentBlockEditor({ mode }) {
       // draft that just landed.
       setSavedDocId(docId);
       loadedKeyRef.current = `${sectionId}__${currentFieldId}`;
+      savedBlockTypeRef.current = content.blockType;
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
         showToast('Draft saved.');
@@ -345,7 +394,11 @@ export default function AdminContentBlockEditor({ mode }) {
         </Link>
       </div>
 
-      <ServerErrorSummary error={error} errorRef={errorRef} />
+      <ServerErrorSummary
+        error={error}
+        errorRef={errorRef}
+        title={error?.clientValidation ? 'Fill in the required fields' : undefined}
+      />
       {status ? <SaveStatus message={status} /> : null}
 
       <Panel

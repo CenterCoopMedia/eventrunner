@@ -54,7 +54,13 @@ export default function AdminContentSection() {
   const blocks = contentRows.filter((row) => row.current?.section === sectionId);
   const allowed = section?.allowedBlocks ?? [];
   const maxBlocks = Number.isFinite(section?.maxBlocks) ? section.maxBlocks : Infinity;
-  const atMax = blocks.length >= maxBlocks;
+  // While either cmsContent revision is still loading, `blocks` can be an
+  // undercount (e.g. the live listener reported an empty result but the
+  // drafts listener, which might hold this section's only blocks, has not
+  // yet) — treating that as "under the cap" would let an operator start a
+  // create past maxBlocks on a slow connection. Block the action instead of
+  // guessing until both listeners have actually reported.
+  const atMax = contentLoading || blocks.length >= maxBlocks;
 
   if ((pagesLoading || contentLoading) && !section) {
     return <LoadingState label="Loading section…" />;
@@ -109,12 +115,19 @@ export default function AdminContentSection() {
         type="button"
         className={primaryButtonClass}
         disabled
-        title={`This section already has its maximum of ${maxBlocks} blocks.`}
+        title={
+          contentLoading
+            ? 'Loading this section’s blocks…'
+            : `This section already has its maximum of ${maxBlocks} blocks.`
+        }
       >
         Add block
       </button>
     ) : (
-      <Link to="new" className={primaryButtonClass}>
+      // '_new', not 'new' — see AdminApp.jsx's route comment: a field id
+      // may legitimately be 'new', so the creation route uses a segment no
+      // valid field id can ever match instead.
+      <Link to="_new" className={primaryButtonClass}>
         Add block
       </Link>
     );
