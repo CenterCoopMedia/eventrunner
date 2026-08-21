@@ -28,6 +28,14 @@ function fakeDb() {
       store.set(key(c, id), data);
     },
     async delete() { store.delete(key(c, id)); },
+    async update(patch) {
+      if (!store.has(key(c, id))) {
+        const err = new Error('5 NOT_FOUND');
+        err.code = 5;
+        throw err;
+      }
+      Object.assign(store.get(key(c, id)), patch);
+    },
     async get() {
       const data = store.get(key(c, id));
       return { exists: data !== undefined, data: () => data };
@@ -78,11 +86,14 @@ const CONFIG = {
   tierA: { publicUrl: 'https://summit.example.org' },
 };
 
-function sendDeps({ db = fakeDb(), sendResult, notify } = {}) {
+function sendDeps({ db = fakeDb(), sendResult, notify, now, sendCeilingMax, sendCeilingWindowMs } = {}) {
   const sent = [];
   const notices = [];
   const deps = {
     db,
+    ...(now ? { now } : {}),
+    ...(sendCeilingMax ? { sendCeilingMax } : {}),
+    ...(sendCeilingWindowMs ? { sendCeilingWindowMs } : {}),
     getConfig: async () => CONFIG,
     sendEmail: async (m) => {
       sent.push(m);
@@ -171,6 +182,279 @@ test('a broken auth.otp override falls back to the default and notifies the oper
   await handler({ method: 'POST', body: { email: 'b@example.org' } }, fakeRes());
   const after = [...db.store.keys()].filter((k) => k.startsWith('system_errors/'));
   assert.equal(after.length, 1);
+});
+
+// --- issue #45: infra-level throttles ----------------------------------------
+
+test('the send ceiling trips on distinct addresses the per-email bucket never sees', async () => {
+  let clock = 1_000_000;
+  const { db, sent, notices, handler } = sendDeps({
+    now: () => clock, sendCeilingMax: 3, sendCeilingWindowMs: 60_000,
+  });
+
+  // Three different addresses: the 5/15min per-address bucket is untouched.
+  for (let i = 0; i < 3; i += 1) {
+    const res = fakeRes();
+    await handler({ method: 'POST', body: { email: `v${i}@example.org` } }, res);
+    assert.equal(res.statusCode, 200);
+    clock += 1000;
+  }
+
+  const tripped = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v3@example.org' } }, tripped);
+  // Same shape the per-address limit already answers with — no oracle.
+  assert.equal(tripped.statusCode, 429);
+  assert.equal(tripped.body.error.code, 'rate-limited');
+  assert.ok(tripped.body.error.retryAfterSeconds > 0);
+  assert.ok(Number(tripped.headers['Retry-After']) > 0);
+  assert.equal(sent.length, 3, 'no mail, no provider cost');
+  assert.equal([...db.store.keys()].filter((k) => k.startsWith('auth_challenges/')).length, 3);
+
+  // One OperatorEvent per trip episode, not per request.
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0].kind, 'error');
+  assert.match(notices[0].title, /send ceiling/);
+  assert.equal(notices[0].dedupeKey, 'otp-send-ceiling-tripped');
+  assert.equal(notices[0].fields.ceiling, '3');
+
+  clock += 1000;
+  const again = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v4@example.org' } }, again);
+  assert.equal(again.statusCode, 429);
+  assert.equal(notices.length, 1, 'still one alert for this trip');
+});
+
+test('the send ceiling resets once the window drains', async () => {
+  let clock = 0;
+  const { sent, notices, handler } = sendDeps({
+    now: () => clock, sendCeilingMax: 2, sendCeilingWindowMs: 60_000,
+  });
+  for (let i = 0; i < 2; i += 1) {
+    await handler({ method: 'POST', body: { email: `v${i}@example.org` } }, fakeRes());
+  }
+  const tripped = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v2@example.org' } }, tripped);
+  assert.equal(tripped.statusCode, 429);
+
+  clock = 60_001;
+  const recovered = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v3@example.org' } }, recovered);
+  assert.equal(recovered.statusCode, 200);
+  assert.equal(sent.length, 3);
+
+  // A second episode is a second alert.
+  await handler({ method: 'POST', body: { email: 'v4@example.org' } }, fakeRes());
+  const secondTrip = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v5@example.org' } }, secondTrip);
+  assert.equal(secondTrip.statusCode, 429);
+  assert.equal(notices.length, 2);
+});
+
+test('one address cannot spend the whole deployment ceiling', async () => {
+  const db = fakeDb();
+  const { handler } = sendDeps({ db, sendCeilingMax: 100, sendCeilingWindowMs: 60_000 });
+  for (let i = 0; i < challengeInternals.RATE_LIMIT_MAX + 5; i += 1) {
+    await handler({ method: 'POST', body: { email: 'a@example.org' } }, fakeRes());
+  }
+  // The per-address bucket stops it first, so the global counter only ever
+  // saw the sends that actually went out.
+  assert.equal(
+    db.store.get('auth_send_ceiling/global').sends.length,
+    challengeInternals.RATE_LIMIT_MAX,
+  );
+});
+
+test('a failed provider send returns its ceiling slot, so an outage cannot trip the breaker', async () => {
+  const db = fakeDb();
+  const { sent, handler } = sendDeps({
+    db,
+    sendResult: { providerMessageId: null, status: 'failed', error: 'down', retries: 2 },
+    sendCeilingMax: 3,
+    sendCeilingWindowMs: 60_000,
+  });
+
+  // Four failed sends against a ceiling of three: without the release the
+  // breaker would be tripped on zero delivered codes.
+  for (let i = 0; i < 4; i += 1) {
+    const res = fakeRes();
+    await handler({ method: 'POST', body: { email: `v${i}@example.org` } }, res);
+    assert.equal(res.statusCode, 502);
+  }
+  assert.equal(sent.length, 4, 'each attempt reached the provider');
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 0);
+
+  // The provider recovers: sign-in works immediately, no lingering 429.
+  const { handler: healthy } = sendDeps({ db, sendCeilingMax: 3, sendCeilingWindowMs: 60_000 });
+  const res = fakeRes();
+  await healthy({ method: 'POST', body: { email: 'v9@example.org' } }, res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('a throw between reservation and send also returns the ceiling slot', async () => {
+  const db = fakeDb();
+  const boom = new Error('firestore unavailable');
+  const { handler } = sendDeps({ db, sendCeilingMax: 2, sendCeilingWindowMs: 60_000 });
+  // One good send establishes a slot that must survive the failure below.
+  await handler({ method: 'POST', body: { email: 'ok@example.org' } }, fakeRes());
+
+  const failing = createSendOtpHandler({
+    db,
+    getConfig: async () => CONFIG,
+    sendEmail: async () => { throw boom; },
+    sendCeilingMax: 2,
+    sendCeilingWindowMs: 60_000,
+    log: { error() {}, warn() {} },
+  });
+  await assert.rejects(
+    failing({ method: 'POST', body: { email: 'bad@example.org' } }, fakeRes()),
+    /firestore unavailable/,
+  );
+  // The failed request gave its slot back; the successful one kept its own.
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 1);
+});
+
+test('a successful send keeps its ceiling slot', async () => {
+  const db = fakeDb();
+  const { handler } = sendDeps({ db, sendCeilingMax: 5, sendCeilingWindowMs: 60_000 });
+  for (let i = 0; i < 3; i += 1) {
+    await handler({ method: 'POST', body: { email: `v${i}@example.org` } }, fakeRes());
+  }
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 3);
+});
+
+test('EVENT_APP_CHECK_ENFORCED gates enforcement, and only the literal "true" enables it', () => {
+  assert.equal(internals.appCheckEnforced({}), false);
+  assert.equal(internals.appCheckEnforced({ EVENT_APP_CHECK_ENFORCED: '' }), false);
+  assert.equal(internals.appCheckEnforced({ EVENT_APP_CHECK_ENFORCED: 'false' }), false);
+  // Anything that is not an explicit "true" leaves enforcement off, so a
+  // typo'd value cannot lock every client out of sign-in.
+  assert.equal(internals.appCheckEnforced({ EVENT_APP_CHECK_ENFORCED: 'yes' }), false);
+  assert.equal(internals.appCheckEnforced({ EVENT_APP_CHECK_ENFORCED: '1' }), false);
+  assert.equal(internals.appCheckEnforced({ EVENT_APP_CHECK_ENFORCED: ' TRUE ' }), true);
+});
+
+test('the App Check gate is a no-op when unconfigured and never loads the service', async () => {
+  let called = 0;
+  const handler = internals.withAppCheckGate(
+    async (_req, res) => { res.status(200).json({ ok: true }); },
+    {
+      enforced: false,
+      getAppCheck: () => { called += 1; return null; },
+      log: { error() {} },
+    },
+  );
+  const res = fakeRes();
+  await handler({ method: 'POST', headers: {}, body: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(called, 0, 'firebase-admin must not be touched by an unconfigured deployment');
+});
+
+test('the App Check gate refuses unattested requests with one shape, and runs before the handler', async () => {
+  const reached = [];
+  const gate = (appCheck) => internals.withAppCheckGate(
+    async (_req, res) => { reached.push(1); res.status(200).json({ ok: true }); },
+    { enforced: true, getAppCheck: () => appCheck, log: { error() {} } },
+  );
+  const appCheck = {
+    async verifyToken(t) {
+      if (t !== 'good') throw new Error('app-check/invalid-argument');
+      return { appId: 'app-1' };
+    },
+  };
+
+  // Missing, invalid, and service-unavailable all answer identically — the
+  // response cannot say why, and the handler never ran, so nothing about
+  // the requested address or challenge could leak.
+  const shapes = [];
+  for (const [instance, token] of [[appCheck, undefined], [appCheck, 'bad'], [null, 'good']]) {
+    const res = fakeRes();
+    await gate(instance)(
+      { method: 'POST', headers: token ? { 'x-firebase-appcheck': token } : {}, body: { email: 'a@example.org' } },
+      res,
+    );
+    assert.equal(res.statusCode, 401);
+    shapes.push(JSON.stringify(res.body));
+  }
+  assert.equal(new Set(shapes).size, 1, 'one failure shape for every rejection cause');
+  assert.equal(reached.length, 0);
+
+  // A valid attestation passes straight through.
+  const ok = fakeRes();
+  await gate(appCheck)({ method: 'POST', headers: { 'x-firebase-appcheck': 'good' }, body: {} }, ok);
+  assert.equal(ok.statusCode, 200);
+  assert.equal(reached.length, 1);
+});
+
+test('EVENT_OTP_SEND_CEILING_PER_HOUR parses strictly, and never parses to "no ceiling"', () => {
+  assert.equal(internals.parseSendCeiling({}), challengeInternals.SEND_CEILING_MAX);
+  assert.equal(internals.parseSendCeiling({ EVENT_OTP_SEND_CEILING_PER_HOUR: ' 50 ' }), 50);
+  // parseInt would take a valid PREFIX here and silently run at 1 or 50
+  // instead of falling back — a fraction of the intended ceiling is a
+  // self-inflicted outage, not the documented default.
+  for (const bad of ['0', '-1', 'lots', '', '1.5', '50oops', '5e2', ' ', '+50', '0x10']) {
+    assert.equal(
+      internals.parseSendCeiling({ EVENT_OTP_SEND_CEILING_PER_HOUR: bad }),
+      challengeInternals.SEND_CEILING_MAX,
+      `"${bad}" must fall back to the default, not to a partial value`,
+    );
+  }
+});
+
+// --- issue #48: the durable row's lifecycle ----------------------------------
+
+test('a resolved system_errors row is reopened when the same fault class recurs', async () => {
+  const db = fakeDb();
+  db.store.set('email_templates/auth.otp', { html: '<p>Welcome!</p>', text: 'Welcome!' });
+  let clock = 1_000_000;
+  const { handler } = sendDeps({ db, now: () => clock });
+
+  await handler({ method: 'POST', body: { email: 'a@example.org' } }, fakeRes());
+  const [errorKey, first] = [...db.store.entries()].find(([k]) => k.startsWith('system_errors/'));
+  assert.equal(first.resolved, false);
+  assert.deepEqual(first.lastSeenAt, new Date(1_000_000));
+
+  // The operator fixes the override and marks the row resolved.
+  db.store.get(errorKey).resolved = true;
+
+  // A LATER, differently-caused override produces the same validation
+  // messages: create() hits ALREADY_EXISTS, so without the reopen the new
+  // fault would leave no durable signal at all.
+  clock += internals.LAST_SEEN_REFRESH_MS + 1;
+  resetTemplateCacheForTest();
+  await handler({ method: 'POST', body: { email: 'b@example.org' } }, fakeRes());
+
+  const rows = [...db.store.keys()].filter((k) => k.startsWith('system_errors/'));
+  assert.equal(rows.length, 1, 'still one row per fault class');
+  const reopened = db.store.get(errorKey);
+  assert.equal(reopened.resolved, false);
+  assert.deepEqual(reopened.lastSeenAt, new Date(clock));
+  assert.deepEqual(reopened.createdAt, new Date(1_000_000), 'first-seen time is preserved');
+});
+
+test('reopen refreshes lastSeenAt on a stale unresolved row but not on a fresh one', async () => {
+  const db = fakeDb();
+  const ref = db.collection('system_errors').doc('fault-1');
+  await ref.create({ resolved: false, createdAt: new Date(0), lastSeenAt: new Date(0) });
+
+  // Fresh and already unresolved: no write, so an unauthenticated flood
+  // cannot hammer one hot document (the fallback branch runs before the
+  // rate limit).
+  const fresh = await internals.reopenSystemError({
+    db, errorId: 'fault-1', seenAt: new Date(internals.LAST_SEEN_REFRESH_MS - 1),
+  });
+  assert.equal(fresh, false);
+  assert.deepEqual(db.store.get('system_errors/fault-1').lastSeenAt, new Date(0));
+
+  // Stale: refreshed, giving operators a "still happening" signal.
+  const stale = new Date(internals.LAST_SEEN_REFRESH_MS + 1);
+  assert.equal(await internals.reopenSystemError({ db, errorId: 'fault-1', seenAt: stale }), true);
+  assert.deepEqual(db.store.get('system_errors/fault-1').lastSeenAt, stale);
+
+  // A row that vanished between create() and reopen is not resurrected.
+  assert.equal(
+    await internals.reopenSystemError({ db, errorId: 'missing', seenAt: stale }),
+    false,
+  );
 });
 
 test('the send-boundary gate: unit truth table', () => {

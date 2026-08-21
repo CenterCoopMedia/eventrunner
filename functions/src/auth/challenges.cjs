@@ -10,6 +10,8 @@
  *     kind in v1 (spec §9).
  *   auth_rate_limits/{emailHash}  5 requests / 15 minutes, keyed by SHA-256
  *     of the normalized address so raw addresses never index a collection.
+ *   auth_send_ceiling/global  deployment-wide OTP send ceiling — the
+ *     circuit breaker behind the per-address bucket (issue #45).
  *
  * Every function takes an injected db and clock — no firebase-admin import.
  */
@@ -20,6 +22,9 @@ const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
+const SEND_CEILING_MAX = 500;
+const SEND_CEILING_WINDOW_MS = 60 * 60 * 1000;
+const SEND_CEILING_DOC = 'global';
 
 /** @param {string} email @returns {string} */
 function normalizeEmail(email) {
@@ -72,6 +77,34 @@ function hashCode(token, code) {
 }
 
 /**
+ * Read `expiresAt` in whichever shape the store handed back: a JS Date from
+ * the in-memory fake, a Firestore Timestamp in production, an ISO string
+ * from a hand-repaired document.
+ * @param {*} value @returns {number} ms, or NaN when unreadable
+ */
+function expiresAtMs(value) {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  return Date.parse(value);
+}
+
+/**
+ * True when a challenge document is still a candidate for verification:
+ * unexpired, unconsumed, attempts left. Deliberately crypto-free — it is
+ * the pre-check that decides whether deriving the scrypt hash is worth it,
+ * and it is re-run inside the transaction as the authoritative check.
+ * @param {object|undefined} data @param {number} nowMs
+ */
+function isVerifiable(data, nowMs) {
+  if (!data) return false;
+  const expires = expiresAtMs(data.expiresAt);
+  if (!Number.isFinite(expires) || nowMs >= expires) return false;
+  if (data.consumedAt) return false;
+  if ((data.attempts || 0) >= MAX_ATTEMPTS) return false;
+  return true;
+}
+
+/**
  * Check and record one rate-limit slot atomically. The check and the
  * record share a transaction so parallel requests cannot both pass a
  * stale read (spec §3.1: 5 per 15 minutes per address).
@@ -94,6 +127,123 @@ async function takeRateLimitSlot({ db, email, now = Date.now }) {
     requests.push(nowMs);
     tx.set(ref, { requests, updatedAt: new Date(nowMs) });
     return { limited: false };
+  });
+}
+
+/**
+ * Take one slot against the deployment-wide OTP send ceiling (issue #45).
+ *
+ * The per-address bucket above is a per-victim control: an attacker holding
+ * a list of a million addresses never trips it, and every request that gets
+ * through costs the operator one provider send. This is the circuit breaker
+ * behind it — a cap on total sends per rolling window for the whole
+ * deployment, independent of who is asking.
+ *
+ * Storage mirrors `auth_rate_limits`: one document holding the live
+ * timestamps, filtered on read, swept by `sweepExpired` on `updatedAt`.
+ * Deliberately unsharded. A slot is written only when the request is BELOW
+ * the ceiling, so writes are capped at `max` per window — 500/hour is two
+ * orders of magnitude under Firestore's sustained per-document write rate —
+ * and once the breaker trips the transaction stops writing entirely, which
+ * is exactly the flood case sharding would otherwise be sized for.
+ *
+ * `trippedAt` is stored so the first request over the line can be told
+ * apart from the thousand behind it: the caller alerts on `firstTrip` only,
+ * once per trip episode and durably across container restarts, rather than
+ * once per request. It is cleared as soon as the window drains.
+ *
+ * MUST be called after the per-address bucket, never before: a single
+ * address hammering the endpoint is stopped by its own 5/15min budget and
+ * must not be able to spend the whole deployment's ceiling on its own.
+ *
+ * @param {{ db: FirebaseFirestore.Firestore, now?: () => number,
+ *           max?: number, windowMs?: number }} args
+ * The slot is a RESERVATION, taken before the send so concurrent requests
+ * cannot both pass a stale count. `releaseGlobalSendSlot` gives it back
+ * when the send does not happen, so the ceiling counts codes that actually
+ * went out rather than provider outages.
+ *
+ * @returns {Promise<{ limited: boolean, count: number, firstTrip: boolean,
+ *           takenAt?: number, retryAfterMs?: number }>}
+ */
+async function takeGlobalSendSlot({
+  db,
+  now = Date.now,
+  max = SEND_CEILING_MAX,
+  windowMs = SEND_CEILING_WINDOW_MS,
+}) {
+  const ref = db.collection('auth_send_ceiling').doc(SEND_CEILING_DOC);
+  const nowMs = now();
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists ? snap.data() : null;
+    const sends = (Array.isArray(data?.sends) ? data.sends : [])
+      .filter((t) => typeof t === 'number' && nowMs - t < windowMs);
+
+    if (sends.length >= max) {
+      const oldest = Math.min(...sends);
+      const firstTrip = !data?.trippedAt;
+      if (firstTrip) {
+        tx.set(ref, { sends, trippedAt: new Date(nowMs), updatedAt: new Date(nowMs) });
+      }
+      return {
+        limited: true,
+        count: sends.length,
+        firstTrip,
+        retryAfterMs: Math.max(0, oldest + windowMs - nowMs),
+      };
+    }
+
+    sends.push(nowMs);
+    // set(), not update(): rewriting the document drops a stale trippedAt
+    // the moment the window drains below the ceiling, so the next trip
+    // alerts again.
+    tx.set(ref, { sends, updatedAt: new Date(nowMs) });
+    return { limited: false, count: sends.length, firstTrip: false, takenAt: nowMs };
+  });
+}
+
+/**
+ * Give back a reservation taken by `takeGlobalSendSlot` when the send it
+ * was reserved for did not happen — a provider outage, a failed challenge
+ * write. Without this, a deployment whose email provider is down burns the
+ * whole hourly ceiling on zero delivered codes and keeps refusing sign-ins
+ * after the provider recovers.
+ *
+ * Removes exactly one timestamp equal to `takenAt`. Two requests reserving
+ * in the same millisecond are indistinguishable, but returning "one slot"
+ * is the correct accounting either way. A slot that already aged out of
+ * the window is a no-op.
+ *
+ * `trippedAt` is carried across so a release cannot re-arm the alert for a
+ * trip episode the operator has already been told about.
+ *
+ * @param {{ db: FirebaseFirestore.Firestore, takenAt: number|undefined,
+ *           now?: () => number, windowMs?: number }} args
+ * @returns {Promise<boolean>} whether a slot was returned
+ */
+async function releaseGlobalSendSlot({
+  db,
+  takenAt,
+  now = Date.now,
+  windowMs = SEND_CEILING_WINDOW_MS,
+}) {
+  if (typeof takenAt !== 'number') return false;
+  const ref = db.collection('auth_send_ceiling').doc(SEND_CEILING_DOC);
+  const nowMs = now();
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+    const data = snap.data();
+    const sends = (Array.isArray(data?.sends) ? data.sends : [])
+      .filter((t) => typeof t === 'number' && nowMs - t < windowMs);
+    const index = sends.indexOf(takenAt);
+    if (index === -1) return false;
+    sends.splice(index, 1);
+    const patch = { sends, updatedAt: new Date(nowMs) };
+    if (data?.trippedAt) patch.trippedAt = data.trippedAt;
+    tx.set(ref, patch);
+    return true;
   });
 }
 
@@ -135,31 +285,40 @@ async function createChallenge({ db, email, code, now = Date.now }) {
  * token is issued, or releases so a transient Auth failure does not force
  * the user to burn another rate-limit slot on a fresh code.
  *
+ * Three stages, in this order (issue #47):
+ *   1. a crypto-free pre-check on one plain read — exists, unexpired,
+ *      unconsumed, attempts left;
+ *   2. the ~50-100ms scrypt derivation, only for a challenge that passed;
+ *   3. the transaction, which re-checks everything authoritatively.
+ * Without stage 1 an unauthenticated flood of random well-formed ids each
+ * bought a threadpool scrypt without consuming an attempt. The pre-check is
+ * advisory only — a stale read can never widen what stage 3 accepts — and
+ * it changes no response: every miss is still the same `{ ok: false }`. The
+ * timing difference between "unknown id" and "wrong code" is accepted;
+ * challenge ids are handles, not secrets.
+ *
  * @param {{ db: FirebaseFirestore.Firestore, token: string, email: string,
- *           code: string, now?: () => number }} args
+ *           code: string, now?: () => number,
+ *           hashFn?: (token: string, code: string) => Promise<string> }} args
  * @returns {Promise<{ ok: boolean, email?: string }>}
  */
-async function verifyChallenge({ db, token, email, code, now = Date.now }) {
+async function verifyChallenge({ db, token, email, code, now = Date.now, hashFn = hashCode }) {
   if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) return { ok: false };
   const ref = db.collection('auth_challenges').doc(token);
   const nowMs = now();
+
+  const preSnap = await ref.get();
+  if (!preSnap.exists || !isVerifiable(preSnap.data(), nowMs)) return { ok: false };
+
   // Derived OUTSIDE the transaction: the expensive hash must run once per
   // request, not once per transaction retry.
-  const providedHash = await hashCode(token, String(code));
+  const providedHash = await hashFn(token, String(code));
 
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) return { ok: false };
     const data = snap.data();
-
-    const expiresMs = data.expiresAt instanceof Date
-      ? data.expiresAt.getTime()
-      : typeof data.expiresAt?.toMillis === 'function'
-        ? data.expiresAt.toMillis()
-        : Date.parse(data.expiresAt);
-    if (!Number.isFinite(expiresMs) || nowMs >= expiresMs) return { ok: false };
-    if (data.consumedAt) return { ok: false };
-    if ((data.attempts || 0) >= MAX_ATTEMPTS) return { ok: false };
+    if (!isVerifiable(data, nowMs)) return { ok: false };
 
     const expected = Buffer.from(String(data.codeHash || ''), 'utf8');
     const provided = Buffer.from(providedHash, 'utf8');
@@ -201,7 +360,7 @@ async function releaseChallenge({ db, token }) {
  *
  * @param {{ db: FirebaseFirestore.Firestore, now?: () => number,
  *           batchLimit?: number }} args
- * @returns {Promise<{ challenges: number, rateLimits: number }>}
+ * @returns {Promise<{ challenges: number, rateLimits: number, sendCeilings: number }>}
  */
 async function sweepExpired({ db, now = Date.now, batchLimit = 250, maxBatches = 40 }) {
   // Drain in batches until a batch comes back short — a daily run capped at
@@ -229,11 +388,20 @@ async function sweepExpired({ db, now = Date.now, batchLimit = 250, maxBatches =
       .where('updatedAt', '<', new Date(now() - RATE_LIMIT_WINDOW_MS))
       .limit(batchLimit),
   );
-  return { challenges, rateLimits };
+  // A drained ceiling document holds only dead timestamps; dropping it also
+  // drops any stale trippedAt, so a later trip alerts as a first trip.
+  const sendCeilings = await drain(
+    db.collection('auth_send_ceiling')
+      .where('updatedAt', '<', new Date(now() - SEND_CEILING_WINDOW_MS))
+      .limit(batchLimit),
+  );
+  return { challenges, rateLimits, sendCeilings };
 }
 
 module.exports = {
   takeRateLimitSlot,
+  takeGlobalSendSlot,
+  releaseGlobalSendSlot,
   createChallenge,
   verifyChallenge,
   finalizeChallenge,
@@ -243,5 +411,13 @@ module.exports = {
   emailHash,
   rateBucketHash,
   hashCode,
-  internals: { RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS, CHALLENGE_TTL_MS, MAX_ATTEMPTS },
+  internals: {
+    RATE_LIMIT_MAX,
+    RATE_LIMIT_WINDOW_MS,
+    CHALLENGE_TTL_MS,
+    MAX_ATTEMPTS,
+    SEND_CEILING_MAX,
+    SEND_CEILING_WINDOW_MS,
+    isVerifiable,
+  },
 };

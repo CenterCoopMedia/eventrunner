@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 
 const {
   takeRateLimitSlot,
+  takeGlobalSendSlot,
+  releaseGlobalSendSlot,
   createChallenge,
   verifyChallenge,
   finalizeChallenge,
@@ -19,15 +21,22 @@ const {
 /** Minimal in-memory Firestore fake with transactions and range queries. */
 function fakeDb() {
   const store = new Map(); // "collection/id" -> data
+  const reads = []; // "collection/id" of every plain (non-transactional) read
   const key = (c, id) => `${c}/${id}`;
   const docRef = (c, id) => ({
     __c: c,
     __id: id,
     async set(data) { store.set(key(c, id), data); },
     async delete() { store.delete(key(c, id)); },
+    async get() {
+      reads.push(key(c, id));
+      const data = store.get(key(c, id));
+      return { exists: data !== undefined, data: () => data };
+    },
   });
   return {
     store,
+    reads,
     collection: (c) => ({
       doc: (id) => docRef(c, id),
       where: (field, op, value) => ({
@@ -193,6 +202,184 @@ test('verify: unknown or malformed token fails without touching the store', asyn
   const db = fakeDb();
   assert.deepEqual(await verifyChallenge({ db, token: 'nope', email: 'a@example.org', code: '123456' }), { ok: false });
   assert.deepEqual(await verifyChallenge({ db, token: 'f'.repeat(64), email: 'a@example.org', code: '123456' }), { ok: false });
+});
+
+// --- issue #45: the deployment-wide send ceiling -----------------------------
+
+test('send ceiling: slots pass up to the cap, then every request is limited', async () => {
+  const db = fakeDb();
+  let clock = 1_000_000;
+  const now = () => clock;
+  const args = { db, now, max: 3, windowMs: 60_000 };
+
+  for (let i = 0; i < 3; i += 1) {
+    const slot = await takeGlobalSendSlot(args);
+    assert.equal(slot.limited, false);
+    assert.equal(slot.count, i + 1);
+    assert.equal(slot.firstTrip, false);
+    clock += 1000;
+  }
+
+  const trip = await takeGlobalSendSlot(args);
+  assert.equal(trip.limited, true);
+  assert.equal(trip.firstTrip, true, 'the first request over the line alerts');
+  assert.ok(trip.retryAfterMs > 0 && trip.retryAfterMs <= 60_000);
+
+  // Everything behind it is limited but must NOT alert again, and must not
+  // write: the flood case is exactly when the counter stops taking writes.
+  clock += 1000;
+  const after = await takeGlobalSendSlot(args);
+  assert.equal(after.limited, true);
+  assert.equal(after.firstTrip, false);
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 3);
+});
+
+test('send ceiling: the window drains, the trip clears, and a later trip alerts again', async () => {
+  const db = fakeDb();
+  let clock = 0;
+  const now = () => clock;
+  const args = { db, now, max: 2, windowMs: 60_000 };
+
+  await takeGlobalSendSlot(args);
+  await takeGlobalSendSlot(args);
+  assert.equal((await takeGlobalSendSlot(args)).firstTrip, true);
+  assert.ok(db.store.get('auth_send_ceiling/global').trippedAt);
+
+  clock = 60_001;
+  const drained = await takeGlobalSendSlot(args);
+  assert.equal(drained.limited, false);
+  assert.equal(drained.count, 1, 'stale timestamps are dropped on read');
+  assert.equal(db.store.get('auth_send_ceiling/global').trippedAt, undefined);
+
+  await takeGlobalSendSlot(args);
+  assert.equal((await takeGlobalSendSlot(args)).firstTrip, true, 'a fresh episode alerts again');
+});
+
+test('send ceiling: a released reservation frees capacity again', async () => {
+  const db = fakeDb();
+  let clock = 1_000_000;
+  const now = () => clock;
+  const args = { db, now, max: 2, windowMs: 60_000 };
+
+  const first = await takeGlobalSendSlot(args);
+  clock += 1000;
+  const second = await takeGlobalSendSlot(args);
+  assert.equal(typeof second.takenAt, 'number');
+  clock += 1000;
+  assert.equal((await takeGlobalSendSlot(args)).limited, true);
+
+  // Give the second reservation back: capacity returns immediately.
+  assert.equal(await releaseGlobalSendSlot({ db, takenAt: second.takenAt, now, windowMs: 60_000 }), true);
+  assert.deepEqual(db.store.get('auth_send_ceiling/global').sends, [first.takenAt]);
+  assert.equal((await takeGlobalSendSlot(args)).limited, false);
+
+  // Releasing an unknown or already-aged-out slot is a harmless no-op, and
+  // no caller can free a slot it never took.
+  assert.equal(await releaseGlobalSendSlot({ db, takenAt: 42, now, windowMs: 60_000 }), false);
+  assert.equal(await releaseGlobalSendSlot({ db, takenAt: undefined, now, windowMs: 60_000 }), false);
+});
+
+test('send ceiling: a release does not re-arm an alert the operator already got', async () => {
+  const db = fakeDb();
+  let clock = 0;
+  const now = () => clock;
+  const args = { db, now, max: 1, windowMs: 60_000 };
+
+  const taken = await takeGlobalSendSlot(args);
+  clock += 1000;
+  assert.equal((await takeGlobalSendSlot(args)).firstTrip, true);
+
+  clock += 1000;
+  await releaseGlobalSendSlot({ db, takenAt: taken.takenAt, now, windowMs: 60_000 });
+  assert.ok(db.store.get('auth_send_ceiling/global').trippedAt, 'the trip marker survives a release');
+});
+
+test('send ceiling: sweepExpired drops a drained ceiling document', async () => {
+  const db = fakeDb();
+  let clock = 0;
+  await takeGlobalSendSlot({ db, now: () => clock, max: 2, windowMs: 60_000 });
+  clock = internals.SEND_CEILING_WINDOW_MS + 1;
+  const swept = await sweepExpired({ db, now: () => clock });
+  assert.equal(swept.sendCeilings, 1);
+  assert.equal(db.store.has('auth_send_ceiling/global'), false);
+});
+
+// --- issue #47: the crypto-free pre-check ------------------------------------
+
+/** Counting stand-in for hashCode; the real digest is not needed here. */
+function countingHash() {
+  const calls = [];
+  return {
+    calls,
+    hashFn: async (token, code) => {
+      calls.push({ token, code });
+      return `hash:${token}:${code}`;
+    },
+  };
+}
+
+test('pre-check: an unknown challenge id derives no hash and stays one shape', async () => {
+  const db = fakeDb();
+  const { calls, hashFn } = countingHash();
+  const verdict = await verifyChallenge({
+    db, token: 'a'.repeat(64), email: 'a@example.org', code: '123456', hashFn,
+  });
+  assert.deepEqual(verdict, { ok: false });
+  assert.equal(calls.length, 0);
+  // One cheap read, no transaction write: a flood of random ids is now a
+  // plain lookup each, not a threadpool scrypt each (issue #47).
+  assert.deepEqual(db.reads, [`auth_challenges/${'a'.repeat(64)}`]);
+});
+
+test('pre-check: expired, consumed, and attempt-exhausted challenges derive no hash', async () => {
+  let clock = 0;
+  const now = () => clock;
+
+  const expiredDb = fakeDb();
+  const expired = await createChallenge({ db: expiredDb, email: 'a@example.org', code: '123456', now });
+  clock = internals.CHALLENGE_TTL_MS + 1;
+  const expiredHash = countingHash();
+  assert.deepEqual(
+    await verifyChallenge({ db: expiredDb, token: expired.token, email: 'a@example.org', code: '123456', now, hashFn: expiredHash.hashFn }),
+    { ok: false },
+  );
+  assert.equal(expiredHash.calls.length, 0);
+
+  clock = 0;
+  const consumedDb = fakeDb();
+  const consumed = await createChallenge({ db: consumedDb, email: 'a@example.org', code: '123456', now });
+  await verifyChallenge({ db: consumedDb, token: consumed.token, email: 'a@example.org', code: '123456', now });
+  const consumedHash = countingHash();
+  assert.deepEqual(
+    await verifyChallenge({ db: consumedDb, token: consumed.token, email: 'a@example.org', code: '123456', now, hashFn: consumedHash.hashFn }),
+    { ok: false },
+  );
+  assert.equal(consumedHash.calls.length, 0);
+
+  const lockedDb = fakeDb();
+  const locked = await createChallenge({ db: lockedDb, email: 'a@example.org', code: '123456', now });
+  for (let i = 0; i < internals.MAX_ATTEMPTS; i += 1) {
+    await verifyChallenge({ db: lockedDb, token: locked.token, email: 'a@example.org', code: '000000', now });
+  }
+  const lockedHash = countingHash();
+  assert.deepEqual(
+    await verifyChallenge({ db: lockedDb, token: locked.token, email: 'a@example.org', code: '123456', now, hashFn: lockedHash.hashFn }),
+    { ok: false },
+  );
+  assert.equal(lockedHash.calls.length, 0);
+});
+
+test('pre-check: a live challenge still derives the hash exactly once, outside the transaction', async () => {
+  const db = fakeDb();
+  const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+  const { calls, hashFn } = countingHash();
+  // Wrong code: the pre-check passes (the challenge is live), the hash is
+  // derived, and the attempt is burned — the pre-check must not short-
+  // circuit a real guess.
+  const miss = await verifyChallenge({ db, token, email: 'a@example.org', code: '000000', hashFn });
+  assert.deepEqual(miss, { ok: false });
+  assert.deepEqual(calls, [{ token, code: '000000' }]);
+  assert.equal(db.store.get(`auth_challenges/${token}`).attempts, 1);
 });
 
 test('sweepExpired deletes expired challenges and stale rate buckets only', async () => {

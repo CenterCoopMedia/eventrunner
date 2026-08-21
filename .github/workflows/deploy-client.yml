@@ -147,6 +147,12 @@ jobs:
           EVENT_TICKETING_PROVIDER: ${{ vars.EVENT_TICKETING_PROVIDER }}
           EVENT_TICKETING_EVENT_ID: ${{ vars.EVENT_TICKETING_EVENT_ID }}
           EVENT_OPERATOR_NOTIFIER: ${{ vars.EVENT_OPERATOR_NOTIFIER }}
+          # OTP abuse controls (§3.1). Both optional; validateDeployEnv
+          # rejects a non-boolean flag, a non-positive ceiling, and
+          # enforcement without a site key.
+          EVENT_APP_CHECK_ENFORCED: ${{ vars.EVENT_APP_CHECK_ENFORCED }}
+          EVENT_OTP_SEND_CEILING_PER_HOUR: ${{ vars.EVENT_OTP_SEND_CEILING_PER_HOUR }}
+          VITE_FIREBASE_APP_CHECK_SITE_KEY: ${{ vars.VITE_FIREBASE_APP_CHECK_SITE_KEY }}
           VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
@@ -232,6 +238,8 @@ jobs:
           EVENT_TICKETING_PROVIDER: ${{ vars.EVENT_TICKETING_PROVIDER }}
           EVENT_TICKETING_EVENT_ID: ${{ vars.EVENT_TICKETING_EVENT_ID }}
           EVENT_OPERATOR_NOTIFIER: ${{ vars.EVENT_OPERATOR_NOTIFIER }}
+          EVENT_APP_CHECK_ENFORCED: ${{ vars.EVENT_APP_CHECK_ENFORCED }}
+          EVENT_OTP_SEND_CEILING_PER_HOUR: ${{ vars.EVENT_OTP_SEND_CEILING_PER_HOUR }}
         run: |
           set -euo pipefail
           {
@@ -245,6 +253,11 @@ jobs:
             echo "EVENT_TICKETING_PROVIDER=$EVENT_TICKETING_PROVIDER"
             echo "EVENT_TICKETING_EVENT_ID=$EVENT_TICKETING_EVENT_ID"
             echo "EVENT_OPERATOR_NOTIFIER=$EVENT_OPERATOR_NOTIFIER"
+            # Read by auth/otp.cjs at deploy time (§3.1). Defaulted here so
+            # an unset variable lands as the documented safe value rather
+            # than a blank line the runtime has to reinterpret.
+            echo "EVENT_APP_CHECK_ENFORCED=${EVENT_APP_CHECK_ENFORCED:-false}"
+            echo "EVENT_OTP_SEND_CEILING_PER_HOUR=${EVENT_OTP_SEND_CEILING_PER_HOUR:-500}"
           } > "functions/.env.${EVENT_FIREBASE_PROJECT_ID}"
       - name: Deploy functions
         env:
@@ -335,6 +348,11 @@ jobs:
           # us-central1 needs this set, or the built bundle calls a region
           # with nothing deployed to it.
           VITE_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+          # App Check site key (§3.1). Unset → firebase.js never loads the
+          # App Check SDK and the bundle behaves exactly as before; it must
+          # be set here before EVENT_APP_CHECK_ENFORCED is turned on, or
+          # every sign-in request is refused as unattested.
+          VITE_FIREBASE_APP_CHECK_SITE_KEY: ${{ vars.VITE_FIREBASE_APP_CHECK_SITE_KEY }}
           VITE_EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
         run: npm run build
       - uses: actions/upload-artifact@v4
