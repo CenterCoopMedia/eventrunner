@@ -10,11 +10,40 @@
 // bad section/field shape, 404/409) still travel back verbatim.
 import { blockTypeFor } from './blockTypes.js';
 
+/**
+ * Mirrors functions/src/cms/content.cjs's DELETE_FIELD_SENTINEL exactly (a
+ * parity test in contentDoc.test.js pins the two literals together, the
+ * same way blockTypes.js mirrors the backend's BLOCK_TYPES registry). A
+ * cmsContent doc's fields are addressed generically — cmsUpdateContent
+ * merges whatever `fields` a caller sends onto the prior draft/live doc's
+ * fields, so a partial edit never has to resend everything — but that
+ * means switching a block's type here would otherwise leave the OLD type's
+ * value fields (an faq_item's `answer`, a cta's `url`, …) stranded on the
+ * doc forever. Setting one of those stale keys to this sentinel tells the
+ * server to drop it instead of carrying it forward.
+ */
+export const DELETE_FIELD_SENTINEL = '__cms_delete_field__';
+
+/**
+ * A block type's EDITABLE value fields — everything the registry declares
+ * except `order`. `order` is real registry data for stat/list_item/
+ * link_group, but the editor exposes exactly one Order control shared by
+ * every block type (it is also how blocks without a registry `order` field
+ * get sorted — see SectionBlocks/getSectionBlocks), so folding it into the
+ * generic per-type loop would render two divergent "Order" inputs bound to
+ * two different pieces of state.
+ *
+ * @param {string} blockTypeId
+ */
+export function valueFieldsOf(blockTypeId) {
+  const type = blockTypeFor(blockTypeId);
+  return (type?.fields ?? []).filter((field) => field.id !== 'order');
+}
+
 /** A blank `values` map for a block type: '' for text-ish fields, false for booleans. */
 export function blankContentValues(blockTypeId) {
-  const type = blockTypeFor(blockTypeId);
   const values = {};
-  for (const field of type?.fields ?? []) {
+  for (const field of valueFieldsOf(blockTypeId)) {
     values[field.id] = field.type === 'boolean' ? false : '';
   }
   return values;
@@ -32,9 +61,8 @@ export function blankContentValues(blockTypeId) {
  */
 export function toEditableContent(doc, blockTypeId) {
   const resolvedType = blockTypeId ?? doc?.blockType ?? '';
-  const type = blockTypeFor(resolvedType);
   const values = {};
-  for (const field of type?.fields ?? []) {
+  for (const field of valueFieldsOf(resolvedType)) {
     const raw = doc?.[field.id];
     if (field.type === 'boolean') values[field.id] = raw === true;
     else if (field.type === 'number') values[field.id] = typeof raw === 'number' ? raw : '';
@@ -68,13 +96,12 @@ export function blankContent(blockTypeId = '') {
  * @returns {object}
  */
 export function toContentFields(content) {
-  const type = blockTypeFor(content.blockType);
   const fields = { blockType: content.blockType };
   if (content.order !== '' && content.order !== null && content.order !== undefined) {
     const order = Number(content.order);
     fields.order = Number.isFinite(order) ? order : content.order;
   }
-  for (const field of type?.fields ?? []) {
+  for (const field of valueFieldsOf(content.blockType)) {
     const raw = content.values?.[field.id];
     if (field.type === 'boolean') {
       fields[field.id] = Boolean(raw);
@@ -87,4 +114,52 @@ export function toContentFields(content) {
     }
   }
   return fields;
+}
+
+/**
+ * DELETE_FIELD_SENTINEL entries for a PRIOR block type's value fields that
+ * the NEW block type does not also declare — the payload addition that
+ * makes switching a block's type actually drop the old type's now-stale
+ * fields (an faq_item's `answer`, a cta's `url`, …) instead of leaving them
+ * merged onto the draft by cmsUpdateContent forever. Nothing to clear when
+ * there is no prior type, or it didn't change.
+ *
+ * @param {string|null} priorBlockTypeId the type last persisted for this doc
+ * @param {string} nextBlockTypeId the type about to be saved
+ * @returns {object} `{ [staleFieldId]: DELETE_FIELD_SENTINEL, ... }`
+ */
+export function staleFieldDeletions(priorBlockTypeId, nextBlockTypeId) {
+  if (!priorBlockTypeId || priorBlockTypeId === nextBlockTypeId) return {};
+  const keep = new Set(valueFieldsOf(nextBlockTypeId).map((field) => field.id));
+  const deletions = {};
+  for (const field of valueFieldsOf(priorBlockTypeId)) {
+    if (!keep.has(field.id)) deletions[field.id] = DELETE_FIELD_SENTINEL;
+  }
+  return deletions;
+}
+
+/**
+ * Client-side required-field check for the chosen block type's value
+ * fields. The generic content endpoints validate only reserved keys, not
+ * block shape (functions/src/cms/content.cjs has no BLOCK_TYPES-aware
+ * validator the way cmsSavePage does for cmsPages), so without this an
+ * operator can publish e.g. an image block with no alt text. Booleans are
+ * skipped: a checkbox always holds a definite true/false, so "required"
+ * has no empty state to catch.
+ *
+ * @param {{ blockType: string, values: object }} content
+ * @returns {Array<{ field: string, message: string }>}
+ */
+export function validateRequiredContent(content) {
+  if (!content.blockType) {
+    return [{ field: 'blockType', message: 'blockType: choose a block type before saving.' }];
+  }
+  const errors = [];
+  for (const field of valueFieldsOf(content.blockType)) {
+    if (!field.required || field.type === 'boolean') continue;
+    const raw = content.values?.[field.id];
+    const isEmpty = raw === undefined || raw === null || String(raw).trim() === '';
+    if (isEmpty) errors.push({ field: field.id, message: `${field.id}: is required.` });
+  }
+  return errors;
 }
