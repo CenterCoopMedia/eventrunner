@@ -69,6 +69,31 @@ test('admin emails are additive, lowercased, and de-duplicated', () => {
   assert.deepEqual(merged.adminEmails, ['granted-in-ui@example.org', 'ops@example.org']);
 });
 
+test('a mis-normalized stored admin list is rewritten, not skipped on a matching count', () => {
+  // firestore.rules compares against request.auth.token.email.lower(), so a
+  // stored "Ops@Example.org" is an admin who can never authenticate. A
+  // length-only comparison would call that list unchanged and leave it.
+  const decision = decideConfigWrite({
+    docId: 'bootstrap',
+    existing: { adminEmails: ['Ops@Example.org'] },
+    next: { adminEmails: ['ops@example.org'] },
+  });
+  assert.equal(decision.action, 'overwrite');
+  assert.deepEqual(decision.value.adminEmails, ['ops@example.org']);
+});
+
+test('an unpublished editor draft protects a document whose live copy still looks seeded', () => {
+  const liveSeeded = { seeded: true, value: '[Replace] x' };
+  const editorDraft = { seeded: false, status: 'dirty', value: 'Unpublished rewrite' };
+  assert.equal(decideSeedWrite(liveSeeded, { draft: editorDraft }).action, 'skip');
+  assert.equal(decideSeedWrite(liveSeeded, { draft: editorDraft, force: true }).action, 'skip');
+  // A draft that is still the seeded one is not an edit.
+  assert.equal(decideSeedWrite(liveSeeded, { draft: { seeded: true } }).action, 'overwrite');
+  // A draft-only document (never published) is protected the same way.
+  assert.equal(decideSeedWrite(null, { draft: editorDraft }).action, 'skip');
+  assert.equal(decideSeedWrite(null, { draft: null }).action, 'create');
+});
+
 test('bootstrap re-runs report skip when the admin list is unchanged', () => {
   const existing = { adminEmails: ['ops@example.org'] };
   const same = decideConfigWrite({ docId: 'bootstrap', existing, next: { adminEmails: ['ops@example.org'] } });

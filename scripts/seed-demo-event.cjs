@@ -38,6 +38,28 @@ const { writeConfigDocs, seedCollection } = require('./lib/write.cjs');
 
 const FLAGS = ['dry-run', 'force', 'i-know-this-is-not-a-demo-project', 'help'];
 
+/**
+ * True when the project id is a demo project.
+ *
+ * A substring test is not good enough for a guard whose whole job is
+ * refusing to publish placeholder speakers onto a live site:
+ * `democratic-media-prod` contains "demo". So the match is either an
+ * exact `DEMO_PROJECT_ID` (the deployment says which project it is) or a
+ * DELIMITED `demo` component of the id — `demo-run-of-show`,
+ * `run_of_show_demo`, or the bare id `demo` — never a fragment of a
+ * longer word.
+ *
+ * @param {string} projectId
+ * @param {string|undefined} configuredDemoId `DEMO_PROJECT_ID`
+ * @returns {boolean}
+ */
+function isDemoProject(projectId, configuredDemoId) {
+  const id = String(projectId || '').trim().toLowerCase();
+  const configured = String(configuredDemoId || '').trim().toLowerCase();
+  if (configured) return id === configured;
+  return id.split(/[-_.]/).includes('demo');
+}
+
 function usage() {
   return [
     'Usage: node scripts/seed-demo-event.cjs [--dry-run] [--force]',
@@ -115,7 +137,7 @@ async function main(argv) {
     return 2;
   }
   const { db, projectId, mode } = handles;
-  if (!/demo/i.test(projectId) && !args['i-know-this-is-not-a-demo-project']) {
+  if (!isDemoProject(projectId, process.env.DEMO_PROJECT_ID) && !args['i-know-this-is-not-a-demo-project']) {
     console.error(
       `Refusing to seed demo content into "${projectId}": the project id does not contain "demo".\n` +
       'This script writes placeholder speakers and sponsors; running it against a client deployment ' +
@@ -138,4 +160,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { main, seedDemo, internals: { usage, FLAGS } };
+module.exports = { main, seedDemo, isDemoProject, internals: { usage, FLAGS } };
