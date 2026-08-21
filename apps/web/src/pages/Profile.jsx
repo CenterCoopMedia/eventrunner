@@ -42,20 +42,30 @@ const primaryButtonClass =
   'touch-target inline-flex items-center justify-center rounded-brand bg-brand-primary ' +
   'px-4 py-2 font-semibold text-brand-surface hover:bg-brand-primary-dark disabled:opacity-60';
 
-/** Flatten config/badges into [{ id, label, categoryId, categoryLabel, maxPicks }]. */
-function readBadgeOptions(badgesConfig) {
+/**
+ * config/badges as the form needs it: one group per category, carrying the
+ * category's maxPicks. The cap is enforced here as well as in the
+ * projection, because a projection-only cap is invisible — the person sees
+ * everything they ticked while everyone else sees the first N (§4.5).
+ */
+function readBadgeCategories(badgesConfig) {
   const categories = Array.isArray(badgesConfig?.categories) ? badgesConfig.categories : [];
-  return categories.flatMap((category) =>
-    (Array.isArray(category?.badges) ? category.badges : [])
-      .filter((badge) => badge && typeof badge.id === 'string')
-      .map((badge) => ({
-        id: badge.id,
-        label: typeof badge.label === 'string' && badge.label ? badge.label : badge.id,
-        categoryId: category.id,
-        categoryLabel:
-          typeof category.label === 'string' && category.label ? category.label : category.id,
-      })),
-  );
+  return categories
+    .filter((category) => category && typeof category.id === 'string')
+    .map((category) => ({
+      id: category.id,
+      label:
+        typeof category.label === 'string' && category.label ? category.label : category.id,
+      maxPicks:
+        Number.isInteger(category.maxPicks) && category.maxPicks > 0 ? category.maxPicks : null,
+      badges: (Array.isArray(category.badges) ? category.badges : [])
+        .filter((badge) => badge && typeof badge.id === 'string')
+        .map((badge) => ({
+          id: badge.id,
+          label: typeof badge.label === 'string' && badge.label ? badge.label : badge.id,
+        })),
+    }))
+    .filter((category) => category.badges.length > 0);
 }
 
 export default function Profile() {
@@ -119,7 +129,7 @@ export default function Profile() {
     (value) =>
       value !== 'public' || features.publicAttendeeProfiles || form.profileVisibility === 'public',
   );
-  const badgeOptions = features.badges ? readBadgeOptions(badgesConfig) : [];
+  const badgeCategories = features.badges ? readBadgeCategories(badgesConfig) : [];
 
   const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -270,31 +280,49 @@ export default function Profile() {
           </div>
         </fieldset>
 
-        {badgeOptions.length > 0 ? (
-          <fieldset>
-            <legend className="font-semibold text-brand-ink">Badges</legend>
-            <p className="mt-1 text-sm text-brand-ink-muted">
-              Badges beyond this event&rsquo;s configured set are not shown on your public
-              profile.
-            </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {badgeOptions.map((badge) => (
-                <label key={badge.id} className="flex items-center gap-3 rounded-brand p-2">
-                  <input
-                    type="checkbox"
-                    checked={form.badges.includes(badge.id)}
-                    onChange={() => toggleBadge(badge.id)}
-                  />
-                  <span className="text-brand-ink">
-                    {badge.label}
-                    <span className="ml-2 text-sm text-brand-ink-muted">
-                      {badge.categoryLabel}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+        {badgeCategories.length > 0 ? (
+          <section>
+            <h2 className="font-heading text-xl text-brand-ink">Badges</h2>
+            {badgeCategories.map((category) => {
+              const picked = category.badges.filter((badge) =>
+                form.badges.includes(badge.id),
+              ).length;
+              const atCap = category.maxPicks != null && picked >= category.maxPicks;
+              return (
+                <fieldset key={category.id} className="mt-4">
+                  <legend className="font-semibold text-brand-ink">{category.label}</legend>
+                  {category.maxPicks != null ? (
+                    <p className="mt-1 text-sm text-brand-ink-muted" role="status">
+                      {atCap
+                        ? `You’ve picked all ${category.maxPicks} — clear one to choose another.`
+                        : `Pick up to ${category.maxPicks} (${picked} chosen).`}
+                    </p>
+                  ) : null}
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {category.badges.map((badge) => {
+                      const checked = form.badges.includes(badge.id);
+                      return (
+                        <label
+                          key={badge.id}
+                          className={`flex items-center gap-3 rounded-brand p-2 ${
+                            !checked && atCap ? 'text-brand-ink-muted' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={!checked && atCap}
+                            onChange={() => toggleBadge(badge.id)}
+                          />
+                          <span className="text-brand-ink">{badge.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              );
+            })}
+          </section>
         ) : null}
 
         <button type="submit" className={primaryButtonClass} disabled={saving}>

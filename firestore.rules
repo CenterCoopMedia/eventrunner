@@ -126,13 +126,54 @@ service cloud.firestore {
       ]);
     }
 
+    // TYPES matter as much as the field list. Every field here is projected
+    // into users_public and rendered by the directory, so a map or an array
+    // written into `bio` through the SDK would be handed to React as a child
+    // and break the directory for every visitor. The projection coerces
+    // these too (packages/shared/src/profile.cjs) — this is the boundary
+    // check, that is the belt.
+    //
     // Badge IDS are not checked here: rules cannot read config/badges for a
     // list-membership test cheaply (§4.5). The syncUserPublic trigger
     // rewrites users_public.badges to the intersection with the configured
     // set, so an unconfigured id never becomes public.
+    // .get(field, <default of the right type>) so a field the account
+    // document happens not to carry is "absent", not a rule error — the
+    // check is about what a client may WRITE, not about repairing a
+    // half-seeded document.
+    function validSelfProfileTypes() {
+      let d = request.resource.data;
+      return d.get('displayName', '') is string
+        && d.get('pronouns', '') is string
+        && d.get('bio', '') is string
+        && d.get('organization', '') is string
+        && d.get('jobTitle', '') is string
+        && (d.get('photoPath', null) == null || d.get('photoPath', '') is string)
+        && d.get('socialHandles', {}) is map
+        && d.get('badges', []) is list
+        && (d.get('updatedAt', null) == null || d.get('updatedAt', null) is timestamp)
+        && d.profileVisibility in ['public', 'attendees_only', 'private'];
+    }
+
+    // config/features.publicAttendeeProfiles is an operator decision: when
+    // it is off, no client may move their profile TO `public` and publish
+    // themselves to the open web. Only the transition is gated — a profile
+    // already stored as `public` (chosen while the feature was on) stays
+    // editable, so turning the flag off does not lock those accounts out of
+    // their own profile. Costs one document read, and only on a write that
+    // asks for `public`. A missing or half-seeded config/features fails
+    // closed for `public` and for nothing else.
+    function publicProfilesEnabled() {
+      return exists(/databases/$(database)/documents/config/features)
+        && get(/databases/$(database)/documents/config/features)
+             .data.get('publicAttendeeProfiles', false) == true;
+    }
+
     function validSelfProfileValues() {
-      return request.resource.data.profileVisibility in ['public', 'attendees_only', 'private']
-        && request.resource.data.badges is list;
+      return validSelfProfileTypes()
+        && (request.resource.data.profileVisibility != 'public'
+            || resource.data.profileVisibility == 'public'
+            || publicProfilesEnabled());
     }
 
     match /users/{userId} {

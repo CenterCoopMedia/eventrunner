@@ -28,6 +28,7 @@
 
 const { buildPublicProfile } = require('shared/profile');
 
+const USERS = 'users';
 const USERS_PUBLIC = 'users_public';
 
 /** Shallow-equal over the projection payload (values are scalars, string
@@ -56,29 +57,26 @@ function sameProjection(a, b) {
 /**
  * Core of the trigger, driven directly by tests with a fake db.
  *
- * The projection is a function of the AFTER state alone — the previous
- * state is not a parameter, so a replayed or out-of-order delivery
- * converges on the same document rather than on a diff of two snapshots.
+ * The event payload is NOT the input. Trigger deliveries are unordered and
+ * may be retried, so projecting the `after` snapshot an event carries can
+ * republish a stale state — a public→private edit whose older (public)
+ * delivery lands last would put the profile back on the open web and leave
+ * it there. Every run therefore re-reads `users/{uid}` inside a
+ * transaction and projects whatever is current, with the projection write
+ * in the same transaction: the event is a wake-up, not data. Out-of-order
+ * and duplicate deliveries then converge on the same document, and the
+ * last writer is by definition the one that read the newest source.
  *
  * @param {{ db: object, getConfig: () => Promise<{ badges: object|null }>,
  *           now?: () => Date, log?: { error: Function } }} deps
- * @returns {(change: { uid: string, after: object|null }) =>
+ * @returns {(change: { uid: string }) =>
  *   Promise<{ action: 'deleted'|'written'|'unchanged' }>}
  */
 function createSyncUserPublic({ db, getConfig, now = () => new Date(), log = console }) {
-  return async function syncUserPublic({ uid, after }) {
+  return async function syncUserPublic({ uid }) {
     if (typeof uid !== 'string' || uid.length === 0) {
       log.error('syncUserPublic called without a uid');
       return { action: 'unchanged' };
-    }
-    const ref = db.collection(USERS_PUBLIC).doc(uid);
-
-    // The account is gone: its public projection must go with it. A
-    // delete of an already-absent doc is a no-op in Firestore, so this
-    // needs no existence check.
-    if (after == null) {
-      await ref.delete();
-      return { action: 'deleted' };
     }
 
     let badgesConfig = null;
@@ -92,13 +90,27 @@ function createSyncUserPublic({ db, getConfig, now = () => new Date(), log = con
       log.error('syncUserPublic: config/badges unavailable; projecting no badges', err);
     }
 
-    const payload = buildPublicProfile(after, badgesConfig);
-    const existing = await ref.get();
-    if (existing.exists && sameProjection(stripStamps(existing.data()), payload)) {
-      return { action: 'unchanged' };
-    }
-    await ref.set({ ...payload, uid, updatedAt: now() });
-    return { action: 'written' };
+    const userRef = db.collection(USERS).doc(uid);
+    const publicRef = db.collection(USERS_PUBLIC).doc(uid);
+
+    return db.runTransaction(async (tx) => {
+      const [userSnap, publicSnap] = await Promise.all([tx.get(userRef), tx.get(publicRef)]);
+
+      // The account is gone: its public projection must go with it. A
+      // delete of an already-absent doc is a no-op in Firestore, so this
+      // needs no existence check.
+      if (!userSnap.exists) {
+        tx.delete(publicRef);
+        return { action: 'deleted' };
+      }
+
+      const payload = buildPublicProfile(userSnap.data(), badgesConfig);
+      if (publicSnap.exists && sameProjection(stripStamps(publicSnap.data()), payload)) {
+        return { action: 'unchanged' };
+      }
+      tx.set(publicRef, { ...payload, uid, updatedAt: now() });
+      return { action: 'written' };
+    });
   };
 }
 
@@ -123,11 +135,9 @@ function buildHandlers() {
         db,
         getConfig: () => getEventConfig({ db }),
       });
-      const after = event.data?.after;
-      await handler({
-        uid: event.params.uid,
-        after: after && after.exists ? after.data() : null,
-      });
+      // The event's snapshots are deliberately unused — see
+      // createSyncUserPublic: the handler re-reads the source document.
+      await handler({ uid: event.params.uid });
     }),
   };
 }
@@ -137,5 +147,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { sameProjection, USERS_PUBLIC },
+  internals: { sameProjection, USERS, USERS_PUBLIC },
 };

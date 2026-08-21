@@ -99,10 +99,24 @@ describe('Attendees', () => {
     expect(screen.getByText('Editor · The Weekly')).toBeInTheDocument();
   });
 
-  it('shows an empty state, not a spinner, when no profiles are listed', () => {
+  it('shows a loading state until a snapshot arrives, and the empty state only for a real empty result', () => {
     renderPage();
+    // No snapshot yet: "nobody signed up" would be a lie at this point.
+    expect(screen.getByRole('status', { name: 'Loading the attendee directory' }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'No attendee profiles yet' })).toBeNull();
+
     pushProfiles([]);
     expect(screen.getByRole('heading', { name: 'No attendee profiles yet' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading the attendee directory' })).toBeNull();
+  });
+
+  it('renders a profile whose fields are the wrong type instead of crashing the directory', () => {
+    renderPage();
+    pushProfiles([
+      { id: 'u1', displayName: 'Amara Diallo', pronouns: { a: 1 }, jobTitle: ['Editor'] },
+    ]);
+    expect(screen.getByRole('link', { name: 'Amara Diallo' })).toBeInTheDocument();
   });
 
   it('says the directory is unavailable when the listener fails, rather than showing it empty', () => {

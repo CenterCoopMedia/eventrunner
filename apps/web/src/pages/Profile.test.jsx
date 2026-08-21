@@ -152,4 +152,53 @@ describe('Profile', () => {
     await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
     expect(saveProfileMock.mock.calls[0][0].badges).toEqual(['writer']);
   });
+
+  it('enforces the category maxPicks in the form, instead of letting the projection truncate silently', async () => {
+    features.badges = true;
+    badgesConfig = {
+      categories: [
+        {
+          id: 'craft',
+          label: 'Craft',
+          maxPicks: 1,
+          badges: [
+            { id: 'writer', label: 'Writer' },
+            { id: 'editor', label: 'Editor' },
+          ],
+        },
+      ],
+    };
+    renderPage();
+    expect(screen.getByText('Pick up to 1 (0 chosen).')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Writer' }));
+    // At the cap: the unchosen badge is no longer selectable, and the copy
+    // says why rather than letting the save look complete and publish one.
+    expect(screen.getByRole('checkbox', { name: 'Editor' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Writer' })).toBeEnabled();
+    expect(
+      screen.getByText('You’ve picked all 1 — clear one to choose another.'),
+    ).toBeInTheDocument();
+
+    // Clearing the pick frees the other one again.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Writer' }));
+    expect(screen.getByRole('checkbox', { name: 'Editor' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Editor' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(saveProfileMock.mock.calls[0][0].badges).toEqual(['editor']);
+  });
+
+  it('groups badges by category, with no cap copy for an uncapped category', () => {
+    features.badges = true;
+    badgesConfig = {
+      categories: [
+        { id: 'craft', label: 'Craft', badges: [{ id: 'writer', label: 'Writer' }] },
+      ],
+    };
+    renderPage();
+    expect(screen.getByRole('group', { name: 'Craft' })).toBeInTheDocument();
+    expect(screen.queryByText(/Pick up to/)).toBeNull();
+  });
 });

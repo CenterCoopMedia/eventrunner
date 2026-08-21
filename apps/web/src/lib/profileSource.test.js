@@ -13,6 +13,7 @@ vi.mock('firebase/firestore', () => ({
   getDoc: (...args) => getDocMock(...args),
   onSnapshot: (...args) => onSnapshotMock(...args),
   query: (target, ...constraints) => ({ ...target, constraints }),
+  serverTimestamp: () => ({ sentinel: 'serverTimestamp' }),
   updateDoc: (...args) => updateDocMock(...args),
   where: (field, op, value) => ({ field, op, value }),
 }));
@@ -79,13 +80,19 @@ describe('saveOwnProfile', () => {
       bio: 'Reporter',
       profileVisibility: 'public',
       badges: ['writer'],
+      // Stamped here, from the server clock — this is updatedAt's only
+      // writer, so a profile edit never leaves the creation time in place.
+      updatedAt: { sentinel: 'serverTimestamp' },
     });
   });
 
   it('omits fields the caller did not supply rather than blanking them', async () => {
     await saveOwnProfile('u1', { displayName: 'Rae' });
     const [, payload] = updateDocMock.mock.calls[0];
-    expect(payload).toEqual({ displayName: 'Rae' });
+    expect(payload).toEqual({
+      displayName: 'Rae',
+      updatedAt: { sentinel: 'serverTimestamp' },
+    });
   });
 });
 

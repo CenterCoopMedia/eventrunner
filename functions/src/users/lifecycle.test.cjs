@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   buildNewUserDoc,
   createOnUserCreated,
+  createOnUserDeleted,
   createMaintainProfileComplete,
 } = require('./lifecycle.cjs');
 
@@ -31,6 +32,14 @@ function fakeDb(seed = {}) {
               }
               docs.set(key, data);
               writes.push({ type: 'create', path: key });
+            },
+            async get() {
+              const data = docs.get(key);
+              return { exists: docs.has(key), data: () => data };
+            },
+            async delete() {
+              docs.delete(key);
+              writes.push({ type: 'delete', path: key });
             },
             async update(patch) {
               if (!docs.has(key)) {
@@ -90,6 +99,36 @@ test('onUserCreated without a uid writes nothing', async () => {
   const errors = [];
   const result = await createOnUserCreated({ db, now: () => NOW, log: { error: () => errors.push(1) } })(null);
   assert.equal(result.created, false);
+  assert.deepEqual(db.writes, []);
+  assert.equal(errors.length, 1);
+});
+
+test('deleting the auth account deletes the account document', async () => {
+  const db = fakeDb({
+    'users/u1': { uid: 'u1', displayName: 'Rae' },
+    'users_public/u1': { uid: 'u1', displayName: 'Rae' },
+  });
+  const result = await createOnUserDeleted({ db })({ uid: 'u1' });
+  assert.equal(result.deleted, true);
+  assert.equal(db.docs.has('users/u1'), false);
+  // The projection goes with it via syncUserPublic, which the delete fires.
+  assert.deepEqual(db.writes, [{ type: 'delete', path: 'users/u1' }]);
+});
+
+test('a deleted account with no document still has its projection removed', async () => {
+  // No users doc means no projection trigger will fire, so a projection
+  // left behind would stay readable in the directory forever.
+  const db = fakeDb({ 'users_public/u1': { uid: 'u1', displayName: 'Rae' } });
+  const result = await createOnUserDeleted({ db })({ uid: 'u1' });
+  assert.equal(result.deleted, false);
+  assert.equal(db.docs.has('users_public/u1'), false);
+});
+
+test('onUserDeleted without a uid writes nothing', async () => {
+  const db = fakeDb({ 'users/u1': { uid: 'u1' } });
+  const errors = [];
+  const result = await createOnUserDeleted({ db, log: { error: () => errors.push(1) } })(null);
+  assert.equal(result.deleted, false);
   assert.deepEqual(db.writes, []);
   assert.equal(errors.length, 1);
 });

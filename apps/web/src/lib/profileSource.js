@@ -24,6 +24,7 @@ import {
   getDoc,
   onSnapshot,
   query,
+  serverTimestamp,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -67,9 +68,12 @@ export function subscribeOwnProfile(uid, onNext) {
  *
  * Only SELF_EDITABLE_PROFILE_FIELDS are sent: the rules reject a write that
  * touches anything else, so filtering here turns a caller mistake into a
- * dropped field instead of a rejected save. `updatedAt` is stamped by the
- * caller-visible field list, not by the client clock, so it is left to the
- * server-side triggers when absent.
+ * dropped field instead of a rejected save.
+ *
+ * `updatedAt` is stamped here, with serverTimestamp() rather than the
+ * browser clock, and this is its ONLY writer — the same single-writer rule
+ * `profileComplete` follows in the trigger. The rules type-check it as a
+ * timestamp, so a client cannot backdate its own profile.
  *
  * @param {string} uid
  * @param {object} fields
@@ -83,6 +87,7 @@ export function saveOwnProfile(uid, fields) {
       payload[key] = fields[key];
     }
   }
+  payload.updatedAt = serverTimestamp();
   return updateDoc(doc(db, USERS, uid), payload);
 }
 

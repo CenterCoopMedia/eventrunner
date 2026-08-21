@@ -7,13 +7,23 @@
 // for "this person is here but has a private profile".
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { validateBadgeSelection } from 'shared/badges';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { useProfile } from '../contexts/ProfileContext.jsx';
 import { fetchPublicProfile } from '../lib/profileSource.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
 
-/** config/badges label lookup; an unconfigured id falls back to the id. */
+/**
+ * Render only strings — the projection coerces these fields and the rules
+ * type-check them, but a page that hands React a map crashes outright.
+ */
+function text(value) {
+  return typeof value === 'string' ? value : '';
+}
+
+/** config/badges label lookup for an id already known to be configured. */
 function badgeLabel(badgesConfig, badgeId) {
   const categories = Array.isArray(badgesConfig?.categories) ? badgesConfig.categories : [];
   for (const category of categories) {
@@ -29,6 +39,11 @@ function badgeLabel(badgesConfig, badgeId) {
 export default function AttendeeProfile() {
   const { uid } = useParams();
   const { features, badges: badgesConfig } = useEventConfig();
+  // A read denied while the viewer was still pending must not stick: when
+  // their approval lands (or they sign in, or out) the rules answer
+  // differently, so the read is re-run rather than leaving "unavailable"
+  // frozen on screen until a manual reload.
+  const { attendeeAccess, status: accountStatus } = useProfile();
   const [state, setState] = useState({ status: 'loading', profile: null });
 
   useEffect(() => {
@@ -41,7 +56,7 @@ export default function AttendeeProfile() {
     return () => {
       cancelled = true;
     };
-  }, [uid]);
+  }, [uid, attendeeAccess, accountStatus]);
 
   if (!features.attendeeDirectory) {
     return (
@@ -80,27 +95,39 @@ export default function AttendeeProfile() {
   }
 
   const { profile } = state;
-  const badges = Array.isArray(profile.badges) ? profile.badges : [];
+  // Intersect with the LIVE config/badges rather than trusting the stored
+  // projection: the projection is rewritten when its user's document is
+  // written, so a badge the operator removed from config/badges afterwards
+  // stays in it until that user next edits their profile. Rendering through
+  // the same validator the projection uses means a removed badge stops
+  // being shown the moment the config changes. (The stored projection is
+  // still stale — see the reprojection note in the PR.)
+  const badges = validateBadgeSelection(
+    Array.isArray(profile.badges) ? profile.badges : [],
+    badgesConfig,
+  ).valid;
 
   return (
     <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
       <article>
         <h1 className="font-heading text-3xl font-semibold text-brand-ink">
-          {profile.displayName}
+          {text(profile.displayName)}
         </h1>
-        {profile.pronouns ? (
-          <p className="mt-1 text-brand-ink-muted">{profile.pronouns}</p>
+        {text(profile.pronouns) ? (
+          <p className="mt-1 text-brand-ink-muted">{text(profile.pronouns)}</p>
         ) : null}
-        {profile.jobTitle || profile.organization ? (
+        {text(profile.jobTitle) || text(profile.organization) ? (
           <p className="mt-2 text-brand-ink-muted">
-            {[profile.jobTitle, profile.organization].filter(Boolean).join(' · ')}
+            {[text(profile.jobTitle), text(profile.organization)].filter(Boolean).join(' · ')}
           </p>
         ) : null}
         {profile.speakerId ? (
           <p className="mt-2 font-semibold text-brand-primary-dark">Speaker at this event</p>
         ) : null}
-        {profile.bio ? (
-          <p className="mt-6 max-w-prose whitespace-pre-line text-brand-ink">{profile.bio}</p>
+        {text(profile.bio) ? (
+          <p className="mt-6 max-w-prose whitespace-pre-line text-brand-ink">
+            {text(profile.bio)}
+          </p>
         ) : null}
         {features.badges && badges.length > 0 ? (
           <>
