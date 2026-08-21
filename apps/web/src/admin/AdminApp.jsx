@@ -20,6 +20,7 @@ import AdminPageEditor from './pages/AdminPageEditor.jsx';
 import AdminEventSettings from './pages/AdminEventSettings.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
+import AdminBranding from './pages/AdminBranding.jsx';
 
 export function AdminGate({ children }) {
   const { user, isAdmin, loading } = useAuth();
@@ -70,6 +71,7 @@ export default function AdminApp() {
           <Route path="settings" element={<AdminEventSettings />} />
           <Route path="features" element={<AdminFeatureSettings />} />
           <Route path="badges" element={<AdminBadgeSettings />} />
+          <Route path="branding" element={<AdminBranding />} />
           <Route
             path="*"
             element={

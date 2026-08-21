@@ -1,0 +1,331 @@
+// Branding tab (issue #15 — "changing colors/logo in the Branding tab
+// restyles the public site with no deploy"), wired to updateTheme.
+//
+// Editable: the palette (config/theme.colors), the three font roles from the
+// bundled font-set allowlist (spec §7.4 — no arbitrary remote fonts), the
+// texture treatment, and the corner-radius scale. Every change is previewed
+// LIVE before saving by running the candidate document through the same
+// lib/themeRuntime.js builder the runtime override uses, so what you see is
+// what the public site will render — no deploy, no rebuild.
+//
+// Logo/asset slots: config/theme.logos holds PATHS, and there is no upload
+// backend yet (storage.rules deny all writes; no upload endpoint exists), so
+// the slots are editable as paths to assets already served by the site and
+// the upload affordance is a marked TODO rather than an invented storage
+// path. Whatever is in `logos` is carried through every save verbatim.
+//
+// config/theme is a WHOLE-DOC replace, so the payload always carries colors,
+// fonts, texture, radius, and logos together.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
+import { useToast } from '../../contexts/ToastContext.jsx';
+import { useAdminApi } from '../adminApi.js';
+import {
+  FONT_SET_IDS,
+  RADIUS_IDS,
+  THEME_COLOR_KEYS,
+  THEME_COLOR_PROPERTIES,
+  THEME_FONT_ROLES,
+  TEXTURE_IDS,
+  rgbTripleToHex,
+} from '../../lib/themeRuntime.js';
+import { applyThemePreview, clearThemePreview } from '../themePreview.js';
+import {
+  Panel,
+  SaveStatus,
+  SelectField,
+  ServerErrorSummary,
+  TextField,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from '../components/formControls.jsx';
+
+const LOGO_SLOTS = ['primary', 'mark', 'footer', 'ogDefault', 'favicon'];
+
+/** A hex value a native color picker will accept. */
+const PICKABLE_HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/**
+ * Seed one color input. config/theme.colors wins; otherwise the value
+ * currently resolved on :root (the build-time palette from generated
+ * theme.css) is read back and converted to hex, so the editor starts from
+ * what the site actually looks like rather than from blanks.
+ */
+function seedColor(colors, key) {
+  const configured = colors?.[key];
+  if (typeof configured === 'string' && configured) return configured;
+  if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return '';
+  const resolved = window
+    .getComputedStyle(document.documentElement)
+    .getPropertyValue(THEME_COLOR_PROPERTIES[key]);
+  return rgbTripleToHex(resolved) ?? '';
+}
+
+function toForm(theme) {
+  const colors = {};
+  for (const key of THEME_COLOR_KEYS) colors[key] = seedColor(theme?.colors, key);
+  const fonts = {};
+  for (const role of THEME_FONT_ROLES) {
+    fonts[role] = FONT_SET_IDS.includes(theme?.fonts?.[role])
+      ? theme.fonts[role]
+      : FONT_SET_IDS[0];
+  }
+  const logos = {};
+  for (const slot of LOGO_SLOTS) {
+    logos[slot] = typeof theme?.logos?.[slot] === 'string' ? theme.logos[slot] : '';
+  }
+  return {
+    colors,
+    fonts,
+    logos,
+    texture: TEXTURE_IDS.includes(theme?.texture) ? theme.texture : TEXTURE_IDS[0],
+    radius: RADIUS_IDS.includes(theme?.radius) ? theme.radius : RADIUS_IDS[1] ?? RADIUS_IDS[0],
+  };
+}
+
+/** The candidate config/theme doc — blank colors are omitted, not sent empty. */
+function toThemeDoc(form) {
+  const colors = {};
+  for (const [key, value] of Object.entries(form.colors)) {
+    if (typeof value === 'string' && value.trim()) colors[key] = value.trim();
+  }
+  const logos = {};
+  for (const [slot, value] of Object.entries(form.logos)) {
+    if (typeof value === 'string' && value.trim()) logos[slot] = value.trim();
+  }
+  return {
+    colors,
+    fonts: { ...form.fonts },
+    logos,
+    texture: form.texture,
+    radius: form.radius,
+  };
+}
+
+const COLOR_LABELS = {
+  primary: 'Primary',
+  primaryDark: 'Primary (dark)',
+  primaryLight: 'Primary (light)',
+  accent: 'Accent',
+  surface: 'Surface',
+  surfaceAlt: 'Surface (alt)',
+  ink: 'Ink',
+  inkMuted: 'Ink (muted)',
+  success: 'Success',
+  warning: 'Warning',
+  danger: 'Danger',
+  highlight: 'Highlight',
+  keynote: 'Keynote',
+};
+
+const FONT_SET_LABELS = {
+  'serif-editorial': 'Serif editorial',
+  'sans-humanist': 'Sans humanist',
+  'script-casual': 'Script casual',
+};
+
+const RADIUS_LABELS = { sharp: 'Sharp', soft: 'Soft', round: 'Round' };
+const TEXTURE_LABELS = { paper: 'Paper', flat: 'Flat' };
+
+export default function AdminBranding() {
+  const { theme } = useEventConfig();
+  const call = useAdminApi();
+  const { showToast } = useToast();
+
+  const [form, setForm] = useState(() => toForm(theme));
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState('');
+  const errorRef = useRef(null);
+  const adoptedRef = useRef(Boolean(theme?.colors));
+
+  // Adopt the runtime doc once it arrives, then leave the form alone so a
+  // listener echo never overwrites in-progress edits.
+  useEffect(() => {
+    if (adoptedRef.current || !theme?.colors) return;
+    adoptedRef.current = true;
+    setForm(toForm(theme));
+  }, [theme]);
+
+  const candidate = useMemo(() => toThemeDoc(form), [form]);
+
+  // Live preview: candidate values are applied to the page on every change
+  // and removed when the tab unmounts, so an abandoned edit leaves nothing
+  // behind and the saved theme renders again.
+  useEffect(() => {
+    applyThemePreview(candidate);
+  }, [candidate]);
+  useEffect(() => () => clearThemePreview(), []);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+
+  const fieldErrors = useMemo(() => {
+    const map = new Map();
+    for (const segment of error?.fieldErrors ?? []) {
+      if (segment.field && !map.has(segment.field)) map.set(segment.field, segment.message);
+    }
+    return map;
+  }, [error]);
+
+  async function submit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    setStatus('');
+    try {
+      await call('updateTheme', { theme: candidate });
+      setStatus('Saved. The public site restyles live — no deploy needed.');
+      showToast('Branding saved.');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function revert() {
+    setForm(toForm(theme));
+    setStatus('Reverted to the saved theme.');
+  }
+
+  return (
+    <form className="flex flex-col gap-6" onSubmit={submit}>
+      <div>
+        <h1 className="font-heading text-2xl font-semibold text-brand-ink">Branding</h1>
+        <p className="text-sm text-brand-ink-muted">
+          Colors, type, and texture. Changes preview on this page immediately;
+          saving applies them to the public site without a deploy.
+        </p>
+      </div>
+
+      <ServerErrorSummary error={error} errorRef={errorRef} />
+      {status ? <SaveStatus message={status} /> : null}
+
+      <Panel
+        title="Palette"
+        description="Hex colors. A color left blank falls back to the build-time palette."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          {THEME_COLOR_KEYS.map((key) => (
+            <div key={key} className="flex items-end gap-3">
+              {PICKABLE_HEX_RE.test(form.colors[key]) ? (
+                <input
+                  type="color"
+                  aria-label={`${COLOR_LABELS[key] ?? key} color picker`}
+                  value={form.colors[key]}
+                  onChange={(event) =>
+                    setForm((c) => ({ ...c, colors: { ...c.colors, [key]: event.target.value } }))
+                  }
+                  className="touch-target h-11 w-14 rounded-brand border border-brand-ink/20 bg-brand-surface p-1"
+                />
+              ) : null}
+              <div className="flex-1">
+                <TextField
+                  label={COLOR_LABELS[key] ?? key}
+                  value={form.colors[key]}
+                  onChange={(value) =>
+                    setForm((c) => ({ ...c, colors: { ...c.colors, [key]: value } }))
+                  }
+                  error={fieldErrors.get(`theme.colors.${key}`)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel
+        title="Type, texture, and shape"
+        description="Font sets are bundled and self-hosted; only these three are available."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          {THEME_FONT_ROLES.map((role) => (
+            <SelectField
+              key={role}
+              label={`${role.charAt(0).toUpperCase()}${role.slice(1)} font`}
+              value={form.fonts[role]}
+              options={FONT_SET_IDS.map((id) => ({
+                value: id,
+                label: FONT_SET_LABELS[id] ?? id,
+              }))}
+              onChange={(value) =>
+                setForm((c) => ({ ...c, fonts: { ...c.fonts, [role]: value } }))
+              }
+            />
+          ))}
+          <SelectField
+            label="Texture"
+            value={form.texture}
+            options={TEXTURE_IDS.map((id) => ({ value: id, label: TEXTURE_LABELS[id] ?? id }))}
+            onChange={(value) => setForm((c) => ({ ...c, texture: value }))}
+            hint="Paper paints a subtle dot pattern behind the page; flat removes it."
+          />
+          <SelectField
+            label="Corner radius"
+            value={form.radius}
+            options={RADIUS_IDS.map((id) => ({ value: id, label: RADIUS_LABELS[id] ?? id }))}
+            onChange={(value) => setForm((c) => ({ ...c, radius: value }))}
+          />
+        </div>
+      </Panel>
+
+      <Panel title="Preview" description="These samples use the same tokens the public site does.">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface">
+            Primary action
+          </span>
+          <span className="rounded-brand bg-brand-accent px-4 py-2 font-semibold text-brand-surface">
+            Accent
+          </span>
+          <span className="rounded-brand border border-brand-ink/20 bg-brand-surface-alt px-4 py-2 text-brand-ink">
+            Surface
+          </span>
+          <span className="rounded-brand bg-success/10 px-3 py-2 text-success">Success</span>
+          <span className="rounded-brand bg-warning/10 px-3 py-2 text-warning">Warning</span>
+          <span className="rounded-brand bg-danger/10 px-3 py-2 text-danger">Danger</span>
+        </div>
+        <p className="mt-4 font-heading text-2xl text-brand-ink">Heading typeface</p>
+        <p className="font-body text-brand-ink">
+          Body typeface — the face most of the site is set in.
+        </p>
+        <p className="font-accent text-xl text-brand-ink">Accent typeface</p>
+      </Panel>
+
+      <Panel
+        title="Logos and assets"
+        description="Paths to the branding assets the site serves. Uploading files here is not built yet."
+      >
+        <p className="mb-4 rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
+          TODO — asset upload has no backend yet: Storage rules deny all writes
+          and no upload endpoint exists. Until one ships, point these slots at
+          assets already served by the site (paths under <code>branding/</code>)
+          rather than uploading here.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {LOGO_SLOTS.map((slot) => (
+            <TextField
+              key={slot}
+              label={`${slot} asset path`}
+              value={form.logos[slot]}
+              onChange={(value) =>
+                setForm((c) => ({ ...c, logos: { ...c.logos, [slot]: value } }))
+              }
+              error={fieldErrors.get(`theme.logos.${slot}`)}
+            />
+          ))}
+        </div>
+      </Panel>
+
+      <div className="flex flex-wrap gap-3">
+        <button type="submit" className={primaryButtonClass} disabled={saving}>
+          {saving ? 'Saving…' : 'Save branding'}
+        </button>
+        <button type="button" className={secondaryButtonClass} onClick={revert} disabled={saving}>
+          Revert to saved
+        </button>
+      </div>
+    </form>
+  );
+}
