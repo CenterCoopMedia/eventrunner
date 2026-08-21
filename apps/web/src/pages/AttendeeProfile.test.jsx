@@ -47,6 +47,33 @@ beforeEach(() => {
 });
 
 describe('AttendeeProfile', () => {
+  it('renders the attendee photo the projection carries', async () => {
+    fetchPublicProfileMock.mockResolvedValue({
+      id: 'u1',
+      displayName: 'Amara Diallo',
+      photoPath: 'profile-photos/u1/photo.png',
+      badges: [],
+    });
+    const { container } = renderPage();
+    await screen.findByRole('heading', { name: 'Amara Diallo' });
+    expect(container.querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining(encodeURIComponent('profile-photos/u1/photo.png')),
+    );
+  });
+
+  it('falls back to a lettered avatar when there is no photo', async () => {
+    fetchPublicProfileMock.mockResolvedValue({
+      id: 'u1',
+      displayName: 'Amara Diallo',
+      badges: [],
+    });
+    const { container } = renderPage();
+    await screen.findByRole('heading', { name: 'Amara Diallo' });
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByText('A')).toBeInTheDocument();
+  });
+
   it('gates the route behind config/features.attendeeDirectory', async () => {
     features.attendeeDirectory = false;
     renderPage();
