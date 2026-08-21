@@ -55,7 +55,7 @@ node scripts/init-event.cjs --attest-auth    # record the manual Firebase Auth s
 | `--admin <email>` | first admin address, repeatable; wins over the answers file |
 | `--force` | re-run against a project that already has `config/event` |
 | `--check` | read-only launch-readiness check (the seven §5.1.1 rows) |
-| `--attest-auth` | record that the manual Auth console steps are done |
+| `--attest-auth` | record that the manual Auth console steps are done, and refresh the still-seeded legal copy that describes sign-in |
 | `--dry-run` | report every write without performing it |
 | `--skip-branding` | do not upload the placeholder branding assets |
 | `--seeded-threshold <n>` | how many seeded blocks `--check` tolerates (default 0) |
@@ -65,9 +65,16 @@ on every fresh deployment because init sets it, and clearing it needs an admin U
 after the hosting deploy a non-zero exit would have blocked. `--check` is the gate on going live;
 `init` is the gate on nothing.
 
+Init validates Tier A (`packages/shared/src/config/deploy.cjs`) before its first write: a missing or
+invalid `EVENT_*` key is fatal, missing `VITE_*` keys warn (they gate the build, not the seed), and
+under `FIRESTORE_EMULATOR_HOST` everything is a warning because the emulator is not a deployment.
+
 **Re-running never clobbers a client.** A seeded document is refreshed only while it still carries
 `seeded: true`; editing it in the CMS clears the flag and init leaves it alone from then on — even
-under `--force`, which only relaxes the "this project is already initialized" refusal. `config/*`
+under `--force`, which only relaxes the "this project is already initialized" refusal. Both
+revisions are checked, so an unpublished editor draft protects its document too. Branding follows
+the same rule in Storage: init stamps `metadata.seeded=true` on what it uploads and never overwrites
+an object without that stamp. `config/*`
 documents are skipped on re-run unless `--force`, and even then the fields another writer owns
 (sender verification, the legal review flag, `announcedAt`/`archivedAt`, the auth attestation,
 ticketing webhook stamps) are preserved. `config/bootstrap.adminEmails` is always additive.
@@ -93,8 +100,9 @@ conflict (§2.2). An answers file that sets one gets a warning.
 ### `seed-demo-event.cjs`
 
 Seeds the public demo instance (§5.4, milestone issue #35): a fictional three-day event with
-placeholder speakers, sponsors, and sessions. Refuses a project id that does not contain `demo`
-unless `--i-know-this-is-not-a-demo-project` is passed — the one thing this script must never do is
+placeholder speakers, sponsors, and sessions. Refuses a project id that is not a demo project —
+either an exact `DEMO_PROJECT_ID` or a delimited `demo` component (`demo-run-of-show`, not
+`democratic-media-prod`) — unless `--i-know-this-is-not-a-demo-project` is passed — the one thing this script must never do is
 publish placeholder speakers on a client's live site. Idempotent on the same terms as init.
 
 ```sh
@@ -112,9 +120,10 @@ node scripts/generate-content.cjs --out "$RUNNER_TEMP/generated"   # deploy-time
 ```
 
 `--demo` reads the in-repo fixture (`scripts/lib/demo-event.cjs`) — no credentials, no network, so
-fork PRs can run it. Reading a real project **requires** `--out` (or `GENERATED_DIR`): deploy-time
-generation must never write into the working tree, or a client's content would sit in a public repo
-one `git add -A` from being committed (§8.6). The hygiene gate also runs as a unit test
+fork PRs can run it. Reading a real project **requires** an output directory outside the checkout:
+any `--out` (or `GENERATED_DIR`) path inside the repository is refused, because a client's content
+sitting anywhere in the working tree of a public repo is one `git add -A` from being committed
+(§8.6). The hygiene gate also runs as a unit test
 (`scripts/lib/emit.test.cjs`), which fails if the committed snapshot is stale or has been
 overwritten with anything other than demo data.
 
@@ -133,6 +142,14 @@ EVENT_EMAIL_PROVIDER=postmark EMAIL_PROVIDER_API_KEY=… EMAIL_ACCOUNT_API_KEY=�
   node scripts/verify-sender-domain.cjs
 node scripts/verify-sender-domain.cjs --domain example.org --no-write
 ```
+
+`webhook` and `console` expose no domain API. For those, `--attest` records an operator attestation
+(`sender.domainVerifiedBy = 'operator-attested'`) after you have checked the relay's DNS yourself —
+without it the launch-readiness sender row could never be cleared and a webhook deployment would be
+permanently unlaunchable. A capable provider refuses `--attest`; its own check is the answer. A
+definitive SPF/DKIM/return-path failure on the configured domain also CLEARS a previously stored
+verification, so `--check` can never pass on a stamp that live DNS has just contradicted (an
+inconclusive "unknown" result never clears it).
 
 Exit codes: `0` verified (or the provider has no domain to verify), `1` not verified, `2`
 misconfigured. Postmark reports domain state only to an **account** token, so

@@ -106,6 +106,23 @@ test('every demo page is a valid page doc, and every demo name is fictional', ()
   }
 });
 
+test('line terminators from real-world copy do not break the generated module', () => {
+  // A Windows-authored paste reaches Firestore with CRLF. Left raw inside
+  // a single-quoted literal it is a syntax error — a build break produced
+  // by an editor's newline convention.
+  const base = demoSnapshot();
+  const noisy = {
+    ...base,
+    content: [
+      { ...base.content[0], id: 'crlf__block', value: 'line one\r\nline two\rline three u2028' },
+    ],
+  };
+  const out = emitAll(noisy)['siteContent.js'];
+  assert.doesNotMatch(out, /\r/, 'no raw CR may reach the emitted literal');
+  const literal = /value: ('.*')/.exec(out)[1];
+  assert.equal(eval(`(${literal})`), 'line one\r\nline two\rline three u2028');
+});
+
 test('jsValue escapes quotes and backslashes rather than emitting broken JS', () => {
   const literal = internals.jsValue({ value: "it's a \\ backslash" });
   assert.equal(literal.includes("\\'"), true);

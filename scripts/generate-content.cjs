@@ -44,6 +44,21 @@ const COMMITTED_DIR = path.join(ROOT, 'apps', 'web', 'src', 'generated');
 
 const FLAGS = ['demo', 'out', 'check', 'help'];
 
+/**
+ * True when `target` is the repository root or anything under it.
+ *
+ * Path-based rather than string-prefix based: `path.relative` handles
+ * `..`, and a sibling directory whose name merely starts with the repo's
+ * (`/work/run-of-show-out`) must NOT be treated as inside it.
+ *
+ * @param {string} target absolute path
+ * @returns {boolean}
+ */
+function isInsideRepo(target) {
+  const rel = path.relative(ROOT, target);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
 function usage() {
   return [
     'Usage: node scripts/generate-content.cjs [--demo] [--out <dir>] [--check]',
@@ -76,15 +91,22 @@ async function readDeployment({ db }) {
 
   const readCollection = async (name) => {
     const snap = await db.collection(name).get();
-    return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    // `id` last: a stored field named `id` (a page doc carries one — §5.2)
+    // must not win over the document's actual id, or the emitted map would
+    // be keyed wrong and two docs could collapse onto one key.
+    return snap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
   };
-  const [pages, content, sessions, organizations] = await Promise.all([
+  // No per-collection catch: a collection that does not exist yet already
+  // returns an empty snapshot, so the only thing a catch here could
+  // swallow is a transient read failure — which would silently ship a
+  // build with no speakers rather than failing the generation.
+  const [pages, content, sessions, organizations, speakers] = await Promise.all([
     readCollection('cmsPages'),
     readCollection('cmsContent'),
     readCollection('cmsSchedule'),
     readCollection('cmsOrganizations'),
+    readCollection('speakers'),
   ]);
-  const speakers = await readCollection('speakers').catch(() => []);
 
   return {
     event: config.event,
@@ -118,14 +140,18 @@ async function main(argv) {
   let snapshot;
   if (args.demo) {
     snapshot = demoSnapshot();
+  } else if (isInsideRepo(outDir)) {
+    // ANY path inside the checkout, not just the committed directory:
+    // `--out apps/web/client-generated` would drop a client's real event
+    // config into the working tree of a public repo, which is the thing
+    // §8.6 is about — one `git add -A` from being committed. The
+    // committed-directory check alone was a spelling test, not a guard.
+    console.error(
+      `Refusing to write a real deployment inside the repository (${path.relative(ROOT, outDir) || '.'}) — spec §8.6.\n` +
+      'Point --out (or GENERATED_DIR) at a directory outside the checkout, e.g. "$RUNNER_TEMP/generated".',
+    );
+    return 2;
   } else {
-    if (outDir === COMMITTED_DIR) {
-      console.error(
-        'Refusing to write a real deployment into apps/web/src/generated (spec §8.6).\n' +
-        'Pass --out <dir> (or set GENERATED_DIR) so deploy-time generation stays out of the tree.',
-      );
-      return 2;
-    }
     const { initFirebase } = require('./lib/firebase-init.cjs');
     const { db, projectId, mode } = initFirebase({ env: process.env });
     console.log(`generate-content: reading ${projectId} (${mode})`);

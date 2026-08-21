@@ -77,12 +77,98 @@ test('the domain checked is the one the deployment sends from', async () => {
 });
 
 test('a provider with no domain concept is "nothing to check", not a failure', async () => {
+  const db = dbWithSender('hello@example.org');
   const code = await run({
     args: {},
-    env: { EVENT_EMAIL_PROVIDER: 'console' },
-    deps: fakeDeps({ provider: { name: 'console' }, db: makeFakeDb() }),
+    env: { EVENT_EMAIL_PROVIDER: 'webhook' },
+    deps: fakeDeps({ provider: { name: 'webhook' }, db }),
   });
   assert.equal(code, 0);
+  assert.equal((await db.collection('config').doc('event').get()).data().sender.domainVerified, false);
+});
+
+test('a provider with no domain API can still satisfy readiness, by operator attestation', async () => {
+  // Without this, EVENT_EMAIL_PROVIDER=webhook could never clear the
+  // launch-readiness sender row: the provider exposes nothing to query, so
+  // the gate would be unclearable and every webhook deployment
+  // permanently unlaunchable — which teaches operators to ignore gates.
+  const db = dbWithSender('hello@example.org');
+  const code = await run({
+    args: { attest: true },
+    env: { EVENT_EMAIL_PROVIDER: 'webhook' },
+    deps: fakeDeps({ provider: { name: 'webhook' }, db }),
+  });
+  assert.equal(code, 0);
+  const sender = (await db.collection('config').doc('event').get()).data().sender;
+  assert.equal(sender.domainVerified, true);
+  assert.equal(sender.domainVerifiedBy, 'operator-attested', 'the record says whose word this is');
+  assert.ok(sender.domainVerifiedAt);
+});
+
+test('a capable provider refuses --attest — its own check is the answer', async () => {
+  const db = dbWithSender('hello@example.org');
+  const code = await run({
+    args: { attest: true },
+    env: { EVENT_EMAIL_PROVIDER: 'postmark' },
+    deps: fakeDeps({ provider: { name: 'postmark', verifySenderDomain: async () => PASS }, db }),
+  });
+  assert.equal(code, 2);
+  assert.equal((await db.collection('config').doc('event').get()).data().sender.domainVerified, false);
+});
+
+test('a definitive failure clears a stale stored verification', async () => {
+  // Otherwise --check would report a launch as ready on a stamp that a
+  // live DNS answer has just contradicted.
+  const db = dbWithSender('hello@example.org');
+  await db.collection('config').doc('event').set(
+    { sender: { email: 'hello@example.org', domainVerified: true, domainVerifiedAt: '2027-01-01T00:00:00Z' } },
+  );
+  const code = await run({
+    args: {},
+    env: { EVENT_EMAIL_PROVIDER: 'postmark' },
+    deps: fakeDeps({ provider: { name: 'postmark', verifySenderDomain: async () => FAIL }, db }),
+  });
+  assert.equal(code, 1);
+  const sender = (await db.collection('config').doc('event').get()).data().sender;
+  assert.equal(sender.domainVerified, false);
+  assert.equal(sender.domainVerifiedAt, null);
+});
+
+test('an inconclusive check does NOT clear a stored verification', async () => {
+  // "No account token, everything unknown" says nothing about the domain;
+  // silently un-verifying a fine deployment would be its own bug.
+  const db = dbWithSender('hello@example.org');
+  await db.collection('config').doc('event').set(
+    { sender: { email: 'hello@example.org', domainVerified: true, domainVerifiedAt: '2027-01-01T00:00:00Z' } },
+  );
+  const unknown = {
+    domain: 'example.org', verified: false, spf: 'unknown', dkim: 'unknown', returnPath: 'unknown',
+    detail: 'EMAIL_ACCOUNT_API_KEY not configured',
+  };
+  const code = await run({
+    args: {},
+    env: { EVENT_EMAIL_PROVIDER: 'postmark' },
+    deps: fakeDeps({ provider: { name: 'postmark', verifySenderDomain: async () => unknown }, db }),
+  });
+  assert.equal(code, 1);
+  assert.equal((await db.collection('config').doc('event').get()).data().sender.domainVerified, true);
+});
+
+test('a definitive failure on some OTHER domain leaves the stored verification alone', async () => {
+  const db = dbWithSender('hello@example.org');
+  await db.collection('config').doc('event').set(
+    { sender: { email: 'hello@example.org', domainVerified: true, domainVerifiedAt: '2027-01-01T00:00:00Z' } },
+  );
+  const code = await run({
+    args: { domain: 'other.example' },
+    env: { EVENT_EMAIL_PROVIDER: 'postmark' },
+    deps: fakeDeps({
+      provider: { name: 'postmark', verifySenderDomain: async () => ({ ...FAIL, domain: 'other.example' }) },
+      db,
+    }),
+  });
+  assert.equal(code, 1);
+  assert.equal((await db.collection('config').doc('event').get()).data().sender.domainVerified, true);
 });
 
 test('a misconfigured provider exits 2 rather than reporting a verdict', async () => {

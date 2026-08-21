@@ -34,12 +34,27 @@
 /**
  * What to do with one seeded document.
  *
+ * BOTH revisions are inspected, because the CMS is a two-revision model
+ * (§8.4) and unpublished editor work lives only in the draft. A live doc
+ * still flagged `seeded: true` with a dirty draft beside it is the exact
+ * shape of "an editor has rewritten this page but has not published it
+ * yet" — refreshing on the live flag alone would overwrite that draft and
+ * then publish the placeholder over it, destroying work that was never
+ * visible to this script's live-doc check.
+ *
  * @param {object|null|undefined} existing the live doc, or null when absent
- * @param {{ force?: boolean }} [opts] `force` still respects client edits;
- *   it only relaxes the whole-run refusal, not this rule.
+ * @param {{ force?: boolean, draft?: object|null }} [opts] `force` still
+ *   respects client edits; it only relaxes the whole-run refusal.
  * @returns {{ action: SeedAction, reason: string }}
  */
 function decideSeedWrite(existing, opts = {}) {
+  const draft = opts.draft ?? null;
+  // An edited draft protects the document whether or not the live copy
+  // still looks seeded — including the case where no live doc exists yet
+  // (a seeded page whose first draft was rewritten before any publish).
+  if (draft != null && draft.seeded !== true) {
+    return { action: 'skip', reason: 'unpublished editor draft' };
+  }
   if (existing == null) return { action: 'create', reason: 'absent' };
   if (existing.seeded === true) {
     return { action: 'overwrite', reason: 'still seeded (unedited)' };
@@ -67,10 +82,18 @@ function decideConfigWrite({ docId, existing, next, force = false }) {
   if (existing == null) return { action: 'create', reason: 'absent', value: next };
   if (docId === 'bootstrap') {
     const merged = mergeAdminEmails(existing, next);
-    const changed = merged.adminEmails.length !== (existing.adminEmails || []).length;
+    // Compare CONTENTS, not counts. A stored list that is merely
+    // mis-normalized ("Ops@Example.org") has the same length as its
+    // normalized form, and skipping that write leaves an entry
+    // firestore.rules can never match — `adminEmails.hasAny([email.lower()])`
+    // — i.e. an admin who silently cannot authenticate.
+    const before = Array.isArray(existing.adminEmails) ? existing.adminEmails : [];
+    const changed =
+      before.length !== merged.adminEmails.length ||
+      before.some((email, i) => email !== merged.adminEmails[i]);
     return {
       action: changed ? 'overwrite' : 'skip',
-      reason: changed ? 'admin list extended' : 'admin list unchanged',
+      reason: changed ? 'admin list extended or renormalized' : 'admin list unchanged',
       value: { ...existing, ...merged },
     };
   }

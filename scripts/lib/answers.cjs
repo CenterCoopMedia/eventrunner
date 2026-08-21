@@ -329,6 +329,38 @@ function buildEvent({ answers, tierA }) {
   };
 }
 
+/**
+ * Overlay a client's theme answers on the neutral defaults, one level
+ * deep for the map-valued keys.
+ *
+ * A top-level spread is wrong here in a way that only shows up in the
+ * browser: `{ colors: { brandPrimary } }` would REPLACE the whole default
+ * palette, and the generated stylesheet would then be missing most of its
+ * custom properties — every `rgb(var(--brand-ink-rgb))` utility resolving
+ * to nothing. A client who names one brand color means "this one is
+ * different", not "drop the other twelve".
+ *
+ * `placeholderLogos` is recomputed rather than merged: a slot a client
+ * supplied their own asset for is no longer a placeholder, and the
+ * launch-readiness branding row reads exactly this list.
+ *
+ * @param {object} base defaultTheme()
+ * @param {*} overrides answers.theme
+ * @returns {object}
+ */
+function mergeTheme(base, overrides) {
+  if (!isPlainObject(overrides)) return base;
+  const merged = { ...base, ...overrides };
+  for (const key of ['colors', 'fonts', 'logos']) {
+    if (isPlainObject(overrides[key])) merged[key] = { ...base[key], ...overrides[key] };
+  }
+  if (isPlainObject(overrides.logos)) {
+    const supplied = new Set(Object.keys(overrides.logos));
+    merged.placeholderLogos = base.placeholderLogos.filter((slot) => !supplied.has(slot));
+  }
+  return merged;
+}
+
 /** The badges doc: an empty, valid skeleton a client fills in later. */
 function defaultBadges() {
   return { categories: [] };
@@ -352,9 +384,7 @@ function buildConfigDocs({ answers, tierA, now = Date.now }) {
   const { providers, warnings: providerWarnings } = buildProviders({ tierA, overrides: answers.providers });
   warnings.push(...featureWarnings, ...providerWarnings);
 
-  const theme = isPlainObject(answers.theme)
-    ? { ...defaultTheme(), ...answers.theme }
-    : defaultTheme();
+  const theme = mergeTheme(defaultTheme(), answers.theme);
   const badges = isPlainObject(answers.badges) ? answers.badges : defaultBadges();
 
   const adminEmails = Array.isArray(answers.adminEmails)
@@ -404,6 +434,7 @@ module.exports = {
   buildEvent,
   buildFeatures,
   buildProviders,
+  mergeTheme,
   defaultBadges,
   internals: { setPath, getPath, orDefault, isPlainObject },
 };

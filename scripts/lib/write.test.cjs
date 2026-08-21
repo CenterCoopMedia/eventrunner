@@ -73,6 +73,53 @@ test('re-running is a no-op for untouched seeds and never clobbers an edited doc
   assert.equal(edited.data().value, 'Our real subtitle');
 });
 
+test('an unpublished editor draft is protected, even while the live doc still looks seeded', async () => {
+  // The two-revision model (§8.4) means unpublished work exists ONLY in
+  // the draft: the live doc still carries seeded: true. Deciding on the
+  // live flag alone would overwrite the draft and then publish the
+  // placeholder over it.
+  const db = makeFakeDb();
+  const content = [{
+    id: 'hero__subtitle', section: 'hero', field: 'subtitle', blockType: 'text',
+    value: '[Replace] One warm supporting sentence.', visible: true, order: 1, seeded: true,
+  }];
+  await seedCollection({ db, store, collection: 'cmsContent', docs: content, now });
+
+  // An editor rewrites it and has not published yet.
+  await store.writeDraft({
+    db,
+    collection: 'cmsContent',
+    docId: 'hero__subtitle',
+    fields: { section: 'hero', field: 'subtitle', blockType: 'text', value: 'Our unpublished copy', seeded: false },
+    visible: true,
+    actor: { uid: 'editor', email: 'editor@example.org' },
+    now,
+  });
+
+  const rerun = await seedCollection({ db, store, collection: 'cmsContent', docs: content, now, force: true });
+  assert.deepEqual(rerun.skipped.map((s) => s.id), ['hero__subtitle']);
+  assert.match(rerun.skipped[0].reason, /draft/);
+  const draft = await db.collection('cmsContent_drafts').doc('hero__subtitle').get();
+  assert.equal(draft.data().value, 'Our unpublished copy');
+  assert.equal(draft.data().status, 'dirty', 'the editor work is still theirs to publish');
+});
+
+test('a draft that is still the seeded one does not block a refresh', async () => {
+  const db = makeFakeDb();
+  const content = [{
+    id: 'hero__subtitle', section: 'hero', field: 'subtitle', blockType: 'text',
+    value: '[Replace] first wording', visible: true, order: 1, seeded: true,
+  }];
+  await seedCollection({ db, store, collection: 'cmsContent', docs: content, now });
+  const updated = [{ ...content[0], value: '[Replace] corrected wording' }];
+  const rerun = await seedCollection({ db, store, collection: 'cmsContent', docs: updated, now });
+  assert.deepEqual(rerun.refreshed, ['hero__subtitle']);
+  assert.equal(
+    (await db.collection('cmsContent').doc('hero__subtitle').get()).data().value,
+    '[Replace] corrected wording',
+  );
+});
+
 test('--force still refuses to overwrite a client-edited doc', async () => {
   const db = makeFakeDb();
   await db.collection('cmsContent').doc('hero__title').set({ value: 'Client copy', seeded: false });
@@ -100,10 +147,10 @@ test('a dry run reports every write and performs none', async () => {
 test('config docs are written once, then left alone until --force', async () => {
   const db = makeFakeDb();
   const config = docs();
-  const first = await writeConfigDocs({ db, docs: config, now });
+  const { results: first } = await writeConfigDocs({ db, docs: config, now });
   assert.deepEqual(first.map((r) => r.action), ['create', 'create', 'create', 'create', 'create', 'create']);
 
-  const second = await writeConfigDocs({ db, docs: config, now });
+  const { results: second } = await writeConfigDocs({ db, docs: config, now });
   assert.deepEqual(
     second.filter((r) => r.docId !== 'bootstrap').map((r) => r.action),
     ['skip', 'skip', 'skip', 'skip', 'skip'],
