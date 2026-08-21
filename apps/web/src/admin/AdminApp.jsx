@@ -18,6 +18,10 @@ import LoadingState from '../components/LoadingState.jsx';
 import AdminLayout from './AdminLayout.jsx';
 import AdminPagesList from './pages/AdminPagesList.jsx';
 import AdminPageEditor from './pages/AdminPageEditor.jsx';
+import AdminContentPages from './pages/AdminContentPages.jsx';
+import AdminContentSections from './pages/AdminContentSections.jsx';
+import AdminContentSection from './pages/AdminContentSection.jsx';
+import AdminContentBlockEditor from './pages/AdminContentBlockEditor.jsx';
 import AdminEventSettings from './pages/AdminEventSettings.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
@@ -73,6 +77,25 @@ export default function AdminApp() {
           <Route path="pages" element={<AdminPagesList />} />
           <Route path="pages/new" element={<AdminPageEditor mode="create" />} />
           <Route path="pages/:pageId" element={<AdminPageEditor mode="edit" />} />
+          <Route path="content" element={<AdminContentPages />} />
+          <Route path="content/:pageId" element={<AdminContentSections />} />
+          <Route path="content/:pageId/:sectionId" element={<AdminContentSection />} />
+          {/* '_new', not 'new': a cmsContent field id may legitimately BE
+              'new' (SECTION_FIELD_RE only requires an alnum first
+              character), which would collide with a static 'new' segment —
+              the edit route for that real field would then always resolve
+              to this blank creation form instead, making the field
+              uneditable. A leading underscore can never be a valid field
+              id (the regex requires an alnum first character), so this
+              route can never collide with one. */}
+          <Route
+            path="content/:pageId/:sectionId/_new"
+            element={<AdminContentBlockEditor mode="create" />}
+          />
+          <Route
+            path="content/:pageId/:sectionId/:field"
+            element={<AdminContentBlockEditor mode="edit" />}
+          />
           <Route path="settings" element={<AdminEventSettings />} />
           <Route path="features" element={<AdminFeatureSettings />} />
           <Route path="badges" element={<AdminBadgeSettings />} />
