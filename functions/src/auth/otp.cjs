@@ -50,6 +50,45 @@ function renderedMailCarriesCode(rendered, code) {
 }
 
 /**
+ * How stale a `lastSeenAt` may get before the reopen path refreshes it.
+ * The fallback branch runs on every request while an override is broken,
+ * and that branch sits ahead of the rate limit — refreshing on a timer
+ * keeps the durable row's writes bounded (one per window per fault class)
+ * instead of one per unauthenticated request against a single hot doc.
+ */
+const LAST_SEEN_REFRESH_MS = 5 * 60 * 1000;
+
+/**
+ * Reopen the durable row for a fault class whose `.create()` came back
+ * ALREADY_EXISTS (issue #48). `resolved: false` is written immediately
+ * whenever the stored row is not already unresolved-and-fresh, so a new
+ * fault that happens to produce the same validation messages as a
+ * previously fixed one still raises a durable signal.
+ *
+ * A lost update between the read and the write is harmless: the next
+ * request repeats it, and both writers write the same intent.
+ *
+ * @param {{ db, errorId: string, seenAt: Date }} args
+ * @returns {Promise<boolean>} whether the row was written
+ */
+async function reopenSystemError({ db, errorId, seenAt }) {
+  const ref = db.collection('system_errors').doc(errorId);
+  const snap = await ref.get();
+  if (!snap.exists) return false;
+  const data = snap.data() || {};
+  const lastSeenMs = data.lastSeenAt instanceof Date
+    ? data.lastSeenAt.getTime()
+    : typeof data.lastSeenAt?.toMillis === 'function'
+      ? data.lastSeenAt.toMillis()
+      : Date.parse(data.lastSeenAt);
+  const fresh = Number.isFinite(lastSeenMs) &&
+    seenAt.getTime() - lastSeenMs < LAST_SEEN_REFRESH_MS;
+  if (data.resolved === false && fresh) return false;
+  await ref.update({ resolved: false, lastSeenAt: seenAt });
+  return true;
+}
+
+/**
  * @param {{ db, sendEmail: (m: object) => Promise<object>,
  *           getConfig: () => Promise<object>,
  *           notifyOperator?: (e: object) => Promise<object>,
@@ -85,23 +124,37 @@ function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = 
       // operator learns the override is broken (spec §6.1 step 4) — via a
       // DURABLE system_errors row first (the notifier is best-effort and
       // may be configured to none), then the notifier.
+      // Deterministic id: one durable row per distinct broken override,
+      // not one per request — this runs before the rate limit, so an
+      // attacker must not be able to mint unbounded Firestore writes.
+      const errorId = crypto.createHash('sha256')
+        .update(`template-override-invalid:auth.otp:${rendered.overrideErrors.join('|')}`, 'utf8')
+        .digest('hex');
+      const seenAt = new Date(now());
       try {
-        // Deterministic id: one durable row per distinct broken override,
-        // not one per request — this runs before the rate limit, so an
-        // attacker must not be able to mint unbounded Firestore writes.
-        const errorId = crypto.createHash('sha256')
-          .update(`template-override-invalid:auth.otp:${rendered.overrideErrors.join('|')}`, 'utf8')
-          .digest('hex');
         await db.collection('system_errors').doc(errorId).create({
           kind: 'template-override-invalid',
           templateId: 'auth.otp',
           errors: rendered.overrideErrors,
           resolved: false,
-          createdAt: new Date(now()),
+          createdAt: seenAt,
+          lastSeenAt: seenAt,
         });
       } catch (err) {
         if (!isAlreadyExists(err)) {
           log.error('system_errors write for auth.otp override fallback failed', err);
+        } else {
+          // The row for this fault class already exists — possibly marked
+          // resolved after an earlier override was fixed. A create() alone
+          // would leave a new, differently-caused fault with no durable
+          // signal at all, so reopen it and stamp a fresh lastSeenAt. One
+          // row per fault class is kept; operators also get a "still
+          // happening" timestamp on a fault that was never resolved.
+          try {
+            await reopenSystemError({ db, errorId, seenAt });
+          } catch (reopenErr) {
+            log.error('system_errors reopen for auth.otp override fallback failed', reopenErr);
+          }
         }
       }
       if (notifyOperator) {
@@ -282,5 +335,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { renderedMailCarriesCode, EXPIRY_MINUTES, EMAIL_RE },
+  internals: { renderedMailCarriesCode, reopenSystemError, EXPIRY_MINUTES, EMAIL_RE, LAST_SEEN_REFRESH_MS },
 };

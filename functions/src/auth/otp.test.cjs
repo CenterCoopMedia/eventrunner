@@ -28,6 +28,14 @@ function fakeDb() {
       store.set(key(c, id), data);
     },
     async delete() { store.delete(key(c, id)); },
+    async update(patch) {
+      if (!store.has(key(c, id))) {
+        const err = new Error('5 NOT_FOUND');
+        err.code = 5;
+        throw err;
+      }
+      Object.assign(store.get(key(c, id)), patch);
+    },
     async get() {
       const data = store.get(key(c, id));
       return { exists: data !== undefined, data: () => data };
@@ -78,11 +86,12 @@ const CONFIG = {
   tierA: { publicUrl: 'https://summit.example.org' },
 };
 
-function sendDeps({ db = fakeDb(), sendResult, notify } = {}) {
+function sendDeps({ db = fakeDb(), sendResult, notify, now } = {}) {
   const sent = [];
   const notices = [];
   const deps = {
     db,
+    ...(now ? { now } : {}),
     getConfig: async () => CONFIG,
     sendEmail: async (m) => {
       sent.push(m);
@@ -171,6 +180,63 @@ test('a broken auth.otp override falls back to the default and notifies the oper
   await handler({ method: 'POST', body: { email: 'b@example.org' } }, fakeRes());
   const after = [...db.store.keys()].filter((k) => k.startsWith('system_errors/'));
   assert.equal(after.length, 1);
+});
+
+// --- issue #48: the durable row's lifecycle ----------------------------------
+
+test('a resolved system_errors row is reopened when the same fault class recurs', async () => {
+  const db = fakeDb();
+  db.store.set('email_templates/auth.otp', { html: '<p>Welcome!</p>', text: 'Welcome!' });
+  let clock = 1_000_000;
+  const { handler } = sendDeps({ db, now: () => clock });
+
+  await handler({ method: 'POST', body: { email: 'a@example.org' } }, fakeRes());
+  const [errorKey, first] = [...db.store.entries()].find(([k]) => k.startsWith('system_errors/'));
+  assert.equal(first.resolved, false);
+  assert.deepEqual(first.lastSeenAt, new Date(1_000_000));
+
+  // The operator fixes the override and marks the row resolved.
+  db.store.get(errorKey).resolved = true;
+
+  // A LATER, differently-caused override produces the same validation
+  // messages: create() hits ALREADY_EXISTS, so without the reopen the new
+  // fault would leave no durable signal at all.
+  clock += internals.LAST_SEEN_REFRESH_MS + 1;
+  resetTemplateCacheForTest();
+  await handler({ method: 'POST', body: { email: 'b@example.org' } }, fakeRes());
+
+  const rows = [...db.store.keys()].filter((k) => k.startsWith('system_errors/'));
+  assert.equal(rows.length, 1, 'still one row per fault class');
+  const reopened = db.store.get(errorKey);
+  assert.equal(reopened.resolved, false);
+  assert.deepEqual(reopened.lastSeenAt, new Date(clock));
+  assert.deepEqual(reopened.createdAt, new Date(1_000_000), 'first-seen time is preserved');
+});
+
+test('reopen refreshes lastSeenAt on a stale unresolved row but not on a fresh one', async () => {
+  const db = fakeDb();
+  const ref = db.collection('system_errors').doc('fault-1');
+  await ref.create({ resolved: false, createdAt: new Date(0), lastSeenAt: new Date(0) });
+
+  // Fresh and already unresolved: no write, so an unauthenticated flood
+  // cannot hammer one hot document (the fallback branch runs before the
+  // rate limit).
+  const fresh = await internals.reopenSystemError({
+    db, errorId: 'fault-1', seenAt: new Date(internals.LAST_SEEN_REFRESH_MS - 1),
+  });
+  assert.equal(fresh, false);
+  assert.deepEqual(db.store.get('system_errors/fault-1').lastSeenAt, new Date(0));
+
+  // Stale: refreshed, giving operators a "still happening" signal.
+  const stale = new Date(internals.LAST_SEEN_REFRESH_MS + 1);
+  assert.equal(await internals.reopenSystemError({ db, errorId: 'fault-1', seenAt: stale }), true);
+  assert.deepEqual(db.store.get('system_errors/fault-1').lastSeenAt, stale);
+
+  // A row that vanished between create() and reopen is not resurrected.
+  assert.equal(
+    await internals.reopenSystemError({ db, errorId: 'missing', seenAt: stale }),
+    false,
+  );
 });
 
 test('the send-boundary gate: unit truth table', () => {
