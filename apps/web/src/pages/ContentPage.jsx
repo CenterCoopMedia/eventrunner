@@ -8,12 +8,26 @@
 // the systemPage guard below stays as defense in depth. Anything that
 // doesn't resolve to a visible, non-system page renders the same NotFound
 // used by every other unknown URL — this route IS the site's 404 path.
+//
+// validatePageDoc (functions/src/cms/pages.cjs) refuses a NEW/edited page
+// whose path starts with a reserved segment, but that guard only runs at
+// save time — a doc written before issue #52 (e.g. the old /p/faq path) or
+// one edited straight in Firestore can still sit in cmsPages with a
+// reserved-looking path. So the router re-checks RESERVED_PATH_SEGMENTS
+// itself, on both the requested URL and the matched doc's stored path, and
+// 404s rather than trusting stored data to already be clean.
 import { Link, useLocation } from 'react-router-dom';
+import { isReservedPathSegment } from 'shared/routing';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
+
+/** First path segment ('' for '/'), no leading/trailing slash. */
+function firstSegment(path) {
+  return path.split('/').filter(Boolean)[0] ?? '';
+}
 
 // Pages seeded from the §5.5 legal templates. While
 // config/event.legal.reviewRequired is set, both carry a visible public
@@ -28,9 +42,17 @@ export default function ContentPage() {
   const { getPage, getSectionBlocks } = useContent();
   const { eventConfig } = useEventConfig();
 
-  const page = getPage(pathname);
+  // The requested URL itself may be reserved territory (a stale /p/... link,
+  // a guess at /signin/help) even before a page lookup happens.
+  const page = isReservedPathSegment(firstSegment(pathname)) ? null : getPage(pathname);
 
-  if (!page || page.systemPage) {
+  // A non-system page whose STORED path starts with a reserved segment is
+  // pre-#52 or hand-edited data, not something the current admin UI could
+  // save today — treat it as unreachable rather than rendering it.
+  const pageReserved =
+    page && page.systemPage !== true && isReservedPathSegment(firstSegment(page.path));
+
+  if (!page || page.systemPage || pageReserved) {
     return <NotFound />;
   }
 
