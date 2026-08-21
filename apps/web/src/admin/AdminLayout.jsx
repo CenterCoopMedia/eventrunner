@@ -10,7 +10,12 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 
-const TABS = [{ to: 'pages', label: 'Pages' }];
+const TABS = [
+  { to: 'pages', label: 'Pages' },
+  { to: 'settings', label: 'Event' },
+  { to: 'features', label: 'Features' },
+  { to: 'badges', label: 'Badges' },
+];
 
 function tabClass({ isActive }) {
   return [

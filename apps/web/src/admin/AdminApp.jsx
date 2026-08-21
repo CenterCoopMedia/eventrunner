@@ -17,6 +17,9 @@ import LoadingState from '../components/LoadingState.jsx';
 import AdminLayout from './AdminLayout.jsx';
 import AdminPagesList from './pages/AdminPagesList.jsx';
 import AdminPageEditor from './pages/AdminPageEditor.jsx';
+import AdminEventSettings from './pages/AdminEventSettings.jsx';
+import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
+import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 
 export function AdminGate({ children }) {
   const { user, isAdmin, loading } = useAuth();
@@ -64,6 +67,9 @@ export default function AdminApp() {
           <Route path="pages" element={<AdminPagesList />} />
           <Route path="pages/new" element={<AdminPageEditor mode="create" />} />
           <Route path="pages/:pageId" element={<AdminPageEditor mode="edit" />} />
+          <Route path="settings" element={<AdminEventSettings />} />
+          <Route path="features" element={<AdminFeatureSettings />} />
+          <Route path="badges" element={<AdminBadgeSettings />} />
           <Route
             path="*"
             element={
