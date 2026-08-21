@@ -7,10 +7,17 @@
 // signed-out visitor, or a signed-in attendee who is neither the session's
 // speaker nor an admin) surfaces the server's refusal as inline text rather
 // than a broken link.
+//
+// A **link** material is opened directly; a **file** material has no `url`
+// at all (functions/src/materials/access.cjs never mints one — see its
+// module doc) and instead goes through downloadSessionMaterialFile, which
+// fetches the bytes through the embargo-gated downloadSessionMaterial
+// endpoint and triggers the browser's save/open behavior locally.
 import { useCallback, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { fetchSessionMaterialUrl } from '../lib/materialsSource.js';
+import { downloadSessionMaterialFile, fetchSessionMaterialUrl } from '../lib/materialsSource.js';
 import { useSessionMaterials } from '../hooks/useSessionMaterials.js';
+import { isSafeUrl } from 'shared/urlSafety';
 
 const TYPE_LABEL = { link: 'Link', file: 'File' };
 
@@ -20,13 +27,28 @@ function MaterialRow({ material }) {
   const onOpen = useCallback(async () => {
     setState({ status: 'loading' });
     try {
+      if (material.type === 'file') {
+        await downloadSessionMaterialFile({ user, materialId: material.id, filename: material.filename });
+        setState({ status: 'idle' });
+        return;
+      }
       const { url } = await fetchSessionMaterialUrl({ user, materialId: material.id });
+      // Belt-and-braces render-time guard (spec §4.4 follow-up): the server
+      // already rejects an unsafe protocol at write time
+      // (materials/store.cjs), so this should never fire in practice — but
+      // a material written before that check existed, or restored from a
+      // backup, must not silently open a javascript:/data:/file: target
+      // just because it made it into Firestore.
+      if (!isSafeUrl(url)) {
+        setState({ status: 'error', message: 'This material has an unsafe link and cannot be opened.' });
+        return;
+      }
       setState({ status: 'idle' });
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (err) {
       setState({ status: 'error', message: err.message || 'This material is not available yet.' });
     }
-  }, [user, material.id]);
+  }, [user, material.id, material.type, material.filename]);
 
   return (
     <li className="flex flex-col gap-1 rounded-brand border border-brand-ink/10 bg-brand-surface-alt p-3">

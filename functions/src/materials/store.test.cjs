@@ -8,7 +8,15 @@ const {
   uploadSessionMaterial,
   updateSessionMaterial,
   deleteSessionMaterial,
-  internals: { SessionNotFoundError, MaterialNotFoundError, NotAuthorizedError },
+  deleteMaterialsForSession,
+  internals: {
+    SessionNotFoundError,
+    MaterialNotFoundError,
+    NotAuthorizedError,
+    InvalidUrlError,
+    MaterialCapExceededError,
+    MAX_MATERIALS_PER_SESSION,
+  },
 } = require('./store.cjs');
 
 /** Minimal in-memory Firestore fake, same shape as bookmarks.test.cjs's. */
@@ -40,6 +48,28 @@ function fakeDb(seed = {}) {
     collection(name) {
       return {
         doc: (id) => docRef(name, id ?? `auto-${++counter}`),
+        where(field, _op, value) {
+          return {
+            async get() {
+              const rows = [...docs.entries()]
+                .filter(([k]) => k.startsWith(`${name}/`))
+                .filter(([, v]) => v?.[field] === value)
+                .map(([k, v]) => ({ id: k.split('/')[1], ref: docRef(name, k.split('/')[1]), data: () => v }));
+              return { empty: rows.length === 0, docs: rows };
+            },
+          };
+        },
+      };
+    },
+    batch() {
+      const ops = [];
+      return {
+        delete(ref) {
+          ops.push(() => docs.delete(ref._key));
+        },
+        async commit() {
+          for (const op of ops) op();
+        },
       };
     },
     async runTransaction(fn) {
@@ -293,4 +323,99 @@ test('deleteSessionMaterial: an unknown material rejects', async () => {
     deleteSessionMaterial({ db, materialId: 'nope', actor: ADMIN }),
     MaterialNotFoundError,
   );
+});
+
+// --------------------------------------------------- unsafe URL rejection (P1)
+
+for (const unsafe of ['javascript:alert(1)', 'data:text/html,hi', 'file:///etc/passwd', 'not-a-url', '']) {
+  test(`addSessionMaterialLink: rejects an unsafe/invalid url (${JSON.stringify(unsafe)})`, async () => {
+    const db = fakeDb(seedSession('s1'));
+    await assert.rejects(
+      addSessionMaterialLink({ db, sessionId: 's1', url: unsafe, label: 'Deck', actor: ADMIN, now }),
+      InvalidUrlError,
+    );
+    // Nothing was written and materialCount was never touched.
+    assert.equal(db.docs.get('cmsSchedule/s1').materialCount, undefined);
+  });
+}
+
+test('addSessionMaterialLink: an http/https url is accepted', async () => {
+  const db = fakeDb(seedSession('s1'));
+  const { material } = await addSessionMaterialLink({
+    db, sessionId: 's1', url: 'http://example.org/deck', label: 'Deck', actor: ADMIN, now,
+  });
+  assert.equal(material.url, 'http://example.org/deck');
+});
+
+test('updateSessionMaterial: rejects an unsafe url patch, leaving the stored url untouched', async () => {
+  const db = fakeDb(seedSession('s1'));
+  const { id } = await addSessionMaterialLink({ db, sessionId: 's1', url: 'https://x.org', label: 'Deck', actor: ADMIN, now });
+  await assert.rejects(
+    updateSessionMaterial({ db, materialId: id, patch: { url: 'javascript:alert(1)' }, actor: ADMIN, now }),
+    InvalidUrlError,
+  );
+  assert.equal(db.docs.get(`session_materials/${id}`).url, 'https://x.org');
+});
+
+// ------------------------------------------------------- per-session cap (P2)
+
+test(`addSessionMaterialLink: rejects the ${MAX_MATERIALS_PER_SESSION + 1}th material for a session`, async () => {
+  const db = fakeDb(seedSession('s1', { materialCount: MAX_MATERIALS_PER_SESSION }));
+  await assert.rejects(
+    addSessionMaterialLink({ db, sessionId: 's1', url: 'https://x.org', label: 'One too many', actor: ADMIN, now }),
+    MaterialCapExceededError,
+  );
+});
+
+test('addSessionMaterialLink: the exact cap boundary is still accepted', async () => {
+  const db = fakeDb(seedSession('s1', { materialCount: MAX_MATERIALS_PER_SESSION - 1 }));
+  const { material } = await addSessionMaterialLink({
+    db, sessionId: 's1', url: 'https://x.org', label: 'Last one', actor: ADMIN, now,
+  });
+  assert.equal(material.filename, 'Last one');
+  assert.equal(db.docs.get('cmsSchedule/s1').materialCount, MAX_MATERIALS_PER_SESSION);
+});
+
+test('uploadSessionMaterial: the cap applies to file materials too', async () => {
+  const db = fakeDb(seedSession('s1', { materialCount: MAX_MATERIALS_PER_SESSION }));
+  await assert.rejects(
+    uploadSessionMaterial({
+      db, sessionId: 's1', storagePath: 'session-materials/s1/x.pdf', filename: 'x.pdf', actor: ADMIN, now,
+    }),
+    MaterialCapExceededError,
+  );
+});
+
+// ------------------------------------------------- deleteMaterialsForSession (cascade)
+
+test('deleteMaterialsForSession: removes every material AND its public projection for the session', async () => {
+  const db = fakeDb(seedSession('s1'));
+  const { id: id1 } = await addSessionMaterialLink({ db, sessionId: 's1', url: 'https://a.org', label: 'A', actor: ADMIN, now });
+  const { id: id2 } = await addSessionMaterialLink({ db, sessionId: 's1', url: 'https://b.org', label: 'B', actor: ADMIN, now });
+  db.docs.set(`session_materials_public/${id1}`, { sessionId: 's1', type: 'link', filename: 'A', reviewStatus: 'approved' });
+  db.docs.set(`session_materials_public/${id2}`, { sessionId: 's1', type: 'link', filename: 'B', reviewStatus: 'approved' });
+
+  const result = await deleteMaterialsForSession({ db, sessionId: 's1' });
+
+  assert.equal(result.deleted, 2);
+  assert.equal(db.docs.has(`session_materials/${id1}`), false);
+  assert.equal(db.docs.has(`session_materials/${id2}`), false);
+  assert.equal(db.docs.has(`session_materials_public/${id1}`), false);
+  assert.equal(db.docs.has(`session_materials_public/${id2}`), false);
+});
+
+test('deleteMaterialsForSession: never touches another session\'s materials', async () => {
+  const db = fakeDb({ ...seedSession('s1'), ...seedSession('s2') });
+  const { id: keep } = await addSessionMaterialLink({ db, sessionId: 's2', url: 'https://c.org', label: 'C', actor: ADMIN, now });
+  await addSessionMaterialLink({ db, sessionId: 's1', url: 'https://a.org', label: 'A', actor: ADMIN, now });
+
+  await deleteMaterialsForSession({ db, sessionId: 's1' });
+
+  assert.equal(db.docs.has(`session_materials/${keep}`), true);
+});
+
+test('deleteMaterialsForSession: a session with no materials is a no-op', async () => {
+  const db = fakeDb();
+  const result = await deleteMaterialsForSession({ db, sessionId: 'empty' });
+  assert.equal(result.deleted, 0);
 });

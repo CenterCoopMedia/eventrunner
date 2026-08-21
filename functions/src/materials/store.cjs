@@ -45,7 +45,7 @@
  * entirely.
  */
 
-const { scrubLinkLabel } = require('shared/urlSafety');
+const { scrubLinkLabel, isSafeUrl } = require('shared/urlSafety');
 const {
   sendError,
   badRequest,
@@ -57,6 +57,20 @@ const {
 
 const SESSIONS = 'cmsSchedule';
 const MATERIALS = 'session_materials';
+const MATERIALS_PUBLIC = 'session_materials_public';
+
+/**
+ * Per-session cap on the number of materials (spec: "the per-session cap
+ * moves to a materialCount field", §4.4 — the ADR names the field but not
+ * the number; the reference implementation's four-collection design had
+ * one too, and this is a judgment call on the value, chosen generously for
+ * a conference session's realistic slide-deck/handout/link count while
+ * still bounding `listSessionMaterials`' response size and the projection
+ * trigger's fan-out). Enforced INSIDE the create transaction so a burst of
+ * concurrent creates cannot all read the same under-cap count and all
+ * commit.
+ */
+const MAX_MATERIALS_PER_SESSION = 25;
 
 class SessionNotFoundError extends Error {
   constructor(sessionId) {
@@ -80,6 +94,22 @@ class NotAuthorizedError extends Error {
   }
 }
 
+/** Thrown when a link material's `url` is not a safe http(s) target. */
+class InvalidUrlError extends Error {
+  constructor(message = 'url must be an http:// or https:// address.') {
+    super(message);
+    this.name = 'InvalidUrlError';
+  }
+}
+
+/** Thrown when a session is already at MAX_MATERIALS_PER_SESSION. */
+class MaterialCapExceededError extends Error {
+  constructor(sessionId) {
+    super(`Session ${sessionId} already has the maximum of ${MAX_MATERIALS_PER_SESSION} materials.`);
+    this.name = 'MaterialCapExceededError';
+  }
+}
+
 /** True when `speakerId` appears in the session doc's `speakerIds` array. */
 function isSpeakerOfSession(sessionData, speakerId) {
   if (!speakerId || !sessionData) return false;
@@ -98,6 +128,12 @@ function isSpeakerOfSession(sessionData, speakerId) {
  * @returns {Promise<{ id: string, material: object }>}
  */
 async function addSessionMaterialLink({ db, sessionId, url, label, actor, now = Date.now }) {
+  // Server-side protocol allowlist (spec's isSafeUrl, shared/urlSafety) —
+  // a client-only check would let javascript:/data:/file: through a
+  // hand-crafted request, get stored, get approved, and eventually reach
+  // window.open post-embargo. Checked here, before the transaction: it is
+  // a pure format check, independent of any stored state.
+  if (!isSafeUrl(url)) throw new InvalidUrlError();
   return createMaterial({
     db,
     sessionId,
@@ -148,6 +184,11 @@ async function createMaterial({ db, sessionId, actor, now, type, url, storagePat
       throw new NotAuthorizedError();
     }
 
+    const currentCount = typeof sessionData.materialCount === 'number' ? sessionData.materialCount : 0;
+    if (currentCount >= MAX_MATERIALS_PER_SESSION) {
+      throw new MaterialCapExceededError(sessionId);
+    }
+
     const at = new Date(now());
     const material = {
       sessionId,
@@ -162,7 +203,6 @@ async function createMaterial({ db, sessionId, actor, now, type, url, storagePat
       updatedAt: at,
     };
     tx.set(materialRef, material);
-    const currentCount = typeof sessionData.materialCount === 'number' ? sessionData.materialCount : 0;
     tx.update(sessionRef, { materialCount: currentCount + 1 });
     return { id: materialRef.id, material };
   });
@@ -194,6 +234,9 @@ async function updateSessionMaterial({ db, materialId, patch, actor, now = Date.
 
     const next = { updatedAt: new Date(now()) };
     if (typeof patch?.url === 'string' && current.type === 'link') {
+      // Same protocol allowlist as create — an update is just as capable of
+      // smuggling in a javascript:/data:/file: target as the initial write.
+      if (!isSafeUrl(patch.url)) throw new InvalidUrlError();
       next.url = patch.url;
     }
     if (typeof patch?.filename === 'string') {
@@ -233,6 +276,45 @@ async function deleteSessionMaterial({ db, materialId, actor }) {
   });
 }
 
+/**
+ * Cascade-delete every material (and its public projection) for a session
+ * that is itself being deleted. Called from functions/src/cms/content.cjs's
+ * `cmsDeleteContent` handler when the deleted collection is `cmsSchedule` —
+ * without this, `deleteBoth` (cms/store.cjs) removes the live+draft
+ * schedule doc but leaves `session_materials` and
+ * `session_materials_public` rows behind, orphaned: the admin UI's
+ * `listSessionMaterials` can no longer reach them (it looks up the session
+ * first and 404s), and the public projection keeps serving metadata for a
+ * session that no longer exists.
+ *
+ * Deliberately a plain batch, not a single transaction spanning the
+ * schedule delete too — `deleteBoth` already owns that batch and does not
+ * accept extra writes, and a session's material count is bounded by
+ * MAX_MATERIALS_PER_SESSION, so one batch here (up to 2 writes per
+ * material) never approaches Firestore's 500-write batch limit. The
+ * schedule doc is already gone by the time this runs; the small window
+ * where the session doc is absent but its materials still exist is a
+ * cosmetic ordering detail, not a security or correctness gap (the
+ * materials are already fully server-only either way).
+ *
+ * No `materialCount` decrement: the doc that field lived on is already
+ * deleted.
+ *
+ * @param {{ db: object, sessionId: string }} args
+ * @returns {Promise<{ deleted: number }>}
+ */
+async function deleteMaterialsForSession({ db, sessionId }) {
+  const snap = await db.collection(MATERIALS).where('sessionId', '==', sessionId).get();
+  if (snap.empty) return { deleted: 0 };
+  const batch = db.batch();
+  for (const doc of snap.docs) {
+    batch.delete(doc.ref);
+    batch.delete(db.collection(MATERIALS_PUBLIC).doc(doc.id));
+  }
+  await batch.commit();
+  return { deleted: snap.docs.length };
+}
+
 /** Map a store.cjs error to an HTTP response. Shared by all three handlers
  * below so the error shape (spec: `{ error: { code, message } }`) stays
  * consistent across create/update/delete. */
@@ -242,6 +324,9 @@ function sendStoreError(res, err, log) {
   }
   if (err instanceof NotAuthorizedError) {
     return forbidden(res, err.message);
+  }
+  if (err instanceof InvalidUrlError || err instanceof MaterialCapExceededError) {
+    return badRequest(res, err.message);
   }
   log.error('materials store operation failed', err);
   return internal(res, 'The material could not be saved.');
@@ -382,6 +467,7 @@ module.exports = {
   uploadSessionMaterial,
   updateSessionMaterial,
   deleteSessionMaterial,
+  deleteMaterialsForSession,
   get handlers() {
     return buildHandlers();
   },
@@ -389,8 +475,12 @@ module.exports = {
     SessionNotFoundError,
     MaterialNotFoundError,
     NotAuthorizedError,
+    InvalidUrlError,
+    MaterialCapExceededError,
     isSpeakerOfSession,
     SESSIONS,
     MATERIALS,
+    MATERIALS_PUBLIC,
+    MAX_MATERIALS_PER_SESSION,
   },
 };
