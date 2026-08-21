@@ -133,14 +133,38 @@ service cloud.firestore {
     // these too (packages/shared/src/profile.cjs) — this is the boundary
     // check, that is the belt.
     //
-    // Badge IDS are not checked here: rules cannot read config/badges for a
-    // list-membership test cheaply (§4.5). The syncUserPublic trigger
-    // rewrites users_public.badges to the intersection with the configured
-    // set, so an unconfigured id never becomes public.
+    // Badge IDs are not checked against config/badges here: rules cannot
+    // read that document for a list-membership test cheaply, and there is
+    // no per-element loop in this rules language to type-check each entry
+    // of a variable-length list the way `socialHandles` is only checked
+    // "is map" and not per-key (§4.5). Full membership + per-category
+    // maxPicks enforcement happens where it CAN read the live config: the
+    // syncUserPublic trigger rewrites users_public.badges to the
+    // intersection with the configured set (packages/shared/src/badges.cjs,
+    // functions/src/users/projection.cjs), and every page that renders a
+    // stored badges list re-filters through that same config before display
+    // (apps/web/src/lib/badgeDisplay.js) so a stale or unconfigured id is
+    // never shown even between one edit and the next. What this boundary
+    // CAN afford cheaply, and does: reject anything that is not a list,
+    // reject duplicates, and cap its length. The cap (40) is a literal here
+    // because rules cannot `require()` packages/shared/src/badges.cjs — it
+    // MUST equal that module's exported `MAX_TOTAL_BADGES`, the same bound
+    // config/schema.cjs's validateBadgesConfig enforces on the sum of every
+    // category's maxPicks, so a config the admin form accepts can never
+    // produce a legitimate selection this boundary would reject.
+    // packages/shared/src/badges.test.cjs pins these two numbers equal so
+    // they cannot drift apart unnoticed.
     // .get(field, <default of the right type>) so a field the account
     // document happens not to carry is "absent", not a rule error — the
     // check is about what a client may WRITE, not about repairing a
     // half-seeded document.
+    function validBadgesList() {
+      let badges = request.resource.data.get('badges', []);
+      return badges is list
+        && badges.size() <= 40
+        && badges.toSet().size() == badges.size();
+    }
+
     function validSelfProfileTypes() {
       let d = request.resource.data;
       return d.get('displayName', '') is string
@@ -150,7 +174,7 @@ service cloud.firestore {
         && d.get('jobTitle', '') is string
         && (d.get('photoPath', null) == null || d.get('photoPath', '') is string)
         && d.get('socialHandles', {}) is map
-        && d.get('badges', []) is list
+        && validBadgesList()
         && (d.get('updatedAt', null) == null || d.get('updatedAt', null) is timestamp)
         && d.profileVisibility in ['public', 'attendees_only', 'private'];
     }
@@ -257,6 +281,24 @@ service cloud.firestore {
     match /feedback/{docId} {
       allow read: if isAdmin();
       allow write: if false;
+    }
+
+    // Emoji reaction aggregate + per-user dedup (spec §4.1, §9). The
+    // aggregate is a counts-by-emoji object, harmless to read publicly
+    // (same reasoning as sessionBookmarks above); only reactToSession
+    // (Admin SDK, functions/src/schedule/reactions.cjs) writes it. The
+    // nested users/{uid} membership doc records which single emoji (if
+    // any) that caller currently has on this session — self-read only, so
+    // "which reaction is mine" can be rendered without exposing anyone
+    // else's choice, and every write still goes through the same handler.
+    match /sessionReactions/{sessionId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /users/{userId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
     }
 
     // Server-only collections, named explicitly so a future edit cannot

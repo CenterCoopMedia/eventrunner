@@ -27,11 +27,13 @@ function describeReason(reason) {
  * @param {object} response cmsPublish JSON
  * @param {string} collection e.g. 'cmsPages'
  * @param {string[]} requestedIds ids the caller asked to publish
+ * @param {string} [noun] plural noun for the count message, e.g. 'pages'
+ *   (default) or 'content blocks'
  * @returns {{ ok: boolean, published: string[],
  *             skipped: Array<{ docId: string, reason: string }>,
  *             message: string }}
  */
-export function summarizePublish(response, collection, requestedIds) {
+export function summarizePublish(response, collection, requestedIds, noun = 'pages') {
   const result = response?.results?.[collection] ?? {};
   const published = Array.isArray(result.published) ? result.published : [];
   const skippedRows = Array.isArray(result.skipped) ? result.skipped : [];
@@ -63,7 +65,7 @@ export function summarizePublish(response, collection, requestedIds) {
     skipped,
     message:
       publishedCount > 0
-        ? `Published ${publishedCount} of ${requested.length} pages. Not published: ${detail}.`
+        ? `Published ${publishedCount} of ${requested.length} ${noun}. Not published: ${detail}.`
         : `Nothing was published: ${detail}.`,
   };
 }

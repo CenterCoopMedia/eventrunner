@@ -15,10 +15,12 @@ const adminConfig = require('./src/admin/config.cjs');
 const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
 const adminFeedback = require('./src/admin/feedback.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
+const scheduleReactions = require('./src/schedule/reactions.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
 const systemErrors = require('./src/telemetry/systemErrors.cjs');
+const systemErrorsAdmin = require('./src/telemetry/systemErrorsAdmin.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -32,8 +34,10 @@ module.exports = {
   ...adminLiveUpdates.handlers,
   ...adminFeedback.handlers,
   ...scheduleBookmarks.handlers,
+  ...scheduleReactions.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
   ...clientErrors.handlers,
   ...systemErrors.handlers,
+  ...systemErrorsAdmin.handlers,
 };

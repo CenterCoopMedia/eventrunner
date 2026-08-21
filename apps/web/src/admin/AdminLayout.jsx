@@ -12,12 +12,14 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 
 const TABS = [
   { to: 'pages', label: 'Pages' },
+  { to: 'content', label: 'Content' },
   { to: 'settings', label: 'Event' },
   { to: 'features', label: 'Features' },
   { to: 'badges', label: 'Badges' },
   { to: 'branding', label: 'Branding' },
   { to: 'live-updates', label: 'Live updates' },
   { to: 'feedback', label: 'Feedback' },
+  { to: 'system-errors', label: 'System errors' },
 ];
 
 function tabClass({ isActive }) {
