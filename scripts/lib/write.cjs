@@ -19,6 +19,7 @@
  */
 
 const { decideSeedWrite, decideConfigWrite } = require('./idempotency.cjs');
+const { draftCollectionFor } = require('../../functions/src/cms/blockTypes.cjs');
 
 /** Actor recorded on seeded writes; not a person, and deliberately visible. */
 const SEED_ACTOR = Object.freeze({ uid: 'init-event-script', email: 'init-event-script' });
@@ -26,18 +27,28 @@ const SEED_ACTOR = Object.freeze({ uid: 'init-event-script', email: 'init-event-
 /**
  * Write the `config/*` documents (§5.1 steps b–c).
  *
+ * Returns both what happened and the EFFECTIVE documents — what the
+ * project holds now, which for a skipped or partially preserved doc is
+ * not what the caller passed in. Content seeding derives copy from
+ * configuration (§5.5 legal templates read the auth and provider
+ * settings), so it must build from what is stored, not from what init
+ * proposed and the merge rules then declined to apply.
+ *
  * @param {{ db: object, docs: object, force?: boolean, dryRun?: boolean,
  *           now?: () => number }} args
- * @returns {Promise<Array<{ docId: string, action: string, reason: string }>>}
+ * @returns {Promise<{ results: Array<{ docId: string, action: string, reason: string }>,
+ *                     effective: object }>}
  */
 async function writeConfigDocs({ db, docs, force = false, dryRun = false, now = Date.now }) {
   const results = [];
+  const effective = {};
   for (const [docId, next] of Object.entries(docs)) {
     const ref = db.collection('config').doc(docId);
     const snap = await ref.get();
     const existing = snap.exists ? snap.data() : null;
     const decision = decideConfigWrite({ docId, existing, next, force });
     results.push({ docId, action: decision.action, reason: decision.reason });
+    effective[docId] = decision.value;
     if (decision.action === 'skip' || dryRun) continue;
     await ref.set({
       ...decision.value,
@@ -45,7 +56,7 @@ async function writeConfigDocs({ db, docs, force = false, dryRun = false, now = 
       updatedBy: SEED_ACTOR.email,
     });
   }
-  return results;
+  return { results, effective };
 }
 
 /**
@@ -63,11 +74,19 @@ async function seedCollection({ db, store, collection, docs, dryRun = false, now
   const skipped = [];
   const toPublish = [];
 
+  const draftCollection = draftCollectionFor(collection);
   for (const doc of docs) {
     const { id, ...fields } = doc;
-    const snap = await db.collection(collection).doc(id).get();
+    // Both revisions: unpublished editor work lives only in the draft, and
+    // writeDraft + publishDocs below would overwrite it and then make the
+    // placeholder live (§8.4).
+    const [snap, draftSnap] = await Promise.all([
+      db.collection(collection).doc(id).get(),
+      db.collection(draftCollection).doc(id).get(),
+    ]);
     const existing = snap.exists ? snap.data() : null;
-    const decision = decideSeedWrite(existing, { force });
+    const draft = draftSnap.exists ? draftSnap.data() : null;
+    const decision = decideSeedWrite(existing, { force, draft });
     if (decision.action === 'skip') {
       skipped.push({ id, reason: decision.reason });
       continue;
@@ -113,10 +132,11 @@ async function countSeeded({ db, collection = 'cmsContent' }) {
  *
  * @param {{ db: object }} args
  * @returns {Promise<{ event: object|null, providers: object|null,
- *                     theme: object|null, bootstrap: object|null }>}
+ *                     theme: object|null, bootstrap: object|null,
+ *                     features: object|null }>}
  */
 async function readConfig({ db }) {
-  const ids = ['event', 'providers', 'theme', 'bootstrap'];
+  const ids = ['event', 'providers', 'theme', 'bootstrap', 'features'];
   const snaps = await db.getAll(...ids.map((id) => db.collection('config').doc(id)));
   const out = {};
   ids.forEach((id, i) => {

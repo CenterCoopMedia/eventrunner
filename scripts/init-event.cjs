@@ -54,12 +54,13 @@ const path = require('node:path');
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { PROMPTS, parseAnswersFile, buildConfigDocs } = require('./lib/answers.cjs');
-const { defaultPages, buildSeedContent } = require('./lib/seed.cjs');
+const { defaultPages, buildSeedContent, buildLegalContentDocs } = require('./lib/seed.cjs');
 const { validatePageDoc } = require('../functions/src/cms/pages.cjs');
 const { getTierA } = require('../functions/src/core/config.cjs');
 const { evaluateReadiness, allReady, formatReadinessTable, DEFAULT_SEEDED_THRESHOLD } =
   require('./lib/readiness.cjs');
 const { manualChecklist, formatChecklist } = require('./lib/checklist.cjs');
+const { validateDeployEnv } = require('shared/config');
 const { uploadPlaceholderBranding } = require('./lib/branding.cjs');
 const { writeConfigDocs, seedCollection, countSeeded, readConfig } = require('./lib/write.cjs');
 
@@ -82,6 +83,46 @@ function usage() {
     '  --skip-branding         do not upload the placeholder branding assets',
     '  --seeded-threshold <n>  how many seeded blocks --check tolerates (default 0)',
   ].join('\n');
+}
+
+/**
+ * Tier A validation before the first write (§5.1 step a).
+ *
+ * `getTierA()` reads the environment; it does not judge it. Without this,
+ * an unset `EVENT_EMAIL_PROVIDER` quietly becomes `console` in
+ * `config/providers`, init reports success, and the deployment looks
+ * seeded right up until the functions runtime refuses to build an email
+ * provider in production — a failure landing hours later, far from its
+ * cause. The shared validator is the same one the build runs, so init
+ * cannot develop its own opinion of what a valid environment is.
+ *
+ * Two severities, one validator:
+ *   - server-side `EVENT_*` keys are what init consumes and mirrors into
+ *     Firestore, so a missing one is fatal;
+ *   - `VITE_*` keys gate the frontend build, not the seed, so a missing
+ *     one is reported and the run continues (the build will fail loudly
+ *     on its own).
+ *
+ * Under `FIRESTORE_EMULATOR_HOST` everything is a warning: the emulator is
+ * explicitly not a deployment, and demanding a hosting site and storage
+ * bucket to seed a throwaway project would only teach operators to fake
+ * the values.
+ *
+ * @param {Record<string,string|undefined>} env
+ * @returns {{ ok: boolean, fatal: string[], warnings: string[] }}
+ */
+function checkDeployEnv(env) {
+  const verdict = validateDeployEnv(env);
+  const emulator = Boolean((env.FIRESTORE_EMULATOR_HOST || '').trim());
+  const fatal = [];
+  const warnings = [];
+  for (const key of verdict.missing) {
+    (key.startsWith('VITE_') || emulator ? warnings : fatal).push(`${key}: not set`);
+  }
+  for (const problem of verdict.errors) {
+    (emulator ? warnings : fatal).push(problem);
+  }
+  return { ok: fatal.length === 0, fatal, warnings };
 }
 
 /** Walk PROMPTS with node:readline. Only reached without --answers. */
@@ -147,7 +188,7 @@ async function runCheck({ db, seededThreshold }) {
   return 0;
 }
 
-async function runAttestAuth({ db, dryRun, now = Date.now }) {
+async function runAttestAuth({ db, store, dryRun, env = process.env, now = Date.now }) {
   const ref = db.collection('config').doc('event');
   const snap = await ref.get();
   if (!snap.exists) {
@@ -158,7 +199,7 @@ async function runAttestAuth({ db, dryRun, now = Date.now }) {
     googleProviderEnabled: true,
     authorizedDomainsConfigured: true,
     attestedAt: new Date(now()).toISOString(),
-    attestedBy: process.env.USER || process.env.LOGNAME || 'operator',
+    attestedBy: env.USER || env.LOGNAME || 'operator',
   };
   console.log('Recording the operator attestation for the §5.6 Firebase Auth steps:');
   console.log(`  Google sign-in provider enabled:     yes`);
@@ -170,14 +211,48 @@ async function runAttestAuth({ db, dryRun, now = Date.now }) {
   }
   await ref.set({ auth: attestation }, { merge: true });
   console.log('config/event.auth updated.');
+
+  // Enabling Google sign-in changes what the privacy policy and terms are
+  // TRUE about: the seeded copy describes the sign-in methods this
+  // deployment offers (§5.5), and it was composed when the answer was
+  // "emailed codes only". Leaving it would publish a privacy policy that
+  // omits a sign-in method the site now has. Refreshed through the normal
+  // seed path, so anything a client has already edited keeps their words.
+  if (!store) return 0;
+  const config = await readConfig({ db });
+  const legalDocs = buildLegalContentDocs({
+    docs: {
+      event: { ...config.event, auth: attestation },
+      providers: config.providers,
+      features: config.features,
+    },
+    seededAt: new Date(now()).toISOString(),
+  });
+  const result = await seedCollection({ db, store, collection: 'cmsContent', docs: legalDocs, now });
+  console.log(
+    `Legal templates: ${result.refreshed.length + result.created.length} refreshed, ` +
+    `${result.skipped.length} left alone (client-edited).`,
+  );
   return 0;
 }
 
-async function runInit({ db, store, bucket, args, tierA, now = Date.now }) {
+async function runInit({ db, store, bucket, args, tierA, env = process.env, now = Date.now }) {
   const dryRun = Boolean(args['dry-run']);
   const force = Boolean(args.force);
 
-  // (a) Refuse an already-initialized project unless --force. The common
+  // (a) Tier A first: a deployment seeded from a half-configured
+  // environment is worse than one that refused to seed.
+  const envCheck = checkDeployEnv(env);
+  for (const warning of envCheck.warnings) console.warn(`warning: ${warning}`);
+  if (!envCheck.ok) {
+    console.error(
+      '\nTier A environment is incomplete — nothing was written:\n  ' +
+      `${envCheck.fatal.join('\n  ')}\n\nSee .env.example for the full set (spec §2.1).`,
+    );
+    return 2;
+  }
+
+  // (a, continued) Refuse an already-initialized project unless --force. The common
   // accident is running init twice, or against the wrong project; stopping
   // before the first write is better than merging around it.
   const eventSnap = await db.collection('config').doc('event').get();
@@ -240,13 +315,19 @@ async function runInit({ db, store, bucket, args, tierA, now = Date.now }) {
     console.error(`\nSeeded pages failed validation — nothing was written:\n  ${pageErrors.join('\n  ')}`);
     return 2;
   }
-  const content = buildSeedContent({ pages, docs, tierA, seededAt });
   const pageDocs = pages.map((page) => ({ ...page, seededAt }));
 
   console.log(`\ninit-event: ${dryRun ? 'DRY RUN — ' : ''}seeding ${tierA.projectId}\n`);
 
-  const configResults = await writeConfigDocs({ db, docs, force, dryRun, now });
+  const { results: configResults, effective } = await writeConfigDocs({ db, docs, force, dryRun, now });
   for (const r of configResults) console.log(`  config/${r.docId.padEnd(9)} ${r.action} (${r.reason})`);
+
+  // Content is derived from the EFFECTIVE config, not from what was
+  // proposed: on a --force re-run the merge rules keep the stored auth
+  // attestation and legal review flag, and the §5.5 legal templates read
+  // exactly those. Building from `docs` would regenerate the privacy page
+  // as if Google sign-in had never been enabled.
+  const content = buildSeedContent({ pages, docs: effective, tierA, seededAt });
 
   const pageResult = await seedCollection({ db, store, collection: 'cmsPages', docs: pageDocs, dryRun, now, force });
   console.log(
@@ -268,26 +349,31 @@ async function runInit({ db, store, bucket, args, tierA, now = Date.now }) {
   } else {
     const branding = await uploadPlaceholderBranding({ bucket, dryRun });
     console.log(`  branding/         ${branding.uploaded.length} uploaded, ${branding.skipped.length} skipped`);
-    for (const s of branding.skipped) console.warn(`    warning: ${s.path}: ${s.reason}`);
+    for (const s of branding.skipped) {
+      // A slot holding a client's own asset is the system working, not a
+      // problem; only a real upload failure is worth a warning.
+      if (s.kind === 'error') console.warn(`    warning: ${s.path}: ${s.reason}`);
+      else console.log(`    - ${s.path}: ${s.reason}`);
+    }
   }
 
   // (h) Manual checklist, then readiness — warnings only, exit 0.
   console.log('\nManual steps a deploy cannot automate (spec §5.6)\n');
   console.log(formatChecklist(manualChecklist({
-    providers: docs.providers,
-    adminEmails: docs.bootstrap.adminEmails,
+    providers: effective.providers,
+    adminEmails: effective.bootstrap.adminEmails,
     publicUrl: tierA.publicUrl,
-    hostingSite: process.env.EVENT_HOSTING_SITE || null,
-    senderEmail: docs.event.sender.email,
+    hostingSite: env.EVENT_HOSTING_SITE || null,
+    senderEmail: effective.event.sender.email,
   })));
 
   const seededContentCount = dryRun ? content.length : await countSeeded({ db });
   reportReadiness(
     {
-      event: docs.event,
-      providers: docs.providers,
-      theme: docs.theme,
-      bootstrap: docs.bootstrap,
+      event: effective.event,
+      providers: effective.providers,
+      theme: effective.theme,
+      bootstrap: effective.bootstrap,
       seededContentCount,
       seededThreshold: DEFAULT_SEEDED_THRESHOLD,
     },
@@ -327,10 +413,10 @@ async function main(argv) {
       : DEFAULT_SEEDED_THRESHOLD;
     return runCheck({ db, seededThreshold: Number.isFinite(threshold) ? threshold : DEFAULT_SEEDED_THRESHOLD });
   }
-  if (args['attest-auth']) {
-    return runAttestAuth({ db, dryRun: Boolean(args['dry-run']) });
-  }
   const store = require('../functions/src/cms/store.cjs');
+  if (args['attest-auth']) {
+    return runAttestAuth({ db, store, dryRun: Boolean(args['dry-run']) });
+  }
   return runInit({ db, store, bucket, args, tierA });
 }
 

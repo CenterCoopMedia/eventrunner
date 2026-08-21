@@ -337,6 +337,49 @@ function placeholderBlock(blockType, description) {
 }
 
 /**
+ * The two legal pages' content docs, composed from the CURRENT effective
+ * config (§5.5).
+ *
+ * Split out of `buildSeedContent` because the legal copy is derived from
+ * configuration that changes AFTER init: the privacy and terms text says
+ * whether Google sign-in exists, and that only becomes true when the
+ * operator attests the manual Auth steps. Anything that changes those
+ * inputs can therefore rebuild these blocks from this one function and
+ * refresh whichever of them a client has not yet edited.
+ *
+ * @param {{ docs: { event: object, providers: object, features?: object },
+ *           seededAt?: string, pageIds?: string[] }} args
+ * @returns {Array<object>} content docs, each with an `id`
+ */
+function buildLegalContentDocs({ docs, seededAt = new Date(0).toISOString(), pageIds = LEGAL_PAGE_IDS }) {
+  const legal = buildLegalContent({
+    event: docs.event,
+    providers: docs.providers,
+    features: docs.features,
+  });
+  const out = [];
+  for (const pageId of pageIds) {
+    const perSection = new Map();
+    for (const item of legal[pageId]) {
+      const order = perSection.get(item.section) ?? 0;
+      perSection.set(item.section, order + 1);
+      out.push({
+        id: `${item.section}__${item.field}`,
+        section: item.section,
+        field: item.field,
+        blockType: item.blockType,
+        value: item.value,
+        visible: true,
+        order,
+        seeded: true,
+        seededAt,
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * Every seeded cmsContent document for a page set (§5.1 step e, §5.4).
  *
  * Docs are keyed `<section>__<field>` — the same key the web snapshot and
@@ -366,22 +409,15 @@ function buildSeedContent({ pages, docs, tierA = {}, seededAt = new Date(0).toIS
     });
   };
 
-  const legal = buildLegalContent({ event: docs.event, providers: docs.providers, features: docs.features });
+  // §5.5: the legal pages are composed from the provider-aware templates,
+  // not from generic placeholders — a `manual`-ticketing deployment's
+  // privacy policy must not carry a "[Replace] name your ticketing vendor"
+  // block it should never fill in.
+  const legalPageIds = pages.map((page) => page.id).filter((id) => LEGAL_PAGE_IDS.includes(id));
+  out.push(...buildLegalContentDocs({ docs, seededAt, pageIds: legalPageIds }));
 
   for (const page of pages) {
-    if (LEGAL_PAGE_IDS.includes(page.id)) {
-      // §5.5: the legal pages are composed from the provider-aware
-      // templates, not from generic placeholders — a `manual`-ticketing
-      // deployment's privacy policy must not carry a "[Replace] name your
-      // ticketing vendor" block it should never fill in.
-      const perSection = new Map();
-      for (const item of legal[page.id]) {
-        const order = perSection.get(item.section) ?? 0;
-        perSection.set(item.section, order + 1);
-        push(item.section, item.field, item.blockType, { value: item.value }, order);
-      }
-      continue;
-    }
+    if (LEGAL_PAGE_IDS.includes(page.id)) continue;
     for (const sec of page.sections) {
       sec.defaultBlocks.forEach((def, order) => {
         const seed = CONFIG_SEEDS[`${sec.id}.${def.field}`];
@@ -396,6 +432,7 @@ function buildSeedContent({ pages, docs, tierA = {}, seededAt = new Date(0).toIS
 module.exports = {
   defaultPages,
   buildSeedContent,
+  buildLegalContentDocs,
   placeholderBlock,
   LEGAL_PAGE_IDS,
   internals: { venueAddress, CONFIG_SEEDS },
