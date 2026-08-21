@@ -14,6 +14,7 @@ const cmsUpdates = require('./src/cms/updates.cjs');
 const adminConfig = require('./src/admin/config.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
 const schedulePdf = require('./src/schedule/pdf.cjs');
+const publicOg = require('./src/public/og.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
@@ -30,6 +31,7 @@ module.exports = {
   ...adminConfig.handlers,
   ...scheduleBookmarks.handlers,
   ...schedulePdf.handlers,
+  ...publicOg.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
   ...clientErrors.handlers,

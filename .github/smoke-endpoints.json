@@ -22,6 +22,7 @@
     "emailDeliveryWebhook",
     "bookmarkSession",
     "buildSchedulePdf",
+    "updatesMeta",
     "logClientError"
   ]
 }
