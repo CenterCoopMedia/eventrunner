@@ -30,3 +30,4 @@ export {
 export { validateBadgeSelection } from './badges.cjs';
 export { generateSlug, generateSpeakerSlug } from './slug.cjs';
 export { isSafeUrl, looksLikeUrl, scrubLinkLabel } from './urlSafety.cjs';
+export { RESERVED_PATH_SEGMENTS, isReservedPathSegment } from './routing.cjs';

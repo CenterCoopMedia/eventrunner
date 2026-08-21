@@ -24,7 +24,7 @@ export default defineConfig({
   // sources; linked deps skip prebundling by default, which would break the
   // dev server's CJS interop. Builds and vitest handle it either way.
   optimizeDeps: {
-    include: ['shared/time', 'shared/config'],
+    include: ['shared/time', 'shared/config', 'shared/routing'],
   },
   resolve: {
     alias: {

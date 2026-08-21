@@ -14,23 +14,31 @@ import Speakers from './pages/Speakers.jsx';
 import Sponsors from './pages/Sponsors.jsx';
 import ContentPage from './pages/ContentPage.jsx';
 import Login from './pages/Login.jsx';
-import NotFound from './pages/NotFound.jsx';
 import AdminApp from './admin/AdminApp.jsx';
 
 export function AppRoutes() {
   return (
     <Routes>
       {/* The whole authenticated admin area lives under this one subtree —
-          it brings its own shell, gate, and nested routes (admin/AdminApp). */}
+          it brings its own shell, gate, and nested routes (admin/AdminApp).
+          It sits ABOVE the Layout branch because the admin area brings its
+          own chrome, and its 'admin' segment is reserved in
+          shared/routing so a generic cmsPages path can never claim it. */}
       <Route path="admin/*" element={<AdminApp />} />
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="schedule" element={<Schedule />} />
         <Route path="speakers" element={<Speakers />} />
         <Route path="sponsors" element={<Sponsors />} />
-        <Route path="p/:slug" element={<ContentPage />} />
         <Route path="signin" element={<Login />} />
-        <Route path="*" element={<NotFound />} />
+        {/* Generic cmsPages route by their own root-level `path`
+            (issue #52) — this catch-all matches whatever the system
+            routes above didn't, and ContentPage looks the current
+            location up against visible pages by full path, falling
+            through to NotFound itself when nothing matches. It MUST
+            stay the LAST route: react-router matches routes in order,
+            and "*" matches everything. */}
+        <Route path="*" element={<ContentPage />} />
       </Route>
     </Routes>
   );

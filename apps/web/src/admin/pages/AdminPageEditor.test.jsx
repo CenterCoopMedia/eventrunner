@@ -54,11 +54,12 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
 
 const SCHOLARSHIPS_DRAFT = {
   id: 'scholarships',
   label: 'Scholarships',
-  path: '/p/scholarships',
+  path: '/scholarships',
   icon: null,
   order: 7,
   visible: true,
@@ -126,7 +127,7 @@ beforeEach(() => {
 
 describe('page list', () => {
   it('shows each page’s publish state across both revisions', async () => {
-    liveDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'faq', label: 'FAQ', path: '/p/faq', status: undefined }];
+    liveDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'faq', label: 'FAQ', path: '/faq', status: undefined }];
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages');
 
@@ -177,7 +178,7 @@ describe('page editor', () => {
 
     fireEvent.change(screen.getByLabelText('Page id'), { target: { value: 'scholarships' } });
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Scholarships' } });
-    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/p/scholarships' } });
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/scholarships' } });
 
     // One section, one block, driven by the registry palette.
     fireEvent.click(screen.getByRole('button', { name: 'Add section' }));
@@ -199,7 +200,7 @@ describe('page editor', () => {
     expect(bodyOf(0).page).toMatchObject({
       id: 'scholarships',
       label: 'Scholarships',
-      path: '/p/scholarships',
+      path: '/scholarships',
       visible: true,
       systemPage: false,
       sections: [
@@ -272,6 +273,42 @@ describe('page editor', () => {
       /must be a string starting with/,
     );
     expect(screen.getByLabelText('Section 1 label')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('names the reserved route segments from the shared registry', async () => {
+    // Root-level paths are canonical (issue #52), so an operator needs to
+    // know which first segments the built-in routes already own. The list is
+    // read from shared/routing — the same registry cmsSavePage validates
+    // against — rather than restated here.
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+
+    const hint = screen.getByLabelText('Path').getAttribute('aria-describedby');
+    const hintText = document.getElementById(hint.split(' ')[0]).textContent;
+    for (const segment of RESERVED_PATH_SEGMENTS) {
+      expect(hintText).toContain(segment);
+    }
+    expect(hintText).not.toMatch(/\/p\//);
+  });
+
+  it('surfaces the server’s reserved-path and collision rejections verbatim', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch.mockResolvedValueOnce(
+      errorResponse(
+        400,
+        'bad-request',
+        "path: 'schedule' is a reserved route and cannot be used by a page",
+      ),
+    );
+    await renderAt('/admin/pages/scholarships');
+
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/schedule' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "path: 'schedule' is a reserved route and cannot be used by a page",
+    );
+    expect(screen.getByLabelText('Path')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('reflects the systemPage delete guard instead of letting the operator hit it', async () => {

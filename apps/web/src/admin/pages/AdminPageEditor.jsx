@@ -13,12 +13,13 @@
 //                       the UI reflects the same rule rather than letting an
 //                       operator hit a wall.
 //
-// `path` is a plain text input validated SERVER-side: the path rules are the
-// server's business (and are changing), so this file hardcodes no shape and
-// surfaces the server's rejection verbatim. Deliberately NOT constrained to
-// /p/:slug — the routing rework makes root-level paths canonical, resolved by
-// a catch-all route with reserved-segment validation, so path resolution and
-// its rules land with that work and are enforced server-side either way.
+// `path` is a plain text input validated SERVER-side: root-level paths are
+// canonical (issue #52 — `/scholarships`, not `/p/scholarships`), resolved by
+// App.jsx's catch-all route, and cmsSavePage owns the rules — segment shape,
+// the reserved first segments in shared/routing, '/' being the home page's,
+// and uniqueness across both revisions. So this file hardcodes no shape and
+// surfaces the server's rejection verbatim; the reserved list below is shown
+// as a hint only, read from that same registry so it cannot drift.
 //
 // Sections carry the block contract: `allowedBlocks` is a palette drawn from
 // the BLOCK_TYPES registry, and `defaultBlocks` are the blocks the section
@@ -26,6 +27,7 @@
 // registry describes.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import LoadingState from '../../components/LoadingState.jsx';
 import EmptyState from '../../components/EmptyState.jsx';
@@ -278,7 +280,7 @@ export default function AdminPageEditor({ mode }) {
             value={page.path}
             onChange={(value) => update({ path: value })}
             error={errorFor('path')}
-            hint="The URL path this page is served at. The server validates it."
+            hint={`The URL path this page is served at, e.g. /scholarships. These first segments belong to built-in routes and cannot be used: ${RESERVED_PATH_SEGMENTS.join(', ')}.`}
           />
           <TextField
             label="Icon"

@@ -12,7 +12,7 @@ import {
 const STORED = {
   id: 'scholarships',
   label: 'Scholarships',
-  path: '/p/scholarships',
+  path: '/scholarships',
   icon: null,
   order: 7,
   visible: true,

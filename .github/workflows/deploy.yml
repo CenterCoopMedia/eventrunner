@@ -1,0 +1,82 @@
+name: Deploy
+
+# Caller workflow (spec §8.1). `${{ inputs.client }}` is populated only on
+# workflow_dispatch — a push-triggered run would evaluate it to the empty
+# string and silently bind no environment, so `resolve` is the one place
+# that decides, per trigger shape, which client environments to fan out to
+# (scripts/lib/deploy-matrix.cjs, unit-tested by `npm test`).
+
+on:
+  workflow_dispatch:
+    inputs:
+      client:
+        description: Client GitHub Environment name to deploy.
+        required: true
+        type: string
+      provision:
+        description: Also (re)deploy firestore:rules, firestore:indexes, and storage. deploy-client.yml's provision job always runs this regardless — kept as an input for operator intent/logging only.
+        required: false
+        type: boolean
+        default: false
+      bootstrap:
+        description: Bootstrap mode for a fresh project — deploy only provision + functions, skipping content/build/hosting/smoke. See docs/DEPLOY_RUNBOOK.md §5.
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  # Reusable-workflow permissions are an intersection of caller and callee:
+  # deploy-client.yml cannot get more than the caller grants, no matter what
+  # its own `permissions:` block says. Without id-token here,
+  # google-github-actions/auth in every deploy-client.yml job fails to mint
+  # an OIDC token and Workload Identity Federation auth never happens.
+  id-token: write
+
+jobs:
+  resolve:
+    name: Resolve target client environments
+    runs-on: ubuntu-latest
+    outputs:
+      clients: ${{ steps.pick.outputs.clients }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - id: pick
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_CLIENT: ${{ inputs.client }}
+          AUTO: ${{ vars.AUTO_DEPLOY_ENVIRONMENTS }}
+        run: |
+          set -euo pipefail
+          CLIENTS=$(node -e '
+            const { resolveClients } = require("./scripts/lib/deploy-matrix.cjs");
+            const clients = resolveClients({
+              eventName: process.env.EVENT_NAME,
+              dispatchClient: process.env.DISPATCH_CLIENT,
+              autoDeployEnvironments: process.env.AUTO,
+            });
+            process.stdout.write(JSON.stringify(clients));
+          ')
+          echo "Resolved clients: $CLIENTS"
+          echo "clients=$CLIENTS" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy
+    needs: resolve
+    if: needs.resolve.outputs.clients != '[]'
+    strategy:
+      fail-fast: false # one client's failure must not cancel the others
+      max-parallel: 1 # deploys are serialized
+      matrix:
+        client: ${{ fromJSON(needs.resolve.outputs.clients) }}
+    uses: ./.github/workflows/deploy-client.yml
+    with:
+      client: ${{ matrix.client }}
+      provision: ${{ github.event_name == 'workflow_dispatch' && inputs.provision || false }}
+      bootstrap: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap || false }}
+    secrets: inherit
