@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { logError, claimAlert, handleSystemErrorCreated } = require('./systemErrors.cjs');
+const { logError, claimAlert, handleSystemErrorCreated, internals } = require('./systemErrors.cjs');
 
 /** Minimal in-memory Firestore fake: doc get/update, collection.add, transactions. */
 function fakeDb() {
@@ -186,6 +186,41 @@ test('two distinct docs with the same kind+message share a dedupeKey (defense ag
 
   assert.equal(notifyOperator.calls.length, 2);
   assert.equal(notifyOperator.calls[0].dedupeKey, notifyOperator.calls[1].dedupeKey);
+});
+
+// --- notifierSecretNames (Codex review finding, P1) -----------------------------
+//
+// createOperatorNotifier's email sink needs the configured EmailProvider's
+// OWN send secrets (postmark's API key, or the generic webhook pair) —
+// EVENT_OPERATOR_NOTIFIER=webhook needs the operator webhook pair instead.
+// Binding the wrong set (or none) means the secret is never mounted into the
+// container, so the email sink's sendEmail call fails at runtime.
+
+test('notifierSecretNames: "webhook" notifier binds the operator webhook pair', () => {
+  assert.deepEqual(
+    internals.notifierSecretNames({ EVENT_OPERATOR_NOTIFIER: 'webhook', EVENT_EMAIL_PROVIDER: 'postmark' }),
+    ['OPERATOR_WEBHOOK_URL', 'OPERATOR_WEBHOOK_SECRET'],
+  );
+});
+
+test('notifierSecretNames: "email" notifier binds the EMAIL PROVIDER\'s own send secrets', () => {
+  assert.deepEqual(
+    internals.notifierSecretNames({ EVENT_OPERATOR_NOTIFIER: 'email', EVENT_EMAIL_PROVIDER: 'postmark' }),
+    ['EMAIL_PROVIDER_API_KEY'],
+  );
+  assert.deepEqual(
+    internals.notifierSecretNames({ EVENT_OPERATOR_NOTIFIER: 'email', EVENT_EMAIL_PROVIDER: 'webhook' }),
+    ['EMAIL_WEBHOOK_URL', 'EMAIL_WEBHOOK_SECRET'],
+  );
+  assert.deepEqual(
+    internals.notifierSecretNames({ EVENT_OPERATOR_NOTIFIER: 'email', EVENT_EMAIL_PROVIDER: 'console' }),
+    [],
+  );
+});
+
+test('notifierSecretNames: "none" (or unset) binds nothing', () => {
+  assert.deepEqual(internals.notifierSecretNames({ EVENT_OPERATOR_NOTIFIER: 'none' }), []);
+  assert.deepEqual(internals.notifierSecretNames({}), []);
 });
 
 test('handleSystemErrorCreated tolerates missing message/kind/url/userAgent', async () => {

@@ -148,28 +148,60 @@ async function handleSystemErrorCreated({ db, ref, data, notifyOperator, now = D
   return { delivered: result.delivered, sink: result.sink };
 }
 
+/**
+ * Secrets to bind for delivering an OperatorEvent (mirrors
+ * functions/src/auth/otp.cjs's buildHandlers): webhook secrets when the
+ * notifier sink is 'webhook', or the configured email provider's OWN send
+ * secrets when the sink is 'email' — the operator email goes out through
+ * the same EmailProvider as everything else, so it needs that provider's
+ * credentials, not the webhook pair.
+ * @param {Record<string, string|undefined>} env
+ * @returns {string[]}
+ */
+function notifierSecretNames(env) {
+  const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+  const notifierName = (env.EVENT_OPERATOR_NOTIFIER || '').trim();
+  const providerName = (env.EVENT_EMAIL_PROVIDER || '').trim();
+  if (notifierName === 'webhook') return ['OPERATOR_WEBHOOK_URL', 'OPERATOR_WEBHOOK_SECRET'];
+  if (notifierName === 'email') return SEND_SECRETS_BY_PROVIDER[providerName] || [];
+  return [];
+}
+
+/**
+ * Build the { db, getConfig, notifyOperator } trio these handlers share —
+ * mirrors otp.cjs's buildDeps: the email core is always constructed and
+ * always wired into createOperatorNotifier as sendEmail, since the notifier
+ * itself is what decides whether the email sink is actually used ('none'
+ * and 'webhook' never touch sendEmail; omitting it here is exactly the bug
+ * this function exists to avoid — the email sink would silently no-op).
+ */
+function buildNotifyDeps() {
+  const { getDb } = require('../core/firestore.cjs');
+  const { getEventConfig } = require('../core/config.cjs');
+  const { getEmailProvider } = require('../email/providers/index.cjs');
+  const { createEmailCore } = require('../email/send.cjs');
+  const { createOperatorNotifier } = require('../notify/operator.cjs');
+  const db = getDb();
+  const getConfig = () => getEventConfig({ db });
+  const emailCore = createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig });
+  const notifier = createOperatorNotifier({ env: process.env, getConfig, sendEmail: emailCore.send });
+  return { db, getConfig, notifyOperator: notifier.notify };
+}
+
 /** Deployable exports (spec §1.3): onSystemErrorCreated. */
 function buildHandlers() {
   const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+  const { defineSecret } = require('firebase-functions/params');
 
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
-  const secrets = [];
-  if ((process.env.EVENT_OPERATOR_NOTIFIER || '').trim() === 'webhook') {
-    const { defineSecret } = require('firebase-functions/params');
-    secrets.push(defineSecret('OPERATOR_WEBHOOK_URL'), defineSecret('OPERATOR_WEBHOOK_SECRET'));
-  }
+  const secrets = notifierSecretNames(process.env).map(defineSecret);
 
   return {
     onSystemErrorCreated: onDocumentCreated({ document: 'system_errors/{id}', region, secrets }, async (event) => {
       const snap = event.data;
       if (!snap) return; // deleted before the handler ran; nothing to alert on
-      const { getDb } = require('../core/firestore.cjs');
-      const { getEventConfig } = require('../core/config.cjs');
-      const { createOperatorNotifier } = require('../notify/operator.cjs');
-      const db = getDb();
-      const getConfig = () => getEventConfig({ db });
-      const notifier = createOperatorNotifier({ env: process.env, getConfig });
-      await handleSystemErrorCreated({ db, ref: snap.ref, data: snap.data(), notifyOperator: notifier.notify });
+      const { db, notifyOperator } = buildNotifyDeps();
+      await handleSystemErrorCreated({ db, ref: snap.ref, data: snap.data(), notifyOperator });
     }),
   };
 }
@@ -181,4 +213,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
+  internals: { notifierSecretNames, buildNotifyDeps },
 };

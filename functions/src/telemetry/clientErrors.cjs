@@ -29,7 +29,7 @@ const crypto = require('node:crypto');
 
 const { isBenignClientError } = require('./benignFilter.cjs');
 const { redactText, redactUrl } = require('./redact.cjs');
-const { logError } = require('./systemErrors.cjs');
+const { logError, internals: systemErrorsInternals } = require('./systemErrors.cjs');
 
 const MAX_MESSAGE_LEN = 2000;
 const MAX_STACK_LEN = 8000;
@@ -54,10 +54,29 @@ function hashIp(ip) {
   return crypto.createHash('sha256').update(String(ip || 'unknown'), 'utf8').digest('hex');
 }
 
-/** @param {object} req @returns {string} */
+/**
+ * Codex review finding (P1): the FIRST X-Forwarded-For entry is whatever
+ * the caller sent — a direct (non-browser) POST to this unauthenticated
+ * endpoint can set its own `X-Forwarded-For: 1.2.3.4` and mint a fresh
+ * rate-limit bucket on every request, defeating the limiter entirely.
+ *
+ * Cloud Functions v2 runs on Cloud Run behind Google's front end, which is
+ * documented to APPEND the real connecting client's IP to whatever
+ * X-Forwarded-For value arrived with the request — it does not trust or
+ * strip the incoming header, it adds to it
+ * (https://cloud.google.com/run/docs/container-contract#https-headers).
+ * So the platform-vetted value is the LAST entry, never the first: that
+ * position is written by Google's infrastructure on the hop into the
+ * container and cannot be forged by the caller. `req.ip` is the fallback
+ * for a request with no XFF header at all (e.g. a direct test fake).
+ * @param {object} req @returns {string}
+ */
 function extractClientIp(req) {
   const forwarded = typeof req?.get === 'function' ? req.get('x-forwarded-for') : req?.headers?.['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    const entries = forwarded.split(',').map((s) => s.trim()).filter(Boolean);
+    if (entries.length > 0) return entries[entries.length - 1];
+  }
   return req?.ip || 'unknown';
 }
 
@@ -171,10 +190,10 @@ function buildHandlers() {
   const { defineSecret } = require('firebase-functions/params');
 
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
-  const secrets = [];
-  if ((process.env.EVENT_OPERATOR_NOTIFIER || '').trim() === 'webhook') {
-    secrets.push(defineSecret('OPERATOR_WEBHOOK_URL'), defineSecret('OPERATOR_WEBHOOK_SECRET'));
-  }
+  // Same secret set as systemErrors.cjs's onSystemErrorCreated — this
+  // handler's own logError persist-fail fallback goes through the same
+  // notifier (see systemErrorsInternals.notifierSecretNames).
+  const secrets = systemErrorsInternals.notifierSecretNames(process.env).map(defineSecret);
 
   const withCors = (handler) => async (req, res) => {
     const { applyCors, parseAllowedOrigins } = require('../core/http.cjs');
@@ -187,13 +206,8 @@ function buildHandlers() {
 
   return {
     logClientError: onRequest({ region, secrets }, withCors(async (req, res) => {
-      const { getDb } = require('../core/firestore.cjs');
-      const { getEventConfig } = require('../core/config.cjs');
-      const { createOperatorNotifier } = require('../notify/operator.cjs');
-      const db = getDb();
-      const getConfig = () => getEventConfig({ db });
-      const notifier = createOperatorNotifier({ env: process.env, getConfig });
-      await createLogClientErrorHandler({ db, notifyOperator: notifier.notify })(req, res);
+      const { db, notifyOperator } = systemErrorsInternals.buildNotifyDeps();
+      await createLogClientErrorHandler({ db, notifyOperator })(req, res);
     })),
   };
 }
