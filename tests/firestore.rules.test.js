@@ -632,3 +632,60 @@ describe("sessionBookmarks aggregate", () => {
     await assertFails(setDoc(doc(nonAdmin(), "sessionBookmarks/session-1"), { count: 99 }));
   });
 });
+
+// Issue #28: live-updates admin form + feedback inbox.
+describe("live_updates dashboard feed", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "live_updates/u1"), {
+        message: "Doors open at 9am.",
+        pinned: false,
+        postedAt: new Date(),
+      });
+    });
+  });
+
+  it("allows anyone, including anonymous, to read entries", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "live_updates/u1")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "live_updates/u1")));
+  });
+
+  it("denies all client writes, admin included — only saveLiveUpdate/deleteLiveUpdate (Admin SDK) write it", async () => {
+    await assertFails(setDoc(doc(admin(), "live_updates/u1"), { message: "hacked" }));
+    await assertFails(setDoc(doc(nonAdmin(), "live_updates/u1"), { message: "hacked" }));
+    await assertFails(deleteDoc(doc(admin(), "live_updates/u1")));
+  });
+});
+
+describe("feedback inbox", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "feedback/f1"), {
+        message: "The registration link 404s.",
+        email: null,
+        category: "bug",
+        status: "new",
+        createdAt: new Date(),
+      });
+    });
+  });
+
+  it("allows admin read of a submission but no one else", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "feedback/f1")));
+    await assertFails(getDoc(doc(nonAdmin(), "feedback/f1")));
+    await assertFails(getDoc(doc(anon(), "feedback/f1")));
+  });
+
+  it("denies all client writes, admin included — submitFeedback/updateFeedbackStatus (Admin SDK) write it", async () => {
+    await assertFails(setDoc(doc(anon(), "feedback/f2"), { message: "spam" }));
+    await assertFails(setDoc(doc(admin(), "feedback/f1"), { status: "reviewed" }));
+  });
+});
+
+describe("feedback_rate_limits stays deny-all", () => {
+  it("denies all access, admin included", async () => {
+    await assertFails(getDoc(doc(anon(), "feedback_rate_limits/h1")));
+    await assertFails(getDoc(doc(admin(), "feedback_rate_limits/h1")));
+    await assertFails(setDoc(doc(admin(), "feedback_rate_limits/h1"), { requests: [] }));
+  });
+});

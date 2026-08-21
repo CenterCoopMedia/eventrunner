@@ -21,6 +21,10 @@
     "updateBadges",
     "emailDeliveryWebhook",
     "bookmarkSession",
-    "logClientError"
+    "logClientError",
+    "saveLiveUpdate",
+    "deleteLiveUpdate",
+    "submitFeedback",
+    "updateFeedbackStatus"
   ]
 }
