@@ -3,7 +3,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createSyncUserPublic } = require('./projection.cjs');
+const {
+  createSyncUserPublic,
+  createRefreshUserPublicBadges,
+} = require('./projection.cjs');
 
 const BADGES_CONFIG = {
   categories: [
@@ -21,13 +24,20 @@ function fakeDb(seed = {}) {
   const docs = new Map(Object.entries(seed));
   const writes = [];
   const reads = [];
-  const ref = (key) => ({ key });
+  const ref = (key) => ({ key, id: key.split('/').at(-1) });
   return {
     docs,
     writes,
     reads,
     collection(name) {
-      return { doc: (id) => ref(`${name}/${id}`) };
+      return {
+        doc: (id) => ref(`${name}/${id}`),
+        async listDocuments() {
+          return [...docs.keys()]
+            .filter((key) => key.startsWith(`${name}/`) && key.split('/').length === 2)
+            .map(ref);
+        },
+      };
     },
     async runTransaction(fn) {
       return fn({
@@ -66,14 +76,11 @@ function userDoc(overrides = {}) {
 }
 
 function build(seed = {}, { badges = BADGES_CONFIG, failConfig = false } = {}) {
-  const db = fakeDb(seed);
+  const db = fakeDb({ 'config/badges': badges, ...seed });
   const errors = [];
   const sync = createSyncUserPublic({
     db,
-    getConfig: async () => {
-      if (failConfig) throw new Error('firestore down');
-      return { badges };
-    },
+    getBadgesConfig: failConfig ? async () => { throw new Error('firestore down'); } : undefined,
     now: () => new Date('2026-08-21T12:00:00Z'),
     log: { error: (...args) => errors.push(args) },
   });
@@ -117,6 +124,70 @@ test('projects the CURRENT account document, so an out-of-order delivery cannot 
 test('rewrites badges to the intersection with config/badges', async () => {
   const { db, sync } = build({ 'users/u1': userDoc({ badges: ['writer', 'unconfigured'] }) });
   await sync({ uid: 'u1' });
+  assert.deepEqual(db.docs.get('users_public/u1').badges, ['writer']);
+});
+
+test('a badge config change refreshes every stored public projection', async () => {
+  const db = fakeDb({
+    'config/badges': {
+      categories: [
+        { id: 'craft', maxPicks: 1, badges: [{ id: 'editor' }] },
+      ],
+    },
+    'users/u1': userDoc({ badges: ['writer', 'editor'] }),
+    'users/u2': userDoc({ uid: 'u2', badges: ['writer'] }),
+    'users_public/u1': { uid: 'u1', badges: ['writer', 'editor'] },
+    'users_public/u2': { uid: 'u2', badges: ['writer'] },
+  });
+  const refresh = createRefreshUserPublicBadges({ db, concurrency: 1 });
+
+  const result = await refresh();
+
+  assert.deepEqual(result, { scanned: 2 });
+  assert.deepEqual(db.docs.get('users_public/u1').badges, ['editor']);
+  assert.deepEqual(db.docs.get('users_public/u2').badges, []);
+});
+
+test('a refresh attempts every user before a partial failure requests a retry', async () => {
+  const db = fakeDb({
+    'users/u1': userDoc(),
+    'users/u2': userDoc({ uid: 'u2' }),
+    'users/u3': userDoc({ uid: 'u3' }),
+  });
+  const attempted = [];
+  const errors = [];
+  const refresh = createRefreshUserPublicBadges({
+    db,
+    concurrency: 1,
+    syncUserPublic: async ({ uid }) => {
+      attempted.push(uid);
+      if (uid === 'u2') throw new Error('projection failed');
+    },
+    log: { error: (message) => errors.push(message) },
+  });
+
+  await assert.rejects(refresh(), /Could not refresh 1 public profile projection/);
+  assert.deepEqual(attempted, ['u1', 'u2', 'u3']);
+  assert.equal(errors.length, 1);
+});
+
+test('a refresh retries a config read failure without clearing stored badges', async () => {
+  const db = fakeDb({
+    'users/u1': userDoc(),
+    'users_public/u1': { uid: 'u1', badges: ['writer'] },
+  });
+  const sync = createSyncUserPublic({
+    db,
+    getBadgesConfig: async () => { throw new Error('firestore down'); },
+    failClosedOnConfigError: false,
+  });
+  const refresh = createRefreshUserPublicBadges({
+    db,
+    syncUserPublic: sync,
+    log: { error() {} },
+  });
+
+  await assert.rejects(refresh(), /Could not refresh 1 public profile projection/);
   assert.deepEqual(db.docs.get('users_public/u1').badges, ['writer']);
 });
 
