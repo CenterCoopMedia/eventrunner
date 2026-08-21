@@ -12,6 +12,8 @@ const cmsVersions = require('./src/cms/versions.cjs');
 const cmsPublish = require('./src/cms/publish.cjs');
 const cmsUpdates = require('./src/cms/updates.cjs');
 const adminConfig = require('./src/admin/config.cjs');
+const clientErrors = require('./src/telemetry/clientErrors.cjs');
+const systemErrors = require('./src/telemetry/systemErrors.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -22,4 +24,6 @@ module.exports = {
   ...cmsPublish.handlers,
   ...cmsUpdates.handlers,
   ...adminConfig.handlers,
+  ...clientErrors.handlers,
+  ...systemErrors.handlers,
 };

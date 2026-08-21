@@ -353,6 +353,7 @@ jobs:
           # be set here before EVENT_APP_CHECK_ENFORCED is turned on, or
           # every sign-in request is refused as unattested.
           VITE_FIREBASE_APP_CHECK_SITE_KEY: ${{ vars.VITE_FIREBASE_APP_CHECK_SITE_KEY }}
+          VITE_ENABLE_CLIENT_ERROR_REPORTING: ${{ vars.VITE_ENABLE_CLIENT_ERROR_REPORTING }}
           VITE_EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
         run: npm run build
       - uses: actions/upload-artifact@v4

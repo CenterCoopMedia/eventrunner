@@ -162,9 +162,10 @@ test('sendOtpCode rate-limits the 6th request with Retry-After and sends no mail
 
 test('a broken auth.otp override falls back to the default and notifies the operator', async () => {
   const db = fakeDb();
+  const seenAtMs = 1_000_000;
   // Valid per save-time checks it never went through: omits {{code}}.
   db.store.set('email_templates/auth.otp', { html: '<p>Welcome!</p>', text: 'Welcome!' });
-  const { sent, notices, handler } = sendDeps({ db });
+  const { sent, notices, handler } = sendDeps({ db, now: () => seenAtMs });
   const res = fakeRes();
   await handler({ method: 'POST', body: { email: 'a@example.org' } }, res);
   // Fallback keeps sign-in working: mail sent from the shipped default.
@@ -177,6 +178,13 @@ test('a broken auth.otp override falls back to the default and notifies the oper
   const errorRows = [...db.store.entries()].filter(([k]) => k.startsWith('system_errors/'));
   assert.equal(errorRows.length, 1);
   assert.equal(errorRows[0][1].templateId, 'auth.otp');
+  // alertedAt is stamped at creation, since this path notifies inline right
+  // here — the collection-wide onSystemErrorCreated trigger must see this
+  // row as already-alerted and skip it, not fire a second (inferior) alert.
+  const seenAt = new Date(seenAtMs);
+  assert.deepEqual(errorRows[0][1].alertedAt, seenAt);
+  assert.deepEqual(errorRows[0][1].createdAt, seenAt);
+  assert.deepEqual(errorRows[0][1].lastSeenAt, seenAt);
   // Deduplicated: a second request against the same broken override must
   // not mint another durable row (this runs before the rate limit).
   await handler({ method: 'POST', body: { email: 'b@example.org' } }, fakeRes());

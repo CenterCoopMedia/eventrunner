@@ -75,3 +75,11 @@ test('web deployment passes the App Check site key and excludes the debug token'
   );
   assert.doesNotMatch(workflow, /VITE_APP_CHECK_DEBUG_TOKEN/);
 });
+
+test('web deployment passes the client error reporting setting', () => {
+  const build = step('Build the web app against the generated snapshot');
+  assert.match(
+    build,
+    /VITE_ENABLE_CLIENT_ERROR_REPORTING: \$\{\{ vars\.VITE_ENABLE_CLIENT_ERROR_REPORTING \}\}/,
+  );
+});

@@ -112,6 +112,7 @@ service cloud.firestore {
     match /sent_emails/{docId} { allow read, write: if false; }
     match /email_claims/{docId} { allow read, write: if false; }
     match /system_errors/{docId} { allow read, write: if false; }
+    match /client_error_rate_limits/{docId} { allow read, write: if false; }
     match /email_templates/{docId} { allow read, write: if false; }
 
     // Everything not matched above stays deny-all.
