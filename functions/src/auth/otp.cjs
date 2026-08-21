@@ -99,9 +99,10 @@ async function reopenSystemError({ db, errorId, seenAt }) {
  * Whole-string match, not parseInt: parseInt accepts a valid PREFIX, so
  * '1.5' would silently become 1 and '50oops' 50 — a fraction of the
  * intended ceiling, which is a self-inflicted outage rather than the
- * documented fallback. validateDeployEnv rejects the same values at build
- * time, but nothing in production calls it today, so this must not depend
- * on it.
+ * documented fallback. scripts/validate-deploy-env.cjs rejects the same
+ * values in the deploy workflow, but a manual `firebase deploy` or a
+ * hand-edited functions/.env skips that gate entirely, so the runtime
+ * parse must stand on its own.
  *
  * @param {Record<string, string|undefined>} [env]
  * @returns {number}

@@ -1324,8 +1324,39 @@ component.
 code's `BLOCK_TYPES` registry and reject unknown ids. The admin CMS reads `cmsPages` at runtime;
 `getPageSections`, `getAllowedBlocksForSection`, `getDefaultBlocks`, `isSectionReorderable`,
 `getMaxBlocks`, and `findFieldLocation` keep their signatures and take the pages collection as input
-instead of closing over the constant. A generic `/p/:slug` route renders any non-system page from
-its sections, so a client adding a "Scholarships" page is a CMS action, not a PR.
+instead of closing over the constant.
+
+**Generic pages route at their own root-level `path`, not a `/p/:slug` prefix (issue #52).** A
+non-system page's admin-set `path` (e.g. `/scholarships`) IS its URL — there is no separate slug
+namespace. `apps/web/src/App.jsx` mounts every system route (`schedule`, `speakers`, `sponsors`,
+`signin`) plus `index` for home explicitly, then a single catch-all (`path="*"`, registered last —
+react-router matches routes top to bottom) that renders `<ContentPage>`. ContentPage reads the
+current location's pathname and looks it up against visible pages by their stored `path` — one
+lookup key, not a route param, and not the old dual `getPage(slug) ?? getPage('/p/' + slug)`
+fallback. A pathname that matches no page (including the retired `/p/...` prefix — those links now
+404 rather than redirect) renders the same `NotFound` used everywhere else on the site; ContentPage
+IS the site's 404 path for anything that isn't a static route.
+
+Because a generic page's path can be anything an admin types, two guards keep it from colliding
+with the site's real structure:
+
+- **Reserved-path registry** (`packages/shared/src/routing.cjs`, `RESERVED_PATH_SEGMENTS`): the
+  first path segment of every statically mounted App.jsx route, plus `p` (reserving the old prefix
+  so it can never be reclaimed by a new page) and `admin` (reserved ahead of its own route landing,
+  for the authenticated admin area under construction on a parallel branch) — the list covers future
+  system areas as well as routes that exist today. This is the single source of truth, imported by
+  both
+  `validatePageDoc` (functions) and, indirectly through the same registry, the web router's mental
+  model of what it owns. `validatePageDoc` rejects a non-system page whose first path segment is
+  reserved, rejects `path === '/'` (home's route) for anything but a system page, and enforces
+  normalized form — lowercase, slug-safe segments (`[a-z0-9-]`, no leading/trailing hyphen), no
+  trailing slash, no empty (`//`) segments. System pages are exempt from the reserved-segment and
+  root checks: they ARE the routes those checks protect (e.g. the schedule page's path IS
+  `/schedule`).
+- **Application-level uniqueness** in `cmsSavePage`: Firestore has no unique index on `path`, so
+  before writing a draft the handler queries both `cmsPages` and `cmsPages_drafts` for an exact
+  `path` match belonging to any OTHER page id, and rejects the save (400, naming the colliding page)
+  if one exists.
 
 ### 5.3 Default seeded pages
 
