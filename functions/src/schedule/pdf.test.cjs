@@ -13,8 +13,11 @@ const {
     fitText,
     groupSessionsByDay,
     resolveSpeakerLine,
+    deriveApprovedSpeakerName,
     formatClock,
     formatSessionTime,
+    canEncode,
+    sanitizeForFont,
   },
 } = require('./pdf.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
@@ -188,6 +191,40 @@ test('resolveSpeakerLine: joins resolved names, drops unresolved ids silently', 
   assert.equal(resolveSpeakerLine(undefined, names), '');
 });
 
+// -------------------------------------------------- canonical speaker name
+
+test('deriveApprovedSpeakerName: prefers displayName, else firstName + lastName, for an approved speaker', () => {
+  assert.equal(
+    deriveApprovedSpeakerName({ firstName: 'Alex', lastName: 'Placeholder', status: 'approved' }),
+    'Alex Placeholder',
+  );
+  assert.equal(
+    deriveApprovedSpeakerName({
+      firstName: 'Alex',
+      lastName: 'Placeholder',
+      displayName: 'A. Placeholder',
+      status: 'approved',
+    }),
+    'A. Placeholder',
+  );
+});
+
+test('deriveApprovedSpeakerName: never resolves a non-approved speaker (invited/pending/declined/removed/missing status)', () => {
+  for (const status of ['invited', 'pending', 'declined', 'removed', undefined, null, '']) {
+    assert.equal(
+      deriveApprovedSpeakerName({ firstName: 'Alex', lastName: 'Placeholder', status }),
+      '',
+      `status ${JSON.stringify(status)} must not resolve a name`,
+    );
+  }
+});
+
+test('deriveApprovedSpeakerName: fails soft on a missing/malformed record', () => {
+  assert.equal(deriveApprovedSpeakerName(null), '');
+  assert.equal(deriveApprovedSpeakerName(undefined), '');
+  assert.equal(deriveApprovedSpeakerName({ status: 'approved' }), ''); // no usable name fields
+});
+
 // ----------------------------------------------------------------- clock
 
 test('formatClock / formatSessionTime: 24h wall clock to 12h display', () => {
@@ -198,6 +235,72 @@ test('formatClock / formatSessionTime: 24h wall clock to 12h display', () => {
   assert.equal(formatSessionTime({ startTime: '09:30', endTime: '10:00' }), '9:30 AM–10:00 AM');
   assert.equal(formatSessionTime({ startTime: '09:30' }), '9:30 AM');
   assert.equal(formatSessionTime({}), '');
+});
+
+// ------------------------------------------------------ unicode sanitize
+
+async function helveticaFont() {
+  const { PDFDocument, StandardFonts } = require('pdf-lib');
+  const doc = await PDFDocument.create();
+  return doc.embedFont(StandardFonts.Helvetica);
+}
+
+test('canEncode: true for WinAnsi-encodable text, false for CJK/Arabic/emoji', async () => {
+  const font = await helveticaFont();
+  assert.equal(canEncode(font, 'Hello, world'), true);
+  assert.equal(canEncode(font, 'café'), true); // Latin-1 accented — WinAnsi covers this directly
+  assert.equal(canEncode(font, '日本語'), false);
+  assert.equal(canEncode(font, 'مرحبا'), false);
+  assert.equal(canEncode(font, '😀'), false);
+});
+
+test('sanitizeForFont: passes already-encodable text through unchanged (fast path)', async () => {
+  const font = await helveticaFont();
+  assert.equal(sanitizeForFont(font, 'Plain ASCII title'), 'Plain ASCII title');
+  assert.equal(sanitizeForFont(font, 'café'), 'café');
+  assert.equal(sanitizeForFont(font, ''), '');
+  assert.equal(sanitizeForFont(font, null), '');
+  assert.equal(sanitizeForFont(font, undefined), '');
+});
+
+test('sanitizeForFont: transliterates accented Latin beyond Latin-1 via NFKD + combining-mark strip', async () => {
+  const font = await helveticaFont();
+  // "ế" (Vietnamese e with circumflex + acute) has no direct WinAnsi slot,
+  // but NFKD-decomposes to "e" plus two combining marks.
+  assert.equal(sanitizeForFont(font, 'Tiếng Việt'), 'Tieng Viet');
+});
+
+test('sanitizeForFont: drops unrecoverable scripts (CJK/Arabic) rather than crashing, keeping the rest', async () => {
+  const font = await helveticaFont();
+  assert.equal(sanitizeForFont(font, 'Hello 日本語 world'), 'Hello  world');
+  assert.equal(sanitizeForFont(font, 'مرحبا'), '(unsupported characters)');
+});
+
+test('sanitizeForFont: a surrogate-pair emoji is dropped whole, never split into lone surrogates', async () => {
+  const font = await helveticaFont();
+  const result = sanitizeForFont(font, 'Party 😀 time');
+  assert.equal(result, 'Party  time');
+  // No lone surrogate leaked through (which would itself be a WinAnsi throw).
+  assert.equal(canEncode(font, result), true);
+});
+
+test('buildSchedulePdf: CJK/Arabic/emoji in event name, title, and speaker name never 500s', async () => {
+  const sessions = [
+    session({
+      id: 'intl',
+      dayId: 'day-1',
+      title: '日本語のセッション',
+      location: 'مؤتمر',
+      speakerIds: ['sp-intl'],
+    }),
+  ];
+  const bytes = await buildSchedulePdf({
+    event: { ...EVENT, name: '日本語イベント 😀', days: THREE_DAYS },
+    theme: THEME,
+    sessions,
+    speakerNamesById: { 'sp-intl': '田中太郎' },
+  });
+  assert.equal(Buffer.from(bytes).toString('latin1', 0, 5), '%PDF-');
 });
 
 // ------------------------------------------------------------- PDF build
@@ -308,6 +411,22 @@ test('createBuildSchedulePdfHandler: 200 with a PDF body, reading only visible s
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Content-Type'], 'application/pdf');
   assert.equal(Buffer.isBuffer(res.sent), true);
+  assert.equal(res.sent.toString('latin1', 0, 5), '%PDF-');
+});
+
+test('createBuildSchedulePdfHandler: resolves speaker names via the canonical firstName/lastName/status shape, approved only', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/s1': session({ id: 's1', speakerIds: ['approved-1', 'pending-1'] }),
+    'speakers/approved-1': { firstName: 'Alex', lastName: 'Placeholder', status: 'approved' },
+    'speakers/pending-1': { firstName: 'Sam', lastName: 'NotYetApproved', status: 'pending' },
+  });
+  const handler = createBuildSchedulePdfHandler({
+    db,
+    getConfig: async () => ({ features: { schedulePdf: true }, event: EVENT, theme: THEME }),
+  });
+  const res = fakeRes();
+  await handler({ method: 'GET' }, res);
+  assert.equal(res.statusCode, 200);
   assert.equal(res.sent.toString('latin1', 0, 5), '%PDF-');
 });
 

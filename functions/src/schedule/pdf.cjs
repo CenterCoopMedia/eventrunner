@@ -199,6 +199,40 @@ function resolveSpeakerLine(speakerIds, namesById) {
     .join(', ');
 }
 
+// The one speaker status this file will resolve a public display name for.
+// Everything else (invited/pending/declined, the soft-delete 'removed'
+// status — ADR §4.3) is treated the same as an unresolved id: silently
+// dropped from the printed session, never a placeholder.
+const PUBLIC_SPEAKER_STATUSES = Object.freeze(new Set(['approved']));
+
+/**
+ * Derive a speaker's public display name from the canonical `speakers/{id}`
+ * record shape (spec §4.3: `firstName`, `lastName`, `status`). The in-flight
+ * speaker directory tranche (PR #74, a parallel branch not yet merged here)
+ * additionally carries an optional `displayName` override, preferred when
+ * present.
+ *
+ * NOTE: PR #74 introduces `shared/speaker`'s `speakerDisplayName` helper for
+ * exactly this derivation. This duplicates that logic locally, deliberately,
+ * so issue #27 does not depend on an unmerged branch — consolidate onto the
+ * shared helper once both land, rather than keeping two implementations.
+ *
+ * Only an **approved** speaker's name is ever resolved; every other status
+ * resolves to '' (dropped by {@link resolveSpeakerLine}'s isNonEmptyString
+ * filter), same as an id with no matching document at all.
+ *
+ * @param {{ firstName?: string, lastName?: string, displayName?: string,
+ *           status?: string } | null | undefined} record
+ * @returns {string}
+ */
+function deriveApprovedSpeakerName(record) {
+  if (!record || typeof record !== 'object') return '';
+  if (!PUBLIC_SPEAKER_STATUSES.has(record.status)) return '';
+  if (isNonEmptyString(record.displayName)) return record.displayName.trim();
+  const parts = [record.firstName, record.lastName].filter(isNonEmptyString);
+  return parts.length > 0 ? parts.join(' ').trim() : '';
+}
+
 /** "09:30" -> "9:30 AM" display, 24h wall-clock in, 12h out. Malformed input passes through unchanged. */
 function formatClock(hhmm) {
   if (typeof hhmm !== 'string' || !/^\d{2}:\d{2}$/.test(hhmm)) return hhmm || '';
@@ -215,6 +249,86 @@ function formatSessionTime(session) {
   if (!start) return '';
   if (!end) return start;
   return `${start}–${end}`;
+}
+
+// Strips Unicode combining diacritical marks (U+0300-U+036F) left behind by
+// an NFKD decomposition — e.g. "é" -> "e" + U+0301, this removes the U+0301.
+const COMBINING_MARKS_RE = /[\u0300-\u036f]/g;
+
+/**
+ * Whether `font` (a pdf-lib StandardFonts font, WinAnsi-encoded) can render
+ * `text` without throwing. `widthOfTextAtSize` validates encodability the
+ * same way `drawText` does, so this is a safe probe with no side effect.
+ *
+ * @param {import('pdf-lib').PDFFont} font
+ * @param {string} text
+ * @returns {boolean}
+ */
+function canEncode(font, text) {
+  try {
+    font.widthOfTextAtSize(text, 12);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Best-effort sanitize free-text config/session/speaker content for a
+ * WinAnsi-only standard font (Helvetica/HelveticaBold) before it is drawn.
+ *
+ * pdf-lib's standard fonts throw ("WinAnsi cannot encode ...") the instant
+ * `drawText`/`widthOfTextAtSize` sees a character outside Windows-1252 —
+ * which is most of Unicode: CJK, Arabic, Cyrillic, emoji, and Latin
+ * characters beyond Latin-1 (e.g. Vietnamese, Turkish "ğ"). Left unhandled,
+ * one event name or speaker name in any of those scripts 500s the whole
+ * public endpoint.
+ *
+ * Tradeoff, chosen over embedding a Unicode font: a broad-coverage face
+ * (e.g. Noto Sans + a CJK companion) that actually covers CJK/Arabic runs
+ * several megabytes even subsetted to common ranges, which is a real cost
+ * on every cold start of a Cloud Function whose only other dependency is
+ * pdf-lib itself (functions ship no other font today, and fontkit's
+ * subsetting still has to walk the full glyph table at embed time). This
+ * sanitize step keeps the function's footprint unchanged and NEVER 500s;
+ * the readable cost is that a CJK/Arabic-only title renders as the bracketed
+ * fallback below, not its own script. If a client's schedule regularly needs
+ * non-Latin display text, embedding a subset Unicode font via
+ * `@pdf-lib/fontkit` is the follow-up — noted here rather than done
+ * speculatively for zero configured deployments that need it yet.
+ *
+ * Per Unicode code point (not UTF-16 code unit, so a surrogate-pair emoji is
+ * never split into two invalid lone surrogates):
+ *   1. Encodable as-is (the common case: plain ASCII/Latin-1) -> kept.
+ *   2. Not encodable, but NFKD-decomposing it and stripping combining marks
+ *      yields an encodable base letter (accented Latin beyond Latin-1,
+ *      e.g. "ế" -> "e") -> the transliterated form is kept.
+ *   3. Still not encodable (CJK, Arabic, Cyrillic, emoji, ...) -> dropped.
+ * If every character in a non-empty input drops, the whole string becomes
+ * a bracketed placeholder rather than silently rendering blank.
+ *
+ * @param {import('pdf-lib').PDFFont} font
+ * @param {*} text
+ * @returns {string}
+ */
+function sanitizeForFont(font, text) {
+  if (typeof text !== 'string' || text === '') return '';
+  if (canEncode(font, text)) return text; // fast path: no scan needed at all
+
+  let out = '';
+  for (const ch of text) {
+    if (canEncode(font, ch)) {
+      out += ch;
+      continue;
+    }
+    const transliterated = ch.normalize('NFKD').replace(COMBINING_MARKS_RE, '');
+    if (transliterated && transliterated !== ch && canEncode(font, transliterated)) {
+      out += transliterated;
+    }
+    // else: unrecoverable in this font — dropped, not replaced per-character
+    // (a run of "???" is worse than a shorter, still-readable string).
+  }
+  return out.trim() ? out : '(unsupported characters)';
 }
 
 // -------------------------------------------------------------- pdf build
@@ -247,6 +361,13 @@ async function buildSchedulePdf({ event, theme, sessions, speakerNamesById = {} 
   const toColor = (c) => rgb(c.r, c.g, c.b);
   const contentWidth = PAGE_SIZE[0] - MARGIN * 2;
 
+  // Every piece of free-text config/session/speaker content is sanitized
+  // through its actual drawing font before `drawText`/`fitText` ever see it
+  // (spec §9, non-WinAnsi text otherwise 500s the whole endpoint — see
+  // sanitizeForFont's doc comment for the tradeoff).
+  const safeBody = (text) => sanitizeForFont(bodyFont, text);
+  const safeBold = (text) => sanitizeForFont(boldFont, text);
+
   /** Draw the shared header band; returns the y coordinate to start content at. */
   function drawHeader(page, dayLabel) {
     const [width, height] = [PAGE_SIZE[0], PAGE_SIZE[1]];
@@ -257,7 +378,7 @@ async function buildSchedulePdf({ event, theme, sessions, speakerNamesById = {} 
       height: HEADER_HEIGHT,
       color: toColor(colors.primary),
     });
-    page.drawText(branding.name, {
+    page.drawText(safeBold(branding.name), {
       x: MARGIN,
       y: height - 40,
       size: 20,
@@ -266,7 +387,7 @@ async function buildSchedulePdf({ event, theme, sessions, speakerNamesById = {} 
     });
     const sub = [branding.tagline, branding.venueLine].filter(isNonEmptyString).join(' · ');
     if (sub) {
-      page.drawText(sub, {
+      page.drawText(safeBody(sub), {
         x: MARGIN,
         y: height - 62,
         size: 10,
@@ -275,7 +396,7 @@ async function buildSchedulePdf({ event, theme, sessions, speakerNamesById = {} 
       });
     }
     if (dayLabel) {
-      page.drawText(dayLabel, {
+      page.drawText(safeBold(dayLabel), {
         x: MARGIN,
         y: height - 82,
         size: 12,
@@ -318,10 +439,14 @@ async function buildSchedulePdf({ event, theme, sessions, speakerNamesById = {} 
         ({ page, y } = newPage(`${dayLabelOf(day)} (cont.)`));
       }
 
-      const timeText = formatSessionTime(session);
-      const locationText = isNonEmptyString(session?.location) ? session.location : '';
-      const titleText = isNonEmptyString(session?.title) ? session.title : 'Untitled session';
-      const speakerText = resolveSpeakerLine(session?.speakerIds, speakerNamesById);
+      const timeText = formatSessionTime(session); // digits/AM/PM/en-dash only — always WinAnsi-safe
+      const locationText = safeBody(
+        isNonEmptyString(session?.location) ? session.location : '',
+      );
+      const titleText = safeBold(
+        isNonEmptyString(session?.title) ? session.title : 'Untitled session',
+      );
+      const speakerText = safeBody(resolveSpeakerLine(session?.speakerIds, speakerNamesById));
 
       const timeColWidth = 90;
       const locationColWidth = 110;
@@ -400,15 +525,18 @@ function createBuildSchedulePdfHandler({ db, getConfig, log = console }) {
       const [sessionsSnap, speakersSnap] = await Promise.all([
         db.collection('cmsSchedule').where('visible', '==', true).get(),
         // Best-effort: no speaker directory is populated in every
-        // deployment yet (issue #27 does not add one) — an empty or
-        // missing collection just means no speaker line is printed.
+        // deployment yet (the speaker tranche, PR #74, is a parallel branch
+        // not yet merged here) — an empty or missing collection just means
+        // no speaker line is printed. deriveApprovedSpeakerName further
+        // requires status === 'approved', so an invited-but-not-yet-approved
+        // speaker record is silently skipped the same way.
         db.collection('speakers').get().catch(() => ({ docs: [] })),
       ]);
       const sessions = sessionsSnap.docs.map((d) => d.data());
       const speakerNamesById = {};
       for (const d of speakersSnap.docs) {
-        const data = d.data();
-        if (isNonEmptyString(data?.name)) speakerNamesById[d.id] = data.name.trim();
+        const name = deriveApprovedSpeakerName(d.data());
+        if (name) speakerNamesById[d.id] = name;
       }
 
       const bytes = await buildSchedulePdf({
@@ -472,7 +600,10 @@ module.exports = {
     fitText,
     groupSessionsByDay,
     resolveSpeakerLine,
+    deriveApprovedSpeakerName,
     formatClock,
     formatSessionTime,
+    canEncode,
+    sanitizeForFont,
   },
 };
