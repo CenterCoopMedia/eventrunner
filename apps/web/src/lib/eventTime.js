@@ -65,6 +65,18 @@ export function zonedDateTime(dateStr, timeStr, timeZone) {
   const [y, mo, d] = dateStr.split('-').map(Number);
   const [h, mi] = timeStr.split(':').map(Number);
   const wallMs = Date.UTC(y, mo - 1, d, h, mi);
+  // Date.UTC normalizes out-of-range components instead of rejecting them
+  // (e.g. 2026-02-30 silently becomes March 2) — check the round trip so an
+  // impossible calendar date fails soft here rather than resolving to a
+  // different day than the one requested.
+  const normalized = new Date(wallMs);
+  if (
+    normalized.getUTCFullYear() !== y ||
+    normalized.getUTCMonth() !== mo - 1 ||
+    normalized.getUTCDate() !== d
+  ) {
+    return null;
+  }
 
   try {
     // offset(t) = wallClockAsUtcMs(t) − t; find utc with utc + offset(utc) = wall.

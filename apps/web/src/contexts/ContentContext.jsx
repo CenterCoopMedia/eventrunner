@@ -8,19 +8,20 @@
 // (?preview=1 is convenience only, wired in App.jsx).
 //
 // Overlay semantics, per collection:
-//   - cmsContent / cmsPages / cmsSchedule: any successful live result —
-//     including an empty array — replaces the snapshot wholesale. The
-//     published set is the truth: once a listener has actually reported in,
-//     an empty result means staff unpublished everything and the public view
-//     must go empty too, not keep showing stale demo content. Only the
-//     *absence* of a result yet (overlay still null — no snapshot has
-//     arrived, e.g. a fresh unseeded project or a still-connecting listener)
-//     or a listener error (fail soft: rules-denied/offline reads must not
-//     blank the page) keeps the snapshot / last-known live values.
+//   - cmsContent / cmsPages / cmsSchedule / cmsOrganizations: any successful
+//     live result — including an empty array — replaces the snapshot
+//     wholesale. The published set is the truth: once a listener has
+//     actually reported in, an empty result means staff unpublished
+//     everything and the public view must go empty too, not keep showing
+//     stale demo content. Only the *absence* of a result yet (overlay still
+//     null — no snapshot has arrived, e.g. a fresh unseeded project or a
+//     still-connecting listener) or a listener error (fail soft:
+//     rules-denied/offline reads must not blank the page) keeps the
+//     snapshot / last-known live values.
 //   - cmsUpdates: live-only; there is no snapshot module, so the default is
 //     an empty list.
-//   - cmsOrganizations / cmsTimeline: snapshot-only for now — their runtime
-//     overlay belongs to a later orgs/timeline tranche.
+//   - cmsTimeline: snapshot-only for now — its runtime overlay belongs to a
+//     later timeline tranche.
 //
 // `loading` is always false: the snapshot renders synchronously on first
 // paint, and the overlay above is applied fire-and-forget as onSnapshot
@@ -38,15 +39,48 @@ import {
 } from 'react';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotScheduleData, { speakers } from '@generated/scheduleData.js';
-import organizationsData from '@generated/organizationsData.js';
+import snapshotOrganizationsData from '@generated/organizationsData.js';
 import snapshotPages from '@generated/pagesData.js';
 import { subscribeContentCollection } from '../lib/contentSource.js';
 
 const ContentContext = createContext(null);
 
-const RUNTIME_COLLECTIONS = ['cmsContent', 'cmsPages', 'cmsUpdates', 'cmsSchedule'];
+const RUNTIME_COLLECTIONS = [
+  'cmsContent',
+  'cmsPages',
+  'cmsUpdates',
+  'cmsSchedule',
+  'cmsOrganizations',
+];
 
 const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
+
+// cmsOrganizations is written through the generic content endpoint
+// (functions/src/cms/content.cjs), which only rejects reserved field
+// *names* — it never checks field *types*. Sponsors.jsx renders
+// name/tier/description straight through as JSX children, so a published
+// doc with e.g. `name: { unexpected: true }` would make React throw and
+// blank the route the instant the listener fires. Guard at this overlay
+// boundary instead: drop (not partially render) any doc whose renderable
+// fields aren't one of the primitive types React can safely render as a
+// child. This keeps the wholesale-replace semantics for every doc that
+// *is* safe — one malformed doc doesn't fall back to the snapshot.
+const ORG_RENDERABLE_FIELDS = ['name', 'tier', 'description'];
+
+function isSafeRenderableValue(value) {
+  return (
+    value == null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  );
+}
+
+function sanitizeOrganizationDocs(docs) {
+  return docs.filter((doc) =>
+    ORG_RENDERABLE_FIELDS.every((field) => isSafeRenderableValue(doc?.[field])),
+  );
+}
 
 export function ContentProvider({ readSource = 'published', children }) {
   // One overlay slot per collection; null = no runtime result yet, so the
@@ -56,12 +90,19 @@ export function ContentProvider({ readSource = 'published', children }) {
     cmsPages: null,
     cmsUpdates: null,
     cmsSchedule: null,
+    cmsOrganizations: null,
   });
 
   useEffect(() => {
     // Switching between published and draft re-subscribes from scratch;
     // stale overlay from the other source must not linger.
-    setOverlay({ cmsContent: null, cmsPages: null, cmsUpdates: null, cmsSchedule: null });
+    setOverlay({
+      cmsContent: null,
+      cmsPages: null,
+      cmsUpdates: null,
+      cmsSchedule: null,
+      cmsOrganizations: null,
+    });
     const unsubscribers = RUNTIME_COLLECTIONS.map((name) =>
       subscribeContentCollection(name, readSource, (docs) => {
         setOverlay((prev) => ({ ...prev, [name]: docs }));
@@ -90,8 +131,15 @@ export function ContentProvider({ readSource = 'published', children }) {
       .sort(byOrder);
     const updates = (overlay.cmsUpdates ?? []).slice().sort(byOrder);
     const scheduleData = overlay.cmsSchedule != null ? overlay.cmsSchedule : snapshotScheduleData;
+    const organizationsData =
+      overlay.cmsOrganizations != null
+        ? sanitizeOrganizationDocs(overlay.cmsOrganizations)
+        : snapshotOrganizationsData;
     const live = Boolean(
-      overlay.cmsContent != null || overlay.cmsPages != null || overlay.cmsSchedule != null,
+      overlay.cmsContent != null ||
+        overlay.cmsPages != null ||
+        overlay.cmsSchedule != null ||
+        overlay.cmsOrganizations != null,
     );
 
     const getBlock = (section, field) => {

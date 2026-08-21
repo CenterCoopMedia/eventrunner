@@ -37,7 +37,9 @@ export default function Home() {
   return (
     <article>
       <section aria-labelledby="hero-title" className="py-8">
-        <p className="font-accent text-2xl text-brand-accent">{eventConfig.tagline}</p>
+        {typeof eventConfig.tagline === 'string' ? (
+          <p className="font-accent text-2xl text-brand-accent">{eventConfig.tagline}</p>
+        ) : null}
         <h1 id="hero-title" className="mt-2 font-heading text-4xl font-semibold text-brand-ink">
           {title?.value ?? eventConfig.name}
         </h1>

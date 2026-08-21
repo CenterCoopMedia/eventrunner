@@ -1,5 +1,7 @@
 // GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.4, §8.6).
 //
+// Regenerate with:  node scripts/generate-content.cjs --demo
+//
 // Shape mirrors published cmsOrganizations docs. All organizations are
 // fictional; logos point at the neutral branding placeholders — no real
 // sponsor logos in seeds, fixtures, tests, or the demo instance (spec §5.4).

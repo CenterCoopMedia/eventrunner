@@ -34,6 +34,26 @@ function isNonEmptyString(v) {
 }
 
 /**
+ * True when the string matches YYYY-MM-DD *and* names a real calendar date.
+ * `new Date(Date.UTC(...))` normalizes out-of-range components instead of
+ * rejecting them (e.g. 2026-02-30 silently becomes 2026-03-02) — round-trip
+ * the parsed components against the normalized result to catch that.
+ *
+ * @param {*} v
+ * @returns {boolean}
+ */
+function isValidCalendarDate(v) {
+  if (typeof v !== 'string' || !DATE_RE.test(v)) return false;
+  const [y, mo, d] = v.split('-').map(Number);
+  const normalized = new Date(Date.UTC(y, mo - 1, d));
+  return (
+    normalized.getUTCFullYear() === y &&
+    normalized.getUTCMonth() === mo - 1 &&
+    normalized.getUTCDate() === d
+  );
+}
+
+/**
  * True when the string names a real IANA timezone, probed via Intl.
  *
  * @param {*} tz
@@ -66,6 +86,9 @@ function validateEventConfig(event) {
   if (!isValidTimezone(event.timezone)) {
     errors.push(`timezone: must be a valid IANA timezone (got ${JSON.stringify(event.timezone)})`);
   }
+  if (event.tagline != null && typeof event.tagline !== 'string') {
+    errors.push('tagline: must be a string or absent');
+  }
 
   if (!Array.isArray(event.days)) {
     errors.push('days: must be an array');
@@ -84,8 +107,8 @@ function validateEventConfig(event) {
       } else {
         seenIds.add(day.id);
       }
-      if (typeof day.date !== 'string' || !DATE_RE.test(day.date)) {
-        errors.push(`${at}.date: must match YYYY-MM-DD`);
+      if (!isValidCalendarDate(day.date)) {
+        errors.push(`${at}.date: must match YYYY-MM-DD and name a real calendar date`);
       }
       const startOk = typeof day.startTime === 'string' && HHMM_RE.test(day.startTime);
       const endOk = typeof day.endTime === 'string' && HHMM_RE.test(day.endTime);
