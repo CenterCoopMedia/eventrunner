@@ -12,6 +12,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 
 const TABS = [
   { to: 'pages', label: 'Pages' },
+  { to: 'speakers', label: 'Speakers' },
   { to: 'settings', label: 'Event' },
   { to: 'features', label: 'Features' },
   { to: 'badges', label: 'Badges' },
