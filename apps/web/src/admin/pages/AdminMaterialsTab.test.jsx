@@ -111,4 +111,38 @@ describe('AdminMaterialsTab', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Not authorized to manage materials for this session.');
   });
+
+  it('ignores a stale listSessionMaterials response that resolves after a newer session switch', async () => {
+    // s1's request is slow and deliberately left pending...
+    let resolveFirst;
+    const firstRequest = new Promise((resolve) => {
+      resolveFirst = resolve;
+    });
+    fetch.mockImplementationOnce(() => firstRequest);
+    renderTab();
+    fireEvent.change(screen.getByLabelText('Session'), { target: { value: 's1' } });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    // ...then the caller switches to s2, whose request resolves quickly.
+    fetch.mockResolvedValueOnce(
+      okResponse({
+        materials: [{ id: 'm2', sessionId: 's2', type: 'link', url: 'https://b.org', filename: 'Session B material', reviewStatus: 'pending' }],
+      }),
+    );
+    fireEvent.change(screen.getByLabelText('Session'), { target: { value: 's2' } });
+    expect(await screen.findByText('Session B material')).toBeInTheDocument();
+
+    // The stale s1 response finally arrives, AFTER s2's already applied —
+    // it must not overwrite what's on screen.
+    resolveFirst(
+      okResponse({
+        materials: [{ id: 'm1', sessionId: 's1', type: 'link', url: 'https://a.org', filename: 'Session A material', reviewStatus: 'pending' }],
+      }),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(screen.queryByText('Session A material')).toBeNull();
+    expect(screen.getByText('Session B material')).toBeInTheDocument();
+  });
 });

@@ -11,7 +11,7 @@
 // drives `session_materials_public` through the projection trigger; delete
 // removes the material and its `cmsSchedule.materialCount` slot in one
 // server transaction.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useContent } from '../../contexts/ContentContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -138,10 +138,20 @@ export default function AdminMaterialsTab() {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Guards against an out-of-order response: switching sessions (or
+  // clicking Approve/Reject/Delete, which each call load() again) fires a
+  // new listSessionMaterials request while a previous one may still be in
+  // flight. Without this, a slow response for session A that resolves
+  // AFTER a fast response for session B would overwrite B's freshly-loaded
+  // list with A's stale one. Every call to load() bumps this ref and
+  // captures its own value; a response only applies if it is still the
+  // most recent request when it resolves.
+  const requestIdRef = useRef(0);
 
   const options = (scheduleData ?? []).map((s) => ({ value: s.id, label: s.title }));
 
   const load = useCallback(async () => {
+    const requestId = (requestIdRef.current += 1);
     if (!sessionId) {
       setMaterials([]);
       return;
@@ -150,11 +160,13 @@ export default function AdminMaterialsTab() {
     setError(null);
     try {
       const result = await call('listSessionMaterials', { sessionId });
+      if (requestIdRef.current !== requestId) return; // superseded by a newer request
       setMaterials(result.materials ?? []);
     } catch (err) {
+      if (requestIdRef.current !== requestId) return;
       setError(err);
     } finally {
-      setLoading(false);
+      if (requestIdRef.current === requestId) setLoading(false);
     }
   }, [sessionId, call]);
 
