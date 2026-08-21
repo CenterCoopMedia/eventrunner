@@ -3,17 +3,29 @@
 // `path` via the catch-all route, and unknown paths get the same designed
 // 404 used everywhere else on the site.
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // Credential-free (spec §8.1): stub the provider seams so no Firebase env or
-// network is needed — same approach as App.test.jsx.
+// network is needed — same approach as App.test.jsx. contentSource's
+// subscription callback is captured so a couple of tests can push a fake
+// cmsPages overlay (a stale /p/... doc, a doc under a reserved prefix) that
+// could never round-trip through cmsSavePage today, matching data already
+// sitting in Firestore from before issue #52.
+const { subscriptions, subscribeContentCollection } = vi.hoisted(() => {
+  const subscriptions = new Map();
+  return {
+    subscriptions,
+    subscribeContentCollection: vi.fn((name, readSource, onNext) => {
+      subscriptions.set(name, onNext);
+      return () => subscriptions.delete(name);
+    }),
+  };
+});
 vi.mock('../lib/configSource.js', () => ({
   subscribeConfigDoc: () => () => {},
 }));
-vi.mock('../lib/contentSource.js', () => ({
-  subscribeContentCollection: () => () => {},
-}));
+vi.mock('../lib/contentSource.js', () => ({ subscribeContentCollection }));
 vi.mock('../firebase.js', () => ({ app: {}, auth: {}, db: {}, storage: {} }));
 
 import App from '../App.jsx';
@@ -90,5 +102,61 @@ describe('ContentPage (catch-all route)', () => {
     // ContentPage — its own page renders, not a 404 and not the generic
     // content article wrapper.
     expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument();
+  });
+
+  it('404s a live/draft doc still carrying the retired /p/ path, not renders it', () => {
+    renderAt('/p/faq');
+    act(() => {
+      subscriptions.get('cmsPages')([
+        ...pagesData,
+        {
+          id: 'legacy-faq',
+          label: 'Legacy FAQ',
+          path: '/p/faq',
+          icon: null,
+          order: 99,
+          visible: true,
+          systemPage: false,
+          sections: [],
+        },
+      ]);
+    });
+    // validatePageDoc would refuse this path on a save today, but the doc
+    // could still be sitting in Firestore from before issue #52 — the
+    // router must not trust it just because it matched.
+    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Legacy FAQ' })).not.toBeInTheDocument();
+  });
+
+  it('404s a doc saved under a reserved prefix like /signin/help', () => {
+    renderAt('/signin/help');
+    act(() => {
+      subscriptions.get('cmsPages')([
+        ...pagesData,
+        {
+          id: 'signin-help',
+          label: 'Sign-in help',
+          path: '/signin/help',
+          icon: null,
+          order: 99,
+          visible: true,
+          systemPage: false,
+          sections: [],
+        },
+      ]);
+    });
+    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Sign-in help' })).not.toBeInTheDocument();
+  });
+
+  it('leaves a normal root-level page unaffected by the reserved-path check', () => {
+    renderAt('/faq');
+    act(() => {
+      subscriptions.get('cmsPages')(pagesData);
+    });
+    const faqPage = pagesData.find((p) => p.id === 'faq');
+    expect(
+      screen.getByRole('heading', { level: 1, name: faqPage.label }),
+    ).toBeInTheDocument();
   });
 });
