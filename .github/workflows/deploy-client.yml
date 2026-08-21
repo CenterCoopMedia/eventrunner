@@ -1,0 +1,322 @@
+name: Deploy client
+
+# Reusable, workflow_call-only (spec §8.1): every job below declares
+# `environment: ${{ inputs.client }}`, which resolves correctly for both the
+# push-fanout and the workflow_dispatch caller because the value arrives as
+# a workflow input, not as `inputs.client` read off the outer event.
+#
+# Auth is Workload Identity Federation (google-github-actions/auth) — no
+# service-account key ever touches the runner or a secret store. Per client
+# environment: `vars.WIF_PROVIDER`, `vars.WIF_SERVICE_ACCOUNT` (see
+# docs/DEPLOY_RUNBOOK.md for the one-time GCP/GitHub setup).
+#
+# No `continue-on-error` anywhere in this file, on purpose (spec §8.1): the
+# workflow this replaces carried it on the functions deploy step, which is
+# how a Cloud Billing API 403 went unnoticed for weeks.
+
+on:
+  workflow_call:
+    inputs:
+      client:
+        description: Client GitHub Environment name.
+        required: true
+        type: string
+      provision:
+        description: Also deploy firestore:rules, firestore:indexes, and storage (always true regardless — see the provision job).
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write # required for google-github-actions/auth (WIF)
+
+concurrency:
+  group: deploy-client-${{ inputs.client }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  guard:
+    name: Guard fork execution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse to run on a forked repository
+        run: |
+          if [ "${{ github.event.repository.fork }}" = "true" ]; then
+            echo "::error::Deploy workflows never run on a forked repository — client secrets are not available there and must not be requested." >&2
+            exit 1
+          fi
+          echo "guard: not a fork — continuing"
+
+  changes:
+    name: Detect functions-affecting changes
+    needs: guard
+    runs-on: ubuntu-latest
+    outputs:
+      functions: ${{ steps.filter.outputs.functions }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            functions:
+              - 'functions/**'
+              - 'packages/shared/**'
+              - 'package-lock.json'
+              - '.github/workflows/deploy-client.yml'
+
+  shared:
+    name: Pack shared workspace
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Pack packages/shared into functions/vendor/shared.tgz
+        run: npm run prepare:functions
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shared-tgz
+          path: functions/vendor/shared.tgz
+          retention-days: 1
+
+  provision:
+    name: Provision Firestore rules/indexes and Storage rules
+    needs: [guard, shared]
+    environment: ${{ inputs.client }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-tgz
+          path: functions/vendor
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Deploy Firestore rules, Firestore indexes, and Storage rules
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+        run: >-
+          npx firebase deploy
+          --only firestore:rules,firestore:indexes,storage
+          --project "$EVENT_FIREBASE_PROJECT_ID"
+          --non-interactive
+
+  functions:
+    name: Deploy functions
+    needs: [guard, shared, changes]
+    # Dispatch always deploys functions — provisioning a fresh project needs
+    # them and there is nothing yet to diff against. Push runs stay gated on
+    # the paths filter so an unrelated change does not burn the deploy quota
+    # (spec §8.1).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.functions == 'true'
+    environment: ${{ inputs.client }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-tgz
+          path: functions/vendor
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Write the functions runtime env for this project
+        # Cloud Functions v2 bakes in `functions/.env.<project-id>` at
+        # deploy time (spec §2.1 Tier A). Secrets (EMAIL_PROVIDER_API_KEY
+        # etc.) are never written here — they reach the function through
+        # `defineSecret`/Secret Manager, provisioned once per environment
+        # (docs/DEPLOY_RUNBOOK.md), not through this file.
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_SLUG: ${{ vars.EVENT_SLUG }}
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+          EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
+          EVENT_STORAGE_BUCKET: ${{ vars.EVENT_STORAGE_BUCKET }}
+          EVENT_ALLOWED_ORIGINS: ${{ vars.EVENT_ALLOWED_ORIGINS }}
+          EVENT_EMAIL_PROVIDER: ${{ vars.EVENT_EMAIL_PROVIDER }}
+          EVENT_TICKETING_PROVIDER: ${{ vars.EVENT_TICKETING_PROVIDER }}
+          EVENT_TICKETING_EVENT_ID: ${{ vars.EVENT_TICKETING_EVENT_ID }}
+          EVENT_OPERATOR_NOTIFIER: ${{ vars.EVENT_OPERATOR_NOTIFIER }}
+        run: |
+          set -euo pipefail
+          {
+            echo "EVENT_SLUG=$EVENT_SLUG"
+            echo "EVENT_FIREBASE_REGION=${EVENT_FIREBASE_REGION:-us-central1}"
+            echo "EVENT_PUBLIC_URL=$EVENT_PUBLIC_URL"
+            echo "EVENT_STORAGE_BUCKET=$EVENT_STORAGE_BUCKET"
+            echo "EVENT_ALLOWED_ORIGINS=$EVENT_ALLOWED_ORIGINS"
+            echo "EVENT_EMAIL_PROVIDER=$EVENT_EMAIL_PROVIDER"
+            echo "EVENT_TICKETING_PROVIDER=$EVENT_TICKETING_PROVIDER"
+            echo "EVENT_TICKETING_EVENT_ID=$EVENT_TICKETING_EVENT_ID"
+            echo "EVENT_OPERATOR_NOTIFIER=$EVENT_OPERATOR_NOTIFIER"
+          } > "functions/.env.${EVENT_FIREBASE_PROJECT_ID}"
+      - name: Deploy functions
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+        run: >-
+          npx firebase deploy
+          --only functions
+          --project "$EVENT_FIREBASE_PROJECT_ID"
+          --non-interactive
+
+  content:
+    name: Generate content snapshot
+    needs: [guard, shared]
+    environment: ${{ inputs.client }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-tgz
+          path: functions/vendor
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Generate the content snapshot out of tree
+        # --out writes to $RUNNER_TEMP, never into apps/web/src/generated
+        # (spec §8.6) — the committed synthetic snapshot is untouched by
+        # every deploy.
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_STORAGE_BUCKET: ${{ vars.EVENT_STORAGE_BUCKET }}
+        run: node scripts/generate-content.cjs --out "$RUNNER_TEMP/generated"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-content
+          path: ${{ runner.temp }}/generated
+          retention-days: 1
+
+  build:
+    name: Build web app
+    needs: content
+    environment: ${{ inputs.client }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-tgz
+          path: functions/vendor
+      - uses: actions/download-artifact@v4
+        with:
+          name: generated-content
+          path: ${{ runner.temp }}/generated
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Build the web app against the generated snapshot
+        env:
+          GENERATED_DIR: ${{ runner.temp }}/generated
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 1
+
+  hosting:
+    name: Deploy hosting
+    needs: [guard, provision, functions, build]
+    # `functions` is skipped (not failed) on a push run the paths filter
+    # excludes — `always()` plus the explicit result checks let hosting
+    # proceed in that case while still failing if functions actually failed.
+    if: |
+      always() &&
+      needs.guard.result == 'success' &&
+      needs.provision.result == 'success' &&
+      needs.build.result == 'success' &&
+      (needs.functions.result == 'success' || needs.functions.result == 'skipped')
+    environment: ${{ inputs.client }}
+    runs-on: ubuntu-latest
+    outputs:
+      public-url: ${{ vars.EVENT_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Deploy hosting
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_HOSTING_SITE: ${{ vars.EVENT_HOSTING_SITE }}
+        run: >-
+          npx firebase deploy
+          --only "hosting:${EVENT_HOSTING_SITE}"
+          --project "$EVENT_FIREBASE_PROJECT_ID"
+          --non-interactive
+
+  smoke:
+    name: Post-deploy smoke test
+    needs: hosting
+    environment: ${{ inputs.client }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: OPTIONS-preflight every reviewed endpoint and GET the public site
+        env:
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
+        run: >-
+          node scripts/smoke-test.cjs
+          --region "${EVENT_FIREBASE_REGION:-us-central1}"
+          --project-id "$EVENT_FIREBASE_PROJECT_ID"
+          --public-url "$EVENT_PUBLIC_URL"
