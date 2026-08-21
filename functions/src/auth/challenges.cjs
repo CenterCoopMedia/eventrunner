@@ -72,6 +72,34 @@ function hashCode(token, code) {
 }
 
 /**
+ * Read `expiresAt` in whichever shape the store handed back: a JS Date from
+ * the in-memory fake, a Firestore Timestamp in production, an ISO string
+ * from a hand-repaired document.
+ * @param {*} value @returns {number} ms, or NaN when unreadable
+ */
+function expiresAtMs(value) {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  return Date.parse(value);
+}
+
+/**
+ * True when a challenge document is still a candidate for verification:
+ * unexpired, unconsumed, attempts left. Deliberately crypto-free — it is
+ * the pre-check that decides whether deriving the scrypt hash is worth it,
+ * and it is re-run inside the transaction as the authoritative check.
+ * @param {object|undefined} data @param {number} nowMs
+ */
+function isVerifiable(data, nowMs) {
+  if (!data) return false;
+  const expires = expiresAtMs(data.expiresAt);
+  if (!Number.isFinite(expires) || nowMs >= expires) return false;
+  if (data.consumedAt) return false;
+  if ((data.attempts || 0) >= MAX_ATTEMPTS) return false;
+  return true;
+}
+
+/**
  * Check and record one rate-limit slot atomically. The check and the
  * record share a transaction so parallel requests cannot both pass a
  * stale read (spec §3.1: 5 per 15 minutes per address).
@@ -135,31 +163,40 @@ async function createChallenge({ db, email, code, now = Date.now }) {
  * token is issued, or releases so a transient Auth failure does not force
  * the user to burn another rate-limit slot on a fresh code.
  *
+ * Three stages, in this order (issue #47):
+ *   1. a crypto-free pre-check on one plain read — exists, unexpired,
+ *      unconsumed, attempts left;
+ *   2. the ~50-100ms scrypt derivation, only for a challenge that passed;
+ *   3. the transaction, which re-checks everything authoritatively.
+ * Without stage 1 an unauthenticated flood of random well-formed ids each
+ * bought a threadpool scrypt without consuming an attempt. The pre-check is
+ * advisory only — a stale read can never widen what stage 3 accepts — and
+ * it changes no response: every miss is still the same `{ ok: false }`. The
+ * timing difference between "unknown id" and "wrong code" is accepted;
+ * challenge ids are handles, not secrets.
+ *
  * @param {{ db: FirebaseFirestore.Firestore, token: string, email: string,
- *           code: string, now?: () => number }} args
+ *           code: string, now?: () => number,
+ *           hashFn?: (token: string, code: string) => Promise<string> }} args
  * @returns {Promise<{ ok: boolean, email?: string }>}
  */
-async function verifyChallenge({ db, token, email, code, now = Date.now }) {
+async function verifyChallenge({ db, token, email, code, now = Date.now, hashFn = hashCode }) {
   if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) return { ok: false };
   const ref = db.collection('auth_challenges').doc(token);
   const nowMs = now();
+
+  const preSnap = await ref.get();
+  if (!preSnap.exists || !isVerifiable(preSnap.data(), nowMs)) return { ok: false };
+
   // Derived OUTSIDE the transaction: the expensive hash must run once per
   // request, not once per transaction retry.
-  const providedHash = await hashCode(token, String(code));
+  const providedHash = await hashFn(token, String(code));
 
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) return { ok: false };
     const data = snap.data();
-
-    const expiresMs = data.expiresAt instanceof Date
-      ? data.expiresAt.getTime()
-      : typeof data.expiresAt?.toMillis === 'function'
-        ? data.expiresAt.toMillis()
-        : Date.parse(data.expiresAt);
-    if (!Number.isFinite(expiresMs) || nowMs >= expiresMs) return { ok: false };
-    if (data.consumedAt) return { ok: false };
-    if ((data.attempts || 0) >= MAX_ATTEMPTS) return { ok: false };
+    if (!isVerifiable(data, nowMs)) return { ok: false };
 
     const expected = Buffer.from(String(data.codeHash || ''), 'utf8');
     const provided = Buffer.from(providedHash, 'utf8');

@@ -19,15 +19,22 @@ const {
 /** Minimal in-memory Firestore fake with transactions and range queries. */
 function fakeDb() {
   const store = new Map(); // "collection/id" -> data
+  const reads = []; // "collection/id" of every plain (non-transactional) read
   const key = (c, id) => `${c}/${id}`;
   const docRef = (c, id) => ({
     __c: c,
     __id: id,
     async set(data) { store.set(key(c, id), data); },
     async delete() { store.delete(key(c, id)); },
+    async get() {
+      reads.push(key(c, id));
+      const data = store.get(key(c, id));
+      return { exists: data !== undefined, data: () => data };
+    },
   });
   return {
     store,
+    reads,
     collection: (c) => ({
       doc: (id) => docRef(c, id),
       where: (field, op, value) => ({
@@ -193,6 +200,84 @@ test('verify: unknown or malformed token fails without touching the store', asyn
   const db = fakeDb();
   assert.deepEqual(await verifyChallenge({ db, token: 'nope', email: 'a@example.org', code: '123456' }), { ok: false });
   assert.deepEqual(await verifyChallenge({ db, token: 'f'.repeat(64), email: 'a@example.org', code: '123456' }), { ok: false });
+});
+
+// --- issue #47: the crypto-free pre-check ------------------------------------
+
+/** Counting stand-in for hashCode; the real digest is not needed here. */
+function countingHash() {
+  const calls = [];
+  return {
+    calls,
+    hashFn: async (token, code) => {
+      calls.push({ token, code });
+      return `hash:${token}:${code}`;
+    },
+  };
+}
+
+test('pre-check: an unknown challenge id derives no hash and stays one shape', async () => {
+  const db = fakeDb();
+  const { calls, hashFn } = countingHash();
+  const verdict = await verifyChallenge({
+    db, token: 'a'.repeat(64), email: 'a@example.org', code: '123456', hashFn,
+  });
+  assert.deepEqual(verdict, { ok: false });
+  assert.equal(calls.length, 0);
+  // One cheap read, no transaction write: a flood of random ids is now a
+  // plain lookup each, not a threadpool scrypt each (issue #47).
+  assert.deepEqual(db.reads, [`auth_challenges/${'a'.repeat(64)}`]);
+});
+
+test('pre-check: expired, consumed, and attempt-exhausted challenges derive no hash', async () => {
+  let clock = 0;
+  const now = () => clock;
+
+  const expiredDb = fakeDb();
+  const expired = await createChallenge({ db: expiredDb, email: 'a@example.org', code: '123456', now });
+  clock = internals.CHALLENGE_TTL_MS + 1;
+  const expiredHash = countingHash();
+  assert.deepEqual(
+    await verifyChallenge({ db: expiredDb, token: expired.token, email: 'a@example.org', code: '123456', now, hashFn: expiredHash.hashFn }),
+    { ok: false },
+  );
+  assert.equal(expiredHash.calls.length, 0);
+
+  clock = 0;
+  const consumedDb = fakeDb();
+  const consumed = await createChallenge({ db: consumedDb, email: 'a@example.org', code: '123456', now });
+  await verifyChallenge({ db: consumedDb, token: consumed.token, email: 'a@example.org', code: '123456', now });
+  const consumedHash = countingHash();
+  assert.deepEqual(
+    await verifyChallenge({ db: consumedDb, token: consumed.token, email: 'a@example.org', code: '123456', now, hashFn: consumedHash.hashFn }),
+    { ok: false },
+  );
+  assert.equal(consumedHash.calls.length, 0);
+
+  const lockedDb = fakeDb();
+  const locked = await createChallenge({ db: lockedDb, email: 'a@example.org', code: '123456', now });
+  for (let i = 0; i < internals.MAX_ATTEMPTS; i += 1) {
+    await verifyChallenge({ db: lockedDb, token: locked.token, email: 'a@example.org', code: '000000', now });
+  }
+  const lockedHash = countingHash();
+  assert.deepEqual(
+    await verifyChallenge({ db: lockedDb, token: locked.token, email: 'a@example.org', code: '123456', now, hashFn: lockedHash.hashFn }),
+    { ok: false },
+  );
+  assert.equal(lockedHash.calls.length, 0);
+});
+
+test('pre-check: a live challenge still derives the hash exactly once, outside the transaction', async () => {
+  const db = fakeDb();
+  const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+  const { calls, hashFn } = countingHash();
+  // Wrong code: the pre-check passes (the challenge is live), the hash is
+  // derived, and the attempt is burned — the pre-check must not short-
+  // circuit a real guess.
+  const miss = await verifyChallenge({ db, token, email: 'a@example.org', code: '000000', hashFn });
+  assert.deepEqual(miss, { ok: false });
+  assert.deepEqual(calls, [{ token, code: '000000' }]);
+  assert.equal(db.store.get(`auth_challenges/${token}`).attempts, 1);
 });
 
 test('sweepExpired deletes expired challenges and stale rate buckets only', async () => {
