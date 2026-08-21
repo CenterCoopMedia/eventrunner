@@ -8,6 +8,7 @@ const {
   createSavePageHandler,
   createDeletePageHandler,
 } = require('./pages.cjs');
+const { makeFakeDb } = require('./firestoreFake.cjs');
 
 // ---------------------------------------------------------------- fixtures
 
@@ -37,31 +38,9 @@ function validPage(overrides = {}) {
   };
 }
 
-/** In-memory Firestore fake: get/set/add on `collection/id` keys. */
+/** In-memory Firestore fake (get/set/where/batch) seeded as 'collection/id'. */
 function fakeDb(seed = {}) {
-  const docs = new Map(Object.entries(seed));
-  const added = [];
-  return {
-    docs,
-    added,
-    collection(name) {
-      return {
-        doc(id) {
-          const key = `${name}/${id}`;
-          return {
-            async get() {
-              const data = docs.get(key);
-              return { exists: data !== undefined, data: () => data };
-            },
-          };
-        },
-        async add(data) {
-          added.push({ collection: name, data });
-          return { id: `auto${added.length}` };
-        },
-      };
-    },
-  };
+  return makeFakeDb(seed);
 }
 
 function fakeStore() {
@@ -164,6 +143,68 @@ test('validatePageDoc requires path to start with a slash', () => {
   const { ok, errors } = validatePageDoc(validPage({ path: 'scholarships' }));
   assert.equal(ok, false);
   assert.ok(errors.some((e) => e.startsWith('path:')));
+});
+
+// -------------------------------------------------- path routing (issue #52)
+
+test('validatePageDoc rejects a reserved first segment on a generic page, naming it', () => {
+  for (const segment of ['schedule', 'speakers', 'sponsors', 'signin', 'p', 'admin']) {
+    const { ok, errors } = validatePageDoc(validPage({ path: `/${segment}` }));
+    assert.equal(ok, false, segment);
+    assert.ok(errors.some((e) => e.includes(`'${segment}' is a reserved route`)), `${segment}: ${errors.join('; ')}`);
+  }
+});
+
+test('validatePageDoc allows a reserved segment on the systemPage that owns it', () => {
+  const { ok } = validatePageDoc(validPage({ path: '/schedule', systemPage: true }));
+  assert.equal(ok, true);
+});
+
+test('validatePageDoc rejects a reserved segment nested deeper in the path too', () => {
+  const { ok, errors } = validatePageDoc(validPage({ path: '/p/old-faq' }));
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.includes("'p' is a reserved route")));
+});
+
+test('validatePageDoc rejects path "/" for a generic page but allows it for a system page', () => {
+  const generic = validatePageDoc(validPage({ path: '/' }));
+  assert.equal(generic.ok, false);
+  assert.ok(generic.errors.some((e) => e.includes("'/' is reserved for the home page")));
+
+  const system = validatePageDoc(validPage({ path: '/', systemPage: true, id: 'home' }));
+  assert.equal(system.ok, true);
+});
+
+test('validatePageDoc rejects a trailing slash', () => {
+  const { ok, errors } = validatePageDoc(validPage({ path: '/scholarships/' }));
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.includes('trailing slash')));
+});
+
+test('validatePageDoc rejects empty segments from a double slash', () => {
+  const { ok, errors } = validatePageDoc(validPage({ path: '/scholarships//apply' }));
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.includes('empty segments')));
+});
+
+test('validatePageDoc rejects uppercase and non-slug characters in a segment', () => {
+  for (const path of ['/Scholarships', '/scholarships_2026', '/scholar ships']) {
+    const { ok, errors } = validatePageDoc(validPage({ path }));
+    assert.equal(ok, false, path);
+    assert.ok(errors.some((e) => e.startsWith('path: segment')), `${path}: ${errors.join('; ')}`);
+  }
+});
+
+test('validatePageDoc rejects leading/trailing hyphens in a segment', () => {
+  for (const path of ['/-scholarships', '/scholarships-']) {
+    const { ok } = validatePageDoc(validPage({ path }));
+    assert.equal(ok, false, path);
+  }
+});
+
+test('validatePageDoc accepts a normalized multi-segment root-level path', () => {
+  const { ok } = validatePageDoc(validPage({ path: '/get-involved/scholarships-2026' }));
+  assert.equal(ok, true);
 });
 
 test('validatePageDoc names unknown top-level and section fields', () => {
@@ -290,6 +331,47 @@ test('cmsSavePage allows systemPage:false on brand-new and non-system pages', as
   await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(d.store.writes.length, 2);
+});
+
+// --------------------------------------------- cmsSavePage path uniqueness
+
+test('cmsSavePage rejects a path already used by another LIVE page', async () => {
+  const db = fakeDb({ 'cmsPages/faq': { id: 'faq', path: '/scholarships', systemPage: false } });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  assert.equal(res.statusCode, 400);
+  assert.ok(res.body.error.message.includes("already used by page 'faq'"));
+  assert.equal(d.store.writes.length, 0);
+});
+
+test('cmsSavePage rejects a path already used by another DRAFT page', async () => {
+  const db = fakeDb({ 'cmsPages_drafts/faq': { id: 'faq', path: '/scholarships', systemPage: false } });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  assert.equal(res.statusCode, 400);
+  assert.ok(res.body.error.message.includes("already used by page 'faq'"));
+  assert.equal(d.store.writes.length, 0);
+});
+
+test('cmsSavePage allows re-saving a page under its own unchanged path', async () => {
+  const db = fakeDb({
+    'cmsPages/scholarships': { id: 'scholarships', path: '/scholarships', systemPage: false },
+    'cmsPages_drafts/scholarships': { id: 'scholarships', path: '/scholarships', systemPage: false, status: 'clean' },
+  });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('cmsSavePage allows two different pages with different paths', async () => {
+  const db = fakeDb({ 'cmsPages/faq': { id: 'faq', path: '/faq', systemPage: false } });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  assert.equal(res.statusCode, 200);
 });
 
 test('cmsSavePage records an admin_logs entry via the store', async () => {

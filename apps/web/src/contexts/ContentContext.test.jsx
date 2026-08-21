@@ -346,7 +346,7 @@ describe('ContentProvider', () => {
         },
       ]);
       subscriptions.get('cmsPages').onNext([
-        { id: 'faq', label: 'Hidden page', path: '/p/faq', visible: false, systemPage: false, order: 0, sections: [] },
+        { id: 'faq', label: 'Hidden page', path: '/faq', visible: false, systemPage: false, order: 0, sections: [] },
       ]);
     });
     expect(screen.getByTestId('hero-title')).toHaveTextContent('');
