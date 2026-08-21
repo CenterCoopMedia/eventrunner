@@ -15,10 +15,24 @@
 //     admin token and writes through the Admin SDK. A client SDK upload to
 //     those namespaces is denied by the rules by design.
 //
-// Reading is uniform: every namespace the library touches is publicly
-// readable, so a download URL works for signed-out visitors too.
-import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { storage } from '../firebase.js';
+// READING does not use getDownloadURL(). That call resolves the
+// `firebaseStorageDownloadTokens` metadata field, and only a client SDK
+// upload mints one: objects written by the Admin SDK — which is every
+// cms-images and branding file, plus the four placeholders init seeds — have
+// no token, so getDownloadURL rejects with storage/no-download-url and the
+// library would report every freshly uploaded file as missing.
+//
+// The fix is not to mint tokens server-side. A tokenized URL is honoured
+// WITHOUT evaluating storage.rules and cannot be withdrawn except by
+// rotating the token, so minting one turns every asset into a permanent
+// public link regardless of what the rules say later — and every future
+// Admin-SDK writer would have to remember to mint one. Instead this module
+// builds the token-free media URL, which the Storage service serves subject
+// to the rules. `allow get: if true` on the public namespaces is what makes
+// it work for anonymous visitors, `session-materials/` stays closed, and a
+// thumbnail costs no metadata round trip.
+import { deleteObject, ref, uploadBytes } from 'firebase/storage';
+import { storage, storageBucketName, storageDownloadOrigin } from '../firebase.js';
 
 /** Mirrors storage.rules for `profile-photos/{uid}/**` — keep in step. */
 export const PROFILE_PHOTO_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/webp']);
@@ -50,17 +64,28 @@ export function formatBytes(size) {
  * the endpoint are — but a person choosing a 12 MB TIFF deserves to hear
  * why before a slow upload fails.
  *
+ * `exclusive` matches the bound on the OTHER side of the wire, so the
+ * pre-check and the enforcement agree on the edge case. storage.rules says
+ * `request.resource.size < 2 * 1024 * 1024` for profile photos — strictly
+ * less — so a file of exactly the cap is refused there and must be refused
+ * here too, or the upload fails after the bytes have been sent. The media
+ * endpoint's own cap is inclusive (`size > MAX_UPLOAD_BYTES` rejects), so
+ * that path passes `exclusive: false`.
+ *
  * @param {File} file
- * @param {{ types: readonly string[], maxBytes: number }} limits
+ * @param {{ types: readonly string[], maxBytes: number, exclusive?: boolean }} limits
  * @returns {string|null} an error message, or null when the file is fine
  */
-export function checkFile(file, { types, maxBytes }) {
+export function checkFile(file, { types, maxBytes, exclusive = false }) {
   if (!file) return 'Choose a file to upload.';
   if (!types.includes(file.type)) {
     return `That file is a ${file.type || 'unknown type'}. Use ${types.map(typeLabel).join(', ')}.`;
   }
-  if (file.size > maxBytes) {
-    return `That file is ${formatBytes(file.size)}. The limit is ${formatBytes(maxBytes)}.`;
+  const tooBig = exclusive ? file.size >= maxBytes : file.size > maxBytes;
+  if (tooBig) {
+    return `That file is ${formatBytes(file.size)}. The limit is ${
+      exclusive ? 'under ' : ''
+    }${formatBytes(maxBytes)}.`;
   }
   return null;
 }
@@ -85,30 +110,63 @@ export function fileToBase64(file) {
 }
 
 /**
- * A displayable URL for a Storage object path. Resolved URLs are memoized
- * for the page's lifetime: a library grid asks for the same paths on every
- * render, and each miss is a network round trip.
+ * A Storage object path, or null. Rejects the shapes that would build a
+ * nonsense URL — a non-string from an unvalidated Firestore doc, an
+ * absolute URL, a leading slash, a parent traversal — so every caller can
+ * treat "not a path" and "no path" the same way.
  *
- * @param {string} path e.g. 'cms-images/abc/hero.png'
- * @returns {Promise<string|null>} null when the object is missing/unreadable
+ * @param {unknown} value
+ * @returns {string|null}
  */
-const urlCache = new Map();
-export function assetUrl(path) {
-  if (typeof path !== 'string' || path.length === 0) return Promise.resolve(null);
-  if (urlCache.has(path)) return urlCache.get(path);
-  const pending = getDownloadURL(ref(storage, path)).catch(() => {
-    // Miss the cache on failure so a later render can retry: an object may
-    // simply not have finished uploading.
-    urlCache.delete(path);
-    return null;
-  });
-  urlCache.set(path, pending);
-  return pending;
+export function storagePath(value) {
+  if (typeof value !== 'string') return null;
+  const path = value.trim();
+  if (path.length === 0) return null;
+  if (path.startsWith('/') || path.includes('..') || /^[a-z][a-z0-9+.-]*:/i.test(path)) return null;
+  return path;
 }
 
-/** Forget one memoized URL (after a delete, or a replaced photo). */
-export function forgetAssetUrl(path) {
-  urlCache.delete(path);
+/**
+ * A displayable URL for a Storage object path, built rather than fetched
+ * (see the module header). Cache-busting is not needed: an upload always
+ * lands on a fresh `{folder}/{assetId}/{name}` path, and a replaced profile
+ * photo keeps its path but is fetched with normal HTTP caching.
+ *
+ * @param {unknown} path e.g. 'cms-images/abc/hero.png'
+ * @returns {string|null} null when the value is not a usable object path
+ */
+export function assetUrl(path) {
+  const object = storagePath(path);
+  if (!object || !storageBucketName) return null;
+  return `${storageDownloadOrigin}/v0/b/${encodeURIComponent(
+    storageBucketName,
+  )}/o/${encodeURIComponent(object)}?alt=media`;
+}
+
+/**
+ * The `src` for a `config/theme.logos` slot (spec §7.2).
+ *
+ * Two shapes live in those slots and they resolve differently:
+ *
+ *   • `branding/logo.svg` — a FLAT path. These are the four placeholders
+ *     init seeds, and identical copies ship in the bundle under
+ *     `apps/web/public/branding/`, so they resolve Hosting-relative and
+ *     render even before Storage has been provisioned.
+ *   • `branding/{assetId}/{name}` — an uploaded asset picked in the admin
+ *     Branding tab. It exists ONLY in the bucket; serving it Hosting-relative
+ *     (which is what this app did before the media library) 404s.
+ *
+ * The segment count is the discriminator. Anything that is not a usable
+ * path resolves to null and the caller renders no image at all, which is
+ * the fail-soft the runtime config overlay requires (§2.4).
+ *
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function brandingSrc(value) {
+  const path = storagePath(value);
+  if (!path) return null;
+  return path.split('/').length > 2 ? assetUrl(path) : `/${path}`;
 }
 
 /**
@@ -124,12 +182,12 @@ export async function uploadProfilePhoto({ uid, file }) {
   const problem = checkFile(file, {
     types: PROFILE_PHOTO_TYPES,
     maxBytes: PROFILE_PHOTO_MAX_BYTES,
+    exclusive: true,
   });
   if (problem) throw new Error(problem);
   const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
   const path = `profile-photos/${uid}/photo.${extension}`;
   await uploadBytes(ref(storage, path), file, { contentType: file.type });
-  forgetAssetUrl(path);
   return { path };
 }
 
@@ -149,5 +207,4 @@ export async function deleteOwnPhoto(path) {
     // An object that is already gone, or a rules refusal on somebody else's
     // path, both end the same way: nothing to clean up here.
   }
-  forgetAssetUrl(path);
 }

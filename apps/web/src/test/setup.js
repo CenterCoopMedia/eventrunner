@@ -11,6 +11,11 @@ vi.mock('@/firebase.js', () => ({
   auth: {},
   db: {},
   storage: {},
+  // lib/mediaSource.js builds object URLs from these two rather than calling
+  // getDownloadURL (Admin-SDK-written objects carry no download token), so a
+  // test run needs them or every asset resolves to "missing".
+  storageBucketName: 'demo-run-of-show.appspot.com',
+  storageDownloadOrigin: 'https://firebasestorage.googleapis.com',
   // App Check is unconfigured in a credential-free test run, which is also
   // its production default: no site key, no attestation header.
   appCheckEnabled: false,

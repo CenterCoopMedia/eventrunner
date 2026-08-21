@@ -21,11 +21,28 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true') {
+const useEmulators = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true';
+
+if (useEmulators) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
   connectStorageEmulator(storage, '127.0.0.1', 9199);
 }
+
+// --- Storage download origin ------------------------------------------------
+// lib/mediaSource.js builds object URLs itself rather than calling
+// getDownloadURL(), so it needs the bucket and the origin serving it. Both
+// hosts below expose the same REST shape:
+//
+//   {origin}/v0/b/{bucket}/o/{encoded object path}?alt=media
+//
+// A request to that endpoint WITHOUT a download token is evaluated against
+// storage.rules, which is exactly the property the media library wants (see
+// lib/mediaSource.js for why tokens are not used).
+export const storageBucketName = firebaseConfig.storageBucket ?? '';
+export const storageDownloadOrigin = useEmulators
+  ? 'http://127.0.0.1:9199'
+  : 'https://firebasestorage.googleapis.com';
 
 // --- App Check (issue #45) ---------------------------------------------------
 // Attests that OTP requests come from this web app rather than from a script,

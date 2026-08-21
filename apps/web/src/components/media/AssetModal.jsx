@@ -90,7 +90,7 @@ export default function AssetModal({ asset, onClose, onChanged, scanUsage, updat
     setBusy(true);
     setError(null);
     try {
-      await remove({ assetId: asset.id, path: asset.path, force });
+      await remove({ assetId: asset.id, force });
       onChanged?.();
       onClose();
     } catch (err) {

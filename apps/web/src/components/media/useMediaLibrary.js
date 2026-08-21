@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { subscribeAdminCollection } from '../../admin/adminSource.js';
 import { useAdminApi } from '../../admin/adminApi.js';
-import { fileToBase64, forgetAssetUrl } from '../../lib/mediaSource.js';
+import { fileToBase64 } from '../../lib/mediaSource.js';
 
 /** Newest first — an upload is nearly always the thing you came to use. */
 function byNewest(a, b) {
@@ -91,11 +91,7 @@ export function useMediaLibrary({ folder = null } = {}) {
    * carried on the error, rather than this hook deciding for them.
    */
   const remove = useCallback(
-    async ({ assetId, path, force = false }) => {
-      const response = await call('mediaDelete', { assetId, force });
-      forgetAssetUrl(path);
-      return response;
-    },
+    ({ assetId, force = false }) => call('mediaDelete', { assetId, force }),
     [call],
   );
 

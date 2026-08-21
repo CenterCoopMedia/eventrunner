@@ -1,8 +1,10 @@
 // App shell: skip link first, landmark structure, keyboard-navigable nav.
 // Everything renders from context — no hardcoded event name, city, or date
 // (event-neutrality).
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { brandingSrc } from '../lib/mediaSource.js';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', end: true },
@@ -23,16 +25,17 @@ function navClass({ isActive }) {
 
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
-  // Branding slots come from config/theme (spec §7.2 logos) — Storage-style
-  // paths under branding/, served from public/ until per-event uploads land.
-  // A runtime config/theme doc is unvalidated Firestore data (§2.4 fail-soft
-  // overlay), so guard against non-string values before calling string
-  // methods on them.
-  const markPath = theme?.logos?.mark;
-  const markSrc =
-    typeof markPath === 'string' && markPath
-      ? `/${markPath.replace(/^\/+/, '')}`
-      : null;
+  // Branding slots come from config/theme (spec §7.2 logos). A slot holds
+  // either a flat seeded path (`branding/mark.svg`, which also ships in the
+  // bundle) or an uploaded asset (`branding/{assetId}/{name}`, which exists
+  // only in the bucket) — brandingSrc resolves each to the origin that
+  // actually serves it. A runtime config/theme doc is unvalidated Firestore
+  // data (§2.4 fail-soft overlay), so a value that is not a usable path
+  // resolves to null and no logo is rendered at all.
+  const markSrc = brandingSrc(theme?.logos?.mark);
+  // A slot can point at an object that has since been deleted from the
+  // bucket. The shell must degrade to the wordmark, never to a broken image.
+  const [markFailed, setMarkFailed] = useState(false);
   // A runtime config/event doc can replace `legal` wholesale (shallow
   // overlay) with a partial or malformed object; fall back per-field so one
   // bad admin write never white-screens the shell that wraps every route.
@@ -51,13 +54,14 @@ export default function Layout() {
             to="/"
             className="touch-target inline-flex items-center gap-2 rounded-brand font-heading text-lg font-semibold text-brand-ink"
           >
-            {markSrc ? (
+            {markSrc && !markFailed ? (
               <img
                 src={markSrc}
                 alt=""
                 className="h-8 w-8"
                 width="32"
                 height="32"
+                onError={() => setMarkFailed(true)}
               />
             ) : null}
             {eventConfig.shortName}
