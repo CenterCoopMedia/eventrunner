@@ -12,6 +12,8 @@ const cmsVersions = require('./src/cms/versions.cjs');
 const cmsPublish = require('./src/cms/publish.cjs');
 const cmsUpdates = require('./src/cms/updates.cjs');
 const adminConfig = require('./src/admin/config.cjs');
+const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
+const adminFeedback = require('./src/admin/feedback.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
 const scheduleReactions = require('./src/schedule/reactions.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
@@ -29,6 +31,8 @@ module.exports = {
   ...cmsPublish.handlers,
   ...cmsUpdates.handlers,
   ...adminConfig.handlers,
+  ...adminLiveUpdates.handlers,
+  ...adminFeedback.handlers,
   ...scheduleBookmarks.handlers,
   ...scheduleReactions.handlers,
   ...usersLifecycle.handlers,

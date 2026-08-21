@@ -26,6 +26,8 @@ import AdminEventSettings from './pages/AdminEventSettings.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminBranding from './pages/AdminBranding.jsx';
+import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
+import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
 
 export function AdminGate({ children }) {
@@ -100,6 +102,8 @@ export default function AdminApp() {
           <Route path="features" element={<AdminFeatureSettings />} />
           <Route path="badges" element={<AdminBadgeSettings />} />
           <Route path="branding" element={<AdminBranding />} />
+          <Route path="live-updates" element={<AdminLiveUpdates />} />
+          <Route path="feedback" element={<AdminFeedback />} />
           <Route path="system-errors" element={<AdminSystemErrors />} />
           <Route
             path="*"

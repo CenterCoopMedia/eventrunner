@@ -24,6 +24,10 @@
     "reactToSession",
     "logClientError",
     "listSystemErrors",
-    "resolveSystemErrors"
+    "resolveSystemErrors",
+    "saveLiveUpdate",
+    "deleteLiveUpdate",
+    "submitFeedback",
+    "updateFeedbackStatus"
   ]
 }

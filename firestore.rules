@@ -265,6 +265,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Live updates dashboard feed (spec §9 "Live updates card", issue #28):
+    // a plain admin-authored feed, not gated editorial content like the CMS
+    // two-revision collections above — harmless to read publicly, written
+    // only by saveLiveUpdate/deleteLiveUpdate (Admin SDK).
+    match /live_updates/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Feedback inbox (spec §9 "Feedback inbox", issue #28): admin-readable
+    // for the review tab, never client-writable — submitFeedback (public,
+    // unauthenticated) and updateFeedbackStatus (admin) both write through
+    // the Admin SDK only.
+    match /feedback/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Emoji reaction aggregate + per-user dedup (spec §4.1, §9). The
     // aggregate is a counts-by-emoji object, harmless to read publicly
     // (same reasoning as sessionBookmarks above); only reactToSession
@@ -293,6 +311,7 @@ service cloud.firestore {
     match /system_errors/{docId} { allow read, write: if false; }
     match /client_error_rate_limits/{docId} { allow read, write: if false; }
     match /email_templates/{docId} { allow read, write: if false; }
+    match /feedback_rate_limits/{docId} { allow read, write: if false; }
 
     // Everything not matched above stays deny-all.
     match /{document=**} {
