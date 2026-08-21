@@ -18,6 +18,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import ProfilePhotoField from '../components/media/ProfilePhotoField.jsx';
 
 const VISIBILITY_COPY = {
   public: {
@@ -92,6 +93,7 @@ export default function Profile() {
       bio: profile.bio ?? '',
       profileVisibility: profile.profileVisibility ?? 'attendees_only',
       badges: Array.isArray(profile.badges) ? profile.badges : [],
+      photoPath: typeof profile.photoPath === 'string' ? profile.photoPath : '',
     });
   }, [profile, form]);
 
@@ -159,6 +161,10 @@ export default function Profile() {
         bio: form.bio.trim(),
         profileVisibility: form.profileVisibility,
         badges: form.badges,
+        // Empty string means "no photo". The rules accept a string or null
+        // for photoPath (firestore.rules validSelfProfileTypes), and the
+        // projection coerces either to nothing rendered.
+        photoPath: form.photoPath ? form.photoPath : null,
       });
       showToast('Profile saved.');
     } catch {
@@ -181,6 +187,11 @@ export default function Profile() {
       </p>
 
       <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
+        <ProfilePhotoField
+          uid={user.uid}
+          value={form.photoPath}
+          onChange={(path) => setField('photoPath', path)}
+        />
         <div>
           <label htmlFor="displayName" className="block font-semibold text-brand-ink">
             Name

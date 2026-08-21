@@ -89,6 +89,9 @@ describe('Profile', () => {
       bio: '',
       profileVisibility: 'attendees_only',
       badges: [],
+      // photoPath is on the self-editable allowlist (firestore.rules); with
+      // no photo chosen it saves as null, never as an empty string.
+      photoPath: null,
     });
     expect(showToastMock).toHaveBeenCalledWith('Profile saved.');
   });
