@@ -3,7 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { verifyAuthToken, requireAdmin, requireAppCheck, internals } = require('./auth.cjs');
+const {
+  verifyAuthToken,
+  requireAdmin,
+  requireAttendeeAccess,
+  requireAppCheck,
+  internals,
+} = require('./auth.cjs');
 
 /** Minimal request fake: headers only, no Express methods. */
 function reqWithAuth(value) {
@@ -187,4 +193,159 @@ test('requireAdmin: missing bootstrap doc or malformed adminEmails → 403, no t
     assert.equal(verdict.ok, false);
     assert.equal(verdict.status, 403);
   }
+});
+
+// -------------------------------------------------------- requireAttendeeAccess
+
+/** Fake `users` collection reader: db.collection('users').doc(uid).get(). */
+function fakeUsersDb(profiles) {
+  return {
+    collection(name) {
+      assert.equal(name, 'users');
+      return {
+        doc(uid) {
+          return {
+            async get() {
+              const data = profiles[uid];
+              return { exists: data !== undefined, data: () => data };
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+const ATTENDEE_TOKEN = { uid: 'u9', email: 'attendee@example.org', email_verified: true };
+
+test('requireAttendeeAccess: no token → 401', async () => {
+  const verdict = await requireAttendeeAccess(
+    { auth: fakeAuth({}), db: fakeUsersDb({}) },
+    reqWithAuth(undefined),
+  );
+  assert.deepEqual(
+    { ok: verdict.ok, status: verdict.status, code: verdict.code },
+    { ok: false, status: 401, code: 'unauthorized' },
+  );
+});
+
+test('requireAttendeeAccess: a missing users/{uid} doc fails closed (retried trigger, brand-new signup) → 403, no throw', async () => {
+  const verdict = await requireAttendeeAccess(
+    { auth: fakeAuth({ good: ATTENDEE_TOKEN }), db: fakeUsersDb({}) },
+    reqWithAuth('Bearer good'),
+  );
+  assert.deepEqual(
+    { ok: verdict.ok, status: verdict.status, code: verdict.code },
+    { ok: false, status: 403, code: 'forbidden' },
+  );
+});
+
+test('requireAttendeeAccess: registrationStatus pending → 403', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'pending' } }),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
+});
+
+test('requireAttendeeAccess: registrationStatus approved → ok', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'approved' } }),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org' });
+});
+
+test('requireAttendeeAccess: a linked speaker profile grants access even when pending', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'pending', speakerId: 'spk-1' } }),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, true);
+});
+
+test('requireAttendeeAccess: revoked attendee is denied', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'revoked' } }),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
+});
+
+// A bootstrap admin's users/{uid}.role is 'attendee' (the auth trigger has
+// no way to know an email is on config/bootstrap.adminEmails) — see the
+// module doc above requireAttendeeAccess. ProfileContext.jsx's isAdmin
+// override already lets the UI enable the bookmark pill for this caller;
+// these pin the server side of that same contract.
+test('requireAttendeeAccess: a bootstrap admin passes even with a pending, non-speaker profile', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'pending', speakerId: null, role: 'attendee' } }),
+      getConfig: fakeGetConfig(['Attendee@Example.ORG']),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org' });
+});
+
+test('requireAttendeeAccess: a bootstrap admin with no users/{uid} doc at all still passes', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({}),
+      getConfig: fakeGetConfig(['attendee@example.org']),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, true);
+});
+
+test('requireAttendeeAccess: an unverified email on the bootstrap list is NOT treated as admin', async () => {
+  const token = { ...ATTENDEE_TOKEN, email_verified: false };
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: token }),
+      db: fakeUsersDb({}),
+      getConfig: fakeGetConfig(['attendee@example.org']),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
+});
+
+test('requireAttendeeAccess: a pending, non-speaker caller NOT on the bootstrap list is still denied', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'pending' } }),
+      getConfig: fakeGetConfig(['someone-else@example.org']),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
+});
+
+test('requireAttendeeAccess: omitted getConfig degrades to the users-doc-only check (no crash)', async () => {
+  const verdict = await requireAttendeeAccess(
+    { auth: fakeAuth({ good: ATTENDEE_TOKEN }), db: fakeUsersDb({ u9: { registrationStatus: 'approved' } }) },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, true);
 });

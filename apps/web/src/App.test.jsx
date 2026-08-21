@@ -60,6 +60,26 @@ vi.mock('firebase/firestore', () => ({
       ? Promise.resolve({ docs: [] })
       : Promise.reject(new Error('permission denied')),
   ),
+  // AuthProvider's attendee-profile subscription (users/{uid}) — the smoke
+  // test never drives it, so a no-op unsubscribe with no snapshot is enough.
+  doc: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
+}));
+// ProfileProvider's one seam to Firebase (issue #17): capture the own-profile
+// subscription so a test can push an account document, and keep the directory
+// listener inert unless a test drives it.
+const profileSubscriptions = new Map();
+vi.mock('./lib/profileSource.js', () => ({
+  subscribeOwnProfile: (uid, onNext) => {
+    profileSubscriptions.set(uid, onNext);
+    return () => profileSubscriptions.delete(uid);
+  },
+  subscribeDirectory: (_options, onNext) => {
+    onNext([]);
+    return () => {};
+  },
+  fetchPublicProfile: () => Promise.resolve(null),
+  saveOwnProfile: () => Promise.resolve(),
 }));
 import App from './App.jsx';
 import { eventConfig } from '@generated/eventConfig.js';
@@ -141,6 +161,24 @@ describe('app shell', () => {
     expect(
       screen.getByRole('heading', { name: 'This event doesn’t have public sponsors' }),
     ).toBeInTheDocument();
+  });
+
+  it('gates the /attendees route and its nav link behind config/features.attendeeDirectory', () => {
+    renderAt('/attendees');
+    // The snapshot enables the directory; signed out with no public profiles,
+    // the page asks for sign-in rather than rendering an empty directory.
+    expect(
+      screen.getByRole('heading', { name: 'Sign in to see who’s attending' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Attendees' })).toBeInTheDocument();
+
+    act(() => {
+      configSubscriptions.get('features')({ attendeeDirectory: false });
+    });
+    expect(
+      screen.getByRole('heading', { name: 'This event doesn’t have an attendee directory' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Attendees' })).toBeNull();
   });
 
   it('?preview=1 alone (signed out) does not select the draft read source', async () => {

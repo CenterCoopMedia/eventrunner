@@ -10,6 +10,7 @@
     "./time": { "require": "./src/time.cjs", "import": "./src/time.mjs" },
     "./registration": { "require": "./src/registration.cjs", "import": "./src/registration.mjs" },
     "./badges": { "require": "./src/badges.cjs", "import": "./src/badges.mjs" },
+    "./profile": { "require": "./src/profile.cjs", "import": "./src/profile.mjs" },
     "./slug": { "require": "./src/slug.cjs", "import": "./src/slug.mjs" },
     "./urlSafety": { "require": "./src/urlSafety.cjs", "import": "./src/urlSafety.mjs" },
     "./routing": { "require": "./src/routing.cjs", "import": "./src/routing.mjs" }

@@ -1,102 +1,44 @@
-// Schedule page — read-only first slice of issue #16.
+// Schedule page (issue #16).
 //
 // Days come from config/event.days (arbitrary length, config-driven);
 // sessions come from ContentProvider (published cmsSchedule overlaying the
 // committed snapshot), grouped by dayId and sorted by start time. Times
 // render on the EVENT's wall clock from config.timezone (lib/eventTime.js).
-// Feature-gated by config/features.schedule. Bookmarks and ICS export are
-// later slices (features.sessionBookmarks / features.icsExport).
+// Feature-gated by config/features.schedule. Bookmarks (features.
+// sessionBookmarks) and ICS/calendar-link export (features.icsExport) are
+// wired through SessionCard, which also carries the per-session detail
+// link (/schedule/:sessionId, SessionDetail.jsx).
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { useProfile } from '../contexts/ProfileContext.jsx';
+import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
-import {
-  formatDayDate,
-  formatSessionTimeRange,
-  zonedDateTime,
-  zoneLabel,
-} from '../lib/eventTime.js';
+import SessionCard from '../components/SessionCard.jsx';
+import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
+import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 
-// TODO(m3-speakers): resolve speakerIds to speaker names (and links to the
-// speakers page) once the speaker directory tranche lands in M3. Kept as a
-// hook called from SessionCard's top level so the card markup gains speaker
-// rows without restructuring; useContent().speakers already carries the
-// snapshot shape this will read from.
-function useSessionSpeakerNames() {
-  return null;
-}
-
-function TypeBadge({ type }) {
-  if (typeof type !== 'string' || !type) return null;
-  // Session types are CMS vocabulary — presented, never interpreted, except
-  // the platform-level keynote emphasis token from config/theme (spec §7.2).
-  const isKeynote = type === 'keynote';
-  return (
-    <span
-      className={[
-        'inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize text-brand-ink',
-        isKeynote ? 'border-keynote/40 bg-keynote/15' : 'border-brand-ink/15 bg-brand-ink/5',
-      ].join(' ')}
-    >
-      {type}
-    </span>
-  );
-}
-
-function SessionCard({ session, eventConfig }) {
-  const speakerNames = useSessionSpeakerNames(session.speakerIds);
-  const range = formatSessionTimeRange(eventConfig, session);
-
-  return (
-    <li>
-      <article
-        className={[
-          'grid gap-2 rounded-brand border border-brand-ink/10 bg-brand-surface-alt p-4 sm:grid-cols-[9.5rem,1fr] sm:gap-4',
-          session.type === 'keynote' ? 'border-s-4 border-s-keynote' : '',
-        ].join(' ')}
-      >
-        <p className="text-sm text-brand-ink-muted">
-          {range ? (
-            <>
-              <time dateTime={range.startIso}>{range.startLabel}</time>
-              {range.endLabel ? (
-                <>
-                  –<time dateTime={range.endIso}>{range.endLabel}</time>
-                </>
-              ) : null}
-              {range.zone ? <span className="ms-1">{range.zone}</span> : null}
-            </>
-          ) : (
-            <span>Time to be announced</span>
-          )}
-        </p>
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold text-brand-ink">{session.title}</h3>
-            <TypeBadge type={session.type} />
-          </div>
-          {session.location ? (
-            <p className="mt-1 text-sm text-brand-ink-muted">{session.location}</p>
-          ) : null}
-          {session.description ? (
-            <p className="mt-2 max-w-prose text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
-              {session.description}
-            </p>
-          ) : null}
-          {speakerNames ? (
-            <p className="mt-2 text-sm text-brand-ink-muted">{speakerNames}</p>
-          ) : null}
-        </div>
-      </article>
-    </li>
+/** Sort sessions the same way everywhere they're grouped by day (Schedule
+ * and MySchedule both use this). Start time first, then explicit `order`,
+ * then title as a stable tiebreaker. */
+export function sortSessions(sessions) {
+  return [...sessions].sort(
+    (a, b) =>
+      String(a.startTime).localeCompare(String(b.startTime)) ||
+      (a.order ?? 0) - (b.order ?? 0) ||
+      String(a.title).localeCompare(String(b.title)),
   );
 }
 
 export default function Schedule() {
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
+  const { user } = useAuth();
+  const { attendeeAccess } = useProfile();
+  const { bookmarkedIds } = useMyBookmarks();
 
   // Days are runtime config — a live config/event write could deliver a
   // malformed entry; drop anything without a usable string id rather than
@@ -119,16 +61,16 @@ export default function Schedule() {
       list.push(session);
       grouped.set(session.dayId, list);
     }
-    for (const list of grouped.values()) {
-      list.sort(
-        (a, b) =>
-          String(a.startTime).localeCompare(String(b.startTime)) ||
-          (a.order ?? 0) - (b.order ?? 0) ||
-          String(a.title).localeCompare(String(b.title)),
-      );
+    for (const [dayId, list] of grouped) {
+      grouped.set(dayId, sortSessions(list));
     }
     return grouped;
   }, [scheduleData]);
+
+  const visibleSessions = useMemo(
+    () => scheduleData.filter((s) => s.visible),
+    [scheduleData],
+  );
 
   if (!features.schedule) {
     return (
@@ -159,13 +101,36 @@ export default function Schedule() {
 
   return (
     <article>
-      <header>
-        <h1 className="font-heading text-3xl font-semibold text-brand-ink">Schedule</h1>
-        {eventZoneLabel ? (
-          <p className="mt-1 text-sm text-brand-ink-muted">
-            All times are shown in {eventZoneLabel}.
-          </p>
-        ) : null}
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-3xl font-semibold text-brand-ink">Schedule</h1>
+          {eventZoneLabel ? (
+            <p className="mt-1 text-sm text-brand-ink-muted">
+              All times are shown in {eventZoneLabel}.
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {features.sessionBookmarks && user && attendeeAccess ? (
+            <Link
+              to="/schedule/mine"
+              className="touch-target inline-flex items-center rounded-brand border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"
+            >
+              My schedule
+            </Link>
+          ) : null}
+          {features.icsExport && visibleSessions.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => {
+                downloadIcs(icsFileName(eventConfig.shortName || eventConfig.name), buildIcsCalendar(eventConfig, visibleSessions));
+              }}
+              className="touch-target inline-flex items-center rounded-brand border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"
+            >
+              Download schedule (.ics)
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {loading ? (
@@ -224,7 +189,13 @@ export default function Schedule() {
             ) : (
               <ul className="mt-4 grid gap-3">
                 {activeSessions.map((session) => (
-                  <SessionCard key={session.id} session={session} eventConfig={eventConfig} />
+                  <SessionCard
+                    key={session.id}
+                    session={session}
+                    eventConfig={eventConfig}
+                    features={features}
+                    bookmarked={bookmarkedIds.has(session.id)}
+                  />
                 ))}
               </ul>
             )}

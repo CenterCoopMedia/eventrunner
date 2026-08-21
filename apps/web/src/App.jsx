@@ -1,19 +1,29 @@
 // App shell: the provider nesting from spec §2.4 —
-// EventConfigProvider (outermost) > AuthProvider > ContentProvider >
-// ToastProvider > routes. The Router wraps everything in main.jsx (tests use
-// MemoryRouter), so ContentProvider can later read search params via hooks.
+// EventConfigProvider (outermost) > AuthProvider > ProfileProvider >
+// ContentProvider > ToastProvider > routes. ProfileProvider sits directly
+// inside AuthProvider because it subscribes to the signed-in user's own
+// users/{uid} document (issue #17).
+// The Router wraps everything in main.jsx (tests use MemoryRouter), so
+// ContentProvider can later read search params via hooks.
 import { Route, Routes, useSearchParams } from 'react-router-dom';
 import { EventConfigProvider } from './contexts/EventConfigContext.jsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { ContentProvider } from './contexts/ContentContext.jsx';
+import { ProfileProvider } from './contexts/ProfileContext.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
+import ProfileSetupRedirect from './components/ProfileSetupRedirect.jsx';
 import Home from './pages/Home.jsx';
 import Schedule from './pages/Schedule.jsx';
+import SessionDetail from './pages/SessionDetail.jsx';
+import MySchedule from './pages/MySchedule.jsx';
 import Speakers from './pages/Speakers.jsx';
 import Sponsors from './pages/Sponsors.jsx';
 import ContentPage from './pages/ContentPage.jsx';
 import Login from './pages/Login.jsx';
+import Profile from './pages/Profile.jsx';
+import Attendees from './pages/Attendees.jsx';
+import AttendeeProfile from './pages/AttendeeProfile.jsx';
 
 export function AppRoutes() {
   return (
@@ -21,9 +31,14 @@ export function AppRoutes() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="schedule" element={<Schedule />} />
+        <Route path="schedule/mine" element={<MySchedule />} />
+        <Route path="schedule/:sessionId" element={<SessionDetail />} />
         <Route path="speakers" element={<Speakers />} />
         <Route path="sponsors" element={<Sponsors />} />
         <Route path="signin" element={<Login />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="attendees" element={<Attendees />} />
+        <Route path="attendees/:uid" element={<AttendeeProfile />} />
         {/* Generic cmsPages route by their own root-level `path`
             (issue #52) — this catch-all matches whatever the system
             routes above didn't, and ContentPage looks the current
@@ -56,11 +71,14 @@ export default function App() {
   return (
     <EventConfigProvider>
       <AuthProvider>
-        <ContentGate>
-          <ToastProvider>
-            <AppRoutes />
-          </ToastProvider>
-        </ContentGate>
+        <ProfileProvider>
+          <ContentGate>
+            <ToastProvider>
+              <ProfileSetupRedirect />
+              <AppRoutes />
+            </ToastProvider>
+          </ContentGate>
+        </ProfileProvider>
       </AuthProvider>
     </EventConfigProvider>
   );

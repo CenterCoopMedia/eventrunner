@@ -117,6 +117,42 @@ export function zoneLabel(timeZone, instant = new Date()) {
 }
 
 /**
+ * Resolve a session's start/end to real Date instants on the event's wall
+ * clock: `{ start, end, startDate, endDate }` (the last two are the
+ * event-local "YYYY-MM-DD" the instant falls on — `endDate` rolls forward a
+ * calendar day for a midnight-crossing session). `start`/`startDate` are
+ * null when the day or start time cannot be resolved; `end`/`endDate` are
+ * null when only the end is missing or malformed. This is the one place
+ * that resolves a session's wall clock to instants — display formatting
+ * (below) and calendar export (utils/calendar.js) both build on it, so a
+ * DST or midnight-rollover fix here reaches both.
+ */
+export function resolveSessionInstants(eventConfig, session) {
+  const timeZone = eventConfig?.timezone;
+  const day = getDay(eventConfig, session?.dayId);
+  if (!day || typeof timeZone !== 'string') {
+    return { start: null, end: null, startDate: null, endDate: null };
+  }
+
+  const start = zonedDateTime(day.date, session.startTime, timeZone);
+  if (!start) return { start: null, end: null, startDate: null, endDate: null };
+  let end = zonedDateTime(day.date, session.endTime, timeZone);
+  // A session ending after midnight ("23:30"–"00:15") resolves its wall
+  // clock on the *next* calendar day — roll both the instant and the ISO
+  // date forward one day so callers never see the session end before it
+  // starts.
+  let endDate = day.date;
+  if (end && end <= start) {
+    const rolled = zonedDateTime(rollDateForward(day.date), session.endTime, timeZone);
+    if (rolled) {
+      end = rolled;
+      endDate = rollDateForward(day.date);
+    }
+  }
+  return { start, end, startDate: day.date, endDate: end ? endDate : null };
+}
+
+/**
  * A session's time range on the event's wall clock, ready to render:
  * `{ startIso, startLabel, endIso, endLabel, zone }`. The shared AM/PM
  * period appears once, on the end ("9:30–10:00 AM"); ranges that cross
@@ -127,31 +163,15 @@ export function zoneLabel(timeZone, instant = new Date()) {
  */
 export function formatSessionTimeRange(eventConfig, session) {
   const timeZone = eventConfig?.timezone;
-  const day = getDay(eventConfig, session?.dayId);
-  if (!day || typeof timeZone !== 'string') return null;
-
-  const start = zonedDateTime(day.date, session.startTime, timeZone);
+  const { start, end, startDate, endDate } = resolveSessionInstants(eventConfig, session);
   if (!start) return null;
-  let end = zonedDateTime(day.date, session.endTime, timeZone);
-  // A session ending after midnight ("23:30"–"00:15") resolves its wall
-  // clock on the *next* calendar day — roll both the instant and the ISO
-  // date forward one day so <time dateTime> never claims the session ends
-  // before it starts.
-  let endDate = day.date;
-  if (end && end <= start) {
-    const rolled = zonedDateTime(rollDateForward(day.date), session.endTime, timeZone);
-    if (rolled) {
-      end = rolled;
-      endDate = rollDateForward(day.date);
-    }
-  }
 
   const s = clockParts(start, timeZone);
   const e = end ? clockParts(end, timeZone) : null;
   const samePeriod = e !== null && s.period === e.period;
 
   return {
-    startIso: `${day.date}T${session.startTime}`,
+    startIso: `${startDate}T${session.startTime}`,
     startLabel: samePeriod ? s.clock : `${s.clock} ${s.period}`.trim(),
     endIso: end ? `${endDate}T${session.endTime}` : null,
     endLabel: e ? `${e.clock} ${e.period}`.trim() : null,

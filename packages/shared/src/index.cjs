@@ -11,6 +11,7 @@ module.exports = {
   ...require('./config/index.cjs'),
   ...require('./registration.cjs'),
   ...require('./badges.cjs'),
+  ...require('./profile.cjs'),
   ...require('./slug.cjs'),
   ...require('./urlSafety.cjs'),
   ...require('./routing.cjs'),
