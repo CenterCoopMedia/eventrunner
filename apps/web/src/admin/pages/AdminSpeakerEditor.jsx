@@ -41,6 +41,11 @@ const STATUS_OPTIONS = [
   { value: 'removed', label: 'Removed — hidden everywhere, record kept' },
 ];
 
+const PIPELINE_STATUS_LABELS = {
+  invited: 'Invite sent — waiting for this speaker to accept',
+  accepted: 'Accepted — waiting for approval',
+};
+
 const EMPTY = {
   firstName: '',
   lastName: '',
@@ -64,16 +69,25 @@ function toForm(speaker) {
     headshotPath: speaker.headshotPath ?? '',
     organization: speaker.organization ?? '',
     jobTitle: speaker.jobTitle ?? '',
-    // A speaker mid-invite carries a status this form may not set; showing
-    // it as-is and letting the select fall back keeps the form honest
-    // rather than silently proposing to reset the pipeline.
-    status: ADMIN_SETTABLE_STATUSES.includes(speaker.status) ? speaker.status : 'draft',
+    // The STORED status, verbatim — never coerced to a value this form can
+    // set. Coercing `invited` to `draft` and then sending it on every save
+    // meant an unrelated bio edit silently reset the invite pipeline: the
+    // speaker still held a token, but the record no longer said so.
+    status: speaker.status ?? 'draft',
   };
 }
 
-/** Empty string clears the optional scalars; the server stores null. */
-function toPayload(form) {
-  return {
+/**
+ * Empty string clears the optional scalars; the server stores null.
+ *
+ * `status` is included only when the admin actually picked a new one. A
+ * speaker mid-invite has a status this form may not set (the server rejects
+ * `invited`/`accepted` by name — they are meaningful only alongside a token
+ * it issues), and an editor that echoed a status back on every save would
+ * either be rejected or, worse, quietly rewrite the pipeline.
+ */
+function toPayload(form, { includeStatus }) {
+  const payload = {
     firstName: form.firstName,
     lastName: form.lastName,
     slug: form.slug,
@@ -82,8 +96,9 @@ function toPayload(form) {
     headshotPath: form.headshotPath.trim() === '' ? null : form.headshotPath.trim(),
     organization: form.organization,
     jobTitle: form.jobTitle,
-    status: form.status,
   };
+  if (includeStatus) payload.status = form.status;
+  return payload;
 }
 
 export default function AdminSpeakerEditor({ mode }) {
@@ -99,6 +114,10 @@ export default function AdminSpeakerEditor({ mode }) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [deleteBlocked, setDeleteBlocked] = useState(false);
+  // Only a deliberate pick sends a status (see toPayload). Creating always
+  // sends one — a new record needs a starting state, and the form's default
+  // is the one the server would apply anyway.
+  const [statusPicked, setStatusPicked] = useState(mode === 'create');
   const errorRef = useRef(null);
   // Adopt the live record exactly once, so a listener update does not
   // overwrite what the admin is typing.
@@ -132,11 +151,16 @@ export default function AdminSpeakerEditor({ mode }) {
     setStatus('');
     try {
       if (mode === 'create') {
-        const response = await call('createSpeaker', { speaker: toPayload(form) });
+        const response = await call('createSpeaker', {
+          speaker: toPayload(form, { includeStatus: true }),
+        });
         showToast('Speaker created.');
         navigate(`../${response.speakerId}`, { replace: true });
       } else {
-        await call('updateSpeaker', { speakerId, speaker: toPayload(form) });
+        await call('updateSpeaker', {
+          speakerId,
+          speaker: toPayload(form, { includeStatus: statusPicked }),
+        });
         setStatus('Saved. The public directory updates within moments.');
         showToast('Speaker saved.');
       }
@@ -271,13 +295,33 @@ export default function AdminSpeakerEditor({ mode }) {
             onChange={(value) => set({ email: value })}
             error={errorFor('email')}
           />
-          <SelectField
-            label="Status"
-            value={form.status}
-            onChange={(value) => set({ status: value })}
-            options={STATUS_OPTIONS}
-            error={errorFor('status')}
-          />
+          {ADMIN_SETTABLE_STATUSES.includes(form.status) ? (
+            <SelectField
+              label="Status"
+              value={form.status}
+              onChange={(value) => {
+                setStatusPicked(true);
+                set({ status: value });
+              }}
+              options={STATUS_OPTIONS}
+              error={errorFor('status')}
+            />
+          ) : (
+            // A speaker mid-invite is shown, not offered. The pipeline
+            // states belong to the invitation flow — they mean nothing
+            // without the token it issues — so the editor reports where
+            // this speaker stands and leaves the state alone. Editing any
+            // other field on this page no longer disturbs it.
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold text-brand-ink">Status</span>
+              <p className="text-brand-ink-muted">
+                {PIPELINE_STATUS_LABELS[form.status] ?? form.status}
+              </p>
+              <p className="text-sm text-brand-ink-muted">
+                Managed by the invitation flow. Saving this form leaves it unchanged.
+              </p>
+            </div>
+          )}
         </div>
         {speaker?.uid ? (
           <p className="mt-3 text-sm text-brand-ink-muted">

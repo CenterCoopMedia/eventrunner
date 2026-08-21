@@ -14,7 +14,10 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
-vi.mock('../../lib/contentSource.js', () => ({ subscribeContentCollection: () => () => {} }));
+vi.mock('../../lib/contentSource.js', () => ({
+  subscribeContentCollection: () => () => {},
+  subscribeSpeakersPublic: () => () => {},
+}));
 vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 
 let speakerDocs = [];
@@ -263,5 +266,70 @@ describe('speaker editor', () => {
     // `invited` and `accepted` belong to the invite pipeline: they are
     // meaningful only alongside an inviteToken the server issues.
     expect(options).toEqual(['draft', 'approved', 'removed']);
+  });
+
+  it('omits status from an edit the admin did not make a status change in', async () => {
+    // The regression: the form coerced an unsettable stored status to
+    // `draft` and sent it on every save, so editing a bio silently reset
+    // the invite pipeline.
+    speakerDocs = [RAE];
+    fetch.mockResolvedValueOnce(okResponse({ speakerId: 'rae-okonkwo' }));
+    await renderAt('/admin/speakers/rae-okonkwo');
+
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Updated bio.' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+    });
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).speaker).not.toHaveProperty('status');
+    expect(bodyOf(0).speaker.bio).toBe('Updated bio.');
+  });
+
+  it('sends status only once the admin picks one', async () => {
+    speakerDocs = [RAE];
+    fetch.mockResolvedValueOnce(okResponse({ speakerId: 'rae-okonkwo' }));
+    await renderAt('/admin/speakers/rae-okonkwo');
+
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'removed' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+    });
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).speaker.status).toBe('removed');
+  });
+
+  for (const status of ['invited', 'accepted']) {
+    it(`shows a ${status} speaker's status read-only and never sends it back`, async () => {
+      speakerDocs = [{ ...RAE, status }];
+      fetch.mockResolvedValueOnce(okResponse({ speakerId: 'rae-okonkwo' }));
+      await renderAt('/admin/speakers/rae-okonkwo');
+
+      // No control at all — a select showing `draft` would be a lie about
+      // what the record holds and an offer the server would reject.
+      expect(screen.queryByLabelText('Status')).toBeNull();
+      expect(screen.getByText(/Managed by the invitation flow/)).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Edited.' } });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+      });
+
+      await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+      expect(bodyOf(0).speaker).not.toHaveProperty('status');
+    });
+  }
+
+  it('always sends a status when creating, since a new record needs one', async () => {
+    fetch.mockResolvedValueOnce(okResponse({ speakerId: 'a-b' }));
+    await renderAt('/admin/speakers/new');
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'A' } });
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'B' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create speaker' }));
+    });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).speaker.status).toBe('draft');
   });
 });
