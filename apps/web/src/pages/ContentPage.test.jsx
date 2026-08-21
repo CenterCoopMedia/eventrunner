@@ -13,7 +13,11 @@ vi.mock('../lib/configSource.js', () => ({
 vi.mock('../lib/contentSource.js', () => ({
   subscribeContentCollection: () => () => {},
 }));
-vi.mock('../firebase.js', () => ({ app: {}, auth: {}, db: {}, storage: {} }));
+vi.mock('../firebase.js', () => ({
+  app: {}, auth: {}, db: {}, storage: {},
+  appCheckEnabled: false,
+  appCheckHeaders: async () => ({}),
+}));
 
 import App from '../App.jsx';
 import siteContent from '@generated/siteContent.js';

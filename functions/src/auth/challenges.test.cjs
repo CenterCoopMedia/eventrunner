@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   takeRateLimitSlot,
+  takeGlobalSendSlot,
   createChallenge,
   verifyChallenge,
   finalizeChallenge,
@@ -200,6 +201,67 @@ test('verify: unknown or malformed token fails without touching the store', asyn
   const db = fakeDb();
   assert.deepEqual(await verifyChallenge({ db, token: 'nope', email: 'a@example.org', code: '123456' }), { ok: false });
   assert.deepEqual(await verifyChallenge({ db, token: 'f'.repeat(64), email: 'a@example.org', code: '123456' }), { ok: false });
+});
+
+// --- issue #45: the deployment-wide send ceiling -----------------------------
+
+test('send ceiling: slots pass up to the cap, then every request is limited', async () => {
+  const db = fakeDb();
+  let clock = 1_000_000;
+  const now = () => clock;
+  const args = { db, now, max: 3, windowMs: 60_000 };
+
+  for (let i = 0; i < 3; i += 1) {
+    const slot = await takeGlobalSendSlot(args);
+    assert.equal(slot.limited, false);
+    assert.equal(slot.count, i + 1);
+    assert.equal(slot.firstTrip, false);
+    clock += 1000;
+  }
+
+  const trip = await takeGlobalSendSlot(args);
+  assert.equal(trip.limited, true);
+  assert.equal(trip.firstTrip, true, 'the first request over the line alerts');
+  assert.ok(trip.retryAfterMs > 0 && trip.retryAfterMs <= 60_000);
+
+  // Everything behind it is limited but must NOT alert again, and must not
+  // write: the flood case is exactly when the counter stops taking writes.
+  clock += 1000;
+  const after = await takeGlobalSendSlot(args);
+  assert.equal(after.limited, true);
+  assert.equal(after.firstTrip, false);
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 3);
+});
+
+test('send ceiling: the window drains, the trip clears, and a later trip alerts again', async () => {
+  const db = fakeDb();
+  let clock = 0;
+  const now = () => clock;
+  const args = { db, now, max: 2, windowMs: 60_000 };
+
+  await takeGlobalSendSlot(args);
+  await takeGlobalSendSlot(args);
+  assert.equal((await takeGlobalSendSlot(args)).firstTrip, true);
+  assert.ok(db.store.get('auth_send_ceiling/global').trippedAt);
+
+  clock = 60_001;
+  const drained = await takeGlobalSendSlot(args);
+  assert.equal(drained.limited, false);
+  assert.equal(drained.count, 1, 'stale timestamps are dropped on read');
+  assert.equal(db.store.get('auth_send_ceiling/global').trippedAt, undefined);
+
+  await takeGlobalSendSlot(args);
+  assert.equal((await takeGlobalSendSlot(args)).firstTrip, true, 'a fresh episode alerts again');
+});
+
+test('send ceiling: sweepExpired drops a drained ceiling document', async () => {
+  const db = fakeDb();
+  let clock = 0;
+  await takeGlobalSendSlot({ db, now: () => clock, max: 2, windowMs: 60_000 });
+  clock = internals.SEND_CEILING_WINDOW_MS + 1;
+  const swept = await sweepExpired({ db, now: () => clock });
+  assert.equal(swept.sendCeilings, 1);
+  assert.equal(db.store.has('auth_send_ceiling/global'), false);
 });
 
 // --- issue #47: the crypto-free pre-check ------------------------------------

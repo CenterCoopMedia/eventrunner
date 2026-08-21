@@ -18,6 +18,7 @@ const { isAlreadyExists } = require('../email/send.cjs').internals;
 
 const {
   takeRateLimitSlot,
+  takeGlobalSendSlot,
   createChallenge,
   verifyChallenge,
   finalizeChallenge,
@@ -89,12 +90,36 @@ async function reopenSystemError({ db, errorId, seenAt }) {
 }
 
 /**
+ * Read the deploy-time OTP send ceiling (spec §2.1). Absent, unparseable,
+ * or non-positive falls back to the module default rather than to "no
+ * ceiling" — a typo in a deploy variable must not silently remove a
+ * safety control. `0` is not a way to disable it; lower it instead.
+ * @param {Record<string, string|undefined>} [env]
+ * @returns {number}
+ */
+function parseSendCeiling(env = process.env) {
+  const raw = Number.parseInt(String(env.EVENT_OTP_SEND_CEILING_PER_HOUR ?? '').trim(), 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : challengeInternals.SEND_CEILING_MAX;
+}
+
+/**
  * @param {{ db, sendEmail: (m: object) => Promise<object>,
  *           getConfig: () => Promise<object>,
  *           notifyOperator?: (e: object) => Promise<object>,
+ *           sendCeilingMax?: number, sendCeilingWindowMs?: number,
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
-function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = Date.now, log = console, renderFn = render }) {
+function createSendOtpHandler({
+  db,
+  sendEmail,
+  getConfig,
+  notifyOperator,
+  sendCeilingMax = challengeInternals.SEND_CEILING_MAX,
+  sendCeilingWindowMs = challengeInternals.SEND_CEILING_WINDOW_MS,
+  now = Date.now,
+  log = console,
+  renderFn = render,
+}) {
   return async function sendOtpCode(req, res) {
     if (req.method !== 'POST') {
       res.set('Allow', 'POST');
@@ -172,15 +197,46 @@ function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = 
       return;
     }
 
-    const slot = await takeRateLimitSlot({ db, email, now });
-    if (slot.limited) {
-      const retryAfterSeconds = slot.retryAfterMs ? Math.ceil(slot.retryAfterMs / 1000) : null;
+    // The hint rides in the body too: Retry-After is not a CORS-safelisted
+    // response header, so cross-origin JS cannot read it.
+    const rateLimited = (retryAfterMs) => {
+      const retryAfterSeconds = retryAfterMs ? Math.ceil(retryAfterMs / 1000) : null;
       if (retryAfterSeconds) res.set('Retry-After', String(retryAfterSeconds));
-      // The hint rides in the body too: Retry-After is not a CORS-safelisted
-      // response header, so cross-origin JS cannot read it.
       res.status(429).json({
         error: { code: 'rate-limited', message: 'Too many code requests. Try again later.', retryAfterSeconds },
       });
+    };
+
+    const slot = await takeRateLimitSlot({ db, email, now });
+    if (slot.limited) {
+      rateLimited(slot.retryAfterMs);
+      return;
+    }
+
+    // The deployment-wide ceiling runs AFTER the per-address bucket: a
+    // single address hammering the endpoint is already stopped by its own
+    // budget and must not be able to spend everyone else's (issue #45).
+    // Same response shape as the per-address limit — a caller cannot tell
+    // which control refused it.
+    const ceiling = await takeGlobalSendSlot({ db, now, max: sendCeilingMax, windowMs: sendCeilingWindowMs });
+    if (ceiling.limited) {
+      log.error(`OTP send ceiling reached: ${ceiling.count} sends in the window (max ${sendCeilingMax})`);
+      if (ceiling.firstTrip && notifyOperator) {
+        // firstTrip is the durable, cross-container once-per-episode gate;
+        // dedupeKey is the notifier's own in-memory window on top of it.
+        await notifyOperator({
+          kind: 'error',
+          title: 'OTP send ceiling reached; sign-in codes are paused',
+          summary: `${ceiling.count} sign-in codes were sent in the last ${Math.round(sendCeilingWindowMs / 60000)} minutes, reaching this deployment's ceiling of ${sendCeilingMax}. New code requests are refused until the window drains. Check for an email-bomb or a stuck client before raising the ceiling.`,
+          fields: {
+            ceiling: String(sendCeilingMax),
+            windowMinutes: String(Math.round(sendCeilingWindowMs / 60000)),
+            sendsInWindow: String(ceiling.count),
+          },
+          dedupeKey: 'otp-send-ceiling-tripped',
+        });
+      }
+      rateLimited(ceiling.retryAfterMs);
       return;
     }
 
@@ -270,6 +326,24 @@ function createVerifyOtpHandler({ db, auth, now = Date.now, log = console }) {
   };
 }
 
+/**
+ * App Check enforcement options for the two public OTP endpoints (issue
+ * #45). Off by default so an existing deployment keeps working untouched;
+ * a deployment that has provisioned a reCAPTCHA site key for the web app
+ * sets EVENT_APP_CHECK_ENFORCED=true and every unattested request is
+ * rejected by the platform before the handler runs.
+ *
+ * Deploy-time, not runtime, on purpose: this is the control that survives
+ * an attacker who ignores our own rate buckets entirely.
+ *
+ * @param {Record<string, string|undefined>} [env]
+ * @returns {{ enforceAppCheck?: true }} spread into the onRequest options
+ */
+function appCheckOptions(env = process.env) {
+  const raw = String(env.EVENT_APP_CHECK_ENFORCED ?? '').trim().toLowerCase();
+  return raw === 'true' ? { enforceAppCheck: true } : {};
+}
+
 /** Deployable exports (spec §1.3): sendOtpCode, verifyOtpCode, cleanup. */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
@@ -289,6 +363,8 @@ function buildHandlers() {
   }
   const secrets = [...secretNames].map(defineSecret);
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
+  const appCheck = appCheckOptions(process.env);
+  const sendCeilingMax = parseSendCeiling(process.env);
 
   const buildDeps = () => {
     const { getDb } = require('../core/firestore.cjs');
@@ -300,7 +376,7 @@ function buildHandlers() {
     const getConfig = () => getEventConfig({ db });
     const emailCore = createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig });
     const notifier = createOperatorNotifier({ env: process.env, getConfig, sendEmail: emailCore.send });
-    return { db, getConfig, sendEmail: emailCore.send, notifyOperator: notifier.notify };
+    return { db, getConfig, sendEmail: emailCore.send, notifyOperator: notifier.notify, sendCeilingMax };
   };
 
   const withCors = (handler) => async (req, res) => {
@@ -313,10 +389,10 @@ function buildHandlers() {
   };
 
   return {
-    sendOtpCode: onRequest({ region, secrets }, withCors(async (req, res) => {
+    sendOtpCode: onRequest({ region, secrets, ...appCheck }, withCors(async (req, res) => {
       await createSendOtpHandler(buildDeps())(req, res);
     })),
-    verifyOtpCode: onRequest({ region }, withCors(async (req, res) => {
+    verifyOtpCode: onRequest({ region, ...appCheck }, withCors(async (req, res) => {
       const { getDb } = require('../core/firestore.cjs');
       const { getAuth } = require('firebase-admin/auth');
       await createVerifyOtpHandler({ db: getDb(), auth: getAuth() })(req, res);
@@ -335,5 +411,13 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { renderedMailCarriesCode, reopenSystemError, EXPIRY_MINUTES, EMAIL_RE, LAST_SEEN_REFRESH_MS },
+  internals: {
+    renderedMailCarriesCode,
+    reopenSystemError,
+    appCheckOptions,
+    parseSendCeiling,
+    EXPIRY_MINUTES,
+    EMAIL_RE,
+    LAST_SEEN_REFRESH_MS,
+  },
 };

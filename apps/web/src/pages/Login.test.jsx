@@ -7,6 +7,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { signInWithCustomToken } from 'firebase/auth';
 import App from '../App.jsx';
 import { functionsOrigin } from '../contexts/AuthContext.jsx';
+import { appCheckHeaders } from '../firebase.js';
 
 function jsonResponse(status, body) {
   return {
@@ -252,5 +253,43 @@ describe('emailed-code sign-in', () => {
     await waitFor(() => {
       expect(error.closest('[tabindex="-1"]')).toHaveFocus();
     });
+  });
+});
+
+describe('App Check attestation (issue #45)', () => {
+  it('sends no extra header when App Check is unconfigured', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse(200, { challengeId: 'chal-1', expiresInMinutes: 10 }),
+    );
+    renderSignIn();
+    await requestCode();
+
+    const [, init] = fetch.mock.calls[0];
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  it('attaches X-Firebase-AppCheck to both OTP calls when a token is available', async () => {
+    vi.mocked(appCheckHeaders).mockResolvedValue({
+      'X-Firebase-AppCheck': 'attestation-token',
+    });
+    fetch
+      .mockResolvedValueOnce(
+        jsonResponse(200, { challengeId: 'chal-1', expiresInMinutes: 10 }),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, { token: 'custom-token-abc' }));
+
+    renderSignIn();
+    const codeInput = await requestCode();
+    fireEvent.change(codeInput, { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    for (const [, init] of fetch.mock.calls) {
+      expect(init.headers).toEqual({
+        'Content-Type': 'application/json',
+        'X-Firebase-AppCheck': 'attestation-token',
+      });
+    }
+    vi.mocked(appCheckHeaders).mockResolvedValue({});
   });
 });

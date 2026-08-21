@@ -86,12 +86,14 @@ const CONFIG = {
   tierA: { publicUrl: 'https://summit.example.org' },
 };
 
-function sendDeps({ db = fakeDb(), sendResult, notify, now } = {}) {
+function sendDeps({ db = fakeDb(), sendResult, notify, now, sendCeilingMax, sendCeilingWindowMs } = {}) {
   const sent = [];
   const notices = [];
   const deps = {
     db,
     ...(now ? { now } : {}),
+    ...(sendCeilingMax ? { sendCeilingMax } : {}),
+    ...(sendCeilingWindowMs ? { sendCeilingWindowMs } : {}),
     getConfig: async () => CONFIG,
     sendEmail: async (m) => {
       sent.push(m);
@@ -180,6 +182,111 @@ test('a broken auth.otp override falls back to the default and notifies the oper
   await handler({ method: 'POST', body: { email: 'b@example.org' } }, fakeRes());
   const after = [...db.store.keys()].filter((k) => k.startsWith('system_errors/'));
   assert.equal(after.length, 1);
+});
+
+// --- issue #45: infra-level throttles ----------------------------------------
+
+test('the send ceiling trips on distinct addresses the per-email bucket never sees', async () => {
+  let clock = 1_000_000;
+  const { db, sent, notices, handler } = sendDeps({
+    now: () => clock, sendCeilingMax: 3, sendCeilingWindowMs: 60_000,
+  });
+
+  // Three different addresses: the 5/15min per-address bucket is untouched.
+  for (let i = 0; i < 3; i += 1) {
+    const res = fakeRes();
+    await handler({ method: 'POST', body: { email: `v${i}@example.org` } }, res);
+    assert.equal(res.statusCode, 200);
+    clock += 1000;
+  }
+
+  const tripped = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v3@example.org' } }, tripped);
+  // Same shape the per-address limit already answers with — no oracle.
+  assert.equal(tripped.statusCode, 429);
+  assert.equal(tripped.body.error.code, 'rate-limited');
+  assert.ok(tripped.body.error.retryAfterSeconds > 0);
+  assert.ok(Number(tripped.headers['Retry-After']) > 0);
+  assert.equal(sent.length, 3, 'no mail, no provider cost');
+  assert.equal([...db.store.keys()].filter((k) => k.startsWith('auth_challenges/')).length, 3);
+
+  // One OperatorEvent per trip episode, not per request.
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0].kind, 'error');
+  assert.match(notices[0].title, /send ceiling/);
+  assert.equal(notices[0].dedupeKey, 'otp-send-ceiling-tripped');
+  assert.equal(notices[0].fields.ceiling, '3');
+
+  clock += 1000;
+  const again = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v4@example.org' } }, again);
+  assert.equal(again.statusCode, 429);
+  assert.equal(notices.length, 1, 'still one alert for this trip');
+});
+
+test('the send ceiling resets once the window drains', async () => {
+  let clock = 0;
+  const { sent, notices, handler } = sendDeps({
+    now: () => clock, sendCeilingMax: 2, sendCeilingWindowMs: 60_000,
+  });
+  for (let i = 0; i < 2; i += 1) {
+    await handler({ method: 'POST', body: { email: `v${i}@example.org` } }, fakeRes());
+  }
+  const tripped = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v2@example.org' } }, tripped);
+  assert.equal(tripped.statusCode, 429);
+
+  clock = 60_001;
+  const recovered = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v3@example.org' } }, recovered);
+  assert.equal(recovered.statusCode, 200);
+  assert.equal(sent.length, 3);
+
+  // A second episode is a second alert.
+  await handler({ method: 'POST', body: { email: 'v4@example.org' } }, fakeRes());
+  const secondTrip = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v5@example.org' } }, secondTrip);
+  assert.equal(secondTrip.statusCode, 429);
+  assert.equal(notices.length, 2);
+});
+
+test('one address cannot spend the whole deployment ceiling', async () => {
+  const db = fakeDb();
+  const { handler } = sendDeps({ db, sendCeilingMax: 100, sendCeilingWindowMs: 60_000 });
+  for (let i = 0; i < challengeInternals.RATE_LIMIT_MAX + 5; i += 1) {
+    await handler({ method: 'POST', body: { email: 'a@example.org' } }, fakeRes());
+  }
+  // The per-address bucket stops it first, so the global counter only ever
+  // saw the sends that actually went out.
+  assert.equal(
+    db.store.get('auth_send_ceiling/global').sends.length,
+    challengeInternals.RATE_LIMIT_MAX,
+  );
+});
+
+test('EVENT_APP_CHECK_ENFORCED gates the enforceAppCheck deploy option', () => {
+  assert.deepEqual(internals.appCheckOptions({}), {});
+  assert.deepEqual(internals.appCheckOptions({ EVENT_APP_CHECK_ENFORCED: '' }), {});
+  assert.deepEqual(internals.appCheckOptions({ EVENT_APP_CHECK_ENFORCED: 'false' }), {});
+  // Anything that is not an explicit "true" leaves enforcement off, so a
+  // typo'd value cannot lock every client out of sign-in.
+  assert.deepEqual(internals.appCheckOptions({ EVENT_APP_CHECK_ENFORCED: 'yes' }), {});
+  assert.deepEqual(
+    internals.appCheckOptions({ EVENT_APP_CHECK_ENFORCED: ' TRUE ' }),
+    { enforceAppCheck: true },
+  );
+});
+
+test('EVENT_OTP_SEND_CEILING_PER_HOUR parses, and never parses to "no ceiling"', () => {
+  assert.equal(internals.parseSendCeiling({}), challengeInternals.SEND_CEILING_MAX);
+  assert.equal(internals.parseSendCeiling({ EVENT_OTP_SEND_CEILING_PER_HOUR: ' 50 ' }), 50);
+  for (const bad of ['0', '-1', 'lots', '']) {
+    assert.equal(
+      internals.parseSendCeiling({ EVENT_OTP_SEND_CEILING_PER_HOUR: bad }),
+      challengeInternals.SEND_CEILING_MAX,
+      `"${bad}" must fall back to the default, not disable the ceiling`,
+    );
+  }
 });
 
 // --- issue #48: the durable row's lifecycle ----------------------------------

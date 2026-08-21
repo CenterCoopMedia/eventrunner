@@ -26,3 +26,57 @@ if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true') {
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
   connectStorageEmulator(storage, '127.0.0.1', 9199);
 }
+
+// --- App Check (issue #45) ---------------------------------------------------
+// Attests that OTP requests come from this web app rather than from a script,
+// so the unauthenticated sendOtpCode/verifyOtpCode endpoints are not an open
+// email-bomb and provider-cost amplifier. The server half is the deploy-time
+// EVENT_APP_CHECK_ENFORCED flag; enable the key here first, then the flag.
+//
+// Entirely opt-in: with no site key the SDK is never even fetched (the import
+// is dynamic, so it stays out of the main chunk) and every request goes out
+// exactly as before. A failure to obtain a token is never fatal here either —
+// the request is sent unattested and the server decides, which keeps a
+// misconfigured reCAPTCHA from becoming a client-side sign-in outage with no
+// server-side trace.
+const appCheckSiteKey = (import.meta.env.VITE_FIREBASE_APP_CHECK_SITE_KEY || '').trim();
+
+export const appCheckEnabled = Boolean(appCheckSiteKey);
+
+const appCheckReady = appCheckSiteKey
+  ? import('firebase/app-check')
+      .then(({ initializeAppCheck, ReCaptchaV3Provider }) => {
+        // Must be set before initializeAppCheck. Dev-only: a debug token in
+        // a production bundle is a published bypass of the whole control.
+        if (import.meta.env.DEV && import.meta.env.VITE_APP_CHECK_DEBUG_TOKEN) {
+          self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APP_CHECK_DEBUG_TOKEN;
+        }
+        return initializeAppCheck(app, {
+          provider: new ReCaptchaV3Provider(appCheckSiteKey),
+          isTokenAutoRefreshEnabled: true,
+        });
+      })
+      .catch((error) => {
+        console.error('App Check initialization failed; requests go out unattested.', error);
+        return null;
+      })
+  : null;
+
+/**
+ * Request headers carrying the App Check attestation, or `{}` when App Check
+ * is not configured or the token could not be obtained.
+ * @returns {Promise<Record<string, string>>}
+ */
+export async function appCheckHeaders() {
+  if (!appCheckReady) return {};
+  try {
+    const instance = await appCheckReady;
+    if (!instance) return {};
+    const { getToken } = await import('firebase/app-check');
+    const { token } = await getToken(instance, /* forceRefresh */ false);
+    return token ? { 'X-Firebase-AppCheck': token } : {};
+  } catch (error) {
+    console.warn('App Check token unavailable; sending the request unattested.', error);
+    return {};
+  }
+}
