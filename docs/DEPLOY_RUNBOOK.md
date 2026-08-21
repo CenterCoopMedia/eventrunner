@@ -289,7 +289,7 @@ A brand-new project has no `config/event` Firestore document yet — `generate-c
 dispatch against a fresh project has to skip it. Two dispatches, in order:
 
 **Step 1 — bootstrap dispatch.** Deploys only rules/indexes/storage (`provision`) and `functions`;
-skips `content`/`build`/`hosting`/`smoke` entirely.
+skips `content`/`build`/`hosting`/`post`/`smoke` entirely.
 
 ```
 Actions tab → Deploy → Run workflow
@@ -301,7 +301,7 @@ Actions tab → Deploy → Run workflow
 `deploy-client.yml`'s `provision` job deploys `firestore:rules`, `firestore:indexes`, and `storage`
 on **every** run regardless of the `provision` input (spec §8.1) — that input exists for operator
 intent and log clarity, not as a gate. `bootstrap: true` is the actual gate: it is what skips
-`content` (and, transitively, `build`/`hosting`/`smoke`) on this run. A dispatch run always deploys
+`content` (and, transitively, `build`/`hosting`/`post`/`smoke`) on this run. A dispatch run always deploys
 functions regardless of `bootstrap`, because a fresh project has none yet and gating that on a paths
 filter would provision an empty, broken deployment (spec §8.1).
 
@@ -328,7 +328,7 @@ Actions tab → Deploy → Run workflow
   bootstrap: false   (the default — leave it unchecked)
 ```
 
-This run's `content` job succeeds, and `build`/`hosting`/`smoke` deploy the live site. From here on,
+This run's `content` job succeeds, and `build`/`hosting`/`post`/`smoke` deploy the live site. From here on,
 either dispatch this way again for any change, or add `<CLIENT_ENV>` to `AUTO_DEPLOY_ENVIRONMENTS`
 (§4) so a push to `main` deploys it automatically — `bootstrap` is never `true` on a push run, so a
 client already past step 3 never needs it again.
@@ -350,6 +350,15 @@ client already past step 3 never needs it again.
   the `smoke` job and pass — it OPTIONS-preflights every endpoint in `.github/smoke-endpoints.json`
   against `https://<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net` and GETs
   `EVENT_PUBLIC_URL`.
+- Between `hosting` and `smoke`, the `post` job redeploys `updatesMeta` (`functions/src/public/og.cjs`)
+  alone. That function self-fetches the deployed hosting `index.html` as its SSR OG-tag template and
+  caches it per container (issue #27) — a container that cold-started before THIS run's hosting
+  deploy would otherwise keep serving crawlers the previous build's asset references until its cache
+  TTL or a natural recycle. Forcing a redeploy here forces a fresh cold start immediately after the
+  new template exists. This was the ADR's `post` step (§8.1), deferred at the M2 deploy PR pending
+  `functions/src/public/og.cjs` landing (this issue) — `smoke`'s OPTIONS-preflight of `updatesMeta`
+  now runs against the freshly-redeployed instance, not the one from the `functions` job earlier in
+  the same run.
 - If `google-github-actions/auth` fails with `permission_denied` on a run you expected to succeed
   (dispatched from `main`), the attribute condition (§1) or the repository+ref binding (§2) is the
   first thing to re-check — copy the exact `repository` and `ref` claims GitHub sent from the failed
