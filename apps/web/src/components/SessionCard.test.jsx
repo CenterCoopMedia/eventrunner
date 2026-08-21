@@ -27,6 +27,18 @@ vi.mock('../lib/materialsSource.js', () => ({
   subscribeSessionMaterials: (...args) => subscribeSessionMaterialsMock(...args),
 }));
 
+const setSessionReactionMock = vi.fn();
+vi.mock('../lib/reactionsSource.js', () => ({
+  REACTION_KINDS: ['👍', '❤️', '🎉', '💡', '👏'],
+  setSessionReaction: (...args) => setSessionReactionMock(...args),
+}));
+
+const EMPTY_COUNTS = { '👍': 0, '❤️': 0, '🎉': 0, '💡': 0, '👏': 0 };
+let useSessionReactionsMock = vi.fn(() => ({ counts: EMPTY_COUNTS, myReaction: null, loading: false }));
+vi.mock('../hooks/useSessionReactions.js', () => ({
+  useSessionReactions: (...args) => useSessionReactionsMock(...args),
+}));
+
 const fixtureConfig = {
   shortName: '[Fixture] LDC',
   timezone: 'America/Chicago',
@@ -90,6 +102,9 @@ beforeEach(() => {
     onNext([]);
     return () => {};
   });
+  setSessionReactionMock.mockReset();
+  useSessionReactionsMock.mockReset();
+  useSessionReactionsMock.mockReturnValue({ counts: EMPTY_COUNTS, myReaction: null, loading: false });
 });
 
 describe('SessionCard', () => {
@@ -308,8 +323,150 @@ describe('SessionCard', () => {
     expect(screen.getByText('2 materials')).not.toBeNull();
   });
 
-  it('the reactions pill stays hidden (no backend yet — TODO stub)', () => {
-    renderCard({ features: { sessionReactions: true } });
-    expect(screen.queryByText(/reaction/i)).toBeNull();
+  describe('reactions pill (features.sessionReactions)', () => {
+    it('renders nothing for a signed-out visitor when every count is zero', () => {
+      renderCard({ features: { sessionReactions: true }, auth: { user: null } });
+      expect(screen.queryByRole('group', { name: /session reactions/i })).toBeNull();
+    });
+
+    it('shows read-only counts to a signed-out visitor when a session has reactions', () => {
+      useSessionReactionsMock.mockReturnValue({
+        counts: { ...EMPTY_COUNTS, '👍': 3 },
+        myReaction: null,
+        loading: false,
+      });
+      renderCard({ features: { sessionReactions: true }, auth: { user: null } });
+      expect(screen.queryByRole('button', { name: /react with/i })).toBeNull();
+      expect(screen.getByRole('group', { name: /session reactions/i })).toHaveTextContent('3');
+    });
+
+    it('shows read-only counts for a signed-in user without attendee access', () => {
+      useSessionReactionsMock.mockReturnValue({
+        counts: { ...EMPTY_COUNTS, '👍': 1 },
+        myReaction: null,
+        loading: false,
+      });
+      renderCard({
+        features: { sessionReactions: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: false },
+      });
+      expect(screen.queryByRole('button', { name: /react with/i })).toBeNull();
+    });
+
+    it('an approved attendee can pick a reaction, optimistically', async () => {
+      setSessionReactionMock.mockResolvedValue({ emoji: '👍', counts: { ...EMPTY_COUNTS, '👍': 1 } });
+      renderCard({
+        features: { sessionReactions: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
+      });
+      const button = screen.getByRole('button', { name: /react with 👍/i });
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+      fireEvent.click(button);
+      // Optimistic: flips before the promise resolves.
+      expect(screen.getByRole('button', { name: /react with 👍/i })).toHaveAttribute('aria-pressed', 'true');
+      expect(setSessionReactionMock).toHaveBeenCalledWith({
+        user: { uid: 'u1' },
+        sessionId: 'fx-1',
+        emoji: '👍',
+      });
+    });
+
+    it('an already-reacted user with no override shows the correct count and stays selected', () => {
+      // Regression test for the optimistic-sentinel collision: `counts`
+      // already includes this user's own reaction (as the real aggregate
+      // would), so with no click in flight the displayed count must NOT be
+      // decremented, and the button must still read as pressed.
+      useSessionReactionsMock.mockReturnValue({
+        counts: { ...EMPTY_COUNTS, '👍': 1 },
+        myReaction: '👍',
+        loading: false,
+      });
+      renderCard({
+        features: { sessionReactions: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
+      });
+      const button = screen.getByRole('button', { name: /react with 👍/i });
+      expect(button).toHaveAttribute('aria-pressed', 'true');
+      expect(button).toHaveAccessibleName('React with 👍, 1');
+    });
+
+    it('clicking the reaction you already left clears it: unselects immediately and decrements exactly once', async () => {
+      useSessionReactionsMock.mockReturnValue({
+        counts: { ...EMPTY_COUNTS, '👍': 1 },
+        myReaction: '👍',
+        loading: false,
+      });
+      // Resolves only when told to, so the assertions below observe the
+      // OPTIMISTIC (pre-confirmation) state, not the post-confirmation one.
+      let resolveRequest;
+      setSessionReactionMock.mockReturnValue(
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+      );
+      renderCard({
+        features: { sessionReactions: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
+      });
+      const button = screen.getByRole('button', { name: /react with 👍/i });
+      expect(button).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(button);
+
+      // Optimistic clear: unselected, and the count drops from 1 to 0 —
+      // exactly once, not further on a stray re-render.
+      const clearedButton = screen.getByRole('button', { name: /^React with 👍$/i });
+      expect(clearedButton).toHaveAttribute('aria-pressed', 'false');
+      expect(clearedButton).toHaveAccessibleName('React with 👍');
+
+      expect(setSessionReactionMock).toHaveBeenCalledWith({
+        user: { uid: 'u1' },
+        sessionId: 'fx-1',
+        emoji: null,
+      });
+
+      // Drain the in-flight promise so it can't resolve into a later test.
+      resolveRequest({ emoji: null, counts: EMPTY_COUNTS });
+      await screen.findByRole('button', { name: /^React with 👍$/i });
+    });
+
+    it('reverts the optimistic pick when the request fails', async () => {
+      setSessionReactionMock.mockRejectedValue(new Error('The reaction could not be saved.'));
+      renderCard({
+        features: { sessionReactions: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /react with 👍/i }));
+      expect(await screen.findByRole('button', { name: /react with 👍/i })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent('The reaction could not be saved.');
+    });
+
+    it('resets the optimistic override when the signed-in identity changes', async () => {
+      setSessionReactionMock.mockResolvedValue({ emoji: '👍', counts: { ...EMPTY_COUNTS, '👍': 1 } });
+      const { rerenderCard } = renderCard({
+        features: { sessionReactions: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /react with 👍/i }));
+      await screen.findByRole('button', { name: /react with 👍.*1/i });
+
+      rerenderCard({
+        features: { sessionReactions: true },
+        auth: { user: { uid: 'u2' } },
+        profile: { attendeeAccess: true },
+      });
+      expect(await screen.findByRole('button', { name: /react with 👍$/i })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    });
   });
 });

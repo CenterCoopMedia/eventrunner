@@ -494,6 +494,28 @@ describe("users account documents (spec §3.4)", () => {
     );
   });
 
+  it("caps the badges list length even though rules cannot check ids against config/badges", async () => {
+    // Real per-event badge counts are nowhere near this; the cap exists only
+    // to bound the one write path that has no config to validate against.
+    const tooMany = Array.from({ length: 41 }, (_, i) => `badge-${i}`);
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), { badges: tooMany }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        badges: tooMany.slice(0, 40),
+      }),
+    );
+  });
+
+  it("denies a badges list with a duplicate id", async () => {
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        badges: ["writer", "writer"],
+      }),
+    );
+  });
+
   it("denies a move to public visibility while config/features.publicAttendeeProfiles is off", async () => {
     await setPublicProfilesFeature(false);
     await assertFails(
@@ -677,5 +699,108 @@ describe("sessionBookmarks aggregate", () => {
   it("denies all client writes, admin included", async () => {
     await assertFails(setDoc(doc(admin(), "sessionBookmarks/session-1"), { count: 99 }));
     await assertFails(setDoc(doc(nonAdmin(), "sessionBookmarks/session-1"), { count: 99 }));
+  });
+});
+
+// Issue #28: live-updates admin form + feedback inbox.
+describe("live_updates dashboard feed", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "live_updates/u1"), {
+        message: "Doors open at 9am.",
+        pinned: false,
+        postedAt: new Date(),
+      });
+    });
+  });
+
+  it("allows anyone, including anonymous, to read entries", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "live_updates/u1")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "live_updates/u1")));
+  });
+
+  it("denies all client writes, admin included — only saveLiveUpdate/deleteLiveUpdate (Admin SDK) write it", async () => {
+    await assertFails(setDoc(doc(admin(), "live_updates/u1"), { message: "hacked" }));
+    await assertFails(setDoc(doc(nonAdmin(), "live_updates/u1"), { message: "hacked" }));
+    await assertFails(deleteDoc(doc(admin(), "live_updates/u1")));
+  });
+});
+
+describe("feedback inbox", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "feedback/f1"), {
+        message: "The registration link 404s.",
+        email: null,
+        category: "bug",
+        status: "new",
+        createdAt: new Date(),
+      });
+    });
+  });
+
+  it("allows admin read of a submission but no one else", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "feedback/f1")));
+    await assertFails(getDoc(doc(nonAdmin(), "feedback/f1")));
+    await assertFails(getDoc(doc(anon(), "feedback/f1")));
+  });
+
+  it("denies all client writes, admin included — submitFeedback/updateFeedbackStatus (Admin SDK) write it", async () => {
+    await assertFails(setDoc(doc(anon(), "feedback/f2"), { message: "spam" }));
+    await assertFails(setDoc(doc(admin(), "feedback/f1"), { status: "reviewed" }));
+  });
+});
+
+describe("feedback_rate_limits stays deny-all", () => {
+  it("denies all access, admin included", async () => {
+    await assertFails(getDoc(doc(anon(), "feedback_rate_limits/h1")));
+    await assertFails(getDoc(doc(admin(), "feedback_rate_limits/h1")));
+    await assertFails(setDoc(doc(admin(), "feedback_rate_limits/h1"), { requests: [] }));
+  });
+});
+
+describe("sessionReactions aggregate", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sessionReactions/session-1"), {
+        counts: { "👍": 2, "❤️": 0, "🎉": 0, "💡": 0, "👏": 0 },
+      });
+    });
+  });
+
+  it("allows anyone, including anonymous, to read the aggregate counts", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "sessionReactions/session-1")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "sessionReactions/session-1")));
+  });
+
+  it("denies all client writes, admin included", async () => {
+    await assertFails(setDoc(doc(admin(), "sessionReactions/session-1"), { counts: {} }));
+    await assertFails(setDoc(doc(nonAdmin(), "sessionReactions/session-1"), { counts: {} }));
+  });
+});
+
+describe("the private sessionReactions/{sessionId}/users dedup subcollection", () => {
+  it("allows a user to read their own reaction doc, denies everyone else", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sessionReactions/session-1/users/attendee-1"), {
+        emoji: "👍",
+        reactedAt: new Date(),
+      });
+    });
+    await assertSucceeds(getDoc(doc(nonAdmin(), "sessionReactions/session-1/users/attendee-1")));
+    await assertFails(getDoc(doc(anon(), "sessionReactions/session-1/users/attendee-1")));
+    const other = testEnv
+      .authenticatedContext("attendee-2", { email: "other@example.com", email_verified: true })
+      .firestore();
+    await assertFails(getDoc(doc(other, "sessionReactions/session-1/users/attendee-1")));
+  });
+
+  it("denies all client writes to the reaction dedup subcollection, owner included", async () => {
+    await assertFails(
+      setDoc(doc(nonAdmin(), "sessionReactions/session-1/users/attendee-1"), {
+        emoji: "👍",
+        reactedAt: new Date(),
+      }),
+    );
   });
 });

@@ -19,6 +19,8 @@ import SessionDetail from './pages/SessionDetail.jsx';
 import MySchedule from './pages/MySchedule.jsx';
 import Speakers from './pages/Speakers.jsx';
 import Sponsors from './pages/Sponsors.jsx';
+import Updates from './pages/Updates.jsx';
+import UpdateDetail from './pages/UpdateDetail.jsx';
 import ContentPage from './pages/ContentPage.jsx';
 import Login from './pages/Login.jsx';
 import AdminApp from './admin/AdminApp.jsx';
@@ -42,6 +44,8 @@ export function AppRoutes() {
         <Route path="schedule/:sessionId" element={<SessionDetail />} />
         <Route path="speakers" element={<Speakers />} />
         <Route path="sponsors" element={<Sponsors />} />
+        <Route path="updates" element={<Updates />} />
+        <Route path="updates/:id" element={<UpdateDetail />} />
         <Route path="signin" element={<Login />} />
         <Route path="profile" element={<Profile />} />
         <Route path="attendees" element={<Attendees />} />

@@ -8,6 +8,7 @@ const {
   createCmsUpdateContentHandler,
   createCmsDeleteContentHandler,
   createGetSiteContentHandler,
+  DELETE_FIELD_SENTINEL,
   internals,
 } = require('./content.cjs');
 const { makeFakeDb } = require('./firestoreFake.cjs');
@@ -256,6 +257,53 @@ test('cmsUpdateContent merges fields onto the existing draft; live stays untouch
   assert.equal(draft.basedOnRevision, 2);
   assert.equal(db.read('cmsContent', 'hero__title').value, 'live');
   assert.equal(db.writes.some((w) => w.path.startsWith('cmsContent/')), false);
+});
+
+test('cmsUpdateContent drops a field explicitly marked with DELETE_FIELD_SENTINEL', async () => {
+  // A cmsContent block switching type (apps/web/src/admin) needs to clear
+  // the OLD type's now-irrelevant fields, which the merge-onto-the-prior-
+  // draft semantics above would otherwise strand on the doc forever.
+  const db = makeFakeDb({
+    'cmsContent_drafts/faq__q1': {
+      question: 'keep', answer: 'stale-answer', section: 'faq', field: 'q1',
+      visible: true, status: 'clean', basedOnRevision: 2,
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({
+      body: {
+        section: 'faq',
+        field: 'q1',
+        fields: { blockType: 'text', value: 'now text', answer: DELETE_FIELD_SENTINEL },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  const draft = db.read('cmsContent_drafts', 'faq__q1');
+  assert.equal(draft.value, 'now text');
+  assert.equal(draft.question, 'keep'); // unspecified fields still survive
+  assert.equal('answer' in draft, false); // explicitly cleared, not merely nulled
+});
+
+test('cmsCreateContent also honors DELETE_FIELD_SENTINEL (defensive; no base to strand)', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        section: 'hero',
+        field: 'title',
+        fields: { value: 'Welcome', extra: DELETE_FIELD_SENTINEL },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  const draft = db.read('cmsContent_drafts', 'hero__title');
+  assert.equal(draft.value, 'Welcome');
+  assert.equal('extra' in draft, false);
 });
 
 test('cmsUpdateContent forks a draft from the live doc when only the live doc exists', async () => {

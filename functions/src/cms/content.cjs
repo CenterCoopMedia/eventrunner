@@ -38,6 +38,36 @@ const { deleteMaterialsForSession } = require('../materials/store.cjs');
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 /**
+ * Sentinel value a caller may set on a `fields` key to explicitly drop that
+ * key from the merged result — see omitDeletedFields. cmsUpdateContent
+ * merges its submitted `fields` ONTO the prior draft/live doc's fields (so a
+ * partial edit does not have to resend every field), which otherwise has no
+ * way to ever remove a key: switching a cmsContent block's type client-side
+ * (apps/web/src/admin) leaves the old type's now-irrelevant value fields
+ * (e.g. an faq_item's `answer`) stranded on the doc forever. A caller that
+ * knows a key should disappear sets it to this sentinel instead of a real
+ * value.
+ */
+const DELETE_FIELD_SENTINEL = '__cms_delete_field__';
+
+/**
+ * Drop every key in `fields` whose value is DELETE_FIELD_SENTINEL. Applied
+ * to the fully-merged field set right before it is written, so a caller can
+ * clear a stale key from the prior doc even though the merge above
+ * otherwise preserves anything it does not mention.
+ *
+ * @param {object} fields
+ * @returns {object}
+ */
+function omitDeletedFields(fields) {
+  const out = {};
+  for (const [key, value] of Object.entries(fields || {})) {
+    if (value !== DELETE_FIELD_SENTINEL) out[key] = value;
+  }
+  return out;
+}
+
+/**
  * The publishable collections these generic endpoints may write. cmsPages
  * and cmsUpdates are deliberately EXCLUDED: their drafts must go through
  * cmsSavePage / cmsSaveUpdate (and cmsDeletePage / cmsDeleteUpdate), whose
@@ -150,7 +180,7 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
         db,
         collection,
         docId,
-        fields: { ...checked.fields, ...extraFields },
+        fields: omitDeletedFields({ ...checked.fields, ...extraFields }),
         visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
         actor,
         now,
@@ -196,7 +226,7 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
       db,
       collection,
       docId,
-      fields: { ...base, ...checked.fields, ...extraFields },
+      fields: omitDeletedFields({ ...base, ...checked.fields, ...extraFields }),
       visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
       actor,
       now,
@@ -313,8 +343,20 @@ module.exports = {
   createCmsUpdateContentHandler,
   createCmsDeleteContentHandler,
   createGetSiteContentHandler,
+  // Mirrored client-side by apps/web/src/admin/contentDoc.js
+  // (DELETE_FIELD_SENTINEL) — see the constant's own doc comment above for
+  // why a caller needs it at all. A parity test on the web side keeps the
+  // two literals from drifting.
+  DELETE_FIELD_SENTINEL,
   get handlers() {
     return buildHandlers();
   },
-  internals: { resolveTarget, validateFields, isValidDocId, SECTION_FIELD_RE, GENERIC_COLLECTIONS },
+  internals: {
+    resolveTarget,
+    validateFields,
+    isValidDocId,
+    SECTION_FIELD_RE,
+    GENERIC_COLLECTIONS,
+    omitDeletedFields,
+  },
 };

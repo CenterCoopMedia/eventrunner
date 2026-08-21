@@ -7,10 +7,10 @@
 // for "this person is here but has a private profile".
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { validateBadgeSelection } from 'shared/badges';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { fetchPublicProfile } from '../lib/profileSource.js';
+import { badgeLabel, visibleBadgeIds } from '../lib/badgeDisplay.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
@@ -21,19 +21,6 @@ import ProfileSidebar from '../components/ProfileSidebar.jsx';
  */
 function text(value) {
   return typeof value === 'string' ? value : '';
-}
-
-/** config/badges label lookup for an id already known to be configured. */
-function badgeLabel(badgesConfig, badgeId) {
-  const categories = Array.isArray(badgesConfig?.categories) ? badgesConfig.categories : [];
-  for (const category of categories) {
-    for (const badge of Array.isArray(category?.badges) ? category.badges : []) {
-      if (badge?.id === badgeId) {
-        return typeof badge.label === 'string' && badge.label ? badge.label : badgeId;
-      }
-    }
-  }
-  return badgeId;
 }
 
 export default function AttendeeProfile() {
@@ -102,10 +89,7 @@ export default function AttendeeProfile() {
   // the same validator the projection uses means a removed badge stops
   // being shown the moment the config changes. (The stored projection is
   // still stale — see the reprojection note in the PR.)
-  const badges = validateBadgeSelection(
-    Array.isArray(profile.badges) ? profile.badges : [],
-    badgesConfig,
-  ).valid;
+  const badges = visibleBadgeIds(profile.badges, badgesConfig);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
