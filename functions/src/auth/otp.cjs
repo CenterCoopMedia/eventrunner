@@ -97,6 +97,13 @@ function createSendOtpHandler({ db, sendEmail, getConfig, notifyOperator, now = 
           templateId: 'auth.otp',
           errors: rendered.overrideErrors,
           resolved: false,
+          // Alerted inline right below, unconditionally on write success —
+          // stamped here so the collection-wide onSystemErrorCreated
+          // trigger (functions/src/telemetry/systemErrors.cjs) treats this
+          // row as already-notified and does not fire a second, inferior
+          // OperatorEvent for it (that row has no `message` field, so a
+          // trigger-driven alert would just read "(no message)").
+          alertedAt: new Date(now()),
           createdAt: new Date(now()),
         });
       } catch (err) {

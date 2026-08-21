@@ -166,6 +166,10 @@ test('a broken auth.otp override falls back to the default and notifies the oper
   const errorRows = [...db.store.entries()].filter(([k]) => k.startsWith('system_errors/'));
   assert.equal(errorRows.length, 1);
   assert.equal(errorRows[0][1].templateId, 'auth.otp');
+  // alertedAt is stamped at creation, since this path notifies inline right
+  // here — the collection-wide onSystemErrorCreated trigger must see this
+  // row as already-alerted and skip it, not fire a second (inferior) alert.
+  assert.ok(errorRows[0][1].alertedAt instanceof Date);
   // Deduplicated: a second request against the same broken override must
   // not mint another durable row (this runs before the rate limit).
   await handler({ method: 'POST', body: { email: 'b@example.org' } }, fakeRes());
