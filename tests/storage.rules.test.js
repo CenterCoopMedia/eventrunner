@@ -3,9 +3,13 @@
 //
 //   • `profile-photos/{uid}/**` is the ONLY client-writable namespace, and
 //     only for its owner, only for an image, only under 2 MiB;
-//   • `cms-images/`, `branding/`, and `speaker-photos/` are read-only to
-//     every client — their writers are admin-gated functions using the
-//     Admin SDK, which bypasses these rules;
+//   • `cms-images/`, `branding/`, and `speaker-photos/` are fetchable but
+//     never writable by a client — their writers are admin-gated functions
+//     using the Admin SDK, which bypasses these rules;
+//   • reads are `get` only: no namespace grants `list`, so no client can
+//     enumerate the bucket and read back assets that only unpublished
+//     drafts reference (the leak firestore.rules keeps `media_assets`
+//     admin-only to prevent);
 //   • `session-materials/` is closed on both verbs (embargo is a per-request
 //     decision, not a static grant);
 //   • everything else is denied by the catch-all.
@@ -21,7 +25,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { deleteObject, getBytes, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, getBytes, listAll, ref, uploadBytes } from "firebase/storage";
 
 const OWNER = "attendee-1";
 const OTHER = "attendee-2";
@@ -228,6 +232,35 @@ describe("exports — readable output, never client-written", () => {
     await assertFails(
       put(asUser(OTHER), "exports/schedule.pdf", { contentType: "application/pdf" }),
     );
+  });
+});
+
+// `get` is what rendering needs (fetch THIS object by its known path);
+// `list` is enumeration and is granted nowhere. Both the namespace root and
+// a nested prefix are pinned: a rule that granted list at one depth and not
+// the other would still be an enumeration hole.
+describe("no namespace grants list — enumeration is denied everywhere", () => {
+  for (const prefix of [
+    "cms-images",
+    "cms-images/asset-1",
+    "branding",
+    "speaker-photos",
+    `profile-photos/${OWNER}`,
+    "exports",
+  ]) {
+    it(`denies an anonymous listing of ${prefix}`, async () => {
+      await assertFails(listAll(ref(anon(), prefix)));
+    });
+
+    it(`denies an authenticated listing of ${prefix}`, async () => {
+      await assertFails(listAll(ref(asUser(OTHER), prefix)));
+    });
+  }
+
+  it("still allows the owner to fetch their own photo by path", async () => {
+    // The counterpart the list denial must not break: get is what the site
+    // actually uses, and it still works for everyone.
+    await assertSucceeds(getBytes(ref(asUser(OWNER), `profile-photos/${OWNER}/avatar.png`)));
   });
 });
 

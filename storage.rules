@@ -11,10 +11,22 @@ rules_version = '2';
 // Admin SDK — which bypasses these rules by design. The role check is a
 // verified token on the server, never a React conditional (§8.5).
 //
-// Reads are deliberately permissive on the public asset namespaces
-// (branding, CMS images, speaker and profile photos, the exported schedule
-// PDF): they are rendered by an anonymously readable site, and an object
-// that needs a token to load is an object the public site cannot show.
+// Reads are split into `get` and `list`, and only `get` is granted. Public
+// rendering needs exactly one thing — fetch THIS object by its known path —
+// and the site knows those paths from Firestore. `list` is the enumeration
+// verb, and granting it would let any visitor walk `cms-images/` and read
+// back every asset the event has ever uploaded, including files referenced
+// only by unpublished drafts: precisely the leak that keeps the
+// `media_assets` index admin-only in firestore.rules. Nothing in the product
+// calls listAll(); the library lists Firestore rows, never the bucket.
+//
+// `get` is deliberately permissive on the public asset namespaces (branding,
+// CMS images, speaker and profile photos, the exported schedule PDF): they
+// are rendered by an anonymously readable site, and an object that needs a
+// credential to load is an object the public site cannot show. The web app
+// builds token-free download URLs (apps/web/src/lib/mediaSource.js), so
+// these rules — not an unrevocable download token — are what decide who can
+// fetch an object.
 // `session-materials/` is the exception — it stays fully closed at the rules
 // layer because materials access is an embargo decision made per request by
 // functions/src/materials/access.cjs (§4.4), not a static grant.
@@ -61,7 +73,8 @@ service firebase.storage {
     // evaluate false and lock an owner out of removing their own photo. The
     // grant is the same principal and the same object either way.
     match /profile-photos/{userId}/{allPaths=**} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow write: if isOwner(userId)
         && underSizeLimit(2 * 1024 * 1024)
         && isAllowedImage();
@@ -75,7 +88,8 @@ service firebase.storage {
     // live in these rules. The rule is defined now so the namespace is
     // closed before its writer exists, rather than after.
     match /speaker-photos/{speakerId}/{allPaths=**} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow write, delete: if false;   // via updateSpeakerProfile (Admin SDK)
     }
 
@@ -84,12 +98,14 @@ service firebase.storage {
     // server side; init seeds `branding/` through the Admin SDK as well
     // (scripts/lib/branding.cjs).
     match /cms-images/{allPaths=**} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow write, delete: if false;   // via mediaUpload / mediaDelete
     }
 
     match /branding/{allPaths=**} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow write, delete: if false;   // via mediaUpload / mediaDelete
     }
 
@@ -105,7 +121,8 @@ service firebase.storage {
     // Generated artifacts (the schedule PDF, §9): world-readable output of
     // generateSchedulePdf, never client-written.
     match /exports/{allPaths=**} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow write, delete: if false;
     }
 
