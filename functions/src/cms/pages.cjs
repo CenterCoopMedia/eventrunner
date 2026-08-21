@@ -6,7 +6,10 @@
  *   cmsSavePage   POST { page } — validate the cmsPages doc shape and write
  *                 the DRAFT revision only (cmsPages_drafts, status 'dirty');
  *                 refuses to flip systemPage true -> false so the delete
- *                 guard below cannot be laundered via save -> publish.
+ *                 guard below cannot be laundered via save -> publish; a
+ *                 generic page's `path` must be root-level, normalized, not
+ *                 reserved (shared/routing, issue #52), and not already
+ *                 claimed by another page (draft or live).
  *   cmsDeletePage POST { id }   — remove live + draft in one batch; refuses
  *                 to delete a systemPage (those own a dedicated React route;
  *                 deleting the doc would strand the route's content).
@@ -28,12 +31,16 @@
 const { isKnownBlockType } = require('./blockTypes.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } = require('../core/errors.cjs');
+const { isReservedPathSegment } = require('shared/routing');
 
 const PAGES_COLLECTION = 'cmsPages';
 const PAGES_DRAFTS = 'cmsPages_drafts';
 
 /** Doc ids are URL-path and Firestore-path safe; no slashes, no dots. */
 const DOC_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** One normalized path segment: lowercase slug, no leading/trailing hyphen. */
+const PATH_SEGMENT_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** Keys a cmsPages doc may carry — anything else is rejected by name. */
 const PAGE_KEYS = Object.freeze(['id', 'label', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections']);
@@ -66,6 +73,32 @@ function validatePageDoc(doc) {
   if (!isNonEmptyString(doc.label)) errors.push('label: must be a non-empty string');
   if (!isNonEmptyString(doc.path) || !doc.path.startsWith('/')) {
     errors.push("path: must be a string starting with '/'");
+  } else if (doc.path === '/') {
+    // '/' is the home page's route (index route in App.jsx) — reserved for
+    // the systemPage that owns it, never assignable to a generic page.
+    if (doc.systemPage !== true) {
+      errors.push("path: '/' is reserved for the home page");
+    }
+  } else if (doc.path.endsWith('/')) {
+    errors.push('path: must not end with a trailing slash');
+  } else if (doc.path.includes('//')) {
+    errors.push('path: must not contain empty segments (//)');
+  } else {
+    const segments = doc.path.slice(1).split('/');
+    segments.forEach((segment) => {
+      if (!PATH_SEGMENT_RE.test(segment)) {
+        errors.push(
+          `path: segment '${segment}' must be lowercase letters, digits, and hyphens, with no leading or trailing hyphen`,
+        );
+      }
+    });
+    // Reserved first-segment collision (issue #52): every statically
+    // mounted App.jsx route (plus the retired /p/ prefix) owns its first
+    // segment. System pages ARE those routes, so they're exempt — this
+    // only blocks a generic page from claiming one.
+    if (doc.systemPage !== true && isReservedPathSegment(segments[0])) {
+      errors.push(`path: '${segments[0]}' is a reserved route and cannot be used by a page`);
+    }
   }
   if (doc.icon !== null && !isNonEmptyString(doc.icon)) {
     errors.push('icon: must be a non-empty string or null');
@@ -194,6 +227,25 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
       if (isSystem) {
         return forbidden(res, 'systemPage: a system page cannot be changed into a regular page.');
       }
+    }
+
+    // Path uniqueness (issue #52): Firestore has no unique index, so this is
+    // an application-level check — scan both revisions for any OTHER page
+    // id already claiming this exact path. Draft AND live are checked: a
+    // collision with an unpublished draft is just as real to an admin about
+    // to save as one already live.
+    try {
+      const [draftPathSnap, livePathSnap] = await Promise.all([
+        db.collection(PAGES_DRAFTS).where('path', '==', page.path).get(),
+        db.collection(PAGES_COLLECTION).where('path', '==', page.path).get(),
+      ]);
+      const collision = [...draftPathSnap.docs, ...livePathSnap.docs].find((doc) => doc.id !== page.id);
+      if (collision) {
+        return badRequest(res, `path: '${page.path}' is already used by page '${collision.id}'`);
+      }
+    } catch (err) {
+      log.error('cmsSavePage path uniqueness check failed', err);
+      return internal(res, 'The page could not be saved.');
     }
 
     try {

@@ -13,7 +13,7 @@
     "build": "npm run build -w apps/web",
     "lint": "eslint .",
     "prepare:functions": "node scripts/prepare-functions.cjs",
-    "test": "node --test \"packages/shared/src/**/*.test.cjs\" \"functions/src/**/*.test.cjs\"",
+    "test": "node --test \"packages/shared/src/**/*.test.cjs\" \"functions/src/**/*.test.cjs\" \"scripts/**/*.test.cjs\"",
     "test:web": "npm run test -w apps/web",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-run-of-show \"vitest run --config vitest.rules.config.js\""
   },

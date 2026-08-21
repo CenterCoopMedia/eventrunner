@@ -24,7 +24,7 @@ the committed **synthetic snapshot** in `src/generated/`:
 | `eventConfig.js` | event identity, dates, features, badges |
 | `theme.css` | `:root` custom properties — brand/semantic colors as space-separated RGB triples, font stacks, radius, texture |
 | `siteContent.js` | published CMS blocks/sections |
-| `pagesData.js` | pages-as-data (`/p/:slug`) |
+| `pagesData.js` | pages-as-data, routed at each page's own root-level `path` |
 | `scheduleData.js` | schedule days/sessions |
 | `organizationsData.js` | speakers/sponsors |
 
@@ -37,8 +37,10 @@ EventConfigProvider          — subscribes to config/{event,features,theme,badg
     ProfileProvider           — subscribes to the signed-in user's own users/{uid}
       ContentProvider         — subscribes to published (or draft) CMS collections
         ToastProvider
-          <Routes>             — Home, Schedule, Speakers, Sponsors, /p/:slug,
-                                 /signin, /profile, /attendees, /attendees/:uid, 404
+          <Routes>             — Home, Schedule (/schedule, /schedule/mine,
+                                 /schedule/:sessionId), Speakers, Sponsors,
+                                 /signin, /profile, /attendees,
+                                 /attendees/:uid, catch-all (cmsPages)
 ```
 
 `EventConfigProvider` also writes a runtime `<style id="event-theme-runtime">`

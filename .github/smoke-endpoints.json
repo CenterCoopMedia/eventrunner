@@ -1,0 +1,24 @@
+{
+  "$comment": "Reviewed with the code that adds an HTTP export (spec §8.1, §1.3). Every deployable onRequest function name from functions/index.js's export barrel belongs here — the deploy-client.yml smoke job OPTIONS-preflights each one against https://{region}-{projectId}.cloudfunctions.net after a hosting deploy. Add a name here in the same PR that adds the export.",
+  "endpoints": [
+    "getSiteContent",
+    "sendOtpCode",
+    "verifyOtpCode",
+    "cmsCreateContent",
+    "cmsUpdateContent",
+    "cmsDeleteContent",
+    "cmsGetVersionHistory",
+    "cmsSavePage",
+    "cmsDeletePage",
+    "cmsPublish",
+    "cmsGetPublishQueue",
+    "cmsUpdatePublishStatus",
+    "cmsSaveUpdate",
+    "cmsDeleteUpdate",
+    "updateEventConfig",
+    "updateFeatures",
+    "updateTheme",
+    "updateBadges",
+    "emailDeliveryWebhook"
+  ]
+}

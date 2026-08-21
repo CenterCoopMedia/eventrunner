@@ -1,26 +1,35 @@
 // GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.4, §8.6).
 //
-// scripts/generate-content.cjs regenerates this from config/event +
-// config/features at deploy time (out-of-tree via GENERATED_DIR). This
-// committed copy is a fictional demo event — never a real organization's
-// name, city, or dates. config/bootstrap is never emitted here.
+// Regenerate with:  node scripts/generate-content.cjs --demo
+// At deploy time the same script reads config/event + config/features from
+// the project and writes out-of-tree (--out / GENERATED_DIR), so this
+// committed copy — a fictional demo event, never a real organization name,
+// city, or dates — is what CI builds from. config/bootstrap is never
+// emitted here (§2.4).
 
 export const eventConfig = {
   name: '[Demo] Harborlight Media Summit',
   shortName: 'DEMO-SUMMIT',
-  tagline: '[Replace] A two-day gathering for people who make community media work.',
+  tagline: '[Replace] A three-day gathering for people who make community media work.',
   timezone: 'America/New_York',
   days: [
     {
       id: 'day-1',
       label: 'Day one',
-      date: '2026-10-15',
+      date: '2026-10-14',
       startTime: '09:00',
       endTime: '17:00',
     },
     {
       id: 'day-2',
       label: 'Day two',
+      date: '2026-10-15',
+      startTime: '09:00',
+      endTime: '17:00',
+    },
+    {
+      id: 'day-3',
+      label: 'Day three',
       date: '2026-10-16',
       startTime: '09:00',
       endTime: '16:00',
@@ -65,7 +74,13 @@ export const eventConfig = {
     description: '[Replace] One-sentence description of the event for search and social cards.',
     defaultOgImagePath: 'branding/og-default.svg',
     organizerName: '[Demo] Harborlight Cooperative',
-    organizerUrl: null,
+    organizerUrl: 'https://example.org',
+  },
+  auth: {
+    googleProviderEnabled: false,
+    authorizedDomainsConfigured: false,
+    attestedAt: null,
+    attestedBy: null,
   },
 };
 
@@ -88,7 +103,11 @@ export const features = {
 };
 
 export const theme = {
-  fonts: { heading: 'serif-editorial', body: 'sans-humanist', accent: 'script-casual' },
+  fonts: {
+    heading: 'serif-editorial',
+    body: 'sans-humanist',
+    accent: 'script-casual',
+  },
   texture: 'paper',
   radius: 'soft',
   logos: {

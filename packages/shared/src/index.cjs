@@ -14,4 +14,5 @@ module.exports = {
   ...require('./profile.cjs'),
   ...require('./slug.cjs'),
   ...require('./urlSafety.cjs'),
+  ...require('./routing.cjs'),
 };
