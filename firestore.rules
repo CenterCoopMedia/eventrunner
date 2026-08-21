@@ -104,6 +104,30 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Attendee profile + private bookmark membership (spec §4.1, §9). Every
+    // WRITE goes through the Admin SDK (bookmarkSession, functions/src/
+    // schedule/bookmarks.cjs) — the client only ever reads its own docs, so
+    // the "my schedule" view can subscribe directly instead of polling a
+    // callable. No user-lifecycle writer exists yet in this codebase (issue
+    // #17), so `users/{uid}` is unpopulated in practice — this rule is
+    // still correct once it lands.
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+
+      match /bookmarks/{sessionId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+    }
+
+    // Aggregate bookmark counts (spec §4.1) — a plain number per session,
+    // harmless to read publicly; only bookmarkSession (Admin SDK) writes it.
+    match /sessionBookmarks/{sessionId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Server-only collections, named explicitly so a future edit cannot
     // open them by accident via a broader match.
     match /auth_challenges/{docId} { allow read, write: if false; }

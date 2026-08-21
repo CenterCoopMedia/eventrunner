@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { verifyAuthToken, requireAdmin, internals } = require('./auth.cjs');
+const { verifyAuthToken, requireAdmin, requireAttendeeAccess, internals } = require('./auth.cjs');
 
 /** Minimal request fake: headers only, no Express methods. */
 function reqWithAuth(value) {
@@ -131,4 +131,95 @@ test('requireAdmin: missing bootstrap doc or malformed adminEmails → 403, no t
     assert.equal(verdict.ok, false);
     assert.equal(verdict.status, 403);
   }
+});
+
+// -------------------------------------------------------- requireAttendeeAccess
+
+/** Fake `users` collection reader: db.collection('users').doc(uid).get(). */
+function fakeUsersDb(profiles) {
+  return {
+    collection(name) {
+      assert.equal(name, 'users');
+      return {
+        doc(uid) {
+          return {
+            async get() {
+              const data = profiles[uid];
+              return { exists: data !== undefined, data: () => data };
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+const ATTENDEE_TOKEN = { uid: 'u9', email: 'attendee@example.org', email_verified: true };
+
+test('requireAttendeeAccess: no token → 401', async () => {
+  const verdict = await requireAttendeeAccess(
+    { auth: fakeAuth({}), db: fakeUsersDb({}) },
+    reqWithAuth(undefined),
+  );
+  assert.deepEqual(
+    { ok: verdict.ok, status: verdict.status, code: verdict.code },
+    { ok: false, status: 401, code: 'unauthorized' },
+  );
+});
+
+test('requireAttendeeAccess: no users/{uid} doc (v1 has no lifecycle writer yet) → 403, no throw', async () => {
+  const verdict = await requireAttendeeAccess(
+    { auth: fakeAuth({ good: ATTENDEE_TOKEN }), db: fakeUsersDb({}) },
+    reqWithAuth('Bearer good'),
+  );
+  assert.deepEqual(
+    { ok: verdict.ok, status: verdict.status, code: verdict.code },
+    { ok: false, status: 403, code: 'forbidden' },
+  );
+});
+
+test('requireAttendeeAccess: registrationStatus pending → 403', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'pending' } }),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
+});
+
+test('requireAttendeeAccess: registrationStatus approved → ok', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'approved' } }),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org' });
+});
+
+test('requireAttendeeAccess: a linked speaker profile grants access even when pending', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'pending', speakerId: 'spk-1' } }),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, true);
+});
+
+test('requireAttendeeAccess: revoked attendee is denied', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'revoked' } }),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
 });

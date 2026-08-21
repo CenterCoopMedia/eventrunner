@@ -204,10 +204,67 @@ describe("server-only collections stay deny-all", () => {
   }
 
   it("denies unmatched collections (catch-all)", async () => {
-    await assertFails(getDoc(doc(anon(), "users/attendee-1")));
+    await assertFails(getDoc(doc(anon(), "some_unmatched_collection/x")));
     await assertFails(
-      setDoc(doc(nonAdmin(), "users/attendee-1"), { name: "x" }),
+      setDoc(doc(nonAdmin(), "some_unmatched_collection/x"), { name: "x" }),
     );
-    await assertFails(setDoc(doc(admin(), "users/attendee-1"), { name: "x" }));
+    await assertFails(
+      setDoc(doc(admin(), "some_unmatched_collection/x"), { name: "x" }),
+    );
+  });
+});
+
+describe("users/{uid} and the private bookmarks subcollection", () => {
+  it("allows a user to read their own profile doc, denies everyone else", async () => {
+    await assertSucceeds(getDoc(doc(nonAdmin(), "users/attendee-1")));
+    await assertFails(getDoc(doc(anon(), "users/attendee-1")));
+    // A different signed-in user, not the owner.
+    const other = testEnv
+      .authenticatedContext("attendee-2", { email: "other@example.com", email_verified: true })
+      .firestore();
+    await assertFails(getDoc(doc(other, "users/attendee-1")));
+  });
+
+  it("denies all client writes to users/{uid}, owner included", async () => {
+    await assertFails(setDoc(doc(nonAdmin(), "users/attendee-1"), { registrationStatus: "approved" }));
+    await assertFails(setDoc(doc(admin(), "users/attendee-1"), { registrationStatus: "approved" }));
+  });
+
+  it("allows a user to read their own bookmark membership docs, denies everyone else", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users/attendee-1/bookmarks/session-1"), {
+        bookmarkedAt: new Date(),
+      });
+    });
+    await assertSucceeds(getDoc(doc(nonAdmin(), "users/attendee-1/bookmarks/session-1")));
+    await assertFails(getDoc(doc(anon(), "users/attendee-1/bookmarks/session-1")));
+    const other = testEnv
+      .authenticatedContext("attendee-2", { email: "other@example.com", email_verified: true })
+      .firestore();
+    await assertFails(getDoc(doc(other, "users/attendee-1/bookmarks/session-1")));
+  });
+
+  it("denies all client writes to the bookmarks subcollection, owner included", async () => {
+    await assertFails(
+      setDoc(doc(nonAdmin(), "users/attendee-1/bookmarks/session-1"), { bookmarkedAt: new Date() }),
+    );
+  });
+});
+
+describe("sessionBookmarks aggregate", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sessionBookmarks/session-1"), { count: 3 });
+    });
+  });
+
+  it("allows anyone, including anonymous, to read the aggregate count", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "sessionBookmarks/session-1")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "sessionBookmarks/session-1")));
+  });
+
+  it("denies all client writes, admin included", async () => {
+    await assertFails(setDoc(doc(admin(), "sessionBookmarks/session-1"), { count: 99 }));
+    await assertFails(setDoc(doc(nonAdmin(), "sessionBookmarks/session-1"), { count: 99 }));
   });
 });

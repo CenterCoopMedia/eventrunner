@@ -15,6 +15,8 @@
  * getConfig) propagate.
  */
 
+const { hasAttendeeAccess } = require('shared/registration');
+
 const BEARER_RE = /^Bearer\s+(\S+)$/i;
 
 /**
@@ -95,8 +97,54 @@ async function requireAdmin({ auth, getConfig }, req) {
   return { ok: true, uid: decoded.uid, email };
 }
 
+/**
+ * Attendee-access gate for endpoints spec §3.4 calls out by name (bookmarks
+ * today; materials/reactions land on the same helper as they're built) —
+ * "the predicate is not an authorization boundary, the rules are", but a
+ * server handler still needs SOME check before it writes, and every such
+ * handler must use the SAME one so a future tightening (issue #17: speaker
+ * profile linking, ticket-derived entitlement, admin role source) only
+ * has one call site to change.
+ *
+ * NOTE: v1 has no user-lifecycle writer yet (`users/{uid}` is never
+ * created by anything in this codebase today), so in practice this reads a
+ * document that does not exist and denies everyone until that lands —
+ * expected, not a bug: `hasAttendeeAccess` on an empty profile is false by
+ * construction (packages/shared/src/registration.cjs), so the gate fails
+ * closed rather than silently granting access.
+ *
+ * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
+ *           db: FirebaseFirestore.Firestore }} deps
+ * @param {object} req
+ * @returns {Promise<{ ok: true, uid: string, email: string|null } |
+ *                    { ok: false, status: 401|403, code: string, message: string }>}
+ */
+async function requireAttendeeAccess({ auth, db }, req) {
+  const decoded = await verifyAuthToken({ auth }, req);
+  if (!decoded?.uid) {
+    return { ok: false, status: 401, code: 'unauthorized', message: 'Authentication required.' };
+  }
+  const snap = await db.collection('users').doc(decoded.uid).get();
+  const data = snap.exists ? snap.data() : null;
+  const profile = {
+    registrationStatus: data?.registrationStatus,
+    speakerId: data?.speakerId ?? null,
+    role: data?.role,
+  };
+  if (!hasAttendeeAccess(profile)) {
+    return {
+      ok: false,
+      status: 403,
+      code: 'forbidden',
+      message: 'Attendee access required.',
+    };
+  }
+  return { ok: true, uid: decoded.uid, email: typeof decoded.email === 'string' ? decoded.email : null };
+}
+
 module.exports = {
   verifyAuthToken,
   requireAdmin,
+  requireAttendeeAccess,
   internals: { extractBearerToken },
 };
