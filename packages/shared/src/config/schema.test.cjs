@@ -83,6 +83,43 @@ test('validateEventConfig rejects days[] dates that are not strictly ascending',
   assert.ok(duplicateDate.errors.some((e) => e.includes('strictly ascending')));
 });
 
+test('validateEventConfig rejects calendar dates Date.UTC would silently normalize', () => {
+  // 2027-02-30 does not exist; Date.UTC(2027, 1, 30) rolls it forward into
+  // March instead of throwing, so the schema must round-trip the components
+  // itself rather than trust the format regex alone.
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    days: [{ id: 'day-1', date: '2027-02-30', startTime: '09:00', endTime: '17:00' }],
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes('days[0].date')));
+
+  // A real leap day is still accepted.
+  const leapDay = validateEventConfig({
+    ...VALID_EVENT,
+    days: [{ id: 'day-1', date: '2028-02-29', startTime: '09:00', endTime: '17:00' }],
+  });
+  assert.equal(leapDay.ok, true);
+
+  // Feb 29 in a non-leap year does not exist.
+  const nonLeapDay = validateEventConfig({
+    ...VALID_EVENT,
+    days: [{ id: 'day-1', date: '2027-02-29', startTime: '09:00', endTime: '17:00' }],
+  });
+  assert.equal(nonLeapDay.ok, false);
+});
+
+test('validateEventConfig: tagline must be a string when present, but is optional', () => {
+  assert.equal(validateEventConfig({ ...VALID_EVENT, tagline: 'A gathering' }).ok, true);
+  assert.equal(validateEventConfig({ ...VALID_EVENT, tagline: undefined }).ok, true);
+
+  for (const tagline of [{ unexpected: 'object' }, 42, ['a'], false]) {
+    const result = validateEventConfig({ ...VALID_EVENT, tagline });
+    assert.equal(result.ok, false, JSON.stringify(tagline));
+    assert.ok(result.errors.some((e) => e.startsWith('tagline:')));
+  }
+});
+
 test('validateEventConfig requires a usable sender (the OTP From address)', () => {
   for (const sender of [undefined, null, 'x', []]) {
     const result = validateEventConfig({ ...VALID_EVENT, sender });
