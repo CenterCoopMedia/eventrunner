@@ -55,6 +55,33 @@ const RUNTIME_COLLECTIONS = [
 
 const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
 
+// cmsOrganizations is written through the generic content endpoint
+// (functions/src/cms/content.cjs), which only rejects reserved field
+// *names* — it never checks field *types*. Sponsors.jsx renders
+// name/tier/description straight through as JSX children, so a published
+// doc with e.g. `name: { unexpected: true }` would make React throw and
+// blank the route the instant the listener fires. Guard at this overlay
+// boundary instead: drop (not partially render) any doc whose renderable
+// fields aren't one of the primitive types React can safely render as a
+// child. This keeps the wholesale-replace semantics for every doc that
+// *is* safe — one malformed doc doesn't fall back to the snapshot.
+const ORG_RENDERABLE_FIELDS = ['name', 'tier', 'description'];
+
+function isSafeRenderableValue(value) {
+  return (
+    value == null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  );
+}
+
+function sanitizeOrganizationDocs(docs) {
+  return docs.filter((doc) =>
+    ORG_RENDERABLE_FIELDS.every((field) => isSafeRenderableValue(doc?.[field])),
+  );
+}
+
 export function ContentProvider({ readSource = 'published', children }) {
   // One overlay slot per collection; null = no runtime result yet, so the
   // committed snapshot stands (spec §2.4 fail-soft first paint).
@@ -105,7 +132,9 @@ export function ContentProvider({ readSource = 'published', children }) {
     const updates = (overlay.cmsUpdates ?? []).slice().sort(byOrder);
     const scheduleData = overlay.cmsSchedule != null ? overlay.cmsSchedule : snapshotScheduleData;
     const organizationsData =
-      overlay.cmsOrganizations != null ? overlay.cmsOrganizations : snapshotOrganizationsData;
+      overlay.cmsOrganizations != null
+        ? sanitizeOrganizationDocs(overlay.cmsOrganizations)
+        : snapshotOrganizationsData;
     const live = Boolean(
       overlay.cmsContent != null ||
         overlay.cmsPages != null ||

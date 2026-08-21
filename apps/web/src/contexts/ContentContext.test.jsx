@@ -242,6 +242,64 @@ describe('ContentProvider', () => {
     );
   });
 
+  it('drops a live cmsOrganizations doc with a non-primitive renderable field, keeping the rest wholesale', () => {
+    // Regression test: the generic content writer (functions/src/cms/
+    // content.cjs) only rejects reserved field *names*, never field *types*,
+    // so a published doc can carry e.g. name: { unexpected: true }.
+    // Sponsors.jsx renders name/tier/description directly as JSX children —
+    // an object there would make React throw and blank the whole route the
+    // moment this listener fires. The malformed doc must be dropped, not
+    // rendered, while a same-batch valid doc still comes through.
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    act(() => {
+      subscriptions.get('cmsOrganizations').onNext([
+        {
+          id: 'malformed-org',
+          name: { unexpected: true },
+          tier: 'presenting',
+          visible: true,
+          order: 0,
+        },
+        {
+          id: 'valid-org',
+          name: 'Valid organization',
+          tier: 'supporting',
+          visible: true,
+          order: 1,
+        },
+      ]);
+    });
+    expect(screen.getByTestId('source')).toHaveTextContent('live');
+    expect(screen.getByTestId('organizations-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('organizations-first-name')).toHaveTextContent(
+      'Valid organization',
+    );
+  });
+
+  it('drops a live cmsOrganizations doc whose tier or description is a non-primitive value', () => {
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    act(() => {
+      subscriptions.get('cmsOrganizations').onNext([
+        { id: 'bad-tier', name: 'Bad tier org', tier: ['not', 'a', 'string'], visible: true },
+        {
+          id: 'bad-description',
+          name: 'Bad description org',
+          description: { unexpected: true },
+          visible: true,
+        },
+      ]);
+    });
+    expect(screen.getByTestId('organizations-count')).toHaveTextContent('0');
+  });
+
   it('a cmsOrganizations listener error leaves last-known values in charge, not the snapshot, once live data was already showing', () => {
     render(
       <ContentProvider>
