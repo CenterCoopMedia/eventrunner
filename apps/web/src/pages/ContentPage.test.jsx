@@ -26,7 +26,13 @@ vi.mock('../lib/configSource.js', () => ({
   subscribeConfigDoc: () => () => {},
 }));
 vi.mock('../lib/contentSource.js', () => ({ subscribeContentCollection }));
-vi.mock('../firebase.js', () => ({ app: {}, auth: {}, db: {}, storage: {} }));
+vi.mock('../firebase.js', () => ({
+  app: {}, auth: {}, db: {}, storage: {},
+  // App Check is unconfigured in a credential-free run, which is also its
+  // production default: no site key, no attestation header (issue #45).
+  appCheckEnabled: false,
+  appCheckHeaders: async () => ({}),
+}));
 
 import App from '../App.jsx';
 import siteContent from '@generated/siteContent.js';

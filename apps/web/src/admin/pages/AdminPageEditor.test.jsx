@@ -12,6 +12,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
 vi.mock('../../lib/contentSource.js', () => ({ subscribeContentCollection: () => () => {} }));
+vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 
 // The admin CMS reads both revisions; each test seeds what the listeners
 // report. `seeded: true` is deliberately present on the draft: a stored doc

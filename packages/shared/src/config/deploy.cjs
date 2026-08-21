@@ -41,6 +41,11 @@ const REQUIRED_ALWAYS = [
 /** Defaults applied when the variable is absent — never reported missing. */
 const DEFAULTS = {
   EVENT_FIREBASE_REGION: 'us-central1',
+  // OTP abuse controls (issue #45). Off / conservative by default so an
+  // existing deployment keeps its current behavior; both are documented in
+  // .env.example. Mirrored by challenges.cjs SEND_CEILING_MAX.
+  EVENT_APP_CHECK_ENFORCED: 'false',
+  EVENT_OTP_SEND_CEILING_PER_HOUR: '500',
 };
 
 /** @param {*} v @returns {boolean} */
@@ -93,6 +98,29 @@ function validateDeployEnv(env = process.env) {
   if (present(source.EVENT_OPERATOR_NOTIFIER) &&
       !OPERATOR_NOTIFIERS.includes(source.EVENT_OPERATOR_NOTIFIER.trim())) {
     errors.push(`EVENT_OPERATOR_NOTIFIER: must be one of ${OPERATOR_NOTIFIERS.join(', ')}`);
+  }
+
+  // OTP abuse controls (issue #45). Both are optional, but a value that
+  // does not parse must fail the build rather than silently reverting to
+  // the default — a deployment that believes it raised its ceiling, or
+  // turned App Check on, and did neither is the worst outcome.
+  if (present(source.EVENT_APP_CHECK_ENFORCED) &&
+      !['true', 'false'].includes(source.EVENT_APP_CHECK_ENFORCED.trim().toLowerCase())) {
+    errors.push('EVENT_APP_CHECK_ENFORCED: must be true or false');
+  }
+  if (present(source.EVENT_OTP_SEND_CEILING_PER_HOUR)) {
+    const ceiling = Number(source.EVENT_OTP_SEND_CEILING_PER_HOUR.trim());
+    if (!Number.isInteger(ceiling) || ceiling <= 0) {
+      errors.push('EVENT_OTP_SEND_CEILING_PER_HOUR: must be a positive integer (there is no unlimited setting)');
+    }
+  }
+  // Enforcing App Check without a site key in the bundle locks every real
+  // visitor out of sign-in: the client would send no attestation token and
+  // the platform would reject every request.
+  if (present(source.EVENT_APP_CHECK_ENFORCED) &&
+      source.EVENT_APP_CHECK_ENFORCED.trim().toLowerCase() === 'true' &&
+      !present(source.VITE_FIREBASE_APP_CHECK_SITE_KEY)) {
+    missing.push('VITE_FIREBASE_APP_CHECK_SITE_KEY');
   }
 
   // Conditionally required: the external event id only exists for a

@@ -15,6 +15,10 @@
  * `/p/<slug>` links must keep 404ing rather than a new page silently
  * reclaiming that prefix.
  *
+ * `profile` and `attendees` are the account and directory routes (issue
+ * #17): /profile, /attendees, and /attendees/:uid are statically mounted,
+ * so a generic page may not claim either segment.
+ *
  * `admin` is reserved ahead of its own route landing: an authenticated
  * `/admin` area is under construction on a parallel branch, and this list
  * also covers system areas that exist on paper before their route does, so
@@ -23,7 +27,9 @@
  * Keep in sync with the static <Route path="..."> segments in App.jsx by
  * hand — there is no build-time check tying the two together.
  */
-const RESERVED_PATH_SEGMENTS = Object.freeze(['schedule', 'speakers', 'sponsors', 'signin', 'p', 'admin']);
+const RESERVED_PATH_SEGMENTS = Object.freeze([
+  'schedule', 'speakers', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin',
+]);
 
 /**
  * True when `segment` (a single path segment, no slashes) collides with a

@@ -210,7 +210,7 @@ use here, formalized).
 | `email/` | `send.cjs`, `templates.cjs`, `render.cjs`, `providers/{postmark,webhook,console}.cjs` | `emailDeliveryWebhook` | One send path. No queues (§3.1). |
 | `notify/` | `operator.cjs`, `sinks/{webhook,email}.cjs` | — | Called by other modules; no HTTP exports. |
 | `telemetry/` | `clientErrors.cjs`, `systemErrors.cjs`, `benignFilter.cjs` | `logClientError`, `resolveSystemErrors`, `onSystemErrorCreated` | Alert delivery via `notify/` only. |
-| `users/` | `lifecycle.cjs`, `projection.cjs` | `onUserCreated`, `syncUserPublic`, `maintainProfileComplete` | |
+| `users/` | `lifecycle.cjs`, `projection.cjs` | `onUserCreated`, `syncUserPublic`, `refreshUserPublicBadges`, `maintainProfileComplete` | |
 | `admin/` | `roles.cjs`, `config.cjs`, `stats.cjs`, `feedback.cjs`, `liveUpdates.cjs`, `exports.cjs` | `grantAdminRole`, `revokeAdminRole`, `getAdminUsers`, `updateEventConfig`, `updateFeatures`, `updateTheme`, `updateBadges`, `getSystemStats`, `exportAttendees`, `saveEditRequest`, `getEditRequests`, `submitFeedback`, `getFeedback`, `saveLiveUpdate`, `deleteLiveUpdate` | `admin/config.cjs` is the **only** writer of `config/*` — see below |
 | `public/` | `signup.cjs`, `health.cjs`, `og.cjs` | `saveEmailSignup`, `health`, `updatesMeta` | |
 | `maintenance/` | `cleanup.cjs` | `cleanupStaleData` | Biweekly. Sweeps expired auth challenges, rate-limit docs, resolved telemetry, terminal publish-queue rows. |
@@ -325,6 +325,9 @@ variables and secrets, one environment per client deployment. `.env.example` doc
 | `EVENT_TICKETING_PROVIDER` | var | functions | `eventbrite` \| `manual` \| `none` |
 | `EVENT_TICKETING_EVENT_ID` | var | functions | the single value that today is hardcoded twice, as `EVENTBRITE_EVENT_ID` (`functions/index.js:126`) and `CJS2026_EVENT_ID` (`functions/index.js:4353`) |
 | `EVENT_OPERATOR_NOTIFIER` | var | functions | `webhook` \| `email` \| `none` |
+| `EVENT_APP_CHECK_ENFORCED` | var | functions | `true` \| `false`, default `false`. Enforces App Check on the OTP endpoints (§3.1). Requires `VITE_FIREBASE_APP_CHECK_SITE_KEY`. |
+| `EVENT_OTP_SEND_CEILING_PER_HOUR` | var | functions | positive integer, default `500`. Deployment-wide OTP send ceiling (§3.1). |
+| `VITE_FIREBASE_APP_CHECK_SITE_KEY` | var | build | reCAPTCHA v3 site key, non-secret. Absent → the App Check SDK is never loaded. |
 | `VITE_FIREBASE_*` (7) | var | build | unchanged set from `apps/web/src/firebase.js` |
 | `VITE_EVENT_PUBLIC_URL` | var | build | mirrors `EVENT_PUBLIC_URL` into the bundle |
 | `FIREBASE_SERVICE_ACCOUNT` | secret | deploy, generate-content | |
@@ -706,6 +709,43 @@ SHA-256 hash of the normalized address, in `auth_rate_limits/{emailHash}` (renam
 `magic_link_rate_limits`). Enforced in `auth/otp.cjs`, not in the email core, because it is an
 authentication control rather than a mail control.
 
+**Two deploy-time controls sit underneath it** (issue #45). The per-address bucket is a *per-victim*
+control: an unauthenticated caller working through a list of distinct addresses never trips it, and
+every request that gets through costs one provider send. Both controls below default off/conservative,
+so an existing deployment keeps its current behavior until an operator opts in.
+
+| Control | Variable | Behavior |
+|---|---|---|
+| Firebase App Check | `EVENT_APP_CHECK_ENFORCED` (+ `VITE_FIREBASE_APP_CHECK_SITE_KEY`) | `true` makes `sendOtpCode` and `verifyOtpCode` verify the `X-Firebase-AppCheck` header (`core/auth.cjs` `requireAppCheck`, backed by `getAppCheck().verifyToken`) before any request work. The web app initializes the App Check SDK (reCAPTCHA v3) and sends the header **only** when the site key is set; with no key the SDK is never fetched. `validateDeployEnv` fails the build if the flag is on without a key, because that combination is a total sign-in outage. |
+| Global send ceiling | `EVENT_OTP_SEND_CEILING_PER_HOUR` (default 500) | A deployment-wide circuit breaker on total OTP sends per rolling hour, in `auth_send_ceiling/global` — same storage and sweep shape as `auth_rate_limits`. Over the ceiling, every request gets the *same* generic rate-limited answer the per-address bucket gives (no oracle), and the first request over the line emits an `OperatorEvent` with `dedupeKey: 'otp-send-ceiling-tripped'`. The document's `trippedAt` marker makes that once per trip episode and durable across containers, not once per request; it clears as the window drains. There is no "unlimited" setting — an absent, zero, or unparseable value falls back to 500. |
+
+Enforcement is explicit rather than the v2 `enforceAppCheck` option: that option is declared on
+`CallableOptions` only — firebase-functions types `onRequest` as
+`HttpsOptions extends Omit<GlobalOptions, 'region' | 'enforceAppCheck'>` and its `onRequest`
+implementation never reads the field, so passing it there is silently ignored. Only `onCall` installs
+the platform middleware, and these endpoints are plain `onRequest` because the client speaks
+fetch/JSON, not the callable protocol. The gate fails **closed** once enforcement is on — a missing
+header, an unverifiable token, and an unavailable App Check service are one 401 with one message —
+and it runs before the request body is read, so it can leak nothing about addresses or challenges.
+`core/http.cjs` allows `X-Firebase-AppCheck` in `Access-Control-Allow-Headers`; without that entry the
+non-safelisted header would preflight and the browser would block both POSTs outright.
+
+Ordering matters: the ceiling is taken **after** the per-address bucket, so one address hammering the
+endpoint is stopped by its own 5/15min budget and cannot spend the whole deployment's ceiling. The
+ceiling slot is a *reservation* — `releaseGlobalSendSlot` returns it when the challenge write or the
+provider send fails, so an email-provider outage cannot burn the hourly budget on zero delivered
+codes and keep refusing sign-ins after recovery. The
+counter is deliberately unsharded — a slot is written only *below* the ceiling, capping writes at
+`max` per window (two orders of magnitude under Firestore's sustained per-document write rate), and
+once tripped the transaction stops writing at all, which is exactly the flood case sharding would
+otherwise be sized for.
+
+Deliberately **not** implemented: per-IP limiting via Cloud Armor or an edge/WAF rule in front of the
+functions. It is the right control for a volumetric flood from few sources, but it is billed
+per-policy, configured outside this repo, and does nothing against a distributed request pattern —
+which is what App Check and the ceiling are for. A deployment that needs it adds it at the load
+balancer with no code change here (noted in `.env.example`).
+
 ### 3.2 OperatorNotifier
 
 Replaces every direct `/alert`, `/alert-action`, `/cjs-error`, and `api.telegram.org` call. There are
@@ -972,6 +1012,7 @@ The templates are therefore **provider-parameterized, not merely tokenized** —
 | `speaker_invites/{token}` | Invite tokens, status flow | — |
 | `auth_challenges/{token}` | OTP challenge store: `{ kind:'otp', email, codeHash, attempts, expiresAt }` | `magic_links` |
 | `auth_rate_limits/{emailHash}` | 5/15min bucket | `magic_link_rate_limits` |
+| `auth_send_ceiling/global` | Deployment-wide OTP send ceiling, `{ sends[], trippedAt, updatedAt }` (§3.1) | new |
 | `cmsPages/{pageId}` | Page + section definitions as data (§5.2) | new (was `PAGE_CONFIGS` in code) |
 | `cmsContent/{docId}` | Content blocks, keyed `section` + `field` | — |
 | `cmsSchedule/{sessionId}` | Sessions. `dayId` replaces free-text `day`; `speakerIds: string[]` replaces the comma-separated `speakers` string | — |

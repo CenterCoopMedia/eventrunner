@@ -28,15 +28,19 @@ the committed **synthetic snapshot** in `src/generated/`:
 | `scheduleData.js` | schedule days/sessions |
 | `organizationsData.js` | speakers/sponsors |
 
-Three providers then overlay live Firestore data on top of that snapshot,
+Four providers then overlay live Firestore data on top of that snapshot,
 outermost first:
 
 ```
 EventConfigProvider          — subscribes to config/{event,features,theme,badges}
   AuthProvider                — Firebase Auth state + Google/OTP sign-in
-    ContentProvider           — subscribes to published (or draft) CMS collections
-      ToastProvider
-        <Routes>               — Home, Schedule, Speakers, Sponsors, /signin, catch-all (cmsPages)
+    ProfileProvider           — subscribes to the signed-in user's own users/{uid}
+      ContentProvider         — subscribes to published (or draft) CMS collections
+        ToastProvider
+          <Routes>             — Home, Schedule (/schedule, /schedule/mine,
+                                 /schedule/:sessionId), Speakers, Sponsors,
+                                 /signin, /profile, /attendees,
+                                 /attendees/:uid, catch-all (cmsPages)
 ```
 
 `EventConfigProvider` also writes a runtime `<style id="event-theme-runtime">`
@@ -50,6 +54,13 @@ that overrides the same custom properties `theme.css` defines, so a live
 Every subscription is fail-soft: a listener error is logged and the app
 keeps rendering the last-known (snapshot or previously-live) values rather
 than blanking the page.
+
+`ProfileProvider` exposes `attendeeAccess`, which decides whether the
+directory asks for `attendees_only` profiles or public ones only. That is a
+query choice, not a permission: `firestore.rules` grant `attendees_only`
+profiles solely to a requester whose own `users` doc shows approved,
+speaker, or admin (spec §3.4), so a wrong guess costs a failed query, never
+a leaked profile.
 
 ## Dev loop
 

@@ -17,6 +17,11 @@
 // at the Functions emulator, e.g.
 //   VITE_FUNCTIONS_ORIGIN=http://127.0.0.1:5001/<project>/<region>
 //
+// App Check (issue #45): both OTP calls carry an X-Firebase-AppCheck header
+// when VITE_FIREBASE_APP_CHECK_SITE_KEY is configured (see firebase.js). With
+// no key the header is absent and nothing changes; the server only requires it
+// when the deployment sets EVENT_APP_CHECK_ENFORCED=true.
+//
 // isAdmin: config/bootstrap.adminEmails is server-only (firestore.rules), so
 // the client cannot read the allowlist. It learns admin-ness by probing one
 // admin-only read (cmsContent_drafts, limit 1): the rules' isAdmin() decides,
@@ -41,7 +46,7 @@ import {
   signOut as firebaseSignOut,
 } from 'firebase/auth';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
-import { auth, db } from '../firebase.js';
+import { appCheckHeaders, auth, db } from '../firebase.js';
 
 const AuthContext = createContext(null);
 
@@ -81,10 +86,13 @@ export class OtpRequestError extends Error {
 
 async function postJson(name, body) {
   let response;
+  // Empty unless App Check is configured for this deployment; the server
+  // only requires it when EVENT_APP_CHECK_ENFORCED is on (issue #45).
+  const attestation = await appCheckHeaders();
   try {
     response = await fetch(`${functionsOrigin()}/${name}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...attestation },
       body: JSON.stringify(body),
     });
   } catch {

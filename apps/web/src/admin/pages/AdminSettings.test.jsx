@@ -17,6 +17,7 @@ vi.mock('../../lib/configSource.js', () => ({
   },
 }));
 vi.mock('../../lib/contentSource.js', () => ({ subscribeContentCollection: () => () => {} }));
+vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (_name, onNext) => {
     onNext([]);
