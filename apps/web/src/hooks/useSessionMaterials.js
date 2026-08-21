@@ -16,6 +16,15 @@ export function useSessionMaterials(sessionId) {
   const [loading, setLoading] = useState(Boolean(sessionId));
 
   useEffect(() => {
+    // Clear immediately on a sessionId change (same class of bug the
+    // reactions hook fixes): without this, switching from session A to B
+    // keeps rendering A's rows until B's first snapshot arrives — usually
+    // instant off the shared listener's in-memory grouping
+    // (materialsSource.js), but not guaranteed. Fail-soft retention
+    // (subscribeSessionMaterials keeping last-known values on a listener
+    // error) still applies AFTER this reset, so it only ever retains data
+    // for the CURRENT session, never a stale previous one.
+    setMaterials([]);
     setLoading(Boolean(sessionId));
     const unsubscribe = subscribeSessionMaterials(
       sessionId,
