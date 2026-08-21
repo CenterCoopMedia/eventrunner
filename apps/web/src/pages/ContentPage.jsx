@@ -10,19 +10,35 @@
 // used by every other unknown URL — this route IS the site's 404 path.
 import { Link, useLocation } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
+import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 
+// Pages seeded from the §5.5 legal templates. While
+// config/event.legal.reviewRequired is set, both carry a visible public
+// notice: the templates are a starting point composed from the deployment
+// configuration, and a reader must not mistake an unreviewed template for
+// the operator's actual policy. The flag is cleared from admin Settings
+// after the client's counsel signs off — it is never cleared by a script.
+const LEGAL_PAGE_IDS = ['privacy', 'terms'];
+
 export default function ContentPage() {
   const { pathname } = useLocation();
   const { getPage, getSectionBlocks } = useContent();
+  const { eventConfig } = useEventConfig();
 
   const page = getPage(pathname);
 
   if (!page || page.systemPage) {
     return <NotFound />;
   }
+
+  // Fail soft (§2.4): a runtime config/event doc can replace `legal`
+  // wholesale with a partial object, so only an explicit `true` shows the
+  // notice and a malformed doc simply shows the page.
+  const showLegalNotice =
+    LEGAL_PAGE_IDS.includes(page.id) && eventConfig?.legal?.reviewRequired === true;
 
   const sections = (page.sections ?? [])
     .map((section) => ({ section, blocks: getSectionBlocks(section.id) }))
@@ -33,6 +49,15 @@ export default function ContentPage() {
       <h1 className="py-8 font-heading text-4xl font-semibold text-brand-ink">
         {page.label}
       </h1>
+      {showLegalNotice ? (
+        <p
+          role="note"
+          className="mb-8 rounded-brand border border-warning/40 bg-warning/10 p-4 text-sm text-brand-ink"
+        >
+          This page is an unreviewed template. It has not been reviewed by the
+          organizer&rsquo;s legal counsel and does not yet state their policy.
+        </p>
+      ) : null}
       {sections.length === 0 ? (
         <EmptyState
           title="Nothing here yet"
