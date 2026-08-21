@@ -18,6 +18,10 @@ import LoadingState from '../components/LoadingState.jsx';
 import AdminLayout from './AdminLayout.jsx';
 import AdminPagesList from './pages/AdminPagesList.jsx';
 import AdminPageEditor from './pages/AdminPageEditor.jsx';
+import AdminContentPages from './pages/AdminContentPages.jsx';
+import AdminContentSections from './pages/AdminContentSections.jsx';
+import AdminContentSection from './pages/AdminContentSection.jsx';
+import AdminContentBlockEditor from './pages/AdminContentBlockEditor.jsx';
 import AdminEventSettings from './pages/AdminEventSettings.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
@@ -72,6 +76,17 @@ export default function AdminApp() {
           <Route path="pages" element={<AdminPagesList />} />
           <Route path="pages/new" element={<AdminPageEditor mode="create" />} />
           <Route path="pages/:pageId" element={<AdminPageEditor mode="edit" />} />
+          <Route path="content" element={<AdminContentPages />} />
+          <Route path="content/:pageId" element={<AdminContentSections />} />
+          <Route path="content/:pageId/:sectionId" element={<AdminContentSection />} />
+          <Route
+            path="content/:pageId/:sectionId/new"
+            element={<AdminContentBlockEditor mode="create" />}
+          />
+          <Route
+            path="content/:pageId/:sectionId/:field"
+            element={<AdminContentBlockEditor mode="edit" />}
+          />
           <Route path="settings" element={<AdminEventSettings />} />
           <Route path="features" element={<AdminFeatureSettings />} />
           <Route path="badges" element={<AdminBadgeSettings />} />
