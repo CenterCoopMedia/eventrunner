@@ -10,6 +10,8 @@ import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
 import Home from './pages/Home.jsx';
 import Schedule from './pages/Schedule.jsx';
+import SessionDetail from './pages/SessionDetail.jsx';
+import MySchedule from './pages/MySchedule.jsx';
 import Speakers from './pages/Speakers.jsx';
 import Sponsors from './pages/Sponsors.jsx';
 import ContentPage from './pages/ContentPage.jsx';
@@ -22,6 +24,8 @@ export function AppRoutes() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="schedule" element={<Schedule />} />
+        <Route path="schedule/mine" element={<MySchedule />} />
+        <Route path="schedule/:sessionId" element={<SessionDetail />} />
         <Route path="speakers" element={<Speakers />} />
         <Route path="sponsors" element={<Sponsors />} />
         <Route path="p/:slug" element={<ContentPage />} />
