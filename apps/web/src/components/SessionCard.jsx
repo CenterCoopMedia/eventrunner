@@ -9,6 +9,7 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import { setSessionBookmarked } from '../lib/bookmarksSource.js';
+import { useSessionMaterialsCount } from '../hooks/useSessionMaterials.js';
 import {
   buildGoogleCalendarUrl,
   buildIcsCalendar,
@@ -23,14 +24,6 @@ import {
 // rows without restructuring; useContent().speakers already carries the
 // snapshot shape this will read from.
 export function useSessionSpeakerNames() {
-  return null;
-}
-
-// TODO(materials tranche): resolve `session_materials_public` once
-// functions/src/materials/ lands (spec §4.4, not built as of issue #16).
-// Stubbed the same way useSessionSpeakerNames is above, so MaterialsPill's
-// markup does not need to change when it does.
-function useSessionMaterialsCount() {
   return null;
 }
 

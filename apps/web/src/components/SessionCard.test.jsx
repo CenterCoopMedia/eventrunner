@@ -15,6 +15,18 @@ vi.mock('../lib/bookmarksSource.js', () => ({
   setSessionBookmarked: (...args) => setSessionBookmarkedMock(...args),
 }));
 
+// useSessionMaterialsCount (issue #23) subscribes through materialsSource.js
+// — mocked the same way bookmarksSource.js is, so this file stays
+// Firebase-free (spec §8.1). Defaults to no materials; individual tests
+// override via subscribeSessionMaterialsMock.mockImplementation.
+const subscribeSessionMaterialsMock = vi.fn((sessionId, onNext) => {
+  onNext([]);
+  return () => {};
+});
+vi.mock('../lib/materialsSource.js', () => ({
+  subscribeSessionMaterials: (...args) => subscribeSessionMaterialsMock(...args),
+}));
+
 const fixtureConfig = {
   shortName: '[Fixture] LDC',
   timezone: 'America/Chicago',
@@ -74,6 +86,10 @@ function renderCard(props = {}) {
 
 beforeEach(() => {
   setSessionBookmarkedMock.mockReset();
+  subscribeSessionMaterialsMock.mockReset().mockImplementation((sessionId, onNext) => {
+    onNext([]);
+    return () => {};
+  });
 });
 
 describe('SessionCard', () => {
@@ -275,8 +291,25 @@ describe('SessionCard', () => {
     });
   });
 
-  it('materials and reactions pills stay hidden (no backend yet — TODO stubs)', () => {
-    renderCard({ features: { sessionMaterials: true, sessionReactions: true } });
+  it('the materials pill stays hidden when the session has no approved materials', () => {
+    renderCard({ features: { sessionMaterials: true } });
     expect(screen.queryByText(/material/i)).toBeNull();
+  });
+
+  it('the materials pill shows the live count once session_materials_public has rows', () => {
+    subscribeSessionMaterialsMock.mockImplementationOnce((sessionId, onNext) => {
+      onNext([
+        { id: 'm1', sessionId, type: 'link', filename: 'Slides', reviewStatus: 'approved' },
+        { id: 'm2', sessionId, type: 'file', filename: 'handout.pdf', reviewStatus: 'approved' },
+      ]);
+      return () => {};
+    });
+    renderCard({ features: { sessionMaterials: true } });
+    expect(screen.getByText('2 materials')).not.toBeNull();
+  });
+
+  it('the reactions pill stays hidden (no backend yet — TODO stub)', () => {
+    renderCard({ features: { sessionReactions: true } });
+    expect(screen.queryByText(/reaction/i)).toBeNull();
   });
 });

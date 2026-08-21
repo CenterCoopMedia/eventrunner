@@ -10,6 +10,7 @@ import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import { SessionPills, TypeBadge } from '../components/SessionCard.jsx';
+import SessionMaterialsList from '../components/SessionMaterialsList.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 
 function NotFoundState({ search }) {
@@ -122,6 +123,8 @@ export default function SessionDetail() {
           bookmarked={bookmarkedIds.has(session.id)}
         />
       </div>
+
+      <SessionMaterialsList session={session} features={features} />
     </article>
   );
 }
