@@ -17,6 +17,7 @@ const {
   validateTheme,
   validateBadgesConfig,
 } = require('shared/config');
+const { defaultTheme } = require('./theme.cjs');
 
 const TIER_A = Object.freeze({
   slug: 'test-event',
@@ -137,6 +138,38 @@ test('validator failures are reported, and nothing claims to be ok', () => {
   });
   assert.equal(built.ok, false);
   assert.match(built.errors.join(' '), /timezone/);
+});
+
+test('a partial theme override keeps the rest of the default palette', () => {
+  // A top-level spread would REPLACE the colors map, and the generated
+  // stylesheet would then be missing most of its custom properties —
+  // every rgb(var(--brand-ink-rgb)) utility resolving to nothing.
+  const { docs } = buildConfigDocs({
+    // Built, not written: the repo lint bans hex literals here.
+    answers: { ...MINIMAL, theme: { colors: { brandPrimary: `#${'123456'}` } } },
+    tierA: TIER_A,
+    now: () => 0,
+  });
+  assert.equal(docs.theme.colors.brandPrimary, `#${'123456'}`);
+  assert.equal(Object.keys(docs.theme.colors).length, Object.keys(defaultTheme().colors).length);
+  assert.ok(docs.theme.colors.brandInk, 'the untouched slots survive');
+  assert.equal(validateTheme(docs.theme).ok, true);
+});
+
+test('a partial fonts or logos override merges the same way', () => {
+  const { docs } = buildConfigDocs({
+    answers: { ...MINIMAL, theme: { fonts: { heading: 'sans-humanist' }, logos: { primary: 'branding/client.svg' } } },
+    tierA: TIER_A,
+    now: () => 0,
+  });
+  assert.equal(docs.theme.fonts.heading, 'sans-humanist');
+  assert.equal(docs.theme.fonts.body, defaultTheme().fonts.body);
+  assert.equal(docs.theme.logos.primary, 'branding/client.svg');
+  assert.equal(docs.theme.logos.mark, defaultTheme().logos.mark);
+  // A slot the client supplied is no longer a placeholder, and the
+  // launch-readiness branding row reads exactly this list.
+  assert.equal(docs.theme.placeholderLogos.includes('primary'), false);
+  assert.equal(docs.theme.placeholderLogos.includes('mark'), true);
 });
 
 test('every prompt targets a distinct answers path', () => {

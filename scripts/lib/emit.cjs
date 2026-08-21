@@ -31,9 +31,28 @@ const STRIPPED_FIELDS = Object.freeze([
 
 const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
-/** @param {string} s @returns {string} single-quoted JS string literal */
+/**
+ * Single-quoted JS string literal.
+ *
+ * Every line terminator is escaped, not just \n: a CR that reached
+ * Firestore through a Windows-authored paste would otherwise sit raw
+ * inside a single-quoted literal and the generated module would fail to
+ * parse — a build break produced by an editor's newline convention.
+ * U+2028/U+2029 are legal in ES2019+ string literals but are escaped too,
+ * because the generated files are also read by humans and by tools older
+ * than that rule.
+ *
+ * @param {string} s
+ * @returns {string}
+ */
 function quote(s) {
-  return `'${String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n')}'`;
+  return `'${String(s)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')}'`;
 }
 
 /**
