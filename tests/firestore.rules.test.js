@@ -286,9 +286,11 @@ describe("server-only collections stay deny-all", () => {
   for (const c of [
     "auth_challenges",
     "auth_rate_limits",
+    "auth_send_ceiling",
     "sent_emails",
     "email_claims",
     "system_errors",
+    "client_error_rate_limits",
     "email_templates",
   ]) {
     it(`denies all access to ${c}, admin included`, async () => {

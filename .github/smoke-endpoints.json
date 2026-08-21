@@ -19,6 +19,8 @@
     "updateFeatures",
     "updateTheme",
     "updateBadges",
-    "emailDeliveryWebhook"
+    "emailDeliveryWebhook",
+    "bookmarkSession",
+    "logClientError"
   ]
 }
