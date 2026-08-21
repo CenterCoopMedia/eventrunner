@@ -265,6 +265,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Emoji reaction aggregate + per-user dedup (spec §4.1, §9). The
+    // aggregate is a counts-by-emoji object, harmless to read publicly
+    // (same reasoning as sessionBookmarks above); only reactToSession
+    // (Admin SDK, functions/src/schedule/reactions.cjs) writes it. The
+    // nested users/{uid} membership doc records which single emoji (if
+    // any) that caller currently has on this session — self-read only, so
+    // "which reaction is mine" can be rendered without exposing anyone
+    // else's choice, and every write still goes through the same handler.
+    match /sessionReactions/{sessionId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /users/{userId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
+    }
+
     // Server-only collections, named explicitly so a future edit cannot
     // open them by accident via a broader match.
     match /auth_challenges/{docId} { allow read, write: if false; }

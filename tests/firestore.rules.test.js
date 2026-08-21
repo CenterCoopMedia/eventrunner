@@ -654,3 +654,49 @@ describe("sessionBookmarks aggregate", () => {
     await assertFails(setDoc(doc(nonAdmin(), "sessionBookmarks/session-1"), { count: 99 }));
   });
 });
+
+describe("sessionReactions aggregate", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sessionReactions/session-1"), {
+        counts: { "👍": 2, "❤️": 0, "🎉": 0, "💡": 0, "👏": 0 },
+      });
+    });
+  });
+
+  it("allows anyone, including anonymous, to read the aggregate counts", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "sessionReactions/session-1")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "sessionReactions/session-1")));
+  });
+
+  it("denies all client writes, admin included", async () => {
+    await assertFails(setDoc(doc(admin(), "sessionReactions/session-1"), { counts: {} }));
+    await assertFails(setDoc(doc(nonAdmin(), "sessionReactions/session-1"), { counts: {} }));
+  });
+});
+
+describe("the private sessionReactions/{sessionId}/users dedup subcollection", () => {
+  it("allows a user to read their own reaction doc, denies everyone else", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sessionReactions/session-1/users/attendee-1"), {
+        emoji: "👍",
+        reactedAt: new Date(),
+      });
+    });
+    await assertSucceeds(getDoc(doc(nonAdmin(), "sessionReactions/session-1/users/attendee-1")));
+    await assertFails(getDoc(doc(anon(), "sessionReactions/session-1/users/attendee-1")));
+    const other = testEnv
+      .authenticatedContext("attendee-2", { email: "other@example.com", email_verified: true })
+      .firestore();
+    await assertFails(getDoc(doc(other, "sessionReactions/session-1/users/attendee-1")));
+  });
+
+  it("denies all client writes to the reaction dedup subcollection, owner included", async () => {
+    await assertFails(
+      setDoc(doc(nonAdmin(), "sessionReactions/session-1/users/attendee-1"), {
+        emoji: "👍",
+        reactedAt: new Date(),
+      }),
+    );
+  });
+});
