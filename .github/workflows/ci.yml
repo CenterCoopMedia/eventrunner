@@ -87,6 +87,27 @@ jobs:
       - name: Assert dist exists
         run: test -f apps/web/dist/index.html
 
+  hygiene:
+    name: Generated-content hygiene
+    runs-on: ubuntu-latest
+    # Regenerates apps/web/src/generated/* from the synthetic demo fixture
+    # (spec §8.6) and fails on any byte-for-byte difference, so the
+    # committed snapshot cannot drift or be overwritten with anything other
+    # than demo data. No credentials — this reads scripts/lib/demo-event.cjs,
+    # never a real project, so it runs on fork PRs too.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Check the committed snapshot against the demo fixture
+        run: node scripts/generate-content.cjs --demo --check
+
   rules:
     name: Security rules on emulators
     runs-on: ubuntu-latest
