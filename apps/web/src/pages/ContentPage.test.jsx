@@ -30,6 +30,7 @@ vi.mock('../firebase.js', () => ({ app: {}, auth: {}, db: {}, storage: {} }));
 
 import App from '../App.jsx';
 import siteContent from '@generated/siteContent.js';
+import { eventConfig } from '@generated/eventConfig.js';
 import pagesData from '@generated/pagesData.js';
 
 function renderAt(path) {
@@ -76,7 +77,7 @@ describe('ContentPage (catch-all route)', () => {
       screen.getByRole('heading', { level: 1, name: faqPage.label }),
     ).toBeInTheDocument();
     // The FAQ item renders as a disclosure with its question.
-    expect(screen.getByText(siteContent.faq__what_is_this.question)).toBeInTheDocument();
+    expect(screen.getByText(siteContent.faq_items__what_is_this.question)).toBeInTheDocument();
   });
 
   it('404s cleanly on an unknown path', () => {
@@ -94,6 +95,20 @@ describe('ContentPage (catch-all route)', () => {
     expect(
       screen.getByRole('heading', { name: 'Page not found' }),
     ).toBeInTheDocument();
+  });
+
+  it('shows the unreviewed-template notice on the seeded legal pages (spec §5.5)', () => {
+    // config/event.legal.reviewRequired is true on every fresh deployment,
+    // and the public notice is one of the two places §5.1.1 puts the
+    // enforcement an operator cannot miss.
+    expect(eventConfig.legal.reviewRequired).toBe(true);
+    renderAt('/privacy');
+    expect(screen.getByRole('note')).toHaveTextContent('unreviewed template');
+  });
+
+  it('does not show the notice on a non-legal page', () => {
+    renderAt('/faq');
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
   it('a system route wins over the catch-all even though both could match', () => {

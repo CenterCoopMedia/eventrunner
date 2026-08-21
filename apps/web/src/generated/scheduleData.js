@@ -1,5 +1,7 @@
 // GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.4, §8.6).
 //
+// Regenerate with:  node scripts/generate-content.cjs --demo
+//
 // Shape mirrors published cmsSchedule docs. dayId values are stable keys
 // from config/event.days (eventConfig.js). All names are fictional; no real
 // speakers, ever (spec §5.4).
@@ -14,7 +16,9 @@ export const scheduleData = [
     description: '[Replace] Short description of the opening session.',
     location: 'Main hall',
     type: 'keynote',
-    speakerIds: ['speaker-placeholder-1'],
+    speakerIds: [
+      'speaker-placeholder-1',
+    ],
     visible: true,
     order: 0,
     seeded: true,
@@ -28,7 +32,9 @@ export const scheduleData = [
     description: '[Replace] What attendees will practice in this workshop.',
     location: 'Room A',
     type: 'workshop',
-    speakerIds: ['speaker-placeholder-2'],
+    speakerIds: [
+      'speaker-placeholder-2',
+    ],
     visible: true,
     order: 1,
     seeded: true,
@@ -42,21 +48,56 @@ export const scheduleData = [
     description: '[Replace] The question this panel will dig into.',
     location: 'Main hall',
     type: 'panel',
-    speakerIds: ['speaker-placeholder-1', 'speaker-placeholder-3'],
+    speakerIds: [
+      'speaker-placeholder-1',
+      'speaker-placeholder-3',
+    ],
+    visible: true,
+    order: 0,
+    seeded: true,
+  },
+  {
+    id: 'session-workshop-b',
+    dayId: 'day-2',
+    startTime: '13:30',
+    endTime: '15:00',
+    title: '[Demo] Workshop: audience research on a small budget',
+    description: '[Replace] What attendees will practice in this workshop.',
+    location: 'Room B',
+    type: 'workshop',
+    speakerIds: [
+      'speaker-placeholder-2',
+    ],
+    visible: true,
+    order: 1,
+    seeded: true,
+  },
+  {
+    id: 'session-unconference',
+    dayId: 'day-3',
+    startTime: '09:30',
+    endTime: '11:30',
+    title: '[Demo] Unconference blocks',
+    description: '[Replace] How the participant-proposed sessions work.',
+    location: 'Rooms A and B',
+    type: 'workshop',
+    speakerIds: [],
     visible: true,
     order: 0,
     seeded: true,
   },
   {
     id: 'session-closing',
-    dayId: 'day-2',
+    dayId: 'day-3',
     startTime: '15:00',
     endTime: '16:00',
     title: '[Demo] Closing conversation',
     description: '[Replace] How the event wraps up and what happens next.',
     location: 'Main hall',
     type: 'plenary',
-    speakerIds: [],
+    speakerIds: [
+      'speaker-placeholder-3',
+    ],
     visible: true,
     order: 1,
     seeded: true,

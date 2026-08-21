@@ -1,27 +1,28 @@
 /*
- * GENERATED FILE — committed synthetic demo copy (spec §2.4, §8.6).
+ * GENERATED FILE — committed synthetic demo copy (spec §2.4, §7.2, §8.6).
  *
- * scripts/generate-content.cjs regenerates this from config/theme at deploy
- * time into an out-of-tree directory (GENERATED_DIR); this committed copy is
- * the synthetic demo event that keeps CI builds credential-free. It is the
- * ONLY file in apps/web allowed to carry raw color values (spec §7.6
- * allowlist), and values are space-separated RGB triples so Tailwind's
- * rgb(var(--…-rgb) / <alpha-value>) utilities keep opacity modifiers working
- * (spec §7.2).
+ * Regenerate with:  node scripts/generate-content.cjs --demo
+ *
+ * At deploy time the same script reads config/theme and writes out-of-tree
+ * (GENERATED_DIR); this committed copy is the synthetic demo event that keeps
+ * CI builds credential-free. It is the ONLY file in apps/web allowed to carry
+ * raw color values (spec §7.6 allowlist), and values are space-separated RGB
+ * triples so Tailwind rgb(var(--…-rgb) / <alpha-value>) utilities keep opacity
+ * modifiers working (spec §7.2).
  *
  * EventConfigProvider overrides these same properties at runtime via
  * <style id="event-theme-runtime">.
  */
 
 :root {
-  /* Brand palette — §7.2 sample values as RGB triples. */
-  --brand-primary-rgb: 42 157 143;        /* teal */
+  /* Brand palette from config/theme.colors, hex converted to RGB triples. */
+  --brand-primary-rgb: 42 157 143;
   --brand-primary-dark-rgb: 30 114 104;
   --brand-primary-light-rgb: 95 191 179;
-  --brand-accent-rgb: 200 75 49;          /* terracotta */
-  --brand-surface-rgb: 245 240 230;       /* warm paper */
+  --brand-accent-rgb: 200 75 49;
+  --brand-surface-rgb: 245 240 230;
   --brand-surface-alt-rgb: 237 232 220;
-  --brand-ink-rgb: 44 62 80;              /* deep slate */
+  --brand-ink-rgb: 44 62 80;
   --brand-ink-muted-rgb: 92 107 122;
 
   /* Semantic tokens — role-named (interface guidelines: Colors). */
@@ -31,14 +32,14 @@
   --semantic-highlight-rgb: 212 160 23;
   --semantic-keynote-rgb: 94 53 177;
 
-  /* Font sets (spec §7.4): config/theme.fonts named a set id; the generator
-     emitted the matching stacks. Demo: heading=serif-editorial,
-     body=sans-humanist, accent=script-casual. */
+  /* Font sets (spec §7.4): config/theme.fonts names a set id; the generator
+     emitted the matching stacks. heading=serif-editorial, body=sans-humanist,
+     accent=script-casual. */
   --font-heading: 'Source Serif 4', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
   --font-body: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-accent: 'Caveat', 'Segoe Script', 'Bradley Hand', cursive;
 
-  /* Radius scale: config/theme.radius = 'soft' for the demo event.
+  /* Radius scale: config/theme.radius = 'soft'.
      ('sharp' → 0 / 2px, 'soft' → 8px / 16px, 'round' → 16px / 28px.) */
   --radius-base: 8px;
   --radius-large: 16px;
