@@ -16,6 +16,7 @@ const TABS = [
   { to: 'features', label: 'Features' },
   { to: 'badges', label: 'Badges' },
   { to: 'branding', label: 'Branding' },
+  { to: 'materials', label: 'Materials' },
 ];
 
 function tabClass({ isActive }) {
