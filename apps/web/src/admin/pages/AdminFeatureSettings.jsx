@@ -45,7 +45,7 @@ function toForm(features) {
 }
 
 export default function AdminFeatureSettings() {
-  const { features, source } = useEventConfig();
+  const { features, sources } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
 
@@ -54,13 +54,18 @@ export default function AdminFeatureSettings() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
-  const adoptedRef = useRef(source === 'live');
+  // Keyed on CONFIG/FEATURES' own readiness. The aggregate `source` flips as
+  // soon as any config doc reports, so seeding on it would let a config/event
+  // snapshot arriving first freeze this form on the build-time flags — and
+  // config/features is a whole-doc replace, so saving that would silently
+  // revert every production flag.
+  const adoptedRef = useRef(sources.features === 'live');
 
   useEffect(() => {
-    if (adoptedRef.current || source !== 'live') return;
+    if (adoptedRef.current || sources.features !== 'live') return;
     adoptedRef.current = true;
     setForm(toForm(features));
-  }, [source, features]);
+  }, [sources.features, features]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();

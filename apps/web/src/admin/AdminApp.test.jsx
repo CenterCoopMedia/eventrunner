@@ -38,15 +38,23 @@ vi.mock('firebase/auth', () => ({
 // The isAdmin probe: resolving means firestore.rules allowed the admin-only
 // drafts read (i.e. an admin); rejecting means it did not.
 let adminProbeShouldSucceed = true;
+// When set, the probe hangs until the test settles it — the window in which
+// the auth handshake has finished but admin-ness is still unknown.
+let pendingProbe = null;
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
   query: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
-  getDocs: vi.fn(() =>
-    adminProbeShouldSucceed
+  getDocs: vi.fn(() => {
+    if (pendingProbe) {
+      return new Promise((resolve, reject) => {
+        pendingProbe = { resolve, reject };
+      });
+    }
+    return adminProbeShouldSucceed
       ? Promise.resolve({ docs: [] })
-      : Promise.reject(new Error('permission denied')),
-  ),
+      : Promise.reject(new Error('permission denied'));
+  }),
 }));
 
 import App from '../App.jsx';
@@ -70,6 +78,7 @@ async function renderAt(path) {
 
 beforeEach(() => {
   adminProbeShouldSucceed = true;
+  pendingProbe = null;
   currentUser = { uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' };
 });
 
@@ -110,6 +119,37 @@ describe('admin route gating', () => {
     await renderAt('/admin/nope');
     expect(screen.getByRole('heading', { name: 'Admin page not found' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+  });
+
+  it('waits for the admin probe instead of flashing the denial at an admin', async () => {
+    // AuthContext.loading covers the auth handshake only, and it goes false
+    // before the probe answers. A gate that read isAdmin at that instant
+    // would show "you don't have admin access" to every admin, every load.
+    pendingProbe = true;
+    await renderAt('/admin/pages');
+
+    expect(screen.queryByRole('heading', { name: 'You don’t have admin access' })).toBeNull();
+    expect(screen.getByRole('status', { name: 'Checking your access…' })).toBeInTheDocument();
+
+    await act(async () => {
+      pendingProbe.resolve({ docs: [] });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+  });
+
+  it('denies once the probe actually answers no', async () => {
+    pendingProbe = true;
+    await renderAt('/admin/pages');
+    await act(async () => {
+      pendingProbe.reject(new Error('permission denied'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(
+      screen.getByRole('heading', { name: 'You don’t have admin access' }),
+    ).toBeInTheDocument();
   });
 
   it('does not gate the public site behind the admin routes', async () => {

@@ -23,9 +23,14 @@ let draftDocs = [];
 // fail-soft path (rows keep rendering, the UI says so, retry happens
 // underneath).
 let listenerError = null;
+// Collections listed here never report — the window in which one revision is
+// known and the other is not.
+let silentCollections = [];
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext, onError) => {
-    onNext(name === 'cmsPages' ? liveDocs : draftDocs);
+    if (!silentCollections.includes(name)) {
+      onNext(name === 'cmsPages' ? liveDocs : draftDocs);
+    }
     if (listenerError) onError?.(listenerError);
     return () => {};
   },
@@ -114,6 +119,7 @@ beforeEach(() => {
   liveDocs = [];
   draftDocs = [];
   listenerError = null;
+  silentCollections = [];
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -323,5 +329,136 @@ describe('page editor', () => {
         .getAllByRole('option')
         .map((o) => o.textContent),
     ).toEqual(['Rich text', 'Statistic']);
+  });
+});
+
+describe('publish results and recovery', () => {
+  it('waits for BOTH revisions before judging publish state', async () => {
+    // With only the live listener in, a draft-only page reads as "no such
+    // page" and a clean draft reads as never published — which Publish all
+    // would then republish, bumping revisions for nothing.
+    liveDocs = [];
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    silentCollections = ['cmsPages_drafts'];
+    await renderAt('/admin/pages');
+
+    expect(screen.getByRole('status', { name: 'Loading pages…' })).toBeInTheDocument();
+    expect(screen.queryByText('Never published')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Publish all/ })).toBeNull();
+  });
+
+  it('still resolves the wait when a listener errors, rather than spinning', async () => {
+    liveDocs = [{ ...SCHOLARSHIPS_DRAFT, status: undefined }];
+    silentCollections = ['cmsPages_drafts'];
+    listenerError = new Error('permission denied');
+    await renderAt('/admin/pages');
+
+    expect(screen.queryByRole('status', { name: 'Loading pages…' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+  });
+
+  it('does not claim success when cmsPublish skipped the page', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch
+      .mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }))
+      .mockResolvedValueOnce(
+        okResponse({
+          queueId: 'q1',
+          status: 'done',
+          results: {
+            cmsPages: {
+              published: [],
+              skipped: [{ docId: 'scholarships', reason: 'conflict' }],
+            },
+          },
+        }),
+      );
+    await renderAt('/admin/pages/scholarships');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+
+    // Both the inline status and the toast carry the verdict.
+    expect(
+      (await screen.findAllByText(/scholarships was edited while publishing/i)).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText(/picks it up live/i)).toBeNull();
+  });
+
+  it('resumes a part-way publish with its queueId instead of republishing', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch
+      .mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }))
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({
+          error: { code: 'publish-failed', message: 'Publish failed part-way. Re-run with { queueId } to resume.' },
+          queueId: 'queue-42',
+        }),
+      })
+      .mockResolvedValueOnce(
+        okResponse({
+          queueId: 'queue-42',
+          status: 'done',
+          results: { cmsPages: { published: ['scholarships'], skipped: [] } },
+        }),
+      );
+    await renderAt('/admin/pages/scholarships');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    const resume = await screen.findByRole('button', { name: 'Resume publish' });
+
+    fireEvent.click(resume);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    // { queueId } — NOT a fresh { collection, docIds }, which would publish
+    // the chunks that already committed a second time.
+    expect(bodyOf(2)).toEqual({ queueId: 'queue-42' });
+    expect((await screen.findAllByText(/picks it up live/i)).length).toBeGreaterThan(0);
+  });
+
+  it('keeps a created page’s id fixed when the publish half fails', async () => {
+    fetch
+      .mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }))
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({
+          error: { code: 'publish-failed', message: 'Publish failed part-way.' },
+          queueId: 'queue-42',
+        }),
+      });
+    await renderAt('/admin/pages/new');
+
+    fireEvent.change(screen.getByLabelText('Page id'), { target: { value: 'scholarships' } });
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Scholarships' } });
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/scholarships' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+
+    await screen.findByRole('alert');
+    // The draft landed, so the id must stop being editable: retrying under a
+    // different id would create a second document and orphan this draft.
+    expect(screen.getByLabelText('Page id')).toHaveAttribute('readonly');
+    expect(screen.getByRole('button', { name: 'Delete page' })).toBeInTheDocument();
+  });
+
+  it('publish all reports skipped pages instead of a blanket success', async () => {
+    liveDocs = [{ ...SCHOLARSHIPS_DRAFT, status: undefined, revision: 2 }];
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch.mockResolvedValueOnce(
+      okResponse({
+        queueId: 'q1',
+        status: 'done',
+        results: {
+          cmsPages: { published: [], skipped: [{ docId: 'scholarships', reason: 'no-draft' }] },
+        },
+      }),
+    );
+    await renderAt('/admin/pages');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
+    const alerts = await screen.findAllByRole('alert');
+    expect(
+      alerts.some((el) => /scholarships has no draft to publish/i.test(el.textContent)),
+    ).toBe(true);
   });
 });

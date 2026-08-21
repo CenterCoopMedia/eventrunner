@@ -13,6 +13,7 @@ import EmptyState from '../../components/EmptyState.jsx';
 import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
+import { summarizePublish } from '../publishResult.js';
 import { Panel, primaryButtonClass, secondaryButtonClass } from '../components/formControls.jsx';
 
 const STATE_CLASSES = {
@@ -39,19 +40,53 @@ export default function AdminPagesList() {
   const call = useAdminApi();
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [resumeQueueId, setResumeQueueId] = useState(null);
 
   const pendingIds = rows.filter((row) => row.state.id !== 'published').map((row) => row.id);
 
   async function publishAll() {
     setPublishing('all');
+    setNotice(null);
+    setResumeQueueId(null);
     try {
       // Only the pages with something to publish: cmsPublish republishes any
       // doc that has a draft, bumping its revision, so sending clean pages
       // would churn revisions for no change.
-      await call('cmsPublish', { collection: 'cmsPages', docIds: pendingIds });
-      showToast('Published. The public site picks it up live.');
+      const response = await call('cmsPublish', {
+        collection: 'cmsPages',
+        docIds: pendingIds,
+      });
+      reportPublish(response, pendingIds);
     } catch (err) {
       showToast(err.message, { tone: 'error' });
+      setNotice({ tone: 'error', message: err.message });
+      // A part-way failure names the queue row a retry must resume from,
+      // so committed chunks are not published a second time.
+      if (err?.queueId) setResumeQueueId(err.queueId);
+    } finally {
+      setPublishing(null);
+    }
+  }
+
+  /** cmsPublish answers 200 even when it skipped what you asked for. */
+  function reportPublish(response, requestedIds) {
+    const verdict = summarizePublish(response, 'cmsPages', requestedIds);
+    setNotice({ tone: verdict.ok ? 'info' : 'error', message: verdict.message });
+    showToast(verdict.message, verdict.ok ? undefined : { tone: 'error' });
+  }
+
+  /** Resume a part-way publish; { queueId } skips the committed chunks. */
+  async function resumePublish() {
+    setPublishing('resume');
+    try {
+      const response = await call('cmsPublish', { queueId: resumeQueueId });
+      setResumeQueueId(null);
+      reportPublish(response, pendingIds);
+    } catch (err) {
+      showToast(err.message, { tone: 'error' });
+      setNotice({ tone: 'error', message: err.message });
+      if (err?.queueId) setResumeQueueId(err.queueId);
     } finally {
       setPublishing(null);
     }
@@ -69,6 +104,16 @@ export default function AdminPagesList() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {resumeQueueId ? (
+            <button
+              type="button"
+              className={secondaryButtonClass}
+              onClick={resumePublish}
+              disabled={publishing !== null}
+            >
+              {publishing === 'resume' ? 'Resuming…' : 'Resume publish'}
+            </button>
+          ) : null}
           {dirtyCount > 0 ? (
             <button
               type="button"
@@ -84,6 +129,19 @@ export default function AdminPagesList() {
           </Link>
         </div>
       </div>
+
+      {notice ? (
+        <p
+          role={notice.tone === 'error' ? 'alert' : 'status'}
+          className={
+            notice.tone === 'error'
+              ? 'rounded-brand border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger'
+              : 'rounded-brand border border-success/40 bg-success/10 px-3 py-2 text-sm text-success'
+          }
+        >
+          {notice.message}
+        </p>
+      ) : null}
 
       {error ? (
         <p role="status" className="rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">

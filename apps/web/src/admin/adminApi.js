@@ -19,11 +19,18 @@ const MESSAGE_PREFIX_RE = /^[^:]*Invalid [a-z]+:\s*/i;
 const FIELD_SEGMENT_RE = /^([A-Za-z0-9_$[\].]+):\s*(.+)$/;
 
 export class AdminApiError extends Error {
-  constructor({ code, message, status }) {
+  constructor({ code, message, status, queueId = null }) {
     super(message);
     this.name = 'AdminApiError';
     this.code = code;
     this.status = status;
+    // cmsPublish reports a part-way failure as an error body PLUS a
+    // top-level queueId, and resuming with { queueId } is what makes the
+    // re-run skip the chunks that already committed (functions/src/cms/
+    // publish.cjs). Dropping it here would turn every retry into a fresh
+    // publish that re-publishes committed docs and double-bumps revisions,
+    // so it is carried on the error rather than normalized away.
+    this.queueId = queueId;
     this.fieldErrors = fieldErrorsOf(message);
   }
 }
@@ -104,6 +111,7 @@ export async function callAdminEndpoint(name, body, getIdToken) {
         typeof error.message === 'string' && error.message
           ? error.message
           : 'Something went wrong. Try again.',
+      queueId: typeof payload?.queueId === 'string' ? payload.queueId : null,
     });
   }
   return payload ?? {};

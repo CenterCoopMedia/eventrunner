@@ -48,7 +48,7 @@ function toPayload(categories) {
 }
 
 export default function AdminBadgeSettings() {
-  const { badges, features } = useEventConfig();
+  const { badges, features, sources } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
 
@@ -57,13 +57,16 @@ export default function AdminBadgeSettings() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
-  const adoptedRef = useRef(false);
+  // Keyed on CONFIG/BADGES' own readiness (never the aggregate `source`):
+  // this doc is overlay-only and a whole-doc replace, so saving before it has
+  // arrived would replace the configured set with an empty one.
+  const adoptedRef = useRef(sources.badges === 'live');
 
   useEffect(() => {
-    if (adoptedRef.current || !badges) return;
+    if (adoptedRef.current || sources.badges !== 'live') return;
     adoptedRef.current = true;
     setCategories(toForm(badges));
-  }, [badges]);
+  }, [sources.badges, badges]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();

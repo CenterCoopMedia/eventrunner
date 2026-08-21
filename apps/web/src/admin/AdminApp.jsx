@@ -6,10 +6,11 @@
 //   • auth still loading → a loading state, never a flash of denial;
 //   • signed out        → redirect to /signin, remembering where they were;
 //   • signed in, not an admin → a plain denial, no retry affordance.
-// "Admin" is exactly what AuthContext's isAdmin reports: a probe read of an
+// "Admin" is exactly what AuthContext's admin probe reports: a read of an
 // admin-only drafts collection, decided by firestore.rules isAdmin(), which
 // is the same config/bootstrap.adminEmails + verified-email test the server's
-// requireAdmin applies.
+// requireAdmin applies. Its tri-state (adminStatus) is what keeps the gate
+// from answering before the probe has.
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -23,10 +24,13 @@ import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminBranding from './pages/AdminBranding.jsx';
 
 export function AdminGate({ children }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, adminStatus, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  // Two waits, not one: `loading` is the auth handshake, and it finishes
+  // BEFORE the admin probe answers. Rendering the denial in that gap would
+  // flash "you don't have admin access" at every admin on every load.
+  if (loading || (user && adminStatus === 'unknown')) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-12">
         <LoadingState label="Checking your access…" />
@@ -46,7 +50,7 @@ export function AdminGate({ children }) {
       />
     );
   }
-  if (!isAdmin) {
+  if (adminStatus !== 'admin') {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-12">
         <EmptyState

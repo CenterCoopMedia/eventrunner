@@ -172,6 +172,46 @@ describe('event settings', () => {
   });
 });
 
+// Every one of these forms seeds itself once and then saves its document
+// whole (or as a merge over it). If a form seeds from the BUILD-TIME snapshot
+// because a sibling config doc reported first, its next save writes those
+// snapshot values over production — so each must key its adoption on its OWN
+// document's arrival, never on the aggregate 'live' flag.
+describe('per-document adoption', () => {
+  it('features: a config/event doc arriving first does not freeze the form on snapshot flags', async () => {
+    await renderAt('/admin/features');
+    // config/event lands first — the aggregate source is now 'live' while
+    // config/features has not been seen at all.
+    await pushConfig('event', LIVE_EVENT);
+    await pushConfig('features', { schedule: false, speakers: true });
+
+    expect(screen.getByLabelText('schedule')).not.toBeChecked();
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save features' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // The snapshot has schedule: true. Saving it would have silently
+    // re-enabled a flag production had turned off.
+    expect(bodyOf(0).features.schedule).toBe(false);
+  });
+
+  it('event: a config/features doc arriving first does not freeze the form on snapshot values', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('features', { schedule: true });
+    await pushConfig('event', LIVE_EVENT);
+    expect(screen.getByLabelText('Event name')).toHaveValue('Community Media Summit');
+  });
+
+  it('badges: a config/event doc arriving first does not freeze the form on an empty set', async () => {
+    await renderAt('/admin/badges');
+    await pushConfig('event', LIVE_EVENT);
+    await pushConfig('badges', {
+      categories: [{ id: 'role', label: 'Role', maxPicks: 1, badges: [] }],
+    });
+    expect(screen.getByLabelText('Category 1 label')).toHaveValue('Role');
+  });
+});
+
 describe('feature flags', () => {
   it('sends every known flag, because an omitted flag means disabled', async () => {
     await renderAt('/admin/features');

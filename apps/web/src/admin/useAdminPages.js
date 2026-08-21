@@ -36,9 +36,14 @@ export function useAdminPages() {
 
   return {
     rows,
-    // Neither listener has reported yet — distinct from "reported an empty
-    // collection", which is a legitimately empty CMS.
-    loading: live === null && drafts === null,
+    // BOTH listeners must report before the list is trustworthy — an empty
+    // array is a legitimate answer ("no pages"), but a missing one is not:
+    // with only the live result in, a draft-only page reads as "no such
+    // page", and with only the drafts result in, a clean draft reads as
+    // never published and Publish all would republish it. An errored
+    // listener resolves the wait instead of spinning forever (fail soft: the
+    // rows we do have keep rendering while the subscription retries).
+    loading: (live === null || drafts === null) && !error,
     error,
     findRow: (id) => rows.find((row) => row.id === id) ?? null,
   };

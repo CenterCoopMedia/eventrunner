@@ -16,7 +16,7 @@
 //
 // config/theme is a WHOLE-DOC replace, so the payload always carries colors,
 // fonts, texture, radius, and logos together.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -42,8 +42,24 @@ import {
 
 const LOGO_SLOTS = ['primary', 'mark', 'footer', 'ogDefault', 'favicon'];
 
-/** A hex value a native color picker will accept. */
-const PICKABLE_HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+/** A hex value the schema accepts: #RGB or #RRGGBB. */
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/**
+ * The value to hand a native color picker. `<input type="color">` only
+ * understands the six-digit form: given #fff it sanitizes the value to black
+ * and would then write that black back over a perfectly valid stored color on
+ * the next interaction. Expanding the shorthand keeps the picker showing the
+ * real color, while the text field beside it still holds what the operator
+ * actually typed.
+ */
+export function toPickerHex(value) {
+  if (typeof value !== 'string' || !HEX_COLOR_RE.test(value.trim())) return null;
+  const digits = value.trim().slice(1);
+  return digits.length === 3
+    ? `#${digits.split('').map((ch) => ch + ch).join('')}`
+    : `#${digits}`;
+}
 
 /**
  * Seed one color input. config/theme.colors wins; otherwise the value
@@ -128,7 +144,7 @@ const RADIUS_LABELS = { sharp: 'Sharp', soft: 'Soft', round: 'Round' };
 const TEXTURE_LABELS = { paper: 'Paper', flat: 'Flat' };
 
 export default function AdminBranding() {
-  const { theme } = useEventConfig();
+  const { theme, sources } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
 
@@ -137,15 +153,25 @@ export default function AdminBranding() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
-  const adoptedRef = useRef(Boolean(theme?.colors));
+  const adoptedRef = useRef(sources.theme === 'live');
 
-  // Adopt the runtime doc once it arrives, then leave the form alone so a
-  // listener echo never overwrites in-progress edits.
+  // Seeding reads unset colors back from the resolved custom properties, so
+  // the preview overlay must be gone first — otherwise a color the saved
+  // theme does not set would "revert" to the unsaved candidate that is
+  // currently painting the page. The preview effect below re-applies from the
+  // fresh form on the next render.
+  const reseedFromTheme = useCallback((themeDoc) => {
+    clearThemePreview();
+    setForm(toForm(themeDoc));
+  }, []);
+
+  // Adopt the runtime doc once CONFIG/THEME itself arrives, then leave the
+  // form alone so a listener echo never overwrites in-progress edits.
   useEffect(() => {
-    if (adoptedRef.current || !theme?.colors) return;
+    if (adoptedRef.current || sources.theme !== 'live') return;
     adoptedRef.current = true;
-    setForm(toForm(theme));
-  }, [theme]);
+    reseedFromTheme(theme);
+  }, [sources.theme, theme, reseedFromTheme]);
 
   const candidate = useMemo(() => toThemeDoc(form), [form]);
 
@@ -186,7 +212,7 @@ export default function AdminBranding() {
   }
 
   function revert() {
-    setForm(toForm(theme));
+    reseedFromTheme(theme);
     setStatus('Reverted to the saved theme.');
   }
 
@@ -210,11 +236,11 @@ export default function AdminBranding() {
         <div className="grid gap-4 sm:grid-cols-2">
           {THEME_COLOR_KEYS.map((key) => (
             <div key={key} className="flex items-end gap-3">
-              {PICKABLE_HEX_RE.test(form.colors[key]) ? (
+              {toPickerHex(form.colors[key]) ? (
                 <input
                   type="color"
                   aria-label={`${COLOR_LABELS[key] ?? key} color picker`}
-                  value={form.colors[key]}
+                  value={toPickerHex(form.colors[key])}
                   onChange={(event) =>
                     setForm((c) => ({ ...c, colors: { ...c.colors, [key]: event.target.value } }))
                   }

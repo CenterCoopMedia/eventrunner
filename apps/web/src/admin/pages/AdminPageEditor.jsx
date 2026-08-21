@@ -15,7 +15,10 @@
 //
 // `path` is a plain text input validated SERVER-side: the path rules are the
 // server's business (and are changing), so this file hardcodes no shape and
-// surfaces the server's rejection verbatim.
+// surfaces the server's rejection verbatim. Deliberately NOT constrained to
+// /p/:slug — the routing rework makes root-level paths canonical, resolved by
+// a catch-all route with reserved-segment validation, so path resolution and
+// its rules land with that work and are enforced server-side either way.
 //
 // Sections carry the block contract: `allowedBlocks` is a palette drawn from
 // the BLOCK_TYPES registry, and `defaultBlocks` are the blocks the section
@@ -35,6 +38,7 @@ import {
   blockTypeLabel,
 } from '../blockTypes.js';
 import { blankPage, blankSection, toEditablePage, toPagePayload } from '../pageDoc.js';
+import { summarizePublish } from '../publishResult.js';
 import {
   CheckboxField,
   Panel,
@@ -71,6 +75,8 @@ export default function AdminPageEditor({ mode }) {
   // Set once a create has landed, so the form switches to editing that
   // document instead of trying to create it again.
   const [savedId, setSavedId] = useState(null);
+  // Set when a publish fails part-way: the queue row the retry must resume.
+  const [resumeQueueId, setResumeQueueId] = useState(null);
   const errorRef = useRef(null);
   // Load the stored revision once; later listener updates (e.g. the echo of
   // our own save) must not clobber whatever is being typed.
@@ -144,28 +150,59 @@ export default function AdminPageEditor({ mode }) {
     setBusy(publish ? 'publish' : 'draft');
     setError(null);
     setStatus('');
+    setResumeQueueId(null);
     const payload = toPagePayload(page);
     try {
       await call('cmsSavePage', { page: payload });
-      if (publish) {
-        // Separate call by design: cmsSavePage only ever writes the draft
-        // revision; the live doc is cmsPublish's to write (spec §8.4).
-        await call('cmsPublish', { collection: 'cmsPages', docIds: [payload.id] });
-      }
-      setStatus(
-        publish
-          ? 'Published. The public site picks it up live.'
-          : 'Draft saved. It is not public until you publish.',
-      );
-      showToast(publish ? 'Page published.' : 'Draft saved.');
-      // A created page stays on this form rather than navigating to the edit
-      // route: the draft listener needs a moment to report the new document,
-      // and bouncing through "no such page" in the meantime would look like
-      // the save had failed. The id simply stops being editable.
+      // Mark the document existing the moment the DRAFT is written, before
+      // any publish attempt: a failed publish must not leave the id editable,
+      // because retrying under a different id would create a second document
+      // and orphan the draft that just landed.
       setSavedId(payload.id);
       loadedIdRef.current = payload.id;
+      if (!publish) {
+        setStatus('Draft saved. It is not public until you publish.');
+        showToast('Draft saved.');
+        return;
+      }
+      // Separate call by design: cmsSavePage only ever writes the draft
+      // revision; the live doc is cmsPublish's to write (spec §8.4).
+      const response = await call('cmsPublish', {
+        collection: 'cmsPages',
+        docIds: [payload.id],
+      });
+      reportPublish(response, [payload.id]);
     } catch (err) {
       setError(err);
+      // A part-way publish failure carries the queue row to resume from.
+      if (err?.queueId) setResumeQueueId(err.queueId);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** cmsPublish answers 200 even when it skipped what you asked for. */
+  function reportPublish(response, requestedIds) {
+    const verdict = summarizePublish(response, 'cmsPages', requestedIds);
+    setStatus(verdict.message);
+    showToast(verdict.message, verdict.ok ? undefined : { tone: 'error' });
+  }
+
+  /**
+   * Resume a publish that failed part-way. Passing { queueId } is what makes
+   * the re-run skip the chunks that already committed instead of publishing
+   * them a second time (functions/src/cms/publish.cjs).
+   */
+  async function resumePublish() {
+    setBusy('publish');
+    setError(null);
+    try {
+      const response = await call('cmsPublish', { queueId: resumeQueueId });
+      setResumeQueueId(null);
+      reportPublish(response, [savedId ?? page.id]);
+    } catch (err) {
+      setError(err);
+      if (err?.queueId) setResumeQueueId(err.queueId);
     } finally {
       setBusy(null);
     }
@@ -568,6 +605,16 @@ export default function AdminPageEditor({ mode }) {
         >
           {busy === 'publish' ? 'Publishing…' : 'Save and publish'}
         </button>
+        {resumeQueueId ? (
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            disabled={busy !== null}
+            onClick={resumePublish}
+          >
+            {busy === 'publish' ? 'Resuming…' : 'Resume publish'}
+          </button>
+        ) : null}
         {isExisting ? (
           <button
             type="button"

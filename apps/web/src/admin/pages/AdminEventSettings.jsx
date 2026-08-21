@@ -139,7 +139,7 @@ function toPayload(form) {
 }
 
 export default function AdminEventSettings() {
-  const { eventConfig, source } = useEventConfig();
+  const { eventConfig, sources } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
 
@@ -148,15 +148,20 @@ export default function AdminEventSettings() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
-  // Adopt runtime config once it arrives (the snapshot renders first), then
-  // stop — later listener echoes must not overwrite in-progress edits.
-  const adoptedRef = useRef(source === 'live');
+  // Adopt runtime config once CONFIG/EVENT itself arrives (the snapshot
+  // renders first), then stop — later listener echoes must not overwrite
+  // in-progress edits. Keyed on this document's own readiness, not the
+  // aggregate `source`: a sibling doc (theme, badges) reporting first would
+  // otherwise freeze the form on snapshot values, and this form's save is a
+  // merge over the stored doc — seeded-from-snapshot values would overwrite
+  // production ones field by field.
+  const adoptedRef = useRef(sources.event === 'live');
 
   useEffect(() => {
-    if (adoptedRef.current || source !== 'live') return;
+    if (adoptedRef.current || sources.event !== 'live') return;
     adoptedRef.current = true;
     setForm(toForm(eventConfig));
-  }, [source, eventConfig]);
+  }, [sources.event, eventConfig]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();

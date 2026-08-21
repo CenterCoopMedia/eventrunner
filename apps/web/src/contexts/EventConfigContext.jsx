@@ -101,6 +101,19 @@ export function EventConfigProvider({ children }) {
       // other three docs.
       badges: overlay.badges,
       source: live ? 'live' : 'snapshot',
+      // Per-document readiness. `source` above is an aggregate — it flips to
+      // 'live' as soon as ANY of the four docs reports — which is fine for
+      // "are we showing runtime values at all" but wrong for any consumer
+      // that must know whether ITS doc has arrived (e.g. an admin form that
+      // seeds itself once and then saves the doc whole: seeding from the
+      // snapshot because a sibling doc reported first would silently revert
+      // production values on save).
+      sources: {
+        event: overlay.event ? 'live' : 'snapshot',
+        features: overlay.features ? 'live' : 'snapshot',
+        theme: overlay.theme ? 'live' : 'snapshot',
+        badges: overlay.badges ? 'live' : 'snapshot',
+      },
     };
   }, [overlay]);
 

@@ -143,6 +143,70 @@ describe('branding live preview', () => {
     await waitFor(() => expect(previewCss()).toContain('42 157 143'));
     expect(screen.getByLabelText('Primary')).toHaveValue(TEAL);
   });
+
+  it('reverting a color the saved theme does not set does not resurrect the candidate', async () => {
+    // Colors absent from config/theme are seeded by reading them back off
+    // :root — so reverting while the preview stylesheet is still applied
+    // would read the UNSAVED candidate as if it were the saved value.
+    // jsdom does not resolve custom properties, so getComputedStyle is stood
+    // in for with a reader over whatever stylesheet is currently applied,
+    // which is exactly the behaviour being guarded against.
+    await renderBranding();
+    // `accent` is not in LIVE_THEME.colors.
+    fireEvent.change(screen.getByLabelText('Accent'), { target: { value: RUST } });
+    await waitFor(() => expect(previewCss()).toContain('--brand-accent-rgb: 200 75 49;'));
+
+    const readFromAppliedCss = vi.spyOn(window, 'getComputedStyle').mockImplementation(() => ({
+      getPropertyValue: (prop) => {
+        const css = document.getElementById(PREVIEW_STYLE_ID)?.textContent ?? '';
+        const match = css.match(new RegExp(`${prop}:\\s*([^;]+);`));
+        return match ? match[1] : '';
+      },
+    }));
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Revert to saved' }));
+    } finally {
+      readFromAppliedCss.mockRestore();
+    }
+
+    expect(screen.getByLabelText('Accent')).toHaveValue('');
+    await waitFor(() => expect(previewCss()).not.toContain('--brand-accent-rgb'));
+  });
+});
+
+describe('color picker input', () => {
+  it('expands #RGB shorthand for the native picker, keeping the typed value', async () => {
+    // <input type="color"> only understands #rrggbb: handed #fff it
+    // sanitizes the value to black, and the next interaction would write
+    // that black over a perfectly valid stored color.
+    configSubscriptions.clear();
+    render(
+      <MemoryRouter
+        initialEntries={['/admin/branding']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <App />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      configSubscriptions.get('theme')({ ...LIVE_THEME, colors: { primary: hex('fff') } });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByLabelText('Primary')).toHaveValue(hex('fff'));
+    expect(screen.getByLabelText('Primary color picker')).toHaveValue(hex('ffffff'));
+  });
+
+  it('hides the picker for a value it cannot represent, rather than showing black', async () => {
+    await renderBranding();
+    fireEvent.change(screen.getByLabelText('Ink'), { target: { value: 'not-a-color' } });
+    await waitFor(() => expect(screen.queryByLabelText('Ink color picker')).toBeNull());
+    expect(screen.getByLabelText('Ink')).toHaveValue('not-a-color');
+  });
 });
 
 describe('branding save', () => {
