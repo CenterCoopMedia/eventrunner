@@ -140,6 +140,14 @@ beforeAll(async () => {
     await setDoc(doc(db, "cmsVersionHistory/v1"), { collection: "cmsPages" });
     await setDoc(doc(db, "cmsPublishQueue/q1"), { status: "complete" });
     await setDoc(doc(db, "admin_logs/l1"), { action: "cmsPublish" });
+    await setDoc(doc(db, "media_assets/asset-1"), {
+      path: "cms-images/asset-1/hero.png",
+      contentType: "image/png",
+      size: 1024,
+      alt: "A hero image",
+      uploadedBy: ADMIN_EMAIL,
+      createdAt: new Date(),
+    });
 
     for (const [uid, account] of Object.entries(ATTENDEES)) {
       await setDoc(doc(db, `users/${uid}`), {
@@ -280,6 +288,38 @@ describe("publish bookkeeping collections", () => {
       await assertFails(setDoc(doc(admin(), path), { x: 1 }));
     });
   }
+});
+
+// The media library's index (spec §4.1, §8.5). Rows are written only by
+// mediaUpload / mediaUpdateMetadata / mediaDelete through the Admin SDK; the
+// admin UI reads them directly so the browser can list and filter without a
+// callable per keystroke.
+describe("media_assets", () => {
+  it("allows an admin to read one asset row and to list the collection", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "media_assets/asset-1")));
+    await assertSucceeds(getDocs(collection(admin(), "media_assets")));
+  });
+
+  it("denies reads to non-admins and anonymous clients", async () => {
+    // The index enumerates assets attached to nothing, or to unpublished
+    // drafts — a pre-announcement leak of exactly the shape §8.4 separates
+    // the draft collections to prevent.
+    await assertFails(getDoc(doc(nonAdmin(), "media_assets/asset-1")));
+    await assertFails(getDoc(doc(anon(), "media_assets/asset-1")));
+    await assertFails(getDocs(collection(nonAdmin(), "media_assets")));
+  });
+
+  it("denies every client write, admin included", async () => {
+    // A client that could write a row could point an existing asset id at
+    // any object path — including one it uploaded under profile-photos.
+    for (const db of [anon(), nonAdmin(), admin()]) {
+      await assertFails(
+        setDoc(doc(db, "media_assets/asset-2"), { path: "cms-images/x/y.png" }),
+      );
+    }
+    await assertFails(updateDoc(doc(admin(), "media_assets/asset-1"), { alt: "x" }));
+    await assertFails(deleteDoc(doc(admin(), "media_assets/asset-1")));
+  });
 });
 
 describe("server-only collections stay deny-all", () => {

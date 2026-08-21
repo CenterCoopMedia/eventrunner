@@ -241,6 +241,25 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // media_assets: the index of uploaded Storage objects behind the media
+    // library (spec §4.1, §8.5). Admin-readable so the library can list and
+    // search without a callable per keystroke; never client-written — every
+    // row is created by mediaUpload and edited by mediaUpdateMetadata /
+    // mediaDelete through the Admin SDK, in the same transaction-adjacent
+    // step that touches the bucket.
+    //
+    // Admin-only READ, not public: the objects themselves are publicly
+    // readable in Storage (storage.rules §8.5), but this index enumerates
+    // every asset an event has ever uploaded — including assets attached to
+    // nothing yet, or to unpublished drafts — which is exactly the kind of
+    // pre-announcement leak the draft collections above are separated to
+    // prevent. Public pages render an asset by the path stored on the
+    // content doc; they never need to list the library.
+    match /media_assets/{assetId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Server-only collections, named explicitly so a future edit cannot
     // open them by accident via a broader match.
     match /auth_challenges/{docId} { allow read, write: if false; }
