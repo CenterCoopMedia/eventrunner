@@ -1,11 +1,15 @@
 // App shell: the provider nesting from spec §2.4 —
-// EventConfigProvider (outermost) > AuthProvider > ContentProvider >
-// ToastProvider > routes. The Router wraps everything in main.jsx (tests use
-// MemoryRouter), so ContentProvider can later read search params via hooks.
+// EventConfigProvider (outermost) > AuthProvider > ProfileProvider >
+// ContentProvider > ToastProvider > routes. ProfileProvider sits directly
+// inside AuthProvider because it subscribes to the signed-in user's own
+// users/{uid} document (issue #17).
+// The Router wraps everything in main.jsx (tests use MemoryRouter), so
+// ContentProvider can later read search params via hooks.
 import { Route, Routes, useSearchParams } from 'react-router-dom';
 import { EventConfigProvider } from './contexts/EventConfigContext.jsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { ContentProvider } from './contexts/ContentContext.jsx';
+import { ProfileProvider } from './contexts/ProfileContext.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
 import Home from './pages/Home.jsx';
@@ -14,6 +18,9 @@ import Speakers from './pages/Speakers.jsx';
 import Sponsors from './pages/Sponsors.jsx';
 import ContentPage from './pages/ContentPage.jsx';
 import Login from './pages/Login.jsx';
+import Profile from './pages/Profile.jsx';
+import Attendees from './pages/Attendees.jsx';
+import AttendeeProfile from './pages/AttendeeProfile.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 export function AppRoutes() {
@@ -26,6 +33,9 @@ export function AppRoutes() {
         <Route path="sponsors" element={<Sponsors />} />
         <Route path="p/:slug" element={<ContentPage />} />
         <Route path="signin" element={<Login />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="attendees" element={<Attendees />} />
+        <Route path="attendees/:uid" element={<AttendeeProfile />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
@@ -51,11 +61,13 @@ export default function App() {
   return (
     <EventConfigProvider>
       <AuthProvider>
-        <ContentGate>
-          <ToastProvider>
-            <AppRoutes />
-          </ToastProvider>
-        </ContentGate>
+        <ProfileProvider>
+          <ContentGate>
+            <ToastProvider>
+              <AppRoutes />
+            </ToastProvider>
+          </ContentGate>
+        </ProfileProvider>
       </AuthProvider>
     </EventConfigProvider>
   );
