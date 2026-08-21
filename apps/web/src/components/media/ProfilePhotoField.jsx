@@ -12,12 +12,22 @@
 // the new path upward. That ordering is deliberate: an object with no
 // profile pointing at it is invisible and costs a few kilobytes, while a
 // saved path with no object is a broken image on the attendee directory.
+//
+// DELETION FOLLOWS THE SAME RULE, which is why this field never deletes
+// anything. "Remove photo" only clears the path in the form; the object is
+// removed by Profile.jsx AFTER the save commits, once the stored profile —
+// and the users_public projection built from it — has stopped referencing
+// it. Deleting on click instead would mean an abandoned edit (navigate away,
+// failed save, closed tab) leaves the directory pointing at an object that
+// no longer exists, which is the one failure mode a photo field must not
+// have. The cost is an orphaned object when a save never happens; that is
+// cheap, invisible, and collectable by a later maintenance sweep (§9
+// cleanup.cjs), whereas a broken avatar is neither.
 import { useRef, useState } from 'react';
 import {
   PROFILE_PHOTO_MAX_BYTES,
   PROFILE_PHOTO_TYPES,
   checkFile,
-  deleteOwnPhoto,
   formatBytes,
   typeLabel,
   uploadProfilePhoto,
@@ -35,6 +45,8 @@ export default function ProfilePhotoField({ uid, value, onChange }) {
     const problem = checkFile(file, {
       types: PROFILE_PHOTO_TYPES,
       maxBytes: PROFILE_PHOTO_MAX_BYTES,
+      // storage.rules refuses a file of EXACTLY the cap (`size < 2 MiB`).
+      exclusive: true,
     });
     if (problem) {
       setError(problem);
@@ -55,10 +67,10 @@ export default function ProfilePhotoField({ uid, value, onChange }) {
     }
   }
 
-  async function remove() {
-    const path = value;
+  function remove() {
+    // Clear the form value only. Profile.jsx deletes the object once the
+    // save has committed — see the module header.
     onChange('');
-    await deleteOwnPhoto(path);
   }
 
   return (

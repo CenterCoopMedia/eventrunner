@@ -19,6 +19,7 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ProfilePhotoField from '../components/media/ProfilePhotoField.jsx';
+import { deleteOwnPhoto } from '../lib/mediaSource.js';
 
 const VISIBILITY_COPY = {
   public: {
@@ -79,6 +80,11 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState(null);
   const nameRef = useRef(null);
+  // The photo path the SAVED profile currently references. Removing or
+  // replacing a photo only changes the form; the old object is deleted once
+  // a save has committed, so an abandoned edit never leaves the directory
+  // pointing at an object that is gone (see ProfilePhotoField).
+  const savedPhotoPathRef = useRef(null);
 
   // Seed the form from the account document the first time it arrives. Later
   // snapshots (e.g. the profileComplete trigger writing back) must not
@@ -95,6 +101,8 @@ export default function Profile() {
       badges: Array.isArray(profile.badges) ? profile.badges : [],
       photoPath: typeof profile.photoPath === 'string' ? profile.photoPath : '',
     });
+    savedPhotoPathRef.current =
+      typeof profile.photoPath === 'string' ? profile.photoPath : null;
   }, [profile, form]);
 
   if (!user) {
@@ -166,6 +174,16 @@ export default function Profile() {
         // projection coerces either to nothing rendered.
         photoPath: form.photoPath ? form.photoPath : null,
       });
+      // The save committed, so nothing points at the previous object any
+      // more: clean it up. Best effort by design — a failed delete leaves an
+      // orphan, which costs storage and nothing else, while failing the save
+      // here would tell someone their profile did not save when it did.
+      const previousPath = savedPhotoPathRef.current;
+      const currentPath = form.photoPath ? form.photoPath : null;
+      savedPhotoPathRef.current = currentPath;
+      if (previousPath && previousPath !== currentPath) {
+        await deleteOwnPhoto(previousPath);
+      }
       showToast('Profile saved.');
     } catch {
       // The rules reject anything outside the self-editable allowlist, and

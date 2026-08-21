@@ -2,31 +2,63 @@
 //
 // Interface guidelines applied: the dialog is labelled by its own heading,
 // focus moves into it on open and returns to whatever opened it on close,
-// Escape closes, the backdrop is inert to clicks that started inside the
-// panel, and the page behind it stops scrolling. No dependency: the app has
-// no dialog library and one modal shell does not justify adding one.
+// Escape closes, and the page behind it stops scrolling. No dependency: the
+// app has no dialog library and one modal shell does not justify adding one.
+//
+// Escape closes ONE dialog — the topmost. These modals nest: ImagePicker
+// opens a library, and a tile inside it opens the asset detail dialog. With
+// every mounted shell handling the same document-level keydown, one Escape
+// would collapse the whole stack and throw away the picker the person was
+// only stepping out of. A module-level stack of open shells decides which
+// handler acts; the rest ignore the key.
 import { useEffect, useId, useRef } from 'react';
+
+/** Open shells, oldest first. The last entry is the topmost dialog. */
+const openShells = [];
 
 export default function ModalShell({ title, description = null, onClose, children }) {
   const headingId = useId();
   const panelRef = useRef(null);
   const openerRef = useRef(null);
 
+  // The token identifies THIS shell in the stack for its whole lifetime.
+  const tokenRef = useRef(null);
+  if (tokenRef.current === null) tokenRef.current = Symbol('modal');
+
+  // Registration is mount/unmount ONLY. Re-registering on every render (an
+  // `onClose` identity that changes with a parent re-render) would move a
+  // parent shell back to the top of the stack while its own child dialog is
+  // still open, and Escape would then close the wrong one.
   useEffect(() => {
+    const token = tokenRef.current;
+    openShells.push(token);
     openerRef.current = document.activeElement;
     panelRef.current?.focus();
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
+      const index = openShells.indexOf(token);
+      if (index !== -1) openShells.splice(index, 1);
+      // A parent shell keeps the page locked; only the last one out
+      // restores scrolling.
+      if (openShells.length === 0) document.body.style.overflow = previousOverflow;
       const opener = openerRef.current;
       if (opener && typeof opener.focus === 'function') opener.focus();
     };
+  }, []);
+
+  useEffect(() => {
+    const token = tokenRef.current;
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      // Only the topmost dialog answers, and it stops the event so a
+      // handler mounted outside this component cannot also act on it.
+      if (openShells[openShells.length - 1] !== token) return;
+      event.stopPropagation();
+      onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
   return (

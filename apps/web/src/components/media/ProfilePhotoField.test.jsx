@@ -2,8 +2,11 @@
 //
 // Pinned here: it uploads to the owner's own prefix through the Storage SDK
 // (not the admin endpoints), it refuses a file storage.rules would refuse
-// before spending the upload, and it reports the PATH upward so the profile
-// save writes `photoPath` — the field firestore.rules lets the owner edit.
+// before spending the upload — including one of EXACTLY the cap, since the
+// rule is a strict `<` — it reports the PATH upward so the profile save
+// writes `photoPath`, and it never deletes an object itself (Profile.jsx
+// does that after the save commits, so an abandoned edit cannot leave the
+// directory pointing at a deleted object).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
@@ -58,11 +61,21 @@ describe('ProfilePhotoField', () => {
     Object.defineProperty(big, 'size', { value: 3 * 1024 * 1024 });
     pick(big);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/limit is 2\.0 MB/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/limit is under 2\.0 MB/);
     expect(uploadBytes).not.toHaveBeenCalled();
   });
 
-  it('clears the path immediately when the photo is removed', async () => {
+  it('refuses a file of exactly 2 MiB — the rule is a strict less-than', async () => {
+    render(<ProfilePhotoField uid="attendee-1" value="" onChange={vi.fn()} />);
+    const exact = new File([''], 'exact.png', { type: 'image/png' });
+    Object.defineProperty(exact, 'size', { value: 2 * 1024 * 1024 });
+    pick(exact);
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(uploadBytes).not.toHaveBeenCalled();
+  });
+
+  it('clears the path on remove but deletes nothing before the save', async () => {
     const onChange = vi.fn();
     render(
       <ProfilePhotoField
@@ -72,10 +85,10 @@ describe('ProfilePhotoField', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
-    // The save is what actually removes the photo from the directory; the
-    // object delete is best effort behind it.
     expect(onChange).toHaveBeenCalledWith('');
-    await waitFor(() => expect(deleteObject).toHaveBeenCalled());
+    // Deleting here would strand the stored profile and its users_public
+    // projection on a deleted object whenever the edit is abandoned.
+    expect(deleteObject).not.toHaveBeenCalled();
   });
 
   it('reports a failed upload rather than pretending it worked', async () => {

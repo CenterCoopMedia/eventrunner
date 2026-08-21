@@ -25,10 +25,8 @@ vi.mock('../../lib/mediaSource.js', async () => {
   const actual = await vi.importActual('../../lib/mediaSource.js');
   return {
     ...actual,
-    // Storage itself is out of scope for these tests: a resolved URL and a
-    // base64 payload are all the components consume.
-    assetUrl: vi.fn(async (path) => `https://example.test/${path}`),
-    forgetAssetUrl: vi.fn(),
+    // Only the file read is faked; assetUrl is a pure builder and runs for
+    // real (lib/mediaSource.test.js covers it).
     fileToBase64: vi.fn(async () => 'ZmFrZQ=='),
   };
 });
@@ -202,6 +200,39 @@ describe('the delete-with-usage-warning flow', () => {
         title: 'Hero',
       }),
     );
+  });
+});
+
+describe('nested dialogs', () => {
+  it('closes only the topmost dialog on Escape', async () => {
+    // ImagePicker opens the library, and a tile inside it opens the asset
+    // detail dialog. One Escape must step back one level, not discard the
+    // picker the person was only stepping out of.
+    render(<ImagePicker label="Primary logo" folder="branding" value="" onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose or upload…' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Details and delete' }));
+
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
+    // The one still open is the picker's library, not the detail modal.
+    expect(screen.getByRole('dialog')).toHaveAccessibleName(/Choose an image/);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('restores page scrolling only when the last dialog closes', async () => {
+    render(<ImagePicker label="Primary logo" folder="branding" value="" onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose or upload…' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Details and delete' }));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
+    expect(document.body.style.overflow).toBe('hidden');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.body.style.overflow).not.toBe('hidden');
   });
 });
 
