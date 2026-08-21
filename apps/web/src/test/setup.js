@@ -29,6 +29,18 @@ vi.mock('firebase/auth', () => ({
   signOut: vi.fn(async () => {}),
 }));
 
+// Storage is mocked for every test file the same way: the media components
+// resolve object paths to download URLs on mount (lib/mediaSource.js), and
+// an unmocked SDK reaches for a real bucket the credential-free run has no
+// configuration for. Individual tests override this per file when they need
+// to assert on an upload.
+vi.mock('firebase/storage', () => ({
+  ref: vi.fn((_storage, path) => ({ path })),
+  getDownloadURL: vi.fn(async (reference) => `https://example.test/${reference?.path ?? ''}`),
+  uploadBytes: vi.fn(async () => ({})),
+  deleteObject: vi.fn(async () => {}),
+}));
+
 vi.mock('firebase/firestore', () => {
   const permissionDenied = () => {
     const error = new Error('Missing or insufficient permissions.');

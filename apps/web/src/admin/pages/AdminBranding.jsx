@@ -8,11 +8,14 @@
 // lib/themeRuntime.js builder the runtime override uses, so what you see is
 // what the public site will render — no deploy, no rebuild.
 //
-// Logo/asset slots: config/theme.logos holds PATHS, and there is no upload
-// backend yet (storage.rules deny all writes; no upload endpoint exists), so
-// the slots are editable as paths to assets already served by the site and
-// the upload affordance is a marked TODO rather than an invented storage
-// path. Whatever is in `logos` is carried through every save verbatim.
+// Logo/asset slots: config/theme.logos holds PATHS into the Storage bucket,
+// and each slot is an ImagePicker over the `branding/` namespace — browse
+// the media library, upload a new file, or type a path by hand for an asset
+// that predates the library (the four placeholders init seeds, or anything
+// served from the bundle). Uploads go through `mediaUpload`, which verifies
+// the admin token and writes with the Admin SDK; storage.rules still deny
+// every client write to `branding/` (spec §8.5). Whatever is in `logos` is
+// carried through every save verbatim.
 //
 // config/theme is a WHOLE-DOC replace, so the payload always carries colors,
 // fonts, texture, radius, and logos together.
@@ -39,8 +42,26 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import ImagePicker from '../../components/media/ImagePicker.jsx';
 
 const LOGO_SLOTS = ['primary', 'mark', 'footer', 'ogDefault', 'favicon'];
+
+/** What each slot is FOR — a path field alone never says (spec §7.2). */
+const LOGO_SLOT_LABELS = {
+  primary: 'Primary logo',
+  mark: 'Mark (square icon)',
+  footer: 'Footer logo',
+  ogDefault: 'Social sharing image',
+  favicon: 'Favicon',
+};
+
+const LOGO_SLOT_HINTS = {
+  primary: 'The header logo, shown at the top of every page.',
+  mark: 'A square version for tight spaces.',
+  footer: 'Used in the site footer; falls back to the primary logo.',
+  ogDefault: 'The image link previews use when a page has none of its own.',
+  favicon: 'The browser tab icon.',
+};
 
 /** A hex value the schema accepts: #RGB or #RRGGBB. */
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -321,19 +342,15 @@ export default function AdminBranding() {
 
       <Panel
         title="Logos and assets"
-        description="Paths to the branding assets the site serves. Uploading files here is not built yet."
+        description="Each slot points at a file in the media library. Choose an existing file or upload a new one."
       >
-        <p className="mb-4 rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
-          TODO — asset upload has no backend yet: Storage rules deny all writes
-          and no upload endpoint exists. Until one ships, point these slots at
-          assets already served by the site (paths under <code>branding/</code>)
-          rather than uploading here.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-2">
           {LOGO_SLOTS.map((slot) => (
-            <TextField
+            <ImagePicker
               key={slot}
-              label={`${slot} asset path`}
+              folder="branding"
+              label={LOGO_SLOT_LABELS[slot] ?? slot}
+              hint={LOGO_SLOT_HINTS[slot]}
               value={form.logos[slot]}
               onChange={(value) =>
                 setForm((c) => ({ ...c, logos: { ...c.logos, [slot]: value } }))

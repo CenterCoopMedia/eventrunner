@@ -19,7 +19,7 @@ const MESSAGE_PREFIX_RE = /^[^:]*Invalid [a-z]+:\s*/i;
 const FIELD_SEGMENT_RE = /^([A-Za-z0-9_$[\].]+):\s*(.+)$/;
 
 export class AdminApiError extends Error {
-  constructor({ code, message, status, queueId = null }) {
+  constructor({ code, message, status, queueId = null, usage = null }) {
     super(message);
     this.name = 'AdminApiError';
     this.code = code;
@@ -31,6 +31,12 @@ export class AdminApiError extends Error {
     // publish that re-publishes committed docs and double-bumps revisions,
     // so it is carried on the error rather than normalized away.
     this.queueId = queueId;
+    // mediaDelete refuses an in-use asset with 409 plus the list of
+    // documents that reference it (functions/src/media/upload.cjs). The
+    // list IS the warning the delete flow exists to show, so it rides on
+    // the error rather than being normalized away — same reasoning as
+    // queueId above.
+    this.usage = usage;
     this.fieldErrors = fieldErrorsOf(message);
   }
 }
@@ -112,6 +118,7 @@ export async function callAdminEndpoint(name, body, getIdToken) {
           ? error.message
           : 'Something went wrong. Try again.',
       queueId: typeof payload?.queueId === 'string' ? payload.queueId : null,
+      usage: Array.isArray(payload?.usage) ? payload.usage : null,
     });
   }
   return payload ?? {};
