@@ -60,6 +60,10 @@ vi.mock('firebase/firestore', () => ({
       ? Promise.resolve({ docs: [] })
       : Promise.reject(new Error('permission denied')),
   ),
+  // AuthProvider's attendee-profile subscription (users/{uid}) — the smoke
+  // test never drives it, so a no-op unsubscribe with no snapshot is enough.
+  doc: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
 }));
 import App from './App.jsx';
 import { eventConfig } from '@generated/eventConfig.js';
