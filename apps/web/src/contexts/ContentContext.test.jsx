@@ -22,9 +22,11 @@ import { ContentProvider, useContent, usePages } from './ContentContext.jsx';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotPages from '@generated/pagesData.js';
 import snapshotScheduleData from '@generated/scheduleData.js';
+import snapshotOrganizationsData from '@generated/organizationsData.js';
 
 function Probe() {
-  const { source, getBlock, getSectionBlocks, scheduleData, loading } = useContent();
+  const { source, getBlock, getSectionBlocks, scheduleData, organizationsData, loading } =
+    useContent();
   const heroTitle = useContent('hero', 'title');
   const { pages, getPage } = usePages();
   return (
@@ -37,6 +39,8 @@ function Probe() {
       <span data-testid="faq-page-label">{getPage('faq')?.label ?? ''}</span>
       <span data-testid="schedule-count">{scheduleData.length}</span>
       <span data-testid="schedule-first-title">{scheduleData[0]?.title ?? ''}</span>
+      <span data-testid="organizations-count">{organizationsData.length}</span>
+      <span data-testid="organizations-first-name">{organizationsData[0]?.name ?? ''}</span>
       <span data-testid="loading">{String(loading)}</span>
     </>
   );
@@ -63,6 +67,7 @@ describe('ContentProvider', () => {
     );
     expect([...subscriptions.keys()].sort()).toEqual([
       'cmsContent',
+      'cmsOrganizations',
       'cmsPages',
       'cmsSchedule',
       'cmsUpdates',
@@ -72,6 +77,9 @@ describe('ContentProvider', () => {
     }
     expect(screen.getByTestId('schedule-count')).toHaveTextContent(
       String(snapshotScheduleData.length),
+    );
+    expect(screen.getByTestId('organizations-count')).toHaveTextContent(
+      String(snapshotOrganizationsData.length),
     );
     // Snapshot renders synchronously; loading is never true (fail soft, no
     // spinner-trap while the live cmsSchedule listener is still connecting).
@@ -129,6 +137,9 @@ describe('ContentProvider', () => {
     expect(screen.getByTestId('schedule-count')).toHaveTextContent(
       String(snapshotScheduleData.length),
     );
+    expect(screen.getByTestId('organizations-count')).toHaveTextContent(
+      String(snapshotOrganizationsData.length),
+    );
   });
 
   it('empties out when a live result reports zero docs — an empty publish replaces the snapshot, it does not fall back to it', () => {
@@ -141,6 +152,7 @@ describe('ContentProvider', () => {
       subscriptions.get('cmsContent').onNext([]);
       subscriptions.get('cmsPages').onNext([]);
       subscriptions.get('cmsSchedule').onNext([]);
+      subscriptions.get('cmsOrganizations').onNext([]);
     });
     // A live result arrived (even though it's empty) — that's authoritative,
     // not a signal to keep showing stale snapshot content.
@@ -148,6 +160,7 @@ describe('ContentProvider', () => {
     expect(screen.getByTestId('hero-title')).toHaveTextContent('');
     expect(screen.getByTestId('page-count')).toHaveTextContent('0');
     expect(screen.getByTestId('schedule-count')).toHaveTextContent('0');
+    expect(screen.getByTestId('organizations-count')).toHaveTextContent('0');
   });
 
   it('a listener error leaves last-known values in charge, not the snapshot, once live data was already showing', () => {
@@ -202,6 +215,115 @@ describe('ContentProvider', () => {
     expect(screen.getByTestId('schedule-count')).toHaveTextContent('1');
     expect(screen.getByTestId('schedule-first-title')).toHaveTextContent(
       'Live-published session',
+    );
+  });
+
+  it('overlays a live published cmsOrganizations set wholesale', () => {
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    act(() => {
+      subscriptions.get('cmsOrganizations').onNext([
+        {
+          id: 'live-org',
+          name: 'Live-published organization',
+          tier: 'presenting',
+          visible: true,
+          order: 0,
+        },
+      ]);
+    });
+    expect(screen.getByTestId('source')).toHaveTextContent('live');
+    expect(screen.getByTestId('organizations-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('organizations-first-name')).toHaveTextContent(
+      'Live-published organization',
+    );
+  });
+
+  it('drops a live cmsOrganizations doc with a non-primitive renderable field, keeping the rest wholesale', () => {
+    // Regression test: the generic content writer (functions/src/cms/
+    // content.cjs) only rejects reserved field *names*, never field *types*,
+    // so a published doc can carry e.g. name: { unexpected: true }.
+    // Sponsors.jsx renders name/tier/description directly as JSX children —
+    // an object there would make React throw and blank the whole route the
+    // moment this listener fires. The malformed doc must be dropped, not
+    // rendered, while a same-batch valid doc still comes through.
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    act(() => {
+      subscriptions.get('cmsOrganizations').onNext([
+        {
+          id: 'malformed-org',
+          name: { unexpected: true },
+          tier: 'presenting',
+          visible: true,
+          order: 0,
+        },
+        {
+          id: 'valid-org',
+          name: 'Valid organization',
+          tier: 'supporting',
+          visible: true,
+          order: 1,
+        },
+      ]);
+    });
+    expect(screen.getByTestId('source')).toHaveTextContent('live');
+    expect(screen.getByTestId('organizations-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('organizations-first-name')).toHaveTextContent(
+      'Valid organization',
+    );
+  });
+
+  it('drops a live cmsOrganizations doc whose tier or description is a non-primitive value', () => {
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    act(() => {
+      subscriptions.get('cmsOrganizations').onNext([
+        { id: 'bad-tier', name: 'Bad tier org', tier: ['not', 'a', 'string'], visible: true },
+        {
+          id: 'bad-description',
+          name: 'Bad description org',
+          description: { unexpected: true },
+          visible: true,
+        },
+      ]);
+    });
+    expect(screen.getByTestId('organizations-count')).toHaveTextContent('0');
+  });
+
+  it('a cmsOrganizations listener error leaves last-known values in charge, not the snapshot, once live data was already showing', () => {
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    act(() => {
+      subscriptions.get('cmsOrganizations').onNext([
+        {
+          id: 'live-org',
+          name: 'Live-published organization',
+          tier: 'presenting',
+          visible: true,
+          order: 0,
+        },
+      ]);
+    });
+    // subscribeContentCollection never calls onNext on error (contentSource.js
+    // fails soft internally) — simulate that by simply not firing onNext
+    // again. The overlay slot keeps its last value, so nothing resets.
+    expect(screen.getByTestId('source')).toHaveTextContent('live');
+    expect(screen.getByTestId('organizations-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('organizations-first-name')).toHaveTextContent(
+      'Live-published organization',
     );
   });
 
