@@ -33,7 +33,49 @@
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 
-const FLAGS = ['domain', 'no-write', 'help'];
+const FLAGS = ['domain', 'no-write', 'attest', 'help'];
+
+/**
+ * Stamp (or clear) `config/event.sender` verification.
+ *
+ * One writer, one shape: `verified` records how the verdict was reached,
+ * so a later reader can tell a provider check from an operator's word.
+ *
+ * @param {{ db: object, verified: boolean, method: string, domain: string,
+ *           now?: () => number }} args
+ * @returns {Promise<string|null>} the ISO stamp written, or null on clear
+ */
+async function stampVerification({ db, verified, method, domain, now = Date.now }) {
+  const at = verified ? new Date(now()).toISOString() : null;
+  await db.collection('config').doc('event').set(
+    {
+      sender: {
+        domainVerified: verified,
+        domainVerifiedAt: at,
+        domainVerifiedBy: verified ? method : null,
+        domainVerifiedDomain: verified ? domain : null,
+      },
+    },
+    { merge: true },
+  );
+  return at;
+}
+
+/**
+ * True when the provider gave a DEFINITIVE negative — at least one record
+ * actually failed, as opposed to the provider being unable to tell.
+ *
+ * The distinction decides whether a previously recorded pass is cleared:
+ * "DKIM is failing" is news that invalidates it, while "no account token,
+ * everything unknown" says nothing about the domain and must not silently
+ * un-verify a deployment that is fine.
+ *
+ * @param {{ spf: string, dkim: string, returnPath: string }} status
+ * @returns {boolean}
+ */
+function isDefinitiveFailure(status) {
+  return [status.spf, status.dkim, status.returnPath].includes('fail');
+}
 
 function usage() {
   return [
@@ -41,6 +83,9 @@ function usage() {
     '',
     '  --domain <domain>  verify this domain instead of config/event.sender.email',
     '  --no-write         report only; do not stamp config/event.sender',
+    '  --attest           record an operator attestation, for providers with no',
+    '                     domain API (webhook, console) — otherwise their',
+    '                     deployments could never satisfy launch readiness',
     '',
     'Environment (Tier A, .env.example):',
     '  EVENT_EMAIL_PROVIDER      postmark | webhook | console',
@@ -86,13 +131,7 @@ async function run({ args, env = process.env, deps = {} }) {
     return 2;
   }
 
-  if (typeof provider.verifySenderDomain !== 'function') {
-    // console and webhook providers have no domain to verify. That is a
-    // clean "not applicable", not a failure — same shape §5.1 step 8 uses
-    // for ticketing providers with no webhook.
-    console.log(`Provider "${provider.name}" does not verify sender domains — nothing to check.`);
-    return 0;
-  }
+  const canVerify = typeof provider.verifySenderDomain === 'function';
 
   const initFirebase = deps.initFirebase || require('./lib/firebase-init.cjs').initFirebase;
   let db = null;
@@ -111,6 +150,45 @@ async function run({ args, env = process.env, deps = {} }) {
       }
       console.warn(`warning: config/event unreadable (${err.message}); reporting only.`);
     }
+  }
+
+  if (!canVerify) {
+    // `webhook` and `console` expose no domain API. Left there, the
+    // launch-readiness sender row could never pass and every webhook
+    // deployment would be permanently unlaunchable — a gate nobody can
+    // clear teaches operators to ignore the gate. So the same escape the
+    // Auth row uses applies: the operator attests, in writing, on the
+    // record, after checking the relay's DNS themselves.
+    const domain = (typeof args.domain === 'string' && args.domain) || configuredDomain;
+    console.log(`Provider "${provider.name}" exposes no sender-domain API — nothing to check automatically.`);
+    if (!args.attest) {
+      console.log(
+        '\nThis deployment sends through a relay this platform cannot query, so launch readiness needs\n' +
+        'your word instead of the provider\'s. Confirm SPF, DKIM, and DMARC for ' +
+        `${domain || 'the sender domain'} in the client DNS, then record it:\n` +
+        '\n  node scripts/verify-sender-domain.cjs --attest\n',
+      );
+      return 0;
+    }
+    if (!domain) {
+      console.error('Cannot attest: config/event.sender.email is unset and --domain was not passed.');
+      return 2;
+    }
+    if (args['no-write'] || !db) {
+      console.log('--no-write: attestation not recorded.');
+      return 0;
+    }
+    const at = await stampVerification({ db, verified: true, method: 'operator-attested', domain });
+    console.log(`\nRecorded operator attestation for ${domain} at ${at}.`);
+    return 0;
+  }
+
+  if (args.attest) {
+    console.error(
+      `Provider "${provider.name}" can verify the domain itself — run without --attest.\n` +
+      'Attestation exists only for providers with no domain API.',
+    );
+    return 2;
   }
 
   const domain = (typeof args.domain === 'string' && args.domain) || configuredDomain;
@@ -138,6 +216,17 @@ async function run({ args, env = process.env, deps = {} }) {
     console.log('\nNot verified yet. To fix:\n');
     console.log(remediation(status));
     console.log('\nUntil this passes, emailed sign-in codes are unreliable (spec §5.6 item 4).');
+    // A definitive failure on the domain this deployment actually sends
+    // from invalidates any previously recorded pass. Leaving the old
+    // `domainVerified: true` standing would let --check report a launch
+    // as ready on a stamp that a live DNS answer just contradicted —
+    // the readiness table would be asserting something known false.
+    // "Unknown" is deliberately NOT enough to clear it: a missing account
+    // token says nothing about the domain.
+    if (!args['no-write'] && db && domain === configuredDomain && isDefinitiveFailure(status)) {
+      await stampVerification({ db, verified: false, method: 'provider-check', domain });
+      console.log('\nCleared the stored sender verification: this domain is failing now.');
+    }
     return 1;
   }
 
@@ -145,11 +234,7 @@ async function run({ args, env = process.env, deps = {} }) {
     console.log('\nVerified. (config/event not stamped: --no-write, no database handle, or a different domain.)');
     return 0;
   }
-  const verifiedAt = new Date().toISOString();
-  await db.collection('config').doc('event').set(
-    { sender: { domainVerified: true, domainVerifiedAt: verifiedAt } },
-    { merge: true },
-  );
+  const verifiedAt = await stampVerification({ db, verified: true, method: 'provider-check', domain });
   console.log(`\nVerified. Stamped config/event.sender.domainVerifiedAt = ${verifiedAt}.`);
   return 0;
 }
@@ -177,4 +262,8 @@ if (require.main === module) {
     });
 }
 
-module.exports = { main, run, internals: { formatStatus, remediation, usage, FLAGS } };
+module.exports = {
+  main,
+  run,
+  internals: { formatStatus, remediation, isDefinitiveFailure, stampVerification, usage, FLAGS },
+};
