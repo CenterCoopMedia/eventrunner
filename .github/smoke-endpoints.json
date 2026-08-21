@@ -22,6 +22,8 @@
     "emailDeliveryWebhook",
     "bookmarkSession",
     "reactToSession",
-    "logClientError"
+    "logClientError",
+    "listSystemErrors",
+    "resolveSystemErrors"
   ]
 }
