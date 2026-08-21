@@ -32,6 +32,14 @@ function fakeDb() {
         const existing = store.get(key(c, id)) || {};
         store.set(key(c, id), { ...existing, ...patch });
       },
+      async create(data) {
+        if (store.has(key(c, id))) {
+          const err = new Error(`ALREADY_EXISTS: document ${c}/${id} already exists`);
+          err.code = 6; // gRPC ALREADY_EXISTS, same as the real Firestore SDK
+          throw err;
+        }
+        store.set(key(c, id), data);
+      },
     };
   }
   return {
@@ -199,6 +207,79 @@ test('a submission faster than the minimum elapsed time is silently dropped', as
   await handler(fakeReq({ body: realBody({ startedAt: NOW - 10 }) }), res);
   assert.equal(res.statusCode, 201);
   assert.equal(db.store.size, 0);
+});
+
+// --- submissionKey (Codex P2: retries after a dropped response must be idempotent) --
+
+test('rejects a malformed submissionKey with 400 and writes nothing', async () => {
+  const db = fakeDb();
+  const handler = createSubmitFeedbackHandler({ db, now: () => NOW });
+  const res = fakeRes();
+  await handler(fakeReq({ body: realBody({ submissionKey: 'short' }) }), res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(db.store.size, 0);
+});
+
+test('rejects a submissionKey with characters outside [A-Za-z0-9_-]', async () => {
+  const db = fakeDb();
+  const handler = createSubmitFeedbackHandler({ db, now: () => NOW });
+  const res = fakeRes();
+  await handler(fakeReq({ body: realBody({ submissionKey: 'not/a valid key!!' }) }), res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(db.store.size, 0);
+});
+
+test('uses a valid submissionKey as the feedback doc id', async () => {
+  const db = fakeDb();
+  const handler = createSubmitFeedbackHandler({ db, now: () => NOW });
+  const res = fakeRes();
+  const key = 'a1b2c3d4e5f6g7h8';
+  await handler(fakeReq({ body: realBody({ submissionKey: key }) }), res);
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.body.id, key);
+  assert.ok(db.store.has(`feedback/${key}`));
+});
+
+test('a retry with the same submissionKey after the original write committed does not duplicate the row', async () => {
+  const db = fakeDb();
+  const sent = [];
+  const sendEmail = async (m) => { sent.push(m); return { status: 'sent' }; };
+  const handler = createSubmitFeedbackHandler({
+    db,
+    now: () => NOW,
+    sendEmail,
+    getConfig: async () => ({ event: { name: 'Test Summit', sender: {} } }),
+  });
+  const body = realBody({ submissionKey: 'retry-key-0123456789', email: 'attendee@example.org' });
+  const feedbackRows = () => [...db.store.keys()].filter((k) => k.startsWith('feedback/'));
+
+  const res1 = fakeRes();
+  await handler(fakeReq({ body }), res1);
+  assert.equal(res1.statusCode, 201);
+  assert.equal(feedbackRows().length, 1);
+
+  // Simulate the client never seeing res1 (e.g. the connection dropped) and
+  // retrying the identical submission.
+  const res2 = fakeRes();
+  await handler(fakeReq({ body }), res2);
+  assert.equal(res2.statusCode, 201);
+  assert.equal(res2.body.id, res1.body.id);
+  assert.equal(feedbackRows().length, 1, 'the retry must not create a second row');
+
+  // Both attempts derive the same onceKey from the same doc id — the real
+  // email core's email_claims store is what actually dedupes the send; this
+  // pins that both calls would present the SAME claim key to it.
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0].onceKey, sent[1].onceKey);
+});
+
+test('a submission with no submissionKey still works (older/non-conforming callers)', async () => {
+  const db = fakeDb();
+  const handler = createSubmitFeedbackHandler({ db, now: () => NOW });
+  const res = fakeRes();
+  await handler(fakeReq({ body: realBody() }), res);
+  assert.equal(res.statusCode, 201);
+  assert.ok(typeof res.body.id === 'string' && res.body.id.length > 0);
 });
 
 // --- rate limiting -----------------------------------------------------------------

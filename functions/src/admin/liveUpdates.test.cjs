@@ -105,7 +105,7 @@ test('validateLiveUpdateDoc rejects a message over the length cap', () => {
 
 // -------------------------------------------------------------- saveLiveUpdate
 
-test('saveLiveUpdate creates a new entry, stamping postedAt and updatedBy', async () => {
+test('saveLiveUpdate creates a new entry, stamping postedAt', async () => {
   const d = deps();
   const res = fakeRes();
   await createSaveLiveUpdateHandler(d)(adminReq({ id: 'u1', update: { message: 'Hello', pinned: true } }), res);
@@ -115,7 +115,22 @@ test('saveLiveUpdate creates a new entry, stamping postedAt and updatedBy', asyn
   assert.equal(stored.message, 'Hello');
   assert.equal(stored.pinned, true);
   assert.deepEqual(stored.postedAt, new Date(1700000000000));
-  assert.equal(stored.updatedBy, 'admin@example.org');
+});
+
+test('saveLiveUpdate never stamps actor identity onto the public doc (Codex P1)', async () => {
+  // live_updates is anonymously readable and admin identity is a
+  // server-only allowlist (config/bootstrap.adminEmails) — an `updatedBy`
+  // field here would let any visitor enumerate admin addresses just by
+  // reading the public feed. Actor identity belongs only in admin_logs.
+  const d = deps();
+  await createSaveLiveUpdateHandler(d)(adminReq({ id: 'u1', update: { message: 'Hello' } }), fakeRes());
+  const stored = d.db.docs.get('live_updates/u1');
+  assert.equal('updatedBy' in stored, false);
+  assert.equal('email' in stored, false);
+  assert.equal('uid' in stored, false);
+  // ...but the admin_logs row still records who made the change.
+  const logEntry = d.db.docs.get([...d.db.docs.keys()].find((k) => k.startsWith('admin_logs/')));
+  assert.equal(logEntry.email, 'admin@example.org');
 });
 
 test('saveLiveUpdate mints an id when none is given', async () => {

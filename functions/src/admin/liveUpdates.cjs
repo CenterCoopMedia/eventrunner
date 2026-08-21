@@ -20,6 +20,13 @@
  * via the Admin SDK, ever writes it. Every write gets an admin_logs row
  * (cms/store.cjs's logAdminAction, same best-effort contract as elsewhere:
  * a failed audit write never fails the mutation it describes).
+ *
+ * The public doc deliberately carries no actor identity: `live_updates` is
+ * anonymously readable, and config/bootstrap.adminEmails is a server-only
+ * allowlist (firestore.rules denies even an admin a direct read of it) —
+ * stamping `updatedBy` here would let any visitor enumerate admin addresses
+ * simply by reading the feed. Actor identity lives ONLY in admin_logs
+ * (admin-read-only), which already records it on every write.
  */
 
 const crypto = require('node:crypto');
@@ -95,12 +102,14 @@ function createSaveLiveUpdateHandler({ db, auth, getConfig, now = Date.now, log 
       // postedAt is stamped once and never moved: an edit fixing a typo must
       // not bump an entry back to the top of a time-ordered feed.
       const postedAt = snap.exists && snap.data()?.postedAt ? snap.data().postedAt : at;
+      // No updatedBy/actor field here — see the module doc comment: this
+      // doc is anonymously readable, and admin_logs (below) is where actor
+      // identity belongs.
       await ref.set({
         message: update.message,
         pinned: update.pinned === true,
         postedAt,
         updatedAt: at,
-        updatedBy: gate.email,
       });
     } catch (err) {
       log.error('saveLiveUpdate write failed', err);

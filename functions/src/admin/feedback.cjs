@@ -10,9 +10,10 @@
  * files agreeing with each other from a distance.
  *
  *   submitFeedback       POST { message, email?, category?, honeypot,
- *                         startedAt } — unauthenticated. Writes `feedback`
- *                         (renamed from `bug_reports`, spec §4.1) and,
- *                         with an email, sends an onceKey-gated confirmation.
+ *                         startedAt, submissionKey? } — unauthenticated.
+ *                         Writes `feedback` (renamed from `bug_reports`,
+ *                         spec §4.1) and, with an email, sends an
+ *                         onceKey-gated confirmation.
  *   updateFeedbackStatus POST { id, status } — admin-gated. Marks a row
  *                         reviewed or archived. Audit-logged.
  *
@@ -34,15 +35,33 @@
  *      last-XFF-entry rule that keeps a direct caller from forging its own
  *      rate-limit bucket (see clientErrors.cjs for the full citation).
  *
+ * Retry idempotency (Codex P2 finding): the feedback doc id used to be
+ * server-random (`db.collection('feedback').doc()`), so a client retry after
+ * a dropped response — the write landed, but the caller never saw the 201 —
+ * created a second row AND, because onceKey was derived from that random id,
+ * a second confirmation email. `submissionKey` fixes this: FeedbackModal.jsx
+ * generates one per form-open session and resends it unchanged on every
+ * retry of the same submission, this handler uses it AS the doc id (so the
+ * onceKey derived from it is stable too), and the write goes through
+ * `.create()` — a retry that lands after the first one already committed
+ * gets Firestore's ALREADY_EXISTS rather than silently overwriting a row an
+ * admin may have already reviewed. A missing or malformed submissionKey
+ * falls back to a random id (older/non-conforming callers keep working,
+ * just without retry-safety).
+ *
  * Telegram triage from the reference implementation is explicitly cut (spec
  * §9): the review surface is this module's admin endpoint plus the plain
  * admin review tab reading `feedback` via firestore.rules' isAdmin() gate.
  */
 
+const crypto = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { internals: clientErrorInternals } = require('../telemetry/clientErrors.cjs');
+// Reused rather than re-implemented: send.cjs already owns the canonical
+// Firestore ALREADY_EXISTS check (gRPC code 6) for its own onceKey claims.
+const { isAlreadyExists } = require('../email/send.cjs').internals;
 
 const { extractClientIp, hashIp } = clientErrorInternals;
 
@@ -66,6 +85,10 @@ const MIN_ELAPSED_MS = 3000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CATEGORIES = Object.freeze(['bug', 'feedback', 'other']);
 const STATUSES = Object.freeze(['new', 'reviewed', 'archived']);
+// Bounded and restricted to characters safe as a bare Firestore doc-id
+// segment (no '/', no '.'/'..'): a hex or uuid-shaped client-generated
+// token, never caller-chosen free text.
+const SUBMISSION_KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
 
 /** @param {unknown} value @param {number} max @returns {string|null} */
 function truncateString(value, max) {
@@ -162,6 +185,15 @@ function createSubmitFeedbackHandler({ db, sendEmail, getConfig, now = Date.now,
     const headerUserAgent = typeof req?.get === 'function' ? req.get('user-agent') : req?.headers?.['user-agent'];
     const userAgent = truncateString(headerUserAgent, MAX_USER_AGENT_LEN);
 
+    // submissionKey (optional): validated by SHAPE only — never trusted as
+    // anything but an idempotency token — so a malformed value is rejected
+    // by name rather than silently coerced or ignored.
+    const rawSubmissionKey = req.body?.submissionKey;
+    if (rawSubmissionKey !== undefined && !SUBMISSION_KEY_RE.test(String(rawSubmissionKey))) {
+      res.status(400).json({ error: { code: 'bad-request', message: 'submissionKey: must be 8-128 characters of [A-Za-z0-9_-].' } });
+      return;
+    }
+
     const nowMs = now();
     // Honeypot + time-gate first: a bot must not spend a rate-limit slot
     // learning which check caught it, and the response is identical to a
@@ -183,9 +215,18 @@ function createSubmitFeedbackHandler({ db, sendEmail, getConfig, now = Date.now,
       return;
     }
 
-    const ref = db.collection(FEEDBACK_COLLECTION).doc();
+    // A validated submissionKey becomes the doc id (and, below, the onceKey
+    // base) so a retry of the SAME submission after a dropped response lands
+    // on the SAME doc instead of minting a new one; absent one, fall back to
+    // a random id (no retry-safety, but every other check still applies).
+    const docId = rawSubmissionKey !== undefined ? String(rawSubmissionKey) : crypto.randomUUID();
+    const ref = db.collection(FEEDBACK_COLLECTION).doc(docId);
     try {
-      await ref.set({
+      // .create(), not .set(): a retry that lands after the first attempt
+      // already committed must not silently overwrite a row an admin may
+      // have already reviewed — it should look like the ORIGINAL write,
+      // not a second one.
+      await ref.create({
         message,
         email,
         category,
@@ -195,9 +236,14 @@ function createSubmitFeedbackHandler({ db, sendEmail, getConfig, now = Date.now,
         createdAt: new Date(nowMs),
       });
     } catch (err) {
-      log.error('feedback write failed', err);
-      res.status(500).json({ error: { code: 'internal', message: 'Your feedback could not be saved. Try again.' } });
-      return;
+      if (!isAlreadyExists(err)) {
+        log.error('feedback write failed', err);
+        res.status(500).json({ error: { code: 'internal', message: 'Your feedback could not be saved. Try again.' } });
+        return;
+      }
+      // Idempotent retry of an already-durable submission: fall through to
+      // the (onceKey-protected) email step and answer 201 exactly as the
+      // original request would have — a caller cannot tell the difference.
     }
 
     // Confirmation email is best-effort and onceKey-gated on the doc id: a
