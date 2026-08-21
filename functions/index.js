@@ -12,13 +12,17 @@ const cmsVersions = require('./src/cms/versions.cjs');
 const cmsPublish = require('./src/cms/publish.cjs');
 const cmsUpdates = require('./src/cms/updates.cjs');
 const adminConfig = require('./src/admin/config.cjs');
+const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
+const adminFeedback = require('./src/admin/feedback.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
 const schedulePdf = require('./src/schedule/pdf.cjs');
 const publicOg = require('./src/public/og.cjs');
+const scheduleReactions = require('./src/schedule/reactions.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
 const systemErrors = require('./src/telemetry/systemErrors.cjs');
+const systemErrorsAdmin = require('./src/telemetry/systemErrorsAdmin.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -29,11 +33,15 @@ module.exports = {
   ...cmsPublish.handlers,
   ...cmsUpdates.handlers,
   ...adminConfig.handlers,
+  ...adminLiveUpdates.handlers,
+  ...adminFeedback.handlers,
   ...scheduleBookmarks.handlers,
   ...schedulePdf.handlers,
   ...publicOg.handlers,
+  ...scheduleReactions.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
   ...clientErrors.handlers,
   ...systemErrors.handlers,
+  ...systemErrorsAdmin.handlers,
 };

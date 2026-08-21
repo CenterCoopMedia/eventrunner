@@ -19,6 +19,7 @@ const { validateTemplateBody } = require('./render.cjs');
 const DEFAULTS = {
   'auth.otp': require('./templates/auth.otp.cjs'),
   'account.welcome': require('./templates/account.welcome.cjs'),
+  'feedback.confirmation': require('./templates/feedback.confirmation.cjs'),
 };
 
 const OVERRIDE_KEYS = ['subject', 'html', 'text'];

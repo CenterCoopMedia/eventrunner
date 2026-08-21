@@ -110,7 +110,17 @@ describe('admin route gating', () => {
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Pages' })).toBeInTheDocument();
     // Every settings surface is reachable from the shell.
-    for (const tab of ['Pages', 'Event', 'Features', 'Badges', 'Branding']) {
+    for (const tab of [
+      'Pages',
+      'Content',
+      'Event',
+      'Features',
+      'Badges',
+      'Branding',
+      'Live updates',
+      'Feedback',
+      'System errors',
+    ]) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     // The signed-in identity is shown, so an operator can tell which account

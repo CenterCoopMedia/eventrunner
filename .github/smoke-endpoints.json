@@ -23,6 +23,13 @@
     "bookmarkSession",
     "buildSchedulePdf",
     "updatesMeta",
-    "logClientError"
+    "reactToSession",
+    "logClientError",
+    "listSystemErrors",
+    "resolveSystemErrors",
+    "saveLiveUpdate",
+    "deleteLiveUpdate",
+    "submitFeedback",
+    "updateFeedbackStatus"
   ]
 }

@@ -9,6 +9,8 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import { setSessionBookmarked } from '../lib/bookmarksSource.js';
+import { REACTION_KINDS, setSessionReaction } from '../lib/reactionsSource.js';
+import { useSessionReactions } from '../hooks/useSessionReactions.js';
 import {
   buildGoogleCalendarUrl,
   buildIcsCalendar,
@@ -31,13 +33,6 @@ export function useSessionSpeakerNames() {
 // Stubbed the same way useSessionSpeakerNames is above, so MaterialsPill's
 // markup does not need to change when it does.
 function useSessionMaterialsCount() {
-  return null;
-}
-
-// TODO(reactions tranche): resolve `sessionReactions/{sessionId}` once
-// functions/src/schedule/reactions.cjs lands (spec §9 "Session reactions",
-// not built as of issue #16). Same stub pattern as the two above.
-function useSessionReactionsSummary() {
   return null;
 }
 
@@ -187,10 +182,110 @@ function MaterialsPill({ session }) {
   );
 }
 
+/**
+ * Emoji reaction bar (spec §9 "Session reactions"). Feature-gated by
+ * config/features.sessionReactions. The aggregate counts are public (rules:
+ * public read of sessionReactions/{sessionId}) so every visitor — signed
+ * out included — sees them; only the click itself is gated the same way
+ * BookmarkPill's is, by ProfileContext's `attendeeAccess`.
+ *
+ * One reaction per caller per session (the server's dedup subcollection,
+ * functions/src/schedule/reactions.cjs): clicking the emoji you already
+ * left clears it, clicking a different one switches to it.
+ */
 function ReactionsPill({ session }) {
-  const summary = useSessionReactionsSummary(session);
-  if (!summary) return null;
-  return <span className={pillClass}>{summary}</span>;
+  const { user } = useAuth();
+  const { attendeeAccess } = useProfile();
+  const { showToast } = useToast();
+  const { counts, myReaction } = useSessionReactions(session.id);
+  const [pending, setPending] = useState(false);
+  // Same optimistic-override pattern as BookmarkPill above: instant visual
+  // feedback on click, cleared on failure AND once the live `myReaction`/
+  // `counts` themselves change — whether that change is the subscription
+  // confirming OUR write, a different tab's write, or the signed-in
+  // identity switching. Without the second clear the optimistic value would
+  // keep masking the live one forever after a successful write.
+  //
+  // `undefined` is a DISTINCT sentinel from `null` here: `undefined` means
+  // "no override in flight — trust the live value", while `null` means "the
+  // override IS an explicit clear". Collapsing them (e.g. via `?? `) would
+  // make "no override" indistinguishable from "optimistically cleared":
+  // an already-reacted user with no override would read as cleared (wrongly
+  // decrementing their own count and showing unselected), and a real
+  // optimistic clear would fall back through to the live reaction and stay
+  // wrongly selected.
+  const [optimistic, setOptimistic] = useState(undefined);
+  const hasOverride = optimistic !== undefined;
+  const myActiveReaction = hasOverride ? optimistic : myReaction;
+
+  useEffect(() => {
+    setOptimistic(undefined);
+  }, [myReaction, session.id, user?.uid]);
+
+  const onPick = useCallback(
+    async (emoji) => {
+      if (!user) return; // no interactive control rendered for a signed-out visitor
+      const next = myActiveReaction === emoji ? null : emoji;
+      setOptimistic(next);
+      setPending(true);
+      try {
+        await setSessionReaction({ user, sessionId: session.id, emoji: next });
+      } catch (err) {
+        setOptimistic(undefined);
+        showToast(err.message || 'The reaction could not be saved.', { tone: 'error' });
+      } finally {
+        setPending(false);
+      }
+    },
+    [user, myActiveReaction, session.id, showToast],
+  );
+
+  // Optimistically nudge the displayed counts so a click feels immediate
+  // even before the aggregate listener's next snapshot arrives. Only
+  // adjusts when an override is actually active — with no override, `counts`
+  // already reflects `myReaction` server-side, so nothing should move.
+  const displayCounts = { ...counts };
+  if (hasOverride) {
+    if (myReaction) displayCounts[myReaction] = Math.max(0, (displayCounts[myReaction] || 0) - 1);
+    if (optimistic) displayCounts[optimistic] = (displayCounts[optimistic] || 0) + 1;
+  }
+
+  const interactive = Boolean(user) && attendeeAccess;
+  const hasAnyCount = REACTION_KINDS.some((emoji) => (displayCounts[emoji] || 0) > 0);
+  if (!interactive && !hasAnyCount) return null;
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1" role="group" aria-label="Session reactions">
+      {REACTION_KINDS.map((emoji) => {
+        const count = displayCounts[emoji] || 0;
+        const mine = myActiveReaction === emoji;
+        if (!interactive) {
+          // Signed out, or signed in without attendee access: read-only
+          // counts, nothing worth rendering when a reaction has zero.
+          if (count === 0) return null;
+          return (
+            <span key={emoji} className={pillClass} aria-hidden="false">
+              <span aria-hidden="true">{emoji}</span> {count}
+            </span>
+          );
+        }
+        return (
+          <button
+            key={emoji}
+            type="button"
+            className={pillClass}
+            onClick={() => onPick(emoji)}
+            disabled={pending}
+            aria-pressed={mine}
+            aria-label={`React with ${emoji}${count ? `, ${count}` : ''}`}
+          >
+            <span aria-hidden="true">{emoji}</span>
+            {count > 0 ? ` ${count}` : ''}
+          </button>
+        );
+      })}
+    </span>
+  );
 }
 
 /**
