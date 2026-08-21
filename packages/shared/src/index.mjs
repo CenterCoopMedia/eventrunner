@@ -38,5 +38,17 @@ export {
   buildPublicProfile,
 } from './profile.cjs';
 export { generateSlug, generateSpeakerSlug } from './slug.cjs';
+export {
+  SPEAKER_STATUSES,
+  ADMIN_SETTABLE_STATUSES,
+  PUBLISHED_SPEAKER_STATUSES,
+  EDITABLE_SPEAKER_FIELDS,
+  SERVER_OWNED_SPEAKER_FIELDS,
+  PUBLIC_SPEAKER_FIELDS,
+  speakerDisplayName,
+  isPubliclyVisibleSpeaker,
+  buildPublicSpeaker,
+  validateSpeaker,
+} from './speaker.cjs';
 export { isSafeUrl, looksLikeUrl, scrubLinkLabel } from './urlSafety.cjs';
 export { RESERVED_PATH_SEGMENTS, isReservedPathSegment } from './routing.cjs';
