@@ -1,8 +1,10 @@
 // App shell: skip link first, landmark structure, keyboard-navigable nav.
 // Everything renders from context — no hardcoded event name, city, or date
 // (event-neutrality).
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import FeedbackModal from './FeedbackModal.jsx';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', end: true },
@@ -39,6 +41,7 @@ export default function Layout() {
   const legal = eventConfig?.legal || {};
   const operatorName = legal.operatorName;
   const supportEmail = legal.supportEmail;
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   return (
     <div className="bg-paper flex min-h-screen flex-col">
@@ -97,8 +100,18 @@ export default function Layout() {
               ) : null}
             </p>
           ) : null}
+          {features.feedbackInbox ? (
+            <button
+              type="button"
+              className="touch-target mt-3 inline-flex items-center rounded-brand border border-brand-ink/20 px-3 py-2 text-brand-ink hover:bg-brand-surface"
+              onClick={() => setFeedbackOpen(true)}
+            >
+              Share feedback
+            </button>
+          ) : null}
         </div>
       </footer>
+      {feedbackOpen ? <FeedbackModal onClose={() => setFeedbackOpen(false)} /> : null}
     </div>
   );
 }

@@ -9,9 +9,10 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import CtaBlock from '../components/blocks/CtaBlock.jsx';
+import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 
 export default function Home() {
-  const { eventConfig } = useEventConfig();
+  const { eventConfig, features } = useEventConfig();
   const { getPage, getSectionBlocks, getBlock } = useContent();
 
   const page = getPage('home') ?? getPage('/');
@@ -54,6 +55,12 @@ export default function Home() {
           </div>
         ) : null}
       </section>
+
+      {features?.liveUpdates ? (
+        <div className="mt-8">
+          <LiveUpdatesCard />
+        </div>
+      ) : null}
 
       <section aria-label="Event days" className="mt-4 grid gap-4 sm:grid-cols-2">
         {eventConfig.days.map((day) => (
