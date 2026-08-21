@@ -34,7 +34,12 @@ function applyCors(req, res, { allowedOrigins, methods = ['POST'] }) {
     res.set('Access-Control-Allow-Origin', origin);
     res.set('Vary', 'Origin');
     res.set('Access-Control-Allow-Methods', methods.join(', '));
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    // X-Firebase-AppCheck is not a CORS-safelisted request header, so the
+    // attestation the web client attaches (issue #45) turns both OTP POSTs
+    // into preflighted requests. Omitting it here would make the browser
+    // fail the preflight and block sign-in entirely the moment a
+    // deployment configures an App Check site key.
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Firebase-AppCheck');
     res.set('Access-Control-Max-Age', '3600');
     // Retry-After is not CORS-safelisted; without this the browser client
     // cannot read the 429 hint.

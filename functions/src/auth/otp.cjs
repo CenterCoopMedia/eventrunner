@@ -19,6 +19,7 @@ const { isAlreadyExists } = require('../email/send.cjs').internals;
 const {
   takeRateLimitSlot,
   takeGlobalSendSlot,
+  releaseGlobalSendSlot,
   createChallenge,
   verifyChallenge,
   finalizeChallenge,
@@ -94,12 +95,22 @@ async function reopenSystemError({ db, errorId, seenAt }) {
  * or non-positive falls back to the module default rather than to "no
  * ceiling" — a typo in a deploy variable must not silently remove a
  * safety control. `0` is not a way to disable it; lower it instead.
+ *
+ * Whole-string match, not parseInt: parseInt accepts a valid PREFIX, so
+ * '1.5' would silently become 1 and '50oops' 50 — a fraction of the
+ * intended ceiling, which is a self-inflicted outage rather than the
+ * documented fallback. validateDeployEnv rejects the same values at build
+ * time, but nothing in production calls it today, so this must not depend
+ * on it.
+ *
  * @param {Record<string, string|undefined>} [env]
  * @returns {number}
  */
 function parseSendCeiling(env = process.env) {
-  const raw = Number.parseInt(String(env.EVENT_OTP_SEND_CEILING_PER_HOUR ?? '').trim(), 10);
-  return Number.isFinite(raw) && raw > 0 ? raw : challengeInternals.SEND_CEILING_MAX;
+  const raw = String(env.EVENT_OTP_SEND_CEILING_PER_HOUR ?? '').trim();
+  if (!/^\d+$/.test(raw)) return challengeInternals.SEND_CEILING_MAX;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value > 0 ? value : challengeInternals.SEND_CEILING_MAX;
 }
 
 /**
@@ -240,21 +251,43 @@ function createSendOtpHandler({
       return;
     }
 
-    const { token } = await createChallenge({ db, email, code, now });
+    // The ceiling slot above is a reservation. Everything from here to a
+    // delivered mail can fail, and a failure that leaves the reservation
+    // behind would let a provider outage burn the whole hourly ceiling on
+    // zero delivered codes — and keep 429ing after the provider recovers.
+    const releaseCeiling = async () => {
+      try {
+        await releaseGlobalSendSlot({ db, takenAt: ceiling.takenAt, now, windowMs: sendCeilingWindowMs });
+      } catch (err) {
+        // Best effort: a stuck reservation ages out of the window on its
+        // own, so this must never mask the failure being reported.
+        log.error('OTP send ceiling slot release failed', err);
+      }
+    };
 
-    // No onceKey — every request must send a new code (spec §3.1).
-    const result = await sendEmail({
-      to: email,
-      subject: rendered.subject,
-      html: rendered.html,
-      text: rendered.text,
-      tag: 'auth.otp',
-      source: 'auth-otp',
-      storeRendered: rendered.storeRendered,
-      hasLegalFooterHtml: rendered.hasLegalFooterHtml,
-      hasLegalFooterText: rendered.hasLegalFooterText,
-    });
+    let token;
+    let result;
+    try {
+      ({ token } = await createChallenge({ db, email, code, now }));
+
+      // No onceKey — every request must send a new code (spec §3.1).
+      result = await sendEmail({
+        to: email,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+        tag: 'auth.otp',
+        source: 'auth-otp',
+        storeRendered: rendered.storeRendered,
+        hasLegalFooterHtml: rendered.hasLegalFooterHtml,
+        hasLegalFooterText: rendered.hasLegalFooterText,
+      });
+    } catch (err) {
+      await releaseCeiling();
+      throw err;
+    }
     if (result.status !== 'sent') {
+      await releaseCeiling();
       res.status(502).json({ error: { code: 'send-failed', message: 'The sign-in email could not be sent. Try again.' } });
       return;
     }
@@ -327,21 +360,71 @@ function createVerifyOtpHandler({ db, auth, now = Date.now, log = console }) {
 }
 
 /**
- * App Check enforcement options for the two public OTP endpoints (issue
+ * Whether App Check is enforced on the two public OTP endpoints (issue
  * #45). Off by default so an existing deployment keeps working untouched;
  * a deployment that has provisioned a reCAPTCHA site key for the web app
- * sets EVENT_APP_CHECK_ENFORCED=true and every unattested request is
- * rejected by the platform before the handler runs.
+ * sets EVENT_APP_CHECK_ENFORCED=true.
  *
  * Deploy-time, not runtime, on purpose: this is the control that survives
- * an attacker who ignores our own rate buckets entirely.
+ * an attacker who ignores our own rate buckets entirely. Only the literal
+ * "true" enables it — a typo must not lock every client out of sign-in.
  *
  * @param {Record<string, string|undefined>} [env]
- * @returns {{ enforceAppCheck?: true }} spread into the onRequest options
+ * @returns {boolean}
  */
-function appCheckOptions(env = process.env) {
-  const raw = String(env.EVENT_APP_CHECK_ENFORCED ?? '').trim().toLowerCase();
-  return raw === 'true' ? { enforceAppCheck: true } : {};
+function appCheckEnforced(env = process.env) {
+  return String(env.EVENT_APP_CHECK_ENFORCED ?? '').trim().toLowerCase() === 'true';
+}
+
+/**
+ * Wrap a public OTP handler with the App Check gate.
+ *
+ * This is deliberately NOT the v2 `enforceAppCheck` option. That option is
+ * declared on `CallableOptions` only: firebase-functions types `onRequest`
+ * as `HttpsOptions extends Omit<GlobalOptions, 'region'|'enforceAppCheck'>`
+ * and its `onRequest` implementation never reads the field, so passing it
+ * to an onRequest definition is silently ignored and enforces nothing. Only
+ * `onCall` installs the platform middleware. Our clients speak plain
+ * fetch/JSON rather than the callable protocol (apps/web AuthContext), so
+ * the verification is done explicitly here instead.
+ *
+ * Ordering: CORS runs OUTSIDE this wrapper, so preflights are answered
+ * before the gate (a preflight carries no custom headers and could never
+ * attest) and a rejected browser request can still read the response.
+ *
+ * @param {(req: object, res: object) => Promise<void>} handler
+ * @param {{ enforced: boolean, getAppCheck: () => object|null,
+ *           log?: Pick<Console, 'error'> }} opts
+ */
+function withAppCheckGate(handler, { enforced, getAppCheck, log = console }) {
+  return async function appCheckGate(req, res) {
+    if (enforced) {
+      const { requireAppCheck } = require('../core/auth.cjs');
+      let appCheck = null;
+      try {
+        appCheck = getAppCheck();
+      } catch (err) {
+        // Fails closed below — an enforcement flag that stops enforcing
+        // because the SDK would not load is worse than no flag at all.
+        log.error('App Check service unavailable while enforcement is on', err);
+      }
+      const verdict = await requireAppCheck({ appCheck, enforced }, req);
+      if (!verdict.ok) {
+        log.error(`App Check refused a request to ${req.path || 'an OTP endpoint'}: ${verdict.reason}`);
+        // One shape for every rejection cause. It reveals nothing about
+        // users: the gate runs before the body is read, so the answer is
+        // identical no matter which address or challenge was asked about.
+        res.status(401).json({
+          error: {
+            code: 'unauthorized',
+            message: 'This request could not be verified. Reload the page and try again.',
+          },
+        });
+        return;
+      }
+    }
+    await handler(req, res);
+  };
 }
 
 /** Deployable exports (spec §1.3): sendOtpCode, verifyOtpCode, cleanup. */
@@ -363,7 +446,7 @@ function buildHandlers() {
   }
   const secrets = [...secretNames].map(defineSecret);
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
-  const appCheck = appCheckOptions(process.env);
+  const enforced = appCheckEnforced(process.env);
   const sendCeilingMax = parseSendCeiling(process.env);
 
   const buildDeps = () => {
@@ -388,11 +471,18 @@ function buildHandlers() {
     await handler(req, res);
   };
 
+  // Resolved lazily and per request: firebase-admin must not be touched at
+  // module load, and an unconfigured deployment never loads it at all.
+  const gated = (handler) => withCors(withAppCheckGate(handler, {
+    enforced,
+    getAppCheck: () => require('firebase-admin/app-check').getAppCheck(),
+  }));
+
   return {
-    sendOtpCode: onRequest({ region, secrets, ...appCheck }, withCors(async (req, res) => {
+    sendOtpCode: onRequest({ region, secrets }, gated(async (req, res) => {
       await createSendOtpHandler(buildDeps())(req, res);
     })),
-    verifyOtpCode: onRequest({ region, ...appCheck }, withCors(async (req, res) => {
+    verifyOtpCode: onRequest({ region }, gated(async (req, res) => {
       const { getDb } = require('../core/firestore.cjs');
       const { getAuth } = require('firebase-admin/auth');
       await createVerifyOtpHandler({ db: getDb(), auth: getAuth() })(req, res);
@@ -414,7 +504,8 @@ module.exports = {
   internals: {
     renderedMailCarriesCode,
     reopenSystemError,
-    appCheckOptions,
+    appCheckEnforced,
+    withAppCheckGate,
     parseSendCeiling,
     EXPIRY_MINUTES,
     EMAIL_RE,

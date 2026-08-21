@@ -52,3 +52,32 @@ test('preflight is fully handled', () => {
   assert.equal(handled, true);
   assert.equal(res.statusCode, 204);
 });
+
+test('the preflight allows every header the OTP client actually sends', () => {
+  const res = fakeRes();
+  const handled = applyCors(
+    {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://a.org',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type,x-firebase-appcheck',
+      },
+    },
+    res,
+    { allowedOrigins: ['https://a.org'] },
+  );
+  assert.equal(handled, true);
+  assert.equal(res.statusCode, 204);
+
+  const allowed = res.headers['Access-Control-Allow-Headers']
+    .split(',')
+    .map((h) => h.trim().toLowerCase());
+  // X-Firebase-AppCheck is not CORS-safelisted: the attestation the web
+  // client attaches (issue #45) preflights, and a missing entry here blocks
+  // both OTP POSTs outright as soon as a site key is configured.
+  for (const header of ['content-type', 'authorization', 'x-firebase-appcheck']) {
+    assert.ok(allowed.includes(header), `preflight must allow ${header}`);
+  }
+  assert.equal(res.headers['Access-Control-Allow-Methods'], 'POST');
+});

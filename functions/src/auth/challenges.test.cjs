@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   takeRateLimitSlot,
   takeGlobalSendSlot,
+  releaseGlobalSendSlot,
   createChallenge,
   verifyChallenge,
   finalizeChallenge,
@@ -252,6 +253,45 @@ test('send ceiling: the window drains, the trip clears, and a later trip alerts 
 
   await takeGlobalSendSlot(args);
   assert.equal((await takeGlobalSendSlot(args)).firstTrip, true, 'a fresh episode alerts again');
+});
+
+test('send ceiling: a released reservation frees capacity again', async () => {
+  const db = fakeDb();
+  let clock = 1_000_000;
+  const now = () => clock;
+  const args = { db, now, max: 2, windowMs: 60_000 };
+
+  const first = await takeGlobalSendSlot(args);
+  clock += 1000;
+  const second = await takeGlobalSendSlot(args);
+  assert.equal(typeof second.takenAt, 'number');
+  clock += 1000;
+  assert.equal((await takeGlobalSendSlot(args)).limited, true);
+
+  // Give the second reservation back: capacity returns immediately.
+  assert.equal(await releaseGlobalSendSlot({ db, takenAt: second.takenAt, now, windowMs: 60_000 }), true);
+  assert.deepEqual(db.store.get('auth_send_ceiling/global').sends, [first.takenAt]);
+  assert.equal((await takeGlobalSendSlot(args)).limited, false);
+
+  // Releasing an unknown or already-aged-out slot is a harmless no-op, and
+  // no caller can free a slot it never took.
+  assert.equal(await releaseGlobalSendSlot({ db, takenAt: 42, now, windowMs: 60_000 }), false);
+  assert.equal(await releaseGlobalSendSlot({ db, takenAt: undefined, now, windowMs: 60_000 }), false);
+});
+
+test('send ceiling: a release does not re-arm an alert the operator already got', async () => {
+  const db = fakeDb();
+  let clock = 0;
+  const now = () => clock;
+  const args = { db, now, max: 1, windowMs: 60_000 };
+
+  const taken = await takeGlobalSendSlot(args);
+  clock += 1000;
+  assert.equal((await takeGlobalSendSlot(args)).firstTrip, true);
+
+  clock += 1000;
+  await releaseGlobalSendSlot({ db, takenAt: taken.takenAt, now, windowMs: 60_000 });
+  assert.ok(db.store.get('auth_send_ceiling/global').trippedAt, 'the trip marker survives a release');
 });
 
 test('send ceiling: sweepExpired drops a drained ceiling document', async () => {

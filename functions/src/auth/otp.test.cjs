@@ -264,27 +264,138 @@ test('one address cannot spend the whole deployment ceiling', async () => {
   );
 });
 
-test('EVENT_APP_CHECK_ENFORCED gates the enforceAppCheck deploy option', () => {
-  assert.deepEqual(internals.appCheckOptions({}), {});
-  assert.deepEqual(internals.appCheckOptions({ EVENT_APP_CHECK_ENFORCED: '' }), {});
-  assert.deepEqual(internals.appCheckOptions({ EVENT_APP_CHECK_ENFORCED: 'false' }), {});
-  // Anything that is not an explicit "true" leaves enforcement off, so a
-  // typo'd value cannot lock every client out of sign-in.
-  assert.deepEqual(internals.appCheckOptions({ EVENT_APP_CHECK_ENFORCED: 'yes' }), {});
-  assert.deepEqual(
-    internals.appCheckOptions({ EVENT_APP_CHECK_ENFORCED: ' TRUE ' }),
-    { enforceAppCheck: true },
-  );
+test('a failed provider send returns its ceiling slot, so an outage cannot trip the breaker', async () => {
+  const db = fakeDb();
+  const { sent, handler } = sendDeps({
+    db,
+    sendResult: { providerMessageId: null, status: 'failed', error: 'down', retries: 2 },
+    sendCeilingMax: 3,
+    sendCeilingWindowMs: 60_000,
+  });
+
+  // Four failed sends against a ceiling of three: without the release the
+  // breaker would be tripped on zero delivered codes.
+  for (let i = 0; i < 4; i += 1) {
+    const res = fakeRes();
+    await handler({ method: 'POST', body: { email: `v${i}@example.org` } }, res);
+    assert.equal(res.statusCode, 502);
+  }
+  assert.equal(sent.length, 4, 'each attempt reached the provider');
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 0);
+
+  // The provider recovers: sign-in works immediately, no lingering 429.
+  const { handler: healthy } = sendDeps({ db, sendCeilingMax: 3, sendCeilingWindowMs: 60_000 });
+  const res = fakeRes();
+  await healthy({ method: 'POST', body: { email: 'v9@example.org' } }, res);
+  assert.equal(res.statusCode, 200);
 });
 
-test('EVENT_OTP_SEND_CEILING_PER_HOUR parses, and never parses to "no ceiling"', () => {
+test('a throw between reservation and send also returns the ceiling slot', async () => {
+  const db = fakeDb();
+  const boom = new Error('firestore unavailable');
+  const { handler } = sendDeps({ db, sendCeilingMax: 2, sendCeilingWindowMs: 60_000 });
+  // One good send establishes a slot that must survive the failure below.
+  await handler({ method: 'POST', body: { email: 'ok@example.org' } }, fakeRes());
+
+  const failing = createSendOtpHandler({
+    db,
+    getConfig: async () => CONFIG,
+    sendEmail: async () => { throw boom; },
+    sendCeilingMax: 2,
+    sendCeilingWindowMs: 60_000,
+    log: { error() {}, warn() {} },
+  });
+  await assert.rejects(
+    failing({ method: 'POST', body: { email: 'bad@example.org' } }, fakeRes()),
+    /firestore unavailable/,
+  );
+  // The failed request gave its slot back; the successful one kept its own.
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 1);
+});
+
+test('a successful send keeps its ceiling slot', async () => {
+  const db = fakeDb();
+  const { handler } = sendDeps({ db, sendCeilingMax: 5, sendCeilingWindowMs: 60_000 });
+  for (let i = 0; i < 3; i += 1) {
+    await handler({ method: 'POST', body: { email: `v${i}@example.org` } }, fakeRes());
+  }
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 3);
+});
+
+test('EVENT_APP_CHECK_ENFORCED gates enforcement, and only the literal "true" enables it', () => {
+  assert.equal(internals.appCheckEnforced({}), false);
+  assert.equal(internals.appCheckEnforced({ EVENT_APP_CHECK_ENFORCED: '' }), false);
+  assert.equal(internals.appCheckEnforced({ EVENT_APP_CHECK_ENFORCED: 'false' }), false);
+  // Anything that is not an explicit "true" leaves enforcement off, so a
+  // typo'd value cannot lock every client out of sign-in.
+  assert.equal(internals.appCheckEnforced({ EVENT_APP_CHECK_ENFORCED: 'yes' }), false);
+  assert.equal(internals.appCheckEnforced({ EVENT_APP_CHECK_ENFORCED: '1' }), false);
+  assert.equal(internals.appCheckEnforced({ EVENT_APP_CHECK_ENFORCED: ' TRUE ' }), true);
+});
+
+test('the App Check gate is a no-op when unconfigured and never loads the service', async () => {
+  let called = 0;
+  const handler = internals.withAppCheckGate(
+    async (_req, res) => { res.status(200).json({ ok: true }); },
+    {
+      enforced: false,
+      getAppCheck: () => { called += 1; return null; },
+      log: { error() {} },
+    },
+  );
+  const res = fakeRes();
+  await handler({ method: 'POST', headers: {}, body: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(called, 0, 'firebase-admin must not be touched by an unconfigured deployment');
+});
+
+test('the App Check gate refuses unattested requests with one shape, and runs before the handler', async () => {
+  const reached = [];
+  const gate = (appCheck) => internals.withAppCheckGate(
+    async (_req, res) => { reached.push(1); res.status(200).json({ ok: true }); },
+    { enforced: true, getAppCheck: () => appCheck, log: { error() {} } },
+  );
+  const appCheck = {
+    async verifyToken(t) {
+      if (t !== 'good') throw new Error('app-check/invalid-argument');
+      return { appId: 'app-1' };
+    },
+  };
+
+  // Missing, invalid, and service-unavailable all answer identically — the
+  // response cannot say why, and the handler never ran, so nothing about
+  // the requested address or challenge could leak.
+  const shapes = [];
+  for (const [instance, token] of [[appCheck, undefined], [appCheck, 'bad'], [null, 'good']]) {
+    const res = fakeRes();
+    await gate(instance)(
+      { method: 'POST', headers: token ? { 'x-firebase-appcheck': token } : {}, body: { email: 'a@example.org' } },
+      res,
+    );
+    assert.equal(res.statusCode, 401);
+    shapes.push(JSON.stringify(res.body));
+  }
+  assert.equal(new Set(shapes).size, 1, 'one failure shape for every rejection cause');
+  assert.equal(reached.length, 0);
+
+  // A valid attestation passes straight through.
+  const ok = fakeRes();
+  await gate(appCheck)({ method: 'POST', headers: { 'x-firebase-appcheck': 'good' }, body: {} }, ok);
+  assert.equal(ok.statusCode, 200);
+  assert.equal(reached.length, 1);
+});
+
+test('EVENT_OTP_SEND_CEILING_PER_HOUR parses strictly, and never parses to "no ceiling"', () => {
   assert.equal(internals.parseSendCeiling({}), challengeInternals.SEND_CEILING_MAX);
   assert.equal(internals.parseSendCeiling({ EVENT_OTP_SEND_CEILING_PER_HOUR: ' 50 ' }), 50);
-  for (const bad of ['0', '-1', 'lots', '']) {
+  // parseInt would take a valid PREFIX here and silently run at 1 or 50
+  // instead of falling back — a fraction of the intended ceiling is a
+  // self-inflicted outage, not the documented default.
+  for (const bad of ['0', '-1', 'lots', '', '1.5', '50oops', '5e2', ' ', '+50', '0x10']) {
     assert.equal(
       internals.parseSendCeiling({ EVENT_OTP_SEND_CEILING_PER_HOUR: bad }),
       challengeInternals.SEND_CEILING_MAX,
-      `"${bad}" must fall back to the default, not disable the ceiling`,
+      `"${bad}" must fall back to the default, not to a partial value`,
     );
   }
 });

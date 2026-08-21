@@ -716,11 +716,25 @@ so an existing deployment keeps its current behavior until an operator opts in.
 
 | Control | Variable | Behavior |
 |---|---|---|
-| Firebase App Check | `EVENT_APP_CHECK_ENFORCED` (+ `VITE_FIREBASE_APP_CHECK_SITE_KEY`) | `true` sets `enforceAppCheck` on the `sendOtpCode` and `verifyOtpCode` definitions, so the platform rejects unattested callers before the handler runs. The web app initializes the App Check SDK (reCAPTCHA v3) and sends `X-Firebase-AppCheck` **only** when the site key is set; with no key the SDK is never fetched. `validateDeployEnv` fails the build if the flag is on without a key, because that combination is a total sign-in outage. |
+| Firebase App Check | `EVENT_APP_CHECK_ENFORCED` (+ `VITE_FIREBASE_APP_CHECK_SITE_KEY`) | `true` makes `sendOtpCode` and `verifyOtpCode` verify the `X-Firebase-AppCheck` header (`core/auth.cjs` `requireAppCheck`, backed by `getAppCheck().verifyToken`) before any request work. The web app initializes the App Check SDK (reCAPTCHA v3) and sends the header **only** when the site key is set; with no key the SDK is never fetched. `validateDeployEnv` fails the build if the flag is on without a key, because that combination is a total sign-in outage. |
 | Global send ceiling | `EVENT_OTP_SEND_CEILING_PER_HOUR` (default 500) | A deployment-wide circuit breaker on total OTP sends per rolling hour, in `auth_send_ceiling/global` — same storage and sweep shape as `auth_rate_limits`. Over the ceiling, every request gets the *same* generic rate-limited answer the per-address bucket gives (no oracle), and the first request over the line emits an `OperatorEvent` with `dedupeKey: 'otp-send-ceiling-tripped'`. The document's `trippedAt` marker makes that once per trip episode and durable across containers, not once per request; it clears as the window drains. There is no "unlimited" setting — an absent, zero, or unparseable value falls back to 500. |
+
+Enforcement is explicit rather than the v2 `enforceAppCheck` option: that option is declared on
+`CallableOptions` only — firebase-functions types `onRequest` as
+`HttpsOptions extends Omit<GlobalOptions, 'region' | 'enforceAppCheck'>` and its `onRequest`
+implementation never reads the field, so passing it there is silently ignored. Only `onCall` installs
+the platform middleware, and these endpoints are plain `onRequest` because the client speaks
+fetch/JSON, not the callable protocol. The gate fails **closed** once enforcement is on — a missing
+header, an unverifiable token, and an unavailable App Check service are one 401 with one message —
+and it runs before the request body is read, so it can leak nothing about addresses or challenges.
+`core/http.cjs` allows `X-Firebase-AppCheck` in `Access-Control-Allow-Headers`; without that entry the
+non-safelisted header would preflight and the browser would block both POSTs outright.
 
 Ordering matters: the ceiling is taken **after** the per-address bucket, so one address hammering the
 endpoint is stopped by its own 5/15min budget and cannot spend the whole deployment's ceiling. The
+ceiling slot is a *reservation* — `releaseGlobalSendSlot` returns it when the challenge write or the
+provider send fails, so an email-provider outage cannot burn the hourly budget on zero delivered
+codes and keep refusing sign-ins after recovery. The
 counter is deliberately unsharded — a slot is written only *below* the ceiling, capping writes at
 `max` per window (two orders of magnitude under Firestore's sustained per-document write rate), and
 once tripped the transaction stops writing at all, which is exactly the flood case sharding would

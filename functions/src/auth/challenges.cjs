@@ -158,8 +158,13 @@ async function takeRateLimitSlot({ db, email, now = Date.now }) {
  *
  * @param {{ db: FirebaseFirestore.Firestore, now?: () => number,
  *           max?: number, windowMs?: number }} args
+ * The slot is a RESERVATION, taken before the send so concurrent requests
+ * cannot both pass a stale count. `releaseGlobalSendSlot` gives it back
+ * when the send does not happen, so the ceiling counts codes that actually
+ * went out rather than provider outages.
+ *
  * @returns {Promise<{ limited: boolean, count: number, firstTrip: boolean,
- *           retryAfterMs?: number }>}
+ *           takenAt?: number, retryAfterMs?: number }>}
  */
 async function takeGlobalSendSlot({
   db,
@@ -194,7 +199,51 @@ async function takeGlobalSendSlot({
     // the moment the window drains below the ceiling, so the next trip
     // alerts again.
     tx.set(ref, { sends, updatedAt: new Date(nowMs) });
-    return { limited: false, count: sends.length, firstTrip: false };
+    return { limited: false, count: sends.length, firstTrip: false, takenAt: nowMs };
+  });
+}
+
+/**
+ * Give back a reservation taken by `takeGlobalSendSlot` when the send it
+ * was reserved for did not happen — a provider outage, a failed challenge
+ * write. Without this, a deployment whose email provider is down burns the
+ * whole hourly ceiling on zero delivered codes and keeps refusing sign-ins
+ * after the provider recovers.
+ *
+ * Removes exactly one timestamp equal to `takenAt`. Two requests reserving
+ * in the same millisecond are indistinguishable, but returning "one slot"
+ * is the correct accounting either way. A slot that already aged out of
+ * the window is a no-op.
+ *
+ * `trippedAt` is carried across so a release cannot re-arm the alert for a
+ * trip episode the operator has already been told about.
+ *
+ * @param {{ db: FirebaseFirestore.Firestore, takenAt: number|undefined,
+ *           now?: () => number, windowMs?: number }} args
+ * @returns {Promise<boolean>} whether a slot was returned
+ */
+async function releaseGlobalSendSlot({
+  db,
+  takenAt,
+  now = Date.now,
+  windowMs = SEND_CEILING_WINDOW_MS,
+}) {
+  if (typeof takenAt !== 'number') return false;
+  const ref = db.collection('auth_send_ceiling').doc(SEND_CEILING_DOC);
+  const nowMs = now();
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+    const data = snap.data();
+    const sends = (Array.isArray(data?.sends) ? data.sends : [])
+      .filter((t) => typeof t === 'number' && nowMs - t < windowMs);
+    const index = sends.indexOf(takenAt);
+    if (index === -1) return false;
+    sends.splice(index, 1);
+    const patch = { sends, updatedAt: new Date(nowMs) };
+    if (data?.trippedAt) patch.trippedAt = data.trippedAt;
+    tx.set(ref, patch);
+    return true;
   });
 }
 
@@ -352,6 +401,7 @@ async function sweepExpired({ db, now = Date.now, batchLimit = 250, maxBatches =
 module.exports = {
   takeRateLimitSlot,
   takeGlobalSendSlot,
+  releaseGlobalSendSlot,
   createChallenge,
   verifyChallenge,
   finalizeChallenge,
