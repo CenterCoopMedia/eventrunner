@@ -146,9 +146,14 @@ service cloud.firestore {
     // (apps/web/src/lib/badgeDisplay.js) so a stale or unconfigured id is
     // never shown even between one edit and the next. What this boundary
     // CAN afford cheaply, and does: reject anything that is not a list,
-    // reject duplicates, and cap its length well above any real per-event
-    // badge count so an attacker cannot force an oversized array through
-    // the one layer that has no config to bound it against.
+    // reject duplicates, and cap its length. The cap (40) is a literal here
+    // because rules cannot `require()` packages/shared/src/badges.cjs — it
+    // MUST equal that module's exported `MAX_TOTAL_BADGES`, the same bound
+    // config/schema.cjs's validateBadgesConfig enforces on the sum of every
+    // category's maxPicks, so a config the admin form accepts can never
+    // produce a legitimate selection this boundary would reject.
+    // packages/shared/src/badges.test.cjs pins these two numbers equal so
+    // they cannot drift apart unnoticed.
     // .get(field, <default of the right type>) so a field the account
     // document happens not to carry is "absent", not a rule error — the
     // check is about what a client may WRITE, not about repairing a
