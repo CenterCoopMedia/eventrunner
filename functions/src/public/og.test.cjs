@@ -185,11 +185,21 @@ function fakeRes() {
 
 const fetchTemplateFn = async () => TEMPLATE;
 
+/** getConfig fixture with the feature on and a public URL set (the common case). */
+function enabledConfig(overrides = {}) {
+  return {
+    event: EVENT,
+    features: { updates: true },
+    tierA: { publicUrl: 'https://example.org' },
+    ...overrides,
+  };
+}
+
 test('createUpdatesMetaHandler: 405 on non-GET', async () => {
   const db = makeFakeDb();
   const handler = createUpdatesMetaHandler({
     db,
-    getConfig: async () => ({ event: EVENT, tierA: { publicUrl: 'https://example.org' } }),
+    getConfig: async () => enabledConfig(),
     fetchTemplateFn,
   });
   const res = fakeRes();
@@ -201,7 +211,7 @@ test('createUpdatesMetaHandler: an existing, visible update unfurls with its own
   const db = makeFakeDb({ 'cmsUpdates/post-1': { title: 'Big news', body: 'Details here.', visible: true } });
   const handler = createUpdatesMetaHandler({
     db,
-    getConfig: async () => ({ event: EVENT, tierA: { publicUrl: 'https://example.org' } }),
+    getConfig: async () => enabledConfig(),
     fetchTemplateFn,
   });
   const res = fakeRes();
@@ -216,7 +226,7 @@ test('createUpdatesMetaHandler: missing-doc fallback serves event-level meta, no
   const db = makeFakeDb();
   const handler = createUpdatesMetaHandler({
     db,
-    getConfig: async () => ({ event: EVENT, tierA: { publicUrl: 'https://example.org' } }),
+    getConfig: async () => enabledConfig(),
     fetchTemplateFn,
   });
   const res = fakeRes();
@@ -229,7 +239,7 @@ test('createUpdatesMetaHandler: a hidden (unpublished) update falls back too, ne
   const db = makeFakeDb({ 'cmsUpdates/draft-1': { title: 'Secret draft', body: 'shh', visible: false } });
   const handler = createUpdatesMetaHandler({
     db,
-    getConfig: async () => ({ event: EVENT, tierA: { publicUrl: 'https://example.org' } }),
+    getConfig: async () => enabledConfig(),
     fetchTemplateFn,
   });
   const res = fakeRes();
@@ -243,7 +253,7 @@ test('createUpdatesMetaHandler: the list route (/updates, no id) serves event-le
   const db = makeFakeDb();
   const handler = createUpdatesMetaHandler({
     db,
-    getConfig: async () => ({ event: EVENT, tierA: { publicUrl: 'https://example.org' } }),
+    getConfig: async () => enabledConfig(),
     fetchTemplateFn,
   });
   const res = fakeRes();
@@ -257,11 +267,62 @@ test('createUpdatesMetaHandler: no configured public URL -> 500, never fetches a
   let called = false;
   const handler = createUpdatesMetaHandler({
     db,
-    getConfig: async () => ({ event: EVENT, tierA: {} }),
+    getConfig: async () => enabledConfig({ tierA: {} }),
     fetchTemplateFn: async () => { called = true; return TEMPLATE; },
   });
   const res = fakeRes();
   await handler({ method: 'GET', path: '/updates/x', query: {} }, res);
   assert.equal(res.statusCode, 500);
   assert.equal(called, false);
+});
+
+// ------------------------------------------------------ features.updates gate
+
+test('createUpdatesMetaHandler: disabled config/features.updates -> not-found, same as buildSchedulePdf\'s pattern', async () => {
+  const db = makeFakeDb({ 'cmsUpdates/post-1': { title: 'Big news', body: 'Details here.', visible: true } });
+  let templateFetched = false;
+  const handler = createUpdatesMetaHandler({
+    db,
+    getConfig: async () => enabledConfig({ features: { updates: false } }),
+    fetchTemplateFn: async () => { templateFetched = true; return TEMPLATE; },
+  });
+  const res = fakeRes();
+  await handler({ method: 'GET', path: '/updates/post-1', query: {} }, res);
+  assert.equal(res.statusCode, 404);
+  assert.equal(templateFetched, false); // never even reaches the self-fetch
+});
+
+test('createUpdatesMetaHandler: a missing features doc (undefined, not false) also does not serve', async () => {
+  const db = makeFakeDb();
+  const handler = createUpdatesMetaHandler({
+    db,
+    getConfig: async () => ({ event: EVENT, tierA: { publicUrl: 'https://example.org' } }), // no `features` at all
+    fetchTemplateFn,
+  });
+  const res = fakeRes();
+  await handler({ method: 'GET', path: '/updates', query: {} }, res);
+  assert.equal(res.statusCode, 404);
+});
+
+// ---------------------------------------------------- strict visible === true
+
+test('createUpdatesMetaHandler: a doc with visible OMITTED (never explicitly published) is treated as unpublished', async () => {
+  // The Admin SDK bypasses firestore.rules — a doc missing the field
+  // entirely (e.g. hand-seeded, or mid-write) must not read as live.
+  const db = makeFakeDb({ 'cmsUpdates/no-flag': { title: 'No visible field at all', body: 'x' } });
+  const handler = createUpdatesMetaHandler({ db, getConfig: async () => enabledConfig(), fetchTemplateFn });
+  const res = fakeRes();
+  await handler({ method: 'GET', path: '/updates/no-flag', query: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.ok(!res.sent.includes('No visible field at all'));
+  assert.ok(res.sent.includes(EVENT.name)); // fell back to event-level meta
+});
+
+test('createUpdatesMetaHandler: visible: true (not just truthy) is required', async () => {
+  const db = makeFakeDb({ 'cmsUpdates/truthy': { title: 'Truthy but not true', body: 'x', visible: 1 } });
+  const handler = createUpdatesMetaHandler({ db, getConfig: async () => enabledConfig(), fetchTemplateFn });
+  const res = fakeRes();
+  await handler({ method: 'GET', path: '/updates/truthy', query: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.ok(!res.sent.includes('Truthy but not true'));
 });

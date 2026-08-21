@@ -27,6 +27,14 @@
  * serving crawlers the previous build's asset references for its whole
  * cache TTL otherwise. Forcing a fresh deploy forces a fresh cold start,
  * which fetches the just-published template immediately.
+ *
+ * Gated behind `config/features.updates`, same flag-gate pattern as
+ * buildSchedulePdf (functions/src/schedule/pdf.cjs) — a disabled feature
+ * answers not-found rather than describing content the event has turned
+ * off. Post lookup requires `visible === true` STRICTLY, not `!== false`:
+ * this handler runs on the Admin SDK, which bypasses firestore.rules
+ * entirely, so a doc with the field merely absent (never explicitly set
+ * true) must not read as published.
  */
 
 const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -177,7 +185,7 @@ function requestedUpdateId(req) {
 
 // -------------------------------------------------------------------- http
 
-const { methodNotAllowed, internal } = require('../core/errors.cjs');
+const { methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
 
 /**
  * @param {{ db: FirebaseFirestore.Firestore, getConfig: () => Promise<object>,
@@ -196,6 +204,13 @@ function createUpdatesMetaHandler({
 
     try {
       const config = await getConfig();
+      // Same flag-gate pattern as buildSchedulePdf (functions/src/schedule/
+      // pdf.cjs): a disabled feature answers not-found, not a crawl of
+      // whatever content happens to still exist in Firestore.
+      if (config?.features?.updates !== true) {
+        return notFound(res, 'Updates are not enabled for this event.');
+      }
+
       const publicUrl = config?.tierA?.publicUrl;
       if (!isNonEmptyString(publicUrl)) {
         return internal(res, 'The site is not configured with a public URL.');
@@ -204,10 +219,13 @@ function createUpdatesMetaHandler({
       const id = requestedUpdateId(req);
       let update = null;
       if (id) {
-        // Live cmsUpdates doc only — a draft (unpublished) update must not
-        // unfurl, same visibility contract as every other cms* read.
+        // Live cmsUpdates doc only, and STRICTLY visible === true — the
+        // Admin SDK bypasses firestore.rules entirely, so an absent
+        // `visible` field must not read as published (a `!== false` check
+        // would treat a doc mid-write, before the field is set, as
+        // published). Same visibility contract as every other cms* read.
         const snap = await db.collection('cmsUpdates').doc(id).get();
-        if (snap.exists && snap.data()?.visible !== false) update = snap.data();
+        if (snap.exists && snap.data()?.visible === true) update = snap.data();
       }
 
       const base = publicUrl.replace(/\/+$/, '');
