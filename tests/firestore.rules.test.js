@@ -615,6 +615,53 @@ describe("users account documents (spec §3.4)", () => {
   });
 });
 
+describe("session materials (spec §4.4, issue #23)", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "session_materials/m1"), {
+        sessionId: "pub",
+        type: "link",
+        url: "https://example.org/embargoed-deck",
+        filename: "Slide deck",
+        reviewStatus: "approved",
+        submittedBySpeakerId: null,
+      });
+      await setDoc(doc(db, "session_materials_public/m1"), {
+        sessionId: "pub",
+        type: "link",
+        filename: "Slide deck",
+        reviewStatus: "approved",
+      });
+    });
+  });
+
+  it("denies every client read of the canonical server-only collection, admin included", async () => {
+    await assertFails(getDoc(doc(anon(), "session_materials/m1")));
+    await assertFails(getDoc(doc(nonAdmin(), "session_materials/m1")));
+    await assertFails(getDoc(doc(admin(), "session_materials/m1")));
+  });
+
+  it("denies every client write to the canonical collection, admin included", async () => {
+    await assertFails(
+      setDoc(doc(admin(), "session_materials/m1"), { reviewStatus: "rejected" }),
+    );
+  });
+
+  it("allows anonymous read of the approved-materials public projection", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "session_materials_public/m1")));
+  });
+
+  it("denies every client write to the public projection, admin included", async () => {
+    await assertFails(
+      setDoc(doc(admin(), "session_materials_public/m1"), { filename: "Renamed" }),
+    );
+    await assertFails(
+      setDoc(doc(nonAdmin(), "session_materials_public/m1"), { filename: "Renamed" }),
+    );
+  });
+});
+
 describe("sessionBookmarks aggregate", () => {
   beforeAll(async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
