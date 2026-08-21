@@ -107,35 +107,63 @@ async function requireAdmin({ auth, getConfig }, req) {
  *
  * `users/{uid}` is seeded by the auth onCreate trigger (issue #17,
  * functions/src/users/lifecycle.cjs — every account starts `pending`,
- * `speakerId: null`) and updated by the invite/approval transactions and
- * the profile-setup self-update path, so this reads a real, populated
- * document for every signed-in caller. The read-a-missing-doc case still
- * fails closed rather than throwing (a retried trigger delivery, a very
- * recent sign-in the trigger hasn't caught up with yet, or a hand-seeded
- * test fixture) — `hasAttendeeAccess` on an empty profile is false by
- * construction (packages/shared/src/registration.cjs). This is the same
+ * `speakerId: null`, `role: 'attendee'`) and updated by the
+ * invite/approval transactions and the profile-setup self-update path, so
+ * this reads a real, populated document for every signed-in caller. The
+ * read-a-missing-doc case still fails closed rather than throwing (a
+ * retried trigger delivery, a very recent sign-in the trigger hasn't
+ * caught up with yet, or a hand-seeded test fixture) —
+ * `hasAttendeeAccess` on an empty profile is false by construction
+ * (packages/shared/src/registration.cjs). This is the same
  * `registrationStatus === 'approved' || speakerId != null` predicate the
  * rules' `requesterIsApprovedAttendee()` (firestore.rules) enforces for
  * direct client reads of `users_public` — one vocabulary, two enforcement
  * points that cannot drift apart.
  *
+ * Bootstrap admins (`config/bootstrap.adminEmails`) get the SAME
+ * `role: 'attendee'` default from the auth trigger as anyone else — the
+ * trigger has no way to know an email is on the bootstrap list. The
+ * client-side counterpart (ProfileContext.jsx) papers over this by
+ * overriding `role` to `'admin'` when its own `isAdmin` probe succeeds,
+ * so the UI shows a working bookmark pill for an admin who isn't also an
+ * approved attendee — but this server gate, reading only the stored
+ * document, would 403 that same admin's click. Resolving bootstrap-admin
+ * identity the same way `requireAdmin` does (verified email against
+ * `config/bootstrap.adminEmails`) keeps the UI's promise and the server's
+ * enforcement in agreement, the same "one predicate, two checkpoints"
+ * discipline the module doc above describes.
+ *
  * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
- *           db: FirebaseFirestore.Firestore }} deps
+ *           db: FirebaseFirestore.Firestore,
+ *           getConfig: () => Promise<{ bootstrap: { adminEmails?: string[] } | null }> }} deps
  * @param {object} req
  * @returns {Promise<{ ok: true, uid: string, email: string|null } |
  *                    { ok: false, status: 401|403, code: string, message: string }>}
  */
-async function requireAttendeeAccess({ auth, db }, req) {
+async function requireAttendeeAccess({ auth, db, getConfig }, req) {
   const decoded = await verifyAuthToken({ auth }, req);
   if (!decoded?.uid) {
     return { ok: false, status: 401, code: 'unauthorized', message: 'Authentication required.' };
   }
+
+  let isBootstrapAdmin = false;
+  const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
+  if (email && decoded.email_verified === true && typeof getConfig === 'function') {
+    const config = await getConfig();
+    const adminEmails = Array.isArray(config?.bootstrap?.adminEmails)
+      ? config.bootstrap.adminEmails
+      : [];
+    isBootstrapAdmin = adminEmails.some(
+      (entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email,
+    );
+  }
+
   const snap = await db.collection('users').doc(decoded.uid).get();
   const data = snap.exists ? snap.data() : null;
   const profile = {
     registrationStatus: data?.registrationStatus,
     speakerId: data?.speakerId ?? null,
-    role: data?.role,
+    role: isBootstrapAdmin ? 'admin' : data?.role,
   };
   if (!hasAttendeeAccess(profile)) {
     return {

@@ -35,14 +35,18 @@ const fixtureSession = {
   visible: true,
 };
 
-function renderCard({
+function cardTree({
   features = {},
   auth = { user: null },
   profile = { attendeeAccess: false },
   bookmarked = false,
+  initialEntries = ['/schedule'],
 } = {}) {
-  return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+  return (
+    <MemoryRouter
+      initialEntries={initialEntries}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <AuthContext.Provider value={auth}>
         <ProfileContext.Provider value={profile}>
           <ToastProvider>
@@ -52,8 +56,20 @@ function renderCard({
           </ToastProvider>
         </ProfileContext.Provider>
       </AuthContext.Provider>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderCard(props = {}) {
+  const result = render(cardTree(props));
+  return {
+    ...result,
+    // Rerenders the SAME tree shape with new props — MemoryRouter/Providers
+    // included — so a test can simulate the `bookmarked` prop changing
+    // underneath an already-mounted BookmarkPill (a subscription update, an
+    // identity switch) without unmounting it.
+    rerenderCard: (nextProps) => result.rerender(cardTree(nextProps)),
+  };
 }
 
 beforeEach(() => {
@@ -66,6 +82,14 @@ describe('SessionCard', () => {
     expect(screen.getByRole('link', { name: fixtureSession.title })).toHaveAttribute(
       'href',
       '/schedule/fx-1',
+    );
+  });
+
+  it('carries the current query string (?preview=1) into the detail link', () => {
+    renderCard({ initialEntries: ['/schedule?preview=1'] });
+    expect(screen.getByRole('link', { name: fixtureSession.title })).toHaveAttribute(
+      'href',
+      '/schedule/fx-1?preview=1',
     );
   });
 
@@ -131,6 +155,86 @@ describe('SessionCard', () => {
         'false',
       );
       expect(await screen.findByRole('alert')).toHaveTextContent('The bookmark could not be saved.');
+    });
+
+    it('drops the optimistic override once an external change updates the subscribed `bookmarked` prop', async () => {
+      setSessionBookmarkedMock.mockResolvedValue({ bookmarked: true, count: 1 });
+      const { rerenderCard } = renderCard({
+        features: { sessionBookmarks: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
+        bookmarked: false,
+      });
+      fireEvent.click(screen.getByRole('button', { name: /bookmark/i }));
+      await screen.findByRole('button', { name: /bookmarked/i }); // optimistic write in flight/confirmed
+
+      // The subscription catches up and confirms the write — `bookmarked`
+      // itself flips to true. Still shows "Bookmarked" (optimistic already
+      // agreed), but now `optimistic` is cleared and `bookmarked` alone is
+      // driving the display.
+      rerenderCard({
+        features: { sessionBookmarks: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
+        bookmarked: true,
+      });
+      expect(await screen.findByRole('button', { name: /bookmarked/i })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+
+      // Someone else unbookmarks this session from elsewhere (another tab,
+      // an admin action) — the next snapshot flips `bookmarked` back to
+      // false. Before the fix this never happened: a stale `optimistic`
+      // from the FIRST click kept masking every subsequent `bookmarked`
+      // update, so the pill stayed stuck on "Bookmarked" forever.
+      rerenderCard({
+        features: { sessionBookmarks: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
+        bookmarked: false,
+      });
+      const button = await screen.findByRole('button', { name: /^Bookmark$/i });
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+
+      // A subsequent click now sends the CORRECT desired state (true, to
+      // re-bookmark) instead of the inverse of a stale optimistic value.
+      setSessionBookmarkedMock.mockClear();
+      fireEvent.click(button);
+      expect(setSessionBookmarkedMock).toHaveBeenCalledWith({
+        user: { uid: 'u1' },
+        sessionId: 'fx-1',
+        bookmarked: true,
+      });
+      // Drain the click's async state update before the test (and its
+      // cleanup/unmount) exits, so it can't resolve into the next test.
+      await screen.findByRole('button', { name: /bookmarked/i });
+    });
+
+    it('resets the optimistic override when the signed-in identity changes', async () => {
+      setSessionBookmarkedMock.mockResolvedValue({ bookmarked: true, count: 1 });
+      const { rerenderCard } = renderCard({
+        features: { sessionBookmarks: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
+        bookmarked: false,
+      });
+      fireEvent.click(screen.getByRole('button', { name: /bookmark/i }));
+      await screen.findByRole('button', { name: /bookmarked/i });
+
+      // A different user signs in on the same mounted card (e.g. a shared
+      // kiosk session) — u1's optimistic bookmark must not leak onto u2's
+      // view, which starts from u2's own (unbookmarked) subscribed state.
+      rerenderCard({
+        features: { sessionBookmarks: true },
+        auth: { user: { uid: 'u2' } },
+        profile: { attendeeAccess: true },
+        bookmarked: false,
+      });
+      expect(await screen.findByRole('button', { name: /^Bookmark$/i })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
     });
   });
 

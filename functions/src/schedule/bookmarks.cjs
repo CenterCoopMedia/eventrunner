@@ -95,7 +95,7 @@ function createBookmarkSessionHandler({ db, auth, getConfig, now = Date.now, log
       return notFound(res, 'Session bookmarking is not enabled for this event.');
     }
 
-    const gate = await requireAttendeeAccess({ auth, db }, req);
+    const gate = await requireAttendeeAccess({ auth, db, getConfig }, req);
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const { sessionId, bookmarked } = req.body || {};

@@ -16,27 +16,40 @@ import { subscribeWithRetry } from './retrySubscription.js';
 /**
  * Subscribe to the signed-in user's bookmarked session ids. Calls
  * onNext(Set<sessionId>) on every snapshot. Returns the unsubscribe
- * function. A listener error (not signed in, rules-denied, offline) leaves
- * the last-known set in place rather than clearing it — fail soft, matches
- * contentSource.js.
+ * function.
+ *
+ * A listener error (not signed in, rules-denied, offline) never touches
+ * `onNext` — contentSource.js's "leave the last-known value in place" fail
+ * soft pattern, which is safe THERE because ContentContext's `loading` is
+ * always false (a committed build-time snapshot already renders). This
+ * module has no such synchronous fallback: `useMyBookmarks`'s `loading`
+ * starts true and is cleared only by `onNext`. Without a distinct error
+ * signal, a listener that fails on its very FIRST attempt (a brand-new
+ * account the users/{uid}/bookmarks subcollection was never created for,
+ * or a genuinely and permanently rules-denied caller) would leave
+ * `loading` stuck true forever, not just until the 15s retry — `onError`
+ * exists so the caller can unblock `loading` while still leaving
+ * `bookmarkedIds` itself untouched (the actual fail-soft part).
  *
  * @param {string} uid
  * @param {(ids: Set<string>) => void} onNext
+ * @param {(error: unknown) => void} [onError]
  */
-export function subscribeMyBookmarks(uid, onNext) {
+export function subscribeMyBookmarks(uid, onNext, onError) {
   if (!uid) {
     onNext(new Set());
     return () => {};
   }
   return subscribeWithRetry(
-    (onError) =>
+    (onListenerError) =>
       onSnapshot(
         collection(db, `users/${uid}/bookmarks`),
         (snapshot) => onNext(new Set(snapshot.docs.map((d) => d.id))),
-        onError,
+        onListenerError,
       ),
     (error) => {
       console.warn('users/{uid}/bookmarks subscription failed; keeping last-known set.', error);
+      onError?.(error);
     },
   );
 }

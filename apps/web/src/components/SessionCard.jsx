@@ -2,8 +2,8 @@
 // materials/reactions/bookmarks pills are feature-flag conditional, so a
 // deployment with those features off renders a plain session card and
 // nothing here assumes they exist.
-import { useCallback, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
@@ -74,11 +74,25 @@ function BookmarkPill({ session, bookmarked }) {
   const { attendeeAccess } = useProfile();
   const { showToast } = useToast();
   const [pending, setPending] = useState(false);
-  // Optimistic local override so a click feels instant; cleared once the
-  // owning subscription's next snapshot confirms the write (bookmarked prop
-  // changes) or the request fails.
+  // Optimistic local override so a click feels instant; cleared on a
+  // failed request (see onClick's catch) AND, below, once `bookmarked`
+  // itself changes — the owning subscription's next snapshot confirming
+  // OUR write, but just as importantly a DIFFERENT change arriving (a
+  // toggle from another tab, an admin action, or the signed-in identity
+  // switching). Without that second clear, `optimistic` would keep
+  // masking `bookmarked` forever after a successful write: the next click
+  // would compute `next = !isBookmarked` off the stale optimistic value
+  // instead of the server's real state, sending the inverse of what the
+  // user actually sees on screen.
   const [optimistic, setOptimistic] = useState(null);
   const isBookmarked = optimistic ?? bookmarked;
+
+  // Keyed on the session and the signed-in identity too: switching users
+  // (or the card being reused for a different session without a fresh
+  // mount) must not carry a stale optimistic value across the switch.
+  useEffect(() => {
+    setOptimistic(null);
+  }, [bookmarked, session.id, user?.uid]);
 
   const onClick = useCallback(async () => {
     if (!user) return; // rendered as a sign-in link instead, see below
@@ -215,6 +229,11 @@ export default function SessionCard({
 }) {
   const speakerNames = useSessionSpeakerNames(session.speakerIds);
   const range = formatSessionTimeRange(eventConfig, session);
+  // Carries the current query string (notably ?preview=1) into the detail
+  // link — react-router resets the URL's search to nothing on a bare
+  // pathname `to`, so without this an admin previewing drafts would flip
+  // back to published content just by clicking a session title.
+  const { search } = useLocation();
 
   return (
     <li>
@@ -243,7 +262,7 @@ export default function SessionCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold text-brand-ink">
               {linkToDetail ? (
-                <Link to={`/schedule/${session.id}`} className="hover:underline">
+                <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
                   {session.title}
                 </Link>
               ) : (

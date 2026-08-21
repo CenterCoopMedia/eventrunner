@@ -51,11 +51,12 @@ function renderDetail(
     loading = false,
     auth = { user: null },
     profile = { attendeeAccess: false },
+    search = '',
   } = {},
 ) {
   return render(
     <MemoryRouter
-      initialEntries={[`/schedule/${sessionId}`]}
+      initialEntries={[`/schedule/${sessionId}${search}`]}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <EventConfigContext.Provider
@@ -106,6 +107,21 @@ describe('SessionDetail', () => {
     expect(screen.getByRole('link', { name: 'Back to the schedule' })).toHaveAttribute(
       'href',
       '/schedule',
+    );
+  });
+
+  it('carries ?preview=1 into both "back to the schedule" links', () => {
+    renderDetail('fx-early', { search: '?preview=1' });
+    expect(
+      screen.getByRole('link', { name: '← Back to the schedule' }),
+    ).toHaveAttribute('href', '/schedule?preview=1');
+  });
+
+  it('carries ?preview=1 into the 404 state\'s "back to the schedule" link too', () => {
+    renderDetail('no-such-session', { search: '?preview=1' });
+    expect(screen.getByRole('link', { name: 'Back to the schedule' })).toHaveAttribute(
+      'href',
+      '/schedule?preview=1',
     );
   });
 

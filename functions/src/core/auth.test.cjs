@@ -223,3 +223,67 @@ test('requireAttendeeAccess: revoked attendee is denied', async () => {
   assert.equal(verdict.ok, false);
   assert.equal(verdict.status, 403);
 });
+
+// A bootstrap admin's users/{uid}.role is 'attendee' (the auth trigger has
+// no way to know an email is on config/bootstrap.adminEmails) — see the
+// module doc above requireAttendeeAccess. ProfileContext.jsx's isAdmin
+// override already lets the UI enable the bookmark pill for this caller;
+// these pin the server side of that same contract.
+test('requireAttendeeAccess: a bootstrap admin passes even with a pending, non-speaker profile', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'pending', speakerId: null, role: 'attendee' } }),
+      getConfig: fakeGetConfig(['Attendee@Example.ORG']),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org' });
+});
+
+test('requireAttendeeAccess: a bootstrap admin with no users/{uid} doc at all still passes', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({}),
+      getConfig: fakeGetConfig(['attendee@example.org']),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, true);
+});
+
+test('requireAttendeeAccess: an unverified email on the bootstrap list is NOT treated as admin', async () => {
+  const token = { ...ATTENDEE_TOKEN, email_verified: false };
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: token }),
+      db: fakeUsersDb({}),
+      getConfig: fakeGetConfig(['attendee@example.org']),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
+});
+
+test('requireAttendeeAccess: a pending, non-speaker caller NOT on the bootstrap list is still denied', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'pending' } }),
+      getConfig: fakeGetConfig(['someone-else@example.org']),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
+});
+
+test('requireAttendeeAccess: omitted getConfig degrades to the users-doc-only check (no crash)', async () => {
+  const verdict = await requireAttendeeAccess(
+    { auth: fakeAuth({ good: ATTENDEE_TOKEN }), db: fakeUsersDb({ u9: { registrationStatus: 'approved' } }) },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(verdict.ok, true);
+});

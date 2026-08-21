@@ -160,8 +160,8 @@ function fakeAuth(tokens) {
 
 const ATTENDEE_TOKEN = { uid: 'u1', email: 'attendee@example.org', email_verified: true };
 
-function fakeGetConfig(overrides = {}) {
-  return async () => ({ features: { sessionBookmarks: true, ...overrides } });
+function fakeGetConfig(featureOverrides = {}, bootstrap = null) {
+  return async () => ({ features: { sessionBookmarks: true, ...featureOverrides }, bootstrap });
 }
 
 test('handler: rejects non-POST', async () => {
@@ -282,4 +282,29 @@ test('handler: a linked speaker (pending registration) may still bookmark', asyn
     res,
   );
   assert.equal(res.statusCode, 200);
+});
+
+// A bootstrap admin's users/{uid}.role is 'attendee' by default (the auth
+// trigger has no way to know an email is on config/bootstrap.adminEmails,
+// functions/src/core/auth.cjs module doc) — the UI already enables the
+// bookmark pill for such a caller (ProfileContext.jsx's isAdmin override),
+// so the handler must accept the click, not 403 it.
+test('handler: a bootstrap admin with a pending, non-speaker profile can still bookmark', async () => {
+  const db = fakeDb({
+    ...seedSession('s1'),
+    'users/u1': { registrationStatus: 'pending', speakerId: null, role: 'attendee' },
+  });
+  const handler = createBookmarkSessionHandler({
+    db,
+    auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+    getConfig: fakeGetConfig({}, { adminEmails: ['attendee@example.org'] }),
+    now,
+  });
+  const res = fakeRes();
+  await handler(
+    { method: 'POST', headers: { authorization: 'Bearer good' }, body: { sessionId: 's1', bookmarked: true } },
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, { bookmarked: true, count: 1 });
 });

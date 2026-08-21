@@ -64,6 +64,31 @@ describe('subscribeMyBookmarks', () => {
     expect(() => capturedError(new Error('permission denied'))).not.toThrow();
     expect(onNext).not.toHaveBeenCalled();
   });
+
+  it('calls the optional onError callback on a listener error, without touching onNext', () => {
+    let capturedError;
+    onSnapshotMock.mockImplementation((_target, _onSuccess, onError) => {
+      capturedError = onError;
+      return vi.fn();
+    });
+    const onNext = vi.fn();
+    const onError = vi.fn();
+    subscribeMyBookmarks('u1', onNext, onError);
+    const err = new Error('permission denied');
+    capturedError(err);
+    expect(onError).toHaveBeenCalledWith(err);
+    expect(onNext).not.toHaveBeenCalled();
+  });
+
+  it('is safe to call with no onError at all (optional, third-party callers)', () => {
+    let capturedError;
+    onSnapshotMock.mockImplementation((_target, _onSuccess, onError) => {
+      capturedError = onError;
+      return vi.fn();
+    });
+    subscribeMyBookmarks('u1', vi.fn());
+    expect(() => capturedError(new Error('boom'))).not.toThrow();
+  });
 });
 
 describe('setSessionBookmarked', () => {

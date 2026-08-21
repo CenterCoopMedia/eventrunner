@@ -31,26 +31,46 @@ export function escapeIcsText(value) {
     .replace(/\r\n|\r|\n/g, '\\n');
 }
 
+const textEncoder = new TextEncoder();
+
 /**
- * Fold one unfolded ICS content line to RFC 5545 §3.1's 75-octet limit:
- * continuation lines start with a single space. Splits on UTF-16 code
- * units, which slightly undercounts multi-byte UTF-8 octets for non-ASCII
- * text — acceptable here since session titles/descriptions are short and a
- * slightly-early fold is spec-legal, while a byte-exact split would risk
- * cutting a multi-byte character in half.
+ * Fold one unfolded ICS content line to RFC 5545 §3.1's 75-OCTET limit:
+ * continuation lines start with a single space. Counts UTF-8 bytes, not
+ * UTF-16 code units or characters — a code-unit count silently undercounts
+ * non-ASCII text (e.g. 40 CJK characters is 40 code units, comfortably
+ * under 75, but 120 UTF-8 bytes, comfortably over the actual limit), which
+ * would emit spec-non-conformant lines a strict calendar client could
+ * reject or mis-render. Splits on Unicode code points (`Array.from`, not
+ * `.slice()`) so a fold point never lands inside a multi-byte character or
+ * a surrogate pair.
  *
  * @param {string} line
  * @returns {string}
  */
 export function foldIcsLine(line) {
-  if (line.length <= 75) return line;
-  const chunks = [line.slice(0, 75)];
-  let rest = line.slice(75);
-  while (rest.length > 74) {
-    chunks.push(rest.slice(0, 74));
-    rest = rest.slice(74);
+  if (textEncoder.encode(line).length <= 75) return line;
+
+  const codePoints = Array.from(line);
+  const chunks = [];
+  let chunk = '';
+  let chunkBytes = 0;
+  // First line budgets 75 octets; each continuation line's leading space
+  // (itself 1 octet) leaves 74 for content.
+  let budget = 75;
+
+  for (const char of codePoints) {
+    const charBytes = textEncoder.encode(char).length;
+    if (chunkBytes + charBytes > budget && chunk.length > 0) {
+      chunks.push(chunk);
+      chunk = '';
+      chunkBytes = 0;
+      budget = 74;
+    }
+    chunk += char;
+    chunkBytes += charBytes;
   }
-  if (rest.length > 0) chunks.push(rest);
+  if (chunk.length > 0) chunks.push(chunk);
+
   return chunks.join('\r\n ');
 }
 

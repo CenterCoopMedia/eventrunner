@@ -42,11 +42,13 @@ describe('escapeIcsText', () => {
 });
 
 describe('foldIcsLine', () => {
+  const byteLength = (s) => new TextEncoder().encode(s).length;
+
   it('leaves short lines untouched', () => {
     expect(foldIcsLine('SUMMARY:short')).toBe('SUMMARY:short');
   });
 
-  it('folds a long line at 75 octets with a leading-space continuation', () => {
+  it('folds a long ASCII line at 75 octets with a leading-space continuation', () => {
     const long = 'DESCRIPTION:' + 'x'.repeat(100);
     const folded = foldIcsLine(long);
     const parts = folded.split('\r\n');
@@ -54,6 +56,45 @@ describe('foldIcsLine', () => {
     expect(parts[1].startsWith(' ')).toBe(true);
     // Rejoining (stripping the fold) must reproduce the original text.
     expect(parts.map((p, i) => (i === 0 ? p : p.slice(1))).join('')).toBe(long);
+  });
+
+  it('folds by UTF-8 OCTETS, not UTF-16 code units — 40 CJK characters is well under', () => {
+    // 40 CJK characters: 40 UTF-16 code units (well under a naive 75-unit
+    // limit) but 3 bytes each in UTF-8 = 120 octets (over the real limit).
+    // A code-unit-based fold would wrongly leave this on one line.
+    const long = 'SUMMARY:' + '会'.repeat(40);
+    const folded = foldIcsLine(long);
+    const lines = folded.split('\r\n');
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) {
+      expect(byteLength(line)).toBeLessThanOrEqual(75);
+    }
+    // Rejoining reproduces the original text exactly — no character lost or
+    // duplicated at a fold boundary.
+    expect(lines.map((l, i) => (i === 0 ? l : l.slice(1))).join('')).toBe(long);
+  });
+
+  it('never splits a multi-byte character across a fold boundary', () => {
+    const long = 'DESCRIPTION:' + '日本語のテスト文字列です。'.repeat(6);
+    const folded = foldIcsLine(long);
+    for (const line of folded.split('\r\n')) {
+      // A line ending mid-character would produce a replacement-character
+      // or truncated sequence when round-tripped through the encoder; a
+      // clean re-encode/re-decode round trip proves every fold landed on a
+      // whole-character boundary.
+      const bytes = new TextEncoder().encode(line.startsWith(' ') ? line.slice(1) : line);
+      expect(new TextDecoder('utf-8', { fatal: true }).decode(bytes)).toBe(
+        line.startsWith(' ') ? line.slice(1) : line,
+      );
+    }
+  });
+
+  it('keeps every folded line at or under 75 octets even for a run of 4-byte characters (emoji)', () => {
+    const long = 'SUMMARY:' + '🎤'.repeat(30);
+    const folded = foldIcsLine(long);
+    for (const line of folded.split('\r\n')) {
+      expect(byteLength(line)).toBeLessThanOrEqual(75);
+    }
   });
 });
 

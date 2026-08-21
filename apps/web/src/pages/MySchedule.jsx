@@ -25,21 +25,36 @@ export default function MySchedule() {
   const { user, loading: authLoading } = useAuth();
   const { bookmarkedIds, loading: bookmarksLoading } = useMyBookmarks();
 
-  const days = Array.isArray(eventConfig.days)
-    ? eventConfig.days.filter((d) => d && typeof d.id === 'string')
-    : [];
+  const days = useMemo(
+    () =>
+      Array.isArray(eventConfig.days)
+        ? eventConfig.days.filter((d) => d && typeof d.id === 'string')
+        : [],
+    [eventConfig.days],
+  );
+  const dayIds = useMemo(() => new Set(days.map((d) => d.id)), [days]);
 
   const myByDay = useMemo(() => {
     const grouped = new Map();
     for (const session of scheduleData) {
       if (!session.visible || !bookmarkedIds.has(session.id)) continue;
+      // A bookmarked session whose configured day was since removed from
+      // config/event.days (an admin edit, independent of the session's own
+      // dayId) is orphaned: grouping it under a day id nothing in `days`
+      // matches would make it count toward `mySessions.length` — skipping
+      // the "no bookmarks" empty state — while never being rendered under
+      // any <section>, since the render below iterates `days`, not this
+      // map's keys. That combination is a blank page under the header, not
+      // a soft failure. Drop it here instead, so "has bookmarks" and
+      // "renders bookmarks" stay the same fact.
+      if (!dayIds.has(session.dayId)) continue;
       const list = grouped.get(session.dayId) ?? [];
       list.push(session);
       grouped.set(session.dayId, list);
     }
     for (const [dayId, list] of grouped) grouped.set(dayId, sortSessions(list));
     return grouped;
-  }, [scheduleData, bookmarkedIds]);
+  }, [scheduleData, bookmarkedIds, dayIds]);
 
   // Flattened for bulk ICS export — day order doesn't matter there, so this
   // reads straight off myByDay's values rather than depending on `days`

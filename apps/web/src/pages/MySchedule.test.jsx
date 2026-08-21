@@ -56,6 +56,19 @@ const fixtureSessions = [
     speakerIds: [],
     visible: true,
   },
+  // Its dayId ('fx-day-removed') matches no entry in fixtureConfig.days —
+  // simulates a session left pointing at a day an admin removed from
+  // config/event.days after the session was bookmarked.
+  {
+    id: 'fx-orphan',
+    dayId: 'fx-day-removed',
+    startTime: '09:00',
+    endTime: '09:30',
+    title: '[Fixture] Orphaned-day session',
+    type: 'panel',
+    speakerIds: [],
+    visible: true,
+  },
 ];
 
 function renderMySchedule({
@@ -128,5 +141,36 @@ describe('MySchedule', () => {
     renderMySchedule({ bookmarkedIds: new Set(['fx-early']) });
     expect(screen.getByRole('heading', { level: 2, name: /Day one/ })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 2, name: /Day two/ })).toBeNull();
+  });
+
+  describe('a bookmarked session whose configured day was removed', () => {
+    it('shows the "no bookmarks" empty state instead of a blank page when it is the only bookmark', () => {
+      renderMySchedule({ bookmarkedIds: new Set(['fx-orphan']) });
+      expect(screen.getByRole('heading', { name: 'No bookmarked sessions yet' })).toBeInTheDocument();
+      expect(screen.queryByText('[Fixture] Orphaned-day session')).toBeNull();
+      // Sanity: this is genuinely the "no bookmarks" branch, not a
+      // coincidental blank body — no stray day-section heading either
+      // (EmptyState's own "No bookmarked sessions yet" IS an <h2>).
+      expect(screen.queryByRole('heading', { level: 2, name: /Day/ })).toBeNull();
+    });
+
+    it('is dropped from a mixed bookmark set — the valid session still renders, nothing is blank', () => {
+      renderMySchedule({ bookmarkedIds: new Set(['fx-orphan', 'fx-early']) });
+      expect(
+        screen.getByRole('heading', { level: 3, name: '[Fixture] Morning kickoff' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('[Fixture] Orphaned-day session')).toBeNull();
+      expect(screen.getByRole('heading', { level: 2, name: /Day one/ })).toBeInTheDocument();
+    });
+
+    it('does not count toward the bulk "download my schedule" export', () => {
+      renderMySchedule({
+        bookmarkedIds: new Set(['fx-orphan']),
+        features: { schedule: true, sessionBookmarks: true, icsExport: true },
+      });
+      // Only the orphaned bookmark exists, so mySessions is empty — the
+      // download button (gated on mySessions.length > 0) must not render.
+      expect(screen.queryByRole('button', { name: /download my schedule/i })).toBeNull();
+    });
   });
 });

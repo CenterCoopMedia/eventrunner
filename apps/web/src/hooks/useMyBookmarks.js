@@ -24,10 +24,19 @@ export function useMyBookmarks() {
    * back a new `user` object reference for the same account. */
   useEffect(() => {
     setLoading(Boolean(user));
-    const unsubscribe = subscribeMyBookmarks(user?.uid, (ids) => {
-      setBookmarkedIds(ids);
-      setLoading(false);
-    });
+    const unsubscribe = subscribeMyBookmarks(
+      user?.uid,
+      (ids) => {
+        setBookmarkedIds(ids);
+        setLoading(false);
+      },
+      // Fail soft (bookmarksSource.js): a listener error leaves
+      // bookmarkedIds untouched — only `loading` needs unblocking, so a
+      // permanently-denied or brand-new-account listener doesn't leave a
+      // caller (MySchedule) spinning forever instead of rendering with
+      // (possibly empty) last-known data.
+      () => setLoading(false),
+    );
     return unsubscribe;
   }, [user?.uid]);
   /* eslint-enable react-hooks/exhaustive-deps */
