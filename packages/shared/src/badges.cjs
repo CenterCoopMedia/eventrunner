@@ -12,6 +12,22 @@
  */
 
 /**
+ * The one aggregate cap on how many badges a user's stored selection may
+ * ever contain, shared by three layers that cannot share a single import:
+ *   - `config/schema.cjs` (validateBadgesConfig) rejects an operator's
+ *     config whose maximum possible selection — summed across categories —
+ *     would exceed this, so the picker and the rules boundary never
+ *     disagree about what a legal config allows.
+ *   - `firestore.rules` cannot `require()` this module, so its
+ *     `validBadgesList()` repeats the literal with a comment naming this
+ *     constant; `badges.test.cjs` pins the two values equal so they cannot
+ *     drift apart silently.
+ *   - the Profile picker (apps/web/src/pages/Profile.jsx) surfaces this
+ *     number in its copy once a config's total picks get close to it.
+ */
+const MAX_TOTAL_BADGES = 40;
+
+/**
  * Filter a user's badge selection down to the configured set and the
  * per-category pick caps.
  *
@@ -69,4 +85,4 @@ function validateBadgeSelection(selectedIds, badgesConfig) {
   return { valid, rejected };
 }
 
-module.exports = { validateBadgeSelection };
+module.exports = { validateBadgeSelection, MAX_TOTAL_BADGES };

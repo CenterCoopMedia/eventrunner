@@ -494,6 +494,28 @@ describe("users account documents (spec §3.4)", () => {
     );
   });
 
+  it("caps the badges list length even though rules cannot check ids against config/badges", async () => {
+    // Real per-event badge counts are nowhere near this; the cap exists only
+    // to bound the one write path that has no config to validate against.
+    const tooMany = Array.from({ length: 41 }, (_, i) => `badge-${i}`);
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), { badges: tooMany }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        badges: tooMany.slice(0, 40),
+      }),
+    );
+  });
+
+  it("denies a badges list with a duplicate id", async () => {
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        badges: ["writer", "writer"],
+      }),
+    );
+  });
+
   it("denies a move to public visibility while config/features.publicAttendeeProfiles is off", async () => {
     await setPublicProfilesFeature(false);
     await assertFails(
