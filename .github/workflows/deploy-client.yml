@@ -408,6 +408,30 @@ jobs:
         run: >-
           npx firebase target:apply hosting site "$EVENT_HOSTING_SITE"
           --project "$EVENT_FIREBASE_PROJECT_ID"
+      - name: Set the updatesMeta rewrite region for this project
+        # firebase.json's /updates/** rewrite names a function region
+        # (object-form "function": { functionId, region }, not the bare
+        # string form — the string form silently defaults to us-central1,
+        # which routes every non-default-region client's /updates/** at a
+        # backend that does not exist there). Region is per-client env
+        # (EVENT_FIREBASE_REGION), while firebase.json is one file shared by
+        # every client's deploy — same shape of problem as the hosting
+        # target above, same fix: patch the WORKING COPY in place for this
+        # run only, right before the deploy step reads it. Never committed.
+        env:
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+        run: |
+          set -euo pipefail
+          region="${EVENT_FIREBASE_REGION:-us-central1}"
+          jq --arg region "$region" '
+            .hosting.rewrites |= map(
+              if (.function | type) == "object" and .function.functionId == "updatesMeta"
+              then .function.region = $region
+              else . end
+            )
+          ' firebase.json > firebase.json.tmp
+          mv firebase.json.tmp firebase.json
+          echo "updatesMeta rewrite region set to: $region"
       - name: Deploy hosting
         env:
           EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}

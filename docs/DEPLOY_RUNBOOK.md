@@ -359,6 +359,18 @@ client already past step 3 never needs it again.
   `functions/src/public/og.cjs` landing (this issue) — `smoke`'s OPTIONS-preflight of `updatesMeta`
   now runs against the freshly-redeployed instance, not the one from the `functions` job earlier in
   the same run.
+- `firebase.json`'s `/updates/**` hosting rewrite names `updatesMeta`'s Cloud Functions **region** in
+  object form (`"function": { "functionId": "updatesMeta", "region": "..." }`) — the shorthand string
+  form (`"function": "updatesMeta"`) silently defaults to `us-central1`, which would route every
+  non-default-region client's `/updates/**` requests at a backend that does not exist there (a 404
+  from Hosting, not from the function). Region is per-client (`EVENT_FIREBASE_REGION`), while
+  `firebase.json` is one file shared by every client's deploy — the same shape of problem
+  `EVENT_HOSTING_SITE` is (target names, not literal site ids), and the same fix: the `hosting` job's
+  "Set the updatesMeta rewrite region for this project" step patches the **working copy** of
+  `firebase.json` with `jq` immediately before `firebase deploy --only hosting:site` reads it,
+  defaulting to `us-central1` when `EVENT_FIREBASE_REGION` is unset (matching every other region
+  default in this pipeline). Nothing is committed back — the committed file keeps `us-central1` as
+  its placeholder, correct for that value and every client that doesn't override the region.
 - If `google-github-actions/auth` fails with `permission_denied` on a run you expected to succeed
   (dispatched from `main`), the attribute condition (§1) or the repository+ref binding (§2) is the
   first thing to re-check — copy the exact `repository` and `ref` claims GitHub sent from the failed
