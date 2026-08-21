@@ -104,25 +104,97 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Attendee profile + private bookmark membership (spec §4.1, §9). Every
-    // WRITE goes through the Admin SDK (bookmarkSession, functions/src/
-    // schedule/bookmarks.cjs) — the client only ever reads its own docs, so
-    // the "my schedule" view can subscribe directly instead of polling a
-    // callable. No user-lifecycle writer exists yet in this codebase (issue
-    // #17), so `users/{uid}` is unpopulated in practice — this rule is
-    // still correct once it lands.
-    match /users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+    // Attendee accounts and their public projection (spec §3.4, §4.1).
+    //
+    // users/{uid} is the account record. The owner reads and edits their own
+    // profile fields; everything else about the account is server-owned —
+    // `speakerId`, `registrationStatus`, `approvalSource`, `role`, `email`,
+    // and the derived `profileComplete` are written only by the
+    // invite/approval transactions and the users/ triggers (§3.4, §4.3). The
+    // update rule therefore enumerates what the owner MAY change and denies
+    // the write when any other key is touched; the list mirrors
+    // SELF_EDITABLE_PROFILE_FIELDS in packages/shared/src/profile.cjs, which
+    // rules cannot import.
+    function isSelf(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
 
+    function editsOnlySelfProfileFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'displayName', 'pronouns', 'bio', 'organization', 'jobTitle',
+        'photoPath', 'socialHandles', 'badges', 'profileVisibility', 'updatedAt'
+      ]);
+    }
+
+    // Badge IDS are not checked here: rules cannot read config/badges for a
+    // list-membership test cheaply (§4.5). The syncUserPublic trigger
+    // rewrites users_public.badges to the intersection with the configured
+    // set, so an unconfigured id never becomes public.
+    function validSelfProfileValues() {
+      return request.resource.data.profileVisibility in ['public', 'attendees_only', 'private']
+        && request.resource.data.badges is list;
+    }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId);
+      allow read: if isAdmin();
+      // Account creation belongs to the auth trigger (users/lifecycle.cjs):
+      // a client that could create its own document could create it
+      // `approved`. Deletion is an admin/server operation for the same reason.
+      allow create, delete: if false;
+      allow update: if isSelf(userId)
+        && editsOnlySelfProfileFields()
+        && validSelfProfileValues();
+
+      // Private per-session bookmark membership (spec §4.1, §9). Every WRITE
+      // goes through the Admin SDK (bookmarkSession, functions/src/schedule/
+      // bookmarks.cjs) — the owner only ever reads their own docs here, so
+      // the "my schedule" view can subscribe directly instead of polling a
+      // callable.
       match /bookmarks/{sessionId} {
-        allow read: if request.auth != null && request.auth.uid == uid;
+        allow read: if isSelf(userId);
         allow write: if false;
       }
     }
 
-    // Aggregate bookmark counts (spec §4.1) — a plain number per session,
-    // harmless to read publicly; only bookmarkSession (Admin SDK) writes it.
+    // The requester's OWN registration state, read from their users doc.
+    // .get(field, default) rather than direct access: a half-seeded account
+    // document must evaluate to "not an approved attendee", not to a rule
+    // error. Costs one document read per attendees_only profile read — the
+    // same cost isAdmin() already pays, which is why the directory queries
+    // users_public once instead of per card (§3.4).
+    function requesterUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function requesterIsApprovedAttendee() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && (requesterUserDoc().get('registrationStatus', '') == 'approved'
+            || requesterUserDoc().get('speakerId', null) != null);
+    }
+
+    // users_public/{uid}: trigger-maintained projection, the only attendee
+    // document a client may read about somebody else. Before v1 this granted
+    // `attendees_only` profiles to ANY authenticated user, so every new
+    // (pending) account could enumerate the directory; the approved-attendee
+    // branch below is that fix (§3.4).
+    //
+    // A `list` query succeeds only when every returned document satisfies a
+    // rule, so the directory query filters on profileVisibility explicitly
+    // rather than relying on these rules to drop rows.
+    match /users_public/{userId} {
+      allow read: if resource.data.profileVisibility == 'public';
+      allow read: if isSelf(userId);
+      allow read: if resource.data.profileVisibility == 'attendees_only'
+        && requesterIsApprovedAttendee();
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Aggregate bookmark counts (spec §4.1, §9) — a plain number per
+    // session, harmless to read publicly; only bookmarkSession (Admin SDK)
+    // writes it.
     match /sessionBookmarks/{sessionId} {
       allow read: if true;
       allow write: if false;

@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/schedule', label: 'Schedule', feature: 'schedule' },
   { to: '/speakers', label: 'Speakers', feature: 'speakers' },
   { to: '/sponsors', label: 'Sponsors', feature: 'sponsors' },
+  { to: '/attendees', label: 'Attendees', feature: 'attendeeDirectory' },
 ];
 
 function navClass({ isActive }) {

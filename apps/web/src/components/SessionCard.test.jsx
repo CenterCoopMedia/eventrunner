@@ -1,10 +1,12 @@
 // SessionCard — the pill row is feature-flag conditional (spec §9), and the
-// bookmark pill's click itself is further gated by hasAttendeeAccess (spec
-// §3.4). No Firebase, no network (spec §8.1) — bookmarksSource is mocked.
+// bookmark pill's click itself is further gated by ProfileContext's
+// attendeeAccess (spec §3.4's hasAttendeeAccess predicate). No Firebase, no
+// network (spec §8.1) — bookmarksSource is mocked.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AuthContext from '../contexts/AuthContext.jsx';
+import ProfileContext from '../contexts/ProfileContext.jsx';
 import { ToastProvider } from '../contexts/ToastContext.jsx';
 import SessionCard from './SessionCard.jsx';
 
@@ -33,15 +35,22 @@ const fixtureSession = {
   visible: true,
 };
 
-function renderCard({ features = {}, auth = { user: null, hasAttendeeAccess: false }, bookmarked = false } = {}) {
+function renderCard({
+  features = {},
+  auth = { user: null },
+  profile = { attendeeAccess: false },
+  bookmarked = false,
+} = {}) {
   return render(
     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthContext.Provider value={auth}>
-        <ToastProvider>
-          <ul>
-            <SessionCard session={fixtureSession} eventConfig={fixtureConfig} features={features} bookmarked={bookmarked} />
-          </ul>
-        </ToastProvider>
+        <ProfileContext.Provider value={profile}>
+          <ToastProvider>
+            <ul>
+              <SessionCard session={fixtureSession} eventConfig={fixtureConfig} features={features} bookmarked={bookmarked} />
+            </ul>
+          </ToastProvider>
+        </ProfileContext.Provider>
       </AuthContext.Provider>
     </MemoryRouter>,
   );
@@ -68,7 +77,7 @@ describe('SessionCard', () => {
 
   describe('bookmark pill (features.sessionBookmarks)', () => {
     it('shows a sign-in prompt for a signed-out visitor', () => {
-      renderCard({ features: { sessionBookmarks: true }, auth: { user: null, hasAttendeeAccess: false } });
+      renderCard({ features: { sessionBookmarks: true }, auth: { user: null }, profile: { attendeeAccess: false } });
       expect(screen.getByRole('link', { name: /sign in to bookmark/i })).toHaveAttribute(
         'href',
         '/signin',
@@ -78,7 +87,8 @@ describe('SessionCard', () => {
     it('shows a disabled pill for a signed-in user without attendee access', () => {
       renderCard({
         features: { sessionBookmarks: true },
-        auth: { user: { uid: 'u1' }, hasAttendeeAccess: false },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: false },
       });
       const pill = screen.getByText('Bookmark');
       expect(pill.closest('[aria-disabled="true"]')).not.toBeNull();
@@ -88,7 +98,8 @@ describe('SessionCard', () => {
       setSessionBookmarkedMock.mockResolvedValue({ bookmarked: true, count: 1 });
       renderCard({
         features: { sessionBookmarks: true },
-        auth: { user: { uid: 'u1' }, hasAttendeeAccess: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
         bookmarked: false,
       });
       const button = screen.getByRole('button', { name: /bookmark/i });
@@ -110,7 +121,8 @@ describe('SessionCard', () => {
       setSessionBookmarkedMock.mockRejectedValue(new Error('The bookmark could not be saved.'));
       renderCard({
         features: { sessionBookmarks: true },
-        auth: { user: { uid: 'u1' }, hasAttendeeAccess: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
         bookmarked: false,
       });
       fireEvent.click(screen.getByRole('button', { name: /bookmark/i }));
@@ -144,12 +156,14 @@ describe('SessionCard', () => {
       const unresolved = { ...fixtureSession, dayId: 'no-such-day' };
       const { container } = render(
         <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <AuthContext.Provider value={{ user: null, hasAttendeeAccess: false }}>
-            <ToastProvider>
-              <ul>
-                <SessionCard session={unresolved} eventConfig={fixtureConfig} features={{ icsExport: true }} />
-              </ul>
-            </ToastProvider>
+          <AuthContext.Provider value={{ user: null }}>
+            <ProfileContext.Provider value={{ attendeeAccess: false }}>
+              <ToastProvider>
+                <ul>
+                  <SessionCard session={unresolved} eventConfig={fixtureConfig} features={{ icsExport: true }} />
+                </ul>
+              </ToastProvider>
+            </ProfileContext.Provider>
           </AuthContext.Provider>
         </MemoryRouter>,
       );

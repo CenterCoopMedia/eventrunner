@@ -102,16 +102,22 @@ async function requireAdmin({ auth, getConfig }, req) {
  * today; materials/reactions land on the same helper as they're built) —
  * "the predicate is not an authorization boundary, the rules are", but a
  * server handler still needs SOME check before it writes, and every such
- * handler must use the SAME one so a future tightening (issue #17: speaker
- * profile linking, ticket-derived entitlement, admin role source) only
- * has one call site to change.
+ * handler must use the SAME one so a future tightening only has one call
+ * site to change.
  *
- * NOTE: v1 has no user-lifecycle writer yet (`users/{uid}` is never
- * created by anything in this codebase today), so in practice this reads a
- * document that does not exist and denies everyone until that lands —
- * expected, not a bug: `hasAttendeeAccess` on an empty profile is false by
- * construction (packages/shared/src/registration.cjs), so the gate fails
- * closed rather than silently granting access.
+ * `users/{uid}` is seeded by the auth onCreate trigger (issue #17,
+ * functions/src/users/lifecycle.cjs — every account starts `pending`,
+ * `speakerId: null`) and updated by the invite/approval transactions and
+ * the profile-setup self-update path, so this reads a real, populated
+ * document for every signed-in caller. The read-a-missing-doc case still
+ * fails closed rather than throwing (a retried trigger delivery, a very
+ * recent sign-in the trigger hasn't caught up with yet, or a hand-seeded
+ * test fixture) — `hasAttendeeAccess` on an empty profile is false by
+ * construction (packages/shared/src/registration.cjs). This is the same
+ * `registrationStatus === 'approved' || speakerId != null` predicate the
+ * rules' `requesterIsApprovedAttendee()` (firestore.rules) enforces for
+ * direct client reads of `users_public` — one vocabulary, two enforcement
+ * points that cannot drift apart.
  *
  * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
  *           db: FirebaseFirestore.Firestore }} deps

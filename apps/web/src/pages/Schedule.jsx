@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
@@ -35,7 +36,8 @@ export function sortSessions(sessions) {
 export default function Schedule() {
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
-  const { user, hasAttendeeAccess } = useAuth();
+  const { user } = useAuth();
+  const { attendeeAccess } = useProfile();
   const { bookmarkedIds } = useMyBookmarks();
 
   // Days are runtime config — a live config/event write could deliver a
@@ -109,7 +111,7 @@ export default function Schedule() {
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {features.sessionBookmarks && user && hasAttendeeAccess ? (
+          {features.sessionBookmarks && user && attendeeAccess ? (
             <Link
               to="/schedule/mine"
               className="touch-target inline-flex items-center rounded-brand border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"

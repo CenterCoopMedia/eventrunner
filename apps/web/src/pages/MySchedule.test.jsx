@@ -7,6 +7,7 @@ import { MemoryRouter } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
+import ProfileContext from '../contexts/ProfileContext.jsx';
 import { ToastProvider } from '../contexts/ToastContext.jsx';
 import MySchedule from './MySchedule.jsx';
 
@@ -59,7 +60,8 @@ const fixtureSessions = [
 
 function renderMySchedule({
   features = { schedule: true, sessionBookmarks: true },
-  auth = { user: { uid: 'u1' }, hasAttendeeAccess: true, loading: false },
+  auth = { user: { uid: 'u1' }, loading: false },
+  profile = { attendeeAccess: true },
   bookmarkedIds = new Set(),
   bookmarksLoading = false,
 } = {}) {
@@ -70,21 +72,23 @@ function renderMySchedule({
         value={{ eventConfig: fixtureConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <AuthContext.Provider value={auth}>
-          <ToastProvider>
-            <ContentContext.Provider
-              value={{
-                readSource: 'published',
-                siteContent: {},
-                scheduleData: fixtureSessions,
-                speakers: [],
-                organizationsData: [],
-                loading: false,
-                getBlock: () => null,
-              }}
-            >
-              <MySchedule />
-            </ContentContext.Provider>
-          </ToastProvider>
+          <ProfileContext.Provider value={profile}>
+            <ToastProvider>
+              <ContentContext.Provider
+                value={{
+                  readSource: 'published',
+                  siteContent: {},
+                  scheduleData: fixtureSessions,
+                  speakers: [],
+                  organizationsData: [],
+                  loading: false,
+                  getBlock: () => null,
+                }}
+              >
+                <MySchedule />
+              </ContentContext.Provider>
+            </ToastProvider>
+          </ProfileContext.Provider>
         </AuthContext.Provider>
       </EventConfigContext.Provider>
     </MemoryRouter>,
@@ -100,7 +104,7 @@ describe('MySchedule', () => {
   });
 
   it('prompts a signed-out visitor to sign in, rather than showing an empty list', () => {
-    renderMySchedule({ auth: { user: null, hasAttendeeAccess: false, loading: false } });
+    renderMySchedule({ auth: { user: null, loading: false }, profile: { attendeeAccess: false } });
     expect(screen.getByRole('heading', { name: 'Sign in to see your schedule' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/signin');
   });

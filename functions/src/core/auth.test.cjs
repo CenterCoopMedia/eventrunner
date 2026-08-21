@@ -167,7 +167,7 @@ test('requireAttendeeAccess: no token → 401', async () => {
   );
 });
 
-test('requireAttendeeAccess: no users/{uid} doc (v1 has no lifecycle writer yet) → 403, no throw', async () => {
+test('requireAttendeeAccess: a missing users/{uid} doc fails closed (retried trigger, brand-new signup) → 403, no throw', async () => {
   const verdict = await requireAttendeeAccess(
     { auth: fakeAuth({ good: ATTENDEE_TOKEN }), db: fakeUsersDb({}) },
     reqWithAuth('Bearer good'),

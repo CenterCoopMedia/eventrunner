@@ -36,8 +36,7 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
-import { collection, doc, getDocs, limit, onSnapshot, query } from 'firebase/firestore';
-import { hasAttendeeAccess } from 'shared/registration';
+import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { auth, db } from '../firebase.js';
 
 const AuthContext = createContext(null);
@@ -119,7 +118,6 @@ async function postJson(name, body) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -148,26 +146,6 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [user]);
-
-  // Attendee profile (spec §3.4, §9): `users/{uid}` is self-readable by
-  // firestore.rules, so this subscribes directly instead of round-tripping
-  // through a callable. `hasAttendeeAccess` is the SAME predicate the
-  // backend uses (packages/shared/src/registration.cjs) — one vocabulary,
-  // not two lists that can drift. No user-lifecycle writer exists yet in
-  // this codebase (issue #17), so the doc is expected to not exist for most
-  // signed-in users today; that reads as "no attendee access" rather than
-  // an error (fail closed, matches functions/src/core/auth.cjs).
-  useEffect(() => {
-    if (!user) {
-      setProfile(null);
-      return undefined;
-    }
-    return onSnapshot(
-      doc(db, 'users', user.uid),
-      (snap) => setProfile(snap.exists() ? snap.data() : null),
-      () => setProfile(null),
-    );
   }, [user]);
 
   const signInWithGoogle = useCallback(
@@ -200,15 +178,13 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       isAdmin,
-      profile,
-      hasAttendeeAccess: hasAttendeeAccess(profile),
       loading,
       signInWithGoogle,
       sendOtpCode,
       verifyOtpCode,
       signOut,
     }),
-    [user, isAdmin, profile, loading, signInWithGoogle, sendOtpCode, verifyOtpCode, signOut],
+    [user, isAdmin, loading, signInWithGoogle, sendOtpCode, verifyOtpCode, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

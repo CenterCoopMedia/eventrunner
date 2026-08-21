@@ -9,7 +9,17 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  deleteDoc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
 
 const ADMIN_EMAIL = "admin@example.com";
 
@@ -53,6 +63,32 @@ function nonAdmin() {
     .firestore();
 }
 
+/**
+ * Signed-in client for one of the seeded attendee accounts below (§3.4).
+ * Their `users` doc — not the token — decides directory access.
+ */
+function attendee(uid) {
+  return testEnv
+    .authenticatedContext(uid, {
+      email: `${uid}@example.com`,
+      email_verified: true,
+    })
+    .firestore();
+}
+
+/**
+ * The attendee accounts the §3.4 read rules branch on. `registrationStatus`
+ * and `speakerId` are server-owned, so these are seeded with rules disabled,
+ * exactly as the users/ triggers would write them.
+ */
+const ATTENDEES = {
+  "pending-1": { registrationStatus: "pending", speakerId: null },
+  "approved-1": { registrationStatus: "approved", speakerId: null },
+  // A speaker whose registration never advanced past pending: speakerId, not
+  // the status, is what grants them attendee access (§3.4).
+  "speaker-1": { registrationStatus: "pending", speakerId: "spk-1" },
+};
+
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: "demo-run-of-show",
@@ -87,6 +123,48 @@ beforeAll(async () => {
     await setDoc(doc(db, "cmsVersionHistory/v1"), { collection: "cmsPages" });
     await setDoc(doc(db, "cmsPublishQueue/q1"), { status: "complete" });
     await setDoc(doc(db, "admin_logs/l1"), { action: "cmsPublish" });
+
+    for (const [uid, account] of Object.entries(ATTENDEES)) {
+      await setDoc(doc(db, `users/${uid}`), {
+        uid,
+        email: `${uid}@example.com`,
+        displayName: uid,
+        pronouns: "",
+        bio: "",
+        organization: "",
+        jobTitle: "",
+        photoPath: null,
+        socialHandles: {},
+        badges: [],
+        profileVisibility: "attendees_only",
+        profileComplete: true,
+        approvalSource: null,
+        role: "attendee",
+        ...account,
+      });
+      await setDoc(doc(db, `users_public/${uid}`), {
+        uid,
+        displayName: uid,
+        badges: [],
+        profileVisibility: "attendees_only",
+        speakerId: account.speakerId,
+      });
+    }
+    // One projection per visibility value, owned by nobody in the test set,
+    // so every read below is a read of somebody else's profile.
+    for (const [id, visibility] of [
+      ["public-profile", "public"],
+      ["attendees-profile", "attendees_only"],
+      ["private-profile", "private"],
+    ]) {
+      await setDoc(doc(db, `users_public/${id}`), {
+        uid: id,
+        displayName: id,
+        badges: [],
+        profileVisibility: visibility,
+        speakerId: null,
+      });
+    }
   });
 });
 
@@ -204,32 +282,13 @@ describe("server-only collections stay deny-all", () => {
   }
 
   it("denies unmatched collections (catch-all)", async () => {
-    await assertFails(getDoc(doc(anon(), "some_unmatched_collection/x")));
-    await assertFails(
-      setDoc(doc(nonAdmin(), "some_unmatched_collection/x"), { name: "x" }),
-    );
-    await assertFails(
-      setDoc(doc(admin(), "some_unmatched_collection/x"), { name: "x" }),
-    );
+    await assertFails(getDoc(doc(anon(), "activity_logs/a1")));
+    await assertFails(setDoc(doc(nonAdmin(), "activity_logs/a1"), { x: 1 }));
+    await assertFails(setDoc(doc(admin(), "activity_logs/a1"), { x: 1 }));
   });
 });
 
-describe("users/{uid} and the private bookmarks subcollection", () => {
-  it("allows a user to read their own profile doc, denies everyone else", async () => {
-    await assertSucceeds(getDoc(doc(nonAdmin(), "users/attendee-1")));
-    await assertFails(getDoc(doc(anon(), "users/attendee-1")));
-    // A different signed-in user, not the owner.
-    const other = testEnv
-      .authenticatedContext("attendee-2", { email: "other@example.com", email_verified: true })
-      .firestore();
-    await assertFails(getDoc(doc(other, "users/attendee-1")));
-  });
-
-  it("denies all client writes to users/{uid}, owner included", async () => {
-    await assertFails(setDoc(doc(nonAdmin(), "users/attendee-1"), { registrationStatus: "approved" }));
-    await assertFails(setDoc(doc(admin(), "users/attendee-1"), { registrationStatus: "approved" }));
-  });
-
+describe("the private bookmarks subcollection under users/{uid}", () => {
   it("allows a user to read their own bookmark membership docs, denies everyone else", async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), "users/attendee-1/bookmarks/session-1"), {
@@ -248,6 +307,217 @@ describe("users/{uid} and the private bookmarks subcollection", () => {
     await assertFails(
       setDoc(doc(nonAdmin(), "users/attendee-1/bookmarks/session-1"), { bookmarkedAt: new Date() }),
     );
+  });
+});
+
+// The six branches issue #17 requires pinned, plus the self-read and
+// list-query shapes §3.4 calls out. The gap being closed: `attendees_only`
+// used to be readable by ANY authenticated user, so a brand-new pending
+// account could enumerate the whole directory.
+describe("users_public directory visibility (spec §3.4)", () => {
+  it("denies a pending account an attendees_only profile", async () => {
+    await assertFails(
+      getDoc(doc(attendee("pending-1"), "users_public/attendees-profile")),
+    );
+  });
+
+  it("allows an approved attendee an attendees_only profile", async () => {
+    await assertSucceeds(
+      getDoc(doc(attendee("approved-1"), "users_public/attendees-profile")),
+    );
+  });
+
+  it("allows a speaker (speakerId set, still pending) an attendees_only profile", async () => {
+    await assertSucceeds(
+      getDoc(doc(attendee("speaker-1"), "users_public/attendees-profile")),
+    );
+  });
+
+  it("allows an admin an attendees_only profile", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "users_public/attendees-profile")));
+  });
+
+  it("allows anyone, signed out included, a public profile", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "users_public/public-profile")));
+    await assertSucceeds(
+      getDoc(doc(attendee("pending-1"), "users_public/public-profile")),
+    );
+  });
+
+  it("denies a private profile to everyone but its owner and admins", async () => {
+    await assertFails(getDoc(doc(anon(), "users_public/private-profile")));
+    await assertFails(
+      getDoc(doc(attendee("approved-1"), "users_public/private-profile")),
+    );
+    await assertFails(
+      getDoc(doc(attendee("speaker-1"), "users_public/private-profile")),
+    );
+    await assertSucceeds(getDoc(doc(admin(), "users_public/private-profile")));
+  });
+
+  it("allows self-read at any visibility, even while pending", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users_public/pending-1"), {
+        uid: "pending-1",
+        displayName: "pending-1",
+        badges: [],
+        profileVisibility: "private",
+        speakerId: null,
+      });
+    });
+    await assertSucceeds(
+      getDoc(doc(attendee("pending-1"), "users_public/pending-1")),
+    );
+    // Restore the seeded visibility for the list-query expectations below.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users_public/pending-1"), {
+        uid: "pending-1",
+        displayName: "pending-1",
+        badges: [],
+        profileVisibility: "attendees_only",
+        speakerId: null,
+      });
+    });
+  });
+
+  it("denies an unauthenticated read of an attendees_only profile", async () => {
+    await assertFails(getDoc(doc(anon(), "users_public/attendees-profile")));
+  });
+
+  it("pins the directory list-query shape: the visibility filter is load-bearing", async () => {
+    const publicOnly = (db) =>
+      getDocs(
+        query(collection(db, "users_public"), where("profileVisibility", "==", "public")),
+      );
+    const directory = (db) =>
+      getDocs(
+        query(
+          collection(db, "users_public"),
+          where("profileVisibility", "in", ["public", "attendees_only"]),
+        ),
+      );
+
+    // Anonymous and pending clients may list public profiles only.
+    await assertSucceeds(publicOnly(anon()));
+    await assertSucceeds(publicOnly(attendee("pending-1")));
+    await assertFails(directory(attendee("pending-1")));
+    // An approved attendee may list the directory; an unfiltered list still
+    // fails, because private docs would be in the result set.
+    await assertSucceeds(directory(attendee("approved-1")));
+    await assertFails(getDocs(collection(attendee("approved-1"), "users_public")));
+  });
+
+  it("denies every client write to users_public, admin included", async () => {
+    await assertFails(
+      setDoc(doc(attendee("approved-1"), "users_public/approved-1"), {
+        displayName: "self-published",
+      }),
+    );
+    await assertFails(
+      setDoc(doc(admin(), "users_public/attendees-profile"), { displayName: "x" }),
+    );
+  });
+});
+
+describe("users account documents (spec §3.4)", () => {
+  it("allows an account owner and an admin to read the account, and nobody else", async () => {
+    await assertSucceeds(getDoc(doc(attendee("pending-1"), "users/pending-1")));
+    await assertSucceeds(getDoc(doc(admin(), "users/pending-1")));
+    await assertFails(getDoc(doc(attendee("approved-1"), "users/pending-1")));
+    await assertFails(getDoc(doc(anon(), "users/pending-1")));
+  });
+
+  it("allows the owner to update their own profile fields", async () => {
+    await assertSucceeds(
+      updateDoc(doc(attendee("approved-1"), "users/approved-1"), {
+        displayName: "Rae Okonkwo",
+        pronouns: "they/them",
+        bio: "Community reporter.",
+        badges: ["writer"],
+        profileVisibility: "public",
+      }),
+    );
+  });
+
+  it("denies a self-update that touches the server-owned registrationStatus", async () => {
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        registrationStatus: "approved",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        displayName: "Sneaky",
+        registrationStatus: "approved",
+      }),
+    );
+  });
+
+  it("denies a self-update that touches the server-owned speakerId", async () => {
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        speakerId: "spk-9",
+      }),
+    );
+  });
+
+  it("denies self-updates to the other server-owned fields", async () => {
+    for (const patch of [
+      { approvalSource: "admin" },
+      { role: "admin" },
+      { email: "someone-else@example.com" },
+      // The seeded value is true, so flip it — a write that changes nothing
+      // affects no keys and is a permitted no-op.
+      { profileComplete: false },
+      { uid: "someone-else" },
+    ]) {
+      await assertFails(
+        updateDoc(doc(attendee("pending-1"), "users/pending-1"), patch),
+      );
+    }
+  });
+
+  it("denies an invalid profileVisibility and a non-list badges field", async () => {
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        profileVisibility: "everyone",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        badges: "writer",
+      }),
+    );
+  });
+
+  it("denies writing another attendee's account document", async () => {
+    await assertFails(
+      updateDoc(doc(attendee("approved-1"), "users/pending-1"), {
+        displayName: "Not mine",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(admin(), "users/pending-1"), { displayName: "Not mine" }),
+    );
+  });
+
+  it("denies client account creation and deletion (the auth trigger owns both)", async () => {
+    const db = testEnv
+      .authenticatedContext("brand-new", {
+        email: "brand-new@example.com",
+        email_verified: true,
+      })
+      .firestore();
+    await assertFails(
+      setDoc(doc(db, "users/brand-new"), {
+        uid: "brand-new",
+        registrationStatus: "approved",
+        profileVisibility: "public",
+        badges: [],
+      }),
+    );
+    await assertFails(deleteDoc(doc(attendee("pending-1"), "users/pending-1")));
+    await assertFails(deleteDoc(doc(admin(), "users/pending-1")));
   });
 });
 

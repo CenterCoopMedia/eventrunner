@@ -5,6 +5,7 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import { setSessionBookmarked } from '../lib/bookmarksSource.js';
@@ -63,12 +64,14 @@ const pillClass =
 /**
  * Bookmark toggle pill (spec §9 "Bookmarks"). Feature-gated by
  * config/features.sessionBookmarks; the click itself is gated by
- * `hasAttendeeAccess` — signed-out visitors see a "sign in" prompt, signed-in
- * non-attendees see a disabled pill naming the requirement, and approved
- * attendees (or speakers, or admins) get a working toggle.
+ * ProfileContext's `attendeeAccess` (spec §3.4's hasAttendeeAccess predicate,
+ * shared with the server) — signed-out visitors see a "sign in" prompt,
+ * signed-in non-attendees see a disabled pill naming the requirement, and
+ * approved attendees (or speakers, or admins) get a working toggle.
  */
 function BookmarkPill({ session, bookmarked }) {
-  const { user, hasAttendeeAccess } = useAuth();
+  const { user } = useAuth();
+  const { attendeeAccess } = useProfile();
   const { showToast } = useToast();
   const [pending, setPending] = useState(false);
   // Optimistic local override so a click feels instant; cleared once the
@@ -100,7 +103,7 @@ function BookmarkPill({ session, bookmarked }) {
     );
   }
 
-  if (!hasAttendeeAccess) {
+  if (!attendeeAccess) {
     return (
       <span
         className={pillClass}

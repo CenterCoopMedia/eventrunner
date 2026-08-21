@@ -7,6 +7,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
+import ProfileContext from '../contexts/ProfileContext.jsx';
 import { ToastProvider } from '../contexts/ToastContext.jsx';
 import SessionDetail from './SessionDetail.jsx';
 
@@ -48,7 +49,8 @@ function renderDetail(
     features = { schedule: true },
     scheduleData = fixtureSessions,
     loading = false,
-    auth = { user: null, hasAttendeeAccess: false },
+    auth = { user: null },
+    profile = { attendeeAccess: false },
   } = {},
 ) {
   return render(
@@ -60,23 +62,25 @@ function renderDetail(
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <AuthContext.Provider value={auth}>
-          <ToastProvider>
-            <ContentContext.Provider
-              value={{
-                readSource: 'published',
-                siteContent: {},
-                scheduleData,
-                speakers: [],
-                organizationsData: [],
-                loading,
-                getBlock: () => null,
-              }}
-            >
-              <Routes>
-                <Route path="/schedule/:sessionId" element={<SessionDetail />} />
-              </Routes>
-            </ContentContext.Provider>
-          </ToastProvider>
+          <ProfileContext.Provider value={profile}>
+            <ToastProvider>
+              <ContentContext.Provider
+                value={{
+                  readSource: 'published',
+                  siteContent: {},
+                  scheduleData,
+                  speakers: [],
+                  organizationsData: [],
+                  loading,
+                  getBlock: () => null,
+                }}
+              >
+                <Routes>
+                  <Route path="/schedule/:sessionId" element={<SessionDetail />} />
+                </Routes>
+              </ContentContext.Provider>
+            </ToastProvider>
+          </ProfileContext.Provider>
         </AuthContext.Provider>
       </EventConfigContext.Provider>
     </MemoryRouter>,

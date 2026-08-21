@@ -4,7 +4,6 @@
 // the Speakers.jsx pattern). A session id that does not resolve to a
 // visible cmsSchedule doc 404s here rather than rendering a blank page.
 import { Link, useParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
@@ -35,7 +34,6 @@ export default function SessionDetail() {
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
   const { bookmarkedIds } = useMyBookmarks();
-  useAuth(); // context participation only — SessionCard's pills read useAuth themselves
 
   if (!features.schedule) {
     return (
