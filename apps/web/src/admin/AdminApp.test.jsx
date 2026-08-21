@@ -12,6 +12,7 @@ vi.mock('../lib/configSource.js', () => ({
 }));
 vi.mock('../lib/contentSource.js', () => ({
   subscribeContentCollection: () => () => {},
+  subscribeSpeakersPublic: () => () => {},
 }));
 vi.mock('../lib/profileSource.js', () => ({
   subscribeOwnProfile: () => () => {},

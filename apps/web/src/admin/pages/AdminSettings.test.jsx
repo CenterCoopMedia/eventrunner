@@ -16,7 +16,10 @@ vi.mock('../../lib/configSource.js', () => ({
     return () => configSubscriptions.delete(docId);
   },
 }));
-vi.mock('../../lib/contentSource.js', () => ({ subscribeContentCollection: () => () => {} }));
+vi.mock('../../lib/contentSource.js', () => ({
+  subscribeContentCollection: () => () => {},
+  subscribeSpeakersPublic: () => () => {},
+}));
 vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (_name, onNext) => {

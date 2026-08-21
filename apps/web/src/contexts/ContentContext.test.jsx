@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 
 // Capture each collection subscription so tests can fire fake snapshots.
-const { subscriptions, subscribeContentCollection } = vi.hoisted(() => {
+const { subscriptions, subscribeContentCollection, subscribeSpeakersPublic } = vi.hoisted(() => {
   const subscriptions = new Map();
   return {
     subscriptions,
@@ -13,19 +13,28 @@ const { subscriptions, subscribeContentCollection } = vi.hoisted(() => {
       subscriptions.set(name, { readSource, onNext });
       return () => subscriptions.delete(name);
     }),
+    // speakers_public is not under the publish model: no _drafts sibling,
+    // no visibility clause, so its subscription takes no readSource.
+    subscribeSpeakersPublic: vi.fn((onNext) => {
+      subscriptions.set('speakers_public', { readSource: 'published', onNext });
+      return () => subscriptions.delete('speakers_public');
+    }),
   };
 });
 
-vi.mock('../lib/contentSource.js', () => ({ subscribeContentCollection }));
+vi.mock('../lib/contentSource.js', () => ({
+  subscribeContentCollection,
+  subscribeSpeakersPublic,
+}));
 
 import { ContentProvider, useContent, usePages } from './ContentContext.jsx';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotPages from '@generated/pagesData.js';
-import snapshotScheduleData from '@generated/scheduleData.js';
+import snapshotScheduleData, { speakers as snapshotScheduleSpeakers } from '@generated/scheduleData.js';
 import snapshotOrganizationsData from '@generated/organizationsData.js';
 
 function Probe() {
-  const { source, getBlock, getSectionBlocks, scheduleData, organizationsData, loading } =
+  const { source, getBlock, getSectionBlocks, scheduleData, organizationsData, speakers, loading } =
     useContent();
   const heroTitle = useContent('hero', 'title');
   const { pages, getPage } = usePages();
@@ -41,6 +50,8 @@ function Probe() {
       <span data-testid="schedule-first-title">{scheduleData[0]?.title ?? ''}</span>
       <span data-testid="organizations-count">{organizationsData.length}</span>
       <span data-testid="organizations-first-name">{organizationsData[0]?.name ?? ''}</span>
+      <span data-testid="speakers-count">{speakers.length}</span>
+      <span data-testid="speakers-names">{speakers.map((s) => s.displayName).join('|')}</span>
       <span data-testid="loading">{String(loading)}</span>
     </>
   );
@@ -71,6 +82,7 @@ describe('ContentProvider', () => {
       'cmsPages',
       'cmsSchedule',
       'cmsUpdates',
+      'speakers_public',
     ]);
     for (const { readSource } of subscriptions.values()) {
       expect(readSource).toBe('published');
@@ -92,9 +104,81 @@ describe('ContentProvider', () => {
         <Probe />
       </ContentProvider>,
     );
-    for (const { readSource } of subscriptions.values()) {
-      expect(readSource).toBe('draft');
+    for (const [name, { readSource }] of subscriptions.entries()) {
+      // speakers_public has no draft revision to preview — the canonical
+      // speaker record is not under the publish model (spec §4.3) — so its
+      // subscription is the same in either mode.
+      expect(readSource).toBe(name === 'speakers_public' ? 'published' : 'draft');
     }
+  });
+
+  // Without a runtime subscription the directory sat on the deploy-time
+  // snapshot forever: a speaker added, edited, or removed after the last
+  // build would never appear or disappear.
+  it('overlays a live speakers_public set wholesale, sorted by display name', () => {
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    expect(screen.getByTestId('speakers-count')).toHaveTextContent(
+      String(snapshotScheduleSpeakers.length),
+    );
+
+    act(() => {
+      subscriptions.get('speakers_public').onNext([
+        { id: 'b', displayName: 'Zoe Last', jobTitle: '', organization: '', bio: '' },
+        { id: 'a', displayName: 'Ada First', jobTitle: '', organization: '', bio: '' },
+      ]);
+    });
+
+    expect(screen.getByTestId('source')).toHaveTextContent('live');
+    expect(screen.getByTestId('speakers-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('speakers-names')).toHaveTextContent('Ada First|Zoe Last');
+  });
+
+  it('empties the directory when the live speaker set is empty', () => {
+    // An empty live result is a real answer — every speaker removed or
+    // unapproved — and must not fall back to stale snapshot speakers.
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    act(() => {
+      subscriptions.get('speakers_public').onNext([]);
+    });
+    expect(screen.getByTestId('speakers-count')).toHaveTextContent('0');
+  });
+
+  it('keeps the snapshot speakers while no live result has arrived', () => {
+    // Fail soft: a rules-denied or still-connecting listener never reports,
+    // so the committed snapshot keeps rendering.
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    expect(screen.getByTestId('speakers-count')).toHaveTextContent(
+      String(snapshotScheduleSpeakers.length),
+    );
+    expect(screen.getByTestId('source')).toHaveTextContent('snapshot');
+  });
+
+  it('drops a speaker whose rendered fields are not renderable', () => {
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    act(() => {
+      subscriptions.get('speakers_public').onNext([
+        { id: 'ok', displayName: 'Fine Person', jobTitle: '', organization: '', bio: '' },
+        { id: 'bad', displayName: { unexpected: true }, jobTitle: '', organization: '', bio: '' },
+      ]);
+    });
+    expect(screen.getByTestId('speakers-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('speakers-names')).toHaveTextContent('Fine Person');
   });
 
   it('overlays a live published cmsContent set wholesale', () => {
