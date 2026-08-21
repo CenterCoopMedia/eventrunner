@@ -304,6 +304,45 @@ test('cmsDeleteContent removes live and draft in one batch and logs the action',
   assert.equal(db.ids('admin_logs').length, 1);
 });
 
+test('cmsDeleteContent on a cmsSchedule doc cascades: its materials and their public projections are deleted too (issue #23 follow-up)', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/s1': { title: 'Session', visible: true, revision: 1, materialCount: 2 },
+    'cmsSchedule_drafts/s1': { title: 'Session', visible: true, status: 'clean', basedOnRevision: 1 },
+    'session_materials/m1': { sessionId: 's1', type: 'link', url: 'https://a.org', filename: 'A', reviewStatus: 'approved' },
+    'session_materials/m2': { sessionId: 's1', type: 'link', url: 'https://b.org', filename: 'B', reviewStatus: 'pending' },
+    'session_materials_public/m1': { sessionId: 's1', type: 'link', filename: 'A', reviewStatus: 'approved' },
+    // A different session's material must survive.
+    'session_materials/other': { sessionId: 's2', type: 'link', url: 'https://c.org', filename: 'C', reviewStatus: 'approved' },
+  });
+  const res = fakeRes();
+  await createCmsDeleteContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 's1' } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsSchedule', 's1'), undefined);
+  assert.equal(db.read('session_materials', 'm1'), undefined);
+  assert.equal(db.read('session_materials', 'm2'), undefined);
+  assert.equal(db.read('session_materials_public', 'm1'), undefined);
+  assert.notEqual(db.read('session_materials', 'other'), undefined);
+});
+
+test('cmsDeleteContent on a non-cmsSchedule collection never queries session_materials', async () => {
+  const db = makeFakeDb({
+    'cmsContent/hero__title': { value: 'live', visible: true, revision: 1 },
+    'cmsContent_drafts/hero__title': { value: 'draft', visible: true, status: 'clean', basedOnRevision: 1 },
+  });
+  const res = fakeRes();
+  await createCmsDeleteContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'title' } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  // No session_materials collection was ever created in the fake store —
+  // asserting on the id list is a cheap proxy for "never touched".
+  assert.deepEqual(db.ids('session_materials'), []);
+});
+
 // --- getSiteContent -----------------------------------------------------------
 
 test('getSiteContent is public GET: returns visible published docs, no auth required', async () => {
