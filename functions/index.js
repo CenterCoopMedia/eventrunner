@@ -11,6 +11,9 @@ const cmsPages = require('./src/cms/pages.cjs');
 const cmsVersions = require('./src/cms/versions.cjs');
 const cmsPublish = require('./src/cms/publish.cjs');
 const cmsUpdates = require('./src/cms/updates.cjs');
+const mediaUpload = require('./src/media/upload.cjs');
+const mediaMetadata = require('./src/media/metadata.cjs');
+const mediaUsage = require('./src/media/usage.cjs');
 const adminConfig = require('./src/admin/config.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
@@ -26,6 +29,9 @@ module.exports = {
   ...cmsVersions.handlers,
   ...cmsPublish.handlers,
   ...cmsUpdates.handlers,
+  ...mediaUpload.handlers,
+  ...mediaMetadata.handlers,
+  ...mediaUsage.handlers,
   ...adminConfig.handlers,
   ...scheduleBookmarks.handlers,
   ...usersLifecycle.handlers,

@@ -19,6 +19,10 @@
     "updateFeatures",
     "updateTheme",
     "updateBadges",
+    "mediaUpload",
+    "mediaDelete",
+    "mediaUpdateMetadata",
+    "scanMediaUsage",
     "emailDeliveryWebhook",
     "bookmarkSession",
     "logClientError"

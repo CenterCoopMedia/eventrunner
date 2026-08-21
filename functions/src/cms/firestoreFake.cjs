@@ -191,6 +191,10 @@ function makeFakeDb(seed = {}) {
         doc(id) {
           return docRef(name, id === undefined ? randomBytes(10).toString('hex') : id);
         },
+        /** Unfiltered listing — what media/usage.cjs walks the corpus with. */
+        async get() {
+          return query(name, [], null, undefined, undefined).get();
+        },
         where(field, op, value) {
           return query(name, [], null, undefined, undefined).where(field, op, value);
         },
