@@ -26,6 +26,11 @@ on:
         required: false
         type: boolean
         default: false
+      bootstrap:
+        description: Bootstrap mode — deploy only provision + functions, skipping content/build/hosting/smoke. Use for the very first deploy of a fresh project, before config/event exists (an operator runs scripts/init-event.cjs in between); see docs/DEPLOY_RUNBOOK.md §5.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -50,6 +55,28 @@ jobs:
             exit 1
           fi
           echo "guard: not a fork — continuing"
+      - name: Refuse to run outside refs/heads/main
+        # Defense-in-depth ONLY. This step runs as code checked out from the
+        # ref being deployed, so a commit on a non-main branch could edit or
+        # delete it before the run ever reaches here — a check like this
+        # cannot be the real boundary. The actual enforcement is the
+        # Workload Identity Federation principalSet condition on the deploy
+        # service account (docs/DEPLOY_RUNBOOK.md §1-2): it is evaluated by
+        # Google's IAM against the OIDC token's `ref` claim, outside this
+        # repository's control, and scoped to `attribute.repository_and_ref
+        # == <org>/<repo>#refs/heads/main`, so a workflow_dispatch against
+        # any other branch fails the token exchange regardless of what this
+        # step does. This step exists only to fail fast, with a clear
+        # message, before spending a job on a run that WIF would refuse
+        # anyway — and to cover the (defense-in-depth) gap between "this
+        # step was accidentally never wired up for a given ref" and the WIF
+        # condition, which cannot be misconfigured per-run.
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Deploys only run from refs/heads/main (got ${{ github.ref }}). This check is defense-in-depth only — see docs/DEPLOY_RUNBOOK.md §1-2 for the actual enforcement (a WIF principalSet condition scoped to this repository AND refs/heads/main)." >&2
+            exit 1
+          fi
+          echo "guard: ref is refs/heads/main — continuing"
 
   changes:
     name: Detect functions-affecting changes
@@ -67,6 +94,8 @@ jobs:
               - 'functions/**'
               - 'packages/shared/**'
               - 'package-lock.json'
+              - 'firebase.json'
+              - 'scripts/prepare-functions.cjs'
               - '.github/workflows/deploy-client.yml'
 
   shared:
@@ -83,20 +112,61 @@ jobs:
         run: npm run prepare:functions
       - uses: actions/upload-artifact@v4
         with:
-          name: shared-tgz
+          # Namespaced by client: a push run can fan out to several clients
+          # in one workflow run (deploy.yml's matrix), and v4 artifacts are
+          # immutable and must be unique within a run — an unqualified name
+          # here would collide on the second client's upload.
+          name: shared-tgz-${{ inputs.client }}
           path: functions/vendor/shared.tgz
           retention-days: 1
 
+  validate-env:
+    name: Validate deploy-time environment
+    needs: guard
+    environment: ${{ inputs.client }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Validate Tier A environment (spec §2.1) before touching GCP
+        # An unset GitHub Environment variable renders as an empty string
+        # in this env: block, not as absent — validateDeployEnv is what
+        # catches that and names the exact key, instead of the vars
+        # reaching firebase deploy / vite build as silent blanks.
+        env:
+          EVENT_SLUG: ${{ vars.EVENT_SLUG }}
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+          EVENT_HOSTING_SITE: ${{ vars.EVENT_HOSTING_SITE }}
+          EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
+          EVENT_STORAGE_BUCKET: ${{ vars.EVENT_STORAGE_BUCKET }}
+          EVENT_ALLOWED_ORIGINS: ${{ vars.EVENT_ALLOWED_ORIGINS }}
+          EVENT_EMAIL_PROVIDER: ${{ vars.EVENT_EMAIL_PROVIDER }}
+          EVENT_TICKETING_PROVIDER: ${{ vars.EVENT_TICKETING_PROVIDER }}
+          EVENT_TICKETING_EVENT_ID: ${{ vars.EVENT_TICKETING_EVENT_ID }}
+          EVENT_OPERATOR_NOTIFIER: ${{ vars.EVENT_OPERATOR_NOTIFIER }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
+        run: node scripts/validate-deploy-env.cjs
+
   provision:
     name: Provision Firestore rules/indexes and Storage rules
-    needs: [guard, shared]
+    needs: [guard, shared, validate-env]
     environment: ${{ inputs.client }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: shared-tgz
+          name: shared-tgz-${{ inputs.client }}
           path: functions/vendor
       - uses: actions/setup-node@v4
         with:
@@ -119,7 +189,7 @@ jobs:
 
   functions:
     name: Deploy functions
-    needs: [guard, shared, changes]
+    needs: [guard, shared, validate-env, changes]
     # Dispatch always deploys functions — provisioning a fresh project needs
     # them and there is nothing yet to diff against. Push runs stay gated on
     # the paths filter so an unrelated change does not burn the deploy quota
@@ -133,7 +203,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: shared-tgz
+          name: shared-tgz-${{ inputs.client }}
           path: functions/vendor
       - uses: actions/setup-node@v4
         with:
@@ -165,6 +235,7 @@ jobs:
         run: |
           set -euo pipefail
           {
+            echo "EVENT_FIREBASE_PROJECT_ID=$EVENT_FIREBASE_PROJECT_ID"
             echo "EVENT_SLUG=$EVENT_SLUG"
             echo "EVENT_FIREBASE_REGION=${EVENT_FIREBASE_REGION:-us-central1}"
             echo "EVENT_PUBLIC_URL=$EVENT_PUBLIC_URL"

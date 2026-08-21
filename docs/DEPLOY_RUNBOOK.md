@@ -37,17 +37,30 @@ gcloud iam workload-identity-pools providers create-oidc "github" \
   --location="global" \
   --workload-identity-pool="github-actions" \
   --display-name="GitHub OIDC" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref,attribute.repository_and_ref=assertion.repository + '#' + assertion.ref" \
   --attribute-condition="assertion.repository_owner == '<GH_ORG>'" \
   --issuer-uri="https://token.actions.githubusercontent.com"
 ```
 
 `--attribute-condition` is the guardrail: without it, any GitHub Actions workflow from any repo that
 can forge a matching subject claim could request a token. Scoping it to `repository_owner` is enough
-here because the per-client principal binding below (§2) additionally restricts *which* repository
-and *which* ref may impersonate the deploy service account — the two checks compose, and both are
-necessary (the provider is shared across every client; the binding is what makes it per-client and
-per-branch).
+at the *pool* level because the per-client principal binding below (§2) does the real narrowing —
+down to one repository **and** one ref (`refs/heads/main`) together. `attribute.repository_and_ref`
+is a mapped custom attribute for exactly that: IAM `principalSet` bindings match on a single
+attribute value, and a repository-only or ref-only binding cannot be combined with a second one
+(multiple `principalSet` members on a role binding are OR'd, not AND'd) — so a repository+ref
+compound value is the only way to express "this repo, this branch, nothing else" as one condition.
+
+**This closes a real gap, not a theoretical one.** Binding only on `attribute.repository` (an
+earlier draft of this runbook did exactly that) lets *any* workflow run in this repository —
+including one dispatched by a collaborator against a feature branch via
+`gh workflow run deploy.yml --ref <branch> -f client=<env>` — impersonate the deploy service
+account and ship that branch's code with the client's real credentials. An in-workflow ref check
+(`deploy-client.yml`'s `guard` job) is necessary but not sufficient on its own: it runs as
+code *from the ref being deployed*, so a workflow-modifying commit on that same branch could remove
+or bypass the check before GCP is ever asked. The `principalSet` condition is enforced by Google's
+IAM outside the runner and outside the repository's control entirely, which is why it is the primary
+control and the in-workflow check is defense-in-depth only.
 
 Capture the full provider resource name — every client's `WIF_PROVIDER` environment variable (§3)
 is the same value:
@@ -121,22 +134,37 @@ Firestore at deploy time (spec §8.6); `datastore.indexAdmin` is separate and is
 `firestore.indexes.json`.
 
 Bind the deploy service account so **only** this repository, on `refs/heads/main`, may impersonate
-it — this is the per-client half of the trust boundary the pool's attribute condition (§1) does not
-cover on its own:
+it — both conditions in one `principalSet`, via the combined attribute mapped in §1:
 
 ```sh
 gcloud iam service-accounts add-iam-policy-binding "${DEPLOY_SA_EMAIL}" \
   --project=<GCP_PROJECT_ID> \
   --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/attribute.repository/<GH_ORG>/<GH_REPO>"
+  --member="principalSet://iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/attribute.repository_and_ref/<GH_ORG>/<GH_REPO>#refs/heads/main"
 ```
 
-Binding on `attribute.repository` rather than `attribute.ref` is deliberate: `deploy-client.yml`'s
-`guard` job is the ref/fork check (it runs first, in-workflow, and fails the run before any
-GCP call), so the IAM binding only needs to prove "this repository," and stays valid whether the
-triggering ref is `main` (push auto-deploy) or a `workflow_dispatch` run kicked off from `main`
-(dispatch runs are only ever started from `main` — this repo does not expose `client` as a
-dispatchable input from anywhere else).
+Verify it — the policy should show exactly one member, and it must end in `#refs/heads/main`:
+
+```sh
+gcloud iam service-accounts get-iam-policy "${DEPLOY_SA_EMAIL}" --project=<GCP_PROJECT_ID> \
+  --format="json(bindings)"
+```
+
+This is the actual enforcement. It holds regardless of what any workflow file in the repository
+says, because Google's OIDC token exchange evaluates the `ref` claim GitHub put in the token — not
+anything the workflow run controls — before minting a credential. A `workflow_dispatch` run against
+a feature branch (`--ref some-branch`) presents a token whose `repository_and_ref` attribute does
+not match `<GH_ORG>/<GH_REPO>#refs/heads/main`, so `google-github-actions/auth` fails at the token
+exchange with `permission_denied` — before `deploy-client.yml` runs a single deploy step, and even
+if that workflow's own `guard` job ref check had been edited or removed on that branch.
+`workflow_dispatch` from `main` itself is unaffected: its ref is `refs/heads/main`, which matches.
+
+**Second layer: a GitHub-side deployment branch rule.** Belt-and-suspenders, and cheap to set up —
+repo Settings → Environments → `<CLIENT_ENV>` → Deployment branches and tags → **Selected branches
+and tags** → add `main` only. This makes GitHub itself refuse to start any job whose `environment:`
+is `<CLIENT_ENV>` unless the run's ref is `main`, independent of both the WIF condition and the
+in-workflow check. Combine it with **Required reviewers** on the same screen for any client where a
+human should see a dispatch before it runs.
 
 ## 3. GitHub Environment
 
@@ -238,15 +266,25 @@ repeatable deploy step. See `scripts/README.md`.
 
 ## 6. Verifying the setup
 
-- `gcloud iam service-accounts get-iam-policy "${DEPLOY_SA_EMAIL}"` shows the
-  `workloadIdentityUser` binding from §2.
-- A `workflow_dispatch` run of `deploy.yml` with `client: <CLIENT_ENV>` should reach the `smoke`
-  job and pass — it OPTIONS-preflights every endpoint in `.github/smoke-endpoints.json` against
-  `https://<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net` and GETs
+- `gcloud iam service-accounts get-iam-policy "${DEPLOY_SA_EMAIL}" --project=<GCP_PROJECT_ID>
+  --format="json(bindings)"` shows the `workloadIdentityUser` binding from §2, and its member ends
+  in `.../attribute.repository_and_ref/<GH_ORG>/<GH_REPO>#refs/heads/main` — not
+  `attribute.repository/<GH_ORG>/<GH_REPO>` alone. A repository-only binding is the gap this runbook
+  now closes: it lets any dispatched run on any branch of this repository impersonate the deploy
+  service account.
+- Confirm the negative case, not just the positive one: `gh workflow run deploy.yml --ref
+  <some-non-main-branch> -f client=<CLIENT_ENV>` must fail at the `google-github-actions/auth` step
+  with a token-exchange `permission_denied` — that is the WIF condition doing its job. It should
+  also fail earlier, at "Waiting for review" or immediately, if the deployment branch rule (§2) is
+  set, since GitHub itself won't start a job against `<CLIENT_ENV>` from that ref.
+- A `workflow_dispatch` run of `deploy.yml` with `client: <CLIENT_ENV>` **from `main`** should reach
+  the `smoke` job and pass — it OPTIONS-preflights every endpoint in `.github/smoke-endpoints.json`
+  against `https://<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net` and GETs
   `EVENT_PUBLIC_URL`.
-- If `google-github-actions/auth` fails with a `permission_denied` on the token exchange, the
-  attribute condition (§1) or the repository binding (§2) is the first thing to re-check — copy the
-  exact `repository` value GitHub sent from the failed run's log against what the binding names.
+- If `google-github-actions/auth` fails with `permission_denied` on a run you expected to succeed
+  (dispatched from `main`), the attribute condition (§1) or the repository+ref binding (§2) is the
+  first thing to re-check — copy the exact `repository` and `ref` claims GitHub sent from the failed
+  run's log against what the binding names.
 
 ## 7. Rotating access
 
