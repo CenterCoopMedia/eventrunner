@@ -67,26 +67,41 @@ function validateSpeakerIdsShape(value) {
  * so this is a single round trip, never a collection scan (the whole point
  * of replacing the name-based join).
  *
- * @param {{ db: object, speakerIds: string[] }} args
+ * Pass `tx` to read inside the caller's transaction. That is the whole
+ * point at the session-save seam: a read outside the transaction that
+ * writes the draft is only a pre-check, and deleteSpeaker can land between
+ * the two — its own transaction queries the sessions and drafts that exist
+ * NOW, so a draft written a moment later still names the deleted speaker
+ * and nothing is left to heal it. Reading the speaker documents inside the
+ * write transaction puts them in its read set, so a concurrent delete
+ * aborts and retries the save, which then rejects.
+ *
+ * @param {{ db: object, speakerIds: string[], tx?: object }} args
  * @returns {Promise<string[]>}
  */
-async function findMissingSpeakerIds({ db, speakerIds }) {
+async function findMissingSpeakerIds({ db, speakerIds, tx = null }) {
   if (!Array.isArray(speakerIds) || speakerIds.length === 0) return [];
   const refs = speakerIds.map((id) => db.collection(SPEAKERS).doc(id));
-  const snaps = await db.getAll(...refs);
+  const snaps = tx ? await tx.getAll(...refs) : await db.getAll(...refs);
   return speakerIds.filter((_id, i) => !snaps[i].exists);
 }
 
 /**
  * Seam #1 in one call: shape, then existence.
  *
- * @param {{ db: object, value: unknown }} args
+ * The returned `speakerIds` is the NORMALIZED array, and callers persist
+ * that rather than the raw payload value: `speakerIds: null` validates
+ * (an absent reference set is not an error) but must be stored as `[]`, or
+ * the stored shape stops being `string[]` and every reader has to defend
+ * against it.
+ *
+ * @param {{ db: object, value: unknown, tx?: object }} args
  * @returns {Promise<{ ok: true, speakerIds: string[] } | { ok: false, errors: string[] }>}
  */
-async function validateSpeakerReferences({ db, value }) {
+async function validateSpeakerReferences({ db, value, tx = null }) {
   const shape = validateSpeakerIdsShape(value);
   if (!shape.ok) return shape;
-  const missing = await findMissingSpeakerIds({ db, speakerIds: shape.speakerIds });
+  const missing = await findMissingSpeakerIds({ db, speakerIds: shape.speakerIds, tx });
   if (missing.length > 0) {
     return {
       ok: false,
