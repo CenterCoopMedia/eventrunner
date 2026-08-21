@@ -8,6 +8,12 @@ const path = require('node:path');
 const { emitAll, internals } = require('./emit.cjs');
 const { demoSnapshot, demoEvent } = require('./demo-event.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
+const {
+  speakerDisplayName,
+  buildPublicSpeaker,
+  validateSpeaker,
+  PUBLIC_SPEAKER_FIELDS,
+} = require('shared/speaker');
 
 const GENERATED_DIR = path.resolve(__dirname, '..', '..', 'apps', 'web', 'src', 'generated');
 
@@ -96,7 +102,9 @@ test('every demo page is a valid page doc, and every demo name is fictional', ()
     assert.equal(validatePageDoc(contract).ok, true, `${page.id} is not a valid page doc`);
   }
   const names = [
-    ...demo.speakers.map((s) => s.name),
+    // Canonical speakers hold firstName/lastName, never a joined `name`
+    // string (spec §4.3) — the display name is derived, here as everywhere.
+    ...demo.speakers.map((s) => speakerDisplayName(s)),
     ...demo.organizations.map((o) => o.name),
     demo.config.event.name,
     demo.config.event.legal.operatorName,
@@ -104,6 +112,31 @@ test('every demo page is a valid page doc, and every demo name is fictional', ()
   for (const name of names) {
     assert.match(name, /^\[Demo\]/, `${name} does not read as demo content`);
   }
+});
+
+test('demo speakers are canonical documents, and the bundle ships only their projection', () => {
+  // The seeder writes demo.speakers into `speakers/{id}`, so they must be
+  // valid canonical records (spec §4.3) — and demoSnapshot must run them
+  // through the same projection the onSpeakerWritten trigger runs, or the
+  // committed bundle would carry fields `speakers_public` never holds.
+  const demo = demoEvent();
+  for (const speaker of demo.speakers) {
+    const { id, seeded, uid, inviteToken, approvedAt, ...editable } = speaker;
+    assert.equal(validateSpeaker(editable).ok, true, `${id} is not a valid speaker payload`);
+    assert.equal(uid, null, 'a seeded speaker holds no account link');
+    assert.equal(inviteToken, null);
+  }
+
+  const emitted = demoSnapshot().speakers;
+  for (const speaker of emitted) {
+    assert.deepEqual(
+      Object.keys(speaker).sort(),
+      ['id', ...PUBLIC_SPEAKER_FIELDS].sort(),
+      'the bundle must carry exactly the public projection',
+    );
+  }
+  const source = emitted.map(({ id, ...rest }) => rest);
+  assert.deepEqual(source, demo.speakers.map((s) => buildPublicSpeaker(s)));
 });
 
 test('line terminators from real-world copy do not break the generated module', () => {

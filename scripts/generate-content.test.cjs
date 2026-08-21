@@ -124,7 +124,7 @@ test('a stored `id` field never overrides the document id', async () => {
 });
 
 test('a failing collection read fails generation instead of shipping an empty section', async () => {
-  const db = readFake({ config: CONFIG, failing: ['speakers'] });
+  const db = readFake({ config: CONFIG, failing: ['speakers_public'] });
   await assert.rejects(() => readDeployment({ db }), /transient read failure/);
 });
 
@@ -167,15 +167,28 @@ test('an unpublished (visible: false) live doc never reaches the snapshot', asyn
   assert.deepEqual(snapshot.content, []);
 });
 
-test('speakers has no visible field and is read unfiltered', async () => {
+// Speakers come from the one-way `speakers_public` projection, never from
+// the canonical `speakers` store (spec §4.3): the canonical record carries
+// `email`, `uid`, and `inviteToken`, and the bundle is publicly served
+// JavaScript. The projection also has no `visible` field — a speaker who
+// is not `approved` simply has no document there — so it is read
+// unfiltered.
+test('speakers are read from speakers_public, never from the canonical store', async () => {
   const db = readFake({
     config: CONFIG,
-    collections: { speakers: [{ __id: 's1', name: 'A' }] },
+    collections: {
+      speakers: [{ __id: 'canonical', firstName: 'A', email: 'a@example.org', inviteToken: 'tok' }],
+      speakers_public: [{ __id: 's1', speakerId: 's1', displayName: 'A B' }],
+    },
   });
 
   const snapshot = await readDeployment({ db });
 
   assert.deepEqual(snapshot.speakers.map((d) => d.id), ['s1']);
+  assert.equal('email' in snapshot.speakers[0], false);
+  assert.equal('inviteToken' in snapshot.speakers[0], false);
+  // `speakerId` is the doc id under another name; the snapshot keys on `id`.
+  assert.equal('speakerId' in snapshot.speakers[0], false);
 });
 
 test('--demo --check flags an unexpected extra file, not just content differences', async () => {
