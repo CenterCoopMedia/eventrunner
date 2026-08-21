@@ -15,10 +15,14 @@ import Sponsors from './pages/Sponsors.jsx';
 import ContentPage from './pages/ContentPage.jsx';
 import Login from './pages/Login.jsx';
 import NotFound from './pages/NotFound.jsx';
+import AdminApp from './admin/AdminApp.jsx';
 
 export function AppRoutes() {
   return (
     <Routes>
+      {/* The whole authenticated admin area lives under this one subtree —
+          it brings its own shell, gate, and nested routes (admin/AdminApp). */}
+      <Route path="admin/*" element={<AdminApp />} />
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="schedule" element={<Schedule />} />
