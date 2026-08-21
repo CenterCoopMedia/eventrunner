@@ -67,4 +67,21 @@ describe('AdminFeedback', () => {
     pushRows([]);
     expect(screen.getByText('Nothing here')).toBeInTheDocument();
   });
+
+  it('never offers "Mark reviewed" on an archived row (Codex P2: it would silently unarchive)', () => {
+    render(<AdminFeedback />);
+    pushRows([{ id: 'f1', message: 'Old bug', status: 'archived', createdAt: new Date() }]);
+    // Switch off the default 'open' filter (which hides archived rows) so
+    // the archived row is actually on screen to assert against.
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'all' } });
+    expect(screen.queryByRole('button', { name: 'Mark reviewed' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeInTheDocument();
+  });
+
+  it('never offers "Mark reviewed" on an already-reviewed row', () => {
+    render(<AdminFeedback />);
+    pushRows([{ id: 'f1', message: 'Handled', status: 'reviewed', createdAt: new Date() }]);
+    expect(screen.queryByRole('button', { name: 'Mark reviewed' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Archive' })).toBeInTheDocument();
+  });
 });

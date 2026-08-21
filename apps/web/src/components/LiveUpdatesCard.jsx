@@ -60,7 +60,7 @@ export default function LiveUpdatesCard() {
                   </time>
                 ) : null}
               </div>
-              <p className="mt-1 text-sm text-brand-ink">{update.message}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-brand-ink">{update.message}</p>
             </li>
           );
         })}

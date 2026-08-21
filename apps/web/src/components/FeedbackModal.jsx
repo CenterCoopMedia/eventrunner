@@ -5,9 +5,15 @@
 //     tells the server this submission is scripted.
 //   - `startedAt` (captured on mount) is the client half of the server's
 //     minimum-time gate — how long the form was open before submit.
-// Neither check is enforced here: the server is the actual gate, and this
-// modal just carries the two signals it needs. Fails soft — a submission
-// error is shown inline; it never throws out of the component.
+//   - `submissionKey` (generated once per form-open session, below) is an
+//     idempotency token: it stays the SAME across every retry of the same
+//     submission (a "Send feedback" click after a network error retries
+//     with the identical key), so a retry after a dropped response updates
+//     the same server-side doc/email claim instead of creating a duplicate
+//     row and a duplicate confirmation email (Codex P2 finding).
+// None of these checks are enforced here: the server is the actual gate,
+// and this modal just carries the signals it needs. Fails soft — a
+// submission error is shown inline; it never throws out of the component.
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
 import {
@@ -27,6 +33,15 @@ const CATEGORY_OPTIONS = [
 export default function FeedbackModal({ onClose }) {
   const titleId = useId();
   const startedAtRef = useRef(Date.now());
+  // One id per form-open session, resent unchanged on every retry — see the
+  // module comment. crypto.randomUUID() output (36 chars incl. hyphens)
+  // satisfies the server's SUBMISSION_KEY_RE (8-128 of [A-Za-z0-9_-]) once
+  // the hyphens are stripped, so the server never sees a shape it rejects.
+  const submissionKeyRef = useRef(
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID().replace(/-/g, '')
+      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`,
+  );
 
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
@@ -58,6 +73,7 @@ export default function FeedbackModal({ onClose }) {
       category,
       honeypot: website,
       startedAt: startedAtRef.current,
+      submissionKey: submissionKeyRef.current,
     });
     setSubmitting(false);
     if (!result.ok) {
@@ -85,9 +101,14 @@ export default function FeedbackModal({ onClose }) {
               Thanks for letting us know
             </h2>
             <p role="status" className="text-sm text-brand-ink-muted">
-              {email.trim()
-                ? 'We received your message and sent a confirmation to your email.'
-                : 'We received your message.'}
+              {/* Receipt-only wording: the backend's confirmation send is
+                  best-effort and swallows its own failures (spec: a failed
+                  send never turns an already-durable submission into a
+                  caller-visible error), so this must never assert that an
+                  email was actually delivered — only that the message
+                  itself was received. */}
+              We got your feedback.
+              {email.trim() ? " If you left an email, we'll try to send a confirmation." : null}
             </p>
             <div>
               <button type="button" className={primaryButtonClass} onClick={onClose}>

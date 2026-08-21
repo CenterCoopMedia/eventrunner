@@ -35,6 +35,17 @@ describe('LiveUpdatesCard', () => {
     expect(screen.getByText('Pinned')).toBeInTheDocument();
   });
 
+  it('preserves multiline messages instead of collapsing them to one line (Codex P2)', () => {
+    hookResult = {
+      loading: false,
+      updates: [{ id: 'u1', message: 'Line one\nLine two' }],
+    };
+    const { container } = render(<LiveUpdatesCard />);
+    const messageEl = container.querySelector('li p');
+    expect(messageEl).toHaveClass('whitespace-pre-wrap');
+    expect(messageEl.textContent).toBe('Line one\nLine two');
+  });
+
   it('sorts pinned entries ahead of unpinned ones', () => {
     hookResult = {
       loading: false,

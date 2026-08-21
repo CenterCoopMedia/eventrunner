@@ -68,4 +68,47 @@ describe('FeedbackModal', () => {
     const honeypot = screen.getByLabelText('Leave this field blank');
     expect(honeypot).toHaveAttribute('tabIndex', '-1');
   });
+
+  it('never asserts the confirmation email was delivered (Codex P2: the send is best-effort and can fail silently)', async () => {
+    submitFeedbackMock.mockResolvedValueOnce({ ok: true, id: 'f1' });
+    render(<FeedbackModal onClose={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello' } });
+    fireEvent.change(screen.getByLabelText('Email (optional)'), { target: { value: 'attendee@example.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('We got your feedback.');
+    // Receipt-only: it hedges ("try to send"), never claims delivery.
+    expect(status.textContent).not.toMatch(/sent a confirmation/i);
+    expect(status).toHaveTextContent("we'll try to send a confirmation");
+  });
+
+  it('sends a submissionKey and reuses the SAME one across a retry (Codex P2 idempotency)', async () => {
+    submitFeedbackMock.mockResolvedValueOnce({ ok: false, error: 'network blip' });
+    submitFeedbackMock.mockResolvedValueOnce({ ok: true, id: 'f1' });
+    render(<FeedbackModal onClose={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByText('We got your feedback.');
+
+    expect(submitFeedbackMock).toHaveBeenCalledTimes(2);
+    const firstKey = submitFeedbackMock.mock.calls[0][0].submissionKey;
+    const secondKey = submitFeedbackMock.mock.calls[1][0].submissionKey;
+    expect(typeof firstKey).toBe('string');
+    expect(firstKey.length).toBeGreaterThanOrEqual(8);
+    expect(secondKey).toBe(firstKey);
+  });
+
+  it('omits the confirmation mention entirely when no email was given', async () => {
+    submitFeedbackMock.mockResolvedValueOnce({ ok: true, id: 'f1' });
+    render(<FeedbackModal onClose={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+
+    const status = await screen.findByRole('status');
+    expect(status.textContent.trim()).toBe('We got your feedback.');
+  });
 });

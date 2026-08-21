@@ -8,7 +8,11 @@ import { resolveFunctionsOrigin } from './errorReporting.js';
 
 /**
  * @param {{ message: string, email?: string, category?: string,
- *           honeypot: string, startedAt: number }} payload
+ *           honeypot: string, startedAt: number, submissionKey: string }} payload
+ *   `submissionKey` is a per-form-session id the caller generates once and
+ *   resends unchanged on a retry (FeedbackModal.jsx) — the server uses it as
+ *   the feedback doc id, so a retry after a dropped response is idempotent
+ *   instead of creating a duplicate row and a duplicate confirmation email.
  * @param {{ env?: object, fetchImpl?: typeof fetch }} [deps]
  * @returns {Promise<{ ok: true, id?: string } | { ok: false, error: string }>}
  */

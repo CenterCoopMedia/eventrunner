@@ -130,7 +130,11 @@ export default function AdminFeedback() {
                   ) : null}
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  {row.status !== 'reviewed' ? (
+                  {/* Only a `new` row offers "Mark reviewed" — showing it on
+                      an archived row would silently unarchive on click
+                      (status would jump straight to reviewed with no
+                      intermediate state to undo it from). */}
+                  {row.status === 'new' ? (
                     <button
                       type="button"
                       className={secondaryButtonClass}
