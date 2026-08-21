@@ -21,6 +21,7 @@
     "updateBadges",
     "emailDeliveryWebhook",
     "bookmarkSession",
+    "buildSchedulePdf",
     "logClientError"
   ]
 }

@@ -13,6 +13,7 @@ const cmsPublish = require('./src/cms/publish.cjs');
 const cmsUpdates = require('./src/cms/updates.cjs');
 const adminConfig = require('./src/admin/config.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
+const schedulePdf = require('./src/schedule/pdf.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
@@ -28,6 +29,7 @@ module.exports = {
   ...cmsUpdates.handlers,
   ...adminConfig.handlers,
   ...scheduleBookmarks.handlers,
+  ...schedulePdf.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
   ...clientErrors.handlers,
