@@ -114,6 +114,18 @@ function buildHandlers() {
   return {
     onSpeakerWritten: onDocumentWritten({
       region,
+      // Retry on failure. This projection is the ONLY thing that removes a
+      // speaker from the public site — §4.3 deliberately leaves no periodic
+      // reconciliation to heal it — so a single transient failure on a
+      // soft-delete write would leave a removed speaker publicly readable
+      // indefinitely. Retries are safe by construction: the handler
+      // re-reads the source inside a transaction and writes nothing when
+      // the projection is already correct, so a duplicate delivery is a
+      // no-op rather than an amplification. (users/projection.cjs's
+      // syncUserPublic does not set this; the difference is that a stale
+      // users_public heals on the owner's next profile edit, while nothing
+      // ever writes a deleted speaker again.)
+      retry: true,
       document: 'speakers/{speakerId}',
     }, async (event) => {
       const { getDb } = require('../core/firestore.cjs');

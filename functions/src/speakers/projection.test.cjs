@@ -137,6 +137,17 @@ test('the tri-sync trigger set and the drift detector do not exist', () => {
   );
 });
 
+test('onSpeakerWritten is deployed with retries enabled', () => {
+  // This projection is the only thing that removes a speaker from the
+  // public site, and §4.3 leaves no reconciliation to heal it — so a
+  // dropped delivery on a soft delete would leave a removed speaker
+  // publicly readable indefinitely. Retries are safe: the handler re-reads
+  // the source and writes nothing when the projection is already correct.
+  const { handlers } = require('./projection.cjs');
+  const endpoint = Object.getOwnPropertyDescriptor(handlers.onSpeakerWritten, '__endpoint')?.value;
+  assert.equal(endpoint.eventTrigger.retry, true);
+});
+
 test('a malformed stored document still projects renderable strings', async () => {
   const { db, sync } = build({
     'speakers/s1': { status: 'approved', firstName: 'Sam', lastName: 'Example', bio: { oops: true } },
