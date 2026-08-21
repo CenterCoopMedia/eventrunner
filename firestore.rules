@@ -265,6 +265,26 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Session materials (spec §4.4, issue #23). Two collections, not four:
+    // `session_materials` is fully server-only — every field, including the
+    // link URL, lives there, and all client access (including admin/speaker
+    // review UIs) goes through Cloud Functions (materials/store.cjs,
+    // review.cjs, access.cjs). Making the raw doc server-only is what
+    // removes the reason the old URL vault collection existed.
+    match /session_materials/{materialId} {
+      allow read, write: if false;
+    }
+
+    // Trigger-maintained projection (materials/projection.cjs): anonymous
+    // read of exactly `{sessionId, type, filename, reviewStatus}`, and only
+    // for materials the trigger has already scrubbed and approval-gated —
+    // a pending or rejected material has no row here at all. Only the
+    // Admin SDK (the trigger) ever writes it.
+    match /session_materials_public/{materialId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Live updates dashboard feed (spec §9 "Live updates card", issue #28):
     // a plain admin-authored feed, not gated editorial content like the CMS
     // two-revision collections above — harmless to read publicly, written

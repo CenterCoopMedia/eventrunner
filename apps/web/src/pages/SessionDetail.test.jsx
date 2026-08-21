@@ -1,7 +1,7 @@
 // SessionDetail — one published session at /schedule/:sessionId (issue #16).
 // No Firebase, no network (spec §8.1); context providers only, same pattern
 // as Schedule.test.jsx.
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
@@ -10,6 +10,24 @@ import AuthContext from '../contexts/AuthContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
 import { ToastProvider } from '../contexts/ToastContext.jsx';
 import SessionDetail from './SessionDetail.jsx';
+
+// session_materials_public (issue #23) — mocked the same way bookmarksSource
+// would be, keeping this file Firebase-free (spec §8.1). Default: no rows.
+const subscribeSessionMaterialsMock = vi.fn((sessionId, onNext) => {
+  onNext([]);
+  return () => {};
+});
+vi.mock('../lib/materialsSource.js', () => ({
+  subscribeSessionMaterials: (...args) => subscribeSessionMaterialsMock(...args),
+  fetchSessionMaterialUrl: vi.fn(),
+}));
+
+beforeEach(() => {
+  subscribeSessionMaterialsMock.mockReset().mockImplementation((sessionId, onNext) => {
+    onNext([]);
+    return () => {};
+  });
+});
 
 const fixtureConfig = {
   name: '[Fixture] Lakeshore Docs Camp',
@@ -152,5 +170,35 @@ describe('SessionDetail', () => {
   it('renders the bookmark pill when features.sessionBookmarks is on', () => {
     renderDetail('fx-early', { features: { schedule: true, sessionBookmarks: true } });
     expect(screen.getByRole('link', { name: /sign in to bookmark/i })).toBeInTheDocument();
+  });
+
+  it('renders no materials section when the session has no approved materials', () => {
+    renderDetail('fx-early', { features: { schedule: true, sessionMaterials: true } });
+    expect(screen.queryByRole('heading', { name: 'Materials' })).toBeNull();
+  });
+
+  it('lists approved materials from session_materials_public when features.sessionMaterials is on', () => {
+    // Two hooks subscribe independently here (MaterialsPill's count and the
+    // list itself), so this stubs every call, not just the first.
+    subscribeSessionMaterialsMock.mockImplementation((sessionId, onNext) => {
+      onNext([
+        { id: 'm1', sessionId, type: 'link', filename: 'Opening slides', reviewStatus: 'approved' },
+        { id: 'm2', sessionId, type: 'file', filename: 'handout.pdf', reviewStatus: 'approved' },
+      ]);
+      return () => {};
+    });
+    renderDetail('fx-early', { features: { schedule: true, sessionMaterials: true } });
+    expect(screen.getByRole('heading', { name: 'Materials' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Opening slides' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'handout.pdf' })).toBeInTheDocument();
+  });
+
+  it('does not render the materials section when config/features.sessionMaterials is off, even with rows available', () => {
+    subscribeSessionMaterialsMock.mockImplementationOnce((sessionId, onNext) => {
+      onNext([{ id: 'm1', sessionId, type: 'link', filename: 'Slides', reviewStatus: 'approved' }]);
+      return () => {};
+    });
+    renderDetail('fx-early', { features: { schedule: true, sessionMaterials: false } });
+    expect(screen.queryByRole('heading', { name: 'Materials' })).toBeNull();
   });
 });

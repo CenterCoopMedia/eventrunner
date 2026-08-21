@@ -43,6 +43,17 @@ const RESERVED_FIELDS = Object.freeze([
   'updatedBy',
   'publishedAt',
   'publishedBy',
+  // materialCount (cmsSchedule only, spec §4.4/issue #23 follow-up) is
+  // maintained transactionally by functions/src/materials/store.cjs, never
+  // by a draft edit. Reserving it here does two things: contentFieldsOf
+  // strips it out of whatever a draft happens to carry (so a stray/forged
+  // value in a draft can never overwrite the true count), and publishDocs
+  // below explicitly re-carries the CURRENT live value onto the new live
+  // doc — without either half of that, a publish's `batch.set` (a full
+  // document replace, not a merge) would silently zero out every
+  // session's material count the next time its schedule content is
+  // edited and republished.
+  'materialCount',
 ]);
 
 const MAX_DOC_ID_LENGTH = 300;
@@ -310,9 +321,16 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
         const revision = baseRevision + 1;
         const contentFields = contentFieldsOf(draft);
         const visible = draft.visible !== false;
+        // Carried over from the CURRENT live doc, not the draft — see the
+        // RESERVED_FIELDS comment on 'materialCount'. Absent on a doc with
+        // no materials yet (or a first publish), which is the same "no
+        // field yet" state materials/store.cjs already treats as 0.
+        const materialCountFields =
+          typeof live?.materialCount === 'number' ? { materialCount: live.materialCount } : {};
 
         batch.set(liveRefs[j], {
           ...contentFields,
+          ...materialCountFields,
           visible,
           revision,
           publishedAt,

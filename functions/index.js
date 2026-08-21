@@ -23,6 +23,11 @@ const usersProjection = require('./src/users/projection.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
 const systemErrors = require('./src/telemetry/systemErrors.cjs');
 const systemErrorsAdmin = require('./src/telemetry/systemErrorsAdmin.cjs');
+const materialsStore = require('./src/materials/store.cjs');
+const materialsReview = require('./src/materials/review.cjs');
+const materialsAccess = require('./src/materials/access.cjs');
+const materialsDownload = require('./src/materials/download.cjs');
+const materialsProjection = require('./src/materials/projection.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -44,4 +49,9 @@ module.exports = {
   ...clientErrors.handlers,
   ...systemErrors.handlers,
   ...systemErrorsAdmin.handlers,
+  ...materialsStore.handlers,
+  ...materialsReview.handlers,
+  ...materialsAccess.handlers,
+  ...materialsDownload.handlers,
+  ...materialsProjection.handlers,
 };

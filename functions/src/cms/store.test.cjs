@@ -36,6 +36,7 @@ test('contentFieldsOf strips every bookkeeping key', () => {
     updatedBy: 'x',
     publishedAt: new Date(),
     publishedBy: 'y',
+    materialCount: 3,
   });
   assert.deepEqual(stripped, { value: 'hello', section: 'hero' });
 });
@@ -228,6 +229,53 @@ test('publishDocs: republish bumps revision by exactly one from the live doc', a
   assert.equal(db.read('cmsContent', 'hero__title').revision, 5);
   assert.equal(db.read('cmsContent', 'hero__title').value, 'v2');
   assert.equal(db.read('cmsContent_drafts', 'hero__title').basedOnRevision, 5);
+});
+
+// --- publish preserves cmsSchedule.materialCount (issue #23 follow-up) -----
+//
+// materialCount is maintained transactionally by functions/src/materials/
+// store.cjs, entirely outside the draft/publish flow — a draft never
+// carries it. Before this fix, publishDocs' live batch.set was a full
+// document replace built from `contentFields` (the draft minus
+// RESERVED_FIELDS) plus a fixed handful of publish-model fields, none of
+// which included materialCount — so publishing ANY edit to a session
+// (even something unrelated, like its title) would silently zero out its
+// material count the next time an admin republishes the schedule.
+
+test('publishDocs republish preserves cmsSchedule.materialCount from the current live doc', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/s1': {
+      title: 'Old title', visible: true, revision: 1, materialCount: 4,
+      publishedAt: new Date(0), publishedBy: 'x',
+    },
+    'cmsSchedule_drafts/s1': { title: 'New title', visible: true, status: 'dirty', basedOnRevision: 1 },
+  });
+  await publishDocs({ db, collection: 'cmsSchedule', docIds: ['s1'], actor: ACTOR, now });
+  const live = db.read('cmsSchedule', 's1');
+  assert.equal(live.title, 'New title');
+  assert.equal(live.materialCount, 4);
+});
+
+test('publishDocs: a draft-supplied materialCount can never override the live doc\'s real count', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/s1': { title: 't', visible: true, revision: 1, materialCount: 4 },
+    // Simulates a draft that somehow carries a materialCount field (e.g. an
+    // old client, or hand-edited data) — RESERVED_FIELDS strips it from
+    // contentFields regardless of how it got there.
+    'cmsSchedule_drafts/s1': {
+      title: 't', visible: true, status: 'dirty', basedOnRevision: 1, materialCount: 999,
+    },
+  });
+  await publishDocs({ db, collection: 'cmsSchedule', docIds: ['s1'], actor: ACTOR, now });
+  assert.equal(db.read('cmsSchedule', 's1').materialCount, 4);
+});
+
+test('publishDocs: a first-time publish with no live doc yet has no materialCount field (same "absent = 0" as materials/store.cjs)', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule_drafts/s1': { title: 't', visible: true, status: 'dirty', basedOnRevision: null },
+  });
+  await publishDocs({ db, collection: 'cmsSchedule', docIds: ['s1'], actor: ACTOR, now });
+  assert.equal('materialCount' in db.read('cmsSchedule', 's1'), false);
 });
 
 test('publishDocs skips docIds without a draft and reports them', async () => {
