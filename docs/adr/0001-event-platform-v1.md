@@ -210,7 +210,7 @@ use here, formalized).
 | `email/` | `send.cjs`, `templates.cjs`, `render.cjs`, `providers/{postmark,webhook,console}.cjs` | `emailDeliveryWebhook` | One send path. No queues (§3.1). |
 | `notify/` | `operator.cjs`, `sinks/{webhook,email}.cjs` | — | Called by other modules; no HTTP exports. |
 | `telemetry/` | `clientErrors.cjs`, `systemErrors.cjs`, `benignFilter.cjs` | `logClientError`, `resolveSystemErrors`, `onSystemErrorCreated` | Alert delivery via `notify/` only. |
-| `users/` | `lifecycle.cjs`, `projection.cjs` | `onUserCreated`, `syncUserPublic`, `maintainProfileComplete` | |
+| `users/` | `lifecycle.cjs`, `projection.cjs` | `onUserCreated`, `syncUserPublic`, `refreshUserPublicBadges`, `maintainProfileComplete` | |
 | `admin/` | `roles.cjs`, `config.cjs`, `stats.cjs`, `feedback.cjs`, `liveUpdates.cjs`, `exports.cjs` | `grantAdminRole`, `revokeAdminRole`, `getAdminUsers`, `updateEventConfig`, `updateFeatures`, `updateTheme`, `updateBadges`, `getSystemStats`, `exportAttendees`, `saveEditRequest`, `getEditRequests`, `submitFeedback`, `getFeedback`, `saveLiveUpdate`, `deleteLiveUpdate` | `admin/config.cjs` is the **only** writer of `config/*` — see below |
 | `public/` | `signup.cjs`, `health.cjs`, `og.cjs` | `saveEmailSignup`, `health`, `updatesMeta` | |
 | `maintenance/` | `cleanup.cjs` | `cleanupStaleData` | Biweekly. Sweeps expired auth challenges, rate-limit docs, resolved telemetry, terminal publish-queue rows. |

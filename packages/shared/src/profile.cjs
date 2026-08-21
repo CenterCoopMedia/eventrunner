@@ -142,10 +142,31 @@ function buildPublicProfile(user, badgesConfig) {
   if (!isValidProfileVisibility(out.profileVisibility)) {
     out.profileVisibility = DEFAULT_PROFILE_VISIBILITY;
   }
-  if (typeof out.displayName !== 'string') out.displayName = '';
+
+  // Every text field is coerced to a string, and photoPath to a string or
+  // null. The rules type-check these on the self-update path, but the
+  // projection is what the directory renders: a map or array that reached
+  // the account document another way (a hand-edited doc, a future
+  // server-side writer) would otherwise be handed to React as a child and
+  // crash the directory for every visitor. Belt and braces, cheap.
+  for (const field of ['displayName', 'pronouns', 'bio', 'organization', 'jobTitle']) {
+    if (typeof out[field] !== 'string') {
+      if (out[field] === undefined && field !== 'displayName') continue;
+      out[field] = '';
+    }
+  }
+  if (typeof out.photoPath !== 'string') {
+    if (out.photoPath !== undefined) out.photoPath = null;
+  }
+  // socialHandles is a flat label → handle map; non-string values are
+  // dropped rather than published as objects.
   if (out.socialHandles == null || typeof out.socialHandles !== 'object'
     || Array.isArray(out.socialHandles)) {
     out.socialHandles = {};
+  } else {
+    out.socialHandles = Object.fromEntries(
+      Object.entries(out.socialHandles).filter(([, v]) => typeof v === 'string'),
+    );
   }
   out.speakerId = typeof source.speakerId === 'string' && source.speakerId ? source.speakerId : null;
 

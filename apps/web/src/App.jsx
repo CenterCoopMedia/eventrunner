@@ -12,6 +12,7 @@ import { ContentProvider } from './contexts/ContentContext.jsx';
 import { ProfileProvider } from './contexts/ProfileContext.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
+import ProfileSetupRedirect from './components/ProfileSetupRedirect.jsx';
 import Home from './pages/Home.jsx';
 import Schedule from './pages/Schedule.jsx';
 import SessionDetail from './pages/SessionDetail.jsx';
@@ -68,6 +69,7 @@ export default function App() {
         <ProfileProvider>
           <ContentGate>
             <ToastProvider>
+              <ProfileSetupRedirect />
               <AppRoutes />
             </ToastProvider>
           </ContentGate>

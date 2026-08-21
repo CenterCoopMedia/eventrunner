@@ -97,6 +97,40 @@ test('projection is total for a garbage or missing document', () => {
   }
 });
 
+test('rendered text fields are coerced to strings, never published as objects', () => {
+  const pub = buildPublicProfile(
+    user({
+      displayName: { first: 'Rae' },
+      pronouns: ['they', 'them'],
+      bio: { html: '<b>hi</b>' },
+      organization: 7,
+      jobTitle: null,
+      photoPath: 12,
+    }),
+    BADGES_CONFIG,
+  );
+  for (const field of ['displayName', 'pronouns', 'bio', 'organization', 'jobTitle']) {
+    assert.equal(typeof pub[field], 'string', `${field} must be a string`);
+    assert.equal(pub[field], '');
+  }
+  assert.equal(pub.photoPath, null);
+});
+
+test('absent optional fields stay absent rather than becoming empty strings', () => {
+  const pub = buildPublicProfile({ displayName: 'Rae', profileVisibility: 'public' }, BADGES_CONFIG);
+  assert.equal('bio' in pub, false);
+  assert.equal('jobTitle' in pub, false);
+  assert.equal(pub.displayName, 'Rae');
+});
+
+test('socialHandles keeps only string values', () => {
+  const pub = buildPublicProfile(
+    user({ socialHandles: { mastodon: '@rae@example.social', nested: { url: 'x' } } }),
+    BADGES_CONFIG,
+  );
+  assert.deepEqual(pub.socialHandles, { mastodon: '@rae@example.social' });
+});
+
 test('socialHandles is copied only when it is a plain object', () => {
   assert.deepEqual(
     buildPublicProfile(user({ socialHandles: { mastodon: '@rae@example.social' } }), BADGES_CONFIG).socialHandles,

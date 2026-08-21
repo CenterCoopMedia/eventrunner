@@ -16,7 +16,17 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { subscribeDirectory } from '../lib/profileSource.js';
 import EmptyState from '../components/EmptyState.jsx';
+import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
+
+/**
+ * Render only strings. The rules type-check these fields and the projection
+ * coerces them, but a directory that hands React a map crashes for every
+ * visitor at once — the cheapest place to be sure is the render itself.
+ */
+function text(value) {
+  return typeof value === 'string' ? value : '';
+}
 
 const homeLink = (
   <Link
@@ -62,6 +72,10 @@ export default function Attendees() {
         .sort((a, b) => a.displayName.localeCompare(b.displayName)),
     [profiles],
   );
+  // null = no snapshot has arrived yet; [] = the directory really is empty.
+  // Conflating them tells a visitor nobody signed up while the query is
+  // still in flight.
+  const loading = profiles === null && !failed;
 
   if (!directoryEnabled) {
     return (
@@ -101,7 +115,9 @@ export default function Attendees() {
           </p>
         ) : null}
 
-        {failed ? (
+        {loading ? (
+          <LoadingState label="Loading the attendee directory" />
+        ) : failed ? (
           <div className="mt-6">
             <EmptyState
               title="The directory is unavailable right now"
@@ -130,12 +146,14 @@ export default function Attendees() {
                     {profile.displayName}
                   </Link>
                 </h2>
-                {profile.pronouns ? (
-                  <p className="text-sm text-brand-ink-muted">{profile.pronouns}</p>
+                {text(profile.pronouns) ? (
+                  <p className="text-sm text-brand-ink-muted">{text(profile.pronouns)}</p>
                 ) : null}
-                {profile.jobTitle || profile.organization ? (
+                {text(profile.jobTitle) || text(profile.organization) ? (
                   <p className="mt-1 text-sm text-brand-ink-muted">
-                    {[profile.jobTitle, profile.organization].filter(Boolean).join(' · ')}
+                    {[text(profile.jobTitle), text(profile.organization)]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </p>
                 ) : null}
                 {profile.speakerId ? (

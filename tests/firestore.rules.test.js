@@ -16,6 +16,7 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -76,6 +77,16 @@ function attendee(uid) {
     .firestore();
 }
 
+/** Flip config/features.publicAttendeeProfiles (server-owned: rules-disabled). */
+async function setPublicProfilesFeature(enabled) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "config/features"), {
+      attendeeDirectory: true,
+      publicAttendeeProfiles: enabled,
+    });
+  });
+}
+
 /**
  * The attendee accounts the §3.4 read rules branch on. `registrationStatus`
  * and `speakerId` are server-owned, so these are seeded with rules disabled,
@@ -102,6 +113,12 @@ beforeAll(async () => {
       adminEmails: [ADMIN_EMAIL],
     });
     await setDoc(doc(db, "config/event"), { title: "Test event" });
+    // publicAttendeeProfiles starts OFF: the rules gate a move to `public`
+    // profile visibility on it, and setPublicProfilesFeature() flips it.
+    await setDoc(doc(db, "config/features"), {
+      attendeeDirectory: true,
+      publicAttendeeProfiles: false,
+    });
     for (const c of PUBLISHABLE) {
       await setDoc(doc(db, `${c}/pub`), {
         body: "published",
@@ -434,7 +451,82 @@ describe("users account documents (spec §3.4)", () => {
         pronouns: "they/them",
         bio: "Community reporter.",
         badges: ["writer"],
+        profileVisibility: "attendees_only",
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("denies a non-string value in any rendered profile field", async () => {
+    for (const patch of [
+      { displayName: { first: "Rae" } },
+      { displayName: 42 },
+      { pronouns: ["they", "them"] },
+      { bio: { html: "<b>hi</b>" } },
+      { organization: 7 },
+      { jobTitle: ["Editor"] },
+      { photoPath: 12 },
+      { socialHandles: ["mastodon"] },
+      { badges: "writer" },
+      { updatedAt: "2026-08-21" },
+    ]) {
+      await assertFails(
+        updateDoc(doc(attendee("pending-1"), "users/pending-1"), patch),
+      );
+    }
+  });
+
+  it("allows the same fields with the right types", async () => {
+    await assertSucceeds(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        displayName: "Rae",
+        pronouns: "they/them",
+        bio: "Reporter",
+        organization: "The Weekly",
+        jobTitle: "Editor",
+        photoPath: null,
+        socialHandles: { mastodon: "@rae@example.social" },
+        badges: ["writer"],
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("denies a move to public visibility while config/features.publicAttendeeProfiles is off", async () => {
+    await setPublicProfilesFeature(false);
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
         profileVisibility: "public",
+      }),
+    );
+  });
+
+  it("allows a move to public visibility once the operator turns the feature on", async () => {
+    await setPublicProfilesFeature(true);
+    await assertSucceeds(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        profileVisibility: "public",
+      }),
+    );
+    await setPublicProfilesFeature(false);
+  });
+
+  it("keeps an already-public profile editable after the feature is turned off", async () => {
+    await setPublicProfilesFeature(true);
+    await assertSucceeds(
+      updateDoc(doc(attendee("speaker-1"), "users/speaker-1"), {
+        profileVisibility: "public",
+      }),
+    );
+    await setPublicProfilesFeature(false);
+    // The stored value stays `public`; editing other fields must still work,
+    // and switching away from public must too.
+    await assertSucceeds(
+      updateDoc(doc(attendee("speaker-1"), "users/speaker-1"), { bio: "Still here." }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(attendee("speaker-1"), "users/speaker-1"), {
+        profileVisibility: "attendees_only",
       }),
     );
   });

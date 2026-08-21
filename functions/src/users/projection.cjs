@@ -8,11 +8,12 @@
  * may read about somebody else — the read rules in firestore.rules branch
  * on its `profileVisibility`, and everything not on
  * PUBLIC_PROFILE_FIELDS (email, registrationStatus, approvalSource, role)
- * stays behind the server-only `users` doc.
+ * stays behind the server-only `users` doc. `refreshUserPublicBadges`
+ * re-runs that projection for every account when config/badges changes, so
+ * removed badges do not stay readable until each user edits their profile.
  *
  * One direction only: nothing ever writes `users` from `users_public`, so
- * there is no cycle and no reconciliation job (§4.3 applies the same rule
- * to speakers).
+ * there is no cycle (§4.3 applies the same rule to speakers).
  *
  * Badge-set intersection (§4.5): rules cannot check list membership
  * against config/badges, so this trigger is where an unconfigured or
@@ -28,7 +29,10 @@
 
 const { buildPublicProfile } = require('shared/profile');
 
+const USERS = 'users';
 const USERS_PUBLIC = 'users_public';
+const BADGES_CONFIG = 'badges';
+const REFRESH_CONCURRENCY = 25;
 
 /** Shallow-equal over the projection payload (values are scalars, string
  * arrays, and a flat socialHandles map). */
@@ -56,49 +60,114 @@ function sameProjection(a, b) {
 /**
  * Core of the trigger, driven directly by tests with a fake db.
  *
- * The projection is a function of the AFTER state alone — the previous
- * state is not a parameter, so a replayed or out-of-order delivery
- * converges on the same document rather than on a diff of two snapshots.
+ * The event payload is NOT the input. Trigger deliveries are unordered and
+ * may be retried, so projecting the `after` snapshot an event carries can
+ * republish a stale state — a public→private edit whose older (public)
+ * delivery lands last would put the profile back on the open web and leave
+ * it there. Every run therefore re-reads `users/{uid}` inside a
+ * transaction and projects whatever is current, with the projection write
+ * in the same transaction: the event is a wake-up, not data. Out-of-order
+ * and duplicate deliveries then converge on the same document, and the
+ * last writer is by definition the one that read the newest source.
  *
- * @param {{ db: object, getConfig: () => Promise<{ badges: object|null }>,
+ * @param {{ db: object, getBadgesConfig?: (tx: object) => Promise<object|null>,
+ *           failClosedOnConfigError?: boolean,
  *           now?: () => Date, log?: { error: Function } }} deps
- * @returns {(change: { uid: string, after: object|null }) =>
+ * @returns {(change: { uid: string }) =>
  *   Promise<{ action: 'deleted'|'written'|'unchanged' }>}
  */
-function createSyncUserPublic({ db, getConfig, now = () => new Date(), log = console }) {
-  return async function syncUserPublic({ uid, after }) {
+function createSyncUserPublic({
+  db,
+  getBadgesConfig,
+  failClosedOnConfigError = true,
+  now = () => new Date(),
+  log = console,
+}) {
+  const badgesRef = db.collection('config').doc(BADGES_CONFIG);
+  const readBadgesConfig = getBadgesConfig ?? (async (tx) => {
+    const snap = await tx.get(badgesRef);
+    return snap.exists ? snap.data() : null;
+  });
+
+  return async function syncUserPublic({ uid }) {
     if (typeof uid !== 'string' || uid.length === 0) {
       log.error('syncUserPublic called without a uid');
       return { action: 'unchanged' };
     }
-    const ref = db.collection(USERS_PUBLIC).doc(uid);
 
-    // The account is gone: its public projection must go with it. A
-    // delete of an already-absent doc is a no-op in Firestore, so this
-    // needs no existence check.
-    if (after == null) {
-      await ref.delete();
-      return { action: 'deleted' };
-    }
+    const userRef = db.collection(USERS).doc(uid);
+    const publicRef = db.collection(USERS_PUBLIC).doc(uid);
 
-    let badgesConfig = null;
-    try {
-      badgesConfig = (await getConfig()).badges;
-    } catch (err) {
-      // Fail closed on badges only: an unreadable config/badges must not
-      // publish an unvalidated badge set, and must not stop the rest of
-      // the profile (display name, visibility) from being projected —
-      // the visibility field is what the read rules depend on.
-      log.error('syncUserPublic: config/badges unavailable; projecting no badges', err);
-    }
+    return db.runTransaction(async (tx) => {
+      let badgesConfig = null;
+      try {
+        // Read config/badges in the projection transaction. Config trigger
+        // deliveries can arrive out of order, so an event snapshot or cached
+        // config could let an older delivery restore a removed badge.
+        badgesConfig = await readBadgesConfig(tx);
+      } catch (err) {
+        if (!failClosedOnConfigError) throw err;
+        // Fail closed on badges only: an unreadable config/badges must not
+        // publish an unvalidated badge set, and must not stop the rest of
+        // the profile (display name, visibility) from being projected.
+        log.error('syncUserPublic: config/badges unavailable; projecting no badges', err);
+      }
+      const [userSnap, publicSnap] = await Promise.all([tx.get(userRef), tx.get(publicRef)]);
 
-    const payload = buildPublicProfile(after, badgesConfig);
-    const existing = await ref.get();
-    if (existing.exists && sameProjection(stripStamps(existing.data()), payload)) {
-      return { action: 'unchanged' };
+      // The account is gone: its public projection must go with it. A
+      // delete of an already-absent doc is a no-op in Firestore, so this
+      // needs no existence check.
+      if (!userSnap.exists) {
+        tx.delete(publicRef);
+        return { action: 'deleted' };
+      }
+
+      const payload = buildPublicProfile(userSnap.data(), badgesConfig);
+      if (publicSnap.exists && sameProjection(stripStamps(publicSnap.data()), payload)) {
+        return { action: 'unchanged' };
+      }
+      tx.set(publicRef, { ...payload, uid, updatedAt: now() });
+      return { action: 'written' };
+    });
+  };
+}
+
+/**
+ * Re-run the current projection for every account after config/badges
+ * changes. listDocuments returns references only; each bounded group then
+ * reads the account, public projection, and CURRENT badge config through
+ * createSyncUserPublic's transaction. A failed group rejects the trigger,
+ * whose retry is safe because unchanged projections do not write.
+ *
+ * @param {{ db: object, syncUserPublic?: (change: { uid: string }) => Promise<object>,
+ *           concurrency?: number, log?: { error: Function } }} deps
+ * @returns {() => Promise<{ scanned: number }>}
+ */
+function createRefreshUserPublicBadges({
+  db,
+  syncUserPublic = createSyncUserPublic({ db, failClosedOnConfigError: false }),
+  concurrency = REFRESH_CONCURRENCY,
+  log = console,
+}) {
+  return async function refreshUserPublicBadges() {
+    const refs = await db.collection(USERS).listDocuments();
+    const failures = [];
+    for (let start = 0; start < refs.length; start += concurrency) {
+      const group = refs.slice(start, start + concurrency);
+      const results = await Promise.allSettled(
+        group.map((ref) => syncUserPublic({ uid: ref.id })),
+      );
+      for (const result of results) {
+        if (result.status === 'rejected') failures.push(result.reason);
+      }
     }
-    await ref.set({ ...payload, uid, updatedAt: now() });
-    return { action: 'written' };
+    if (failures.length > 0) {
+      log.error(`refreshUserPublicBadges: ${failures.length} projection(s) failed`);
+      throw new Error(`Could not refresh ${failures.length} public profile projection(s).`, {
+        cause: failures[0],
+      });
+    }
+    return { scanned: refs.length };
   };
 }
 
@@ -109,33 +178,47 @@ function stripStamps(data) {
   return rest;
 }
 
-/** Deployable exports (spec §1.3 users/): syncUserPublic. */
+/** Deployable exports (spec §1.3 users/): syncUserPublic and badge refresh. */
 function buildHandlers() {
   const { onDocumentWritten } = require('firebase-functions/v2/firestore');
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
 
   return {
-    syncUserPublic: onDocumentWritten({ region, document: 'users/{uid}' }, async (event) => {
+    syncUserPublic: onDocumentWritten({
+      region,
+      document: 'users/{uid}',
+    }, async (event) => {
       const { getDb } = require('../core/firestore.cjs');
-      const { getEventConfig } = require('../core/config.cjs');
       const db = getDb();
-      const handler = createSyncUserPublic({
-        db,
-        getConfig: () => getEventConfig({ db }),
-      });
-      const after = event.data?.after;
-      await handler({
-        uid: event.params.uid,
-        after: after && after.exists ? after.data() : null,
-      });
+      const handler = createSyncUserPublic({ db });
+      // The event's snapshots are deliberately unused — see
+      // createSyncUserPublic: the handler re-reads the source document.
+      await handler({ uid: event.params.uid });
+    }),
+    refreshUserPublicBadges: onDocumentWritten({
+      region,
+      retry: true,
+      timeoutSeconds: 540,
+      document: 'config/badges',
+    }, async () => {
+      const { getDb } = require('../core/firestore.cjs');
+      const db = getDb();
+      await createRefreshUserPublicBadges({ db })();
     }),
   };
 }
 
 module.exports = {
   createSyncUserPublic,
+  createRefreshUserPublicBadges,
   get handlers() {
     return buildHandlers();
   },
-  internals: { sameProjection, USERS_PUBLIC },
+  internals: {
+    sameProjection,
+    USERS,
+    USERS_PUBLIC,
+    BADGES_CONFIG,
+    REFRESH_CONCURRENCY,
+  },
 };
