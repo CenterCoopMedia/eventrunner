@@ -15,6 +15,9 @@ const adminConfig = require('./src/admin/config.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
+const speakersProfile = require('./src/speakers/profile.cjs');
+const speakersLifecycle = require('./src/speakers/lifecycle.cjs');
+const speakersProjection = require('./src/speakers/projection.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
 const systemErrors = require('./src/telemetry/systemErrors.cjs');
 
@@ -30,6 +33,9 @@ module.exports = {
   ...scheduleBookmarks.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
+  ...speakersProfile.handlers,
+  ...speakersLifecycle.handlers,
+  ...speakersProjection.handlers,
   ...clientErrors.handlers,
   ...systemErrors.handlers,
 };
