@@ -18,11 +18,22 @@ on:
         required: false
         type: boolean
         default: false
+      bootstrap:
+        description: Bootstrap mode for a fresh project — deploy only provision + functions, skipping content/build/hosting/smoke. See docs/DEPLOY_RUNBOOK.md §5.
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [main]
 
 permissions:
   contents: read
+  # Reusable-workflow permissions are an intersection of caller and callee:
+  # deploy-client.yml cannot get more than the caller grants, no matter what
+  # its own `permissions:` block says. Without id-token here,
+  # google-github-actions/auth in every deploy-client.yml job fails to mint
+  # an OIDC token and Workload Identity Federation auth never happens.
+  id-token: write
 
 jobs:
   resolve:
@@ -67,4 +78,5 @@ jobs:
     with:
       client: ${{ matrix.client }}
       provision: ${{ github.event_name == 'workflow_dispatch' && inputs.provision || false }}
+      bootstrap: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap || false }}
     secrets: inherit

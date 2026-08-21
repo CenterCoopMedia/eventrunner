@@ -85,6 +85,7 @@ gcloud services enable \
   run.googleapis.com \
   firestore.googleapis.com \
   secretmanager.googleapis.com \
+  cloudscheduler.googleapis.com \
   --project=<GCP_PROJECT_ID>
 
 # If the project has never had Firebase added:
@@ -114,7 +115,8 @@ for role in \
   roles/cloudbuild.builds.editor \
   roles/artifactregistry.writer \
   roles/serviceusage.serviceUsageConsumer \
-  roles/datastore.user
+  roles/datastore.user \
+  roles/cloudscheduler.admin
 do
   gcloud projects add-iam-policy-binding <GCP_PROJECT_ID> \
     --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
@@ -129,9 +131,17 @@ needs end to end (Cloud Functions v2 builds through Cloud Build and Artifact Reg
 deploying principal must be allowed to act as the runtime service account).
 `secretmanager.secretAccessor` is required only once the environment actually uses a secret
 (`EMAIL_PROVIDER_API_KEY` etc., spec §2.1) — grant it up front so onboarding a provider later is a
-config change, not an IAM change. `datastore.user` is what `generate-content.cjs` needs to read
-Firestore at deploy time (spec §8.6); `datastore.indexAdmin` is separate and is what deploys
-`firestore.indexes.json`.
+config change, not an IAM change. **This binding is only what the *deploying* identity needs to
+reference a secret while wiring up `defineSecret` at deploy time — it does NOT cover the deployed
+function actually reading the secret's value at runtime. That is a separate binding, on the
+project's default compute service account, done per secret in §2's Secret Manager step below; skip
+it and every `defineSecret`-backed function fails at cold start or at read, not at deploy.**
+`datastore.user` is what `generate-content.cjs` needs to read Firestore at deploy time (spec §8.6);
+`datastore.indexAdmin` is separate and is what deploys `firestore.indexes.json`.
+`cloudscheduler.admin` is what `firebase deploy --only functions` needs to create/update the Cloud
+Scheduler job behind `cleanupExpiredAuthChallenges` (an `onSchedule` v2 function,
+`functions/src/auth/otp.cjs`) — every deployment has at least this one scheduled function, so the
+role is not conditional the way `secretmanager.secretAccessor` is.
 
 Bind the deploy service account so **only** this repository, on `refs/heads/main`, may impersonate
 it — both conditions in one `principalSet`, via the combined attribute mapped in §1:
@@ -219,6 +229,31 @@ echo -n "<the actual API key>" | gcloud secrets create EMAIL_PROVIDER_API_KEY \
 # repeat per secret this client's provider selection actually needs
 ```
 
+**Then bind `secretAccessor` on each secret to the function's RUNTIME service account — not the
+deploy service account.** These are two different identities with two different jobs: `${DEPLOY_SA_EMAIL}`
+(§2, above) only needs to *reference* the secret while deploying; the function's runtime identity is
+what actually reads the secret's value on every invocation, and it is a separate principal that
+`${DEPLOY_SA_EMAIL}`'s own `secretmanager.secretAccessor` grant does not cover. Cloud Functions v2
+runs as the project's default compute service account unless a function explicitly sets
+`serviceAccount` (this repo's functions do not), so:
+
+```sh
+PROJECT_NUMBER=$(gcloud projects describe <GCP_PROJECT_ID> --format="value(projectNumber)")
+RUNTIME_SA_EMAIL="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+for secret in EMAIL_PROVIDER_API_KEY; do   # repeat the list for every secret this client uses
+  gcloud secrets add-iam-policy-binding "${secret}" \
+    --project=<GCP_PROJECT_ID> \
+    --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
+    --role="roles/secretmanager.secretAccessor"
+done
+```
+
+Skipping this step is a deploy-succeeds-runtime-fails trap: `firebase deploy --only functions` does
+not read the secret's value, so the deploy itself can succeed with this binding missing, and the
+function then fails at cold start (or at the first read, depending on `defineSecret` vs. lazy access)
+with a Secret Manager permission error — which surfaces as a broken client feature, not a red CI run.
+
 (Optional) restrict who can approve deploys to this environment: Settings → Environments →
 `<CLIENT_ENV>` → Deployment protection rules → Required reviewers.
 
@@ -240,17 +275,29 @@ comfortable auto-deploying on merge.
 
 ## 5. First deploy (provisioning a fresh project)
 
+A brand-new project has no `config/event` Firestore document yet — `generate-content.cjs` (the
+`content` job) throws "run scripts/init-event.cjs first" against one, on purpose (spec §8.6). The
+`content` job runs before any operator has ever had the chance to run `init-event.cjs`, so the first
+dispatch against a fresh project has to skip it. Two dispatches, in order:
+
+**Step 1 — bootstrap dispatch.** Deploys only rules/indexes/storage (`provision`) and `functions`;
+skips `content`/`build`/`hosting`/`smoke` entirely.
+
 ```
 Actions tab → Deploy → Run workflow
   client: <CLIENT_ENV>
   provision: true
+  bootstrap: true
 ```
 
 `deploy-client.yml`'s `provision` job deploys `firestore:rules`, `firestore:indexes`, and `storage`
-on **every** run regardless of the `provision` input (spec §8.1) — the input exists for operator
-intent and log clarity, not as a gate. A dispatch run also always deploys functions, because a fresh
-project has none yet and gating that on a paths filter would provision an empty, broken deployment
-(spec §8.1). After the workflow succeeds:
+on **every** run regardless of the `provision` input (spec §8.1) — that input exists for operator
+intent and log clarity, not as a gate. `bootstrap: true` is the actual gate: it is what skips
+`content` (and, transitively, `build`/`hosting`/`smoke`) on this run. A dispatch run always deploys
+functions regardless of `bootstrap`, because a fresh project has none yet and gating that on a paths
+filter would provision an empty, broken deployment (spec §8.1).
+
+**Step 2 — seed content**, from an operator's machine, once the bootstrap dispatch succeeds:
 
 ```sh
 export FIRESTORE_EMULATOR_HOST=  # unset — this targets the real project
@@ -263,6 +310,20 @@ node scripts/init-event.cjs --check
 `init-event.cjs` runs from an operator's machine (or a follow-up dispatch of a future
 provisioning workflow), not from `deploy-client.yml` — it is the one-time content bootstrap, not a
 repeatable deploy step. See `scripts/README.md`.
+
+**Step 3 — normal dispatch**, now that `config/event` exists:
+
+```
+Actions tab → Deploy → Run workflow
+  client: <CLIENT_ENV>
+  provision: false
+  bootstrap: false   (the default — leave it unchecked)
+```
+
+This run's `content` job succeeds, and `build`/`hosting`/`smoke` deploy the live site. From here on,
+either dispatch this way again for any change, or add `<CLIENT_ENV>` to `AUTO_DEPLOY_ENVIRONMENTS`
+(§4) so a push to `main` deploys it automatically — `bootstrap` is never `true` on a push run, so a
+client already past step 3 never needs it again.
 
 ## 6. Verifying the setup
 
