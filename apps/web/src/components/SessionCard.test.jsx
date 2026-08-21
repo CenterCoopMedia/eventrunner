@@ -345,13 +345,40 @@ describe('SessionCard', () => {
       });
     });
 
-    it('clicking the reaction you already left clears it', async () => {
+    it('an already-reacted user with no override shows the correct count and stays selected', () => {
+      // Regression test for the optimistic-sentinel collision: `counts`
+      // already includes this user's own reaction (as the real aggregate
+      // would), so with no click in flight the displayed count must NOT be
+      // decremented, and the button must still read as pressed.
       useSessionReactionsMock.mockReturnValue({
         counts: { ...EMPTY_COUNTS, '👍': 1 },
         myReaction: '👍',
         loading: false,
       });
-      setSessionReactionMock.mockResolvedValue({ emoji: null, counts: EMPTY_COUNTS });
+      renderCard({
+        features: { sessionReactions: true },
+        auth: { user: { uid: 'u1' } },
+        profile: { attendeeAccess: true },
+      });
+      const button = screen.getByRole('button', { name: /react with 👍/i });
+      expect(button).toHaveAttribute('aria-pressed', 'true');
+      expect(button).toHaveAccessibleName('React with 👍, 1');
+    });
+
+    it('clicking the reaction you already left clears it: unselects immediately and decrements exactly once', async () => {
+      useSessionReactionsMock.mockReturnValue({
+        counts: { ...EMPTY_COUNTS, '👍': 1 },
+        myReaction: '👍',
+        loading: false,
+      });
+      // Resolves only when told to, so the assertions below observe the
+      // OPTIMISTIC (pre-confirmation) state, not the post-confirmation one.
+      let resolveRequest;
+      setSessionReactionMock.mockReturnValue(
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+      );
       renderCard({
         features: { sessionReactions: true },
         auth: { user: { uid: 'u1' } },
@@ -360,11 +387,22 @@ describe('SessionCard', () => {
       const button = screen.getByRole('button', { name: /react with 👍/i });
       expect(button).toHaveAttribute('aria-pressed', 'true');
       fireEvent.click(button);
+
+      // Optimistic clear: unselected, and the count drops from 1 to 0 —
+      // exactly once, not further on a stray re-render.
+      const clearedButton = screen.getByRole('button', { name: /^React with 👍$/i });
+      expect(clearedButton).toHaveAttribute('aria-pressed', 'false');
+      expect(clearedButton).toHaveAccessibleName('React with 👍');
+
       expect(setSessionReactionMock).toHaveBeenCalledWith({
         user: { uid: 'u1' },
         sessionId: 'fx-1',
         emoji: null,
       });
+
+      // Drain the in-flight promise so it can't resolve into a later test.
+      resolveRequest({ emoji: null, counts: EMPTY_COUNTS });
+      await screen.findByRole('button', { name: /^React with 👍$/i });
     });
 
     it('reverts the optimistic pick when the request fails', async () => {

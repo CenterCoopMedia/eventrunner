@@ -205,11 +205,21 @@ function ReactionsPill({ session }) {
   // confirming OUR write, a different tab's write, or the signed-in
   // identity switching. Without the second clear the optimistic value would
   // keep masking the live one forever after a successful write.
-  const [optimistic, setOptimistic] = useState(null);
-  const myActiveReaction = optimistic ?? myReaction;
+  //
+  // `undefined` is a DISTINCT sentinel from `null` here: `undefined` means
+  // "no override in flight — trust the live value", while `null` means "the
+  // override IS an explicit clear". Collapsing them (e.g. via `?? `) would
+  // make "no override" indistinguishable from "optimistically cleared":
+  // an already-reacted user with no override would read as cleared (wrongly
+  // decrementing their own count and showing unselected), and a real
+  // optimistic clear would fall back through to the live reaction and stay
+  // wrongly selected.
+  const [optimistic, setOptimistic] = useState(undefined);
+  const hasOverride = optimistic !== undefined;
+  const myActiveReaction = hasOverride ? optimistic : myReaction;
 
   useEffect(() => {
-    setOptimistic(null);
+    setOptimistic(undefined);
   }, [myReaction, session.id, user?.uid]);
 
   const onPick = useCallback(
@@ -221,7 +231,7 @@ function ReactionsPill({ session }) {
       try {
         await setSessionReaction({ user, sessionId: session.id, emoji: next });
       } catch (err) {
-        setOptimistic(null);
+        setOptimistic(undefined);
         showToast(err.message || 'The reaction could not be saved.', { tone: 'error' });
       } finally {
         setPending(false);
@@ -231,9 +241,11 @@ function ReactionsPill({ session }) {
   );
 
   // Optimistically nudge the displayed counts so a click feels immediate
-  // even before the aggregate listener's next snapshot arrives.
+  // even before the aggregate listener's next snapshot arrives. Only
+  // adjusts when an override is actually active — with no override, `counts`
+  // already reflects `myReaction` server-side, so nothing should move.
   const displayCounts = { ...counts };
-  if (optimistic !== myReaction) {
+  if (hasOverride) {
     if (myReaction) displayCounts[myReaction] = Math.max(0, (displayCounts[myReaction] || 0) - 1);
     if (optimistic) displayCounts[optimistic] = (displayCounts[optimistic] || 0) + 1;
   }

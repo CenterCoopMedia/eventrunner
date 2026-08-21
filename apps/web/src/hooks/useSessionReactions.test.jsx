@@ -66,4 +66,49 @@ describe('useSessionReactions', () => {
     rerender({ sessionId: 's2' });
     expect(subscribeMySessionReactionMock).toHaveBeenCalledWith('s2', 'u1', expect.any(Function));
   });
+
+  it('resets counts and own-reaction when sessionId changes, instead of showing the previous session\'s stale values', () => {
+    const { result, rerender } = renderHook(({ sessionId }) => useSessionReactions(sessionId), {
+      wrapper,
+      initialProps: { sessionId: 's1' },
+    });
+    act(() => capturedCountsOnNext({ '👍': 5, '❤️': 0, '🎉': 0, '💡': 0, '👏': 0 }));
+    act(() => capturedMineOnNext('👍'));
+    expect(result.current.counts).toEqual({ '👍': 5, '❤️': 0, '🎉': 0, '💡': 0, '👏': 0 });
+    expect(result.current.myReaction).toBe('👍');
+    expect(result.current.loading).toBe(false);
+
+    // Switch sessions — the new session's listener has not emitted yet
+    // (and may never, if it errors), so s1's counts/reaction must not
+    // leak into s2's render.
+    rerender({ sessionId: 's2' });
+    expect(result.current.counts).toEqual({});
+    expect(result.current.myReaction).toBeNull();
+    expect(result.current.loading).toBe(true);
+
+    // The new session's own snapshot then populates independently.
+    act(() => capturedCountsOnNext({ '👍': 0, '❤️': 1, '🎉': 0, '💡': 0, '👏': 0 }));
+    act(() => capturedMineOnNext(null));
+    expect(result.current.counts).toEqual({ '👍': 0, '❤️': 1, '🎉': 0, '💡': 0, '👏': 0 });
+    expect(result.current.myReaction).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('a listener error on the NEW session after a switch does not resurrect the previous session\'s counts', () => {
+    const { result, rerender } = renderHook(({ sessionId }) => useSessionReactions(sessionId), {
+      wrapper,
+      initialProps: { sessionId: 's1' },
+    });
+    act(() => capturedCountsOnNext({ '👍': 5, '❤️': 0, '🎉': 0, '💡': 0, '👏': 0 }));
+
+    rerender({ sessionId: 's2' });
+    expect(result.current.counts).toEqual({});
+
+    // s2's listener fails on its very first attempt — fail soft still
+    // applies (no fabricated counts), but it must stay at s2's reset
+    // state, not fall back to s1's stale 5.
+    act(() => capturedCountsOnError(new Error('permission denied')));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.counts).toEqual({});
+  });
 });

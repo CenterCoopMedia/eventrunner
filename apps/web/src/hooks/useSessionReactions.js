@@ -20,6 +20,13 @@ export function useSessionReactions(sessionId) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Reset BEFORE attaching the new listener: without this, switching to a
+    // different session (a card being reused, not a fresh mount) would keep
+    // rendering the PREVIOUS session's counts — indefinitely, if the new
+    // listener's first attempt errors, since the fail-soft contract
+    // (reactionsSource.js) is "leave last-known values in place" and
+    // ReactionsPill does not gate its render on `loading`.
+    setCounts(null);
     setLoading(true);
     const unsubscribeCounts = subscribeSessionReactions(
       sessionId,
@@ -35,8 +42,11 @@ export function useSessionReactions(sessionId) {
   }, [sessionId]);
 
   // Re-subscribes on sessionId OR signed-in identity change (mirrors
-  // useMyBookmarks.js).
+  // useMyBookmarks.js). Reset first, same reasoning as the counts effect
+  // above — a stale `myReaction` from a different session/user must not
+  // leak into the new subscription's target until it reports in.
   useEffect(() => {
+    setMyReaction(null);
     const unsubscribeMine = subscribeMySessionReaction(sessionId, user?.uid, setMyReaction);
     return unsubscribeMine;
   }, [sessionId, user?.uid]);
