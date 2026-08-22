@@ -22,6 +22,20 @@ const TOKEN_RE = /\{\{\s*([a-z0-9_]+)\s*\}\}/gi;
 const PLACEHOLDER_RE = /\{\{([^{}]*)\}\}/g;
 const TOKEN_NAME_RE = /^[a-z0-9_]+$/i;
 
+/**
+ * Conditional block syntax: `{{#if token}}...{{/if}}` (spec §6.2 —
+ * `ticket.get_ticket`/`ticket.claim_prompt` "omit the CTA button block
+ * entirely when `cta_url` is null"). This is the ONE piece of template
+ * logic the renderer supports, and it exists for exactly that
+ * provider-parameterized case: a token substitution alone can turn a
+ * button's `href` empty, but it cannot remove the button. Not nestable —
+ * no template needs it, and a non-nesting engine is trivial to validate.
+ */
+const CONDITIONAL_RE = /\{\{#if\s+([a-z0-9_]+)\s*\}\}([\s\S]*?)\{\{\/if\}\}/gi;
+/** Matches a bare `{{#if name}}` opener, for the malformed-placeholder check. */
+const CONDITIONAL_OPEN_RE = /^#if\s+([a-z0-9_]+)$/i;
+const CONDITIONAL_CLOSE = '/if';
+
 /** @param {string} s */
 function escapeHtml(s) {
   return String(s)
@@ -146,10 +160,13 @@ function buildGlobalTokens(config, { now = () => new Date() } = {}) {
   };
 }
 
-/** Unique token names referenced in a body. @param {string} body */
+/** Unique token names referenced in a body — including a conditional's guard. @param {string} body */
 function referencedTokens(body) {
   const names = new Set();
   for (const match of String(body).matchAll(TOKEN_RE)) {
+    names.add(match[1].toLowerCase());
+  }
+  for (const match of String(body).matchAll(CONDITIONAL_RE)) {
     names.add(match[1].toLowerCase());
   }
   return names;
@@ -173,10 +190,23 @@ function validateTemplateBody(template, candidate) {
         errors.push(`${field}: unknown token {{${name}}}`);
       }
     }
+    let opens = 0;
+    let closes = 0;
     for (const match of String(body || '').matchAll(PLACEHOLDER_RE)) {
-      if (!TOKEN_NAME_RE.test(match[1].trim())) {
-        errors.push(`${field}: malformed placeholder {{${match[1]}}}`);
+      const content = match[1].trim();
+      if (TOKEN_NAME_RE.test(content)) continue;
+      if (CONDITIONAL_OPEN_RE.test(content)) {
+        opens += 1;
+        continue;
       }
+      if (content.toLowerCase() === CONDITIONAL_CLOSE) {
+        closes += 1;
+        continue;
+      }
+      errors.push(`${field}: malformed placeholder {{${match[1]}}}`);
+    }
+    if (opens !== closes) {
+      errors.push(`${field}: unbalanced {{#if}}/{{/if}} (${opens} open, ${closes} close)`);
     }
   }
 
@@ -205,7 +235,16 @@ function validateTemplateBody(template, candidate) {
  * @param {string[]} warnings mutated: missing-value warnings
  */
 function substitute(body, kind, values, config, warnings) {
-  return String(body).replace(TOKEN_RE, (_, rawName) => {
+  // Conditionals resolve BEFORE token substitution: a kept block's tokens
+  // still need substituting, and a dropped block's tokens must never be
+  // evaluated at all (an omitted CTA must not warn about a missing
+  // {{cta_label}} the caller never intended to render).
+  const withConditionals = String(body).replace(CONDITIONAL_RE, (_, rawName, inner) => {
+    const name = rawName.toLowerCase();
+    const value = values[name];
+    return value ? inner : '';
+  });
+  return withConditionals.replace(TOKEN_RE, (_, rawName) => {
     const name = rawName.toLowerCase();
     if (name.endsWith('_html')) {
       const resolver = HTML_TOKEN_RESOLVERS[name];
@@ -322,5 +361,6 @@ module.exports = {
     buildSocialLinksHtml,
     formatEventDates,
     formatVenueAddress,
+    CONDITIONAL_RE,
   },
 };

@@ -37,11 +37,9 @@
  *     unticketed new signup is pointed at the client's own registration
  *     form when `config/event.registration.externalUrl` is set, or told an
  *     organizer will confirm them when it is not; an unclaimed ticket gets
- *     the claim prompt, same shape as every other provider. The claim
- *     page's URL is left null here — no such page exists yet (issue #33
- *     builds the self-service claim UI `ticketingVerifyOrder` backs); the
- *     template renders no CTA button when `ctaUrl` is null (§6.2), which is
- *     the correct degraded state until that page ships.
+ *     the claim prompt pointed at `/ticket/claim` (issue #33) — the
+ *     attendee-facing page that calls `ticketingVerifyOrder` with the order
+ *     number they type in.
  */
 
 const TICKETS = 'tickets';
@@ -49,6 +47,19 @@ const PROVIDER_NAME = 'manual';
 
 /** Ticket rows one `listTickets()` page returns. Bounds a full sync's read cost. */
 const LIST_PAGE_SIZE = 200;
+
+/**
+ * The self-service claim page (issue #33): `/ticket/claim`, reserved in
+ * `shared/routing` alongside `/speaker/accept`. `config.tierA.publicUrl` is
+ * the deploy-time origin (spec §2.1); a deployment with none configured has
+ * bigger problems than a missing CTA link, so this degrades to null rather
+ * than emitting a bare path.
+ * @param {object|null} config @returns {string|null}
+ */
+function claimUrl(config) {
+  const site = typeof config?.tierA?.publicUrl === 'string' ? config.tierA.publicUrl.replace(/\/+$/, '') : '';
+  return site ? `${site}/ticket/claim` : null;
+}
 
 /** @param {FirebaseFirestore.QueryDocumentSnapshot} doc @returns {object} TicketRecord (§3.3) */
 function ticketRecordFromDoc(doc) {
@@ -176,14 +187,12 @@ function createManualProvider({ env = process.env, db = null, getConfig = null }
       if (ctx?.isSpeaker === true || ctx?.hasClaimedTicket === true) return suppressed;
 
       if (ctx?.trigger === 'ticket_unclaimed') {
+        const config = typeof getConfig === 'function' ? await getConfig() : null;
         return {
           send: true,
           templateId: 'ticket.claim_prompt',
           ctaLabel: 'Claim your ticket',
-          // No claim page exists yet (issue #33). The template omits the
-          // CTA button entirely when ctaUrl is null (§6.2) — the correct
-          // degraded rendering until that page ships.
-          ctaUrl: null,
+          ctaUrl: claimUrl(config),
           action: 'claim',
           bodyNote: null,
         };
@@ -222,4 +231,7 @@ function createManualProvider({ env = process.env, db = null, getConfig = null }
   };
 }
 
-module.exports = { createManualProvider, internals: { TICKETS, PROVIDER_NAME, LIST_PAGE_SIZE, ticketRecordFromDoc } };
+module.exports = {
+  createManualProvider,
+  internals: { TICKETS, PROVIDER_NAME, LIST_PAGE_SIZE, ticketRecordFromDoc, claimUrl },
+};

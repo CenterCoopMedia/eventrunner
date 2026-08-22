@@ -26,6 +26,7 @@ import ContentPage from './pages/ContentPage.jsx';
 import Login from './pages/Login.jsx';
 import SpeakerAccept from './pages/SpeakerAccept.jsx';
 import SpeakerProfile from './pages/SpeakerProfile.jsx';
+import TicketClaim from './pages/TicketClaim.jsx';
 import AdminApp from './admin/AdminApp.jsx';
 import Profile from './pages/Profile.jsx';
 import Attendees from './pages/Attendees.jsx';
@@ -63,6 +64,12 @@ export function AppRoutes() {
             (functions/src/email/templates/speaker.accepted.cjs) links
             straight here. */}
         <Route path="speaker/profile" element={<SpeakerProfile />} />
+        {/* Self-service ticket claim (issue #33): every `ticket.claim_prompt`
+            CTA (manual.cjs, eventbrite.cjs getRegistrationPrompt) links
+            here. `ticket` is reserved in shared/routing alongside `speaker`,
+            for the same reason — mail already sent with this link must
+            keep working. */}
+        <Route path="ticket/claim" element={<TicketClaim />} />
         <Route path="profile" element={<Profile />} />
         <Route path="attendees" element={<Attendees />} />
         <Route path="attendees/:uid" element={<AttendeeProfile />} />

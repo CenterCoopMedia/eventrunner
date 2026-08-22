@@ -164,6 +164,82 @@ test('validateTemplateBody rejects malformed placeholders the token grammar skip
   assert.ok(bad.errors.some((e) => e.includes('malformed placeholder {{profile.url}}')));
 });
 
+// --- {{#if token}}...{{/if}} conditionals (spec §6.2: the ticket.* CTA
+// button block must be omitted entirely, not rendered with an empty href) --
+
+const CONDITIONAL_TEMPLATE = {
+  id: 'test.conditional',
+  subject: 'Hello {{first_name}}',
+  html: '<p>Hi {{first_name}}.</p>{{#if cta_url}}<a href="{{cta_url}}">{{cta_label}}</a>{{/if}}',
+  text: 'Hi {{first_name}}.{{#if cta_url}} {{cta_label}}: {{cta_url}}{{/if}}',
+  tokens: ['first_name', 'cta_label', 'cta_url'],
+  requiredTokens: [],
+  storeRendered: true,
+};
+
+test('a conditional block renders when its token is truthy', () => {
+  const out = render({
+    template: CONDITIONAL_TEMPLATE,
+    tokenValues: { first_name: 'Ada', cta_label: 'Go', cta_url: 'https://example.org' },
+    config: CONFIG,
+  });
+  assert.ok(out.html.includes('<a href="https://example.org">Go</a>'));
+  assert.ok(out.text.includes('Go: https://example.org'));
+});
+
+test('a conditional block is omitted entirely when its token is empty, with no warnings', () => {
+  const out = render({
+    template: CONDITIONAL_TEMPLATE,
+    tokenValues: { first_name: 'Ada', cta_label: '', cta_url: '' },
+    config: CONFIG,
+  });
+  assert.ok(!out.html.includes('<a href'));
+  assert.ok(!out.text.includes('Go'));
+  // The dropped block's own tokens (cta_label) are never evaluated, so
+  // there is no "missing value" warning for them.
+  assert.deepEqual(out.warnings, []);
+});
+
+test('a conditional block is omitted when its token is simply absent from tokenValues', () => {
+  const out = render({
+    template: CONDITIONAL_TEMPLATE,
+    tokenValues: { first_name: 'Ada' },
+    config: CONFIG,
+  });
+  assert.ok(!out.html.includes('<a href'));
+  assert.deepEqual(out.warnings, []);
+});
+
+test('validateTemplateBody accepts a well-formed {{#if}}/{{/if}} pair and treats the guard as referenced', () => {
+  const check = validateTemplateBody(CONDITIONAL_TEMPLATE, {
+    subject: CONDITIONAL_TEMPLATE.subject,
+    html: CONDITIONAL_TEMPLATE.html,
+    text: CONDITIONAL_TEMPLATE.text,
+  });
+  assert.deepEqual(check.errors, []);
+  assert.equal(check.ok, true);
+});
+
+test('validateTemplateBody rejects an unbalanced {{#if}}/{{/if}}', () => {
+  const check = validateTemplateBody(CONDITIONAL_TEMPLATE, {
+    subject: 'ok',
+    html: '{{#if cta_url}}<a href="{{cta_url}}">go</a>',
+    text: 'fine',
+  });
+  assert.equal(check.ok, false);
+  assert.ok(check.errors.some((e) => e.includes('unbalanced {{#if}}/{{/if}}')));
+});
+
+test('validateTemplateBody rejects an {{#if}} guarding an undeclared token', () => {
+  const check = validateTemplateBody(CONDITIONAL_TEMPLATE, {
+    subject: 'ok',
+    html: '{{#if surprise}}x{{/if}}',
+    text: 'fine',
+  });
+  assert.equal(check.ok, false);
+  assert.ok(check.errors.some((e) => e.includes('unknown token {{surprise}}')));
+});
+
 test('buildGlobalTokens derives urls, dates, and year', () => {
   const tokens = buildGlobalTokens(CONFIG, { now: () => new Date('2027-01-01T00:00:00Z') });
   assert.equal(tokens.site_url, 'https://summit.example.org');

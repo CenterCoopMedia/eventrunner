@@ -63,7 +63,7 @@ test.beforeEach(() => resetTemplateCacheForTest());
 
 // --- registry -------------------------------------------------------------
 
-test('listTemplateIds returns the phase-2 defaults plus the phase-3 speaker trio', () => {
+test('listTemplateIds returns the phase-2 defaults, the phase-3 speaker trio, and the phase-4 ticket pair', () => {
   assert.deepEqual(listTemplateIds().sort(), [
     'account.welcome',
     'auth.otp',
@@ -74,6 +74,10 @@ test('listTemplateIds returns the phase-2 defaults plus the phase-3 speaker trio
     'speaker.accepted',
     'speaker.confirmation',
     'speaker.invite',
+    // §6.3 phase 4: could not be finished before the provider that
+    // parameterizes them existed (issue #33).
+    'ticket.claim_prompt',
+    'ticket.get_ticket',
   ]);
 });
 
@@ -92,6 +96,9 @@ test('storeRendered flags match the spec', () => {
   assert.equal(getDefaultTemplate('speaker.invite').storeRendered, false);
   assert.equal(getDefaultTemplate('speaker.accepted').storeRendered, true);
   assert.equal(getDefaultTemplate('speaker.confirmation').storeRendered, true);
+  // Neither ticket.* mail carries a bearer credential.
+  assert.equal(getDefaultTemplate('ticket.get_ticket').storeRendered, true);
+  assert.equal(getDefaultTemplate('ticket.claim_prompt').storeRendered, true);
 });
 
 test('required tokens match the spec', () => {
@@ -100,6 +107,85 @@ test('required tokens match the spec', () => {
   assert.deepEqual(getDefaultTemplate('speaker.invite').requiredTokens, ['invite_url']);
   assert.deepEqual(getDefaultTemplate('speaker.accepted').requiredTokens, ['profile_wizard_url']);
   assert.deepEqual(getDefaultTemplate('speaker.confirmation').requiredTokens, ['session_title']);
+  // Every provider-parameterized field on the ticket.* pair can legitimately
+  // be absent (§3.5 `action: 'await_approval'` sends no CTA at all), so
+  // neither template requires one.
+  assert.deepEqual(getDefaultTemplate('ticket.get_ticket').requiredTokens, []);
+  assert.deepEqual(getDefaultTemplate('ticket.claim_prompt').requiredTokens, []);
+});
+
+// --- ticket.* CTA conditional (§6.2: "omits the button block entirely when
+// cta_url is null") ----------------------------------------------------
+
+test('ticket.get_ticket renders the CTA button when cta_url is set', () => {
+  const out = render({
+    template: getDefaultTemplate('ticket.get_ticket'),
+    tokenValues: {
+      first_name: 'Ada',
+      cta_label: 'Get your ticket',
+      cta_url: 'https://tickets.example.org/buy',
+      provider_note: '',
+      registration_closes: '',
+    },
+    config: CONFIG,
+  });
+  assert.ok(out.html.includes('https://tickets.example.org/buy'));
+  assert.ok(out.html.includes('Get your ticket'));
+  assert.ok(out.text.includes('https://tickets.example.org/buy'));
+});
+
+test('ticket.get_ticket omits the CTA button entirely when cta_url is null', () => {
+  const out = render({
+    template: getDefaultTemplate('ticket.get_ticket'),
+    tokenValues: {
+      first_name: 'Ada',
+      cta_label: '',
+      cta_url: '',
+      provider_note: 'An organizer will confirm your registration.',
+      registration_closes: '',
+    },
+    config: CONFIG,
+  });
+  // The CTA button carries this inline style; nothing else in the mail does.
+  assert.ok(!out.html.includes('display:inline-block'));
+  assert.ok(!out.text.includes('undefined'));
+  assert.ok(out.html.includes('An organizer will confirm your registration.'));
+  // No warnings: the conditional resolves before token substitution, so a
+  // dropped block's own tokens (cta_label here) are never evaluated.
+  assert.deepEqual(out.warnings, []);
+});
+
+test('ticket.claim_prompt renders the CTA button when cta_url is set, and the ticket class', () => {
+  const out = render({
+    template: getDefaultTemplate('ticket.claim_prompt'),
+    tokenValues: {
+      first_name: 'Ada',
+      ticket_class: 'General admission',
+      cta_label: 'Claim your ticket',
+      cta_url: 'https://example.org/claim',
+      provider_note: '',
+    },
+    config: CONFIG,
+  });
+  assert.ok(out.html.includes('https://example.org/claim'));
+  assert.ok(out.html.includes('General admission'));
+});
+
+test('ticket.claim_prompt omits the CTA button and the ticket class when absent', () => {
+  const out = render({
+    template: getDefaultTemplate('ticket.claim_prompt'),
+    tokenValues: {
+      first_name: 'Ada',
+      ticket_class: '',
+      cta_label: '',
+      cta_url: '',
+      provider_note: '',
+    },
+    config: CONFIG,
+  });
+  assert.ok(!out.html.includes('display:inline-block'));
+  assert.ok(!out.html.includes('General admission'));
+  assert.deepEqual(out.warnings, []);
 });
 
 test('an override that drops the invite link is refused at save time', () => {

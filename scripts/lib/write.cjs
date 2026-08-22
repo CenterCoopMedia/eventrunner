@@ -116,6 +116,48 @@ async function seedCollection({ db, store, collection, docs, dryRun = false, now
 }
 
 /**
+ * Seed the `email_templates/{id}` overrides (spec §5.1 step f). A flat
+ * document write, not the CMS draft/publish path `seedCollection` uses —
+ * `email_templates` is a code-default registry with an OPTIONAL override
+ * doc (functions/src/email/templates.cjs `loadTemplate`), not a
+ * publishable content collection, so there is no draft revision to protect
+ * and no publish step to run. The `seeded`-flag idempotency rule is the
+ * same one every other seed follows (idempotency.cjs `decideSeedWrite`):
+ * unedited, still-seeded docs refresh on re-run; anything a human touched
+ * is left alone, even under `--force`.
+ *
+ * @param {{ db: object, docs: object[], dryRun?: boolean, now?: () => number,
+ *           force?: boolean }} args
+ * @returns {Promise<{ created: string[], refreshed: string[],
+ *                     skipped: Array<{ id: string, reason: string }> }>}
+ */
+async function seedEmailTemplateOverrides({ db, docs, dryRun = false, now = Date.now, force = false }) {
+  const created = [];
+  const refreshed = [];
+  const skipped = [];
+  for (const doc of docs) {
+    const { id, ...fields } = doc;
+    const ref = db.collection('email_templates').doc(id);
+    const snap = await ref.get();
+    const existing = snap.exists ? snap.data() : null;
+    const decision = decideSeedWrite(existing, { force });
+    if (decision.action === 'skip') {
+      skipped.push({ id, reason: decision.reason });
+      continue;
+    }
+    if (decision.action === 'create') created.push(id);
+    else refreshed.push(id);
+    if (dryRun) continue;
+    await ref.set({
+      ...fields,
+      updatedAt: new Date(now()),
+      updatedBy: SEED_ACTOR.email,
+    });
+  }
+  return { created, refreshed, skipped };
+}
+
+/**
  * Count live `cmsContent` docs still flagged `seeded: true` — the
  * launch-readiness seeded-content row (§5.1.1).
  *
@@ -145,4 +187,11 @@ async function readConfig({ db }) {
   return out;
 }
 
-module.exports = { writeConfigDocs, seedCollection, countSeeded, readConfig, SEED_ACTOR };
+module.exports = {
+  writeConfigDocs,
+  seedCollection,
+  seedEmailTemplateOverrides,
+  countSeeded,
+  readConfig,
+  SEED_ACTOR,
+};

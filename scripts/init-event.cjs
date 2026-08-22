@@ -22,6 +22,10 @@
  *   e. seeds `cmsContent` with placeholder blocks for every `defaultBlocks`
  *      entry, and the two legal pages from the provider-aware templates
  *      (§5.4, §5.5);
+ *   f. seeds `email_templates` overrides for the two client-visible
+ *      templates whose copy is event-specific (`ticket.get_ticket`,
+ *      `ticket.claim_prompt`); every other shipped template runs from its
+ *      code default, no override doc (§6.3);
  *   g. uploads the neutral placeholder branding assets (§5.4);
  *   h. prints the manual checklist (§5.6) and the launch-readiness summary,
  *      then EXITS 0.
@@ -54,7 +58,7 @@ const path = require('node:path');
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { PROMPTS, parseAnswersFile, buildConfigDocs } = require('./lib/answers.cjs');
-const { defaultPages, buildSeedContent, buildLegalContentDocs } = require('./lib/seed.cjs');
+const { defaultPages, buildSeedContent, buildLegalContentDocs, buildEmailTemplateSeeds } = require('./lib/seed.cjs');
 const { validatePageDoc } = require('../functions/src/cms/pages.cjs');
 const { getTierA } = require('../functions/src/core/config.cjs');
 const { evaluateReadiness, allReady, formatReadinessTable, DEFAULT_SEEDED_THRESHOLD } =
@@ -62,7 +66,9 @@ const { evaluateReadiness, allReady, formatReadinessTable, DEFAULT_SEEDED_THRESH
 const { manualChecklist, formatChecklist } = require('./lib/checklist.cjs');
 const { validateDeployEnv } = require('shared/config');
 const { uploadPlaceholderBranding } = require('./lib/branding.cjs');
-const { writeConfigDocs, seedCollection, countSeeded, readConfig } = require('./lib/write.cjs');
+const {
+  writeConfigDocs, seedCollection, seedEmailTemplateOverrides, countSeeded, readConfig,
+} = require('./lib/write.cjs');
 
 const FLAGS = [
   'answers', 'admin', 'force', 'check', 'attest-auth', 'dry-run',
@@ -341,6 +347,19 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
     `  cmsContent        ${contentResult.created.length} created, ${contentResult.refreshed.length} refreshed, ` +
     `${contentResult.skipped.length} left alone`,
   );
+
+  // (f) email_templates overrides for the two client-visible templates
+  // (§5.1 step f, §6.3). Same idempotency rule as every other seed: a
+  // still-seeded doc refreshes, a client-edited one is left alone.
+  const emailTemplateDocs = buildEmailTemplateSeeds({ seededAt });
+  const emailTemplateResult = await seedEmailTemplateOverrides({
+    db, docs: emailTemplateDocs, dryRun, now, force,
+  });
+  console.log(
+    `  email_templates   ${emailTemplateResult.created.length} created, ` +
+    `${emailTemplateResult.refreshed.length} refreshed, ${emailTemplateResult.skipped.length} left alone`,
+  );
+  for (const s of emailTemplateResult.skipped) console.log(`    - ${s.id}: ${s.reason}`);
 
   // (g) Branding placeholders. Fail-soft (§5.1.1): the assets also ship in
   // the web bundle, so a skipped upload degrades, it does not break.
