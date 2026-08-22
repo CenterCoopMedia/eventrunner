@@ -27,8 +27,13 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
+import SignInPanel from '../components/SignInPanel.jsx';
 import SpeakerPhotoField from '../components/media/SpeakerPhotoField.jsx';
-import { getOwnSpeakerProfile, updateOwnSpeakerProfile } from '../lib/speakerProfileApi.js';
+import {
+  deleteSpeakerPhoto,
+  getOwnSpeakerProfile,
+  updateOwnSpeakerProfile,
+} from '../lib/speakerProfileApi.js';
 
 const inputClass =
   'touch-target w-full rounded-brand border border-brand-ink/20 bg-brand-surface px-3 py-2 ' +
@@ -47,13 +52,24 @@ const STATUS_COPY = {
   },
   approved: {
     tone: 'status',
-    text: 'Your profile is live on the public programme. Changes here are reviewed again before they replace it.',
+    text: 'Your profile is live on the public programme. Changes here are reviewed by an organizer before they replace it.',
   },
   removed: {
     tone: 'status',
     text: 'This speaker record has been removed and is not on the public programme.',
   },
 };
+
+// Staged edits (spec §4.3, issue #22 review finding P1-1): once a speaker
+// is `approved`, a self-service save is queued in `pendingEdits` rather
+// than written onto the live fields, so speakers_public is untouched until
+// an organizer applies it (functions/src/speakers/profile.cjs). This is a
+// SEPARATE note from STATUS_COPY.approved above — the status note is about
+// the whole record's publish state, this one is about a specific edit still
+// in flight.
+const PENDING_EDITS_NOTE =
+  'You have changes awaiting organizer review. The form below shows those changes; the public page ' +
+  'still shows what was last approved until an organizer applies them.';
 
 /** One `label: handle` pair per row, matching Object.entries(socialHandles). */
 function handlesToRows(handles) {
@@ -84,23 +100,64 @@ export default function SpeakerProfile() {
   const [saving, setSaving] = useState(false);
   const nameRef = useRef(null);
 
+  // Guards against a stale response landing after the identity it was
+  // fetched for has changed (issue #22 review finding P2-9) — a signed-in
+  // speaker signing out and a different one signing in inside the same
+  // mounted page, or the linked speakerId changing under it. Each call to
+  // loadProfile (mount, retry, post-save refresh) claims the next id;
+  // a response only applies if it is still the most recent claim when it
+  // resolves. Effect-cleanup alone would not cover the "Try again" button
+  // or the post-save refresh, both of which call loadProfile directly
+  // rather than through the effect, so the guard lives in the request
+  // itself.
+  const requestIdRef = useRef(0);
+
+  // Photo cleanup bookkeeping (issue #22 review findings P1-2 / P2-3).
+  // Every upload lands at a FRESH path (SpeakerPhotoField / speakerPhotoApi
+  // .uploadSpeakerPhoto), so choosing a file never touches the live public
+  // object — but that means a superseded upload needs an explicit deferred
+  // delete once a save no longer points at it, the same rule
+  // ProfilePhotoField follows for attendee photos. Two refs, captured at
+  // LOAD time (before any edit) and read again at SAVE time:
+  //   • livePhotoPathRef  — speakers.headshotPath as currently PUBLISHED
+  //     (or about-to-publish, pre-approval). NEVER deleted from here — an
+  //     approved speaker's queued edit does not touch this object until an
+  //     organizer applies it (functions/src/speakers/profile.cjs deletes
+  //     the superseded live object itself, once it actually stops being
+  //     live).
+  //   • photoBaselineRef  — the EFFECTIVE path the form started from this
+  //     load (a queued pendingEdits.headshotPath if one exists, else the
+  //     live value). Safe to delete once superseded, UNLESS it equals the
+  //     live path AND this save is itself going to be staged (i.e., it is
+  //     not yet safe to delete the still-public photo).
+  const livePhotoPathRef = useRef(null);
+  const photoBaselineRef = useRef(null);
+  const statusAtLoadRef = useRef(null);
+
   const loadProfile = useCallback(() => {
     if (!user || !speakerId) return;
+    const requestId = ++requestIdRef.current;
     setLoad({ status: 'loading', speaker: null, error: null });
     getOwnSpeakerProfile({ user, speakerId })
       .then((speaker) => {
+        if (requestIdRef.current !== requestId) return; // superseded by a newer request
+        const effective = { ...speaker, ...(speaker.pendingEdits ?? {}) };
         setLoad({ status: 'ready', speaker, error: null });
         setForm({
-          firstName: speaker.firstName ?? '',
-          lastName: speaker.lastName ?? '',
-          bio: speaker.bio ?? '',
-          organization: speaker.organization ?? '',
-          jobTitle: speaker.jobTitle ?? '',
-          headshotPath: speaker.headshotPath ?? '',
-          socialRows: handlesToRows(speaker.socialHandles),
+          firstName: effective.firstName ?? '',
+          lastName: effective.lastName ?? '',
+          bio: effective.bio ?? '',
+          organization: effective.organization ?? '',
+          jobTitle: effective.jobTitle ?? '',
+          headshotPath: effective.headshotPath ?? '',
+          socialRows: handlesToRows(effective.socialHandles),
         });
+        livePhotoPathRef.current = speaker.headshotPath ?? null;
+        photoBaselineRef.current = effective.headshotPath ?? null;
+        statusAtLoadRef.current = speaker.status;
       })
       .catch((err) => {
+        if (requestIdRef.current !== requestId) return; // superseded by a newer request
         setLoad({ status: 'error', speaker: null, error: err?.message || 'Your profile could not be loaded.' });
       });
   }, [user, speakerId]);
@@ -110,19 +167,26 @@ export default function SpeakerProfile() {
   }, [loadProfile]);
 
   if (!user) {
+    // SignInPanel mounts INLINE rather than navigating to /signin (issue
+    // #22 review finding P2-11): AuthContext's `user` flips truthy the
+    // moment sign-in completes, which re-renders this same component past
+    // this branch — no redirect, no return-path state to lose. Navigating
+    // to /signin instead would need a return-path mechanism AND would need
+    // to be coordinated with ProfileSetupRedirect, which claims '/' and
+    // '/signin' as its post-sign-in landing spots and would otherwise
+    // hijack a brand-new account to /profile before it ever reached this
+    // page. Staying on /speaker/profile the whole time sidesteps both.
     return (
-      <EmptyState
-        title="Sign in to complete your speaker profile"
-        description="Your speaker profile is part of your account, so it lives behind sign-in."
-        action={
-          <Link
-            to="/signin"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
-            Go to sign in
-          </Link>
-        }
-      />
+      <article className="mx-auto max-w-md">
+        <h1 className="font-heading text-3xl font-semibold text-brand-ink">Sign in to continue</h1>
+        <p className="mt-2 text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+          Your speaker profile is part of your account, so it lives behind sign-in. Sign in below to pick
+          up right where you left off.
+        </p>
+        <div className="mt-6">
+          <SignInPanel />
+        </div>
+      </article>
     );
   }
 
@@ -171,6 +235,7 @@ export default function SpeakerProfile() {
   }
 
   const statusNote = STATUS_COPY[load.speaker.status] ?? null;
+  const hasPendingEdits = Boolean(load.speaker.pendingEdits);
 
   const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -216,8 +281,32 @@ export default function SpeakerProfile() {
       for (const key of Object.keys(fields)) {
         if (!SELF_EDITABLE_SPEAKER_FIELDS.includes(key)) delete fields[key];
       }
-      await updateOwnSpeakerProfile({ user, speakerId, fields });
-      showToast('Speaker profile saved.');
+      const result = await updateOwnSpeakerProfile({ user, speakerId, fields });
+
+      // Deferred photo cleanup (issue #22 review findings P1-2 / P2-3): the
+      // upload already landed at a fresh path, so the only object left to
+      // remove is the one this save just SUPERSEDED — and only when it is
+      // safe to. See the refs' own comments above for why the live path is
+      // excluded from a staged save.
+      const previousPath = photoBaselineRef.current;
+      const newPath = fields.headshotPath;
+      const wasStaged = statusAtLoadRef.current === 'approved';
+      const changed = previousPath !== newPath;
+      const safeToDelete = changed && previousPath && (!wasStaged || previousPath !== livePhotoPathRef.current);
+      if (safeToDelete) {
+        try {
+          await deleteSpeakerPhoto({ user, speakerId, path: previousPath });
+        } catch {
+          // Best-effort, same as ProfilePhotoField's deferred delete: an
+          // orphaned object costs a little storage, not a broken profile.
+        }
+      }
+
+      showToast(
+        result?.staged
+          ? 'Changes submitted. An organizer reviews them before they replace your public profile.'
+          : 'Speaker profile saved.',
+      );
       loadProfile();
     } catch (err) {
       showToast(err?.message || 'Your speaker profile could not be saved.', { tone: 'error' });
@@ -235,6 +324,11 @@ export default function SpeakerProfile() {
       {statusNote ? (
         <p role="status" className="mt-4 rounded-brand border border-brand-ink/10 bg-brand-surface-alt px-3 py-2 text-sm text-brand-ink">
           {statusNote.text}
+        </p>
+      ) : null}
+      {hasPendingEdits ? (
+        <p role="status" className="mt-2 rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
+          {PENDING_EDITS_NOTE}
         </p>
       ) : null}
 

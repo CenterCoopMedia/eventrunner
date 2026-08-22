@@ -59,12 +59,15 @@ export function updateOwnSpeakerProfile({ user, speakerId, fields }) {
 }
 
 /**
- * Upload a speaker headshot to `speaker-photos/{speakerId}/`. Unlike the
+ * Upload a speaker headshot to a FRESH versioned path under
+ * `speaker-photos/{speakerId}/` (issue #22 review finding P1-2). Unlike the
  * attendee profile photo, this namespace is server-authorized (storage.rules
  * `write: if false`), so the bytes travel through speakerPhotoUpload as
  * base64 rather than a direct client SDK PUT — the same shape mediaUpload
  * uses for cms-images/branding, sized down to the profile-photo class of
- * limit.
+ * limit. Never the fixed path `speakers.headshotPath` currently points at:
+ * picking a file must not overwrite the live public object before Save is
+ * even clicked.
  *
  * @param {{ user: object, speakerId: string, file: File }} args
  * @returns {Promise<{ path: string }>}
@@ -79,10 +82,25 @@ export async function uploadSpeakerPhoto({ user, speakerId, file }) {
   const data = await fileToBase64(file);
   const payload = await callAdminEndpoint(
     'speakerPhotoUpload',
-    { speakerId, contentType: file.type, data },
+    { speakerId, contentType: file.type, filename: file.name, data },
     idTokenGetter(user),
   );
   return { path: payload.path };
+}
+
+/**
+ * Delete a speaker photo object — the deferred-cleanup half of the upload
+ * above (issue #22 review finding P2-3), mirroring ProfilePhotoField's
+ * "never delete on click, delete once a save no longer points at it" rule.
+ * Best-effort by design: the caller decides whether a failure here matters
+ * enough to surface, and typically it does not — an orphaned object costs
+ * a few kilobytes and nothing else.
+ *
+ * @param {{ user: object, speakerId: string, path: string }} args
+ * @returns {Promise<void>}
+ */
+export async function deleteSpeakerPhoto({ user, speakerId, path }) {
+  await callAdminEndpoint('speakerPhotoDelete', { speakerId, path }, idTokenGetter(user));
 }
 
 export { formatBytes, typeLabel };

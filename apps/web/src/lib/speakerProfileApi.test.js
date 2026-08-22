@@ -4,6 +4,7 @@
 // speaker calls about their own record.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  deleteSpeakerPhoto,
   getOwnSpeakerProfile,
   updateOwnSpeakerProfile,
   uploadSpeakerPhoto,
@@ -73,5 +74,25 @@ describe('uploadSpeakerPhoto', () => {
     Object.defineProperty(big, 'size', { value: 2 * 1024 * 1024 });
     await expect(uploadSpeakerPhoto({ user, speakerId: 'rae', file: big })).rejects.toThrow(/limit/);
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('deleteSpeakerPhoto', () => {
+  it('POSTs speakerId and path with the bearer token', async () => {
+    fetch.mockResolvedValueOnce(response(200, { path: 'speaker-photos/rae/old/photo.png', deleted: true }));
+    await deleteSpeakerPhoto({ user, speakerId: 'rae', path: 'speaker-photos/rae/old/photo.png' });
+    const [url, init] = fetch.mock.calls[0];
+    expect(String(url)).toMatch(/\/speakerPhotoDelete$/);
+    expect(init.headers.Authorization).toBe('Bearer id-token');
+    expect(JSON.parse(init.body)).toEqual({ speakerId: 'rae', path: 'speaker-photos/rae/old/photo.png' });
+  });
+
+  it('surfaces a server rejection', async () => {
+    fetch.mockResolvedValueOnce(
+      response(400, { error: { code: 'bad-request', message: 'path: must be under speaker-photos/rae/' } }),
+    );
+    await expect(
+      deleteSpeakerPhoto({ user, speakerId: 'rae', path: 'speaker-photos/someone-else/photo.png' }),
+    ).rejects.toMatchObject({ name: 'AdminApiError', code: 'bad-request' });
   });
 });
