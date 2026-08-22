@@ -258,11 +258,29 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
       // can act on, and a later re-invite would then show two live-looking
       // invitations for one speaker. One commit moves both, the same
       // discipline seam #3 applies to the account-link pair.
-      if (stored.status === 'invited' && patch.status !== undefined && patch.status !== 'invited') {
+      //
+      // Changing the EMAIL of an invited speaker kills it too, and that one
+      // is a security fix rather than tidiness: the outstanding token was
+      // mailed to the OLD address, and acceptance authorizes against the
+      // address stored here (invites.cjs). Left live, the old recipient
+      // could still accept and bind their account — so re-pointing a
+      // speaker at a new address would silently hand the old one a working
+      // credential for it. Retyping an address is also exactly what an
+      // admin does after mistyping it, or after a speaker changes jobs.
+      //
+      // The speaker drops back to `draft`, which is honest: `draft` is the
+      // §4.3 state for "a record that has not been invited", and there is
+      // now no invitation outstanding. The admin list then offers Invite
+      // again, which mails the new address.
+      const emailChanged = patch.email !== undefined &&
+        String(patch.email ?? '').toLowerCase() !== String(stored.email ?? '').toLowerCase();
+      const leavingInvited = patch.status !== undefined && patch.status !== 'invited';
+      if (stored.status === 'invited' && (leavingInvited || emailChanged)) {
         const { invalidateInviteInTx } = require('./inviteTokens.cjs');
         Object.assign(patch, invalidateInviteInTx({
           tx, db, speaker: stored, at, status: 'superseded', actorEmail: actor.email,
         }));
+        if (!leavingInvited) patch.status = 'draft';
       }
 
       // approvedAt is server-owned and records the FIRST approval: stamped

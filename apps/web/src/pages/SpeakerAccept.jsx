@@ -110,6 +110,8 @@ export default function SpeakerAccept() {
           err instanceof SpeakerInviteError
             ? err.message
             : 'Something went wrong. Try again.',
+        invitedEmailMasked:
+          err instanceof SpeakerInviteError ? err.invitedEmailMasked : null,
       });
       // An expired or already-used invitation is a fact about the link, not
       // about this attempt: move the whole page into that state so the
@@ -181,20 +183,19 @@ export default function SpeakerAccept() {
             Thank you{accepted.speakerName ? `, ${accepted.speakerName}` : ''} — your
             invitation is accepted and linked to this account.
           </p>
-          {accepted.emailMismatch ? (
-            <p className="rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
-              We sent the invitation to a different address than the one you
-              signed in with. That is fine — the organizers can see both — but
-              tell them if you would rather hear from them at{' '}
-              {user?.email ? <strong>{user.email}</strong> : 'this address'}.
-            </p>
-          ) : null}
+          {/* COPY NOTE (issue #21 → #22): /profile edits the ATTENDEE
+              record (users/{uid}), not the canonical speaker document an
+              organizer approves, so this promises only what that page can
+              do. Issue #22 ships the speaker profile wizard; when it lands,
+              this CTA becomes its route and the copy gains the "write your
+              speaker bio" instruction. */}
           <p className="text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
-            Next, fill in the profile the programme and the website will use. It
-            appears publicly once an organizer has reviewed it.
+            An organizer will be in touch about your session and the biography
+            and photograph we publish on the programme. Your speaker profile
+            appears publicly once they have reviewed it.
           </p>
           <Link to="/profile" className={primaryButtonClass}>
-            Complete your speaker profile
+            Check your account details
           </Link>
         </Panel>
       </article>
@@ -232,27 +233,59 @@ export default function SpeakerAccept() {
               <span>{error.message}</span>
             </p>
           ) : null}
-          <button
-            type="button"
-            onClick={accept}
-            disabled={accepting}
-            className={primaryButtonClass}
-          >
-            {accepting ? 'Accepting…' : 'Accept the invitation'}
-          </button>
-          {/* The way out of link-occupied and of "wrong account" generally:
-              the account is the thing that has to change, and signing out
-              here keeps the token in the URL so the page comes straight
-              back to this step. */}
-          <button type="button" onClick={() => signOut()} className={secondaryButtonClass}>
-            Use a different account
-          </button>
+          {/* The invited address is an authorization boundary, not a
+              preference (functions/src/speakers/invites.cjs): the server
+              refuses to link an account at any other address, because a
+              forwarded invitation would otherwise let whoever holds the
+              link claim the speaker record and the access that comes with
+              it. So the wrong-account case gets the instruction that
+              actually resolves it rather than a retry button that cannot
+              succeed — sign in at the invited inbox, which the emailed code
+              does without a password. */}
+          {error?.code === 'email-mismatch' ? (
+            <div className="space-y-3">
+              <p className="text-brand-ink" style={{ textWrap: 'pretty' }}>
+                Sign in with{' '}
+                {error.invitedEmailMasked ? (
+                  <strong>{error.invitedEmailMasked}</strong>
+                ) : (
+                  'the invited address'
+                )}{' '}
+                — ask for a sign-in code at that address, or use a Google
+                account there. If you would rather use this account, ask the
+                organizers to re-send the invitation to it.
+              </p>
+              <button type="button" onClick={() => signOut()} className={primaryButtonClass}>
+                Sign in with the invited address
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={accept}
+                disabled={accepting}
+                className={primaryButtonClass}
+              >
+                {accepting ? 'Accepting…' : 'Accept the invitation'}
+              </button>
+              {/* The way out of link-occupied and of "wrong account"
+                  generally: the account is the thing that has to change, and
+                  signing out here keeps the token in the URL so the page
+                  comes straight back to this step. */}
+              <button type="button" onClick={() => signOut()} className={secondaryButtonClass}>
+                Use a different account
+              </button>
+            </>
+          )}
         </Panel>
       ) : (
         <>
           <p className="mt-4 text-brand-ink" style={{ textWrap: 'pretty' }}>
-            Sign in to accept. We link the invitation to the account you sign in
-            with, so use the one you want to manage your session from.
+            Sign in with the address this invitation was sent to
+            {invite.invitedEmailMasked ? ` (${invite.invitedEmailMasked})` : ''} to
+            accept it. The quickest way is a one-time code emailed to that
+            address — no password needed.
           </p>
           <div className="mt-4">
             <SignInPanel />

@@ -29,37 +29,45 @@
  * the leaker still has to sign in as somebody, and whoever they sign in as
  * is the account the invitation gets bound to and audited against.
  *
- * **Ordering inside acceptance: link first, invalidate second.** The pair
- * write (`linkSpeakerToUser`, §4.3 seam #3) is its own transaction and the
- * status/token transition is a second one. Doing it the other way round —
- * burning the token first — makes a failed link unrecoverable: the speaker
- * would hold a consumed invitation, no account link, and no way back
- * without an admin resend. In this order a failure leaves the invitation
- * intact and the whole handler safely repeatable, because re-linking the
- * SAME (speaker, uid) pair passes lifecycle.cjs's occupant check by
- * construction. The window it opens — linked but still `invited` — cannot
- * be exploited by a second holder of the same token: their link attempt is
- * refused with the 409 `link-occupied` naming the occupying speaker.
+ * **Acceptance is ONE transaction.** Validating the token, writing the
+ * `users.speakerId` ↔ `speakers.uid` pair (§4.3 seam #3, through
+ * lifecycle.cjs's `applySpeakerLinkInTx`), moving the status, and burning
+ * the token all commit together. Splitting them — validate, then link, then
+ * transition — leaves a window in which an admin cancel, resend, or removal
+ * lands between the steps: the pair write commits against a speaker who is
+ * no longer invited, and the account is left permanently holding speaker
+ * identity, with the attendee access §3.4 grants for `speakerId != null`,
+ * for a record the organizer just revoked. Both documents are in the
+ * transaction's read set, so a concurrent write to either aborts and
+ * retries against the new state instead.
  *
- * **Invite address vs. signed-in address.** A mismatch is ACCEPTED and
- * recorded, never refused. §4.3 states exactly one rule about who may hold
- * the link — the pair is single-valued and written only here — and
- * lifecycle.cjs already enforces it by refusing an occupied target. An
- * address equality check would add no security (a token holder can create
- * an account at any address they control, so it filters nobody) while
- * breaking the ordinary case the spec's own §4.3 note anticipates: the
- * organizer has the speaker's work address, the speaker signs in with the
- * Google account they actually use. So acceptance stores `acceptedEmail`
- * beside the invited address and reports the mismatch to both parties —
- * the accept page tells the speaker which account they just bound, and
- * listSpeakerInvites shows the admin the address that accepted.
+ * **The invited address is an authorization boundary.** Acceptance requires
+ * the signed-in account's VERIFIED email to equal the invited address. The
+ * token grants real privileges — attendee-directory access (§3.4) and
+ * speaker access to embargoed session materials (§4.4) — and invite URLs
+ * travel: forwarded mail, shared screens, chat logs, browser history (the
+ * address masking elsewhere in this module exists because they do). With
+ * possession as the only test, any signed-in account that saw the link
+ * could claim the record.
+ *
+ * The check does not break the invite-first flow §4.3 is built around,
+ * because the deployment already ships proof of inbox control: the emailed
+ * six-digit code (auth/otp.cjs) signs the recipient in AT the invited
+ * address, and Google sign-in does the same for a Google account there.
+ * Registering an address is free; holding its inbox is not. A speaker whose
+ * work and personal addresses genuinely differ is an ADMIN action — the
+ * organizer edits the speaker's email, which invalidates the outstanding
+ * token (profile.cjs), and sends a fresh invitation. `acceptedEmail` is
+ * still recorded on both documents so the audit stands on its own if the
+ * speaker's email is edited afterwards.
  */
 
 const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
 const { speakerDisplayName } = require('shared/speaker');
-const { linkSpeakerToUser } = require('./lifecycle.cjs');
+const { normalizeEmail } = require('../auth/challenges.cjs');
+const { applySpeakerLinkInTx } = require('./lifecycle.cjs');
 const {
   SPEAKER_INVITES,
   INVITE_TTL_MS,
@@ -107,6 +115,22 @@ const SEND_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
 /** Newest-first cap for listSpeakerInvites. */
 const MAX_LISTED_INVITES = 200;
+
+/**
+ * The two acceptance refusals that must never differ by cause. Defined once
+ * so every throw site in the acceptance transaction returns byte-identical
+ * copy — a second wording would be an oracle by accident.
+ */
+const INVALID_INVITE = Object.freeze({
+  status: 401,
+  code: 'invite-invalid',
+  message: 'This invitation link is not valid. Ask the organizers to send a new one.',
+});
+const EXPIRED_INVITE = Object.freeze({
+  status: 410,
+  code: 'invite-expired',
+  message: 'This invitation has expired. Ask the organizers to send a new one.',
+});
 
 /** Shared admin-POST preamble. Sends the response itself on failure. */
 async function gateAdminPost({ auth, getConfig }, req, res) {
@@ -412,6 +436,21 @@ async function applyCancelInvite({ db, speakerId, actor, now = Date.now }) {
  * @returns {Promise<{ ok: true, tokenHash: string, invite: object, speaker: object, speakerId: string } |
  *                    { ok: false, reason: 'invalid'|'expired' }>}
  */
+function evaluateInvite({ invite, speaker, tokenHash, nowMs }) {
+  if (!invite || invite.status !== 'pending') return { ok: false, reason: 'invalid' };
+
+  const expires = timestampMs(invite.expiresAt);
+  if (!Number.isFinite(expires) || nowMs >= expires) return { ok: false, reason: 'expired' };
+
+  // Both halves must agree. The speaker document is authoritative about
+  // which token is current, so an invite row that survived a rotation
+  // (a partially applied write, a hand edit) can never be accepted.
+  if (!speaker || speaker.status !== 'invited' || speaker.inviteToken !== tokenHash) {
+    return { ok: false, reason: 'invalid' };
+  }
+  return { ok: true };
+}
+
 async function resolveInvite({ db, token, now = Date.now }) {
   if (!isWellFormedToken(token)) return { ok: false, reason: 'invalid' };
   const tokenHash = hashInviteToken(token);
@@ -419,150 +458,181 @@ async function resolveInvite({ db, token, now = Date.now }) {
   const inviteSnap = await db.collection(SPEAKER_INVITES).doc(tokenHash).get();
   if (!inviteSnap.exists) return { ok: false, reason: 'invalid' };
   const invite = inviteSnap.data();
-  if (invite.status !== 'pending') return { ok: false, reason: 'invalid' };
+  const speakerSnap = invite.speakerId
+    ? await db.collection(SPEAKERS).doc(invite.speakerId).get()
+    : null;
+  const speaker = speakerSnap?.exists ? speakerSnap.data() : null;
 
-  const expires = timestampMs(invite.expiresAt);
-  if (!Number.isFinite(expires) || now() >= expires) return { ok: false, reason: 'expired' };
-
-  const speakerSnap = await db.collection(SPEAKERS).doc(invite.speakerId).get();
-  if (!speakerSnap.exists) return { ok: false, reason: 'invalid' };
-  const speaker = speakerSnap.data();
-  // Both halves must agree. The speaker document is authoritative about
-  // which token is current, so an invite row that survived a rotation
-  // (a partially applied write, a hand edit) can never be accepted.
-  if (speaker.status !== 'invited' || speaker.inviteToken !== tokenHash) {
-    return { ok: false, reason: 'invalid' };
-  }
+  const verdict = evaluateInvite({ invite, speaker, tokenHash, nowMs: now() });
+  if (!verdict.ok) return verdict;
   return { ok: true, tokenHash, invite, speaker, speakerId: invite.speakerId };
 }
 
 /**
- * The §4.3 acceptance seam.
+ * The §4.3 acceptance seam — ONE transaction.
+ *
+ * Validation, the pair write, the status transition, and burning the token
+ * all commit together. They cannot be split: validating in one transaction
+ * and linking in another leaves a window in which an admin cancel, resend,
+ * or removal lands between the two, and the pair write then commits against
+ * a speaker who is no longer invited — an account left permanently holding
+ * speaker identity, and the attendee access §3.4 grants for
+ * `speakerId != null`, for a record the organizer just revoked. Firestore's
+ * read-set makes the single transaction airtight instead: the invite row and
+ * the speaker document are both read inside it, so any concurrent write to
+ * either aborts and retries against the new state.
  *
  * @param {{ db: object, token: unknown, uid: string, email: string|null,
- *           now?: () => number }} args
+ *           emailVerified?: boolean, now?: () => number }} args
  * @returns {Promise<{ ok: true, speakerId: string, speakerName: string,
- *                     emailMismatch: boolean, alreadyAccepted: boolean, speaker: object,
+ *                     alreadyAccepted: boolean, speaker: object,
  *                     invitedEmail: string } |
- *                    { ok: false, status: number, code: string, message: string }>}
+ *                    { ok: false, status: number, code: string, message: string,
+ *                      invitedEmailMasked?: string }>}
  */
-async function applyAcceptInvite({ db, token, uid, email, now = Date.now }) {
-  const resolved = await resolveInvite({ db, token, now });
-  if (!resolved.ok) {
-    return resolved.reason === 'expired'
-      ? {
-        ok: false,
-        status: 410,
-        code: 'invite-expired',
-        message: 'This invitation has expired. Ask the organizers to send a new one.',
-      }
-      : {
-        ok: false,
-        status: 401,
-        code: 'invite-invalid',
-        message: 'This invitation link is not valid. Ask the organizers to send a new one.',
-      };
+async function applyAcceptInvite({ db, token, uid, email, emailVerified = false, now = Date.now }) {
+  if (!isWellFormedToken(token)) {
+    return { ok: false, ...INVALID_INVITE };
   }
-
-  const { speakerId, tokenHash } = resolved;
-  const accountEmail = typeof email === 'string' ? email.trim().toLowerCase() : null;
-  const invitedEmail = typeof resolved.speaker.email === 'string' ? resolved.speaker.email : '';
-
-  // Step 1 — the pair write (§4.3 seam #3). Idempotent for the same
-  // (speaker, uid), which is what makes the whole handler retriable.
-  const link = await linkSpeakerToUser({ db, speakerId, uid, now });
-  if (!link.ok) {
-    if (link.code === 'link-occupied') {
-      return {
-        ok: false,
-        status: 409,
-        code: 'link-occupied',
-        // lifecycle.cjs's message names the occupying speaker, which is the
-        // only actionable part; it is admin-facing detail, so the handler
-        // trims it for the public response.
-        message:
-          'The account you are signed in as is already linked to a different speaker record. ' +
-          'Sign in with the account you use for this event, or ask the organizers to unlink the other record.',
-      };
-    }
-    if (link.code === 'link-target-missing') {
-      return {
-        ok: false,
-        status: 409,
-        code: 'account-not-ready',
-        message: 'Your account is still being set up. Wait a moment and try again.',
-      };
-    }
-    return { ok: false, status: link.status, code: link.code, message: link.message };
-  }
-
-  // Step 2 — burn the token and move the pipeline state.
+  const tokenHash = hashInviteToken(token);
+  const accountEmail = typeof email === 'string' ? normalizeEmail(email) : '';
   const at = new Date(now());
-  let alreadyAccepted = false;
+  const nowMs = now();
+
+  let outcome;
   try {
-    await db.runTransaction(async (tx) => {
-      const snap = await tx.get(db.collection(SPEAKERS).doc(speakerId));
-      if (!snap.exists) {
-        const err = new Error('NOT_FOUND');
-        err.conflict = { status: 404, code: 'not-found', message: 'This invitation is no longer valid.' };
+    outcome = await db.runTransaction(async (tx) => {
+      const inviteRef = db.collection(SPEAKER_INVITES).doc(tokenHash);
+      const inviteSnap = await tx.get(inviteRef);
+      if (!inviteSnap.exists) {
+        const err = new Error('UNKNOWN_TOKEN');
+        err.conflict = INVALID_INVITE;
         throw err;
       }
-      const stored = snap.data();
-      // A retry after a dropped response, or a double-click: the pair is
-      // already ours and the token is already burned, so report success
-      // rather than a conflict the speaker cannot act on.
-      if (stored.status === 'accepted' && stored.uid === uid) {
-        alreadyAccepted = true;
-        return;
+      const invite = inviteSnap.data();
+
+      // Retry after a lost response: this token was already consumed BY
+      // THIS ACCOUNT. The work is done and durable, so report the original
+      // success rather than "not valid" — the speaker did everything right
+      // and their browser merely lost the answer. Any other account
+      // presenting a consumed token still falls through to the single
+      // invalid verdict below.
+      if (invite.status === 'accepted' && invite.acceptedByUid === uid) {
+        const doneSnap = await tx.get(db.collection(SPEAKERS).doc(invite.speakerId));
+        if (doneSnap.exists && doneSnap.data().uid === uid) {
+          return { speakerId: invite.speakerId, speaker: doneSnap.data(), alreadyAccepted: true };
+        }
       }
-      if (stored.status !== 'invited' || stored.inviteToken !== tokenHash) {
-        const err = new Error('RACED');
+
+      const speakerRef = db.collection(SPEAKERS).doc(invite.speakerId);
+      const speakerSnap = invite.speakerId ? await tx.get(speakerRef) : null;
+      const speaker = speakerSnap?.exists ? speakerSnap.data() : null;
+
+      const verdict = evaluateInvite({ invite, speaker, tokenHash, nowMs });
+      if (!verdict.ok) {
+        const err = new Error('NOT_ACCEPTABLE');
+        err.conflict = verdict.reason === 'expired' ? EXPIRED_INVITE : INVALID_INVITE;
+        throw err;
+      }
+
+      // The invited address is the authorization boundary, not just a
+      // record. The token grants real privileges — `users.speakerId != null`
+      // is attendee access (§3.4) and speaker access to embargoed session
+      // materials (§4.4) — and invitation URLs travel: forwarded mail,
+      // shared screens, chat logs, browser history. Possession alone would
+      // let ANY signed-in account claim the record.
+      //
+      // Requiring the account's address to match closes that without
+      // blocking the invite-first flow §4.3 is built around, because the
+      // deployment already ships proof of inbox control: the emailed
+      // six-digit code (auth/otp.cjs) signs the recipient in AT the invited
+      // address, and Google sign-in does the same for a Google account at
+      // that address. An attacker can register any address they like; they
+      // cannot get a verified session at an inbox they do not hold.
+      //
+      // A speaker whose work and personal addresses genuinely differ is an
+      // ADMIN action, not a self-service one: the organizer edits the
+      // speaker's email (which invalidates the outstanding token, see
+      // profile.cjs) and sends a fresh invitation to the address the
+      // speaker actually uses.
+      if (!emailVerified || !accountEmail || accountEmail !== normalizeEmail(speaker.email || '')) {
+        const err = new Error('EMAIL_MISMATCH');
         err.conflict = {
-          status: 409,
-          code: 'invite-invalid',
-          message: 'This invitation is no longer valid. Ask the organizers to send a new one.',
+          status: 403,
+          code: 'email-mismatch',
+          message:
+            'This invitation was sent to a different email address than the account you are signed in ' +
+            'with. Sign in with the invited address — request a sign-in code for it, or use a Google ' +
+            'account at that address — or ask the organizers to re-send the invitation to this address.',
+          // Masked, like validateSpeakerInvite: enough to act on, without
+          // printing the address into a page opened from a travelling link.
+          invitedEmailMasked: maskEmail(speaker.email),
         };
         throw err;
       }
+
+      // The pair write (§4.3 seam #3), in this same commit.
+      const linkPatch = await applySpeakerLinkInTx({
+        tx, db, speakerId: invite.speakerId, speaker, uid, at,
+      });
+
       tx.set(
-        db.collection(SPEAKER_INVITES).doc(tokenHash),
-        {
-          status: 'accepted',
-          acceptedAt: at,
-          acceptedByUid: uid,
-          acceptedEmail: accountEmail,
-          updatedAt: at,
-        },
+        inviteRef,
+        { status: 'accepted', acceptedAt: at, acceptedByUid: uid, acceptedEmail: accountEmail, updatedAt: at },
         { merge: true },
       );
       tx.set(
-        db.collection(SPEAKERS).doc(speakerId),
+        speakerRef,
         {
+          ...linkPatch,
           status: 'accepted',
           inviteToken: null,
           acceptedAt: at,
-          // Recorded, never enforced (see the module header): the address
-          // that actually accepted, beside the address that was invited.
+          // Recorded as well as enforced: the address that accepted is the
+          // invited one by the check above, but storing it keeps the audit
+          // self-contained if the speaker's email is later edited.
           acceptedEmail: accountEmail,
           updatedAt: at,
           updatedBy: accountEmail || uid,
         },
         { merge: true },
       );
+      return { speakerId: invite.speakerId, speaker, alreadyAccepted: false };
     });
   } catch (err) {
-    if (err?.conflict) return { ok: false, ...err.conflict };
+    if (err?.conflict) {
+      if (err.conflict.code === 'link-occupied') {
+        return {
+          ok: false,
+          status: 409,
+          code: 'link-occupied',
+          // lifecycle.cjs's message names the occupying speaker, which is
+          // admin-facing detail; the public response omits it.
+          message:
+            'The account you are signed in as is already linked to a different speaker record. ' +
+            'Sign in with the account you use for this event, or ask the organizers to unlink the other record.',
+        };
+      }
+      if (err.conflict.code === 'link-target-missing') {
+        return {
+          ok: false,
+          status: 409,
+          code: 'account-not-ready',
+          message: 'Your account is still being set up. Wait a moment and try again.',
+        };
+      }
+      return { ok: false, ...err.conflict };
+    }
     throw err;
   }
 
   return {
     ok: true,
-    speakerId,
-    speakerName: speakerDisplayName(resolved.speaker),
-    speaker: resolved.speaker,
-    invitedEmail,
-    emailMismatch: Boolean(accountEmail && invitedEmail && accountEmail !== invitedEmail.toLowerCase()),
-    alreadyAccepted,
+    speakerId: outcome.speakerId,
+    speakerName: speakerDisplayName(outcome.speaker),
+    speaker: outcome.speaker,
+    invitedEmail: typeof outcome.speaker?.email === 'string' ? outcome.speaker.email : '',
+    alreadyAccepted: outcome.alreadyAccepted,
   };
 }
 
@@ -588,6 +658,12 @@ async function sendAcceptedEmail({ db, sendEmail, getConfig, speakerId, speaker,
       override,
       tokenValues: {
         speaker_name: speakerDisplayName(speaker),
+        // /profile is the ATTENDEE profile (users/{uid}) — it does not edit
+        // the canonical speaker record organizers approve. The template copy
+        // says so plainly rather than promising a speaker profile this
+        // release does not have. ISSUE #22 ships the speaker profile wizard;
+        // when it lands, this value becomes its route and the copy in
+        // email/templates/speaker.accepted.cjs changes with it.
         profile_wizard_url: site ? `${site}/profile` : '',
         // Declared but unreferenced in the shipped copy; a client override
         // that wants a deadline gets the event's first day rather than an
@@ -620,12 +696,21 @@ async function sendAcceptedEmail({ db, sendEmail, getConfig, speakerId, speaker,
  * the token digest, and nothing in the admin UI addresses an invitation by
  * anything other than its speaker.
  *
+ * Ordered and capped IN THE QUERY, not after it. `speaker_invites` is
+ * append-only over the life of an event — every send, resend, and cancel
+ * leaves a row — so a collection read plus a client-side slice would grow
+ * without bound and bill the whole history to render one screen. The
+ * composite index the filtered form needs is declared in
+ * firestore.indexes.json.
+ *
  * @param {{ db: object, speakerId?: unknown, limit?: number }} args
  */
 async function listInvites({ db, speakerId = null, limit = MAX_LISTED_INVITES }) {
   const collection = db.collection(SPEAKER_INVITES);
-  const query = isValidDocId(speakerId) ? collection.where('speakerId', '==', speakerId) : collection;
-  const snap = await query.get();
+  const filtered = isValidDocId(speakerId)
+    ? collection.where('speakerId', '==', speakerId)
+    : collection;
+  const snap = await filtered.orderBy('createdAt', 'desc').limit(limit).get();
   const rows = snap.docs.map((doc) => {
     const data = doc.data() || {};
     return {
@@ -642,8 +727,7 @@ async function listInvites({ db, speakerId = null, limit = MAX_LISTED_INVITES })
       closedAt: isoOrNull(data.closedAt),
     };
   });
-  rows.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
-  return rows.slice(0, limit);
+  return rows;
 }
 
 /* ------------------------------------------------------------------ */
@@ -715,13 +799,23 @@ async function runInviteSend({ db, getConfig, sendEmail, now, log, req, res, act
       token: minted.token,
       inviteType,
       actor,
-      // A resend is an admin-initiated resend of a mail the recipient may
-      // already have — §3.1's table gives that its own key shape so the
-      // claim on the original send cannot suppress it, while a
-      // double-submitted click inside the same minute still sends once.
+      // Keyed by the token digest in BOTH modes, resend included.
+      //
+      // §3.1's table gives admin-initiated resends the shape
+      // `<same>:resend:{adminUid}:{isoMinute}`, which is right for resending
+      // the same message — but a resend here does not resend a message, it
+      // mints a NEW credential and kills the old one. Under the per-minute
+      // key, a second resend inside the same UTC minute (two speakers, or
+      // one speaker twice) claims an existing key, the email core returns
+      // `skipped: true` with `status: 'sent'`, and the handler would stamp
+      // the new token as delivered although no mail carrying it ever went
+      // out — leaving the speaker holding a dead link and the admin looking
+      // at a delivered invitation. The digest is unique per mint, so it
+      // dedupes exactly what should be deduped (one mail per token) and
+      // nothing that should not.
       onceKey: mode === 'send'
         ? `speaker-invite:${minted.tokenHash}`
-        : `speaker-invite:resend:${actor.uid}:${new Date(now()).toISOString().slice(0, 16)}`,
+        : `speaker-invite:resend:${minted.tokenHash}`,
       now,
       log,
     });
@@ -857,13 +951,33 @@ function createAcceptSpeakerInviteHandler({ db, auth, getConfig, sendEmail, now 
         token: req.body?.token,
         uid: decoded.uid,
         email: typeof decoded.email === 'string' ? decoded.email : null,
+        // Only a VERIFIED address may satisfy the invited-address check: an
+        // unverified one is a claim, not proof of inbox control, and proof is
+        // the whole reason the check exists. Both shipped sign-in paths
+        // produce verified addresses (auth/otp.cjs sets emailVerified on the
+        // accounts it creates; Google asserts it).
+        emailVerified: decoded.email_verified === true,
         now,
       });
     } catch (err) {
       log.error('acceptSpeakerInvite failed', err);
       return internal(res, 'The invitation could not be accepted.');
     }
-    if (!result.ok) return sendError(res, result.status, result.code, result.message);
+    if (!result.ok) {
+      // The mismatch refusal carries the masked invited address, so the
+      // accept page can name the inbox to sign in from without the page
+      // printing an address a travelling link should not carry.
+      if (result.code === 'email-mismatch') {
+        return res.status(result.status).json({
+          error: {
+            code: result.code,
+            message: result.message,
+            invitedEmailMasked: result.invitedEmailMasked ?? null,
+          },
+        });
+      }
+      return sendError(res, result.status, result.code, result.message);
+    }
 
     // onceKey-gated, so the retriable handler still mails once per speaker.
     if (typeof sendEmail === 'function' && typeof getConfig === 'function') {
@@ -876,7 +990,6 @@ function createAcceptSpeakerInviteHandler({ db, auth, getConfig, sendEmail, now 
       speakerId: result.speakerId,
       speakerName: result.speakerName,
       status: 'accepted',
-      emailMismatch: result.emailMismatch,
     });
   };
 }
@@ -893,16 +1006,39 @@ function buildHandlers() {
   const secrets = (SEND_SECRETS_BY_PROVIDER[providerName] || []).map(defineSecret);
   const enforced = otpInternals.appCheckEnforced(process.env);
 
-  const buildDeps = () => {
+  // Two dependency shapes, because constructing the email provider is not
+  // free of consequence: getEmailProvider throws when EVENT_EMAIL_PROVIDER
+  // is unset outside the emulator, and the postmark/webhook adapters throw
+  // at construction when their secrets are unbound. Building it for
+  // cancel/list/validate — none of which send mail — would turn a
+  // provider-configuration problem into a 500 on endpoints that never needed
+  // a provider, including the public one a speaker's accept page calls
+  // first. Only the mail-sending endpoints construct it, and only they bind
+  // the send secrets in their onRequest options.
+  const buildBaseDeps = () => {
     const { getDb } = require('../core/firestore.cjs');
     const { getAuth } = require('firebase-admin/auth');
     const { getEventConfig } = require('../core/config.cjs');
+    const db = getDb();
+    return {
+      db,
+      auth: getAuth(),
+      getConfig: () => getEventConfig({ db }),
+      now: Date.now,
+      log: console,
+    };
+  };
+
+  const buildMailDeps = () => {
     const { getEmailProvider } = require('../email/providers/index.cjs');
     const { createEmailCore } = require('../email/send.cjs');
-    const db = getDb();
-    const getConfig = () => getEventConfig({ db });
-    const emailCore = createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig });
-    return { db, auth: getAuth(), getConfig, sendEmail: emailCore.send, now: Date.now, log: console };
+    const deps = buildBaseDeps();
+    const emailCore = createEmailCore({
+      db: deps.db,
+      provider: getEmailProvider({ env: process.env }),
+      getConfig: deps.getConfig,
+    });
+    return { ...deps, sendEmail: emailCore.send };
   };
 
   const withCors = (handler) => async (req, res) => {
@@ -928,22 +1064,22 @@ function buildHandlers() {
 
   return {
     sendSpeakerInvite: onRequest({ region, secrets }, withCors(async (req, res) => {
-      await createSendSpeakerInviteHandler(buildDeps())(req, res);
+      await createSendSpeakerInviteHandler(buildMailDeps())(req, res);
     })),
     resendSpeakerInvite: onRequest({ region, secrets }, withCors(async (req, res) => {
-      await createResendSpeakerInviteHandler(buildDeps())(req, res);
+      await createResendSpeakerInviteHandler(buildMailDeps())(req, res);
     })),
     cancelSpeakerInvite: onRequest({ region }, withCors(async (req, res) => {
-      await createCancelSpeakerInviteHandler(buildDeps())(req, res);
+      await createCancelSpeakerInviteHandler(buildBaseDeps())(req, res);
     })),
     listSpeakerInvites: onRequest({ region }, withCors(async (req, res) => {
-      await createListSpeakerInvitesHandler(buildDeps())(req, res);
+      await createListSpeakerInvitesHandler(buildBaseDeps())(req, res);
     })),
     validateSpeakerInvite: onRequest({ region }, gated(async (req, res) => {
-      await createValidateSpeakerInviteHandler(buildDeps())(req, res);
+      await createValidateSpeakerInviteHandler(buildBaseDeps())(req, res);
     })),
     acceptSpeakerInvite: onRequest({ region, secrets }, gated(async (req, res) => {
-      await createAcceptSpeakerInviteHandler(buildDeps())(req, res);
+      await createAcceptSpeakerInviteHandler(buildMailDeps())(req, res);
     })),
   };
 }

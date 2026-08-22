@@ -90,6 +90,14 @@ function deps(db, { admin = true, sendResult = { status: 'sent', providerMessage
   };
 }
 
+/**
+ * applyAcceptInvite with a verified account address. Both shipped sign-in
+ * paths produce one (auth/otp.cjs sets emailVerified on the accounts it
+ * creates; Google asserts it), so this is the ordinary case; the tests that
+ * exercise the refusal pass emailVerified explicitly.
+ */
+const acceptWith = (args) => applyAcceptInvite({ emailVerified: true, ...args });
+
 const adminReq = (body) => ({ method: 'POST', body, headers: { authorization: 'Bearer t' } });
 
 test.beforeEach(() => resetTemplateCacheForTest());
@@ -226,7 +234,7 @@ test('a cancelled invitation cannot be accepted', async () => {
   const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
   await applyCancelInvite({ db, speakerId: 'rae', actor: ACTOR, now: () => T0 + 10 });
 
-  const accepted = await applyAcceptInvite({
+  const accepted = await acceptWith({
     db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 20,
   });
   assert.equal(accepted.ok, false);
@@ -237,7 +245,7 @@ test('a cancelled invitation cannot be accepted', async () => {
 test('an accepted invitation cannot be cancelled', async () => {
   const db = makeSpeakersDb(world());
   const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
-  await applyAcceptInvite({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
+  await acceptWith({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
 
   const result = await applyCancelInvite({ db, speakerId: 'rae', actor: ACTOR, now: () => T0 + 20 });
   assert.equal(result.ok, false);
@@ -267,7 +275,7 @@ test('an expired token is expired, not invalid — and cannot be accepted', asyn
   const after = () => T0 + INVITE_TTL_MS + 1;
 
   assert.deepEqual(await resolveInvite({ db, token: minted.token, now: after }), { ok: false, reason: 'expired' });
-  const accepted = await applyAcceptInvite({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: after });
+  const accepted = await acceptWith({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: after });
   assert.equal(accepted.ok, false);
   assert.equal(accepted.status, 410);
   assert.equal(accepted.code, 'invite-expired');
@@ -281,12 +289,11 @@ test('acceptance links both halves, transitions to accepted, and burns the token
   const db = makeSpeakersDb(world());
   const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
 
-  const result = await applyAcceptInvite({
+  const result = await acceptWith({
     db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10,
   });
 
   assert.equal(result.ok, true);
-  assert.equal(result.emailMismatch, false);
   // §4.3 seam #3: both halves, one pair.
   assert.equal(db.read('users', 'u1').speakerId, 'rae');
   assert.equal(db.read('speakers', 'rae').uid, 'u1');
@@ -299,27 +306,41 @@ test('acceptance links both halves, transitions to accepted, and burns the token
 test('the token is single-use: a second acceptance by a different account is refused', async () => {
   const db = makeSpeakersDb(world({ 'users/u2': { uid: 'u2', speakerId: null } }));
   const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
-  await applyAcceptInvite({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
+  await acceptWith({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
 
-  const second = await applyAcceptInvite({ db, token: minted.token, uid: 'u2', email: 'other@example.org', now: () => T0 + 20 });
+  const second = await acceptWith({ db, token: minted.token, uid: 'u2', email: 'other@example.org', now: () => T0 + 20 });
   assert.equal(second.ok, false);
   assert.equal(second.code, 'invite-invalid');
   assert.equal(db.read('users', 'u2').speakerId, null);
   assert.equal(db.read('speakers', 'rae').uid, 'u1');
 });
 
-test('the same account replaying its own acceptance is idempotent, not an error', async () => {
+test('the same account replaying its own acceptance gets the original success back', async () => {
   const db = makeSpeakersDb(world());
   const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
-  await applyAcceptInvite({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
+  await acceptWith({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
 
-  // The token no longer resolves, so a replay of the WHOLE handler is a
-  // clean refusal; the idempotent branch is the one that matters for a
-  // retry between the link and the transition (below).
-  const replay = await applyAcceptInvite({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 20 });
-  assert.equal(replay.ok, false);
-  assert.equal(replay.code, 'invite-invalid');
+  // A lost HTTP response, or a double-click: the work is done and durable,
+  // so telling this speaker their link is "not valid" would be false and
+  // send them to support over a dropped packet.
+  const writesBefore = db.writes.length;
+  const replay = await acceptWith({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 20 });
+  assert.equal(replay.ok, true);
+  assert.equal(replay.alreadyAccepted, true);
+  assert.equal(replay.speakerId, 'rae');
   assert.equal(db.read('speakers', 'rae').status, 'accepted');
+  assert.equal(db.writes.length, writesBefore, 'a replay rewrote something');
+});
+
+test('a consumed token replayed by a DIFFERENT account is still just invalid', async () => {
+  const db = makeSpeakersDb(world({ 'users/u2': { uid: 'u2', speakerId: null } }));
+  const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
+  await acceptWith({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
+
+  const other = await acceptWith({ db, token: minted.token, uid: 'u2', email: 'rae@example.org', now: () => T0 + 20 });
+  assert.equal(other.ok, false);
+  assert.equal(other.code, 'invite-invalid');
+  assert.equal(db.read('users', 'u2').speakerId, null);
 });
 
 test('a retry after the link committed but the transition did not still succeeds', async () => {
@@ -332,7 +353,7 @@ test('a retry after the link committed but the transition did not still succeeds
   await linkSpeakerToUser({ db, speakerId: 'rae', uid: 'u1', now: () => T0 + 5 });
   assert.equal(db.read('speakers', 'rae').status, 'invited');
 
-  const result = await applyAcceptInvite({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
+  const result = await acceptWith({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
   assert.equal(result.ok, true);
   assert.equal(db.read('speakers', 'rae').status, 'accepted');
   assert.equal(db.read('speakers', 'rae').inviteToken, null);
@@ -345,7 +366,7 @@ test('an account already linked to another speaker is refused with link-occupied
   }));
   const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
 
-  const result = await applyAcceptInvite({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
+  const result = await acceptWith({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });
   assert.equal(result.ok, false);
   assert.equal(result.status, 409);
   assert.equal(result.code, 'link-occupied');
@@ -362,7 +383,7 @@ test('an account whose users document does not exist yet gets retry guidance', a
   const db = makeSpeakersDb(world());
   const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
 
-  const result = await applyAcceptInvite({ db, token: minted.token, uid: 'brand-new', email: 'rae@example.org', now: () => T0 + 10 });
+  const result = await acceptWith({ db, token: minted.token, uid: 'brand-new', email: 'rae@example.org', now: () => T0 + 10 });
   assert.equal(result.ok, false);
   assert.equal(result.status, 409);
   assert.equal(result.code, 'account-not-ready');
@@ -371,19 +392,85 @@ test('an account whose users document does not exist yet gets retry guidance', a
   assert.equal(db.read('speakers', 'rae').uid, null);
 });
 
-test('a different signed-in address is accepted and recorded, never refused', async () => {
+test('an account at a DIFFERENT address is refused, and nothing is linked', async () => {
+  const db = makeSpeakersDb(world());
+  const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
+
+  const result = await acceptWith({
+    db, token: minted.token, uid: 'u1', email: 'Rae.Personal@Example.NET', now: () => T0 + 10,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.equal(result.code, 'email-mismatch');
+  // Actionable without printing the address into a page reached from a link
+  // that may have travelled.
+  assert.equal(result.invitedEmailMasked, 'r**@example.org');
+  assert.equal(result.message.includes('rae@example.org'), false);
+  // The pair is untouched and the invitation still works for the right
+  // account — a mismatch must not consume the token.
+  assert.equal(db.read('users', 'u1').speakerId, null);
+  assert.equal(db.read('speakers', 'rae').uid, null);
+  assert.equal(db.read('speakers', 'rae').status, 'invited');
+  assert.equal((await resolveInvite({ db, token: minted.token, now: () => T0 + 20 })).ok, true);
+});
+
+test('the invited address matches case-insensitively and ignores surrounding space', async () => {
+  const db = makeSpeakersDb(world());
+  const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
+
+  const result = await acceptWith({
+    db, token: minted.token, uid: 'u1', email: '  RAE@Example.ORG ', now: () => T0 + 10,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 'rae').acceptedEmail, 'rae@example.org');
+});
+
+test('an UNVERIFIED address at the invited inbox is refused: the check wants proof, not a claim', async () => {
   const db = makeSpeakersDb(world());
   const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
 
   const result = await applyAcceptInvite({
-    db, token: minted.token, uid: 'u1', email: 'Rae.Personal@Example.NET', now: () => T0 + 10,
+    db, token: minted.token, uid: 'u1', email: 'rae@example.org', emailVerified: false, now: () => T0 + 10,
   });
-  assert.equal(result.ok, true);
-  assert.equal(result.emailMismatch, true);
-  assert.equal(db.read('speakers', 'rae').acceptedEmail, 'rae.personal@example.net');
-  // The invited address is left alone — it is the organizer's record.
-  assert.equal(db.read('speakers', 'rae').email, 'rae@example.org');
-  assert.equal(db.read(SPEAKER_INVITES, hashInviteToken(minted.token)).acceptedEmail, 'rae.personal@example.net');
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'email-mismatch');
+  assert.equal(db.read('users', 'u1').speakerId, null);
+});
+
+test('an admin cancelling mid-acceptance cannot leave a linked, uninvited speaker', async () => {
+  // The race the single transaction exists for: with validation and the
+  // pair write in separate transactions, a cancel landing between them
+  // linked the account to a speaker the organizer had just revoked — and
+  // left it linked, holding the attendee access §3.4 grants for
+  // `speakerId != null`, while the speaker was told the invite was invalid.
+  const db = makeSpeakersDb(world());
+  const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
+
+  let cancelled = false;
+  const racingDb = {
+    ...db,
+    async runTransaction(fn) {
+      // Fire the cancel once, after the acceptance transaction has read but
+      // before it commits; the second attempt (Firestore retries an aborted
+      // transaction) then sees the cancelled state.
+      if (!cancelled) {
+        cancelled = true;
+        await applyCancelInvite({ db, speakerId: 'rae', actor: ACTOR, now: () => T0 + 5 });
+      }
+      return db.runTransaction(fn);
+    },
+  };
+
+  const result = await acceptWith({
+    db: racingDb, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'invite-invalid');
+  // The critical assertion: the pair did NOT move.
+  assert.equal(db.read('users', 'u1').speakerId, null);
+  assert.equal(db.read('speakers', 'rae').uid, null);
+  assert.equal(db.read('speakers', 'rae').status, 'draft');
 });
 
 /* --- listing ---------------------------------------------------------- */
@@ -399,6 +486,28 @@ test('the invite listing never returns the token digest', async () => {
   assert.equal(rows[0].inviteType, 'panelist');
   assert.equal(JSON.stringify(rows[0]).includes(hashInviteToken(minted.token)), false);
   assert.equal(JSON.stringify(rows[0]).includes(minted.token), false);
+});
+
+test('the listing orders and caps in the QUERY, not after it', async () => {
+  const db = makeSpeakersDb(world());
+  // Six invitations for one speaker, oldest first.
+  let at = T0;
+  await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: () => at });
+  for (let i = 0; i < 4; i += 1) {
+    at += 2 * internals.SEND_LIMIT_WINDOW_MS;
+    await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'resend', actor: ACTOR, now: () => at });
+  }
+  assert.equal(db.ids(SPEAKER_INVITES).length, 5);
+
+  const rows = await listInvites({ db, limit: 2 });
+  assert.equal(rows.length, 2);
+  // Newest first, and the cap was applied by the query — `speaker_invites`
+  // is append-only for the life of an event, so a collection read plus a
+  // client-side slice would bill the whole history to render one screen.
+  assert.equal(rows[0].createdAt > rows[1].createdAt, true);
+  assert.equal(rows[0].status, 'pending');
+  const lastRead = db.reads[db.reads.length - 1];
+  assert.equal(String(lastRead).startsWith(SPEAKER_INVITES), true);
 });
 
 test('the listing filters by speaker', async () => {
@@ -473,17 +582,51 @@ test('a provider failure leaves the invitation recorded, undelivered, and says s
   assert.equal(onlyInvite(db).data.sentAt, null);
 });
 
-test('resend passes an admin-resend onceKey so the original claim cannot suppress it', async () => {
+test('resend keys its send-once claim on the minted token, not on the minute', async () => {
   const db = makeSpeakersDb(world());
+  // A frozen clock is the point: under a per-minute key these two resends
+  // would claim the same key, the email core would answer skipped, and the
+  // second (only valid) token would be stamped delivered without a mail
+  // ever carrying it — leaving the speaker with a dead link.
   const { sent, deps: d } = deps(db);
   await createSendSpeakerInviteHandler(d)(adminReq({ speakerId: 'rae' }), fakeRes());
+  await createResendSpeakerInviteHandler(d)(adminReq({ speakerId: 'rae' }), fakeRes());
   const res = fakeRes();
   await createResendSpeakerInviteHandler(d)(adminReq({ speakerId: 'rae' }), res);
 
   assert.equal(res.statusCode, 200);
-  assert.equal(sent.length, 2);
-  assert.notEqual(sent[0].onceKey, sent[1].onceKey);
-  assert.match(sent[1].onceKey, /^speaker-invite:resend:admin-1:/);
+  assert.equal(sent.length, 3);
+  assert.equal(new Set(sent.map((m) => m.onceKey)).size, 3, 'two sends shared a send-once key');
+  for (const message of sent.slice(1)) {
+    assert.match(message.onceKey, /^speaker-invite:resend:[0-9a-f]{64}$/);
+  }
+  // Each mail carries the token whose digest keys it.
+  for (const message of sent) {
+    const token = message.text.match(/token=([0-9a-f]{64})/)[1];
+    assert.equal(message.onceKey.endsWith(hashInviteToken(token)), true);
+  }
+  // And the live token is the last one mailed.
+  const lastToken = sent[2].text.match(/token=([0-9a-f]{64})/)[1];
+  assert.equal(db.read('speakers', 'rae').inviteToken, hashInviteToken(lastToken));
+});
+
+test('two speakers invited in the same minute by one admin both get mail', async () => {
+  const db = makeSpeakersDb(world({
+    'speakers/sam': { firstName: 'Sam', lastName: 'Other', email: 'sam@example.org', status: 'invited', inviteToken: null },
+  }));
+  // Seeded `invited` with no token so the resend path applies to both.
+  await db.collection('speakers').doc('sam').set({ status: 'draft' }, { merge: true });
+  const { sent, deps: d } = deps(db);
+  await createSendSpeakerInviteHandler(d)(adminReq({ speakerId: 'rae' }), fakeRes());
+  await createSendSpeakerInviteHandler(d)(adminReq({ speakerId: 'sam' }), fakeRes());
+  await createResendSpeakerInviteHandler(d)(adminReq({ speakerId: 'rae' }), fakeRes());
+  await createResendSpeakerInviteHandler(d)(adminReq({ speakerId: 'sam' }), fakeRes());
+
+  assert.equal(sent.length, 4);
+  assert.equal(new Set(sent.map((m) => m.onceKey)).size, 4);
+  assert.deepEqual(sent.map((m) => m.to), [
+    'rae@example.org', 'sam@example.org', 'rae@example.org', 'sam@example.org',
+  ]);
 });
 
 test('the rate-limited resend answers 429 with a Retry-After', async () => {
@@ -557,12 +700,35 @@ test('a successful acceptance mails speaker.accepted with the §3.1 onceKey', as
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, 'accepted');
-  assert.equal(res.body.emailMismatch, false);
   const confirmation = sent.find((m) => m.tag === 'speaker.accepted');
   assert.notEqual(confirmation, undefined);
   assert.equal(confirmation.onceKey, 'speaker-accepted:rae');
   assert.equal(confirmation.storeRendered, true);
   assert.equal(confirmation.html.includes('https://summit.example.org/profile'), true);
+  // The CTA is the ATTENDEE profile until the speaker wizard lands
+  // (issue #22), so the copy must not promise speaker-profile editing.
+  assert.equal(/complete your speaker profile/i.test(confirmation.text), false);
+  assert.match(confirmation.text, /account details/i);
+});
+
+test('the accept handler answers a mismatch with the masked invited address', async () => {
+  const db = makeSpeakersDb(world());
+  const { sent, deps: d } = deps(db);
+  const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
+
+  const res = fakeRes();
+  await createAcceptSpeakerInviteHandler({
+    ...d,
+    auth: { verifyIdToken: async () => ({ uid: 'u1', email: 'someone.else@example.net', email_verified: true }) },
+  })({ method: 'POST', body: { token: minted.token }, headers: { authorization: 'Bearer t' } }, res);
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.code, 'email-mismatch');
+  assert.equal(res.body.error.invitedEmailMasked, 'r**@example.org');
+  assert.equal(JSON.stringify(res.body).includes('rae@example.org'), false);
+  // No confirmation mail for a refused acceptance.
+  assert.equal(sent.some((m) => m.tag === 'speaker.accepted'), false);
+  assert.equal(db.read('users', 'u1').speakerId, null);
 });
 
 test('an acceptance whose confirmation mail fails is still an acceptance', async () => {
@@ -595,4 +761,54 @@ test('listSpeakerInvites answers admins with rows and rejects a bad filter', asy
   const bad = fakeRes();
   await createListSpeakerInvitesHandler(d)(adminReq({ speakerId: 'a/b' }), bad);
   assert.equal(bad.statusCode, 400);
+});
+
+test('the endpoints that never send mail work without an email provider', async () => {
+  // Deploy shape, asserted through the handler factories: cancel, list, and
+  // validate are constructed with NO sendEmail at all. Building an email
+  // provider for them would make a provider-configuration problem
+  // (unset EVENT_EMAIL_PROVIDER, unbound adapter secrets — both throw at
+  // construction) a 500 on endpoints that never needed one, including the
+  // public endpoint a speaker's accept page calls first.
+  const db = makeSpeakersDb(world());
+  await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
+  const { deps: full } = deps(db);
+  const mailless = { ...full };
+  delete mailless.sendEmail;
+
+  const cancelled = fakeRes();
+  await createCancelSpeakerInviteHandler(mailless)(adminReq({ speakerId: 'rae' }), cancelled);
+  assert.equal(cancelled.statusCode, 200);
+
+  const listed = fakeRes();
+  await createListSpeakerInvitesHandler(mailless)(adminReq({}), listed);
+  assert.equal(listed.statusCode, 200);
+
+  const validated = fakeRes();
+  await createValidateSpeakerInviteHandler(mailless)({ method: 'POST', body: { token: 'f'.repeat(64) } }, validated);
+  assert.equal(validated.statusCode, 200);
+});
+
+test('the deployable definitions bind send secrets only to the mail-sending endpoints', () => {
+  // The other half of the same guarantee: a secret bound to an endpoint is
+  // a secret that endpoint's deployment requires.
+  const previous = process.env.EVENT_EMAIL_PROVIDER;
+  process.env.EVENT_EMAIL_PROVIDER = 'postmark';
+  try {
+    const { handlers } = require('./invites.cjs');
+    const secretsOf = (fn) =>
+      (Object.getOwnPropertyDescriptor(fn, '__endpoint')?.value?.secretEnvironmentVariables ?? [])
+        .map((s) => s.key)
+        .sort();
+
+    assert.deepEqual(secretsOf(handlers.cancelSpeakerInvite), []);
+    assert.deepEqual(secretsOf(handlers.listSpeakerInvites), []);
+    assert.deepEqual(secretsOf(handlers.validateSpeakerInvite), []);
+    assert.equal(secretsOf(handlers.sendSpeakerInvite).length > 0, true);
+    assert.equal(secretsOf(handlers.resendSpeakerInvite).length > 0, true);
+    assert.equal(secretsOf(handlers.acceptSpeakerInvite).length > 0, true);
+  } finally {
+    if (previous === undefined) delete process.env.EVENT_EMAIL_PROVIDER;
+    else process.env.EVENT_EMAIL_PROVIDER = previous;
+  }
 });

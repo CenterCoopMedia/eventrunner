@@ -117,29 +117,52 @@ function makeSpeakersDb(seed = {}) {
     };
   }
 
-  function runQuery(col, filters, limitN) {
-    const rows = [...colMap(col).entries()]
-      .filter(([, data]) => filters.every((f) => matches(data, f)))
-      .map(([id]) => snapshot(col, id));
-    const docs = typeof limitN === 'number' ? rows.slice(0, limitN) : rows;
+  /** Comparable value for orderBy: Dates by time, everything else as-is. */
+  function sortValue(v) {
+    return v instanceof Date ? v.getTime() : v;
+  }
+
+  function runQuery(col, filters, limitN, order) {
+    let rows = [...colMap(col).entries()]
+      .filter(([, data]) => filters.every((f) => matches(data, f)));
+    if (order) {
+      // Rows missing the ordered field are DROPPED, as Firestore drops
+      // documents without the field an orderBy names — a listing test must
+      // not pass against a fake that is more forgiving than the store.
+      rows = rows
+        .filter(([, data]) => data?.[order.field] !== undefined && data?.[order.field] !== null)
+        .sort(([, a], [, b]) => {
+          const left = sortValue(a[order.field]);
+          const right = sortValue(b[order.field]);
+          if (left === right) return 0;
+          const ascending = left < right ? -1 : 1;
+          return order.direction === 'desc' ? -ascending : ascending;
+        });
+    }
+    const snaps = rows.map(([id]) => snapshot(col, id));
+    const docs = typeof limitN === 'number' ? snaps.slice(0, limitN) : snaps;
     return { docs, size: docs.length, empty: docs.length === 0 };
   }
 
-  function query(col, filters, limitN) {
+  function query(col, filters, limitN, order = null) {
     return {
       _kind: 'query',
       _col: col,
       _filters: filters,
       _limit: limitN,
+      _order: order,
       where(field, op, value) {
-        return query(col, [...filters, { field, op, value }], limitN);
+        return query(col, [...filters, { field, op, value }], limitN, order);
       },
       limit(n) {
-        return query(col, filters, n);
+        return query(col, filters, n, order);
+      },
+      orderBy(field, direction = 'asc') {
+        return query(col, filters, limitN, { field, direction });
       },
       async get() {
         reads.push(`${col}?${filters.map((f) => `${f.field}${f.op}${f.value}`).join('&')}`);
-        return runQuery(col, filters, limitN);
+        return runQuery(col, filters, limitN, order);
       },
     };
   }
@@ -154,8 +177,10 @@ function makeSpeakersDb(seed = {}) {
         // An omitted id mirrors the Admin SDK's auto-id (admin_logs rows).
         doc: (id) => docRef(name, id === undefined ? randomBytes(10).toString('hex') : id),
         where: (field, op, value) => query(name, [{ field, op, value }], undefined),
-        // Unfiltered collection read — listSpeakerInvites with no speakerId
-        // filter (functions/src/speakers/invites.cjs) is the one caller.
+        // Unfiltered collection reads — listSpeakerInvites with no speakerId
+        // filter (functions/src/speakers/invites.cjs) orders and limits at
+        // the collection level.
+        orderBy: (field, direction) => query(name, [], undefined).orderBy(field, direction),
         get: () => query(name, [], undefined).get(),
       };
     },

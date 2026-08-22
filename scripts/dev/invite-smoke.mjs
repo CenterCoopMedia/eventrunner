@@ -16,10 +16,12 @@
  *
  *   admin creates a speaker → admin sends the invitation → the email is
  *   captured → the link validates before anybody signs in → an
- *   unauthenticated acceptance is refused → the speaker accepts and
- *   users.speakerId ↔ speakers.uid are linked while the token is burned →
- *   the used link no longer validates → admin approves → speakers_public
- *   appears carrying no pipeline fields.
+ *   unauthenticated acceptance is refused → an account at a DIFFERENT
+ *   address is refused (the invited address is an authorization boundary)
+ *   → the invited speaker accepts and users.speakerId ↔ speakers.uid are
+ *   linked while the token is burned → the used link no longer validates,
+ *   though the accepting account's own replay stays idempotent → admin
+ *   approves → speakers_public appears carrying no pipeline fields.
  *
  * Prerequisites (all credential-free / demo-project):
  *   firebase emulators:start --only functions,firestore,auth \
@@ -123,18 +125,78 @@ async function ensureUser(email) {
 }
 
 /**
- * Wait for the invitation URL to appear in the emulator log. The console
- * email provider prints the rendered body, so this is the speaker's inbox.
+ * Wait for something the console email provider printed into the emulator
+ * log. That log IS the recipient's inbox for this run: both the invitation
+ * token and the sign-in code exist nowhere else server-side (one is stored
+ * as a SHA-256 digest, the other as a scrypt hash), so reading the mail is
+ * the only way to obtain either — exactly as a speaker does.
  */
-async function waitForInviteUrl(since, deadline) {
-  const re = /\/speaker\/accept\?token=([0-9a-f]{64})/g;
+async function waitForMailMatch(re, since, deadline) {
   while (Date.now() < deadline) {
-    const log = fs.existsSync(args.emulatorLog) ? fs.readFileSync(args.emulatorLog, 'utf8') : '';
-    const matches = [...log.slice(since).matchAll(re)];
+    // Sliced as BYTES, then decoded: `since` comes from statSync, and the
+    // mail bodies contain multibyte characters (the em dash in the OTP
+    // copy), so slicing the decoded string by a byte offset would read
+    // mail from an earlier run back into the window.
+    const buffer = fs.existsSync(args.emulatorLog) ? fs.readFileSync(args.emulatorLog) : Buffer.alloc(0);
+    const log = buffer.subarray(since).toString('utf8');
+    const matches = [...log.matchAll(re)];
     if (matches.length > 0) return matches[matches.length - 1][1];
     await sleep(300);
   }
   return null;
+}
+
+const waitForInviteUrl = (since, deadline) =>
+  waitForMailMatch(/\/speaker\/accept\?token=([0-9a-f]{64})/g, since, deadline);
+
+/**
+ * Sign in through the REAL emailed-code flow (functions/src/auth/otp.cjs),
+ * at `email`, and return the resulting ID token.
+ *
+ * This is the load-bearing half of the invited-address rule: acceptance
+ * requires a verified account AT the invited address, and this is the path
+ * that produces one for a speaker who has no account yet. If OTP sign-in
+ * ever stopped yielding a verified address, match-required would lock every
+ * invite-first speaker out — so the smoke proves the two together rather
+ * than assuming they agree.
+ */
+async function signInWithEmailedCode(email, deadline) {
+  const logSize = fs.existsSync(args.emulatorLog) ? fs.statSync(args.emulatorLog).size : 0;
+  const requested = await call('sendOtpCode', { email });
+  if (requested.status !== 200) fail(`sendOtpCode answered ${requested.status}`);
+
+  // Read out of the PLAIN-TEXT body specifically, where the code stands on
+  // its own line. Anything looser picks up a six-digit lookalike from the
+  // HTML alternative — `color:#333333` is the one that bites — and reports
+  // it as a wrong-code failure that has nothing to do with the code.
+  const code = await waitForMailMatch(
+    /"text":\s*"Here is your sign-in code[^"]{0,120}?\\n\\n(\d{6})\\n/g,
+    logSize,
+    deadline,
+  );
+  if (!code) fail('the sign-in code never appeared in the captured mail');
+
+  const verified = await call('verifyOtpCode', {
+    challengeId: requested.body.challengeId,
+    email,
+    code,
+  });
+  if (verified.status !== 200) fail(`verifyOtpCode answered ${verified.status}: ${JSON.stringify(verified.body)}`);
+
+  const exchanged = await fetch(
+    `http://${args.authHost}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake-api-key`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: verified.body.token, returnSecureToken: true }),
+    },
+  );
+  const payload = await exchanged.json();
+  if (!payload.idToken) fail(`custom-token exchange failed: ${JSON.stringify(payload)}`);
+  // The custom-token exchange does not always return `localId`; the uid is
+  // in the ID token itself, which is what the server reads anyway.
+  const claims = JSON.parse(Buffer.from(payload.idToken.split('.')[1], 'base64url').toString('utf8'));
+  return { idToken: payload.idToken, uid: claims.user_id || claims.sub, claims };
 }
 
 async function main() {
@@ -156,30 +218,10 @@ async function main() {
   );
 
   const adminUid = await ensureUser(ADMIN_EMAIL);
-  const speakerUid = await ensureUser(SPEAKER_EMAIL);
   const adminToken = await idTokenFor(adminUid);
-  const speakerToken = await idTokenFor(speakerUid);
-
-  // The account document is seeded by the auth onCreate trigger
-  // (users/lifecycle.cjs), which the emulator fires for real — so this waits
-  // for it rather than writing it, which is also what makes the acceptance
-  // below a genuine test of the pair write against a trigger-seeded account.
-  //
-  // The other branch — acceptance racing ahead of that trigger, which
-  // lifecycle.cjs answers with the retriable 409 `link-target-missing` — is
-  // NOT reproducible here: the trigger wins long before an operator can
-  // click, and forcing it by deleting the document just races the trigger
-  // again. It is covered by unit tests instead
-  // (functions/src/speakers/invites.test.cjs).
-  const accountDeadline = deadline();
-  while (Date.now() < accountDeadline) {
-    if ((await db.collection('users').doc(speakerUid).get()).exists) break;
-    await sleep(300);
-  }
-  check(
-    (await db.collection('users').doc(speakerUid).get()).exists,
-    'the auth trigger seeded the speaker account document',
-  );
+  // The speaker deliberately has NO account yet: invite-first is the flow
+  // §4.3 is built around, and it is the case the invited-address rule has
+  // to keep working for. They get one below, through the emailed code.
 
   console.log('admin creates a draft speaker');
   const created = await call(
@@ -218,8 +260,56 @@ async function main() {
   const anonymous = await call('acceptSpeakerInvite', { token });
   check(anonymous.status === 401, `acceptance without a signed-in account is 401 (${anonymous.status})`);
 
-  console.log('the speaker accepts');
-  const accepted = await call('acceptSpeakerInvite', { token }, speakerToken);
+  console.log('an account at another address cannot claim the invitation');
+  // The invited address is an authorization boundary: the token grants
+  // attendee access and speaker access to embargoed materials, and invite
+  // URLs travel. A signed-in stranger holding the link must get nowhere.
+  const strangerUid = await ensureUser(`invite-smoke-stranger-${Date.now()}@example.test`);
+  const strangerToken = await idTokenFor(strangerUid);
+  const stranger = await call('acceptSpeakerInvite', { token }, strangerToken);
+  check(
+    stranger.status === 403 && stranger.body?.error?.code === 'email-mismatch',
+    `a different address is refused with email-mismatch (${stranger.status}: ${JSON.stringify(stranger.body)})`,
+  );
+  check(
+    typeof stranger.body?.error?.invitedEmailMasked === 'string' &&
+      !stranger.body.error.invitedEmailMasked.includes(SPEAKER_EMAIL),
+    'the refusal names the invited inbox, masked',
+  );
+  const afterStranger = (await db.collection('speakers').doc(SPEAKER_ID).get()).data();
+  check(afterStranger.uid == null, 'the refused attempt linked nothing');
+  check(afterStranger.status === 'invited', 'the invitation is still outstanding');
+  check(
+    (await db.collection('users').doc(strangerUid).get()).data()?.speakerId == null,
+    'the stranger account holds no speaker id',
+  );
+
+  console.log('the speaker signs in with the emailed code, at the invited address');
+  const { idToken: speakerToken, uid: speakerUid, claims } = await signInWithEmailedCode(
+    SPEAKER_EMAIL,
+    deadline(),
+  );
+  check(Boolean(speakerUid), 'the emailed code produced an account at the invited address');
+  // The load-bearing property: acceptance requires a VERIFIED address, and
+  // this is where an invite-first speaker's verified address comes from.
+  check(claims.email === SPEAKER_EMAIL, 'the session is at the invited address');
+  check(claims.email_verified === true, 'and that address is verified by the code they proved they received');
+
+  console.log('the invited speaker accepts');
+  // The account document is seeded by the auth onCreate trigger
+  // (users/lifecycle.cjs) moments after the sign-in above, so the first
+  // attempt may genuinely land ahead of it — which is the retriable 409
+  // `link-target-missing` that lifecycle.cjs returns and the accept page
+  // retries. Retrying here exercises that branch for real instead of
+  // asserting it cannot happen.
+  let accepted;
+  const acceptDeadline = deadline();
+  do {
+    accepted = await call('acceptSpeakerInvite', { token }, speakerToken);
+    if (accepted.body?.error?.code !== 'account-not-ready') break;
+    console.log('  ..  account not seeded yet; retrying, as the page does');
+    await sleep(300);
+  } while (Date.now() < acceptDeadline);
   check(accepted.status === 200, `acceptSpeakerInvite answered 200 (${accepted.status}: ${JSON.stringify(accepted.body)})`);
   check(accepted.body?.status === 'accepted', 'the response reports the accepted status');
 
@@ -230,11 +320,19 @@ async function main() {
   check(afterAccept.status === 'accepted', 'the speaker is accepted');
   check(afterAccept.inviteToken === null, 'the token is burned');
 
-  console.log('the used link is single-use');
+  console.log('the used link is single-use, but a lost response is not');
   const reused = await call('validateSpeakerInvite', { token });
   check(reused.body?.valid === false, 'the same link no longer validates');
-  const reaccepted = await call('acceptSpeakerInvite', { token }, speakerToken);
-  check(reaccepted.status !== 200, `re-accepting is refused (${reaccepted.status})`);
+  // The SAME account replaying its own acceptance — a dropped response, a
+  // double-click — gets the original success back rather than "not valid".
+  const replayed = await call('acceptSpeakerInvite', { token }, speakerToken);
+  check(
+    replayed.status === 200 && replayed.body?.status === 'accepted',
+    `the accepting account's replay is idempotent (${replayed.status})`,
+  );
+  const otherUid = await ensureUser(`invite-smoke-other-${Date.now()}@example.test`);
+  const reaccepted = await call('acceptSpeakerInvite', { token }, await idTokenFor(otherUid));
+  check(reaccepted.status !== 200, `a consumed token gets nobody else in (${reaccepted.status})`);
 
   console.log('admin approves, and the public projection appears');
   const approved = await call('updateSpeaker', { speakerId: SPEAKER_ID, speaker: { status: 'approved' } }, adminToken);

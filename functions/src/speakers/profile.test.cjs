@@ -361,3 +361,88 @@ test('updating a missing speaker answers 404 through the handler', async () => {
   );
   assert.equal(res.statusCode, 404);
 });
+
+// --- invitation invalidation on admin edits (issue #21) -------------------
+
+const { SPEAKER_INVITES, hashInviteToken } = require('./inviteTokens.cjs');
+
+/** A speaker with one outstanding invitation, seeded directly. */
+function invitedWorld(token = 'tok-1', email = 'rae@example.org') {
+  const hash = hashInviteToken(token);
+  return {
+    world: {
+      'speakers/rae': {
+        firstName: 'Rae',
+        lastName: 'Okonkwo',
+        slug: 'rae-okonkwo',
+        email,
+        status: 'invited',
+        uid: null,
+        inviteToken: hash,
+      },
+      [`${SPEAKER_INVITES}/${hash}`]: { speakerId: 'rae', email, status: 'pending' },
+    },
+    hash,
+  };
+}
+
+test('changing an invited speaker’s email kills the token mailed to the old address', async () => {
+  // Acceptance authorizes against the address stored on the speaker, so an
+  // outstanding token left live after a re-point would hand the OLD
+  // recipient a working credential for the new one.
+  const { world, hash } = invitedWorld();
+  const db = makeSpeakersDb(world);
+
+  const result = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { email: 'new@example.org' }, actor: ACTOR, now: NOW,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 'rae').inviteToken, null);
+  assert.equal(db.read('speakers', 'rae').email, 'new@example.org');
+  // Back to the state §4.3 defines as "a record that has not been invited",
+  // which is what the admin list reads to offer Invite again.
+  assert.equal(db.read('speakers', 'rae').status, 'draft');
+  assert.equal(db.read(SPEAKER_INVITES, hash).status, 'superseded');
+});
+
+test('a same-address save leaves an outstanding invitation alone', async () => {
+  const { world, hash } = invitedWorld();
+  const db = makeSpeakersDb(world);
+
+  const result = await applyUpdateSpeaker({
+    // The same address in different case, plus an unrelated edit: retyping
+    // an address identically must not cost the speaker their live link.
+    db, speakerId: 'rae', payload: { email: 'RAE@example.org', bio: 'Reporter.' }, actor: ACTOR, now: NOW,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 'rae').status, 'invited');
+  assert.equal(db.read('speakers', 'rae').inviteToken, hash);
+  assert.equal(db.read(SPEAKER_INVITES, hash).status, 'pending');
+});
+
+test('an edit that leaves `invited` by status still kills the token', async () => {
+  const { world, hash } = invitedWorld();
+  const db = makeSpeakersDb(world);
+
+  await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { status: 'removed' }, actor: ACTOR, now: NOW,
+  });
+
+  assert.equal(db.read('speakers', 'rae').status, 'removed');
+  assert.equal(db.read('speakers', 'rae').inviteToken, null);
+  assert.equal(db.read(SPEAKER_INVITES, hash).status, 'superseded');
+});
+
+test('an email edit on a speaker with no invitation changes no invite row', async () => {
+  const db = makeSpeakersDb({
+    'speakers/rae': { firstName: 'Rae', lastName: 'O', slug: 'rae-o', email: 'a@example.org', status: 'draft', inviteToken: null },
+  });
+  const result = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { email: 'b@example.org' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 'rae').status, 'draft');
+  assert.deepEqual(db.ids(SPEAKER_INVITES), []);
+});

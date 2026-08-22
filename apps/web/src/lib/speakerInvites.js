@@ -20,11 +20,15 @@ import { appCheckHeaders } from '../firebase.js';
  * 'invite-invalid', …) plus 'network' for a fetch that never landed.
  */
 export class SpeakerInviteError extends Error {
-  constructor({ code, message, status }) {
+  constructor({ code, message, status, invitedEmailMasked = null }) {
     super(message);
     this.name = 'SpeakerInviteError';
     this.code = code;
     this.status = status;
+    // Only `email-mismatch` carries it: the masked address the invitation
+    // went to, so the page can name the inbox to sign in from without
+    // printing the address into a page opened from a travelling link.
+    this.invitedEmailMasked = invitedEmailMasked;
   }
 }
 
@@ -67,6 +71,8 @@ async function post(name, body, { idToken = null } = {}) {
         typeof error.message === 'string' && error.message
           ? error.message
           : 'Something went wrong. Try again.',
+      invitedEmailMasked:
+        typeof error.invitedEmailMasked === 'string' ? error.invitedEmailMasked : null,
     });
   }
   return payload ?? {};

@@ -99,7 +99,7 @@ describe('checking the link', () => {
     await screen.findByText(/Rae Okonkwo, you are invited/);
     expect(screen.getByText(/panelist/)).toBeInTheDocument();
     // Masked, never the full address (the link may have travelled).
-    expect(screen.getByText(/r\*\*@example\.org/)).toBeInTheDocument();
+    expect(screen.getAllByText(/r\*\*@example\.org/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/rae@example\.org/)).not.toBeInTheDocument();
 
     const [, options] = globalThis.fetch.mock.calls[0];
@@ -162,7 +162,6 @@ describe('accepting', () => {
         speakerId: 'rae-okonkwo',
         speakerName: 'Rae Okonkwo',
         status: 'accepted',
-        emailMismatch: false,
       }),
     });
     renderAccept();
@@ -170,7 +169,7 @@ describe('accepting', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Accept the invitation' }));
 
     await screen.findByText('You are confirmed');
-    expect(screen.getByRole('link', { name: 'Complete your speaker profile' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Check your account details' })).toHaveAttribute(
       'href',
       '/profile',
     );
@@ -182,20 +181,55 @@ describe('accepting', () => {
     expect(acceptCall[1].headers.Authorization).toBe('Bearer id-token');
   });
 
-  it('tells the speaker when the address that accepted is not the invited one', async () => {
+  it('turns an address mismatch into the instruction that resolves it', async () => {
+    // The server refuses to link an account at any address other than the
+    // invited one, so a retry button could never succeed here — the page
+    // has to send the speaker to the right inbox instead.
     routeFetch({
       validate: jsonResponse(200, VALID_INVITE),
-      accept: jsonResponse(200, {
-        speakerId: 'rae-okonkwo',
-        speakerName: 'Rae Okonkwo',
-        status: 'accepted',
-        emailMismatch: true,
+      accept: jsonResponse(403, {
+        error: {
+          code: 'email-mismatch',
+          message:
+            'This invitation was sent to a different email address than the account you are signed in with.',
+          invitedEmailMasked: 'r**@example.org',
+        },
       }),
     });
     renderAccept();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Accept the invitation' }));
-    await screen.findByText(/sent the invitation to a different address/);
+
+    await screen.findByRole('alert');
+    expect(
+      await screen.findByRole('button', { name: 'Sign in with the invited address' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/r\*\*@example\.org/).length).toBeGreaterThan(0);
+    // No retry affordance that cannot work.
+    expect(screen.queryByRole('button', { name: 'Accept the invitation' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with the invited address' }));
+    expect(signOutMock).toHaveBeenCalled();
+  });
+
+  it('does not promise speaker-profile editing the CTA cannot deliver yet', async () => {
+    // /profile is the attendee record until the speaker wizard lands
+    // (issue #22); the confirmation must not say otherwise.
+    routeFetch({
+      validate: jsonResponse(200, VALID_INVITE),
+      accept: jsonResponse(200, { speakerId: 'rae-okonkwo', speakerName: 'Rae Okonkwo', status: 'accepted' }),
+    });
+    renderAccept();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Accept the invitation' }));
+    await screen.findByText('You are confirmed');
+    expect(
+      screen.queryByRole('link', { name: 'Complete your speaker profile' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Check your account details' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
   });
 
   it('surfaces link-occupied verbatim and offers the account switch that fixes it', async () => {
