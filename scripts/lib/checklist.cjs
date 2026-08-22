@@ -34,8 +34,12 @@ function manualChecklist(ctx = {}) {
         `domain${ctx.hostingSite ? ` (${ctx.hostingSite}.web.app)` : ''}. Sign-in fails on any domain not listed.`,
     },
     {
-      title: 'Firebase Hosting → add the custom domain',
-      detail: 'Complete DNS verification and wait for certificate issuance before announcing the site.',
+      title: `Firebase Hosting → add the custom domain${ctx.publicUrl ? ` (${ctx.publicUrl})` : ''}`,
+      detail:
+        'Complete DNS verification (TXT record) and wait for certificate issuance before announcing the ' +
+        'site — both can take from minutes to about 24 hours; check the readiness table again before ' +
+        'go-live rather than assuming it finished. See docs/DEPLOY_RUNBOOK.md for the wildcard-vs-per-client ' +
+        'DNS tradeoff (issue #66).',
     },
     {
       title: `Email provider → verify ${senderDomain}`,

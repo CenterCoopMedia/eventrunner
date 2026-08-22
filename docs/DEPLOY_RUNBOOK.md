@@ -381,3 +381,84 @@ client already past step 3 never needs it again.
 There is no key to rotate. To revoke a client's deploy access, remove the IAM policy binding from
 §2 (`gcloud iam service-accounts remove-iam-policy-binding`) or delete the GitHub Environment; both
 take effect on the next run, immediately.
+
+## 8. Rolling back a bad deploy
+
+`deploy-client.yml` deploys hosting, functions, rules/indexes, and content on every run — a bad
+deploy is rarely just one of those. Roll back the piece that's actually broken; rolling back
+everything when only one component regressed reintroduces whatever the other components' good
+deploys fixed.
+
+### Hosting
+
+Firebase Hosting keeps prior releases. Fastest path is the Firebase Console — Hosting → the site →
+release history → **Rollback** on the last-known-good release; it's a Console action against
+`EVENT_HOSTING_SITE`, not a re-run of CI. From the CLI, with the same credentials an operator uses
+for one-off scripts (not the deploy service account — this is a manual, watched action):
+
+```sh
+firebase hosting:clone <SITE_ID>:<GOOD_RELEASE_ID> <SITE_ID>:live --project <GCP_PROJECT_ID>
+```
+
+Find `<GOOD_RELEASE_ID>` from `firebase hosting:releases:list` or the Console's release history.
+This affects the served static bundle only — it does not touch functions, rules, or content.
+
+### Functions
+
+There is no one-click functions rollback the way Hosting has one; the fix is to redeploy the prior
+good ref. Dispatch `deploy.yml` (`workflow_dispatch`, `client: <CLIENT_ENV>`) **from `main` at the
+last-known-good commit** — either revert forward on `main` and dispatch normally, or, if you need
+the exact prior artifact right now, `git checkout <good-sha>` and dispatch the deploy workflow with
+that ref (`gh workflow run deploy.yml --ref <good-sha> -f client=<CLIENT_ENV>`). Recall §1–2: the
+WIF binding only authorizes `refs/heads/main`, so a dispatch against an arbitrary SHA or tag that
+isn't reachable from `main`'s current HEAD, or isn't itself on `refs/heads/main`, fails at the
+token-exchange step — this is a control, not a bug, and it means the practical rollback path is
+"revert on `main`," not "dispatch an old tag directly." Read §5's step ordering again if this is a
+fresh-enough project that `bootstrap` semantics could matter.
+
+### Firestore rules and indexes
+
+`provision` deploys `firestore:rules`, `firestore:indexes`, and `storage` on every run (§5) — a
+rules regression rolls back the same way functions do: revert on `main`, redeploy. Two things that
+don't roll back cleanly:
+
+- **A tightened rule that already blocked a write nobody needed** rolls back fine — nothing was
+  lost by the tightening.
+- **An index removed or narrowed** takes real time to rebuild once restored — Firestore composite
+  index builds are not instant, and any query depending on the removed index fails (not degrades)
+  until the rebuild finishes. Budget for that gap; it is not the same shape of "instant" as a
+  Hosting rollback.
+
+### Content snapshot implications
+
+`content` (`generate-content.cjs`) regenerates `apps/web/src/generated/*` from live Firestore at
+deploy time — rolling back **hosting** alone serves the *previous build's* generated snapshot,
+which was correct for the config/content at that previous deploy's time, not for whatever's in
+Firestore now. If a client has edited and published content since the bad deploy, a hosting-only
+rollback can visibly regress their content even though nothing about their content itself broke.
+When content has moved since the deploy you're rolling back from, prefer rolling forward (fix and
+redeploy) over rolling back, or expect to re-publish the affected pages after the rollback.
+
+### When NOT to roll back
+
+**Schema-forward migrations.** A deploy that changed the *shape* of a `config/*` document, added a
+required field a running function now depends on, or changed what a Firestore trigger writes is not
+safely undone by redeploying old function code against the new data shape (or vice versa) — the two
+can disagree about what a document should look like, and that disagreement is a worse failure mode
+than the original bug. If the deploy you want to roll back included a migration, roll **forward**
+with a fix instead: write the small forward-fixing change, dispatch it, and treat the rollback
+tooling above as being for deploys that were *behaviorally* wrong, not ones that changed a data
+contract other code now depends on.
+
+### Custom domain and readiness notes
+
+A custom-domain rollback (attaching a different Hosting site, or reverting a
+`EVENT_PUBLIC_URL`/authorized-domains change) does not take effect immediately even after the
+Hosting/Auth Console steps are redone — DNS propagation and certificate issuance/reissuance can take
+from minutes to about a day (§0–3, and `docs/CLIENT_ONBOARDING.md` §3 item 3). Re-run
+`node scripts/init-event.cjs --check` after a domain change of any kind rather than assuming the
+readiness table is still accurate; the sender-domain and Auth rows in particular are
+operator-attested and do not re-verify themselves on a timer. See issue #66 for the fuller
+per-client-subdomain (`client.runofshow.net`) provisioning flow this repo will eventually build on
+top of this same Hosting custom-domain mechanism — wildcard-vs-per-client CNAME strategy and the
+Cloud Run site-publisher automation are out of scope here and tracked there, not in this runbook.
