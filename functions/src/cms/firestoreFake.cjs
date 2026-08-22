@@ -140,6 +140,11 @@ function makeFakeDb(seed = {}) {
 
   function query(col, filters, order, limitN, startAfterValue) {
     return {
+      // Marks this object as a Query for `tx.get()`, which accepts either a
+      // DocumentReference or a Query in the Admin SDK (the ticketing
+      // entitlement recomputation reads its ticket set inside the
+      // transaction that writes the account).
+      _kind: 'query',
       where(field, op, value) {
         if (op !== '==') throw new Error(`fake supports only '==', got ${op}`);
         return query(col, [...filters, { field, value }], order, limitN, startAfterValue);

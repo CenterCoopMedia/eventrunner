@@ -736,6 +736,96 @@ describe("users account documents (spec §3.4)", () => {
   });
 });
 
+// Registration state is server-owned (spec §3.4, issue #32). The state
+// machine lives in Cloud Functions — the claim path, the entitlement
+// recomputation trigger, and the admin approve/revoke endpoints — and these
+// are the pins that say a client cannot short-circuit any of it by writing
+// the two fields directly. The self-edit allowlist denies them by OMISSION
+// (firestore.rules editsOnlySelfProfileFields), which is exactly the kind of
+// rule a later edit could widen without noticing, so every value in the
+// vocabulary is pinned rather than one representative.
+describe("registration state stays server-owned (spec §3.4, issue #32)", () => {
+  it("denies a self-update to EVERY registrationStatus value", async () => {
+    // Each value is written to an account NOT already holding it: a write
+    // that changes nothing affects no keys and is a permitted no-op, so
+    // pinning `pending` on the pending account would pin nothing.
+    for (const [uid, status] of [
+      ["approved-1", "pending"],
+      ["pending-1", "ticketed"],
+      ["pending-1", "approved"],
+      ["pending-1", "revoked"],
+    ]) {
+      await assertFails(
+        updateDoc(doc(attendee(uid), `users/${uid}`), { registrationStatus: status }),
+      );
+    }
+  });
+
+  it("denies a self-update to EVERY approvalSource value", async () => {
+    // Both seeded accounts carry `approvalSource: null`, so the two values a
+    // client could gain anything by writing are the two pinned here.
+    for (const source of ["admin", "ticket"]) {
+      await assertFails(
+        updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+          approvalSource: source,
+        }),
+      );
+    }
+  });
+
+  it("denies smuggling either field alongside a legitimate profile edit", async () => {
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        bio: "A perfectly ordinary bio.",
+        registrationStatus: "approved",
+        approvalSource: "admin",
+      }),
+    );
+    // The same edit without the two server-owned keys is allowed, so the
+    // denial above is about those keys and not about the write shape.
+    await assertSucceeds(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        bio: "A perfectly ordinary bio.",
+      }),
+    );
+  });
+
+  it("denies a full-document set that would rewrite the registration fields", async () => {
+    await assertFails(
+      setDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        uid: "pending-1",
+        displayName: "pending-1",
+        profileVisibility: "attendees_only",
+        badges: [],
+        registrationStatus: "approved",
+        approvalSource: "admin",
+      }),
+    );
+  });
+
+  it("denies an ADMIN client writing registration state from the browser", async () => {
+    // The admin approve/revoke path is an endpoint (users/approval.cjs), not
+    // a client write: an admin's browser has no more write access to a
+    // registration field than an attendee's does.
+    await assertFails(
+      updateDoc(doc(admin(), "users/pending-1"), {
+        registrationStatus: "approved",
+        approvalSource: "admin",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(admin(), "users/pending-1"), { registrationStatus: "revoked" }),
+    );
+  });
+
+  it("denies revoking somebody else's access from another attendee's session", async () => {
+    await assertFails(
+      updateDoc(doc(attendee("approved-1"), "users/pending-1"), {
+        registrationStatus: "revoked",
+      }),
+    );
+  });
+});
 // The canonical speaker store and its one-way projection (spec §4.3,
 // issue #20). The property under test: everything that would let a client
 // break a reference outside the transaction that owns it is denied — and
