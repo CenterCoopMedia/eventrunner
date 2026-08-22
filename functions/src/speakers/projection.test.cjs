@@ -133,7 +133,21 @@ test('the tri-sync trigger set and the drift detector do not exist', () => {
   }
   assert.deepEqual(
     exports_.filter((name) => /speaker/i.test(name)).sort(),
-    ['createSpeaker', 'deleteSpeaker', 'onSpeakerWritten', 'updateSpeaker'],
+    [
+      // The invite pipeline (issue #21). Listed here on purpose: this
+      // assertion is the guard against a speaker export nobody reviewed,
+      // so adding one is meant to fail it until the name is written down.
+      'acceptSpeakerInvite',
+      'cancelSpeakerInvite',
+      'createSpeaker',
+      'deleteSpeaker',
+      'listSpeakerInvites',
+      'onSpeakerWritten',
+      'resendSpeakerInvite',
+      'sendSpeakerInvite',
+      'updateSpeaker',
+      'validateSpeakerInvite',
+    ],
   );
 });
 

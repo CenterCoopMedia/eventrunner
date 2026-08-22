@@ -63,8 +63,16 @@ test.beforeEach(() => resetTemplateCacheForTest());
 
 // --- registry -------------------------------------------------------------
 
-test('listTemplateIds returns the phase-2 defaults', () => {
-  assert.deepEqual(listTemplateIds().sort(), ['account.welcome', 'auth.otp', 'feedback.confirmation']);
+test('listTemplateIds returns the phase-2 defaults plus the phase-3 speaker pair', () => {
+  assert.deepEqual(listTemplateIds().sort(), [
+    'account.welcome',
+    'auth.otp',
+    'feedback.confirmation',
+    // §6.3 phase 3: tokenized WITH the invite pipeline, not after it —
+    // a non-CJS deployment cannot exercise the pipeline otherwise (issue #21).
+    'speaker.accepted',
+    'speaker.invite',
+  ]);
 });
 
 test('getDefaultTemplate returns modules for known ids, null otherwise', () => {
@@ -76,11 +84,28 @@ test('getDefaultTemplate returns modules for known ids, null otherwise', () => {
 test('storeRendered flags match the spec', () => {
   assert.equal(getDefaultTemplate('auth.otp').storeRendered, false);
   assert.equal(getDefaultTemplate('account.welcome').storeRendered, true);
+  // The invitation body carries a bearer token, so it gets auth.otp's
+  // treatment rather than account.welcome's (§3.1: never persist rendered
+  // content for auth mail). The acceptance confirmation carries none.
+  assert.equal(getDefaultTemplate('speaker.invite').storeRendered, false);
+  assert.equal(getDefaultTemplate('speaker.accepted').storeRendered, true);
 });
 
 test('required tokens match the spec', () => {
   assert.deepEqual(getDefaultTemplate('auth.otp').requiredTokens, ['code']);
   assert.deepEqual(getDefaultTemplate('account.welcome').requiredTokens, ['login_url']);
+  assert.deepEqual(getDefaultTemplate('speaker.invite').requiredTokens, ['invite_url']);
+  assert.deepEqual(getDefaultTemplate('speaker.accepted').requiredTokens, ['profile_wizard_url']);
+});
+
+test('an override that drops the invite link is refused at save time', () => {
+  const { validateOverridePayload } = require('./templates.cjs');
+  const check = validateOverridePayload('speaker.invite', {
+    html: '<p>Come and speak at {{event_name}}.</p>',
+    text: 'Come and speak at {{event_name}}.',
+  });
+  assert.equal(check.ok, false);
+  assert.equal(check.errors.some((e) => e.includes('{{invite_url}}')), true);
 });
 
 // --- shipped defaults are self-consistent ----------------------------------

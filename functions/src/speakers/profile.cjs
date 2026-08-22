@@ -250,6 +250,21 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
       const linked = removing ? await readLinkedUser({ tx, db, speaker: stored }) : null;
       if (removing) patch.uid = null;
 
+      // An admin status edit that moves a speaker OFF `invited` kills the
+      // outstanding invitation in this same commit (issue #21). Acceptance
+      // already refuses a speaker whose status is not `invited`, so the
+      // stale token was inert either way — but leaving it would keep a row
+      // reading `pending` in the admin invite list for an invitation nobody
+      // can act on, and a later re-invite would then show two live-looking
+      // invitations for one speaker. One commit moves both, the same
+      // discipline seam #3 applies to the account-link pair.
+      if (stored.status === 'invited' && patch.status !== undefined && patch.status !== 'invited') {
+        const { invalidateInviteInTx } = require('./inviteTokens.cjs');
+        Object.assign(patch, invalidateInviteInTx({
+          tx, db, speaker: stored, at, status: 'superseded', actorEmail: actor.email,
+        }));
+      }
+
       // approvedAt is server-owned and records the FIRST approval: stamped
       // only when there is none stored. A speaker who is removed and later
       // re-approved keeps their original date — the field is history, and

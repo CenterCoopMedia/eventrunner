@@ -154,6 +154,9 @@ function makeSpeakersDb(seed = {}) {
         // An omitted id mirrors the Admin SDK's auto-id (admin_logs rows).
         doc: (id) => docRef(name, id === undefined ? randomBytes(10).toString('hex') : id),
         where: (field, op, value) => query(name, [{ field, op, value }], undefined),
+        // Unfiltered collection read — listSpeakerInvites with no speakerId
+        // filter (functions/src/speakers/invites.cjs) is the one caller.
+        get: () => query(name, [], undefined).get(),
       };
     },
     async getAll(...refs) {

@@ -49,12 +49,13 @@ const SESSION_DRAFTS = 'cmsSchedule_drafts';
 const USERS = 'users';
 
 /**
- * Firestore's per-transaction write ceiling. The unlink spends up to three
- * writes on the speaker itself (user link, projection, record), so the
- * session budget is what is left.
+ * Firestore's per-transaction write ceiling. The unlink spends up to five
+ * writes on the speaker itself (user link, projection, record, slug
+ * reservation, outstanding invitation), so the session budget is what is
+ * left.
  */
 const MAX_TRANSACTION_WRITES = 500;
-const FIXED_WRITES = 3;
+const FIXED_WRITES = 5;
 const MAX_UNLINKED_SESSIONS = MAX_TRANSACTION_WRITES - FIXED_WRITES;
 
 /**
@@ -142,10 +143,18 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
         // halves go in this commit, which is exactly the seam-#3 rule: the
         // pair is written by the invite/acceptance transaction and by the
         // delete paths, never independently.
+        //
+        // It also kills any outstanding invitation (issue #21): a removed
+        // speaker must not leave a `pending` row in the admin invite list,
+        // and the same one-commit rule applies to the token as to the pair.
         const linked = await readLinkedUser({ tx, db, speaker });
+        const { invalidateInviteInTx } = require('./inviteTokens.cjs');
+        const invalidation = invalidateInviteInTx({
+          tx, db, speaker, at, status: 'superseded', actorEmail: actor.email,
+        });
         tx.set(
           speakerRef,
-          { status: 'removed', uid: null, updatedAt: at, updatedBy: actor.email },
+          { ...invalidation, status: 'removed', uid: null, updatedAt: at, updatedBy: actor.email },
           { merge: true },
         );
         if (linked) tx.set(linked.ref, { speakerId: null, updatedAt: at }, { merge: true });
@@ -203,6 +212,14 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
       // does not — the record still exists and still owns its slug.
       if (typeof speaker.slug === 'string' && speaker.slug) {
         tx.delete(db.collection(SPEAKER_SLUGS).doc(speaker.slug));
+      }
+      // Same for the outstanding invitation, if any: the speaker record it
+      // names is gone, so the row is not history any admin can act on —
+      // deleting it keeps `speaker_invites` free of invitations pointing at
+      // documents that no longer exist (issue #21).
+      if (typeof speaker.inviteToken === 'string' && speaker.inviteToken) {
+        const { SPEAKER_INVITES } = require('./inviteTokens.cjs');
+        tx.delete(db.collection(SPEAKER_INVITES).doc(speaker.inviteToken));
       }
 
       return {

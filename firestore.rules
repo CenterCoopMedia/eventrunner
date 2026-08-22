@@ -369,6 +369,15 @@ service cloud.firestore {
     // (functions/src/speakers/profile.cjs). Pure bookkeeping: nothing
     // outside those handlers reads or writes it.
     match /speaker_slugs/{slug} { allow read, write: if false; }
+    // Speaker invitations (`speaker_invites/{sha256(token)}`, spec §4.1,
+    // issue #21). Server-only in BOTH directions, and the read denial is
+    // the load-bearing half: the document id is the digest of a live
+    // invite token and the row names the invited address, so a client that
+    // could read the collection could enumerate every outstanding
+    // invitation. Admins see invite state through listSpeakerInvites
+    // (functions/src/speakers/invites.cjs), which returns the status fields
+    // and never the id. Every write is the invite/acceptance transaction.
+    match /speaker_invites/{tokenHash} { allow read, write: if false; }
 
     // Everything not matched above stays deny-all.
     match /{document=**} {
