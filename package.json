@@ -15,11 +15,13 @@
     "prepare:functions": "node scripts/prepare-functions.cjs",
     "test": "node --test \"packages/shared/src/**/*.test.cjs\" \"functions/src/**/*.test.cjs\" \"scripts/**/*.test.cjs\"",
     "test:web": "npm run test -w apps/web",
-    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-run-of-show \"vitest run --config vitest.rules.config.js\""
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-run-of-show \"vitest run --config vitest.rules.config.js\"",
+    "test:e2e": "bash scripts/dev/run-e2e.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
     "@firebase/rules-unit-testing": "^5.0.0",
+    "@playwright/test": "1.56.1",
     "eslint": "^9.33.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
