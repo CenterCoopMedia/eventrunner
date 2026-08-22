@@ -29,6 +29,7 @@
 
 const { buildConfigDocs } = require('./answers.cjs');
 const { defaultPages, buildSeedContent } = require('./seed.cjs');
+const { buildPublicSpeaker } = require('shared/speaker');
 
 /** Fixed instant for every demo `seededAt`, so regeneration is stable. */
 const DEMO_SEEDED_AT = '2026-01-01T00:00:00.000Z';
@@ -211,33 +212,71 @@ const DEMO_SESSIONS = Object.freeze([
   },
 ]);
 
-/** Fictional speakers; headshots are the neutral branding mark (§5.4). */
+/**
+ * Fictional speakers in the CANONICAL `speakers/{speakerId}` shape
+ * (spec §4.3): identity, profile, pipeline state, and the `uid` link half.
+ * Headshots are the neutral branding mark (§5.4).
+ *
+ * These are the documents seed-demo-event.cjs writes. What the public
+ * bundle ships is the PROJECTION of them (demoSnapshot below runs the same
+ * buildPublicSpeaker() the onSpeakerWritten trigger runs), so the demo
+ * instance's `speakers_public` and the committed snapshot are the same
+ * bytes by construction — including the fact that `email`, `uid`,
+ * `inviteToken`, and `status` never appear in the bundle.
+ *
+ * Every one is `approved`: the demo exists to show a working directory,
+ * and only `approved` projects.
+ */
 const DEMO_SPEAKERS = Object.freeze([
   {
     id: 'speaker-placeholder-1',
-    name: '[Demo] Alex Placeholder',
-    title: '[Replace] Role, Organization',
+    firstName: '[Demo] Alex',
+    lastName: 'Placeholder',
+    slug: 'demo-alex-placeholder',
+    email: null,
     bio: '[Replace] Two-sentence speaker bio.',
-    photoPath: 'branding/mark.svg',
-    visible: true,
+    headshotPath: 'branding/mark.svg',
+    organization: '[Replace] Organization',
+    jobTitle: '[Replace] Role',
+    socialHandles: {},
+    status: 'approved',
+    uid: null,
+    inviteToken: null,
+    approvedAt: DEMO_SEEDED_AT,
     seeded: true,
   },
   {
     id: 'speaker-placeholder-2',
-    name: '[Demo] Sam Example',
-    title: '[Replace] Role, Organization',
+    firstName: '[Demo] Sam',
+    lastName: 'Example',
+    slug: 'demo-sam-example',
+    email: null,
     bio: '[Replace] Two-sentence speaker bio.',
-    photoPath: 'branding/mark.svg',
-    visible: true,
+    headshotPath: 'branding/mark.svg',
+    organization: '[Replace] Organization',
+    jobTitle: '[Replace] Role',
+    socialHandles: {},
+    status: 'approved',
+    uid: null,
+    inviteToken: null,
+    approvedAt: DEMO_SEEDED_AT,
     seeded: true,
   },
   {
     id: 'speaker-placeholder-3',
-    name: '[Demo] Riley Specimen',
-    title: '[Replace] Role, Organization',
+    firstName: '[Demo] Riley',
+    lastName: 'Specimen',
+    slug: 'demo-riley-specimen',
+    email: null,
     bio: '[Replace] Two-sentence speaker bio.',
-    photoPath: 'branding/mark.svg',
-    visible: true,
+    headshotPath: 'branding/mark.svg',
+    organization: '[Replace] Organization',
+    jobTitle: '[Replace] Role',
+    socialHandles: {},
+    status: 'approved',
+    uid: null,
+    inviteToken: null,
+    approvedAt: DEMO_SEEDED_AT,
     seeded: true,
   },
 ]);
@@ -324,6 +363,12 @@ function demoEvent() {
 /**
  * The demo shaped for the generated-file emitters.
  *
+ * Speakers go through `buildPublicSpeaker` — the SAME projection the
+ * onSpeakerWritten trigger applies (spec §4.3) — because the bundle ships
+ * what `speakers_public` holds, never the canonical record. Reading the
+ * canonical documents here would put `email` and `inviteToken` into a
+ * committed, publicly served JavaScript file.
+ *
  * @returns {object} snapshot accepted by emit.cjs `emitAll`
  */
 function demoSnapshot() {
@@ -335,7 +380,7 @@ function demoSnapshot() {
     pages: demo.pages,
     content: demo.content,
     sessions: demo.sessions,
-    speakers: demo.speakers,
+    speakers: demo.speakers.map((speaker) => ({ id: speaker.id, ...buildPublicSpeaker(speaker) })),
     organizations: demo.organizations,
   };
 }

@@ -408,6 +408,30 @@ jobs:
         run: >-
           npx firebase target:apply hosting site "$EVENT_HOSTING_SITE"
           --project "$EVENT_FIREBASE_PROJECT_ID"
+      - name: Set the updatesMeta rewrite region for this project
+        # firebase.json's /updates/** rewrite names a function region
+        # (object-form "function": { functionId, region }, not the bare
+        # string form — the string form silently defaults to us-central1,
+        # which routes every non-default-region client's /updates/** at a
+        # backend that does not exist there). Region is per-client env
+        # (EVENT_FIREBASE_REGION), while firebase.json is one file shared by
+        # every client's deploy — same shape of problem as the hosting
+        # target above, same fix: patch the WORKING COPY in place for this
+        # run only, right before the deploy step reads it. Never committed.
+        env:
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+        run: |
+          set -euo pipefail
+          region="${EVENT_FIREBASE_REGION:-us-central1}"
+          jq --arg region "$region" '
+            .hosting.rewrites |= map(
+              if (.function | type) == "object" and .function.functionId == "updatesMeta"
+              then .function.region = $region
+              else . end
+            )
+          ' firebase.json > firebase.json.tmp
+          mv firebase.json.tmp firebase.json
+          echo "updatesMeta rewrite region set to: $region"
       - name: Deploy hosting
         env:
           EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
@@ -417,9 +441,84 @@ jobs:
           --project "$EVENT_FIREBASE_PROJECT_ID"
           --non-interactive
 
+  post:
+    name: Refresh updatesMeta after hosting (self-fetch template ordering)
+    # updatesMeta (functions/src/public/og.cjs) self-fetches the deployed
+    # hosting index.html as its SSR template and caches it per container
+    # (spec §9 "Updates + SSR OG", issue #27). A container that cold-started
+    # — and so cached its template — BEFORE this run's hosting deploy went
+    # out would keep serving crawlers the PREVIOUS build's asset references
+    # for the rest of its cache TTL. Redeploying just this one function here
+    # forces a fresh cold start, which fetches the just-published template
+    # immediately, rather than waiting on natural container recycling.
+    # Unconditional on `hosting` succeeding — hosting always changes the
+    # template on every run, whether or not `functions/**` did.
+    needs: [guard, hosting]
+    if: always() && needs.guard.result == 'success' && needs.hosting.result == 'success'
+    environment: ${{ inputs.client }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-tgz-${{ inputs.client }}
+          path: functions/vendor
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Write the functions runtime env for this project
+        # Same shape as the `functions` job's env file (spec §2.1 Tier A) —
+        # `firebase deploy --only functions:updatesMeta` still bakes
+        # `functions/.env.<project-id>` at deploy time even for a
+        # single-function deploy.
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_SLUG: ${{ vars.EVENT_SLUG }}
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+          EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
+          EVENT_STORAGE_BUCKET: ${{ vars.EVENT_STORAGE_BUCKET }}
+          EVENT_ALLOWED_ORIGINS: ${{ vars.EVENT_ALLOWED_ORIGINS }}
+          EVENT_EMAIL_PROVIDER: ${{ vars.EVENT_EMAIL_PROVIDER }}
+          EVENT_TICKETING_PROVIDER: ${{ vars.EVENT_TICKETING_PROVIDER }}
+          EVENT_TICKETING_EVENT_ID: ${{ vars.EVENT_TICKETING_EVENT_ID }}
+          EVENT_OPERATOR_NOTIFIER: ${{ vars.EVENT_OPERATOR_NOTIFIER }}
+          EVENT_APP_CHECK_ENFORCED: ${{ vars.EVENT_APP_CHECK_ENFORCED }}
+          EVENT_OTP_SEND_CEILING_PER_HOUR: ${{ vars.EVENT_OTP_SEND_CEILING_PER_HOUR }}
+        run: |
+          set -euo pipefail
+          {
+            echo "EVENT_FIREBASE_PROJECT_ID=$EVENT_FIREBASE_PROJECT_ID"
+            echo "EVENT_SLUG=$EVENT_SLUG"
+            echo "EVENT_FIREBASE_REGION=${EVENT_FIREBASE_REGION:-us-central1}"
+            echo "EVENT_PUBLIC_URL=$EVENT_PUBLIC_URL"
+            echo "EVENT_STORAGE_BUCKET=$EVENT_STORAGE_BUCKET"
+            echo "EVENT_ALLOWED_ORIGINS=$EVENT_ALLOWED_ORIGINS"
+            echo "EVENT_EMAIL_PROVIDER=$EVENT_EMAIL_PROVIDER"
+            echo "EVENT_TICKETING_PROVIDER=$EVENT_TICKETING_PROVIDER"
+            echo "EVENT_TICKETING_EVENT_ID=$EVENT_TICKETING_EVENT_ID"
+            echo "EVENT_OPERATOR_NOTIFIER=$EVENT_OPERATOR_NOTIFIER"
+            echo "EVENT_APP_CHECK_ENFORCED=${EVENT_APP_CHECK_ENFORCED:-false}"
+            echo "EVENT_OTP_SEND_CEILING_PER_HOUR=${EVENT_OTP_SEND_CEILING_PER_HOUR:-500}"
+          } > "functions/.env.${EVENT_FIREBASE_PROJECT_ID}"
+      - name: Redeploy updatesMeta only
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+        run: >-
+          npx firebase deploy
+          --only functions:updatesMeta
+          --project "$EVENT_FIREBASE_PROJECT_ID"
+          --non-interactive
+
   smoke:
     name: Post-deploy smoke test
-    needs: hosting
+    needs: post
     environment: ${{ inputs.client }}
     runs-on: ubuntu-latest
     steps:

@@ -5,11 +5,12 @@ import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 let features;
+let badgesConfig;
 let profileValue;
 const subscribeDirectoryMock = vi.fn();
 
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
-  useEventConfig: () => ({ features }),
+  useEventConfig: () => ({ features, badges: badgesConfig }),
 }));
 vi.mock('../contexts/ProfileContext.jsx', () => ({
   useProfile: () => profileValue,
@@ -36,6 +37,7 @@ function pushProfiles(profiles) {
 
 beforeEach(() => {
   features = { attendeeDirectory: true, publicAttendeeProfiles: false, badges: false };
+  badgesConfig = null;
   profileValue = { status: 'ready', attendeeAccess: true, profile: null, needsProfileSetup: false };
   subscribeDirectoryMock.mockReset();
   subscribeDirectoryMock.mockReturnValue(() => {});
@@ -132,6 +134,29 @@ describe('Attendees', () => {
       { id: 'u1', displayName: 'Amara Diallo', pronouns: { a: 1 }, jobTitle: ['Editor'] },
     ]);
     expect(screen.getByRole('link', { name: 'Amara Diallo' })).toBeInTheDocument();
+  });
+
+  it('renders badge labels resolved from live config, dropping ids no longer configured', () => {
+    features.badges = true;
+    badgesConfig = {
+      categories: [{ id: 'craft', label: 'Craft', maxPicks: 2, badges: [{ id: 'writer', label: 'Writer' }] }],
+    };
+    renderPage();
+    pushProfiles([
+      { id: 'u1', displayName: 'Amara Diallo', badges: ['writer', 'left-over-id'] },
+    ]);
+    expect(screen.getByText('Writer')).toBeInTheDocument();
+    expect(screen.queryByText('left-over-id')).toBeNull();
+  });
+
+  it('renders no badges section when config/features.badges is off', () => {
+    features.badges = false;
+    badgesConfig = {
+      categories: [{ id: 'craft', label: 'Craft', maxPicks: 2, badges: [{ id: 'writer', label: 'Writer' }] }],
+    };
+    renderPage();
+    pushProfiles([{ id: 'u1', displayName: 'Amara Diallo', badges: ['writer'] }]);
+    expect(screen.queryByText('Writer')).toBeNull();
   });
 
   it('says the directory is unavailable when the listener fails, rather than showing it empty', () => {

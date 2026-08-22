@@ -20,6 +20,13 @@
 //     snapshot / last-known live values.
 //   - cmsUpdates: live-only; there is no snapshot module, so the default is
 //     an empty list.
+//   - speakers_public: same wholesale-replace semantics, from its own
+//     subscription (spec §4.3). It is not under the publish model — no
+//     `_drafts` sibling, no `visible` field — so it needs neither the
+//     readSource switch nor the visibility clause; an unapproved speaker
+//     simply has no document. Without this overlay the directory would sit
+//     on the deploy-time snapshot forever, so a speaker added, edited, or
+//     removed after the last build would never appear or disappear.
 //   - cmsTimeline: snapshot-only for now — its runtime overlay belongs to a
 //     later timeline tranche.
 //
@@ -38,10 +45,10 @@ import {
   useState,
 } from 'react';
 import snapshotSiteContent from '@generated/siteContent.js';
-import snapshotScheduleData, { speakers } from '@generated/scheduleData.js';
+import snapshotScheduleData, { speakers as snapshotSpeakers } from '@generated/scheduleData.js';
 import snapshotOrganizationsData from '@generated/organizationsData.js';
 import snapshotPages from '@generated/pagesData.js';
-import { subscribeContentCollection } from '../lib/contentSource.js';
+import { subscribeContentCollection, subscribeSpeakersPublic } from '../lib/contentSource.js';
 
 const ContentContext = createContext(null);
 
@@ -67,6 +74,14 @@ const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
 // *is* safe — one malformed doc doesn't fall back to the snapshot.
 const ORG_RENDERABLE_FIELDS = ['name', 'tier', 'description'];
 
+// The same guard for speakers_public. buildPublicSpeaker already coerces
+// every one of these to a string on the way in (packages/shared/src/
+// speaker.cjs), so this is defence in depth rather than the primary
+// control — but the projection trigger fires on Admin SDK writes too, and
+// the directory blanking for every visitor is too cheap a failure to leave
+// to one layer.
+const SPEAKER_RENDERABLE_FIELDS = ['displayName', 'jobTitle', 'organization', 'bio'];
+
 function isSafeRenderableValue(value) {
   return (
     value == null ||
@@ -82,6 +97,20 @@ function sanitizeOrganizationDocs(docs) {
   );
 }
 
+/** Renderable-safe speakers, ordered the way the directory reads them. */
+function prepareSpeakerDocs(docs) {
+  return docs
+    .filter((doc) =>
+      SPEAKER_RENDERABLE_FIELDS.every((field) => isSafeRenderableValue(doc?.[field])),
+    )
+    .slice()
+    .sort(
+      (a, b) =>
+        String(a.displayName ?? '').localeCompare(String(b.displayName ?? '')) ||
+        String(a.id).localeCompare(String(b.id)),
+    );
+}
+
 export function ContentProvider({ readSource = 'published', children }) {
   // One overlay slot per collection; null = no runtime result yet, so the
   // committed snapshot stands (spec §2.4 fail-soft first paint).
@@ -91,6 +120,7 @@ export function ContentProvider({ readSource = 'published', children }) {
     cmsUpdates: null,
     cmsSchedule: null,
     cmsOrganizations: null,
+    speakers: null,
   });
 
   useEffect(() => {
@@ -102,12 +132,20 @@ export function ContentProvider({ readSource = 'published', children }) {
       cmsUpdates: null,
       cmsSchedule: null,
       cmsOrganizations: null,
+      speakers: null,
     });
-    const unsubscribers = RUNTIME_COLLECTIONS.map((name) =>
-      subscribeContentCollection(name, readSource, (docs) => {
-        setOverlay((prev) => ({ ...prev, [name]: docs }));
+    const unsubscribers = [
+      ...RUNTIME_COLLECTIONS.map((name) =>
+        subscribeContentCollection(name, readSource, (docs) => {
+          setOverlay((prev) => ({ ...prev, [name]: docs }));
+        }),
+      ),
+      // Speakers have no draft revision, so this subscription is the same
+      // in preview as in published mode.
+      subscribeSpeakersPublic((docs) => {
+        setOverlay((prev) => ({ ...prev, speakers: docs }));
       }),
-    );
+    ];
     return () => {
       for (const unsubscribe of unsubscribers) {
         if (typeof unsubscribe === 'function') unsubscribe();
@@ -135,11 +173,19 @@ export function ContentProvider({ readSource = 'published', children }) {
       overlay.cmsOrganizations != null
         ? sanitizeOrganizationDocs(overlay.cmsOrganizations)
         : snapshotOrganizationsData;
+    // Same != null rule as every other overlay: an empty live result is a
+    // real answer (every speaker was removed or unapproved) and must empty
+    // the directory; only "no result yet" or a listener error keeps the
+    // committed snapshot.
+    const speakers = prepareSpeakerDocs(
+      overlay.speakers != null ? overlay.speakers : snapshotSpeakers,
+    );
     const live = Boolean(
       overlay.cmsContent != null ||
         overlay.cmsPages != null ||
         overlay.cmsSchedule != null ||
-        overlay.cmsOrganizations != null,
+        overlay.cmsOrganizations != null ||
+        overlay.speakers != null,
     );
 
     const getBlock = (section, field) => {

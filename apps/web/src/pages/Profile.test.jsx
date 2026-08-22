@@ -218,6 +218,33 @@ describe('Profile', () => {
     expect(screen.getByRole('group', { name: 'Craft' })).toBeInTheDocument();
     expect(screen.queryByText(/Pick up to/)).toBeNull();
   });
+
+  it('warns when the configured badge total is close to the platform limit', async () => {
+    const { MAX_TOTAL_BADGES } = await import('shared/badges');
+    features.badges = true;
+    badgesConfig = {
+      categories: [
+        {
+          id: 'craft',
+          label: 'Craft',
+          maxPicks: MAX_TOTAL_BADGES - 2,
+          badges: Array.from({ length: MAX_TOTAL_BADGES - 2 }, (_, i) => ({ id: `b${i}` })),
+        },
+      ],
+    };
+    renderPage();
+    expect(screen.getByText(new RegExp(`close to the platform.s ${MAX_TOTAL_BADGES}-badge total`)))
+      .toBeInTheDocument();
+  });
+
+  it('does not warn when the configured badge total is well under the platform limit', async () => {
+    features.badges = true;
+    badgesConfig = {
+      categories: [{ id: 'craft', label: 'Craft', maxPicks: 2, badges: [{ id: 'writer', label: 'Writer' }] }],
+    };
+    renderPage();
+    expect(screen.queryByText(/close to the platform/)).toBeNull();
+  });
 });
 
 // The photo's delete ordering (issue #24 review follow-up): the object that

@@ -64,7 +64,7 @@ test.beforeEach(() => resetTemplateCacheForTest());
 // --- registry -------------------------------------------------------------
 
 test('listTemplateIds returns the phase-2 defaults', () => {
-  assert.deepEqual(listTemplateIds().sort(), ['account.welcome', 'auth.otp']);
+  assert.deepEqual(listTemplateIds().sort(), ['account.welcome', 'auth.otp', 'feedback.confirmation']);
 });
 
 test('getDefaultTemplate returns modules for known ids, null otherwise', () => {

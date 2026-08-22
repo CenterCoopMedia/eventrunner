@@ -21,7 +21,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 vi.mock('../firebase.js', () => ({ db: {} }));
 
-const { subscribeContentCollection } = await import('./contentSource.js');
+const { subscribeContentCollection, subscribeSpeakersPublic } = await import('./contentSource.js');
 
 describe('subscribeContentCollection', () => {
   beforeEach(() => {
@@ -149,5 +149,69 @@ describe('subscribeContentCollection', () => {
     const unsubscribe = subscribeContentCollection('cmsContent', 'published', vi.fn());
     unsubscribe();
     expect(detach).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('subscribeSpeakersPublic', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    onSnapshotMock.mockReset();
+    collectionMock.mockClear();
+    whereMock.mockClear();
+    queryMock.mockClear();
+    onSnapshotMock.mockImplementation(() => vi.fn());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reads the whole speakers_public collection with no visibility clause', () => {
+    // speakers_public is not under the publish model (spec §4.3): there is
+    // no `visible` field to filter on and no `_drafts` sibling. A speaker
+    // who is not `approved` has no document here at all, so the collection
+    // IS the published set.
+    subscribeSpeakersPublic(vi.fn());
+
+    expect(collectionMock).toHaveBeenCalledWith({}, 'speakers_public');
+    expect(whereMock).not.toHaveBeenCalled();
+    expect(queryMock).not.toHaveBeenCalled();
+    expect(onSnapshotMock.mock.calls[0][0]).toEqual({
+      __kind: 'collection',
+      name: 'speakers_public',
+    });
+  });
+
+  it('maps snapshot docs to { id, ...data }', () => {
+    let onSuccess;
+    onSnapshotMock.mockImplementation((_target, success) => {
+      onSuccess = success;
+      return vi.fn();
+    });
+    const onNext = vi.fn();
+    subscribeSpeakersPublic(onNext);
+
+    onSuccess({ docs: [{ id: 'rae-okonkwo', data: () => ({ displayName: 'Rae Okonkwo' }) }] });
+    expect(onNext).toHaveBeenCalledWith([{ id: 'rae-okonkwo', displayName: 'Rae Okonkwo' }]);
+  });
+
+  it('fails soft and retries on a listener error', () => {
+    let attachCount = 0;
+    let capturedError;
+    onSnapshotMock.mockImplementation((_target, _success, onError) => {
+      attachCount += 1;
+      capturedError = onError;
+      return vi.fn();
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const onNext = vi.fn();
+    subscribeSpeakersPublic(onNext);
+    capturedError(new Error('permission denied'));
+
+    // The caller keeps its last-known values — the error never blanks them.
+    expect(onNext).not.toHaveBeenCalled();
+    vi.runOnlyPendingTimers();
+    expect(attachCount).toBeGreaterThan(1);
   });
 });

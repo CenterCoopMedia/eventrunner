@@ -43,6 +43,17 @@ const RESERVED_FIELDS = Object.freeze([
   'updatedBy',
   'publishedAt',
   'publishedBy',
+  // materialCount (cmsSchedule only, spec §4.4/issue #23 follow-up) is
+  // maintained transactionally by functions/src/materials/store.cjs, never
+  // by a draft edit. Reserving it here does two things: contentFieldsOf
+  // strips it out of whatever a draft happens to carry (so a stray/forged
+  // value in a draft can never overwrite the true count), and publishDocs
+  // below explicitly re-carries the CURRENT live value onto the new live
+  // doc — without either half of that, a publish's `batch.set` (a full
+  // document replace, not a merge) would silently zero out every
+  // session's material count the next time its schedule content is
+  // edited and republished.
+  'materialCount',
 ]);
 
 const MAX_DOC_ID_LENGTH = 300;
@@ -86,16 +97,31 @@ function contentFieldsOf(data) {
  * rejection (see isAlreadyExistsError) instead of silently clobbering the
  * first writer's draft. An existing draft is refused before writing.
  *
- * @param {{ db: FirebaseFirestore.Firestore, collection: string,
+ * Pass `tx` to make this write part of the CALLER'S transaction. That is
+ * what the session-save seam needs (spec §4.3 rule 1): validating
+ * `speakerIds` in one round trip and writing the draft in another leaves a
+ * window in which deleteSpeaker can remove a speaker that this write is
+ * about to reference — and deleteSpeaker's own transaction cannot see a
+ * draft that does not exist yet, so the reference would dangle with
+ * nothing left to heal it. Reading the speaker documents inside the same
+ * transaction that writes the draft puts them in the transaction's read
+ * set, so a concurrent delete aborts and retries this write instead.
+ *
+ * Every read here happens before the write, so a caller may interleave its
+ * own reads (Firestore requires all reads before all writes).
+ *
+ * @param {{ db: FirebaseFirestore.Firestore, tx?: FirebaseFirestore.Transaction,
+ *           collection: string,
  *           docId: string, fields: object, visible?: boolean,
  *           actor: { uid: string, email: string }, now?: () => number,
  *           createOnly?: boolean }} args
  * @returns {Promise<{ docPath: string, existed: boolean }>}
  */
-async function writeDraft({ db, collection, docId, fields, visible, actor, now = Date.now, createOnly = false }) {
+async function writeDraft({ db, tx = null, collection, docId, fields, visible, actor, now = Date.now, createOnly = false }) {
   const draftCol = draftCollectionFor(collection);
   const ref = db.collection(draftCol).doc(docId);
-  const draftSnap = await ref.get();
+  const read = (target) => (tx ? tx.get(target) : target.get());
+  const draftSnap = await read(ref);
   if (createOnly && draftSnap.exists) {
     throw new Error(`ALREADY_EXISTS: document ${draftCol}/${docId} already exists`);
   }
@@ -107,7 +133,7 @@ async function writeDraft({ db, collection, docId, fields, visible, actor, now =
     basedOnRevision = typeof prior.basedOnRevision === 'number' ? prior.basedOnRevision : null;
     priorVisible = prior.visible !== false;
   } else {
-    const liveSnap = await db.collection(collection).doc(docId).get();
+    const liveSnap = await read(db.collection(collection).doc(docId));
     if (liveSnap.exists) {
       const live = liveSnap.data();
       basedOnRevision = typeof live.revision === 'number' ? live.revision : null;
@@ -123,7 +149,10 @@ async function writeDraft({ db, collection, docId, fields, visible, actor, now =
     updatedAt: new Date(now()),
     updatedBy: actor.email,
   };
-  if (createOnly) {
+  if (tx) {
+    if (createOnly) tx.create(ref, payload);
+    else tx.set(ref, payload);
+  } else if (createOnly) {
     await ref.create(payload);
   } else {
     await ref.set(payload);
@@ -310,9 +339,16 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
         const revision = baseRevision + 1;
         const contentFields = contentFieldsOf(draft);
         const visible = draft.visible !== false;
+        // Carried over from the CURRENT live doc, not the draft — see the
+        // RESERVED_FIELDS comment on 'materialCount'. Absent on a doc with
+        // no materials yet (or a first publish), which is the same "no
+        // field yet" state materials/store.cjs already treats as 0.
+        const materialCountFields =
+          typeof live?.materialCount === 'number' ? { materialCount: live.materialCount } : {};
 
         batch.set(liveRefs[j], {
           ...contentFields,
+          ...materialCountFields,
           visible,
           revision,
           publishedAt,

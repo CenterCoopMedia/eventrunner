@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
+import FeedbackModal from './FeedbackModal.jsx';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', end: true },
@@ -12,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/speakers', label: 'Speakers', feature: 'speakers' },
   { to: '/sponsors', label: 'Sponsors', feature: 'sponsors' },
   { to: '/attendees', label: 'Attendees', feature: 'attendeeDirectory' },
+  { to: '/updates', label: 'Updates', feature: 'updates' },
 ];
 
 function navClass({ isActive }) {
@@ -42,6 +44,7 @@ export default function Layout() {
   const legal = eventConfig?.legal || {};
   const operatorName = legal.operatorName;
   const supportEmail = legal.supportEmail;
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   return (
     <div className="bg-paper flex min-h-screen flex-col">
@@ -101,8 +104,18 @@ export default function Layout() {
               ) : null}
             </p>
           ) : null}
+          {features.feedbackInbox ? (
+            <button
+              type="button"
+              className="touch-target mt-3 inline-flex items-center rounded-brand border border-brand-ink/20 px-3 py-2 text-brand-ink hover:bg-brand-surface"
+              onClick={() => setFeedbackOpen(true)}
+            >
+              Share feedback
+            </button>
+          ) : null}
         </div>
       </footer>
+      {feedbackOpen ? <FeedbackModal onClose={() => setFeedbackOpen(false)} /> : null}
     </div>
   );
 }

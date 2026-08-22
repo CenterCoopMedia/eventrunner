@@ -332,6 +332,7 @@ describe("server-only collections stay deny-all", () => {
     "system_errors",
     "client_error_rate_limits",
     "email_templates",
+    "speaker_slugs",
   ]) {
     it(`denies all access to ${c}, admin included`, async () => {
       await assertFails(getDoc(doc(anon(), `${c}/d1`)));
@@ -534,6 +535,28 @@ describe("users account documents (spec §3.4)", () => {
     );
   });
 
+  it("caps the badges list length even though rules cannot check ids against config/badges", async () => {
+    // Real per-event badge counts are nowhere near this; the cap exists only
+    // to bound the one write path that has no config to validate against.
+    const tooMany = Array.from({ length: 41 }, (_, i) => `badge-${i}`);
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), { badges: tooMany }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        badges: tooMany.slice(0, 40),
+      }),
+    );
+  });
+
+  it("denies a badges list with a duplicate id", async () => {
+    await assertFails(
+      updateDoc(doc(attendee("pending-1"), "users/pending-1"), {
+        badges: ["writer", "writer"],
+      }),
+    );
+  });
+
   it("denies a move to public visibility while config/features.publicAttendeeProfiles is off", async () => {
     await setPublicProfilesFeature(false);
     await assertFails(
@@ -655,6 +678,125 @@ describe("users account documents (spec §3.4)", () => {
   });
 });
 
+// The canonical speaker store and its one-way projection (spec §4.3,
+// issue #20). The property under test: everything that would let a client
+// break a reference outside the transaction that owns it is denied — and
+// the canonical document's pipeline fields (email, inviteToken, uid) never
+// reach a non-admin at all.
+describe("speakers canonical store and speakers_public projection (spec §4.3)", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "speakers/spk-1"), {
+        firstName: "Demo",
+        lastName: "Speaker",
+        slug: "demo-speaker",
+        email: "speaker@example.com",
+        inviteToken: "tok_secret",
+        status: "approved",
+        uid: "speaker-1",
+        approvedAt: new Date(),
+      });
+      await setDoc(doc(db, "speakers_public/spk-1"), {
+        speakerId: "spk-1",
+        firstName: "Demo",
+        lastName: "Speaker",
+        displayName: "Demo Speaker",
+        slug: "demo-speaker",
+        bio: "",
+        headshotPath: null,
+        organization: "",
+        jobTitle: "",
+        socialHandles: {},
+      });
+    });
+  });
+
+  it("denies the canonical speaker document to anonymous and non-admin clients", async () => {
+    await assertFails(getDoc(doc(anon(), "speakers/spk-1")));
+    await assertFails(getDoc(doc(nonAdmin(), "speakers/spk-1")));
+    // Not even the linked speaker reads their own canonical record: the
+    // invite token and the users.speakerId link half live on it.
+    await assertFails(getDoc(doc(attendee("speaker-1"), "speakers/spk-1")));
+    await assertFails(getDocs(collection(anon(), "speakers")));
+  });
+
+  it("allows an admin to read speakers, for the list and the session typeahead", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "speakers/spk-1")));
+    await assertSucceeds(getDocs(collection(admin(), "speakers")));
+  });
+
+  it("denies every client write to speakers, admin included", async () => {
+    // Every write is a Cloud Function (createSpeaker / updateSpeaker /
+    // deleteSpeaker / the invite transaction) — that is what makes §4.3's
+    // seams transactional rather than advisory.
+    await assertFails(setDoc(doc(admin(), "speakers/spk-2"), { firstName: "New" }));
+    await assertFails(updateDoc(doc(admin(), "speakers/spk-1"), { status: "removed" }));
+    await assertFails(updateDoc(doc(admin(), "speakers/spk-1"), { uid: "attendee-1" }));
+    await assertFails(deleteDoc(doc(admin(), "speakers/spk-1")));
+    await assertFails(setDoc(doc(nonAdmin(), "speakers/spk-1"), { firstName: "Hijacked" }));
+  });
+
+  it("allows anyone to read the public projection", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "speakers_public/spk-1")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "speakers_public/spk-1")));
+    await assertSucceeds(getDocs(collection(anon(), "speakers_public")));
+  });
+
+  it("denies every client write to the projection, admin included", async () => {
+    await assertFails(setDoc(doc(admin(), "speakers_public/spk-1"), { displayName: "Edited" }));
+    await assertFails(setDoc(doc(anon(), "speakers_public/spk-9"), { displayName: "Injected" }));
+    await assertFails(deleteDoc(doc(admin(), "speakers_public/spk-1")));
+  });
+});
+
+describe("session materials (spec §4.4, issue #23)", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "session_materials/m1"), {
+        sessionId: "pub",
+        type: "link",
+        url: "https://example.org/embargoed-deck",
+        filename: "Slide deck",
+        reviewStatus: "approved",
+        submittedBySpeakerId: null,
+      });
+      await setDoc(doc(db, "session_materials_public/m1"), {
+        sessionId: "pub",
+        type: "link",
+        filename: "Slide deck",
+        reviewStatus: "approved",
+      });
+    });
+  });
+
+  it("denies every client read of the canonical server-only collection, admin included", async () => {
+    await assertFails(getDoc(doc(anon(), "session_materials/m1")));
+    await assertFails(getDoc(doc(nonAdmin(), "session_materials/m1")));
+    await assertFails(getDoc(doc(admin(), "session_materials/m1")));
+  });
+
+  it("denies every client write to the canonical collection, admin included", async () => {
+    await assertFails(
+      setDoc(doc(admin(), "session_materials/m1"), { reviewStatus: "rejected" }),
+    );
+  });
+
+  it("allows anonymous read of the approved-materials public projection", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "session_materials_public/m1")));
+  });
+
+  it("denies every client write to the public projection, admin included", async () => {
+    await assertFails(
+      setDoc(doc(admin(), "session_materials_public/m1"), { filename: "Renamed" }),
+    );
+    await assertFails(
+      setDoc(doc(nonAdmin(), "session_materials_public/m1"), { filename: "Renamed" }),
+    );
+  });
+});
+
 describe("sessionBookmarks aggregate", () => {
   beforeAll(async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
@@ -670,5 +812,108 @@ describe("sessionBookmarks aggregate", () => {
   it("denies all client writes, admin included", async () => {
     await assertFails(setDoc(doc(admin(), "sessionBookmarks/session-1"), { count: 99 }));
     await assertFails(setDoc(doc(nonAdmin(), "sessionBookmarks/session-1"), { count: 99 }));
+  });
+});
+
+// Issue #28: live-updates admin form + feedback inbox.
+describe("live_updates dashboard feed", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "live_updates/u1"), {
+        message: "Doors open at 9am.",
+        pinned: false,
+        postedAt: new Date(),
+      });
+    });
+  });
+
+  it("allows anyone, including anonymous, to read entries", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "live_updates/u1")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "live_updates/u1")));
+  });
+
+  it("denies all client writes, admin included — only saveLiveUpdate/deleteLiveUpdate (Admin SDK) write it", async () => {
+    await assertFails(setDoc(doc(admin(), "live_updates/u1"), { message: "hacked" }));
+    await assertFails(setDoc(doc(nonAdmin(), "live_updates/u1"), { message: "hacked" }));
+    await assertFails(deleteDoc(doc(admin(), "live_updates/u1")));
+  });
+});
+
+describe("feedback inbox", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "feedback/f1"), {
+        message: "The registration link 404s.",
+        email: null,
+        category: "bug",
+        status: "new",
+        createdAt: new Date(),
+      });
+    });
+  });
+
+  it("allows admin read of a submission but no one else", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "feedback/f1")));
+    await assertFails(getDoc(doc(nonAdmin(), "feedback/f1")));
+    await assertFails(getDoc(doc(anon(), "feedback/f1")));
+  });
+
+  it("denies all client writes, admin included — submitFeedback/updateFeedbackStatus (Admin SDK) write it", async () => {
+    await assertFails(setDoc(doc(anon(), "feedback/f2"), { message: "spam" }));
+    await assertFails(setDoc(doc(admin(), "feedback/f1"), { status: "reviewed" }));
+  });
+});
+
+describe("feedback_rate_limits stays deny-all", () => {
+  it("denies all access, admin included", async () => {
+    await assertFails(getDoc(doc(anon(), "feedback_rate_limits/h1")));
+    await assertFails(getDoc(doc(admin(), "feedback_rate_limits/h1")));
+    await assertFails(setDoc(doc(admin(), "feedback_rate_limits/h1"), { requests: [] }));
+  });
+});
+
+describe("sessionReactions aggregate", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sessionReactions/session-1"), {
+        counts: { "👍": 2, "❤️": 0, "🎉": 0, "💡": 0, "👏": 0 },
+      });
+    });
+  });
+
+  it("allows anyone, including anonymous, to read the aggregate counts", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "sessionReactions/session-1")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "sessionReactions/session-1")));
+  });
+
+  it("denies all client writes, admin included", async () => {
+    await assertFails(setDoc(doc(admin(), "sessionReactions/session-1"), { counts: {} }));
+    await assertFails(setDoc(doc(nonAdmin(), "sessionReactions/session-1"), { counts: {} }));
+  });
+});
+
+describe("the private sessionReactions/{sessionId}/users dedup subcollection", () => {
+  it("allows a user to read their own reaction doc, denies everyone else", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sessionReactions/session-1/users/attendee-1"), {
+        emoji: "👍",
+        reactedAt: new Date(),
+      });
+    });
+    await assertSucceeds(getDoc(doc(nonAdmin(), "sessionReactions/session-1/users/attendee-1")));
+    await assertFails(getDoc(doc(anon(), "sessionReactions/session-1/users/attendee-1")));
+    const other = testEnv
+      .authenticatedContext("attendee-2", { email: "other@example.com", email_verified: true })
+      .firestore();
+    await assertFails(getDoc(doc(other, "sessionReactions/session-1/users/attendee-1")));
+  });
+
+  it("denies all client writes to the reaction dedup subcollection, owner included", async () => {
+    await assertFails(
+      setDoc(doc(nonAdmin(), "sessionReactions/session-1/users/attendee-1"), {
+        emoji: "👍",
+        reactedAt: new Date(),
+      }),
+    );
   });
 });

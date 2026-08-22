@@ -107,20 +107,29 @@ async function readDeployment({ db }) {
     const snap = await db.collection(name).where('visible', '==', true).get();
     return snap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
   };
-  // speakers has no draft/publish model and no `visible` field (spec §1.3's
-  // speakers/ module is not landed on this branch) — read unconditionally,
-  // like every other collection. No per-collection catch: a collection
-  // that does not exist yet already returns an empty snapshot, so the only
-  // thing a catch here could swallow is a transient read failure — which
-  // would silently ship a build with no speakers rather than failing the
-  // generation.
-  const [pages, content, sessions, organizations, speakers] = await Promise.all([
+  // Speakers come from `speakers_public`, NOT from the canonical
+  // `speakers` collection (spec §4.3). The canonical record carries
+  // `email`, `uid`, `inviteToken`, and the pipeline `status`; emitting it
+  // would compile a client's speaker email addresses and live invite
+  // tokens into a publicly served JavaScript bundle. The projection is the
+  // published, public-safe view by definition, and it exists only for
+  // speakers whose status is `approved` — so it also replaces the
+  // `visible == true` filter the publishable collections need. No
+  // per-collection catch: a collection that does not exist yet already
+  // returns an empty snapshot, so the only thing a catch here could
+  // swallow is a transient read failure — which would silently ship a
+  // build with no speakers rather than failing the generation.
+  const [pages, content, sessions, organizations, speakerProjections] = await Promise.all([
     readVisibleCollection('cmsPages'),
     readVisibleCollection('cmsContent'),
     readVisibleCollection('cmsSchedule'),
     readVisibleCollection('cmsOrganizations'),
-    readCollection('speakers'),
+    readCollection('speakers_public'),
   ]);
+  // `speakerId` on the projection is the document id under another name;
+  // the emitted snapshot addresses speakers by `id` like every other
+  // collection, so carrying both would be two spellings of one value.
+  const speakers = speakerProjections.map(({ speakerId: _speakerId, ...rest }) => rest);
 
   return {
     event: config.event,

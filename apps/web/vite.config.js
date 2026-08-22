@@ -31,6 +31,8 @@ export default defineConfig({
       'shared/routing',
       'shared/profile',
       'shared/badges',
+      'shared/speaker',
+      'shared/urlSafety',
     ],
   },
   resolve: {

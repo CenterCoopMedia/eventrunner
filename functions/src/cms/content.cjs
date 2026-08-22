@@ -33,8 +33,40 @@ const {
   isAlreadyExistsError,
   internals: storeInternals,
 } = require('./store.cjs');
+const { validateSpeakerReferences } = require('../speakers/references.cjs');
+const { deleteMaterialsForSession } = require('../materials/store.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+
+/**
+ * Sentinel value a caller may set on a `fields` key to explicitly drop that
+ * key from the merged result — see omitDeletedFields. cmsUpdateContent
+ * merges its submitted `fields` ONTO the prior draft/live doc's fields (so a
+ * partial edit does not have to resend every field), which otherwise has no
+ * way to ever remove a key: switching a cmsContent block's type client-side
+ * (apps/web/src/admin) leaves the old type's now-irrelevant value fields
+ * (e.g. an faq_item's `answer`) stranded on the doc forever. A caller that
+ * knows a key should disappear sets it to this sentinel instead of a real
+ * value.
+ */
+const DELETE_FIELD_SENTINEL = '__cms_delete_field__';
+
+/**
+ * Drop every key in `fields` whose value is DELETE_FIELD_SENTINEL. Applied
+ * to the fully-merged field set right before it is written, so a caller can
+ * clear a stale key from the prior doc even though the merge above
+ * otherwise preserves anything it does not mention.
+ *
+ * @param {object} fields
+ * @returns {object}
+ */
+function omitDeletedFields(fields) {
+  const out = {};
+  for (const [key, value] of Object.entries(fields || {})) {
+    if (value !== DELETE_FIELD_SENTINEL) out[key] = value;
+  }
+  return out;
+}
 
 /**
  * The publishable collections these generic endpoints may write. cmsPages
@@ -107,6 +139,62 @@ function validateFields(fields) {
   return { ok: true, fields };
 }
 
+/**
+ * Referential integrity at the session-save seam (spec §4.3 rule 1).
+ *
+ * `cmsSchedule.speakerIds[]` is a foreign key into the canonical
+ * `speakers` store, and Firestore enforces nothing: a typo'd or stale id
+ * in an admin payload would otherwise be written and only surface as a
+ * blank name on the public schedule. So every session save reads each id
+ * and REJECTS the write, naming the id, when the speaker does not exist.
+ * Rejecting is right rather than silently dropping — an id nobody meant to
+ * send is a bug to surface, not data to discard.
+ *
+ * The check runs over the RESULT of the merge, not just the payload: a
+ * session whose stored draft already names a missing speaker must not be
+ * quietly re-saved with the dangling reference intact.
+ *
+ * It also runs INSIDE the transaction that writes the draft, and that is
+ * load-bearing rather than tidy. As a pre-check it was only advisory:
+ * deleteSpeaker could commit between the check and the write, and its
+ * transaction queries the sessions and drafts that exist at that moment —
+ * a draft written a heartbeat later still named the deleted speaker, with
+ * no reconciliation left in the system to notice. Reading `speakers/{id}`
+ * in the write transaction puts those documents in its read set, so a
+ * concurrent delete aborts this transaction; the retry re-reads, finds the
+ * speaker gone, and rejects the save.
+ *
+ * The returned `fields` carry the NORMALIZED `speakerIds`, which is what
+ * the caller persists: `speakerIds: null` validates as "no references"
+ * but must be stored as `[]` so the stored shape is always `string[]`.
+ *
+ * Only cmsSchedule carries speaker references today. No block type in the
+ * §5.2 registry embeds a speaker list, so cmsSavePage has nothing to
+ * validate; when one lands, it calls the same helper.
+ *
+ * @returns {Promise<{ ok: true, fields: object } | { ok: false, message: string }>}
+ */
+async function checkSpeakerReferences({ db, tx = null, collection, fields }) {
+  if (collection !== 'cmsSchedule') return { ok: true, fields };
+  if (!Object.prototype.hasOwnProperty.call(fields, 'speakerIds')) return { ok: true, fields };
+  const verdict = await validateSpeakerReferences({ db, tx, value: fields.speakerIds });
+  if (!verdict.ok) return { ok: false, message: verdict.errors.join('; ') };
+  return { ok: true, fields: { ...fields, speakerIds: verdict.speakerIds } };
+}
+
+/**
+ * An HTTP-shaped rejection thrown from inside a transaction body, so a
+ * refusal aborts the transaction (writing nothing) instead of returning a
+ * verdict the caller would have to unwind by hand.
+ */
+class RequestError extends Error {
+  constructor(status, code, message) {
+    super(message);
+    this.name = 'RequestError';
+    this.httpError = { status, code, message };
+  }
+}
+
 /** Shared admin-POST preamble. Sends the response itself on failure. */
 async function gateAdminPost({ auth, getConfig }, req, res) {
   if (req.method !== 'POST') {
@@ -134,28 +222,52 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
     if (!checked.ok) return badRequest(res, checked.message);
 
     const { collection, docId, extraFields } = target;
-    const liveSnap = await db.collection(collection).doc(docId).get();
-    if (liveSnap.exists) {
-      return sendError(res, 409, 'already-exists', 'That document already exists; use cmsUpdateContent.');
-    }
 
+    // ONE transaction: the live-doc existence check, the speaker-reference
+    // reads, and the draft write. See checkSpeakerReferences — a reference
+    // validated in a separate round trip is only advisory.
+    //
     // The draft-side race is closed by the create() precondition inside
     // writeDraft (createOnly): two concurrent creates cannot both win —
     // the loser's ALREADY_EXISTS maps to the same 409 a pre-check would
     // have produced, instead of clobbering the first writer's draft.
     let docPath;
     try {
-      ({ docPath } = await writeDraft({
-        db,
-        collection,
-        docId,
-        fields: { ...checked.fields, ...extraFields },
-        visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
-        actor,
-        now,
-        createOnly: true,
-      }));
+      docPath = await db.runTransaction(async (tx) => {
+        const liveSnap = await tx.get(db.collection(collection).doc(docId));
+        if (liveSnap.exists) {
+          throw new RequestError(409, 'already-exists', 'That document already exists; use cmsUpdateContent.');
+        }
+        // Deletions are applied BEFORE the reference check, so the check
+        // runs on what will actually be written: a caller dropping
+        // `speakerIds` entirely is removing the reference set, not
+        // submitting a malformed one.
+        const references = await checkSpeakerReferences({
+          db,
+          tx,
+          collection,
+          fields: omitDeletedFields({ ...checked.fields, ...extraFields }),
+        });
+        if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
+
+        const written = await writeDraft({
+          db,
+          tx,
+          collection,
+          docId,
+          fields: references.fields,
+          visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
+          actor,
+          now,
+          createOnly: true,
+        });
+        return written.docPath;
+      });
     } catch (err) {
+      if (err?.httpError) {
+        const { status, code, message } = err.httpError;
+        return sendError(res, status, code, message);
+      }
       if (isAlreadyExistsError(err)) {
         return sendError(res, 409, 'already-exists', 'That document already exists; use cmsUpdateContent.');
       }
@@ -179,27 +291,61 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
     if (!checked.ok) return badRequest(res, checked.message);
 
     const { collection, docId, extraFields } = target;
-    const draftSnap = await db.collection(draftCollectionFor(collection)).doc(docId).get();
-    let base;
-    if (draftSnap.exists) {
-      base = contentFieldsOf(draftSnap.data());
-    } else {
-      // No draft yet: fork one from the published doc. writeDraft picks up
-      // basedOnRevision from the live doc itself.
-      const liveSnap = await db.collection(collection).doc(docId).get();
-      if (!liveSnap.exists) return notFound(res, 'No such document; use cmsCreateContent.');
-      base = contentFieldsOf(liveSnap.data());
-    }
 
-    const { docPath } = await writeDraft({
-      db,
-      collection,
-      docId,
-      fields: { ...base, ...checked.fields, ...extraFields },
-      visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
-      actor,
-      now,
-    });
+    // ONE transaction: the merge base, the speaker-reference reads, and the
+    // draft write (see checkSpeakerReferences).
+    let docPath;
+    try {
+      docPath = await db.runTransaction(async (tx) => {
+        const draftSnap = await tx.get(db.collection(draftCollectionFor(collection)).doc(docId));
+        let base;
+        if (draftSnap.exists) {
+          base = contentFieldsOf(draftSnap.data());
+        } else {
+          // No draft yet: fork one from the published doc. writeDraft picks
+          // up basedOnRevision from the live doc itself.
+          const liveSnap = await tx.get(db.collection(collection).doc(docId));
+          if (!liveSnap.exists) {
+            throw new RequestError(404, 'not-found', 'No such document; use cmsCreateContent.');
+          }
+          base = contentFieldsOf(liveSnap.data());
+        }
+
+        // Deletions are applied to the MERGED set before the reference
+        // check, which is the whole point of the sentinel: the merge
+        // otherwise preserves every key the payload does not mention, so
+        // clearing a stale `speakerIds` from the prior doc is only possible
+        // this way — and the check must see the post-deletion result, since
+        // that is what gets written.
+        const references = await checkSpeakerReferences({
+          db,
+          tx,
+          collection,
+          fields: omitDeletedFields({ ...base, ...checked.fields, ...extraFields }),
+        });
+        if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
+
+        const written = await writeDraft({
+          db,
+          tx,
+          collection,
+          docId,
+          fields: references.fields,
+          visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
+          actor,
+          now,
+        });
+        return written.docPath;
+      });
+    } catch (err) {
+      if (err?.httpError) {
+        const { status, code, message } = err.httpError;
+        return status === 404
+          ? notFound(res, message)
+          : sendError(res, status, code, message);
+      }
+      throw err;
+    }
     await logAdminAction({ db, action: 'cms-update-content', docPath, actor, now, log });
     res.status(200).json({ docPath, docId, status: 'dirty' });
   };
@@ -220,6 +366,21 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
       collection: target.collection,
       docId: target.docId,
     });
+
+    // Cascade cleanup (issue #23 follow-up, spec §4.4): deleting a
+    // cmsSchedule doc must not orphan its session_materials /
+    // session_materials_public rows — without this, listSessionMaterials
+    // 404s on the now-gone session (so the admin UI can never reach them
+    // again) while the public projection keeps serving metadata for a
+    // session that no longer exists. Only cmsSchedule carries materials;
+    // every other GENERIC_COLLECTIONS member is a no-op-safe call away
+    // from this (deleteMaterialsForSession would just find nothing), but
+    // scoping it to cmsSchedule keeps the intent explicit and skips the
+    // query entirely for the collections that never have materials.
+    if (target.collection === 'cmsSchedule') {
+      await deleteMaterialsForSession({ db, sessionId: target.docId });
+    }
+
     await logAdminAction({ db, action: 'cms-delete-content', docPath: livePath, actor, now, log });
     res.status(200).json({ deleted: [livePath, draftPath] });
   };
@@ -297,8 +458,21 @@ module.exports = {
   createCmsUpdateContentHandler,
   createCmsDeleteContentHandler,
   createGetSiteContentHandler,
+  // Mirrored client-side by apps/web/src/admin/contentDoc.js
+  // (DELETE_FIELD_SENTINEL) — see the constant's own doc comment above for
+  // why a caller needs it at all. A parity test on the web side keeps the
+  // two literals from drifting.
+  DELETE_FIELD_SENTINEL,
   get handlers() {
     return buildHandlers();
   },
-  internals: { resolveTarget, validateFields, isValidDocId, SECTION_FIELD_RE, GENERIC_COLLECTIONS },
+  internals: {
+    resolveTarget,
+    validateFields,
+    checkSpeakerReferences,
+    isValidDocId,
+    SECTION_FIELD_RE,
+    GENERIC_COLLECTIONS,
+    omitDeletedFields,
+  },
 };

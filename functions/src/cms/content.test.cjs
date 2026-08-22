@@ -8,6 +8,7 @@ const {
   createCmsUpdateContentHandler,
   createCmsDeleteContentHandler,
   createGetSiteContentHandler,
+  DELETE_FIELD_SENTINEL,
   internals,
 } = require('./content.cjs');
 const { makeFakeDb } = require('./firestoreFake.cjs');
@@ -258,6 +259,53 @@ test('cmsUpdateContent merges fields onto the existing draft; live stays untouch
   assert.equal(db.writes.some((w) => w.path.startsWith('cmsContent/')), false);
 });
 
+test('cmsUpdateContent drops a field explicitly marked with DELETE_FIELD_SENTINEL', async () => {
+  // A cmsContent block switching type (apps/web/src/admin) needs to clear
+  // the OLD type's now-irrelevant fields, which the merge-onto-the-prior-
+  // draft semantics above would otherwise strand on the doc forever.
+  const db = makeFakeDb({
+    'cmsContent_drafts/faq__q1': {
+      question: 'keep', answer: 'stale-answer', section: 'faq', field: 'q1',
+      visible: true, status: 'clean', basedOnRevision: 2,
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({
+      body: {
+        section: 'faq',
+        field: 'q1',
+        fields: { blockType: 'text', value: 'now text', answer: DELETE_FIELD_SENTINEL },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  const draft = db.read('cmsContent_drafts', 'faq__q1');
+  assert.equal(draft.value, 'now text');
+  assert.equal(draft.question, 'keep'); // unspecified fields still survive
+  assert.equal('answer' in draft, false); // explicitly cleared, not merely nulled
+});
+
+test('cmsCreateContent also honors DELETE_FIELD_SENTINEL (defensive; no base to strand)', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        section: 'hero',
+        field: 'title',
+        fields: { value: 'Welcome', extra: DELETE_FIELD_SENTINEL },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  const draft = db.read('cmsContent_drafts', 'hero__title');
+  assert.equal(draft.value, 'Welcome');
+  assert.equal('extra' in draft, false);
+});
+
 test('cmsUpdateContent forks a draft from the live doc when only the live doc exists', async () => {
   const db = makeFakeDb({
     'cmsContent/hero__title': { value: 'live', extra: 'field', section: 'hero', field: 'title', visible: true, revision: 6 },
@@ -302,6 +350,45 @@ test('cmsDeleteContent removes live and draft in one batch and logs the action',
   assert.equal(db.read('cmsContent_drafts', 'hero__title'), undefined);
   assert.equal(db.commitCount, 1);
   assert.equal(db.ids('admin_logs').length, 1);
+});
+
+test('cmsDeleteContent on a cmsSchedule doc cascades: its materials and their public projections are deleted too (issue #23 follow-up)', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/s1': { title: 'Session', visible: true, revision: 1, materialCount: 2 },
+    'cmsSchedule_drafts/s1': { title: 'Session', visible: true, status: 'clean', basedOnRevision: 1 },
+    'session_materials/m1': { sessionId: 's1', type: 'link', url: 'https://a.org', filename: 'A', reviewStatus: 'approved' },
+    'session_materials/m2': { sessionId: 's1', type: 'link', url: 'https://b.org', filename: 'B', reviewStatus: 'pending' },
+    'session_materials_public/m1': { sessionId: 's1', type: 'link', filename: 'A', reviewStatus: 'approved' },
+    // A different session's material must survive.
+    'session_materials/other': { sessionId: 's2', type: 'link', url: 'https://c.org', filename: 'C', reviewStatus: 'approved' },
+  });
+  const res = fakeRes();
+  await createCmsDeleteContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 's1' } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsSchedule', 's1'), undefined);
+  assert.equal(db.read('session_materials', 'm1'), undefined);
+  assert.equal(db.read('session_materials', 'm2'), undefined);
+  assert.equal(db.read('session_materials_public', 'm1'), undefined);
+  assert.notEqual(db.read('session_materials', 'other'), undefined);
+});
+
+test('cmsDeleteContent on a non-cmsSchedule collection never queries session_materials', async () => {
+  const db = makeFakeDb({
+    'cmsContent/hero__title': { value: 'live', visible: true, revision: 1 },
+    'cmsContent_drafts/hero__title': { value: 'draft', visible: true, status: 'clean', basedOnRevision: 1 },
+  });
+  const res = fakeRes();
+  await createCmsDeleteContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'title' } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  // No session_materials collection was ever created in the fake store —
+  // asserting on the id list is a cheap proxy for "never touched".
+  assert.deepEqual(db.ids('session_materials'), []);
 });
 
 // --- getSiteContent -----------------------------------------------------------
@@ -373,4 +460,191 @@ test('resolveTarget routes cmsPages/cmsUpdates to their validated writers (never
   assert.equal(updates.ok, false);
   assert.match(updates.message, /cmsSaveUpdate/);
   assert.deepEqual(internals.GENERIC_COLLECTIONS, ['cmsContent', 'cmsSchedule', 'cmsOrganizations', 'cmsTimeline']);
+});
+
+// --- speakerIds referential integrity (spec §4.3 seam #1) -------------------
+
+const SPEAKERS = {
+  'speakers/s1': { firstName: 'Rae', lastName: 'Okonkwo', slug: 'rae-okonkwo', status: 'approved' },
+  'speakers/s2': { firstName: 'Sam', lastName: 'Example', slug: 'sam-example', status: 'draft' },
+};
+
+test('creating a session with a dangling speakerId is REJECTED, naming the id', async () => {
+  const db = makeFakeDb({ ...SPEAKERS });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { title: 'Panel', speakerIds: ['s1', 'ghost'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'speakerIds: no speaker exists with id "ghost"');
+  // Rejected, not silently dropped: nothing was written at all.
+  assert.equal(db.read('cmsSchedule_drafts', 'sess-1'), undefined);
+});
+
+test('creating a session whose speakerIds all resolve is accepted verbatim', async () => {
+  const db = makeFakeDb({ ...SPEAKERS });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { title: 'Panel', speakerIds: ['s1', 's2'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.read('cmsSchedule_drafts', 'sess-1').speakerIds, ['s1', 's2']);
+});
+
+test('a speaker in any pipeline status satisfies the reference — existence is the test', async () => {
+  // The seam asks "does speakers/{id} exist", not "is it published": an
+  // unapproved speaker is a legitimate session assignment, and it is the
+  // projection that decides what the public sees.
+  const db = makeFakeDb({ ...SPEAKERS });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-2', fields: { speakerIds: ['s2'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+});
+
+test('updating a session validates the MERGED speakerIds, not just the payload', async () => {
+  const db = makeFakeDb({
+    ...SPEAKERS,
+    'cmsSchedule_drafts/sess-1': { title: 'Panel', speakerIds: ['ghost'], status: 'dirty' },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { title: 'Renamed' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /no speaker exists with id "ghost"/);
+  assert.equal(db.read('cmsSchedule_drafts', 'sess-1').title, 'Panel', 'nothing was written');
+});
+
+test('an update that FIXES the dangling reference is accepted', async () => {
+  const db = makeFakeDb({
+    ...SPEAKERS,
+    'cmsSchedule_drafts/sess-1': { title: 'Panel', speakerIds: ['ghost'], status: 'dirty' },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { speakerIds: ['s1'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.read('cmsSchedule_drafts', 'sess-1').speakerIds, ['s1']);
+});
+
+test('a malformed speakerIds value is rejected before any speaker read', async () => {
+  const db = makeFakeDb({ ...SPEAKERS });
+  for (const speakerIds of ['s1', [42], ['s1', 's1']]) {
+    const res = fakeRes();
+    await createCmsCreateContentHandler(deps(db))(
+      req({ body: { collection: 'cmsSchedule', docId: 'sess-x', fields: { speakerIds } } }),
+      res,
+    );
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body.error.message, /^speakerIds: /);
+  }
+});
+
+test('a concurrent deleteSpeaker aborts the save instead of leaving a dangling id', async () => {
+  // The seam is only real if the reference read and the draft write are the
+  // SAME transaction. As a pre-check it was advisory: deleteSpeaker queries
+  // the sessions and drafts that exist at its moment, so a draft written a
+  // heartbeat later still named the deleted speaker — with no reconciler
+  // left in the system to notice.
+  const db = makeFakeDb({ ...SPEAKERS });
+  // The speaker vanishes between the transaction body and its commit.
+  db.beforeCommit = () => {
+    db.collection('speakers').doc('s1').delete();
+  };
+
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { speakerIds: ['s1'] } } }),
+    res,
+  );
+
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /no speaker exists with id "s1"/);
+  assert.equal(db.read('cmsSchedule_drafts', 'sess-1'), undefined, 'no dangling draft was written');
+});
+
+test('the same interleaving on an update leaves the stored draft untouched', async () => {
+  const db = makeFakeDb({
+    ...SPEAKERS,
+    'cmsSchedule_drafts/sess-1': { title: 'Panel', speakerIds: [], status: 'dirty' },
+  });
+  db.beforeCommit = () => {
+    db.collection('speakers').doc('s2').delete();
+  };
+
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { speakerIds: ['s2'] } } }),
+    res,
+  );
+
+  assert.equal(res.statusCode, 400);
+  assert.deepEqual(db.read('cmsSchedule_drafts', 'sess-1').speakerIds, []);
+});
+
+test('a save that races nothing still commits on the retry path', async () => {
+  // The conflict machinery must not turn an unrelated concurrent write
+  // into a failed save: the body re-runs and succeeds.
+  const db = makeFakeDb({ ...SPEAKERS });
+  db.beforeCommit = () => {
+    db.collection('speakers').doc('s1').set({ ...SPEAKERS['speakers/s1'], bio: 'edited' });
+  };
+
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { speakerIds: ['s1'] } } }),
+    res,
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.read('cmsSchedule_drafts', 'sess-1').speakerIds, ['s1']);
+});
+
+test('speakerIds is stored as an array even when the payload sends null', async () => {
+  // `null` validates as "no references" — it must not be PERSISTED as
+  // null, or the stored shape stops being string[] and every reader has to
+  // defend against it.
+  const db = makeFakeDb({ ...SPEAKERS });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { title: 'Panel', speakerIds: null } } }),
+    res,
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.read('cmsSchedule_drafts', 'sess-1').speakerIds, []);
+});
+
+test('an update that clears speakerIds with null stores an empty array', async () => {
+  const db = makeFakeDb({
+    ...SPEAKERS,
+    'cmsSchedule_drafts/sess-1': { title: 'Panel', speakerIds: ['s1'], status: 'dirty' },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-1', fields: { speakerIds: null } } }),
+    res,
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.read('cmsSchedule_drafts', 'sess-1').speakerIds, []);
+});
+
+test('collections without speaker references are untouched by the seam', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  // cmsContent has no speakers; a stray speakerIds field is ordinary content.
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'blurb', fields: { speakerIds: ['ghost'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
 });

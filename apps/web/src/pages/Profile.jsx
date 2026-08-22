@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PROFILE_VISIBILITIES } from 'shared/profile';
+import { MAX_TOTAL_BADGES } from 'shared/badges';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
@@ -68,6 +69,27 @@ function readBadgeCategories(badgesConfig) {
         })),
     }))
     .filter((category) => category.badges.length > 0);
+}
+
+// How close a config's total is allowed to get to MAX_TOTAL_BADGES before
+// the picker says anything: the operator-side validator (validateBadgesConfig,
+// packages/shared/src/config/schema.cjs) already refuses a config that
+// crosses the limit, so this is advance notice for whoever is filling out
+// categories close to it, not a correctness check the picker performs.
+const APPROACHING_LIMIT_MARGIN = 5;
+
+/**
+ * The most badges an attendee could ever have selected at once across these
+ * categories — sum of each category's maxPicks, bounded by how many badges
+ * it actually offers. Mirrors the bound validateBadgesConfig enforces
+ * against MAX_TOTAL_BADGES, so the picker can warn using the same number.
+ */
+function totalSelectable(categories) {
+  return categories.reduce(
+    (sum, category) =>
+      sum + Math.min(category.maxPicks ?? category.badges.length, category.badges.length),
+    0,
+  );
 }
 
 export default function Profile() {
@@ -140,6 +162,8 @@ export default function Profile() {
       value !== 'public' || features.publicAttendeeProfiles || form.profileVisibility === 'public',
   );
   const badgeCategories = features.badges ? readBadgeCategories(badgesConfig) : [];
+  const nearBadgeLimit =
+    MAX_TOTAL_BADGES - totalSelectable(badgeCategories) <= APPROACHING_LIMIT_MARGIN;
 
   const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -312,6 +336,12 @@ export default function Profile() {
         {badgeCategories.length > 0 ? (
           <section>
             <h2 className="font-heading text-xl text-brand-ink">Badges</h2>
+            {nearBadgeLimit ? (
+              <p className="mt-1 text-sm text-brand-ink-muted" role="status">
+                This event is close to the platform’s {MAX_TOTAL_BADGES}-badge total across all
+                categories, so some categories may offer fewer picks than usual.
+              </p>
+            ) : null}
             {badgeCategories.map((category) => {
               const picked = category.badges.filter((badge) =>
                 form.badges.includes(badge.id),

@@ -12,11 +12,17 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 
 const TABS = [
   { to: 'pages', label: 'Pages' },
+  { to: 'content', label: 'Content' },
+  { to: 'speakers', label: 'Speakers' },
   { to: 'settings', label: 'Event' },
   { to: 'features', label: 'Features' },
   { to: 'badges', label: 'Badges' },
   { to: 'branding', label: 'Branding' },
   { to: 'media', label: 'Media' },
+  { to: 'materials', label: 'Materials' },
+  { to: 'live-updates', label: 'Live updates' },
+  { to: 'feedback', label: 'Feedback' },
+  { to: 'system-errors', label: 'System errors' },
 ];
 
 function tabClass({ isActive }) {

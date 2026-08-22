@@ -9,6 +9,8 @@
  * offending field.
  */
 
+const { MAX_TOTAL_BADGES } = require('../badges.cjs');
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HHMM_RE = /^\d{2}:\d{2}$/;
 const NAIVE_ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
@@ -201,7 +203,19 @@ function validateTheme(theme) {
  * Validate a config/badges document:
  * `{ categories: [{ id, label, maxPicks, badges: [{ id, label, ... }] }] }`.
  * Category ids unique, badge ids unique across all categories, maxPicks a
- * positive integer.
+ * positive integer, and the total a user could ever have stored at once
+ * bounded by MAX_TOTAL_BADGES.
+ *
+ * That last check exists because `firestore.rules` caps a stored `badges`
+ * array at MAX_TOTAL_BADGES entries (it cannot read this config to check
+ * membership, so it can only bound the array's size) — without this check
+ * an operator could configure e.g. one category with maxPicks 41, the
+ * picker would let an attendee select all 41, and the save would fail at
+ * the rules boundary with a generic error the attendee cannot act on. The
+ * bound is the sum, across categories, of `min(maxPicks, badge count)` —
+ * the actual maximum number of ids an attendee could ever have selected at
+ * once — not the total number of badges configured, since a category can
+ * offer far more badges than its maxPicks lets anyone pick.
  *
  * @param {object} badges
  * @returns {{ ok: boolean, errors: string[] }}
@@ -216,6 +230,7 @@ function validateBadgesConfig(badges) {
   }
   const categoryIds = new Set();
   const badgeIds = new Set();
+  let maxSelectable = 0;
   badges.categories.forEach((cat, i) => {
     const at = `badges.categories[${i}]`;
     if (!cat || typeof cat !== 'object') {
@@ -248,7 +263,15 @@ function validateBadgesConfig(badges) {
         badgeIds.add(badge.id);
       }
     });
+    const cap = Number.isInteger(cat.maxPicks) && cat.maxPicks > 0 ? cat.maxPicks : cat.badges.length;
+    maxSelectable += Math.min(cap, cat.badges.length);
   });
+  if (maxSelectable > MAX_TOTAL_BADGES) {
+    errors.push(
+      `badges: the maximum an attendee could select across all categories (${maxSelectable}) ` +
+        `exceeds the platform limit of ${MAX_TOTAL_BADGES} — lower one or more categories' maxPicks`,
+    );
+  }
   return { ok: errors.length === 0, errors };
 }
 
