@@ -53,12 +53,25 @@ test('an unknown provider names the valid set', () => {
 });
 
 test('selecting an adapter that is not in the build says so, not MODULE_NOT_FOUND', () => {
-  for (const name of ['eventbrite', 'manual']) {
-    assert.throws(
-      () => getTicketingProvider({ env: { EVENT_TICKETING_PROVIDER: name } }),
-      new RegExp(`is "${name}", but that adapter is not part of this build`),
-    );
-  }
+  // manual (#31) has landed; only eventbrite (#30) is still unbuilt.
+  assert.throws(
+    () => getTicketingProvider({ env: { EVENT_TICKETING_PROVIDER: 'eventbrite' } }),
+    /is "eventbrite", but that adapter is not part of this build/,
+  );
+});
+
+test('manual is resolved by convention — adding providers/manual.cjs was the whole registration', () => {
+  const { makeFakeDb } = require('../../cms/firestoreFake.cjs');
+  const db = makeFakeDb();
+  const provider = getTicketingProvider({ env: { EVENT_TICKETING_PROVIDER: 'manual' }, db });
+  assert.equal(provider.name, 'manual');
+  assert.equal(typeof provider.verifyWebhook, 'function');
+  assert.equal(typeof provider.fetchOrder, 'function');
+  assert.equal(typeof provider.listTickets, 'function');
+  assert.equal(typeof provider.lookupByOrderNumber, 'function');
+  assert.equal(typeof provider.getRegistrationPrompt, 'function');
+  // No registerWebhook (§3.3 capability gate).
+  assert.equal(typeof provider.registerWebhook, 'undefined');
 });
 
 test('a registered adapter factory is used and contract-checked', () => {

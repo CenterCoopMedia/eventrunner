@@ -63,6 +63,8 @@
     "ticketingVerifyOrder",
     "createUserFromTicket",
     "getTicketingStatus",
+    "ticketingImportCsv",
+    "ticketingListTickets",
     "approveUser",
     "revokeUser"
   ]

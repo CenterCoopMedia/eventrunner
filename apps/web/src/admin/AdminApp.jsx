@@ -34,6 +34,7 @@ import AdminAttendees from './pages/AdminAttendees.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
+import AdminTicketing from './pages/AdminTicketing.jsx';
 
 export function AdminGate({ children }) {
   const { user, adminStatus, loading } = useAuth();
@@ -113,6 +114,7 @@ export default function AdminApp() {
           <Route path="media" element={<AdminMedia />} />
           <Route path="materials" element={<AdminMaterialsTab />} />
           <Route path="attendees" element={<AdminAttendees />} />
+          <Route path="ticketing" element={<AdminTicketing />} />
           <Route path="live-updates" element={<AdminLiveUpdates />} />
           <Route path="feedback" element={<AdminFeedback />} />
           <Route path="system-errors" element={<AdminSystemErrors />} />

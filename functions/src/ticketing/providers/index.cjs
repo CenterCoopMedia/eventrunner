@@ -70,7 +70,13 @@ function loadAdapterFactory(name) {
   return mod[factoryName];
 }
 
-/** Built-in factories. Adapters are resolved lazily by loadAdapterFactory. */
+/**
+ * Built-in factories. `none` is the only one: it must work with no adapter
+ * file present (the safe default, spec §3.3). `manual` is resolved lazily
+ * by loadAdapterFactory below — providers/manual.cjs existing and exporting
+ * `createManualProvider` is the whole registration; this registry needed no
+ * edit for issue #31 to land, exactly as the module doc above promises.
+ */
 const BUILT_IN_FACTORIES = { none: createNoneProvider };
 
 /**
@@ -113,12 +119,18 @@ function assertProviderContract(provider, expectedName) {
  * Select and construct the configured provider.
  *
  * @param {{ env?: Record<string, string|undefined>, fetchImpl?: typeof fetch,
- *           factories?: Record<string, Function> }} [deps]
- *   `factories` is a test seam (and the seam #30/#31 will register through);
- *   it never reaches production code paths.
+ *           factories?: Record<string, Function>, db?: object,
+ *           getConfig?: () => Promise<object> }} [deps]
+ *   `factories` is a test seam; it never reaches production code paths.
+ *   `db`/`getConfig` are forwarded to the adapter factory unchanged — the
+ *   `manual` adapter needs both (it reads/writes `tickets/{externalId}`
+ *   directly and reads `config/event.registration.externalUrl` for §3.5);
+ *   `none` and `eventbrite` ignore what they do not need. Nothing in this
+ *   module imports firebase-admin itself (core/firestore.cjs's job) — `db`
+ *   only ever arrives here already constructed by the caller.
  * @returns {object} TicketingProvider (spec §3.3)
  */
-function getTicketingProvider({ env = process.env, fetchImpl, factories } = {}) {
+function getTicketingProvider({ env = process.env, fetchImpl, factories, db, getConfig } = {}) {
   const raw = typeof env.EVENT_TICKETING_PROVIDER === 'string'
     ? env.EVENT_TICKETING_PROVIDER.trim()
     : env.EVENT_TICKETING_PROVIDER;
@@ -140,7 +152,7 @@ function getTicketingProvider({ env = process.env, fetchImpl, factories } = {}) 
     ? override
     : BUILT_IN_FACTORIES[raw] || loadAdapterFactory(raw);
 
-  return assertProviderContract(factory({ env, fetchImpl }), raw);
+  return assertProviderContract(factory({ env, fetchImpl, db, getConfig }), raw);
 }
 
 /**
