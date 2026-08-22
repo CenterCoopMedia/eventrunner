@@ -31,7 +31,7 @@
  * leaves the replacement alone.
  */
 
-const { requireAdmin } = require('../core/auth.cjs');
+const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
 const { scanUsage } = require('./usage.cjs');
@@ -75,6 +75,29 @@ const MAX_ALT_LENGTH = 500;
 const MAX_TITLE_LENGTH = 200;
 
 const CACHE_CONTROL = 'public, max-age=3600';
+
+/**
+ * Speaker headshots (spec §8.5, §9 "Speaker profile wizard", issue #22).
+ *
+ * NOT one of FOLDERS above: this namespace is scoped by `speakerId`, not by
+ * a generated `assetId`, and it is not indexed in `media_assets` — a
+ * headshot is addressed the same way a profile photo is, straight off
+ * `speakers.headshotPath`, and mediaDelete's usage scan has no business
+ * over a namespace `speakers/{id}` already owns as a foreign key. Its
+ * storage.rules match block is `write: if false` in BOTH directions — the
+ * comment there names this handler by design, so the object path and the
+ * authorization it enforces are the only things standing between a public
+ * `get: if true` namespace and an arbitrary write.
+ *
+ * SVG is excluded, same reasoning as storage.rules' `isAllowedImage()` for
+ * the one client-writable namespace (profile-photos): an SVG served from
+ * the bucket is a script-execution surface, and unlike `branding/` there is
+ * no seeded placeholder here that needs the format.
+ */
+const SPEAKER_PHOTO_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/webp']);
+
+/** Mirrors storage.rules' `profile-photos` cap — the same class of asset. */
+const SPEAKER_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 
 /** Base64 with optional padding, nothing else. */
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -389,6 +412,104 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
   };
 }
 
+/**
+ * Write a speaker's headshot object at its fixed per-speaker path. Fixed
+ * filename per content type — like `uploadProfilePhoto` on the web side —
+ * so replacing a photo overwrites the one object instead of accumulating
+ * every headshot a speaker has ever picked.
+ *
+ * @param {{ bucket: object, speakerId: string, contentType: string,
+ *           buffer: Buffer, actor: { uid: string, email: string } }} args
+ * @returns {Promise<{ path: string }>}
+ */
+async function storeSpeakerPhoto({ bucket, speakerId, contentType, buffer, actor }) {
+  const path = `speaker-photos/${speakerId}/photo.${EXTENSIONS[contentType]}`;
+  await bucket.file(path).save(buffer, {
+    resumable: false,
+    contentType,
+    metadata: {
+      contentType,
+      cacheControl: CACHE_CONTROL,
+      metadata: { uploadedBy: actor.email },
+    },
+  });
+  return { path };
+}
+
+/**
+ * `speakerPhotoUpload`: POST a base64 image for a speaker's headshot.
+ *
+ * Authorized two ways, checked in this order: an admin (same
+ * `config/bootstrap.adminEmails` check `requireAdmin` runs, inlined here so
+ * a non-admin does not pay for an admin-only rejection path), or the
+ * speaker who OWNS the record — `speakers/{speakerId}.uid` equals the
+ * caller's uid, the same pair `functions/src/speakers/profile.cjs`'s
+ * `updateOwnSpeakerProfile` checks. Nobody else may reach the object path,
+ * which is what makes storage.rules' `write: if false` on `speaker-photos/`
+ * safe to leave permanently closed to clients.
+ *
+ * The response carries only `{ path }` — the wizard sets it as the form's
+ * `headshotPath` and saves it through `updateOwnSpeakerProfile`, the same
+ * "upload lands before the record is saved" ordering `ProfilePhotoField`
+ * uses for attendee photos (an object with no record pointing at it is
+ * cheap and invisible; a saved path with no object is a broken image).
+ */
+function createSpeakerPhotoUploadHandler({ db, bucket, auth, getConfig, log = console }) {
+  return async function speakerPhotoUpload(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+
+    const decoded = await verifyAuthToken({ auth }, req);
+    if (!decoded?.uid) return sendError(res, 401, 'unauthorized', 'Authentication required.');
+
+    const speakerId = typeof req.body?.speakerId === 'string' ? req.body.speakerId.trim() : '';
+    if (!speakerId) return badRequest(res, 'speakerId: required');
+
+    let isAdmin = false;
+    const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
+    if (email && decoded.email_verified === true) {
+      const config = await getConfig();
+      const adminEmails = Array.isArray(config?.bootstrap?.adminEmails) ? config.bootstrap.adminEmails : [];
+      isAdmin = adminEmails.some((entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email);
+    }
+
+    if (!isAdmin) {
+      const snap = await db.collection('speakers').doc(speakerId).get();
+      if (!snap.exists) return notFound(res, `No speaker with id "${speakerId}".`);
+      const stored = snap.data() || {};
+      if (typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
+        return sendError(res, 403, 'forbidden', 'You may only upload a photo for your own speaker profile.');
+      }
+    }
+
+    const contentType = typeof req.body?.contentType === 'string' ? req.body.contentType.trim() : '';
+    if (!SPEAKER_PHOTO_TYPES.includes(contentType)) {
+      return badRequest(res, `contentType: must be one of ${SPEAKER_PHOTO_TYPES.join(', ')}`);
+    }
+    const decodedUpload = decodeUpload(req.body?.data);
+    if (!decodedUpload.ok) return badRequest(res, decodedUpload.message);
+    // storage.rules refuses a profile-class photo of EXACTLY the cap
+    // (`size < 2 MiB`); this mirrors that so the two paths agree.
+    if (decodedUpload.buffer.length >= SPEAKER_PHOTO_MAX_BYTES) {
+      return badRequest(res, `data: must be under ${SPEAKER_PHOTO_MAX_BYTES} bytes`);
+    }
+
+    let stored;
+    try {
+      stored = await storeSpeakerPhoto({
+        bucket,
+        speakerId,
+        contentType,
+        buffer: decodedUpload.buffer,
+        actor: { uid: decoded.uid, email: typeof decoded.email === 'string' ? decoded.email : '' },
+      });
+    } catch (err) {
+      log.error('speakerPhotoUpload failed', err);
+      return internal(res, 'The photo could not be uploaded.');
+    }
+    res.status(200).json({ path: stored.path });
+  };
+}
+
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
   const { withMediaDeps } = require('./deps.cjs');
@@ -396,13 +517,16 @@ function buildHandlers() {
   return {
     mediaUpload: onRequest({ region, memory: '512MiB' }, withMediaDeps(createMediaUploadHandler)),
     mediaDelete: onRequest({ region }, withMediaDeps(createMediaDeleteHandler)),
+    speakerPhotoUpload: onRequest({ region, memory: '512MiB' }, withMediaDeps(createSpeakerPhotoUploadHandler)),
   };
 }
 
 module.exports = {
   createMediaUploadHandler,
   createMediaDeleteHandler,
+  createSpeakerPhotoUploadHandler,
   storeAsset,
+  storeSpeakerPhoto,
   get handlers() {
     return buildHandlers();
   },
@@ -417,5 +541,7 @@ module.exports = {
     MAX_ALT_LENGTH,
     MAX_TITLE_LENGTH,
     CACHE_CONTROL,
+    SPEAKER_PHOTO_TYPES,
+    SPEAKER_PHOTO_MAX_BYTES,
   },
 };

@@ -7,7 +7,8 @@ const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const {
   createMediaUploadHandler,
   createMediaDeleteHandler,
-  internals: { validateUpload, decodeUpload, safeObjectName, MAX_UPLOAD_BYTES },
+  createSpeakerPhotoUploadHandler,
+  internals: { validateUpload, decodeUpload, safeObjectName, MAX_UPLOAD_BYTES, SPEAKER_PHOTO_MAX_BYTES },
 } = require('./upload.cjs');
 
 const ADMIN_EMAIL = 'admin@example.org';
@@ -353,4 +354,111 @@ test('mediaDelete rejects an assetId that is a path', async () => {
     res,
   );
   assert.equal(res.statusCode, 400);
+});
+
+// ------------------------------------------------------------ speakerPhotoUpload
+
+const SPEAKER_UID = 'speaker-uid-1';
+
+/** { db, bucket } seeded with one speaker owned by SPEAKER_UID. */
+function speakerWorld(extra = {}) {
+  return makeFakeDb({
+    'speakers/rae': { firstName: 'Rae', lastName: 'Okonkwo', uid: SPEAKER_UID, status: 'accepted', ...extra },
+  });
+}
+
+function speakerAuthDeps(db, bucket, { uid = SPEAKER_UID, email = 'rae@example.org' } = {}) {
+  return {
+    db,
+    bucket,
+    auth: { verifyIdToken: async () => ({ uid, email, email_verified: true }) },
+    getConfig: async () => ({ bootstrap: { adminEmails: [ADMIN_EMAIL] } }),
+    log: { warn() {}, error() {} },
+  };
+}
+
+test('speakerPhotoUpload requires a token', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    { method: 'POST', headers: {}, body: { speakerId: 'rae', contentType: 'image/png', data: PNG } },
+    res,
+  );
+  assert.equal(res.statusCode, 401);
+});
+
+test('speakerPhotoUpload lets the owning speaker write their own folder', async () => {
+  const bucket = fakeBucket();
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), bucket))(
+    post({ speakerId: 'rae', contentType: 'image/png', data: PNG }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.path, 'speaker-photos/rae/photo.png');
+  assert.equal(bucket.objects.has('speaker-photos/rae/photo.png'), true);
+});
+
+test('speakerPhotoUpload refuses a caller who does not own the speaker record', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket(), { uid: 'someone-else' }))(
+    post({ speakerId: 'rae', contentType: 'image/png', data: PNG }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+});
+
+test('speakerPhotoUpload 404s for an unknown speaker', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(makeFakeDb({}), fakeBucket()))(
+    post({ speakerId: 'ghost', contentType: 'image/png', data: PNG }),
+    res,
+  );
+  assert.equal(res.statusCode, 404);
+});
+
+test('speakerPhotoUpload lets an admin upload on a speaker’s behalf even without ownership', async () => {
+  const bucket = fakeBucket();
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(
+    speakerAuthDeps(speakerWorld(), bucket, { uid: 'admin-1', email: ADMIN_EMAIL }),
+  )(post({ speakerId: 'rae', contentType: 'image/png', data: PNG }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('speakerPhotoUpload rejects a disallowed content type (no SVG here)', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    post({ speakerId: 'rae', contentType: 'image/svg+xml', data: PNG }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /contentType/);
+});
+
+test('speakerPhotoUpload rejects a payload at or over the 2 MiB cap', async () => {
+  const oversize = 'A'.repeat(Math.ceil(SPEAKER_PHOTO_MAX_BYTES / 3) * 4);
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    post({ speakerId: 'rae', contentType: 'image/png', data: oversize }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+});
+
+test('speakerPhotoUpload requires a speakerId', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    post({ contentType: 'image/png', data: PNG }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+});
+
+test('speakerPhotoUpload is POST-only', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    { method: 'GET' },
+    res,
+  );
+  assert.equal(res.statusCode, 405);
 });
