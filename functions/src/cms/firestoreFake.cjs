@@ -197,6 +197,12 @@ function makeFakeDb(seed = {}) {
         orderBy(field, direction) {
           return query(name, [], null, undefined, undefined).orderBy(field, direction);
         },
+        // Unfiltered read of the whole collection — real Firestore's
+        // CollectionReference supports `.get()` directly (it IS an
+        // unfiltered Query), so the fake must too.
+        get() {
+          return query(name, [], null, undefined, undefined).get();
+        },
       };
     },
     async getAll(...refs) {

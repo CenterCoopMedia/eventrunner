@@ -16,7 +16,16 @@
     "target": "site",
     "public": "apps/web/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+    "rewrites": [
+      {
+        "source": "/updates/**",
+        "function": {
+          "functionId": "updatesMeta",
+          "region": "us-central1"
+        }
+      },
+      { "source": "**", "destination": "/index.html" }
+    ]
   },
   "emulators": {
     "auth": { "port": 9099 },

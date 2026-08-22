@@ -24,6 +24,15 @@
     "deleteSpeaker",
     "emailDeliveryWebhook",
     "bookmarkSession",
-    "logClientError"
+    "buildSchedulePdf",
+    "updatesMeta",
+    "reactToSession",
+    "logClientError",
+    "listSystemErrors",
+    "resolveSystemErrors",
+    "saveLiveUpdate",
+    "deleteLiveUpdate",
+    "submitFeedback",
+    "updateFeedbackStatus"
   ]
 }

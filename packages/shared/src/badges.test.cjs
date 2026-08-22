@@ -2,7 +2,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { validateBadgeSelection } = require('./badges.cjs');
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
+const { validateBadgeSelection, MAX_TOTAL_BADGES } = require('./badges.cjs');
 
 const CONFIG = {
   categories: [
@@ -34,4 +36,19 @@ test('degrades safely on garbage input', () => {
   assert.deepEqual(validateBadgeSelection(null, CONFIG), { valid: [], rejected: [] });
   assert.deepEqual(validateBadgeSelection(['writer'], null), { valid: [], rejected: ['writer'] });
   assert.deepEqual(validateBadgeSelection([42, 'writer'], CONFIG), { valid: ['writer'], rejected: [42] });
+});
+
+// firestore.rules cannot `require()` this module, so its badges-array size
+// cap is a hand-written literal (validBadgesList()) rather than an import
+// of MAX_TOTAL_BADGES. This pins the two numbers equal so a change to one
+// without the other fails loudly here instead of surfacing as a config an
+// admin can save but an attendee can never fully select (see
+// config/schema.cjs's validateBadgesConfig, which enforces the same bound
+// on the config side).
+test('MAX_TOTAL_BADGES matches the literal cap hand-written into firestore.rules', () => {
+  const rulesPath = path.join(__dirname, '..', '..', '..', 'firestore.rules');
+  const rulesText = readFileSync(rulesPath, 'utf8');
+  const match = rulesText.match(/badges\.size\(\)\s*<=\s*(\d+)/);
+  assert.ok(match, 'expected to find badges.size() <= N in firestore.rules');
+  assert.equal(Number(match[1]), MAX_TOTAL_BADGES);
 });

@@ -7,6 +7,14 @@
         { "fieldPath": "docPath", "order": "ASCENDING" },
         { "fieldPath": "revision", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "system_errors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "resolved", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

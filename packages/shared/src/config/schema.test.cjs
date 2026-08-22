@@ -8,6 +8,7 @@ const {
   validateBadgesConfig,
   validateFeatures,
 } = require('./schema.cjs');
+const { MAX_TOTAL_BADGES } = require('../badges.cjs');
 
 const VALID_EVENT = {
   name: 'Demo Summit',
@@ -187,6 +188,62 @@ test('validateBadgesConfig enforces unique ids and positive maxPicks', () => {
   assert.ok(bad.errors.some((e) => e.includes('duplicate badge id')));
   assert.ok(bad.errors.filter((e) => e.includes('maxPicks')).length >= 2);
   assert.equal(validateBadgesConfig(null).ok, false);
+});
+
+test('validateBadgesConfig rejects a config whose maximum selectable total exceeds MAX_TOTAL_BADGES', () => {
+  // One category alone over the cap.
+  const oneCategoryOver = validateBadgesConfig({
+    categories: [
+      {
+        id: 'craft',
+        label: 'Craft',
+        maxPicks: MAX_TOTAL_BADGES + 1,
+        badges: Array.from({ length: MAX_TOTAL_BADGES + 1 }, (_, i) => ({ id: `b${i}` })),
+      },
+    ],
+  });
+  assert.equal(oneCategoryOver.ok, false);
+  assert.ok(oneCategoryOver.errors.some((e) => e.startsWith('badges:') && e.includes('platform limit')));
+
+  // Several categories individually fine, but summing past the cap.
+  const summedOver = validateBadgesConfig({
+    categories: [
+      {
+        id: 'craft',
+        maxPicks: MAX_TOTAL_BADGES - 5,
+        badges: Array.from({ length: MAX_TOTAL_BADGES - 5 }, (_, i) => ({ id: `craft-${i}` })),
+      },
+      {
+        id: 'fun',
+        maxPicks: 10,
+        badges: Array.from({ length: 10 }, (_, i) => ({ id: `fun-${i}` })),
+      },
+    ],
+  });
+  assert.equal(summedOver.ok, false);
+  assert.ok(summedOver.errors.some((e) => e.startsWith('badges:')));
+
+  // Exactly at the cap is allowed.
+  const atCap = validateBadgesConfig({
+    categories: [
+      {
+        id: 'craft',
+        maxPicks: MAX_TOTAL_BADGES,
+        badges: Array.from({ length: MAX_TOTAL_BADGES }, (_, i) => ({ id: `b${i}` })),
+      },
+    ],
+  });
+  assert.equal(atCap.ok, true);
+
+  // A generous maxPicks bounded by a small badge list does not count against
+  // the cap at its face value — only the number an attendee could actually
+  // select does.
+  const generousCapSmallList = validateBadgesConfig({
+    categories: [
+      { id: 'craft', maxPicks: 1000, badges: [{ id: 'b1' }, { id: 'b2' }] },
+    ],
+  });
+  assert.equal(generousCapSmallList.ok, true);
 });
 
 test('validateFeatures: booleans only, unknown keys rejected', () => {
