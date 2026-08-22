@@ -50,6 +50,18 @@ function mergeDeep(base, patch) {
   return out;
 }
 
+/**
+ * Resolve a Firestore field path against a document's data. Dotted paths
+ * are how real queries address a nested map field (`publisher.status`),
+ * and the maintenance sweep's queries use them, so the fake must too.
+ */
+function readPath(data, field) {
+  if (!field.includes('.')) return data?.[field];
+  return field.split('.').reduce((value, key) => (
+    value && typeof value === 'object' ? value[key] : undefined
+  ), data);
+}
+
 function orderValue(v) {
   if (v instanceof Date) return v.getTime();
   return v;
@@ -161,7 +173,7 @@ function makeFakeDb(seed = {}) {
       async get() {
         let rows = [...colMap(col).entries()]
           .map(([id, data]) => ({ id, data }))
-          .filter(({ data }) => filters.every((f) => data[f.field] === f.value));
+          .filter(({ data }) => filters.every((f) => readPath(data, f.field) === f.value));
         if (order) {
           const dir = order.direction === 'desc' ? -1 : 1;
           rows.sort((a, b) => {

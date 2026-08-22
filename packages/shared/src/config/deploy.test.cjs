@@ -147,3 +147,53 @@ test('EVENT_OTP_SEND_CEILING_PER_HOUR must be a positive integer', () => {
     assert.ok(result.errors.some((e) => e.startsWith('EVENT_OTP_SEND_CEILING_PER_HOUR')));
   }
 });
+
+// --- site publisher (spec §8.4 phase 5, issue #36) -----------------------------
+
+test('the site publisher defaults off and is never reported missing', () => {
+  const result = validateDeployEnv(VALID_ENV);
+  assert.equal(result.ok, true);
+  assert.equal(result.resolved.EVENT_SITE_PUBLISHER_ENABLED, 'false');
+  assert.equal(DEFAULTS.EVENT_SITE_PUBLISHER_ENABLED, 'false');
+});
+
+test('EVENT_SITE_PUBLISHER_ENABLED must be true or false', () => {
+  for (const bad of ['yes', '1', 'on']) {
+    const result = validateDeployEnv({ ...VALID_ENV, EVENT_SITE_PUBLISHER_ENABLED: bad });
+    assert.equal(result.ok, false, `"${bad}" must fail the build`);
+    assert.ok(result.errors.some((e) => e.startsWith('EVENT_SITE_PUBLISHER_ENABLED')));
+  }
+});
+
+test('enabling the site publisher requires its own service account, with no default', () => {
+  const enabled = validateDeployEnv({ ...VALID_ENV, EVENT_SITE_PUBLISHER_ENABLED: 'true' });
+  assert.equal(enabled.ok, false);
+  assert.ok(enabled.missing.includes('EVENT_PUBLISHER_SERVICE_ACCOUNT'));
+  assert.equal(enabled.resolved.EVENT_PUBLISHER_SERVICE_ACCOUNT, undefined);
+
+  const provisioned = validateDeployEnv({
+    ...VALID_ENV,
+    EVENT_SITE_PUBLISHER_ENABLED: 'true',
+    EVENT_PUBLISHER_SERVICE_ACCOUNT: 'site-publisher@demo-project.iam.gserviceaccount.com',
+  });
+  assert.equal(provisioned.ok, true);
+});
+
+test('service-account variables must be service-account emails', () => {
+  const cases = {
+    EVENT_PUBLISHER_SERVICE_ACCOUNT: 'site-publisher',
+    EVENT_FUNCTIONS_SERVICE_ACCOUNT: 'operator@example.org',
+  };
+  for (const [key, bad] of Object.entries(cases)) {
+    const result = validateDeployEnv({ ...VALID_ENV, [key]: bad });
+    assert.equal(result.ok, false, `${key}="${bad}" must fail the build`);
+    assert.ok(result.errors.some((e) => e.startsWith(key)));
+  }
+  // The default compute account (what Cloud Functions v2 runs as) is a
+  // gserviceaccount.com address without the `iam.` label — it must pass.
+  const compute = validateDeployEnv({
+    ...VALID_ENV,
+    EVENT_FUNCTIONS_SERVICE_ACCOUNT: '123456789-compute@developer.gserviceaccount.com',
+  });
+  assert.equal(compute.ok, true);
+});
