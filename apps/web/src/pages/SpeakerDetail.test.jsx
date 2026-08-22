@@ -10,8 +10,14 @@ let scheduleData;
 vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({ speakers, scheduleData }),
 }));
-let features = { speakers: true };
-const eventConfig = { timezone: 'America/Chicago', days: [{ id: 'day-1', date: '2026-10-15' }] };
+let features = { speakers: true, schedule: true };
+const eventConfig = {
+  timezone: 'America/Chicago',
+  days: [
+    { id: 'day-1', date: '2026-10-15' },
+    { id: 'day-2', date: '2026-10-16' },
+  ],
+};
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ features, eventConfig }),
 }));
@@ -100,9 +106,37 @@ describe('SpeakerDetail', () => {
   it('gates on the speakers feature flag', () => {
     speakers = [PROJECTED];
     scheduleData = [];
-    features = { speakers: false };
+    features = { speakers: false, schedule: true };
     renderAt('/speakers/rae-okonkwo');
     expect(screen.getByText('This event doesn’t have a public speaker directory')).toBeInTheDocument();
-    features = { speakers: true };
+    features = { speakers: true, schedule: true };
+  });
+
+  it('does not render a session list when features.schedule is off (issue #22 review P2-6)', () => {
+    speakers = [PROJECTED];
+    scheduleData = [
+      { id: 'sess-1', title: 'Reporting on Deadline', dayId: 'day-1', startTime: '10:00 AM', speakerIds: ['rae-okonkwo'], visible: true },
+    ];
+    features = { speakers: true, schedule: false };
+    renderAt('/speakers/rae-okonkwo');
+    expect(screen.queryByText('Sessions')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Reporting on Deadline' })).toBeNull();
+    features = { speakers: true, schedule: true };
+  });
+
+  it('orders sessions by day, then start time within the day (issue #22 review P2-10)', () => {
+    // Raw session.startTime is a zero-padded 24-hour "HH:MM" string
+    // (matching cmsSchedule's stored shape — see SessionCard.jsx's own
+    // fixtures), which is what makes sortSessions' plain string compare a
+    // correct time sort.
+    speakers = [PROJECTED];
+    scheduleData = [
+      { id: 'day2-early', title: 'Day 2 early', dayId: 'day-2', startTime: '08:00', speakerIds: ['rae-okonkwo'], visible: true },
+      { id: 'day1-late', title: 'Day 1 late', dayId: 'day-1', startTime: '16:00', speakerIds: ['rae-okonkwo'], visible: true },
+      { id: 'day1-early', title: 'Day 1 early', dayId: 'day-1', startTime: '09:00', speakerIds: ['rae-okonkwo'], visible: true },
+    ];
+    renderAt('/speakers/rae-okonkwo');
+    const links = screen.getAllByRole('link').filter((el) => el.getAttribute('href')?.startsWith('/schedule/'));
+    expect(links.map((el) => el.textContent)).toEqual(['Day 1 early', 'Day 1 late', 'Day 2 early']);
   });
 });

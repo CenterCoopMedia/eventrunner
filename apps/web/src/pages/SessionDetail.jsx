@@ -112,7 +112,7 @@ export default function SessionDetail() {
           ) : null}
         </p>
         {session.location ? <p className="mt-1 text-brand-ink-muted">{session.location}</p> : null}
-        <SpeakerNames speakers={speakerNames} className="mt-2 text-brand-ink-muted" />
+        <SpeakerNames speakers={speakerNames} features={features} className="mt-2 text-brand-ink-muted" />
       </header>
 
       {session.description ? (

@@ -134,16 +134,20 @@ describe('SessionCard', () => {
     expect(screen.queryByText(/add to calendar/i)).toBeNull();
   });
 
-  it('renders a link per resolved speaker name, dropping ids with no matching document', () => {
+  function renderWithSpeaker({ speakerFeature = true, initialEntries = ['/schedule'] } = {}) {
     const withSpeakers = { ...fixtureSession, speakerIds: ['spk-1', 'spk-ghost'] };
-    render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    return render(
+      <MemoryRouter initialEntries={initialEntries} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthContext.Provider value={{ user: null }}>
           <ContentContext.Provider value={{ speakers: [{ id: 'spk-1', displayName: 'Rae Okonkwo', slug: 'rae-okonkwo' }] }}>
             <ProfileContext.Provider value={{ attendeeAccess: false }}>
               <ToastProvider>
                 <ul>
-                  <SessionCard session={withSpeakers} eventConfig={fixtureConfig} features={{}} />
+                  <SessionCard
+                    session={withSpeakers}
+                    eventConfig={fixtureConfig}
+                    features={{ speakers: speakerFeature }}
+                  />
                 </ul>
               </ToastProvider>
             </ProfileContext.Provider>
@@ -151,9 +155,27 @@ describe('SessionCard', () => {
         </AuthContext.Provider>
       </MemoryRouter>,
     );
+  }
+
+  it('renders a link per resolved speaker name, dropping ids with no matching document', () => {
+    renderWithSpeaker();
     const link = screen.getByRole('link', { name: 'Rae Okonkwo' });
     expect(link).toHaveAttribute('href', '/speakers/rae-okonkwo');
     expect(screen.queryByText(/spk-ghost/)).toBeNull();
+  });
+
+  it('renders plain (unlinked) names when features.speakers is off (issue #22 review P2-7)', () => {
+    renderWithSpeaker({ speakerFeature: false });
+    expect(screen.getByText('Rae Okonkwo')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Rae Okonkwo' })).not.toBeInTheDocument();
+  });
+
+  it('carries the current query string into the speaker link (issue #22 review P2-8)', () => {
+    renderWithSpeaker({ initialEntries: ['/schedule?preview=1'] });
+    expect(screen.getByRole('link', { name: 'Rae Okonkwo' })).toHaveAttribute(
+      'href',
+      '/speakers/rae-okonkwo?preview=1',
+    );
   });
 
   describe('bookmark pill (features.sessionBookmarks)', () => {

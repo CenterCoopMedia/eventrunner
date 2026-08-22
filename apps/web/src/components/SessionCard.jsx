@@ -53,17 +53,37 @@ export function useSessionSpeakerNames(speakerIds) {
   }, [speakerIds, speakers]);
 }
 
-/** The comma-joined speaker link row SessionCard and SessionDetail share. */
-export function SpeakerNames({ speakers, className = 'mt-2 text-sm text-brand-ink-muted' }) {
+/**
+ * The comma-joined speaker row SessionCard and SessionDetail share.
+ *
+ * Links only when `features.speakers` is on (issue #22 review finding
+ * P2-7): the public speaker directory route itself gates on that flag
+ * (Speakers.jsx, SpeakerDetail.jsx) and shows "this event doesn't have a
+ * public speaker directory" for it, so a deployment with the feature off
+ * must not send a schedule-card click into that dead end — plain,
+ * unlinked names still tell the reader who is speaking.
+ *
+ * Carries the current query string into the link (issue #22 review finding
+ * P2-8), the same fix SessionCard's title link already has for
+ * `?preview=1`: without it, an admin previewing drafts who clicks a
+ * speaker's name loses the preview the moment they land on the speaker
+ * page.
+ */
+export function SpeakerNames({ speakers, features = {}, className = 'mt-2 text-sm text-brand-ink-muted' }) {
+  const { search } = useLocation();
   if (!speakers || speakers.length === 0) return null;
   return (
     <p className={className}>
       {speakers.map((speaker, index) => (
         <span key={speaker.id}>
           {index > 0 ? ', ' : ''}
-          <Link to={`/speakers/${speaker.slug}`} className="hover:underline">
-            {speaker.displayName}
-          </Link>
+          {features.speakers ? (
+            <Link to={{ pathname: `/speakers/${speaker.slug}`, search }} className="hover:underline">
+              {speaker.displayName}
+            </Link>
+          ) : (
+            speaker.displayName
+          )}
         </span>
       ))}
     </p>
@@ -408,7 +428,7 @@ export default function SessionCard({
               {session.description}
             </p>
           ) : null}
-          <SpeakerNames speakers={speakerNames} />
+          <SpeakerNames speakers={speakerNames} features={features} />
           <div className="mt-3">
             <SessionPills
               session={session}

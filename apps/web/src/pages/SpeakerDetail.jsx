@@ -18,6 +18,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
+import { sortSessions } from './Schedule.jsx';
 
 function text(value) {
   return typeof value === 'string' ? value : '';
@@ -66,9 +67,28 @@ export default function SpeakerDetail() {
   if (!speaker) return <NotFoundState />;
 
   const affiliation = [text(speaker.jobTitle), text(speaker.organization)].filter(Boolean).join(', ');
-  const sessions = scheduleData.filter(
-    (session) => Array.isArray(session.speakerIds) && session.speakerIds.includes(speaker.id),
+  // Gated on features.schedule (issue #22 review finding P2-6): the
+  // schedule itself is a feature a deployment can turn off, and a session
+  // list here would be a working cross-link into a part of the site that
+  // does not otherwise exist for this event.
+  //
+  // Day-major, then time-minor (issue #22 review finding P2-10): a
+  // speaker's sessions can span multiple days, and sortSessions alone only
+  // orders by start time — correct for one day's list (Schedule.jsx groups
+  // by day first), wrong across days, where a later day's early-morning
+  // session would sort ahead of an earlier day's afternoon one. Array.sort
+  // is stable, so sorting by day index AFTER sortSessions's time/order/title
+  // pass preserves that ordering within each day.
+  const dayOrder = new Map(
+    (Array.isArray(eventConfig.days) ? eventConfig.days : []).map((day, index) => [day?.id, index]),
   );
+  const sessions = features.schedule
+    ? sortSessions(
+        scheduleData.filter(
+          (session) => Array.isArray(session.speakerIds) && session.speakerIds.includes(speaker.id),
+        ),
+      ).sort((a, b) => (dayOrder.get(a.dayId) ?? Infinity) - (dayOrder.get(b.dayId) ?? Infinity))
+    : [];
 
   return (
     <article>
