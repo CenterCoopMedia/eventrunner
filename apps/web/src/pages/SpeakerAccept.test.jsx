@@ -169,9 +169,9 @@ describe('accepting', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Accept the invitation' }));
 
     await screen.findByText('You are confirmed');
-    expect(screen.getByRole('link', { name: 'Check your account details' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Write your speaker profile' })).toHaveAttribute(
       'href',
-      '/profile',
+      '/speaker/profile',
     );
 
     const acceptCall = globalThis.fetch.mock.calls.find(([url]) =>
@@ -212,9 +212,10 @@ describe('accepting', () => {
     expect(signOutMock).toHaveBeenCalled();
   });
 
-  it('does not promise speaker-profile editing the CTA cannot deliver yet', async () => {
-    // /profile is the attendee record until the speaker wizard lands
-    // (issue #22); the confirmation must not say otherwise.
+  it('sends a confirmed speaker to the wizard, not the attendee profile', async () => {
+    // /speaker/profile edits the canonical speakers/{id} record an
+    // organizer approves; /profile is the attendee users/{uid} record
+    // (issue #22).
     routeFetch({
       validate: jsonResponse(200, VALID_INVITE),
       accept: jsonResponse(200, { speakerId: 'rae-okonkwo', speakerName: 'Rae Okonkwo', status: 'accepted' }),
@@ -223,12 +224,10 @@ describe('accepting', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Accept the invitation' }));
     await screen.findByText('You are confirmed');
-    expect(
-      screen.queryByRole('link', { name: 'Complete your speaker profile' }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Check your account details' })).toHaveAttribute(
+    expect(screen.queryByRole('link', { name: 'Check your account details' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Write your speaker profile' })).toHaveAttribute(
       'href',
-      '/profile',
+      '/speaker/profile',
     );
   });
 

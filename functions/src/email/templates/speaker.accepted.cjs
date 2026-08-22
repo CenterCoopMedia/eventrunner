@@ -3,7 +3,7 @@
 /**
  * speaker.accepted — the confirmation a speaker gets the moment their
  * invitation is accepted and their account is linked (spec §6.2, phase 3;
- * issue #21).
+ * issue #21, issue #22).
  *
  * Sent by `acceptSpeakerInvite` with `onceKey: speaker-accepted:{speakerId}`
  * — the exact key §3.1's send-once table assigns this template, which is
@@ -14,6 +14,12 @@
  * account.welcome's ['login_url'] (§6.1): this mail's whole job is getting
  * the speaker to the profile they now need to complete, and an override that
  * drops the link leaves them with a congratulation and nowhere to go.
+ *
+ * {{profile_wizard_url}} points at /speaker/profile (issue #22's wizard),
+ * which edits the CANONICAL `speakers/{id}` record an organizer approves —
+ * not /profile, the attendee `users/{uid}` record. The invite/acceptance
+ * caller (functions/src/speakers/invites.cjs) is what resolves the token;
+ * this module only names what the button says.
  *
  * {{deadline}} is declared but deliberately NOT referenced in the shipped
  * copy: no config field states a speaker-profile deadline, and shipped
@@ -29,24 +35,13 @@
 const { wrap } = require('./layout.cjs');
 const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
 
-// COPY NOTE (issue #21 → #22): {{profile_wizard_url}} currently resolves to
-// /profile, which edits the ATTENDEE record (users/{uid}) — not the
-// canonical `speakers/{id}` document an organizer approves. So the copy
-// below promises exactly that and no more: the account details, plus "an
-// organizer will be in touch about your speaker details". Issue #22 ships
-// the speaker profile wizard; when it lands, this body gains the "write your
-// speaker bio" instruction and the caller
-// (functions/src/speakers/invites.cjs) points the token at the wizard route.
-// Promising the wizard now would send every accepted speaker to a page that
-// cannot do what the mail said.
 const html = wrap(
   [
     '<p style="margin:0 0 16px 0;">Hi {{speaker_name}},</p>',
     '<p style="margin:0 0 16px 0;">Thank you — your place at {{event_name}} is confirmed, and this invitation is now linked to your account.</p>',
-    '<p style="margin:0 0 16px 0;">An organizer will be in touch about your session and the biography and photograph we publish on the programme.</p>',
-    '<p style="margin:0 0 16px 0;">In the meantime you can check your account details — your name, pronouns, and how you appear to other attendees:</p>',
+    '<p style="margin:0 0 16px 0;">Next, write your speaker profile — your biography, photograph, and organization — for the public programme:</p>',
     '<p style="margin:0 0 16px 0;text-align:center;">',
-    '<a href="{{profile_wizard_url}}" style="display:inline-block;padding:12px 24px;background-color:{{brand_primary}};color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-weight:bold;text-decoration:none;">Check your account details</a>',
+    '<a href="{{profile_wizard_url}}" style="display:inline-block;padding:12px 24px;background-color:{{brand_primary}};color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-weight:bold;text-decoration:none;">Write your speaker profile</a>',
     '</p>',
     '<p style="margin:0;">Your speaker profile appears publicly once an organizer has reviewed it.</p>',
   ].join('\n')
@@ -57,9 +52,7 @@ const text = [
   '',
   'Thank you — your place at {{event_name}} is confirmed, and this invitation is now linked to your account.',
   '',
-  'An organizer will be in touch about your session and the biography and photograph we publish on the programme.',
-  '',
-  'In the meantime you can check your account details — your name, pronouns, and how you appear to other attendees:',
+  'Next, write your speaker profile — your biography, photograph, and organization — for the public programme:',
   '{{profile_wizard_url}}',
   '',
   'Your speaker profile appears publicly once an organizer has reviewed it.',

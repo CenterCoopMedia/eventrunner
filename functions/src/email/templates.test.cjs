@@ -63,14 +63,16 @@ test.beforeEach(() => resetTemplateCacheForTest());
 
 // --- registry -------------------------------------------------------------
 
-test('listTemplateIds returns the phase-2 defaults plus the phase-3 speaker pair', () => {
+test('listTemplateIds returns the phase-2 defaults plus the phase-3 speaker trio', () => {
   assert.deepEqual(listTemplateIds().sort(), [
     'account.welcome',
     'auth.otp',
     'feedback.confirmation',
-    // §6.3 phase 3: tokenized WITH the invite pipeline, not after it —
-    // a non-CJS deployment cannot exercise the pipeline otherwise (issue #21).
+    // §6.3 phase 3: tokenized WITH the invite/wizard pipeline, not after
+    // it — a non-CJS deployment cannot exercise the pipeline otherwise
+    // (issue #21, issue #22).
     'speaker.accepted',
+    'speaker.confirmation',
     'speaker.invite',
   ]);
 });
@@ -89,6 +91,7 @@ test('storeRendered flags match the spec', () => {
   // content for auth mail). The acceptance confirmation carries none.
   assert.equal(getDefaultTemplate('speaker.invite').storeRendered, false);
   assert.equal(getDefaultTemplate('speaker.accepted').storeRendered, true);
+  assert.equal(getDefaultTemplate('speaker.confirmation').storeRendered, true);
 });
 
 test('required tokens match the spec', () => {
@@ -96,6 +99,7 @@ test('required tokens match the spec', () => {
   assert.deepEqual(getDefaultTemplate('account.welcome').requiredTokens, ['login_url']);
   assert.deepEqual(getDefaultTemplate('speaker.invite').requiredTokens, ['invite_url']);
   assert.deepEqual(getDefaultTemplate('speaker.accepted').requiredTokens, ['profile_wizard_url']);
+  assert.deepEqual(getDefaultTemplate('speaker.confirmation').requiredTokens, ['session_title']);
 });
 
 test('an override that drops the invite link is refused at save time', () => {

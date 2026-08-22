@@ -138,13 +138,27 @@ test('the tri-sync trigger set and the drift detector do not exist', () => {
       // assertion is the guard against a speaker export nobody reviewed,
       // so adding one is meant to fail it until the name is written down.
       'acceptSpeakerInvite',
+      // Staged-edit review (issue #22 review finding P1-1): an admin
+      // resolves an approved speaker's queued self-edit either way.
+      'applySpeakerPendingEdits',
       'cancelSpeakerInvite',
       'createSpeaker',
       'deleteSpeaker',
+      'discardSpeakerPendingEdits',
+      // The self-service profile wizard (issue #22): getOwnSpeakerProfile
+      // and updateOwnSpeakerProfile live in speakers/profile.cjs alongside
+      // the admin CRUD; speakerPhotoUpload/speakerPhotoDelete live in
+      // media/upload.cjs (they match /speaker/i too) because they share
+      // that module's upload machinery, not because they belong to a
+      // different collection.
+      'getOwnSpeakerProfile',
       'listSpeakerInvites',
       'onSpeakerWritten',
       'resendSpeakerInvite',
       'sendSpeakerInvite',
+      'speakerPhotoDelete',
+      'speakerPhotoUpload',
+      'updateOwnSpeakerProfile',
       'updateSpeaker',
       'validateSpeakerInvite',
     ],

@@ -7,7 +7,9 @@ const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const {
   createMediaUploadHandler,
   createMediaDeleteHandler,
-  internals: { validateUpload, decodeUpload, safeObjectName, MAX_UPLOAD_BYTES },
+  createSpeakerPhotoUploadHandler,
+  createSpeakerPhotoDeleteHandler,
+  internals: { validateUpload, decodeUpload, safeObjectName, MAX_UPLOAD_BYTES, SPEAKER_PHOTO_MAX_BYTES },
 } = require('./upload.cjs');
 
 const ADMIN_EMAIL = 'admin@example.org';
@@ -353,4 +355,221 @@ test('mediaDelete rejects an assetId that is a path', async () => {
     res,
   );
   assert.equal(res.statusCode, 400);
+});
+
+// ------------------------------------------------------------ speakerPhotoUpload
+
+const SPEAKER_UID = 'speaker-uid-1';
+
+/** { db, bucket } seeded with one speaker owned by SPEAKER_UID. */
+function speakerWorld(extra = {}) {
+  return makeFakeDb({
+    'speakers/rae': { firstName: 'Rae', lastName: 'Okonkwo', uid: SPEAKER_UID, status: 'accepted', ...extra },
+  });
+}
+
+function speakerAuthDeps(db, bucket, { uid = SPEAKER_UID, email = 'rae@example.org', newId } = {}) {
+  return {
+    db,
+    bucket,
+    auth: { verifyIdToken: async () => ({ uid, email, email_verified: true }) },
+    getConfig: async () => ({ bootstrap: { adminEmails: [ADMIN_EMAIL] } }),
+    log: { warn() {}, error() {} },
+    ...(newId ? { newId } : {}),
+  };
+}
+
+test('speakerPhotoUpload requires a token', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    { method: 'POST', headers: {}, body: { speakerId: 'rae', contentType: 'image/png', data: PNG } },
+    res,
+  );
+  assert.equal(res.statusCode, 401);
+});
+
+test('speakerPhotoUpload writes to a FRESH versioned path, not the fixed live path (issue #22 review P1-2)', async () => {
+  const bucket = fakeBucket();
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), bucket, { newId: () => ASSET_ID }))(
+    post({ speakerId: 'rae', contentType: 'image/png', filename: 'me.png', data: PNG }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.path, `speaker-photos/rae/${ASSET_ID}/me.png`);
+  assert.equal(bucket.objects.has(`speaker-photos/rae/${ASSET_ID}/me.png`), true);
+});
+
+test('speakerPhotoUpload: two uploads for the same speaker land at two different paths', async () => {
+  const bucket = fakeBucket();
+  const first = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), bucket))(
+    post({ speakerId: 'rae', contentType: 'image/png', data: PNG }),
+    first,
+  );
+  const second = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), bucket))(
+    post({ speakerId: 'rae', contentType: 'image/png', data: PNG }),
+    second,
+  );
+  assert.notEqual(first.body.path, second.body.path);
+  // Neither upload overwrote or removed the other — both objects exist,
+  // which is exactly what protects the currently-live object from an
+  // abandoned or still-under-review edit.
+  assert.equal(bucket.objects.has(first.body.path), true);
+  assert.equal(bucket.objects.has(second.body.path), true);
+});
+
+test('speakerPhotoUpload refuses a caller who does not own the speaker record', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket(), { uid: 'someone-else' }))(
+    post({ speakerId: 'rae', contentType: 'image/png', data: PNG }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+});
+
+test('speakerPhotoUpload 404s for an unknown speaker', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(makeFakeDb({}), fakeBucket()))(
+    post({ speakerId: 'ghost', contentType: 'image/png', data: PNG }),
+    res,
+  );
+  assert.equal(res.statusCode, 404);
+});
+
+test('speakerPhotoUpload lets an admin upload on a speaker’s behalf even without ownership', async () => {
+  const bucket = fakeBucket();
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(
+    speakerAuthDeps(speakerWorld(), bucket, { uid: 'admin-1', email: ADMIN_EMAIL }),
+  )(post({ speakerId: 'rae', contentType: 'image/png', data: PNG }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('speakerPhotoUpload rejects a disallowed content type (no SVG here)', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    post({ speakerId: 'rae', contentType: 'image/svg+xml', data: PNG }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /contentType/);
+});
+
+test('speakerPhotoUpload rejects a payload at or over the 2 MiB cap', async () => {
+  const oversize = 'A'.repeat(Math.ceil(SPEAKER_PHOTO_MAX_BYTES / 3) * 4);
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    post({ speakerId: 'rae', contentType: 'image/png', data: oversize }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+});
+
+test('speakerPhotoUpload requires a speakerId', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    post({ contentType: 'image/png', data: PNG }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+});
+
+test('speakerPhotoUpload is POST-only', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    { method: 'GET' },
+    res,
+  );
+  assert.equal(res.statusCode, 405);
+});
+
+// ------------------------------------------------------------ speakerPhotoDelete
+
+test('speakerPhotoDelete requires a token', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    { method: 'POST', headers: {}, body: { speakerId: 'rae', path: 'speaker-photos/rae/x/photo.png' } },
+    res,
+  );
+  assert.equal(res.statusCode, 401);
+});
+
+test('speakerPhotoDelete lets the owning speaker delete an object under their own prefix', async () => {
+  const bucket = fakeBucket();
+  await bucket.file('speaker-photos/rae/old/photo.png').save(Buffer.from('x'), {});
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld(), bucket))(
+    post({ speakerId: 'rae', path: 'speaker-photos/rae/old/photo.png' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, { path: 'speaker-photos/rae/old/photo.png', deleted: true });
+  assert.equal(bucket.objects.has('speaker-photos/rae/old/photo.png'), false);
+});
+
+test('speakerPhotoDelete rejects a path outside the caller\'s own speaker prefix', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    post({ speakerId: 'rae', path: 'speaker-photos/someone-else/photo.png' }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^path: must be under speaker-photos\/rae\//);
+});
+
+test('speakerPhotoDelete rejects a path traversal attempt', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    post({ speakerId: 'rae', path: 'speaker-photos/rae/../../cms-images/hero.png' }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+});
+
+test('speakerPhotoDelete refuses a caller who does not own the speaker record', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld(), fakeBucket(), { uid: 'someone-else' }))(
+    post({ speakerId: 'rae', path: 'speaker-photos/rae/old/photo.png' }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+});
+
+test('speakerPhotoDelete lets an admin delete on a speaker\'s behalf', async () => {
+  const bucket = fakeBucket();
+  await bucket.file('speaker-photos/rae/old/photo.png').save(Buffer.from('x'), {});
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(
+    speakerAuthDeps(speakerWorld(), bucket, { uid: 'admin-1', email: ADMIN_EMAIL }),
+  )(post({ speakerId: 'rae', path: 'speaker-photos/rae/old/photo.png' }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('speakerPhotoDelete succeeds (ignoreNotFound) for an object already gone', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    post({ speakerId: 'rae', path: 'speaker-photos/rae/gone/photo.png' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+});
+
+test('speakerPhotoDelete 404s for an unknown speaker', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(makeFakeDb({}), fakeBucket()))(
+    post({ speakerId: 'ghost', path: 'speaker-photos/ghost/x/photo.png' }),
+    res,
+  );
+  assert.equal(res.statusCode, 404);
+});
+
+test('speakerPhotoDelete is POST-only', async () => {
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld(), fakeBucket()))(
+    { method: 'GET' },
+    res,
+  );
+  assert.equal(res.statusCode, 405);
 });

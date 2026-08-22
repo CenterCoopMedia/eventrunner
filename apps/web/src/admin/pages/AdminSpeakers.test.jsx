@@ -483,3 +483,63 @@ describe('invite actions', () => {
     await waitFor(() => expect(screen.getByText(/Expires 2026-09-04/)).toBeInTheDocument());
   });
 });
+
+describe('pending-edit review (issue #22 review finding P1-1)', () => {
+  function routePendingFetch({ action } = {}) {
+    globalThis.fetch = vi.fn(async (url) => {
+      if (String(url).endsWith('/listSpeakerInvites')) return okResponse({ invites: [] });
+      if (typeof action === 'function') return action(String(url));
+      return action ?? okResponse({});
+    });
+  }
+  const callTo = (name) => fetch.mock.calls.find(([url]) => String(url).endsWith(`/${name}`));
+
+  it('shows a chip and the queued field names for an approved speaker with pendingEdits', async () => {
+    speakerDocs = [
+      { ...RAE, id: 'rae-okonkwo', pendingEdits: { bio: 'new bio', organization: 'New Org' } },
+    ];
+    routePendingFetch();
+    await renderAt('/admin/speakers');
+
+    expect(screen.getByText('Changes pending review')).toBeInTheDocument();
+    expect(screen.getByText(/bio, organization/)).toBeInTheDocument();
+  });
+
+  it('offers no pending-edit affordance when there is nothing queued', async () => {
+    speakerDocs = [{ ...RAE, id: 'rae-okonkwo' }];
+    routePendingFetch();
+    await renderAt('/admin/speakers');
+
+    expect(screen.queryByText('Changes pending review')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply changes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Discard changes' })).not.toBeInTheDocument();
+  });
+
+  it('posts applySpeakerPendingEdits and confirms the changes are live', async () => {
+    speakerDocs = [{ ...RAE, id: 'rae-okonkwo', pendingEdits: { bio: 'new bio' } }];
+    routePendingFetch({ action: () => okResponse({ speakerId: 'rae-okonkwo', appliedFields: ['bio'] }) });
+    await renderAt('/admin/speakers');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
+    });
+
+    await waitFor(() => expect(callTo('applySpeakerPendingEdits')).toBeTruthy());
+    expect(JSON.parse(callTo('applySpeakerPendingEdits')[1].body)).toEqual({ speakerId: 'rae-okonkwo' });
+    expect(screen.getByText(/changes are now live/)).toBeInTheDocument();
+  });
+
+  it('posts discardSpeakerPendingEdits and confirms the discard', async () => {
+    speakerDocs = [{ ...RAE, id: 'rae-okonkwo', pendingEdits: { bio: 'new bio' } }];
+    routePendingFetch({ action: () => okResponse({ speakerId: 'rae-okonkwo' }) });
+    await renderAt('/admin/speakers');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    });
+
+    await waitFor(() => expect(callTo('discardSpeakerPendingEdits')).toBeTruthy());
+    expect(JSON.parse(callTo('discardSpeakerPendingEdits')[1].body)).toEqual({ speakerId: 'rae-okonkwo' });
+    expect(screen.getByText(/pending changes were discarded/)).toBeInTheDocument();
+  });
+});

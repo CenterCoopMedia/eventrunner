@@ -183,19 +183,18 @@ export default function SpeakerAccept() {
             Thank you{accepted.speakerName ? `, ${accepted.speakerName}` : ''} — your
             invitation is accepted and linked to this account.
           </p>
-          {/* COPY NOTE (issue #21 → #22): /profile edits the ATTENDEE
-              record (users/{uid}), not the canonical speaker document an
-              organizer approves, so this promises only what that page can
-              do. Issue #22 ships the speaker profile wizard; when it lands,
-              this CTA becomes its route and the copy gains the "write your
-              speaker bio" instruction. */}
+          {/* /speaker/profile is the wizard (issue #22): it edits the
+              CANONICAL speaker record an organizer approves, not /profile
+              (the attendee users/{uid} record) — same route
+              speaker.accepted's email CTA now points at
+              (functions/src/speakers/invites.cjs). */}
           <p className="text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
-            An organizer will be in touch about your session and the biography
-            and photograph we publish on the programme. Your speaker profile
-            appears publicly once they have reviewed it.
+            Next, write your speaker profile — your biography, photograph, and
+            organization — for the public programme. It appears publicly once
+            an organizer has reviewed it.
           </p>
-          <Link to="/profile" className={primaryButtonClass}>
-            Check your account details
+          <Link to="/speaker/profile" className={primaryButtonClass}>
+            Write your speaker profile
           </Link>
         </Panel>
       </article>

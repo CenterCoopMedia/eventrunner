@@ -70,6 +70,28 @@ const EDITABLE_SPEAKER_FIELDS = Object.freeze([
 ]);
 
 /**
+ * The subset of EDITABLE_SPEAKER_FIELDS a speaker may write about
+ * THEMSELVES through updateOwnSpeakerProfile (spec §4.3, §9 "Speaker
+ * profile wizard", issue #22). `slug` stays admin-only: it addresses the
+ * public page, and a self-service name edit re-deriving it would move a URL
+ * already shared (a programme page, a social post) out from under the
+ * speaker without an admin's say-so. `email` and `status` stay admin-only
+ * for the same reason profile.cjs's applyUpdateSpeaker treats them as
+ * pipeline-sensitive: email is the invite/acceptance security boundary and
+ * status is the publish gate, neither of which a speaker should move on
+ * their own.
+ */
+const SELF_EDITABLE_SPEAKER_FIELDS = Object.freeze([
+  'firstName',
+  'lastName',
+  'bio',
+  'headshotPath',
+  'organization',
+  'jobTitle',
+  'socialHandles',
+]);
+
+/**
  * Server-owned fields, rejected BY NAME when a payload carries them
  * (§4.3 rule 3): `uid` is one half of the users.speakerId ↔ speakers.uid
  * pair, which only the invite/acceptance transaction and deleteSpeaker may
@@ -92,6 +114,17 @@ const SERVER_OWNED_SPEAKER_FIELDS = Object.freeze([
   'createdAt',
   'updatedAt',
   'updatedBy',
+  // Staged self-service edits (§4.3, issue #22 review finding P1-1). Once a
+  // speaker is `approved`, a self-service save must not write straight onto
+  // the fields onSpeakerWritten republishes — the wizard's own copy tells
+  // the speaker an organizer reviews changes, and a direct write would
+  // republish speakers_public before that review happens. The queued patch
+  // and its stamps are written only by applyUpdateOwnSpeakerProfile (queuing)
+  // and applySpeakerPendingEdits / applyDiscardSpeakerPendingEdits
+  // (resolving) — never accepted in a client payload.
+  'pendingEdits',
+  'pendingEditsAt',
+  'pendingEditsBy',
 ]);
 
 /**
@@ -114,6 +147,15 @@ const MAX_NAME_LENGTH = 120;
 const MAX_SHORT_TEXT_LENGTH = 200;
 const MAX_BIO_LENGTH = 4000;
 const MAX_SOCIAL_HANDLES = 12;
+// Per-entry caps (issue #22 review finding P2-5): MAX_SOCIAL_HANDLES bounds
+// the COUNT of entries, but nothing previously bounded any one entry's
+// length — a self-service payload (or an admin one) could carry an
+// arbitrarily long label or handle string straight into speakers_public,
+// which is anonymously readable. A handle is a short "@name" or a URL, not
+// a document, so the caps are generous for a legitimate value and small
+// enough to cap the blast radius of an abusive one.
+const MAX_SOCIAL_LABEL_LENGTH = 40;
+const MAX_SOCIAL_HANDLE_LENGTH = 200;
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -197,11 +239,20 @@ function buildPublicSpeaker(speaker) {
  * With `partial: true` (the update path) only the keys present are
  * checked; without it (create) firstName and lastName are required.
  *
+ * `fieldsAllowed` narrows which of EDITABLE_SPEAKER_FIELDS the caller may
+ * send — the admin CRUD in profile.cjs leaves it at the default (every
+ * editable field); updateOwnSpeakerProfile passes
+ * SELF_EDITABLE_SPEAKER_FIELDS, so a self-service payload naming `slug`,
+ * `email`, or `status` is rejected by name with the SAME "not editable
+ * here" treatment SERVER_OWNED_SPEAKER_FIELDS gets for "read-only" —
+ * distinct wording because the field genuinely is editable, just not by
+ * this caller.
+ *
  * @param {unknown} payload
- * @param {{ partial?: boolean }} [options]
+ * @param {{ partial?: boolean, fieldsAllowed?: readonly string[] }} [options]
  * @returns {{ ok: true, fields: object } | { ok: false, errors: string[] }}
  */
-function validateSpeaker(payload, { partial = false } = {}) {
+function validateSpeaker(payload, { partial = false, fieldsAllowed = EDITABLE_SPEAKER_FIELDS } = {}) {
   if (!isPlainObject(payload)) {
     return { ok: false, errors: ['speaker: must be an object'] };
   }
@@ -217,9 +268,13 @@ function validateSpeaker(payload, { partial = false } = {}) {
     }
   }
   for (const key of Object.keys(payload)) {
-    if (!EDITABLE_SPEAKER_FIELDS.includes(key) && !SERVER_OWNED_SPEAKER_FIELDS.includes(key)) {
-      errors.push(`${key}: unknown speaker field`);
-    }
+    if (SERVER_OWNED_SPEAKER_FIELDS.includes(key)) continue; // already reported above
+    if (fieldsAllowed.includes(key)) continue;
+    errors.push(
+      EDITABLE_SPEAKER_FIELDS.includes(key)
+        ? `${key}: not editable here`
+        : `${key}: unknown speaker field`,
+    );
   }
   if (errors.length > 0) return { ok: false, errors };
 
@@ -299,6 +354,10 @@ function validateSpeaker(payload, { partial = false } = {}) {
       errors.push(`socialHandles: must have at most ${MAX_SOCIAL_HANDLES} entries`);
     } else if (Object.values(value).some((v) => typeof v !== 'string')) {
       errors.push('socialHandles: every value must be a string');
+    } else if (Object.keys(value).some((label) => label.length > MAX_SOCIAL_LABEL_LENGTH)) {
+      errors.push(`socialHandles: every label must be at most ${MAX_SOCIAL_LABEL_LENGTH} characters`);
+    } else if (Object.values(value).some((handle) => handle.length > MAX_SOCIAL_HANDLE_LENGTH)) {
+      errors.push(`socialHandles: every handle must be at most ${MAX_SOCIAL_HANDLE_LENGTH} characters`);
     } else {
       fields.socialHandles = { ...value };
     }
@@ -335,6 +394,7 @@ module.exports = {
   ADMIN_SETTABLE_STATUSES,
   PUBLISHED_SPEAKER_STATUSES,
   EDITABLE_SPEAKER_FIELDS,
+  SELF_EDITABLE_SPEAKER_FIELDS,
   SERVER_OWNED_SPEAKER_FIELDS,
   PUBLIC_SPEAKER_FIELDS,
   speakerDisplayName,
@@ -346,6 +406,8 @@ module.exports = {
     MAX_SHORT_TEXT_LENGTH,
     MAX_BIO_LENGTH,
     MAX_SOCIAL_HANDLES,
+    MAX_SOCIAL_LABEL_LENGTH,
+    MAX_SOCIAL_HANDLE_LENGTH,
     SLUG_RE,
     EMAIL_RE,
   },

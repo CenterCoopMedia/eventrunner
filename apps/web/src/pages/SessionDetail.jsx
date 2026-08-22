@@ -9,7 +9,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
-import { SessionPills, TypeBadge } from '../components/SessionCard.jsx';
+import { SessionPills, SpeakerNames, TypeBadge, useSessionSpeakerNames } from '../components/SessionCard.jsx';
 import SessionMaterialsList from '../components/SessionMaterialsList.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 
@@ -41,6 +41,12 @@ export default function SessionDetail() {
   // detail-link fix for the same round trip).
   const { search } = useLocation();
 
+  // Looked up here, ahead of every early return, so useSessionSpeakerNames
+  // (a hook) is called unconditionally — React's rules of hooks forbid
+  // calling it only on the "found" branch below.
+  const session = scheduleData.find((s) => s.id === sessionId && s.visible);
+  const speakerNames = useSessionSpeakerNames(session?.speakerIds);
+
   if (!features.schedule) {
     return (
       <EmptyState
@@ -66,7 +72,6 @@ export default function SessionDetail() {
     );
   }
 
-  const session = scheduleData.find((s) => s.id === sessionId && s.visible);
   if (!session) return <NotFoundState search={search} />;
 
   const range = formatSessionTimeRange(eventConfig, session);
@@ -107,6 +112,7 @@ export default function SessionDetail() {
           ) : null}
         </p>
         {session.location ? <p className="mt-1 text-brand-ink-muted">{session.location}</p> : null}
+        <SpeakerNames speakers={speakerNames} features={features} className="mt-2 text-brand-ink-muted" />
       </header>
 
       {session.description ? (

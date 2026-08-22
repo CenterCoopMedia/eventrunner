@@ -57,6 +57,17 @@ const STATUS_CLASSES = {
   draft: 'border-brand-ink/20 bg-brand-surface-alt text-brand-ink-muted',
 };
 
+/**
+ * Field names queued in `speaker.pendingEdits` (spec §4.3, issue #22
+ * review finding P1-1) — an approved speaker's self-service edit that
+ * onSpeakerWritten deliberately did NOT publish, awaiting an admin's
+ * apply/discard decision (functions/src/speakers/profile.cjs).
+ */
+function pendingFieldsOf(speaker) {
+  const pending = speaker?.pendingEdits;
+  return pending && typeof pending === 'object' ? Object.keys(pending) : [];
+}
+
 function StatusChip({ status }) {
   return (
     <span
@@ -104,6 +115,8 @@ export default function AdminSpeakersList() {
   const ACTION_NOTICES = {
     cancel: (name) => `Invitation to ${name} cancelled.`,
     approve: (name) => `${name} approved — they now appear on the public site.`,
+    apply: (name) => `${name}'s changes are now live.`,
+    discard: (name) => `${name}'s pending changes were discarded.`,
   };
 
   async function run(action, endpoint, speaker, body = {}) {
@@ -209,6 +222,11 @@ export default function AdminSpeakersList() {
                           Account linked
                         </span>
                       ) : null}
+                      {pendingFieldsOf(speaker).length > 0 ? (
+                        <span className="rounded-brand border border-warning/40 bg-warning/10 px-2 py-1 text-xs font-semibold text-warning">
+                          Changes pending review
+                        </span>
+                      ) : null}
                     </div>
                     <p className="mt-1 truncate text-sm text-brand-ink-muted">
                       {[speaker.jobTitle, speaker.organization].filter(Boolean).join(', ') || '—'}
@@ -216,6 +234,12 @@ export default function AdminSpeakersList() {
                       {speaker.slug}
                       {note ? ` · ${note}` : ''}
                     </p>
+                    {pendingFieldsOf(speaker).length > 0 ? (
+                      <p className="mt-1 text-sm text-brand-ink-muted">
+                        Speaker-submitted changes awaiting review:{' '}
+                        {pendingFieldsOf(speaker).join(', ')}.
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {speaker.status === 'draft' ? (
@@ -259,6 +283,26 @@ export default function AdminSpeakersList() {
                       >
                         {busy === `${speaker.id}:approve` ? 'Approving…' : 'Approve'}
                       </button>
+                    ) : null}
+                    {pendingFieldsOf(speaker).length > 0 ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => run('apply', 'applySpeakerPendingEdits', speaker)}
+                          disabled={busy === `${speaker.id}:apply`}
+                          className={primaryButtonClass}
+                        >
+                          {busy === `${speaker.id}:apply` ? 'Applying…' : 'Apply changes'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => run('discard', 'discardSpeakerPendingEdits', speaker)}
+                          disabled={busy === `${speaker.id}:discard`}
+                          className={linkButtonClass}
+                        >
+                          {busy === `${speaker.id}:discard` ? 'Discarding…' : 'Discard changes'}
+                        </button>
+                      </>
                     ) : null}
                     <Link to={speaker.id} className={secondaryButtonClass}>
                       Edit

@@ -22,6 +22,7 @@ const DEFAULTS = {
   'feedback.confirmation': require('./templates/feedback.confirmation.cjs'),
   'speaker.invite': require('./templates/speaker.invite.cjs'),
   'speaker.accepted': require('./templates/speaker.accepted.cjs'),
+  'speaker.confirmation': require('./templates/speaker.confirmation.cjs'),
 };
 
 const OVERRIDE_KEYS = ['subject', 'html', 'text'];

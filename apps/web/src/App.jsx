@@ -18,12 +18,14 @@ import Schedule from './pages/Schedule.jsx';
 import SessionDetail from './pages/SessionDetail.jsx';
 import MySchedule from './pages/MySchedule.jsx';
 import Speakers from './pages/Speakers.jsx';
+import SpeakerDetail from './pages/SpeakerDetail.jsx';
 import Sponsors from './pages/Sponsors.jsx';
 import Updates from './pages/Updates.jsx';
 import UpdateDetail from './pages/UpdateDetail.jsx';
 import ContentPage from './pages/ContentPage.jsx';
 import Login from './pages/Login.jsx';
 import SpeakerAccept from './pages/SpeakerAccept.jsx';
+import SpeakerProfile from './pages/SpeakerProfile.jsx';
 import AdminApp from './admin/AdminApp.jsx';
 import Profile from './pages/Profile.jsx';
 import Attendees from './pages/Attendees.jsx';
@@ -44,6 +46,7 @@ export function AppRoutes() {
         <Route path="schedule/mine" element={<MySchedule />} />
         <Route path="schedule/:sessionId" element={<SessionDetail />} />
         <Route path="speakers" element={<Speakers />} />
+        <Route path="speakers/:slug" element={<SpeakerDetail />} />
         <Route path="sponsors" element={<Sponsors />} />
         <Route path="updates" element={<Updates />} />
         <Route path="updates/:id" element={<UpdateDetail />} />
@@ -53,6 +56,13 @@ export function AppRoutes() {
             every invitation email ever sent links here, so a generic
             cmsPages path must never be able to claim the segment. */}
         <Route path="speaker/accept" element={<SpeakerAccept />} />
+        {/* The speaker profile wizard (issue #22): self-service editing of
+            the caller's own speakers/{id} record, distinct from /profile
+            (the attendee users/{uid} record). Sits under the same reserved
+            `speaker` segment as speaker/accept, and speaker.accepted's CTA
+            (functions/src/email/templates/speaker.accepted.cjs) links
+            straight here. */}
+        <Route path="speaker/profile" element={<SpeakerProfile />} />
         <Route path="profile" element={<Profile />} />
         <Route path="attendees" element={<Attendees />} />
         <Route path="attendees/:uid" element={<AttendeeProfile />} />

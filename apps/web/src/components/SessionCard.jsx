@@ -2,9 +2,10 @@
 // materials/reactions/bookmarks pills are feature-flag conditional, so a
 // deployment with those features off renders a plain session card and
 // nothing here assumes they exist.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useContent } from '../contexts/ContentContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
@@ -20,17 +21,73 @@ import {
   icsFileName,
 } from '../utils/calendar.js';
 
-// TODO(#22): resolve speakerIds to speaker names and link them to the
-// speaker pages. The data side is now in place — the speaker store (#20)
-// landed, so `useContent().speakers` carries the live `speakers_public`
-// projection keyed by the same ids `session.speakerIds` holds — and what
-// is left is the rendering half that ships with the speaker pages, since
-// a name here should be a link to the page that issue creates.
-//
-// Kept as a hook called from SessionCard's top level so the card markup
-// gains speaker rows without restructuring when it does.
-export function useSessionSpeakerNames() {
-  return null;
+/**
+ * Resolve a session's `speakerIds` against the live `speakers_public`
+ * projection `useContent().speakers` carries (spec §4.3, issue #22).
+ * Returns the ordered list of `{ id, displayName, slug }` the caller
+ * renders as links to `/speakers/:slug` — an id with no matching document
+ * (not yet approved, or removed since the session was saved) is silently
+ * dropped rather than rendered as a broken link, the same "no document,
+ * nothing shown" rule the public speaker page itself follows.
+ *
+ * A hook (not a plain function) because it reads ContentContext; kept
+ * separate from SessionCard's body so SessionDetail can call it too
+ * without re-deriving the same list a different way.
+ *
+ * @param {string[] | undefined} speakerIds
+ * @returns {Array<{ id: string, displayName: string, slug: string }>}
+ */
+export function useSessionSpeakerNames(speakerIds) {
+  const { speakers } = useContent();
+  return useMemo(() => {
+    if (!Array.isArray(speakerIds) || speakerIds.length === 0) return [];
+    const byId = new Map(speakers.map((speaker) => [speaker.id, speaker]));
+    return speakerIds
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .map((speaker) => ({
+        id: speaker.id,
+        displayName: speaker.displayName,
+        slug: typeof speaker.slug === 'string' && speaker.slug ? speaker.slug : speaker.id,
+      }));
+  }, [speakerIds, speakers]);
+}
+
+/**
+ * The comma-joined speaker row SessionCard and SessionDetail share.
+ *
+ * Links only when `features.speakers` is on (issue #22 review finding
+ * P2-7): the public speaker directory route itself gates on that flag
+ * (Speakers.jsx, SpeakerDetail.jsx) and shows "this event doesn't have a
+ * public speaker directory" for it, so a deployment with the feature off
+ * must not send a schedule-card click into that dead end — plain,
+ * unlinked names still tell the reader who is speaking.
+ *
+ * Carries the current query string into the link (issue #22 review finding
+ * P2-8), the same fix SessionCard's title link already has for
+ * `?preview=1`: without it, an admin previewing drafts who clicks a
+ * speaker's name loses the preview the moment they land on the speaker
+ * page.
+ */
+export function SpeakerNames({ speakers, features = {}, className = 'mt-2 text-sm text-brand-ink-muted' }) {
+  const { search } = useLocation();
+  if (!speakers || speakers.length === 0) return null;
+  return (
+    <p className={className}>
+      {speakers.map((speaker, index) => (
+        <span key={speaker.id}>
+          {index > 0 ? ', ' : ''}
+          {features.speakers ? (
+            <Link to={{ pathname: `/speakers/${speaker.slug}`, search }} className="hover:underline">
+              {speaker.displayName}
+            </Link>
+          ) : (
+            speaker.displayName
+          )}
+        </span>
+      ))}
+    </p>
+  );
 }
 
 export function TypeBadge({ type }) {
@@ -371,9 +428,7 @@ export default function SessionCard({
               {session.description}
             </p>
           ) : null}
-          {speakerNames ? (
-            <p className="mt-2 text-sm text-brand-ink-muted">{speakerNames}</p>
-          ) : null}
+          <SpeakerNames speakers={speakerNames} features={features} />
           <div className="mt-3">
             <SessionPills
               session={session}

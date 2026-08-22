@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AuthContext from '../contexts/AuthContext.jsx';
+import ContentContext from '../contexts/ContentContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
 import { ToastProvider } from '../contexts/ToastContext.jsx';
 import SessionCard from './SessionCard.jsx';
@@ -65,6 +66,7 @@ function cardTree({
   profile = { attendeeAccess: false },
   bookmarked = false,
   initialEntries = ['/schedule'],
+  content = { speakers: [] },
 } = {}) {
   return (
     <MemoryRouter
@@ -72,13 +74,15 @@ function cardTree({
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <AuthContext.Provider value={auth}>
-        <ProfileContext.Provider value={profile}>
-          <ToastProvider>
-            <ul>
-              <SessionCard session={fixtureSession} eventConfig={fixtureConfig} features={features} bookmarked={bookmarked} />
-            </ul>
-          </ToastProvider>
-        </ProfileContext.Provider>
+        <ContentContext.Provider value={content}>
+          <ProfileContext.Provider value={profile}>
+            <ToastProvider>
+              <ul>
+                <SessionCard session={fixtureSession} eventConfig={fixtureConfig} features={features} bookmarked={bookmarked} />
+              </ul>
+            </ToastProvider>
+          </ProfileContext.Provider>
+        </ContentContext.Provider>
       </AuthContext.Provider>
     </MemoryRouter>
   );
@@ -128,6 +132,50 @@ describe('SessionCard', () => {
     renderCard({ features: {} });
     expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
     expect(screen.queryByText(/add to calendar/i)).toBeNull();
+  });
+
+  function renderWithSpeaker({ speakerFeature = true, initialEntries = ['/schedule'] } = {}) {
+    const withSpeakers = { ...fixtureSession, speakerIds: ['spk-1', 'spk-ghost'] };
+    return render(
+      <MemoryRouter initialEntries={initialEntries} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <AuthContext.Provider value={{ user: null }}>
+          <ContentContext.Provider value={{ speakers: [{ id: 'spk-1', displayName: 'Rae Okonkwo', slug: 'rae-okonkwo' }] }}>
+            <ProfileContext.Provider value={{ attendeeAccess: false }}>
+              <ToastProvider>
+                <ul>
+                  <SessionCard
+                    session={withSpeakers}
+                    eventConfig={fixtureConfig}
+                    features={{ speakers: speakerFeature }}
+                  />
+                </ul>
+              </ToastProvider>
+            </ProfileContext.Provider>
+          </ContentContext.Provider>
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    );
+  }
+
+  it('renders a link per resolved speaker name, dropping ids with no matching document', () => {
+    renderWithSpeaker();
+    const link = screen.getByRole('link', { name: 'Rae Okonkwo' });
+    expect(link).toHaveAttribute('href', '/speakers/rae-okonkwo');
+    expect(screen.queryByText(/spk-ghost/)).toBeNull();
+  });
+
+  it('renders plain (unlinked) names when features.speakers is off (issue #22 review P2-7)', () => {
+    renderWithSpeaker({ speakerFeature: false });
+    expect(screen.getByText('Rae Okonkwo')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Rae Okonkwo' })).not.toBeInTheDocument();
+  });
+
+  it('carries the current query string into the speaker link (issue #22 review P2-8)', () => {
+    renderWithSpeaker({ initialEntries: ['/schedule?preview=1'] });
+    expect(screen.getByRole('link', { name: 'Rae Okonkwo' })).toHaveAttribute(
+      'href',
+      '/speakers/rae-okonkwo?preview=1',
+    );
   });
 
   describe('bookmark pill (features.sessionBookmarks)', () => {
@@ -292,13 +340,15 @@ describe('SessionCard', () => {
       const { container } = render(
         <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthContext.Provider value={{ user: null }}>
-            <ProfileContext.Provider value={{ attendeeAccess: false }}>
-              <ToastProvider>
-                <ul>
-                  <SessionCard session={unresolved} eventConfig={fixtureConfig} features={{ icsExport: true }} />
-                </ul>
-              </ToastProvider>
-            </ProfileContext.Provider>
+            <ContentContext.Provider value={{ speakers: [] }}>
+              <ProfileContext.Provider value={{ attendeeAccess: false }}>
+                <ToastProvider>
+                  <ul>
+                    <SessionCard session={unresolved} eventConfig={fixtureConfig} features={{ icsExport: true }} />
+                  </ul>
+                </ToastProvider>
+              </ProfileContext.Provider>
+            </ContentContext.Provider>
           </AuthContext.Provider>
         </MemoryRouter>,
       );

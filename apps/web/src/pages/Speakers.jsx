@@ -4,8 +4,9 @@
 // status) is server-only and never reaches this bundle, and a speaker who
 // is not `approved` has no projection at all — which is why there is no
 // visibility filter to apply.
-// TODO(#22): speaker detail routes, headshot rendering from Storage
-// branding paths, session cross-links.
+// Each card links to /speakers/:slug (SpeakerDetail.jsx, issue #22) — the
+// slug is stored on the projection itself (buildPublicSpeaker always
+// derives one), so no extra lookup is needed to build the link.
 // Feature-gated by config/features.speakers — the nav link already hides
 // when the feature is off, but the route itself must gate too, since direct
 // navigation bypasses the nav (matches the Schedule.jsx pattern).
@@ -13,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import AssetImage from '../components/media/AssetImage.jsx';
 
 export default function Speakers() {
   const { features } = useEventConfig();
@@ -54,12 +56,22 @@ export default function Speakers() {
             const affiliation = [speaker.jobTitle, speaker.organization]
               .filter(Boolean)
               .join(', ');
+            const href = `/speakers/${typeof speaker.slug === 'string' && speaker.slug ? speaker.slug : speaker.id}`;
             return (
               <li
                 key={speaker.id}
                 className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
               >
-                <h2 className="font-heading text-lg text-brand-ink">{speaker.displayName}</h2>
+                <Link to={href} className="flex items-start gap-3 hover:underline">
+                  {speaker.headshotPath ? (
+                    <AssetImage
+                      path={speaker.headshotPath}
+                      alt=""
+                      className="h-12 w-12 shrink-0 rounded-full bg-brand-surface object-cover"
+                    />
+                  ) : null}
+                  <h2 className="font-heading text-lg text-brand-ink">{speaker.displayName}</h2>
+                </Link>
                 {affiliation ? (
                   <p className="mt-1 text-sm text-brand-ink-muted">{affiliation}</p>
                 ) : null}
