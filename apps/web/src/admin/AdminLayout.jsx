@@ -20,6 +20,7 @@ const TABS = [
   { to: 'branding', label: 'Branding' },
   { to: 'media', label: 'Media' },
   { to: 'materials', label: 'Materials' },
+  { to: 'attendees', label: 'Attendees' },
   { to: 'live-updates', label: 'Live updates' },
   { to: 'feedback', label: 'Feedback' },
   { to: 'system-errors', label: 'System errors' },
