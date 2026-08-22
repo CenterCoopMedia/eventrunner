@@ -10,5 +10,10 @@ coverage/
 .DS_Store
 _upstream/
 
+# Playwright e2e suite (e2e/, spec §8.1, issue #38)
+playwright-report/
+test-results/
+e2e/.tmp/
+
 # Harness-managed agent worktrees and local session state
 .claude/

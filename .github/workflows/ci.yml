@@ -184,3 +184,65 @@ jobs:
           restore-keys: firebase-emulators-${{ runner.os }}-
       - name: Run rules tests
         run: npm run test:rules
+
+  e2e:
+    name: E2E on emulators
+    runs-on: ubuntu-latest
+    # Credential-free (spec §8.1, issue #38): Playwright drives the real app
+    # against the full emulator suite (auth, firestore, storage, functions)
+    # with the console email provider and manual ticketing — no secrets, no
+    # live project, so this runs the same on a fork PR as every other job.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        env:
+          # Installed explicitly below, cached on its own key — skip the
+          # postinstall fetch here so a `npm ci` cache hit never re-downloads
+          # a browser binary npm never asked for.
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: firebase-emulators-${{ runner.os }}-
+      - name: Run e2e tests
+        # Invoke the script directly rather than through `npm run test:e2e`
+        # (which is just this same script — see package.json) so local and
+        # CI share exactly one invocation path, with nothing to drift: the
+        # captured-mail log every OTP/invite journey reads only exists
+        # because scripts/dev/run-e2e.sh tees `emulators:exec`'s output to
+        # it before Playwright starts. Reimplementing the emulators:exec
+        # call here instead would silently drop that tee.
+        run: bash scripts/dev/run-e2e.sh
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          # e2e/.tmp carries the captured-mail file every OTP/invite journey
+          # reads plus the full emulator log, which is what a mail-related
+          # failure actually needs to be diagnosed from the artifact alone.
+          path: |
+            playwright-report/
+            e2e/.tmp/
+          retention-days: 7

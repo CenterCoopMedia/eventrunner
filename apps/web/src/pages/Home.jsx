@@ -13,7 +13,7 @@ import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 
 export default function Home() {
   const { eventConfig, features } = useEventConfig();
-  const { getPage, getSectionBlocks, getBlock } = useContent();
+  const { getPage, getSectionBlocks, getBlock, source } = useContent();
 
   const page = getPage('home') ?? getPage('/');
   const title = getBlock('hero', 'title');
@@ -36,7 +36,14 @@ export default function Home() {
   );
 
   return (
-    <article>
+    // data-content-source mirrors ContentContext's own `source` field
+    // ('snapshot' | 'live') — inert everywhere except the e2e suite
+    // (e2e/cms-publish.spec.js), which has no other DOM-observable way to
+    // tell "the build-time snapshot is still rendering" apart from "the
+    // runtime cmsContent listener has delivered its first live batch",
+    // since a freshly-seeded project's live content and the committed demo
+    // snapshot render identical text by construction (spec §8.6 hygiene).
+    <article data-content-source={source}>
       <section aria-labelledby="hero-title" className="py-8">
         {typeof eventConfig.tagline === 'string' ? (
           <p className="font-accent text-2xl text-brand-accent">{eventConfig.tagline}</p>
