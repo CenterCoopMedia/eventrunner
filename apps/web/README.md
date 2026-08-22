@@ -162,3 +162,14 @@ Requires the `playwright` package and a Chromium binary
 (`PLAYWRIGHT_BROWSERS_PATH`); it never runs `playwright install` itself —
 if the browser isn't present it fails fast with a clear message instead of
 attempting a network fetch.
+
+### Full e2e suite
+
+`node scripts/dev/login-smoke.mjs` above covers OTP sign-in on its own; the
+repo-root [`e2e/`](../../e2e/) Playwright suite (`npm run test:e2e`, spec
+§8.1, issue #38) covers that plus the other three critical journeys — admin
+CMS edit → publish → public, speaker invite → accept → wizard, ticket claim
+→ approved → bookmark — against the same emulator/dev-server combination,
+seeded from `scripts/init-event.cjs` + `scripts/seed-demo-event.cjs`. See
+[`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full test command
+table.

@@ -91,9 +91,12 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 | `npm run test:rules` | Firestore and Storage security rules on the Firebase emulators |
 | `npm run test -w apps/web` | `apps/web` component/context/lib unit tests (vitest + Testing Library, jsdom — no emulator) |
 | `npm run build -w apps/web` | Production build of `apps/web`; credential-free with dummy `VITE_FIREBASE_*` values |
+| `npm run test:e2e` | Playwright end-to-end suite (OTP sign-in, CMS edit → publish → public, speaker invite → accept → wizard, ticket claim → approved → bookmark) against the full Firebase emulator suite, seeded from the synthetic demo fixture — see [`e2e/`](e2e/) |
 | `node scripts/dev/login-smoke.mjs` | Live Playwright smoke test of the emailed-code sign-in flow against the Functions/Firestore/Auth emulators (dev tool, not run by CI) |
 
-CI runs the first five on every pull request and every push to `main`, credential-free. Fork PRs must be able to run every check without credentials.
+CI runs the first six on every pull request and every push to `main`, credential-free. Fork PRs must be able to run every check without credentials.
+
+`npm run test:e2e` needs Java 21+ (the same Firestore/Storage emulators `test:rules` uses) and a Chromium build Playwright can find. It never runs `playwright install` itself: point `PLAYWRIGHT_BROWSERS_PATH` at an existing install, or run `npx playwright install --with-deps chromium` once yourself first — `.github/workflows/ci.yml`'s `e2e` job does the latter, cached.
 
 One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 
