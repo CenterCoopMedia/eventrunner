@@ -111,6 +111,10 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 
 CI runs everything above except the dev-only smoke test on every pull request and every push to `main`, credential-free. Fork PRs must be able to run every check without credentials.
 
+## Releases
+
+Tags, `CHANGELOG.md` hygiene, and what a release includes are in [RELEASING.md](RELEASING.md).
+
 One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 
 ## Security

@@ -32,5 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Admin Media tab: a browsable library per namespace with upload, alt-text editing, and delete-with-usage-warning, plus a reusable `ImagePicker` that now backs the Branding tab's five logo slots (closing its upload TODO) and an owner-bound photo field on the attendee profile.
 - `scripts/dev/login-smoke.mjs`: a Playwright-driven, credential-free live smoke test for the emailed-code sign-in flow against the Firebase emulators.
 - `functions` emulator wired into `firebase.json` alongside `firestore`/`auth`/`storage` for the local dev loop.
+- `docs/CLIENT_ONBOARDING.md`: the operator's start-to-finish checklist for standing up one client event, cross-linking `docs/DEPLOY_RUNBOOK.md` rather than repeating it (spec §5.6, #34).
+- `docs/ADMIN_GUIDE.md`: staff-facing task reference for every admin surface, cross-linking the wiki handbook's narrative version (#34).
+- `docs/DEPLOY_RUNBOOK.md`: a rollback section — hosting, functions, rules/indexes, content-snapshot implications, and when not to roll back (#34).
+- Custom-domain naming in the operator-facing readiness output: `init-event.cjs`'s printed §5.6 Auth checklist and `scripts/lib/checklist.cjs` now name the client's custom domain when `EVENT_PUBLIC_URL` is configured, and `docs/DEPLOY_RUNBOOK.md` gets a short custom-domain/readiness note pointing at the fuller flow issue (#66 sliver).
+- DCO enforcement: `CONTRIBUTING.md` documents `git commit -s` and what the sign-off attests; a credential-free `dco` CI job (`scripts/check-dco.cjs`) fails a pull request carrying an unsigned commit, fork PRs included (spec §1.5, #37).
+- `RELEASING.md`: version scheme, CHANGELOG hygiene, and the tag-cutting process for this Keep a Changelog project (#37).
+- Credential-free secret scanning: a `secrets` CI job runs the gitleaks CLI (checksum-verified download, no marketplace action, no license secret) over the pull request range and, on push to `main`, the full history; `.gitleaks.toml` allowlists two known-synthetic test fixture values by exact string match (#39 sliver).
 
 The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Remaining Phase 2 modules have not landed yet.
