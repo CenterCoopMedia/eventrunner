@@ -334,6 +334,14 @@ describe("server-only collections stay deny-all", () => {
     "email_templates",
     "speaker_slugs",
     "speaker_invites",
+    // Ticketing (spec §3.3, §4.2). `tickets` names every purchaser's
+    // address and who claimed it; `ticket_webhook_deliveries` is the dedup
+    // claim store a forged pre-claim could use to make a real delivery
+    // acknowledge work it never did; `ticket_sync_queue` is the one
+    // sanctioned queue (§10 q9).
+    "tickets",
+    "ticket_webhook_deliveries",
+    "ticket_sync_queue",
   ]) {
     it(`denies all access to ${c}, admin included`, async () => {
       await assertFails(getDoc(doc(anon(), `${c}/d1`)));
@@ -346,6 +354,55 @@ describe("server-only collections stay deny-all", () => {
     await assertFails(getDoc(doc(anon(), "activity_logs/a1")));
     await assertFails(setDoc(doc(nonAdmin(), "activity_logs/a1"), { x: 1 }));
     await assertFails(setDoc(doc(admin(), "activity_logs/a1"), { x: 1 }));
+  });
+});
+
+describe("ticketing stays server-only (spec §3.3, §4.2, issue #29)", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "tickets/tkt-1"), {
+        externalId: "tkt-1",
+        orderId: "ord-1",
+        email: "attendee@example.com",
+        status: "valid",
+        // The signed-in non-admin in this suite.
+        claimedByUid: "attendee-1",
+      });
+      await setDoc(doc(db, "ticket_webhook_deliveries/del-1"), { deliveryId: "del-1", orderId: "ord-1" });
+      await setDoc(doc(db, "ticket_sync_queue/ord-1"), { orderId: "ord-1", status: "pending" });
+    });
+  });
+
+  it("denies a ticket read even to the account that claimed it", async () => {
+    await assertFails(getDoc(doc(nonAdmin(), "tickets/tkt-1")));
+    await assertFails(getDoc(doc(anon(), "tickets/tkt-1")));
+    await assertFails(getDoc(doc(admin(), "tickets/tkt-1")));
+  });
+
+  it("denies a list query over tickets — no attendee enumeration", async () => {
+    await assertFails(
+      getDocs(query(collection(nonAdmin(), "tickets"), where("status", "==", "valid"))),
+    );
+  });
+
+  it("denies a self-claim written straight to the ticket document", async () => {
+    await assertFails(
+      updateDoc(doc(nonAdmin(), "tickets/tkt-1"), { claimedByUid: "attendee-1" }),
+    );
+  });
+
+  it("denies pre-claiming a webhook delivery id", async () => {
+    await assertFails(
+      setDoc(doc(nonAdmin(), "ticket_webhook_deliveries/del-2"), { deliveryId: "del-2" }),
+    );
+    await assertFails(getDoc(doc(nonAdmin(), "ticket_webhook_deliveries/del-1")));
+  });
+
+  it("denies every client touch of the sync queue", async () => {
+    await assertFails(getDoc(doc(admin(), "ticket_sync_queue/ord-1")));
+    await assertFails(setDoc(doc(admin(), "ticket_sync_queue/ord-2"), { status: "pending" }));
+    await assertFails(deleteDoc(doc(admin(), "ticket_sync_queue/ord-1")));
   });
 });
 

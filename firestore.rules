@@ -398,6 +398,31 @@ service cloud.firestore {
     // and never the id. Every write is the invite/acceptance transaction.
     match /speaker_invites/{tokenHash} { allow read, write: if false; }
 
+    // Ticketing (spec §3.3, §4.1, §4.2). All three collections are
+    // server-only in BOTH directions, and the read denial is load-bearing
+    // on every one of them:
+    //
+    //   `tickets/{externalId}` is the single collection that replaced the
+    //   matched/unmatched pair. Every row names a purchaser's address and
+    //   which account (if any) claimed it, so a client that could read the
+    //   collection could enumerate every attendee who ever bought a
+    //   ticket. Attendees reach their own ticket through
+    //   ticketingVerifyOrder, admins through the admin endpoints — both
+    //   Admin SDK. The claim is a single-document transaction there
+    //   (functions/src/ticketing/registration.cjs), which is what makes
+    //   `allow write: if false` cost nothing.
+    //
+    //   `ticket_webhook_deliveries/{deliveryId}` is the dedup claim store.
+    //   A client that could write it could pre-claim a delivery id and
+    //   make the real webhook acknowledge an order it never enqueued.
+    //
+    //   `ticket_sync_queue/{orderId}` is the one sanctioned queue in the
+    //   system (§10 question 9, CONTRIBUTING.md). Only the webhook
+    //   endpoint enqueues and only processTicketSyncQueue drains.
+    match /tickets/{externalId} { allow read, write: if false; }
+    match /ticket_webhook_deliveries/{deliveryId} { allow read, write: if false; }
+    match /ticket_sync_queue/{orderId} { allow read, write: if false; }
+
     // Everything not matched above stays deny-all.
     match /{document=**} {
       allow read, write: if false;
