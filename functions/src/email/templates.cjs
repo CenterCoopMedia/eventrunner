@@ -23,6 +23,8 @@ const DEFAULTS = {
   'speaker.invite': require('./templates/speaker.invite.cjs'),
   'speaker.accepted': require('./templates/speaker.accepted.cjs'),
   'speaker.confirmation': require('./templates/speaker.confirmation.cjs'),
+  'ticket.get_ticket': require('./templates/ticket.get_ticket.cjs'),
+  'ticket.claim_prompt': require('./templates/ticket.claim_prompt.cjs'),
 };
 
 const OVERRIDE_KEYS = ['subject', 'html', 'text'];
