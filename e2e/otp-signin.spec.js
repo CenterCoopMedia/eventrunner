@@ -1,14 +1,14 @@
-// OTP sign-in (issue #38 done-when a): request a code → scrape it from the
-// emulator's captured console-provider log (the same technique
-// scripts/dev/login-smoke.mjs uses outside Playwright) → verify → signed-in
-// state, driven through the real Login page end to end.
+// OTP sign-in (issue #38 done-when a): request a code → read it from the
+// captured-mail file the console email provider appends to (see
+// e2e/helpers.mjs) → verify → signed-in state, driven through the real
+// Login page end to end.
 import { test, expect } from '@playwright/test';
 import { mailFileSize, waitForOtpCode } from './helpers.mjs';
 
 test.describe.serial('OTP sign-in', () => {
   const email = `otp-e2e-${Date.now()}@example.test`;
 
-  test('request code, scrape it from the emulator log, verify, and stay signed in', async ({ page }) => {
+  test('request code, read it from the mail file, verify, and stay signed in', async ({ page }) => {
     const since = mailFileSize();
 
     await page.goto('/signin');
