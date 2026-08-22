@@ -6,8 +6,12 @@ const assert = require('node:assert/strict');
 const {
   applyCreateSpeaker,
   applyUpdateSpeaker,
+  applyGetOwnSpeakerProfile,
+  applyUpdateOwnSpeakerProfile,
   createCreateSpeakerHandler,
   createUpdateSpeakerHandler,
+  createGetOwnSpeakerProfileHandler,
+  createUpdateOwnSpeakerProfileHandler,
 } = require('./profile.cjs');
 const { makeSpeakersDb } = require('./speakersFake.cjs');
 
@@ -445,4 +449,234 @@ test('an email edit on a speaker with no invitation changes no invite row', asyn
   assert.equal(result.ok, true);
   assert.equal(db.read('speakers', 'rae').status, 'draft');
   assert.deepEqual(db.ids(SPEAKER_INVITES), []);
+});
+
+// --- speaker self-service profile wizard (issue #22) -----------------------
+
+const SPEAKER_UID = 'speaker-uid-1';
+const OTHER_UID = 'someone-else';
+const SPEAKER_ACTOR = { uid: SPEAKER_UID, email: 'rae@example.org' };
+
+function ownedWorld(extra = {}) {
+  return {
+    'speakers/rae': {
+      firstName: 'Rae',
+      lastName: 'Okonkwo',
+      slug: 'rae-okonkwo',
+      email: 'rae@example.org',
+      bio: 'old bio',
+      organization: '',
+      jobTitle: '',
+      socialHandles: {},
+      headshotPath: null,
+      status: 'accepted',
+      uid: SPEAKER_UID,
+      inviteToken: null,
+      approvedAt: null,
+      ...extra,
+    },
+  };
+}
+
+test('applyGetOwnSpeakerProfile: the owner sees their own record, minus server-only fields', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const result = await applyGetOwnSpeakerProfile({ db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.speaker, {
+    speakerId: 'rae',
+    firstName: 'Rae',
+    lastName: 'Okonkwo',
+    slug: 'rae-okonkwo',
+    bio: 'old bio',
+    headshotPath: null,
+    organization: '',
+    jobTitle: '',
+    socialHandles: {},
+    status: 'accepted',
+  });
+  assert.equal('email' in result.speaker, false);
+  assert.equal('uid' in result.speaker, false);
+  assert.equal('inviteToken' in result.speaker, false);
+});
+
+test('applyGetOwnSpeakerProfile: a different uid is refused with 403', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const result = await applyGetOwnSpeakerProfile({ db, speakerId: 'rae', uid: OTHER_UID, isAdmin: false });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+});
+
+test('applyGetOwnSpeakerProfile: an admin may view any speaker', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const result = await applyGetOwnSpeakerProfile({ db, speakerId: 'rae', uid: OTHER_UID, isAdmin: true });
+  assert.equal(result.ok, true);
+  assert.equal(result.speaker.speakerId, 'rae');
+});
+
+test('applyGetOwnSpeakerProfile: a missing speaker is a 404', async () => {
+  const db = makeSpeakersDb();
+  const result = await applyGetOwnSpeakerProfile({ db, speakerId: 'ghost', uid: SPEAKER_UID, isAdmin: false });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 404);
+});
+
+test('applyUpdateOwnSpeakerProfile: the owner may edit the self-editable fields', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false,
+    payload: { bio: 'new bio', organization: 'The Record', jobTitle: 'Reporter', socialHandles: { twitter: '@rae' } },
+    actor: SPEAKER_ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true);
+  const stored = db.read('speakers', 'rae');
+  assert.equal(stored.bio, 'new bio');
+  assert.equal(stored.organization, 'The Record');
+  assert.equal(stored.jobTitle, 'Reporter');
+  assert.deepEqual(stored.socialHandles, { twitter: '@rae' });
+  assert.equal(stored.updatedBy, SPEAKER_ACTOR.email);
+});
+
+test('applyUpdateOwnSpeakerProfile: a name edit does NOT re-derive the slug', async () => {
+  // Unlike the admin path (applyUpdateSpeaker), a self-service name edit
+  // must not move a public URL that may already be shared.
+  const db = makeSpeakersDb(ownedWorld());
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false,
+    payload: { lastName: 'Adeyemi' },
+    actor: SPEAKER_ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 'rae').slug, 'rae-okonkwo');
+  assert.equal(db.read('speakers', 'rae').lastName, 'Adeyemi');
+});
+
+test('applyUpdateOwnSpeakerProfile: slug, email, and status are rejected by name', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  for (const payload of [
+    { slug: 'new-slug' },
+    { email: 'new@example.org' },
+    { status: 'approved' },
+  ]) {
+    const result = await applyUpdateOwnSpeakerProfile({
+      db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false, payload, actor: SPEAKER_ACTOR, now: NOW,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.match(result.message, /not editable here/);
+  }
+  assert.deepEqual(db.read('speakers', 'rae').slug, 'rae-okonkwo');
+});
+
+test('applyUpdateOwnSpeakerProfile: server-owned fields are rejected the same as the admin path', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false, payload: { uid: 'steal-me' }, actor: SPEAKER_ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 400);
+  assert.match(result.message, /^uid: read-only/);
+});
+
+test('applyUpdateOwnSpeakerProfile: a caller who is not the linked account is refused with 403', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'rae', uid: OTHER_UID, isAdmin: false, payload: { bio: 'hijack' }, actor: { uid: OTHER_UID, email: 'x@example.org' }, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.equal(db.read('speakers', 'rae').bio, 'old bio');
+});
+
+test('applyUpdateOwnSpeakerProfile: a speaker never linked to an account (uid null) cannot self-edit', async () => {
+  const db = makeSpeakersDb(ownedWorld({ uid: null }));
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false, payload: { bio: 'hijack' }, actor: SPEAKER_ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+});
+
+test('applyUpdateOwnSpeakerProfile: an admin may edit on behalf of a speaker', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'rae', uid: 'admin-1', isAdmin: true, payload: { bio: 'admin edit' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 'rae').bio, 'admin edit');
+});
+
+test('applyUpdateOwnSpeakerProfile: a missing speaker is a 404', async () => {
+  const db = makeSpeakersDb();
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'ghost', uid: SPEAKER_UID, isAdmin: false, payload: { bio: 'x' }, actor: SPEAKER_ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 404);
+});
+
+test('applyUpdateOwnSpeakerProfile: an empty payload is refused rather than stamped', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false, payload: {}, actor: SPEAKER_ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 400);
+  assert.deepEqual(db.writes, []);
+});
+
+// --- self-service handlers --------------------------------------------------
+
+function speakerDeps(db, { uid = SPEAKER_UID, email = 'rae@example.org', verified = true } = {}) {
+  return {
+    db,
+    auth: { verifyIdToken: async () => ({ uid, email, email_verified: verified }) },
+    getConfig: async () => ({ bootstrap: { adminEmails: [] } }),
+    now: NOW,
+    log: { error() {}, warn() {} },
+  };
+}
+
+const speakerReq = (body) => ({ method: 'POST', body, headers: { authorization: 'Bearer t' } });
+
+test('getOwnSpeakerProfile handler: 401 with no token, 200 for the owner', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const noAuth = fakeRes();
+  await createGetOwnSpeakerProfileHandler(speakerDeps(db))({ method: 'POST', body: { speakerId: 'rae' }, headers: {} }, noAuth);
+  assert.equal(noAuth.statusCode, 401);
+
+  const ok = fakeRes();
+  await createGetOwnSpeakerProfileHandler(speakerDeps(db))(speakerReq({ speakerId: 'rae' }), ok);
+  assert.equal(ok.statusCode, 200);
+  assert.equal(ok.body.speaker.speakerId, 'rae');
+});
+
+test('updateOwnSpeakerProfile handler: 403 for a different uid, 200 and audited for the owner', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const forbidden = fakeRes();
+  await createUpdateOwnSpeakerProfileHandler(speakerDeps(db, { uid: OTHER_UID }))(
+    speakerReq({ speakerId: 'rae', speaker: { bio: 'hijack' } }),
+    forbidden,
+  );
+  assert.equal(forbidden.statusCode, 403);
+
+  const ok = fakeRes();
+  await createUpdateOwnSpeakerProfileHandler(speakerDeps(db))(
+    speakerReq({ speakerId: 'rae', speaker: { bio: 'updated via wizard' } }),
+    ok,
+  );
+  assert.equal(ok.statusCode, 200);
+  assert.equal(db.read('speakers', 'rae').bio, 'updated via wizard');
+  const logs = db.ids('admin_logs').map((id) => db.read('admin_logs', id));
+  assert.equal(logs[0].action, 'updateOwnSpeakerProfile');
+});
+
+test('updateOwnSpeakerProfile handler is POST-only and requires speakerId', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const wrongMethod = fakeRes();
+  await createUpdateOwnSpeakerProfileHandler(speakerDeps(db))({ method: 'GET' }, wrongMethod);
+  assert.equal(wrongMethod.statusCode, 405);
+
+  const missingId = fakeRes();
+  await createUpdateOwnSpeakerProfileHandler(speakerDeps(db))(speakerReq({ speaker: { bio: 'x' } }), missingId);
+  assert.equal(missingId.statusCode, 400);
 });

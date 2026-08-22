@@ -141,10 +141,18 @@ test('the tri-sync trigger set and the drift detector do not exist', () => {
       'cancelSpeakerInvite',
       'createSpeaker',
       'deleteSpeaker',
+      // The self-service profile wizard (issue #22): getOwnSpeakerProfile
+      // and updateOwnSpeakerProfile live in speakers/profile.cjs alongside
+      // the admin CRUD; speakerPhotoUpload lives in media/upload.cjs (it
+      // matches /speaker/i too) because it shares that module's upload
+      // machinery, not because it belongs to a different collection.
+      'getOwnSpeakerProfile',
       'listSpeakerInvites',
       'onSpeakerWritten',
       'resendSpeakerInvite',
       'sendSpeakerInvite',
+      'speakerPhotoUpload',
+      'updateOwnSpeakerProfile',
       'updateSpeaker',
       'validateSpeakerInvite',
     ],

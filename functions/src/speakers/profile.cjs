@@ -24,10 +24,10 @@
  * fixture and the web app cannot drift from the server.
  */
 
-const { requireAdmin } = require('../core/auth.cjs');
-const { sendError, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
+const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
+const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
-const { validateSpeaker } = require('shared/speaker');
+const { validateSpeaker, SELF_EDITABLE_SPEAKER_FIELDS } = require('shared/speaker');
 const { generateSpeakerSlug } = require('shared/slug');
 const { readLinkedUser } = require('./lifecycle.cjs');
 
@@ -309,6 +309,229 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
 }
 
 /**
+ * The self-service view of a speaker's OWN record (spec §4.3, §9 "Speaker
+ * profile wizard", issue #22). Deliberately narrower than PUBLIC_SPEAKER_FIELDS
+ * PLUS PUBLIC_SPEAKER_FIELDS: it adds `status` (so the wizard can say "an
+ * organizer is reviewing this" versus "this is live"), but never `email`,
+ * `inviteToken`, or `approvedAt` — the module doc's "NOT anonymously or
+ * attendee-readable" line applies to the speaker's own client just as much
+ * as to anyone else's, so those stay server-side even for the owner.
+ *
+ * @param {object} speaker stored `speakers/{id}` document
+ * @param {string} speakerId
+ * @returns {object}
+ */
+function buildOwnSpeakerView(speaker, speakerId) {
+  return {
+    speakerId,
+    firstName: typeof speaker.firstName === 'string' ? speaker.firstName : '',
+    lastName: typeof speaker.lastName === 'string' ? speaker.lastName : '',
+    slug: typeof speaker.slug === 'string' ? speaker.slug : '',
+    bio: typeof speaker.bio === 'string' ? speaker.bio : '',
+    headshotPath: typeof speaker.headshotPath === 'string' && speaker.headshotPath
+      ? speaker.headshotPath
+      : null,
+    organization: typeof speaker.organization === 'string' ? speaker.organization : '',
+    jobTitle: typeof speaker.jobTitle === 'string' ? speaker.jobTitle : '',
+    socialHandles: speaker.socialHandles && typeof speaker.socialHandles === 'object'
+      ? { ...speaker.socialHandles }
+      : {},
+    status: typeof speaker.status === 'string' ? speaker.status : 'draft',
+  };
+}
+
+/**
+ * Authenticate the caller for the self-service speaker endpoints and decide
+ * whether they are acting as an admin. Deliberately does NOT decide
+ * ownership of a particular speaker record — that check needs the record
+ * itself, which each caller reads on its own (a transaction for the write
+ * path, a plain get for the read path), so this only answers "who is this
+ * and are they an admin" once per request.
+ *
+ * @param {{ auth: object, getConfig: () => Promise<object> }} deps
+ * @param {object} req
+ * @returns {Promise<{ ok: true, uid: string, email: string, isAdmin: boolean } |
+ *                    { ok: false, status: 401, code: string, message: string }>}
+ */
+async function gateSpeakerSelfOrAdmin({ auth, getConfig }, req) {
+  const decoded = await verifyAuthToken({ auth }, req);
+  if (!decoded?.uid) {
+    return { ok: false, status: 401, code: 'unauthorized', message: 'Authentication required.' };
+  }
+  let isAdmin = false;
+  const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
+  if (email && decoded.email_verified === true) {
+    const config = await getConfig();
+    const adminEmails = Array.isArray(config?.bootstrap?.adminEmails)
+      ? config.bootstrap.adminEmails
+      : [];
+    isAdmin = adminEmails.some(
+      (entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email,
+    );
+  }
+  return {
+    ok: true,
+    uid: decoded.uid,
+    email: typeof decoded.email === 'string' ? decoded.email : '',
+    isAdmin,
+  };
+}
+
+/**
+ * Read the caller's own speaker record (or, for an admin, any record —
+ * support and the admin UI both need to see what a speaker currently has
+ * without going through the admin CRUD's server-owned fields).
+ *
+ * @param {{ db: object, speakerId: unknown, uid: string, isAdmin: boolean }} args
+ */
+async function applyGetOwnSpeakerProfile({ db, speakerId, uid, isAdmin }) {
+  if (!isValidDocId(speakerId)) {
+    return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
+  }
+  const snap = await db.collection(SPEAKERS).doc(speakerId).get();
+  if (!snap.exists) {
+    return { ok: false, status: 404, code: 'not-found', message: `No speaker with id "${speakerId}".` };
+  }
+  const stored = snap.data();
+  if (!isAdmin && (typeof stored.uid !== 'string' || !stored.uid || stored.uid !== uid)) {
+    return { ok: false, status: 403, code: 'forbidden', message: 'You may only view your own speaker profile.' };
+  }
+  return { ok: true, speaker: buildOwnSpeakerView(stored, speakerId) };
+}
+
+/**
+ * Self-service edit of the caller's OWN canonical speaker record — the
+ * server half of the profile wizard (spec §4.3, §9, issue #22). Same
+ * transaction shape as applyUpdateSpeaker, but:
+ *
+ *   - the editable surface is SELF_EDITABLE_SPEAKER_FIELDS, enforced by
+ *     validateSpeaker's `fieldsAllowed` — a payload naming `slug`, `email`,
+ *     `status`, or any SERVER_OWNED_SPEAKER_FIELDS entry is rejected by
+ *     name rather than silently dropped;
+ *   - the slug is NEVER re-derived here, unlike the admin path: a speaker
+ *     correcting their own name must not move their public URL out from
+ *     under a link already shared;
+ *   - there is no invite-invalidation branch, because neither `email` nor
+ *     `status` — the two fields that branch reacts to — is reachable
+ *     through this payload at all.
+ *
+ * Ownership is checked INSIDE the transaction against the record it is
+ * about to write, not against a value the caller passed in — the same
+ * "read the thing you're about to gate on, in the same transaction"
+ * discipline applyUpdateSpeaker's removal branch follows.
+ *
+ * @param {{ db: object, speakerId: unknown, uid: string, isAdmin: boolean,
+ *           payload: unknown, actor: { uid: string, email: string },
+ *           now?: () => number }} args
+ * @returns {Promise<{ ok: true, speakerId: string, docPath: string } |
+ *                    { ok: false, status: number, code: string, message: string }>}
+ */
+async function applyUpdateOwnSpeakerProfile({ db, speakerId, uid, isAdmin, payload, actor, now = Date.now }) {
+  if (!isValidDocId(speakerId)) {
+    return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
+  }
+  const verdict = validateSpeaker(payload, { partial: true, fieldsAllowed: SELF_EDITABLE_SPEAKER_FIELDS });
+  if (!verdict.ok) {
+    return { ok: false, status: 400, code: 'bad-request', message: verdict.errors.join('; ') };
+  }
+  if (Object.keys(verdict.fields).length === 0) {
+    return { ok: false, status: 400, code: 'bad-request', message: 'speaker: no editable fields in the payload' };
+  }
+
+  const at = new Date(now());
+  const ref = db.collection(SPEAKERS).doc(speakerId);
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) {
+        const err = new Error('NOT_FOUND');
+        err.conflict = { status: 404, code: 'not-found', message: `No speaker with id "${speakerId}".` };
+        throw err;
+      }
+      const stored = snap.data();
+      if (!isAdmin && (typeof stored.uid !== 'string' || !stored.uid || stored.uid !== uid)) {
+        const err = new Error('FORBIDDEN');
+        err.conflict = { status: 403, code: 'forbidden', message: 'You may only edit your own speaker profile.' };
+        throw err;
+      }
+      tx.set(ref, { ...verdict.fields, updatedAt: at, updatedBy: actor.email }, { merge: true });
+    });
+  } catch (err) {
+    if (err?.conflict) return { ok: false, ...err.conflict };
+    throw err;
+  }
+
+  return { ok: true, speakerId, docPath: `${SPEAKERS}/${speakerId}` };
+}
+
+/**
+ * @param {{ db, auth, getConfig, now?: () => number, log?: Console }} deps
+ */
+function createGetOwnSpeakerProfileHandler({ db, auth, getConfig, log = console }) {
+  return async function getOwnSpeakerProfile(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const gate = await gateSpeakerSelfOrAdmin({ auth, getConfig }, req);
+    if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+
+    let result;
+    try {
+      result = await applyGetOwnSpeakerProfile({
+        db, speakerId: req.body?.speakerId, uid: gate.uid, isAdmin: gate.isAdmin,
+      });
+    } catch (err) {
+      log.error('getOwnSpeakerProfile failed', err);
+      return internal(res, 'Your speaker profile could not be loaded.');
+    }
+    if (!result.ok) return sendError(res, result.status, result.code, result.message);
+    res.status(200).json({ speaker: result.speaker });
+  };
+}
+
+/**
+ * @param {{ db, auth, getConfig, now?: () => number, log?: Console }} deps
+ */
+function createUpdateOwnSpeakerProfileHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+  return async function updateOwnSpeakerProfile(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const speakerId = req.body?.speakerId;
+    if (!isValidDocId(speakerId)) return badRequest(res, 'speakerId: required');
+    const gate = await gateSpeakerSelfOrAdmin({ auth, getConfig }, req);
+    if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+
+    let result;
+    try {
+      result = await applyUpdateOwnSpeakerProfile({
+        db,
+        speakerId,
+        uid: gate.uid,
+        isAdmin: gate.isAdmin,
+        payload: req.body?.speaker,
+        actor: { uid: gate.uid, email: gate.email },
+        now,
+      });
+    } catch (err) {
+      log.error('updateOwnSpeakerProfile failed', err);
+      return internal(res, 'Your speaker profile could not be saved.');
+    }
+    if (!result.ok) {
+      return result.status === 404
+        ? notFound(res, result.message)
+        : sendError(res, result.status, result.code, result.message);
+    }
+    await logAdminAction({
+      db,
+      action: 'updateOwnSpeakerProfile',
+      docPath: result.docPath,
+      actor: { uid: gate.uid, email: gate.email },
+      now,
+      log,
+    });
+    res.status(200).json({ speakerId: result.speakerId, docPath: result.docPath });
+  };
+}
+
+/**
  * @param {{ db, auth, getConfig, now?: () => number, log?: Console }} deps
  */
 function createCreateSpeakerHandler({ db, auth, getConfig, now = Date.now, log = console }) {
@@ -394,16 +617,29 @@ function buildHandlers() {
     updateSpeaker: onRequest({ region }, withCors(async (req, res) => {
       await createUpdateSpeakerHandler(buildDeps())(req, res);
     })),
+    getOwnSpeakerProfile: onRequest({ region }, withCors(async (req, res) => {
+      await createGetOwnSpeakerProfileHandler(buildDeps())(req, res);
+    })),
+    updateOwnSpeakerProfile: onRequest({ region }, withCors(async (req, res) => {
+      await createUpdateOwnSpeakerProfileHandler(buildDeps())(req, res);
+    })),
   };
 }
 
 module.exports = {
   applyCreateSpeaker,
   applyUpdateSpeaker,
+  applyGetOwnSpeakerProfile,
+  applyUpdateOwnSpeakerProfile,
   createCreateSpeakerHandler,
   createUpdateSpeakerHandler,
+  createGetOwnSpeakerProfileHandler,
+  createUpdateOwnSpeakerProfileHandler,
   get handlers() {
     return buildHandlers();
   },
-  internals: { SPEAKERS, SPEAKER_SLUGS, newSpeakerDefaults, findSlugOwner, gateAdminPost },
+  internals: {
+    SPEAKERS, SPEAKER_SLUGS, newSpeakerDefaults, findSlugOwner, gateAdminPost,
+    gateSpeakerSelfOrAdmin, buildOwnSpeakerView,
+  },
 };
