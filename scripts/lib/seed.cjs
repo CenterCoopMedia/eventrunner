@@ -28,6 +28,7 @@
  */
 
 const { buildLegalContent } = require('./legal.cjs');
+const { getDefaultTemplate } = require('../../functions/src/email/templates.cjs');
 
 /** Field-list sections seed empty (spec §5.3): zero items renders nothing. */
 const EMPTY = [];
@@ -429,11 +430,52 @@ function buildSeedContent({ pages, docs, tierA = {}, seededAt = new Date(0).toIS
   return out;
 }
 
+/**
+ * The two `email_templates/{id}` overrides seeded at init (spec §5.1 step f,
+ * §6.3): "the two client-visible templates whose copy is event-specific" —
+ * `ticket.get_ticket` and `ticket.claim_prompt` are the only templates that
+ * seed a Firestore override at all; every other shipped default (§6.3's
+ * phase 2/3 list) runs straight from code, no override doc, no seed step.
+ *
+ * The seeded override is a COPY of the shipped default (functions/src/
+ * email/templates/ticket.*.cjs), not new client-specific prose — there is
+ * no admin editing surface for `email_templates` yet, so a starting point
+ * identical to what already renders is the correct seed: it is guaranteed
+ * to pass `validateTemplateBody` against itself (same source), and it gives
+ * a future editor something live to start customizing rather than a
+ * doc that silently diverges from what the mail actually says today.
+ *
+ * @param {{ seededAt?: string, ids?: string[] }} [args]
+ * @returns {Array<{ id: string, subject: string, html: string, text: string,
+ *                   seeded: true, seededAt: string }>}
+ */
+const EMAIL_TEMPLATE_OVERRIDE_IDS = Object.freeze(['ticket.get_ticket', 'ticket.claim_prompt']);
+
+function buildEmailTemplateSeeds({ seededAt = new Date(0).toISOString(), ids = EMAIL_TEMPLATE_OVERRIDE_IDS } = {}) {
+  return ids.map((id) => {
+    const template = getDefaultTemplate(id);
+    if (!template) {
+      // A code bug (a seeded id with no shipped default), not a data state.
+      throw new Error(`buildEmailTemplateSeeds: no shipped template default for "${id}"`);
+    }
+    return {
+      id,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+      seeded: true,
+      seededAt,
+    };
+  });
+}
+
 module.exports = {
   defaultPages,
   buildSeedContent,
   buildLegalContentDocs,
+  buildEmailTemplateSeeds,
   placeholderBlock,
   LEGAL_PAGE_IDS,
+  EMAIL_TEMPLATE_OVERRIDE_IDS,
   internals: { venueAddress, CONFIG_SEEDS },
 };

@@ -97,6 +97,60 @@ test('init seeds config, pages, and content, and exits 0 despite unmet readiness
   assert.match(output, /Legal review/);
 });
 
+test('init seeds the two client-visible email_templates overrides (§5.1 step f)', async () => {
+  const db = makeFakeDb();
+  await quietly(() =>
+    runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+
+  const { getDefaultTemplate } = require('../functions/src/email/templates.cjs');
+  for (const id of ['ticket.get_ticket', 'ticket.claim_prompt']) {
+    const doc = await db.collection('email_templates').doc(id).get();
+    assert.equal(doc.exists, true, id);
+    const data = doc.data();
+    assert.equal(data.seeded, true);
+    // The seed is a copy of the shipped default — a starting point
+    // guaranteed to validate, not new prose (§6.3, scripts/lib/seed.cjs).
+    const template = getDefaultTemplate(id);
+    assert.equal(data.subject, template.subject);
+    assert.equal(data.html, template.html);
+    assert.equal(data.text, template.text);
+  }
+  // No override is seeded for a template that ships from code only.
+  assert.equal((await db.collection('email_templates').doc('auth.otp').get()).exists, false);
+});
+
+test('re-running init refreshes an untouched email_templates seed but leaves an edited one alone', async () => {
+  const db = makeFakeDb();
+  await quietly(() =>
+    runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+
+  // A client edits the claim prompt's subject; the flag clears, same
+  // convention as every other seeded document (idempotency.cjs).
+  await db.collection('email_templates').doc('ticket.claim_prompt').set({
+    subject: 'Client-written subject',
+    html: (await db.collection('email_templates').doc('ticket.claim_prompt').get()).data().html,
+    text: (await db.collection('email_templates').doc('ticket.claim_prompt').get()).data().text,
+    seeded: false,
+  });
+
+  await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+
+  const claimPrompt = await db.collection('email_templates').doc('ticket.claim_prompt').get();
+  assert.equal(claimPrompt.data().subject, 'Client-written subject', 'client edit survives --force');
+  const getTicket = await db.collection('email_templates').doc('ticket.get_ticket').get();
+  assert.equal(getTicket.data().seeded, true, 'the untouched sibling still refreshes');
+});
+
+test('--dry-run seeds no email_templates override either', async () => {
+  const db = makeFakeDb();
+  await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ 'dry-run': true }), tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  assert.equal((await db.collection('email_templates').doc('ticket.get_ticket').get()).exists, false);
+});
+
 test('init prints the manual checklist including the Firebase Auth steps (§5.6)', async () => {
   const db = makeFakeDb();
   const { output } = await quietly(() =>
