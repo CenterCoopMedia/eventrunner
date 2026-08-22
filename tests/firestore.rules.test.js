@@ -293,6 +293,7 @@ describe("server-only collections stay deny-all", () => {
     "client_error_rate_limits",
     "email_templates",
     "speaker_slugs",
+    "speaker_invites",
   ]) {
     it(`denies all access to ${c}, admin included`, async () => {
       await assertFails(getDoc(doc(anon(), `${c}/d1`)));
@@ -707,6 +708,41 @@ describe("speakers canonical store and speakers_public projection (spec §4.3)",
     await assertFails(setDoc(doc(admin(), "speakers_public/spk-1"), { displayName: "Edited" }));
     await assertFails(setDoc(doc(anon(), "speakers_public/spk-9"), { displayName: "Injected" }));
     await assertFails(deleteDoc(doc(admin(), "speakers_public/spk-1")));
+  });
+});
+
+// Invitations (spec §4.1 `speaker_invites`, issue #21). The deny-all loop
+// above already covers the generic case; these pin the two properties that
+// make the collection safe to key by token digest — nobody can enumerate
+// outstanding invitations, and nobody can mint one from a client.
+describe("speaker invitations stay server-only (spec §4.1, issue #21)", () => {
+  const tokenHash = "a".repeat(64);
+
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `speaker_invites/${tokenHash}`), {
+        speakerId: "spk-1",
+        email: "speaker@example.com",
+        status: "pending",
+        expiresAt: new Date(Date.now() + 86_400_000),
+      });
+    });
+  });
+
+  it("denies reading an invitation, admin included — including a list query", async () => {
+    // An admin reads invite STATE through listSpeakerInvites, which never
+    // returns the document id; the id is the digest of a live token.
+    await assertFails(getDoc(doc(anon(), `speaker_invites/${tokenHash}`)));
+    await assertFails(getDoc(doc(nonAdmin(), `speaker_invites/${tokenHash}`)));
+    await assertFails(getDoc(doc(admin(), `speaker_invites/${tokenHash}`)));
+    await assertFails(getDocs(collection(admin(), "speaker_invites")));
+  });
+
+  it("denies minting, accepting, or deleting an invitation from a client", async () => {
+    await assertFails(setDoc(doc(anon(), `speaker_invites/${"b".repeat(64)}`), { speakerId: "spk-1" }));
+    await assertFails(setDoc(doc(admin(), `speaker_invites/${"b".repeat(64)}`), { speakerId: "spk-1" }));
+    await assertFails(updateDoc(doc(admin(), `speaker_invites/${tokenHash}`), { status: "accepted" }));
+    await assertFails(deleteDoc(doc(admin(), `speaker_invites/${tokenHash}`)));
   });
 });
 

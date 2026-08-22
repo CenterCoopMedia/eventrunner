@@ -23,6 +23,7 @@ import Updates from './pages/Updates.jsx';
 import UpdateDetail from './pages/UpdateDetail.jsx';
 import ContentPage from './pages/ContentPage.jsx';
 import Login from './pages/Login.jsx';
+import SpeakerAccept from './pages/SpeakerAccept.jsx';
 import AdminApp from './admin/AdminApp.jsx';
 import Profile from './pages/Profile.jsx';
 import Attendees from './pages/Attendees.jsx';
@@ -47,6 +48,11 @@ export function AppRoutes() {
         <Route path="updates" element={<Updates />} />
         <Route path="updates/:id" element={<UpdateDetail />} />
         <Route path="signin" element={<Login />} />
+        {/* Speaker invite acceptance (issue #21). Singular `speaker`, and
+            reserved in shared/routing alongside the plural directory route:
+            every invitation email ever sent links here, so a generic
+            cmsPages path must never be able to claim the segment. */}
+        <Route path="speaker/accept" element={<SpeakerAccept />} />
         <Route path="profile" element={<Profile />} />
         <Route path="attendees" element={<Attendees />} />
         <Route path="attendees/:uid" element={<AttendeeProfile />} />

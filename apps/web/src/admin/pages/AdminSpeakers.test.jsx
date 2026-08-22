@@ -333,3 +333,120 @@ describe('speaker editor', () => {
     expect(bodyOf(0).speaker.status).toBe('draft');
   });
 });
+
+// Invite actions on the list (issue #21). The buttons offered are exactly
+// the transitions the server accepts — offering one it will reject is worse
+// than offering none — and every action posts { speakerId } and nothing else.
+describe('invite actions', () => {
+  /**
+   * The list calls listSpeakerInvites once on mount, so a test that wants a
+   * click's request routes by endpoint rather than counting calls.
+   */
+  function routeInviteFetch({ invites = [], action } = {}) {
+    globalThis.fetch = vi.fn(async (url) => {
+      if (String(url).endsWith('/listSpeakerInvites')) return okResponse({ invites });
+      if (typeof action === 'function') return action();
+      return action ?? okResponse({});
+    });
+  }
+
+  const callTo = (name) => fetch.mock.calls.find(([url]) => String(url).endsWith(`/${name}`));
+
+  it('offers Invite for a draft speaker only', async () => {
+    speakerDocs = [
+      { ...RAE, id: 'draft-one', firstName: 'Draft', lastName: 'One', status: 'draft' },
+      { ...RAE, id: 'published-one', firstName: 'Published', lastName: 'One', status: 'approved' },
+    ];
+    routeInviteFetch();
+    await renderAt('/admin/speakers');
+
+    expect(screen.getAllByRole('button', { name: 'Invite' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Resend invite' })).not.toBeInTheDocument();
+  });
+
+  it('offers Resend and Cancel for an invited speaker, and no Invite', async () => {
+    speakerDocs = [{ ...RAE, id: 'invited-one', firstName: 'Invited', lastName: 'One', status: 'invited' }];
+    routeInviteFetch();
+    await renderAt('/admin/speakers');
+
+    expect(screen.getByRole('button', { name: 'Resend invite' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel invite' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Invite' })).not.toBeInTheDocument();
+  });
+
+  it('posts sendSpeakerInvite with the speaker id and confirms', async () => {
+    speakerDocs = [{ ...RAE, id: 'draft-one', firstName: 'Draft', lastName: 'One', status: 'draft' }];
+    routeInviteFetch({ action: okResponse({ speakerId: 'draft-one', status: 'invited' }) });
+    await renderAt('/admin/speakers');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+    });
+
+    await waitFor(() => expect(callTo('sendSpeakerInvite')).toBeTruthy());
+    expect(JSON.parse(callTo('sendSpeakerInvite')[1].body)).toEqual({ speakerId: 'draft-one' });
+    expect(screen.getByText(/Invitation emailed to Draft One/)).toBeInTheDocument();
+  });
+
+  it('posts cancelSpeakerInvite and says the invitation was cancelled', async () => {
+    speakerDocs = [{ ...RAE, id: 'invited-one', firstName: 'Invited', lastName: 'One', status: 'invited' }];
+    routeInviteFetch({ action: okResponse({ speakerId: 'invited-one', status: 'draft' }) });
+    await renderAt('/admin/speakers');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel invite' }));
+    });
+
+    await waitFor(() => expect(callTo('cancelSpeakerInvite')).toBeTruthy());
+    expect(screen.getByText(/cancelled/)).toBeInTheDocument();
+  });
+
+  it('surfaces a refused transition verbatim', async () => {
+    speakerDocs = [{ ...RAE, id: 'draft-one', firstName: 'Draft', lastName: 'One', status: 'draft' }];
+    routeInviteFetch({
+      action: errorResponse(
+        409,
+        'invalid-status',
+        'This speaker already has an outstanding invitation. Resend it, or cancel it first.',
+      ),
+    });
+    await renderAt('/admin/speakers');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText(/already has an outstanding invitation/)).toBeInTheDocument(),
+    );
+  });
+
+  it('shows an invitation that was recorded but never delivered', async () => {
+    speakerDocs = [{ ...RAE, id: 'invited-one', firstName: 'Invited', lastName: 'One', status: 'invited' }];
+    routeInviteFetch({
+      invites: [
+        { speakerId: 'invited-one', status: 'pending', sentAt: null, expiresAt: '2026-09-04T12:00:00.000Z' },
+      ],
+    });
+    await renderAt('/admin/speakers');
+
+    await waitFor(() => expect(screen.getByText(/Recorded, not delivered/)).toBeInTheDocument());
+  });
+
+  it('shows the expiry of a delivered invitation', async () => {
+    speakerDocs = [{ ...RAE, id: 'invited-one', firstName: 'Invited', lastName: 'One', status: 'invited' }];
+    routeInviteFetch({
+      invites: [
+        {
+          speakerId: 'invited-one',
+          status: 'pending',
+          sentAt: '2026-08-21T12:00:00.000Z',
+          expiresAt: '2026-09-04T12:00:00.000Z',
+        },
+      ],
+    });
+    await renderAt('/admin/speakers');
+
+    await waitFor(() => expect(screen.getByText(/Expires 2026-09-04/)).toBeInTheDocument());
+  });
+});

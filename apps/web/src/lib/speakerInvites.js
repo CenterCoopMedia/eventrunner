@@ -1,0 +1,86 @@
+// HTTP seam for the speaker invite pipeline (issue #21, spec §4.3).
+//
+// Two endpoints, both reached the same way the OTP pair is (see
+// AuthContext.jsx): POST <functionsOrigin>/<name> with the App Check
+// attestation attached when the deployment configured one.
+//
+//   validateSpeakerInvite  { token } → { valid, reason? , speakerName, … }
+//   acceptSpeakerInvite    { token } + Bearer ID token → { speakerId, … }
+//
+// validateSpeakerInvite answers 200 for a miss as well as a hit — the server
+// deliberately gives every failure the same status so a network log cannot
+// be read as an oracle — so `valid` is the field to branch on, not
+// `response.ok`.
+import { functionsOrigin } from '../contexts/AuthContext.jsx';
+import { appCheckHeaders } from '../firebase.js';
+
+/**
+ * Error shape both calls normalize to. `code` mirrors the server's
+ * `error.code` ('link-occupied', 'account-not-ready', 'invite-expired',
+ * 'invite-invalid', …) plus 'network' for a fetch that never landed.
+ */
+export class SpeakerInviteError extends Error {
+  constructor({ code, message, status }) {
+    super(message);
+    this.name = 'SpeakerInviteError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
+async function post(name, body, { idToken = null } = {}) {
+  const attestation = await appCheckHeaders();
+  let response;
+  try {
+    response = await fetch(`${functionsOrigin()}/${name}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        ...attestation,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new SpeakerInviteError({
+      code: 'network',
+      status: 0,
+      message: 'We could not reach the server. Check your connection and try again.',
+    });
+  }
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null; // non-JSON body (proxy error page); fall through
+  }
+  if (!response.ok) {
+    const error = payload?.error ?? {};
+    throw new SpeakerInviteError({
+      code: typeof error.code === 'string' ? error.code : 'unknown',
+      status: response.status,
+      // Verbatim: these messages are the actionable part (which account is
+      // linked, whether to wait and retry), and rewriting them client-side
+      // would throw that away.
+      message:
+        typeof error.message === 'string' && error.message
+          ? error.message
+          : 'Something went wrong. Try again.',
+    });
+  }
+  return payload ?? {};
+}
+
+/** @param {string} token @returns {Promise<object>} the server's answer */
+export function validateSpeakerInvite(token) {
+  return post('validateSpeakerInvite', { token });
+}
+
+/**
+ * @param {{ token: string, idToken: string }} args
+ * @returns {Promise<{ speakerId: string, speakerName: string, emailMismatch: boolean }>}
+ */
+export function acceptSpeakerInvite({ token, idToken }) {
+  return post('acceptSpeakerInvite', { token }, { idToken });
+}
