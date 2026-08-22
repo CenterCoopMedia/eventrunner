@@ -137,6 +137,38 @@ function readMailSince(since) {
 }
 
 /**
+ * Fail loudly, immediately, when the captured-mail log itself is the
+ * problem — rather than letting a mail scan poll a file that will never
+ * receive content for its whole timeout and surface as an opaque "the OTP
+ * code was captured" assertion failure. Missing-or-still-empty after this
+ * grace window means the file was never created (or nothing has ever been
+ * teed into it), which happens exactly one way: something invoked
+ * `firebase emulators:exec` / `playwright test` OUTSIDE
+ * scripts/dev/run-e2e.sh, so the `tee` that produces E2E_EMULATOR_LOG never
+ * ran. `emulatorLogSize()` capturing a byte offset moments earlier is what
+ * every caller already does, so the file existing by then is normal; this
+ * only exists to catch it NOT existing.
+ *
+ * @param {number} graceMs how long to tolerate the file not existing yet
+ *   (global-setup's seeding takes several seconds, so a brief absence right
+ *   at suite start is not itself a problem)
+ */
+async function assertMailLogIsWired(graceMs = 5000) {
+  const deadline = Date.now() + graceMs;
+  while (Date.now() < deadline) {
+    if (fs.existsSync(EMULATOR_LOG)) return;
+    await sleep(250);
+  }
+  throw new Error(
+    `E2E_EMULATOR_LOG (${EMULATOR_LOG}) does not exist. A mail scan cannot ever find anything ` +
+    'in a log that was never written — the e2e suite must run through scripts/dev/run-e2e.sh ' +
+    '(npm run test:e2e / the ci.yml e2e job), which tees `firebase emulators:exec`\'s output to ' +
+    'this file before Playwright starts. Invoking `playwright test` directly, or wrapping ' +
+    '`firebase emulators:exec` some other way, never creates it.',
+  );
+}
+
+/**
  * Poll the captured emulator log until `extract` finds something in mail
  * sent to `email` since byte offset `since`, or time out.
  *
@@ -145,6 +177,7 @@ function readMailSince(since) {
  * @param {number} timeoutMs
  */
 async function waitForMail(since, email, extract, timeoutMs = 30000) {
+  await assertMailLogIsWired();
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const mails = readMailSince(since).filter((m) => m.to === email);

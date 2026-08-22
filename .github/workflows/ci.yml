@@ -226,7 +226,14 @@ jobs:
           key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: firebase-emulators-${{ runner.os }}-
       - name: Run e2e tests
-        run: npm run test:e2e
+        # Invoke the script directly rather than through `npm run test:e2e`
+        # (which is just this same script — see package.json) so local and
+        # CI share exactly one invocation path, with nothing to drift: the
+        # captured-mail log every OTP/invite journey reads only exists
+        # because scripts/dev/run-e2e.sh tees `emulators:exec`'s output to
+        # it before Playwright starts. Reimplementing the emulators:exec
+        # call here instead would silently drop that tee.
+        run: bash scripts/dev/run-e2e.sh
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4

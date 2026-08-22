@@ -33,4 +33,19 @@ npx firebase emulators:exec \
   --only firestore,storage,auth,functions \
   --project "$EVENT_FIREBASE_PROJECT_ID" \
   "npx playwright test" 2>&1 | tee "$LOG"
-exit "${PIPESTATUS[0]}"
+status="${PIPESTATUS[0]}"
+
+# Belt and suspenders on top of e2e/helpers.mjs's own runtime check: if
+# nothing at all landed in the tee'd log, the capture path itself is broken
+# (not the app) — say so loudly here too, since a run that fails for THIS
+# reason should never be mistaken for a real app regression by whoever
+# reads the CI log next.
+if [ ! -s "$LOG" ]; then
+  echo "run-e2e.sh: $LOG is empty or missing — nothing was captured from" \
+    "\`firebase emulators:exec\`. Every OTP/invite journey reads its mail" \
+    "from this file; an empty one means the tee above never ran, not that" \
+    "no mail was sent." >&2
+  exit 1
+fi
+
+exit "$status"
