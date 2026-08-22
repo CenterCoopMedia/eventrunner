@@ -1,0 +1,21 @@
+{
+  "adminEmails": ["e2e-admin@example.test"],
+  "event": {
+    "name": "E2E Test Summit",
+    "shortName": "E2E Summit",
+    "timezone": "America/New_York",
+    "days": [
+      { "id": "day-1", "label": "Day one", "date": "2027-05-13", "startTime": "09:00", "endTime": "17:00" }
+    ],
+    "venue": { "name": "Example Hall", "city": "Example City" },
+    "sender": { "email": "hello@example.test", "name": "E2E Test Summit" },
+    "legal": {
+      "operatorName": "Example Operator",
+      "supportEmail": "help@example.test"
+    }
+  },
+  "features": {
+    "sessionBookmarks": true,
+    "autoApproveTicketHolders": true
+  }
+}
