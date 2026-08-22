@@ -33,6 +33,7 @@ const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed } = require('../core/errors.cjs');
 const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
 const { listDirty, publishDocs, logAdminAction, isValidDocId } = require('./store.cjs');
+const { requestSitePublish } = require('./publisher.cjs');
 
 const MAX_DOC_IDS = 2000;
 const QUEUE_LIST_DEFAULT = 20;
@@ -83,9 +84,19 @@ async function resolveRequest({ db }, body) {
 }
 
 /**
- * @param {{ db, auth, getConfig, now?: () => number, log?: Console }} deps
+ * @param {{ db, auth, getConfig, env?: object, fetchImpl?: typeof fetch,
+ *           notifyOperator?: Function, now?: () => number, log?: Console }} deps
  */
-function createCmsPublishHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+function createCmsPublishHandler({
+  db,
+  auth,
+  getConfig,
+  env = process.env,
+  fetchImpl,
+  notifyOperator,
+  now = Date.now,
+  log = console,
+}) {
   return async function cmsPublish(req, res) {
     const actor = await gateAdminPost({ auth, getConfig }, req, res);
     if (!actor) return;
@@ -167,7 +178,19 @@ function createCmsPublishHandler({ db, auth, getConfig, now = Date.now, log = co
 
     await queueRef.set({ status: 'done', finishedAt: new Date(now()), updatedAt: new Date(now()) }, { merge: true });
     await logAdminAction({ db, action: 'cms-publish', docPath: queueRef.path, actor, now, log });
-    res.status(200).json({ queueId: queueRef.id, status: 'done', results });
+
+    // The publish is committed and the row says so. Refreshing the static
+    // snapshot is a separate, best-effort concern (§8.4 phase 5): the
+    // runtime read path already serves the new content to human visitors,
+    // and a publisher that cannot be reached only leaves crawler first
+    // paint stale — the exact phase 2-4 state. So this is fail-soft by
+    // construction: requestSitePublish never throws, records its own
+    // outcome on the row, and raises an OperatorEvent on failure.
+    const publisher = await requestSitePublish({
+      db, queueId: queueRef.id, env, fetchImpl, notifyOperator, now, log,
+    });
+
+    res.status(200).json({ queueId: queueRef.id, status: 'done', results, publisher });
   };
 }
 
@@ -237,7 +260,24 @@ function createUpdatePublishStatusHandler({ db, auth, getConfig, now = Date.now,
 /** Deployable exports (spec §1.3 cms/). */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
+  const { defineSecret } = require('firebase-functions/params');
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
+
+  // cmsPublish raises an OperatorEvent when the site-publisher invoke fails
+  // (§8.4 phase 5), so whichever sink is selected has to be usable from
+  // inside it — same reasoning as auth/otp.cjs and ticketing/sync.cjs.
+  const notifierName = (process.env.EVENT_OPERATOR_NOTIFIER || '').trim();
+  const secretNames = new Set();
+  if (notifierName === 'webhook') {
+    secretNames.add('OPERATOR_WEBHOOK_URL');
+    secretNames.add('OPERATOR_WEBHOOK_SECRET');
+  }
+  if (notifierName === 'email') {
+    const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+    const provider = (process.env.EVENT_EMAIL_PROVIDER || '').trim();
+    for (const name of SEND_SECRETS_BY_PROVIDER[provider] || []) secretNames.add(name);
+  }
+  const secrets = [...secretNames].map(defineSecret);
 
   const buildDeps = () => {
     const { getDb } = require('../core/firestore.cjs');
@@ -245,6 +285,28 @@ function buildHandlers() {
     const { getEventConfig } = require('../core/config.cjs');
     const db = getDb();
     return { db, auth: getAuth(), getConfig: () => getEventConfig({ db }), now: Date.now, log: console };
+  };
+
+  const buildPublishDeps = () => {
+    const deps = buildDeps();
+    const { createOperatorNotifier } = require('../notify/operator.cjs');
+    // The email sink is resolved lazily inside the notifier, and only when
+    // a publish actually fails to invoke — an ordinary publish never loads
+    // the email core at all.
+    const notifier = createOperatorNotifier({
+      env: process.env,
+      getConfig: deps.getConfig,
+      sendEmail: async (message) => {
+        const { getEmailProvider } = require('../email/providers/index.cjs');
+        const { createEmailCore } = require('../email/send.cjs');
+        return createEmailCore({
+          db: deps.db,
+          provider: getEmailProvider({ env: process.env }),
+          getConfig: deps.getConfig,
+        }).send(message);
+      },
+    });
+    return { ...deps, env: process.env, notifyOperator: notifier.notify };
   };
 
   const withCors = (handler) => async (req, res) => {
@@ -257,8 +319,8 @@ function buildHandlers() {
   };
 
   return {
-    cmsPublish: onRequest({ region }, withCors(async (req, res) => {
-      await createCmsPublishHandler(buildDeps())(req, res);
+    cmsPublish: onRequest({ region, secrets }, withCors(async (req, res) => {
+      await createCmsPublishHandler(buildPublishDeps())(req, res);
     })),
     cmsGetPublishQueue: onRequest({ region }, withCors(async (req, res) => {
       await createGetPublishQueueHandler(buildDeps())(req, res);
