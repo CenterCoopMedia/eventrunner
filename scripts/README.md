@@ -150,7 +150,7 @@ job publishes and writes no status, which is what makes a hand-started execution
 
 Exit codes name the stage — `2` configuration, `3` generation, `4` build, `5` hosting deploy — so
 `gcloud run jobs executions describe` is usually enough to triage without opening the log. Setup,
-verification, and the rollback interaction: `docs/DEPLOY_RUNBOOK.md` §8.
+verification, and the rollback interaction: `docs/DEPLOY_RUNBOOK.md` §9.
 
 ### `verify-sender-domain.cjs`
 

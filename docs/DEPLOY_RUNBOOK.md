@@ -203,9 +203,9 @@ bearer token, and none of the Tier A values are confidential either.
 | `EVENT_OTP_SEND_CEILING_PER_HOUR` | positive integer; defaults to `500` |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_MEASUREMENT_ID` | from Firebase Console → Project settings → your web app's SDK config |
 | `VITE_FIREBASE_APP_CHECK_SITE_KEY` | reCAPTCHA v3 site key; set this before enabling App Check enforcement |
-| `EVENT_SITE_PUBLISHER_ENABLED` | `false` by default. `true` provisions the site-publisher Cloud Run job — do §8 first |
-| `EVENT_PUBLISHER_SERVICE_ACCOUNT` | required when the publisher is enabled; the job's own runtime identity (§8) |
-| `EVENT_FUNCTIONS_SERVICE_ACCOUNT` | optional; overrides the default compute service account that receives `run.invoker` (§8) |
+| `EVENT_SITE_PUBLISHER_ENABLED` | `false` by default. `true` provisions the site-publisher Cloud Run job — do §9 first |
+| `EVENT_PUBLISHER_SERVICE_ACCOUNT` | required when the publisher is enabled; the job's own runtime identity (§9) |
+| `EVENT_FUNCTIONS_SERVICE_ACCOUNT` | optional; overrides the default compute service account that receives `run.invoker` (§9) |
 
 App Check activation requires two successful deploys. First set
 `VITE_FIREBASE_APP_CHECK_SITE_KEY` and wait for that deploy to finish. Then set
@@ -385,7 +385,98 @@ There is no key to rotate. To revoke a client's deploy access, remove the IAM po
 §2 (`gcloud iam service-accounts remove-iam-policy-binding`) or delete the GitHub Environment; both
 take effect on the next run, immediately.
 
-## 8. Site publisher (optional, per client)
+## 8. Rolling back a bad deploy
+
+`deploy-client.yml` deploys hosting, functions, rules/indexes, and content on every run — a bad
+deploy is rarely just one of those. Roll back the piece that's actually broken; rolling back
+everything when only one component regressed reintroduces whatever the other components' good
+deploys fixed.
+
+### Hosting
+
+Firebase Hosting keeps prior releases. Fastest path is the Firebase Console — Hosting → the site →
+release history → **Rollback** on the last-known-good release; it's a Console action against
+`EVENT_HOSTING_SITE`, not a re-run of CI. From the CLI, with the same credentials an operator uses
+for one-off scripts (not the deploy service account — this is a manual, watched action):
+
+```sh
+firebase hosting:clone <SITE_ID>:<GOOD_RELEASE_ID> <SITE_ID>:live --project <GCP_PROJECT_ID>
+```
+
+Find `<GOOD_RELEASE_ID>` from `firebase hosting:releases:list` or the Console's release history.
+This affects the served static bundle only — it does not touch functions, rules, or content.
+
+### Functions
+
+There is no one-click functions rollback the way Hosting has one; the fix is to redeploy the prior
+good ref. Dispatch `deploy.yml` (`workflow_dispatch`, `client: <CLIENT_ENV>`) **from `main` at the
+last-known-good commit** — either revert forward on `main` and dispatch normally, or, if you need
+the exact prior artifact right now, `git checkout <good-sha>` and dispatch the deploy workflow with
+that ref (`gh workflow run deploy.yml --ref <good-sha> -f client=<CLIENT_ENV>`). Recall §1–2: the
+WIF binding only authorizes `refs/heads/main`, so a dispatch against an arbitrary SHA or tag that
+isn't reachable from `main`'s current HEAD, or isn't itself on `refs/heads/main`, fails at the
+token-exchange step — this is a control, not a bug, and it means the practical rollback path is
+"revert on `main`," not "dispatch an old tag directly." Read §5's step ordering again if this is a
+fresh-enough project that `bootstrap` semantics could matter.
+
+### Firestore rules and indexes
+
+`provision` deploys `firestore:rules`, `firestore:indexes`, and `storage` on every run (§5) — a
+rules regression rolls back the same way functions do: revert on `main`, redeploy. Two things that
+don't roll back cleanly:
+
+- **A tightened rule that already blocked a write nobody needed** rolls back fine — nothing was
+  lost by the tightening.
+- **An index removed or narrowed** takes real time to rebuild once restored — Firestore composite
+  index builds are not instant, and any query depending on the removed index fails (not degrades)
+  until the rebuild finishes. Budget for that gap; it is not the same shape of "instant" as a
+  Hosting rollback.
+
+### Content snapshot implications
+
+`content` (`generate-content.cjs`) regenerates `apps/web/src/generated/*` from live Firestore at
+deploy time — rolling back **hosting** alone serves the *previous build's* generated snapshot,
+which was correct for the config/content at that previous deploy's time, not for whatever's in
+Firestore now. If a client has edited and published content since the bad deploy, a hosting-only
+rollback can visibly regress their content even though nothing about their content itself broke.
+When content has moved since the deploy you're rolling back from, prefer rolling forward (fix and
+redeploy) over rolling back, or expect to re-publish the affected pages after the rollback.
+
+**If this client has the site publisher enabled (§9), a hosting-only rollback does not hold.** The
+next CMS publish invokes the `site-publisher` Cloud Run job, which rebuilds from its own image — the
+one the last deploy pushed, i.e. the code you just rolled hosting back *from* — and redeploys
+hosting over the rollback. So "re-publish the affected pages after the rollback", above, is the one
+thing that will silently undo it. To hold a hosting rollback on a publisher-enabled client, either
+set `EVENT_SITE_PUBLISHER_ENABLED=false` and deploy before rolling back, or roll the code back
+properly (revert on `main`, deploy) so the rebuilt image carries the good code. §9.3 has the detail.
+
+### When NOT to roll back
+
+**Schema-forward migrations.** A deploy that changed the *shape* of a `config/*` document, added a
+required field a running function now depends on, or changed what a Firestore trigger writes is not
+safely undone by redeploying old function code against the new data shape (or vice versa) — the two
+can disagree about what a document should look like, and that disagreement is a worse failure mode
+than the original bug. If the deploy you want to roll back included a migration, roll **forward**
+with a fix instead: write the small forward-fixing change, dispatch it, and treat the rollback
+tooling above as being for deploys that were *behaviorally* wrong, not ones that changed a data
+contract other code now depends on.
+
+### Custom domain and readiness notes
+
+A custom-domain rollback (attaching a different Hosting site, or reverting a
+`EVENT_PUBLIC_URL`/authorized-domains change) does not take effect immediately even after the
+Hosting/Auth Console steps are redone — DNS propagation and certificate issuance/reissuance can take
+from minutes to about a day (§0–3, and `docs/CLIENT_ONBOARDING.md` §3 item 3). Re-run
+`node scripts/init-event.cjs --check` after a domain change of any kind rather than assuming the
+readiness table is still accurate; the sender-domain and Auth rows in particular are
+operator-attested and do not re-verify themselves on a timer. See issue #66 for the fuller
+per-client-subdomain (`client.runofshow.net`) provisioning flow this repo will eventually build on
+top of this same Hosting custom-domain mechanism — the wildcard-vs-per-client CNAME strategy is out
+of scope here and tracked there, not in this runbook. The Cloud Run site-publisher has since landed
+(#36) and is documented in §9; it is orthogonal to per-client subdomains, reaching the job as
+ordinary per-client environment with no domain coupling, so nothing in §9 waits on #66.
+
+## 9. Site publisher (optional, per client)
 
 **What it does.** The frontend reads CMS content from Firestore at runtime, so a publish is already
 live for human visitors the moment `cmsPublish` commits (spec §2.4, §8.4). What lags is the static
@@ -403,7 +494,7 @@ job's own service account — no GitHub token, no `repository_dispatch`, no cros
 env, and `cmsPublish` skips the invoke without writing anything. That is the phase 2–4 behavior:
 publishes work, and the crawler snapshot refreshes at the next deploy.
 
-### 8.1 One-time setup per client
+### 9.1 One-time setup per client
 
 Enable the two APIs the job needs (`run.googleapis.com` is already in §2's list):
 
@@ -487,7 +578,7 @@ before the job exists. A publish in that window still succeeds — the invoke fa
 `publisher.invoke.status: 'failed'` on the queue row, and raises an operator alert. Re-publish
 after the run completes.
 
-### 8.2 Verifying it
+### 9.2 Verifying it
 
 ```sh
 # The job exists, runs as the right identity, and carries this client's env.
@@ -530,10 +621,12 @@ Common failures on the invoke side, from the queue row's `publisher.invoke.error
 - `Cloud Run responded 404` — the job does not exist in that region. Check
   `EVENT_FIREBASE_REGION` matches where the deploy created it.
 
-### 8.3 Interaction with rollback
+### 9.3 Interaction with rollback
 
-The publisher deploys hosting from **whatever commit built its image**, not from the currently
-deployed bundle. Two consequences worth knowing before an incident:
+§8 is the rollback procedure; this is only what changes once a client has a publisher. The publisher
+deploys hosting from **whatever commit built its image**, not from the currently deployed bundle,
+which turns §8's "Hosting" rollback from a durable action into a temporary one. Two consequences
+worth knowing before an incident:
 
 - **Rolling back hosting alone does not stick.** A Firebase Hosting rollback in the console is
   undone by the next CMS publish, because the job rebuilds from its image and redeploys. To hold a
@@ -548,7 +641,7 @@ Stranded rows are not an incident. If neither `cmsPublish` nor the job reports a
 the row failed after 90 minutes and alerts once — a failed publish row is resumable from the CMS,
 and a failed publisher row just means the snapshot is stale until the next publish or deploy.
 
-### 8.4 Cost
+### 9.4 Cost
 
 The job runs on demand — once per CMS publish, plus whatever an operator starts by hand. There is
 no idle cost: a Cloud Run job bills only while an execution is running, and it has no minimum

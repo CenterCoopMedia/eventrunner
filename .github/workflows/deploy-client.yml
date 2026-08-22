@@ -294,7 +294,7 @@ jobs:
     # Off unless the client's Environment opts in. The job needs an
     # Artifact Registry repository, the Cloud Run and Artifact Registry
     # APIs, and a dedicated runtime service account, none of which exist
-    # in a project that has not been through docs/DEPLOY_RUNBOOK.md §8 —
+    # in a project that has not been through docs/DEPLOY_RUNBOOK.md §9 —
     # so an existing client deploys exactly as it did before phase 5.
     # Skipped on a bootstrap run for the same reason `content` is: a fresh
     # project has no config/event, so the job would have nothing to
@@ -451,7 +451,7 @@ jobs:
         #
         # --service-account is the whole least-privilege story: the job runs
         # as an account scoped to this one project's Firestore, Storage, and
-        # Hosting (docs/DEPLOY_RUNBOOK.md §8), never as the deploy identity
+        # Hosting (docs/DEPLOY_RUNBOOK.md §9), never as the deploy identity
         # and never with a credential that can reach another client.
         #
         # --max-retries=0: publish-site.cjs is idempotent, but a retry that

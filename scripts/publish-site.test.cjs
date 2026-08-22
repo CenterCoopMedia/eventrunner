@@ -7,7 +7,7 @@
  * region patch, and the cmsPublishQueue status lifecycle. What remains
  * operator-verified is only the parts a test cannot reach — that the image
  * builds, that ADC on Cloud Run authenticates firebase-tools, and that the
- * hosting release lands (docs/DEPLOY_RUNBOOK.md §8).
+ * hosting release lands (docs/DEPLOY_RUNBOOK.md §9).
  */
 
 const test = require('node:test');

@@ -1,0 +1,31 @@
+title = "Run of Show gitleaks config"
+
+# Credential-free CI (spec §8.1): this file only tunes false positives out of
+# the default ruleset. It adds no rule that requires a provider account or a
+# secret to evaluate — gitleaks reads the git tree and history, nothing else.
+
+[extend]
+useDefault = true
+
+# Two unit-test fixtures trip the default `generic-api-key` and `jwt` rules on
+# shape alone. Neither is a live credential:
+#
+#   - functions/src/admin/feedback.test.cjs: `a1b2c3d4e5f6g7h8` is a literal
+#     placeholder string used to assert a redaction/masking code path, not a
+#     value that authenticates anything.
+#   - functions/src/telemetry/redact.test.cjs: the JWT is the well-known
+#     jwt.io example token (header `{"alg":"HS256"}`, payload
+#     `{"sub":"1234567890"}`), used to assert the telemetry redactor strips
+#     bearer tokens from logged headers.
+#
+# Scoped to the exact literal fixture values, not to the files they live in
+# (a file-level path allowlist would exempt anything ELSE dropped into the
+# same test file — including a real secret pasted in by accident — which
+# defeats the point of scanning tests at all). A finding is only skipped when
+# the extracted secret is byte-for-byte one of these two known-fake strings.
+[allowlist]
+description = "Synthetic values in unit-test fixtures (spec §1.5 — no real credentials, ever, in tests)"
+regexes = [
+  '''^a1b2c3d4e5f6g7h8$''',
+  '''^eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.SflKxwRJSMeKKF2QT4fwpM$''',
+]
