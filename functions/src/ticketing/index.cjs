@@ -179,7 +179,9 @@ function buildTicketingDeps() {
   });
   return {
     db,
-    provider: getTicketingProvider({ env: process.env }),
+    // db/getConfig forwarded: the manual adapter reads tickets/{externalId}
+    // itself and needs config/event.registration.externalUrl for §3.5.
+    provider: getTicketingProvider({ env: process.env, db, getConfig }),
     getConfig,
     notifyOperator: notifier.notify,
     auth: getAuth(),

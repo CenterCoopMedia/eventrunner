@@ -250,10 +250,12 @@ function buildHandlers() {
       // request, and an allow-origin header on a signed webhook endpoint
       // would only invite one.
       const { getDb } = require('../core/firestore.cjs');
+      const { getEventConfig } = require('../core/config.cjs');
       const { getTicketingProvider } = require('./providers/index.cjs');
+      const db = getDb();
       await createTicketingWebhookHandler({
-        db: getDb(),
-        provider: getTicketingProvider({ env: process.env }),
+        db,
+        provider: getTicketingProvider({ env: process.env, db, getConfig: () => getEventConfig({ db }) }),
       })(req, res);
     }),
   };
