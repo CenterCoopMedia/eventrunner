@@ -6,8 +6,9 @@
 // nothing about it is browser-observable. What IS the point of the
 // exercise, ported into Playwright from invite-smoke.mjs's own comment on
 // this: the invite token is stored only as a SHA-256 digest, so the ONLY
-// way to obtain it is to read the mail — scraped from the captured
-// emulator log — exactly as an invited speaker does. From there the whole
+// way to obtain it is to read the mail — from the captured-mail file the
+// console email provider appends to — exactly as an invited speaker does.
+// From there the whole
 // accept journey (sign in with an emailed code, accept, land on the
 // profile wizard) runs through the real /speaker/accept page.
 import { test, expect } from '@playwright/test';
