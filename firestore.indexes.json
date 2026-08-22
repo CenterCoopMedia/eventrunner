@@ -23,6 +23,14 @@
         { "fieldPath": "resolved", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "ticket_sync_queue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "readyAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
