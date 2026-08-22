@@ -12,7 +12,7 @@
 // profile wizard) runs through the real /speaker/accept page.
 import { test, expect } from '@playwright/test';
 import {
-  adminIdToken, adminDb, callFunction, emulatorLogSize, waitForInviteToken, waitForOtpCode,
+  adminIdToken, adminDb, callFunction, mailFileSize, waitForInviteToken, waitForOtpCode,
 } from './helpers.mjs';
 
 test.describe.serial('Speaker invite -> accept -> wizard', () => {
@@ -24,7 +24,7 @@ test.describe.serial('Speaker invite -> accept -> wizard', () => {
   test('an invited speaker signs in and accepts, and lands on the profile wizard', async ({ page }) => {
     const idToken = await adminIdToken();
 
-    const since = emulatorLogSize();
+    const since = mailFileSize();
     const created = await callFunction('createSpeaker', {
       speakerId,
       speaker: { firstName: 'E2E', lastName: `Speaker ${stamp}`, email: speakerEmail, status: 'draft' },
@@ -46,7 +46,7 @@ test.describe.serial('Speaker invite -> accept -> wizard', () => {
     // the load-bearing property invite-smoke.mjs's own comment names: the
     // invited address is an authorization boundary, and this is where an
     // invite-first speaker's VERIFIED account at that address comes from.
-    const otpSince = emulatorLogSize();
+    const otpSince = mailFileSize();
     const emailInput = page.locator('#signin-email');
     await emailInput.waitFor({ state: 'visible' });
     await emailInput.fill(speakerEmail);
@@ -55,7 +55,7 @@ test.describe.serial('Speaker invite -> accept -> wizard', () => {
     const codeInput = page.locator('#signin-code');
     await codeInput.waitFor({ state: 'visible' });
     const code = await waitForOtpCode(otpSince, speakerEmail, 30000);
-    expect(code, 'the sign-in code was captured from the emulator log').toBeTruthy();
+    expect(code, 'the sign-in code was captured from the mail file').toBeTruthy();
     await codeInput.fill(code);
     await page.getByRole('button', { name: /^sign in$/i }).click();
 

@@ -11,13 +11,19 @@
  */
 
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 
 /**
  * @param {{ env?: Record<string, string|undefined>,
- *           log?: Pick<Console, 'log'> }} deps
+ *           log?: Pick<Console, 'log'>,
+ *           appendFileSync?: typeof fs.appendFileSync }} deps
  * @returns {{ name: 'console', send: (message: object) => Promise<object> }}
  */
-function createConsoleProvider({ env = process.env, log = console } = {}) {
+function createConsoleProvider({
+  env = process.env,
+  log = console,
+  appendFileSync = fs.appendFileSync,
+} = {}) {
   if (env.FUNCTIONS_EMULATOR !== 'true' && (env.EVENT_EMAIL_PROVIDER || '').trim() !== 'console') {
     throw new Error(
       'console email provider refuses to load outside the emulator unless ' +
@@ -25,9 +31,23 @@ function createConsoleProvider({ env = process.env, log = console } = {}) {
     );
   }
 
+  // Test-observability sink (e2e only, opt-in). The e2e suite needs to read
+  // the OTP codes and invite tokens that exist nowhere else server-side (one
+  // is a scrypt hash, the other a SHA-256 digest), and scraping them back out
+  // of the emulator's stdout proved unreliable: under `emulators:exec`
+  // firebase-tools re-prints every captured line with a "> " prefix that is
+  // ANSI-colorized whenever it thinks the terminal supports color (it does in
+  // GitHub Actions), which interleaves escape sequences into the middle of the
+  // pretty-printed JSON blob below and makes it unparseable. Writing one
+  // self-delimiting JSON line per message straight to a file removes that
+  // whole channel from the test path. Strictly gated on E2E_MAIL_FILE, which
+  // only scripts/dev/run-e2e.sh ever sets, so normal dev and production
+  // behavior is byte-for-byte unchanged.
+  const mailFile = typeof env.E2E_MAIL_FILE === 'string' ? env.E2E_MAIL_FILE.trim() : '';
+
   /** @param {object} message EmailMessage @returns {Promise<object>} EmailSendResult */
   async function send(message) {
-    log.log('[email:console]', JSON.stringify({
+    const captured = {
       to: message.to,
       from: message.from,
       replyTo: message.replyTo,
@@ -35,7 +55,15 @@ function createConsoleProvider({ env = process.env, log = console } = {}) {
       tag: message.tag,
       text: message.text,
       html: message.html,
-    }, null, 2));
+    };
+    log.log('[email:console]', JSON.stringify(captured, null, 2));
+    if (mailFile) {
+      // Synchronous + append-only + one line per message: no buffering to be
+      // lost if the emulator is killed mid-run, and a reader polling by byte
+      // offset can never observe a torn record (a single write() of a line
+      // under the pipe-buffer size is atomic for O_APPEND).
+      appendFileSync(mailFile, `${JSON.stringify(captured)}\n`);
+    }
     return {
       providerMessageId: `console-${crypto.randomUUID()}`,
       status: 'sent',

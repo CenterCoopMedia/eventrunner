@@ -63,6 +63,51 @@ test('send returns a fresh id per call', async () => {
   assert.notEqual(first.providerMessageId, second.providerMessageId);
 });
 
+test('send does not touch any file unless E2E_MAIL_FILE is set', async () => {
+  const writes = [];
+  const provider = createConsoleProvider({
+    env: { FUNCTIONS_EMULATOR: 'true' },
+    log: fakeLog(),
+    appendFileSync: (...args) => writes.push(args),
+  });
+  await provider.send({ to: 'a@example.com', subject: 's' });
+  assert.deepEqual(writes, []);
+});
+
+test('send appends one JSON line per message when E2E_MAIL_FILE is set', async () => {
+  const writes = [];
+  const provider = createConsoleProvider({
+    env: { FUNCTIONS_EMULATOR: 'true', E2E_MAIL_FILE: '/tmp/mail.jsonl' },
+    log: fakeLog(),
+    appendFileSync: (path, data) => writes.push({ path, data }),
+  });
+  await provider.send({ to: 'a@example.com', subject: 'Hello', tag: 'auth.otp', text: 'code 123456' });
+  await provider.send({ to: 'b@example.com', subject: 'Bye' });
+
+  assert.equal(writes.length, 2);
+  assert.equal(writes[0].path, '/tmp/mail.jsonl');
+  // One line, newline-terminated, and parseable on its own — the e2e reader
+  // splits on newlines, so a message must never span two lines.
+  assert.ok(writes[0].data.endsWith('\n'));
+  assert.equal(writes[0].data.trimEnd().includes('\n'), false);
+  const first = JSON.parse(writes[0].data);
+  assert.equal(first.to, 'a@example.com');
+  assert.equal(first.tag, 'auth.otp');
+  assert.equal(first.text, 'code 123456');
+  assert.equal(JSON.parse(writes[1].data).to, 'b@example.com');
+});
+
+test('an all-whitespace E2E_MAIL_FILE is treated as unset', async () => {
+  const writes = [];
+  const provider = createConsoleProvider({
+    env: { FUNCTIONS_EMULATOR: 'true', E2E_MAIL_FILE: '   ' },
+    log: fakeLog(),
+    appendFileSync: (...args) => writes.push(args),
+  });
+  await provider.send({ to: 'a@example.com', subject: 's' });
+  assert.deepEqual(writes, []);
+});
+
 test('does not implement verifyDeliveryWebhook so ingest refuses every request', () => {
   const provider = createConsoleProvider({ env: { FUNCTIONS_EMULATOR: 'true' }, log: fakeLog() });
   assert.equal(provider.verifyDeliveryWebhook, undefined);

@@ -9,7 +9,7 @@
 // turned on by e2e/fixtures/answers.json), and bookmarking a session — runs
 // through the real pages a signed-in attendee uses.
 import { test, expect } from '@playwright/test';
-import { adminDb, ensureUser, emulatorLogSize, waitForOtpCode } from './helpers.mjs';
+import { adminDb, ensureUser, mailFileSize, waitForOtpCode } from './helpers.mjs';
 
 test.describe.serial('Ticket claim -> approved -> bookmark', () => {
   const stamp = Date.now();
@@ -37,7 +37,7 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
   test('an attendee claims a manual ticket, is approved, and bookmarks a session', async ({ page }) => {
     // Sign in as the ticket-holder through the real OTP flow — the account
     // this order's email address has to match to claim it.
-    const since = emulatorLogSize();
+    const since = mailFileSize();
     await page.goto('/signin');
     const emailInput = page.locator('#signin-email');
     await emailInput.waitFor({ state: 'visible' });
@@ -46,7 +46,7 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
     const codeInput = page.locator('#signin-code');
     await codeInput.waitFor({ state: 'visible' });
     const code = await waitForOtpCode(since, email, 30000);
-    expect(code, 'the OTP code was captured from the emulator log').toBeTruthy();
+    expect(code, 'the OTP code was captured from the mail file').toBeTruthy();
     await codeInput.fill(code);
     await page.getByRole('button', { name: /^sign in$/i }).click();
     // A successful verify lands on "/", but ProfileSetupRedirect

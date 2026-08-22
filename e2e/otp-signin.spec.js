@@ -3,13 +3,13 @@
 // scripts/dev/login-smoke.mjs uses outside Playwright) → verify → signed-in
 // state, driven through the real Login page end to end.
 import { test, expect } from '@playwright/test';
-import { emulatorLogSize, waitForOtpCode } from './helpers.mjs';
+import { mailFileSize, waitForOtpCode } from './helpers.mjs';
 
 test.describe.serial('OTP sign-in', () => {
   const email = `otp-e2e-${Date.now()}@example.test`;
 
   test('request code, scrape it from the emulator log, verify, and stay signed in', async ({ page }) => {
-    const since = emulatorLogSize();
+    const since = mailFileSize();
 
     await page.goto('/signin');
     const emailInput = page.locator('#signin-email');
@@ -22,7 +22,7 @@ test.describe.serial('OTP sign-in', () => {
     await codeInput.waitFor({ state: 'visible' });
 
     const code = await waitForOtpCode(since, email, 30000);
-    expect(code, 'the OTP code was captured from the emulator log').toBeTruthy();
+    expect(code, 'the OTP code was captured from the mail file').toBeTruthy();
 
     await codeInput.fill(code);
     await page.getByRole('button', { name: /^sign in$/i }).click();
