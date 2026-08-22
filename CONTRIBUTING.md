@@ -105,6 +105,7 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 | `npm run test:rules` | Firestore and Storage security rules on the Firebase emulators |
 | `npm run test -w apps/web` | `apps/web` component/context/lib unit tests (vitest + Testing Library, jsdom — no emulator) |
 | `npm run build -w apps/web` | Production build of `apps/web`; credential-free with dummy `VITE_FIREBASE_*` values |
+| `./gitleaks detect --source .` | Secret scan (`.gitleaks.toml`) — CI downloads and checksum-verifies the gitleaks CLI directly rather than a marketplace action, so it stays credential-free on a fork PR (an org-repo license secret is not something a fork PR could ever have) |
 | `node scripts/check-dco.cjs <base> <head>` | Every non-merge commit in the pull request's range carries a DCO `Signed-off-by` trailer — see [Sign your commits](#sign-your-commits-dco) |
 | `node scripts/dev/login-smoke.mjs` | Live Playwright smoke test of the emailed-code sign-in flow against the Functions/Firestore/Auth emulators (dev tool, not run by CI) |
 

@@ -26,6 +26,42 @@ jobs:
       - name: Verify every commit is signed off
         run: node scripts/check-dco.cjs "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
 
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    # Credential-free by construction, not just by omitting `env:` — the
+    # marketplace gitleaks-action requires a paid GITLEAKS_LICENSE secret
+    # for an organization-owned repo (this one), which a fork PR could never
+    # have anyway. Downloading the plain gitleaks CLI, checksum-verified
+    # against the release's published SHA-256, needs no token, no license,
+    # and no third-party Action's trust boundary in this workflow at all —
+    # same reasoning as scripts/check-dco.cjs above. Version pinned; bump
+    # both the version and the checksum together on a deliberate upgrade.
+    env:
+      GITLEAKS_VERSION: "8.21.2"
+      GITLEAKS_SHA256: "5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: this job also runs on push to main, and a shallow
+          # checkout would only ever scan the tip commit.
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          curl -sSL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: gitleaks (PR range)
+        if: github.event_name == 'pull_request'
+        run: |
+          ./gitleaks detect --source . --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
+            --redact -v
+      - name: gitleaks (full history)
+        if: github.event_name == 'push'
+        run: ./gitleaks detect --source . --log-opts="--all" --redact -v
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
