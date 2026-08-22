@@ -704,11 +704,10 @@ test('a successful acceptance mails speaker.accepted with the §3.1 onceKey', as
   assert.notEqual(confirmation, undefined);
   assert.equal(confirmation.onceKey, 'speaker-accepted:rae');
   assert.equal(confirmation.storeRendered, true);
-  assert.equal(confirmation.html.includes('https://summit.example.org/profile'), true);
-  // The CTA is the ATTENDEE profile until the speaker wizard lands
-  // (issue #22), so the copy must not promise speaker-profile editing.
-  assert.equal(/complete your speaker profile/i.test(confirmation.text), false);
-  assert.match(confirmation.text, /account details/i);
+  assert.equal(confirmation.html.includes('https://summit.example.org/speaker/profile'), true);
+  // The CTA is the WIZARD (issue #22) — the canonical speakers/{id} record
+  // an organizer approves, not the attendee /profile page.
+  assert.match(confirmation.text, /write your speaker profile/i);
 });
 
 test('the accept handler answers a mismatch with the masked invited address', async () => {

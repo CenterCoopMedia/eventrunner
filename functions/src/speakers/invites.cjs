@@ -658,13 +658,13 @@ async function sendAcceptedEmail({ db, sendEmail, getConfig, speakerId, speaker,
       override,
       tokenValues: {
         speaker_name: speakerDisplayName(speaker),
-        // /profile is the ATTENDEE profile (users/{uid}) — it does not edit
-        // the canonical speaker record organizers approve. The template copy
-        // says so plainly rather than promising a speaker profile this
-        // release does not have. ISSUE #22 ships the speaker profile wizard;
-        // when it lands, this value becomes its route and the copy in
-        // email/templates/speaker.accepted.cjs changes with it.
-        profile_wizard_url: site ? `${site}/profile` : '',
+        // /speaker/profile is the wizard (issue #22): self-service editing
+        // of the canonical speakers/{id} record an organizer approves,
+        // distinct from /profile (the attendee users/{uid} record). Every
+        // accepted speaker lands here to write their bio and upload a
+        // headshot — see email/templates/speaker.accepted.cjs for the copy
+        // this URL backs.
+        profile_wizard_url: site ? `${site}/speaker/profile` : '',
         // Declared but unreferenced in the shipped copy; a client override
         // that wants a deadline gets the event's first day rather than an
         // empty substitution and a warning.
