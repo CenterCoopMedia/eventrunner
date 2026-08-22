@@ -66,6 +66,20 @@ No `.env` and no cloud credentials are required for any of these — `test:rules
 5. Fill in the pull request template, including how you verified the change.
 6. Sign off each commit (`git commit -s`) under the [Developer Certificate of Origin](https://developercertificate.org/).
 
+### Sign your commits (DCO)
+
+Every commit needs a `Signed-off-by` trailer:
+
+```
+git commit -s -m "Fix schedule timezone rollover"
+```
+
+That adds a line to the commit message — `Signed-off-by: Your Name <you@example.org>` — using the name and email from your git config. It is not a CLA and nobody countersigns it; by adding it you are personally certifying the [Developer Certificate of Origin](https://developercertificate.org/) (spec §1.5): that you wrote the change or otherwise have the right to submit it under this project's license, and that you understand it is public and permanently recorded with your contribution.
+
+Forgot on a commit that is not pushed yet: `git commit --amend -s`. Forgot on several: `git rebase --signoff <base-branch>` rewrites every commit on your branch to add the trailer, then force-push your branch (never `main`).
+
+**CI enforces this.** The `dco` job in `.github/workflows/ci.yml` walks every non-merge commit in the pull request's range and fails if any is missing the trailer — `node scripts/check-dco.cjs <base-sha> <head-sha>`, credential-free, so it runs identically on a fork PR. A PR failing only the DCO check does not need new code: sign off the existing commits as above and push.
+
 ### Shared package
 
 `packages/shared` is CommonJS first. Add a `.mjs` re-export shim next to every new `.cjs` module.
@@ -91,9 +105,10 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 | `npm run test:rules` | Firestore and Storage security rules on the Firebase emulators |
 | `npm run test -w apps/web` | `apps/web` component/context/lib unit tests (vitest + Testing Library, jsdom — no emulator) |
 | `npm run build -w apps/web` | Production build of `apps/web`; credential-free with dummy `VITE_FIREBASE_*` values |
+| `node scripts/check-dco.cjs <base> <head>` | Every non-merge commit in the pull request's range carries a DCO `Signed-off-by` trailer — see [Sign your commits](#sign-your-commits-dco) |
 | `node scripts/dev/login-smoke.mjs` | Live Playwright smoke test of the emailed-code sign-in flow against the Functions/Firestore/Auth emulators (dev tool, not run by CI) |
 
-CI runs the first five on every pull request and every push to `main`, credential-free. Fork PRs must be able to run every check without credentials.
+CI runs everything above except the dev-only smoke test on every pull request and every push to `main`, credential-free. Fork PRs must be able to run every check without credentials.
 
 One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 

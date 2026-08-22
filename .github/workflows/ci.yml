@@ -11,6 +11,21 @@ permissions:
   contents: read
 
 jobs:
+  dco:
+    name: DCO sign-off
+    runs-on: ubuntu-latest
+    # Credential-free (spec §8.1, §1.5): reads only the checked-out git
+    # range from the PR event payload — no token, no third-party action, so
+    # a fork PR runs it exactly like a same-repo PR. Skipped on push (a
+    # merge to main has already passed this check as a PR).
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify every commit is signed off
+        run: node scripts/check-dco.cjs "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
