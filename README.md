@@ -9,6 +9,10 @@ A white-label event CMS for conferences and gatherings. Each client event gets i
 Site: [centercoopmedia.github.io/run-of-show](https://centercoopmedia.github.io/run-of-show/)
 Handbook: [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki)
 
+A public demo instance and README screenshots are pending the operator's deploy of that instance
+(see [#35](https://github.com/CenterCoopMedia/run-of-show/issues/35)) — this section gets the link
+and images once that deployment exists.
+
 ## Who it is for
 
 Nonprofit and journalism organizations, universities, and event producers who want a staff-run event site: schedule, speakers, registration, materials, and a block-based CMS.
