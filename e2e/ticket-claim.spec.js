@@ -9,7 +9,7 @@
 // turned on by e2e/fixtures/answers.json), and bookmarking a session — runs
 // through the real pages a signed-in attendee uses.
 import { test, expect } from '@playwright/test';
-import { adminDb, emulatorLogSize, waitForOtpCode } from './helpers.mjs';
+import { adminDb, ensureUser, emulatorLogSize, waitForOtpCode } from './helpers.mjs';
 
 test.describe.serial('Ticket claim -> approved -> bookmark', () => {
   const stamp = Date.now();
@@ -49,7 +49,25 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
     expect(code, 'the OTP code was captured from the emulator log').toBeTruthy();
     await codeInput.fill(code);
     await page.getByRole('button', { name: /^sign in$/i }).click();
-    await page.waitForURL(/\/$/);
+    // A successful verify lands on "/", but ProfileSetupRedirect
+    // (components/ProfileSetupRedirect.jsx) can immediately bounce a
+    // brand-new account on to "/profile" — waiting for "/" alone races
+    // that redirect and can time out even though sign-in succeeded.
+    // Either destination proves sign-in stuck; the explicit goto below
+    // moves on regardless of which one the SPA settled on.
+    await page.waitForURL((url) => url.pathname === '/' || url.pathname === '/profile');
+
+    // The claim endpoint requires users/{uid} to already exist —
+    // applyTicketClaimToUser (functions/src/ticketing/registration.cjs)
+    // no-ops on a missing account doc, silently burning the ticket's claim
+    // without ever reaching "approved". That doc is seeded by the
+    // onUserCreated auth trigger (functions/src/users/lifecycle.cjs)
+    // moments after sign-in, so without this wait the claim click can beat
+    // it. Poll for it directly rather than trusting a fixed delay.
+    const uid = await ensureUser(email);
+    await expect
+      .poll(async () => (await adminDb().collection('users').doc(uid).get()).exists, { timeout: 15000 })
+      .toBe(true);
 
     // Claim the ticket by order number (issue #33): every failure mode
     // answers the same 404 (module doc, apps/web/src/pages/TicketClaim.jsx),
@@ -68,8 +86,7 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
     await expect
       .poll(async () => (await adminDb().collection('tickets').doc(externalId).get()).data()?.claimedByUid,
         { timeout: 15000 })
-      .toBeTruthy();
-    const uid = (await adminDb().collection('tickets').doc(externalId).get()).data().claimedByUid;
+      .toBe(uid);
     await expect
       .poll(async () => (await adminDb().collection('users').doc(uid).get()).data()?.registrationStatus,
         { timeout: 15000 })

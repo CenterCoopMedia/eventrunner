@@ -28,16 +28,17 @@ test.describe.serial('OTP sign-in', () => {
     await page.getByRole('button', { name: /^sign in$/i }).click();
 
     // A successful verify signs the user in via signInWithCustomToken and
-    // Login.jsx navigates to "/" immediately — no dead-end sign-in page.
-    await page.waitForURL(/\/$/);
-
-    // A brand-new account has no profile yet, so ProfileSetupRedirect
+    // Login.jsx navigates to "/" immediately — no dead-end sign-in page. A
+    // brand-new account has no profile yet, so ProfileSetupRedirect
     // (components/ProfileSetupRedirect.jsx) — which fires from '/' or
     // '/signin' once the signed-in account's profile status is 'ready' —
-    // takes it straight to /profile. That redirect only fires for an
-    // authenticated, fully-hydrated session, which makes landing there the
-    // real proof the sign-in stuck, stronger than re-rendering the sign-in
-    // form's own "you are signed in" copy would be.
+    // takes it straight to /profile next. Waiting for "/" first would race
+    // that redirect: it can fire fast enough that the URL never settles on
+    // "/" for a poll to observe, which would time out even though sign-in
+    // (and the redirect) both succeeded. Wait directly for the durable
+    // destination instead — landing there is also the real proof the
+    // sign-in stuck, stronger than re-rendering the sign-in form's own "you
+    // are signed in" copy would be.
     await page.waitForURL(/\/profile$/);
     await expect(page.getByRole('heading', { name: /complete your profile/i })).toBeVisible();
 
