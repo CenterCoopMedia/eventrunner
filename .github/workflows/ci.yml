@@ -133,3 +133,53 @@ jobs:
           restore-keys: firebase-emulators-${{ runner.os }}-
       - name: Run rules tests
         run: npm run test:rules
+
+  e2e:
+    name: E2E on emulators
+    runs-on: ubuntu-latest
+    # Credential-free (spec §8.1, issue #38): Playwright drives the real app
+    # against the full emulator suite (auth, firestore, storage, functions)
+    # with the console email provider and manual ticketing — no secrets, no
+    # live project, so this runs the same on a fork PR as every other job.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        env:
+          # Installed explicitly below, cached on its own key — skip the
+          # postinstall fetch here so a `npm ci` cache hit never re-downloads
+          # a browser binary npm never asked for.
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: firebase-emulators-${{ runner.os }}-
+      - name: Run e2e tests
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
