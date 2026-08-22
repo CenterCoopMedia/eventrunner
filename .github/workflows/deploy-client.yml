@@ -152,6 +152,14 @@ jobs:
           # enforcement without a site key.
           EVENT_APP_CHECK_ENFORCED: ${{ vars.EVENT_APP_CHECK_ENFORCED }}
           EVENT_OTP_SEND_CEILING_PER_HOUR: ${{ vars.EVENT_OTP_SEND_CEILING_PER_HOUR }}
+          # Site publisher (spec §8.4 phase 5). Both are deploy-time only.
+          # validateDeployEnv rejects a non-boolean flag, and rejects
+          # enabling the publisher without the service account it must run
+          # as — an unset account would otherwise reach `gcloud run jobs
+          # deploy` as a blank and take the project's default identity.
+          EVENT_SITE_PUBLISHER_ENABLED: ${{ vars.EVENT_SITE_PUBLISHER_ENABLED }}
+          EVENT_PUBLISHER_SERVICE_ACCOUNT: ${{ vars.EVENT_PUBLISHER_SERVICE_ACCOUNT }}
+          EVENT_FUNCTIONS_SERVICE_ACCOUNT: ${{ vars.EVENT_FUNCTIONS_SERVICE_ACCOUNT }}
           VITE_FIREBASE_APP_CHECK_SITE_KEY: ${{ vars.VITE_FIREBASE_APP_CHECK_SITE_KEY }}
           VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -240,6 +248,7 @@ jobs:
           EVENT_OPERATOR_NOTIFIER: ${{ vars.EVENT_OPERATOR_NOTIFIER }}
           EVENT_APP_CHECK_ENFORCED: ${{ vars.EVENT_APP_CHECK_ENFORCED }}
           EVENT_OTP_SEND_CEILING_PER_HOUR: ${{ vars.EVENT_OTP_SEND_CEILING_PER_HOUR }}
+          EVENT_SITE_PUBLISHER_ENABLED: ${{ vars.EVENT_SITE_PUBLISHER_ENABLED }}
         run: |
           set -euo pipefail
           {
@@ -258,6 +267,17 @@ jobs:
             # than a blank line the runtime has to reinterpret.
             echo "EVENT_APP_CHECK_ENFORCED=${EVENT_APP_CHECK_ENFORCED:-false}"
             echo "EVENT_OTP_SEND_CEILING_PER_HOUR=${EVENT_OTP_SEND_CEILING_PER_HOUR:-500}"
+            # Presence-of-config gate for the site publisher (spec §8.4):
+            # cms/publisher.cjs treats an unset EVENT_SITE_PUBLISHER_JOB as
+            # "this deployment has no publisher" and skips cleanly. The key
+            # is written ONLY for a client whose publisher job this workflow
+            # actually creates, so a client without one never invokes a job
+            # that does not exist. The value is the fixed job name — see
+            # SITE_PUBLISHER_JOB_NAME in packages/shared/src/config/deploy.cjs
+            # and the `publisher` job below.
+            if [ "${EVENT_SITE_PUBLISHER_ENABLED:-false}" = "true" ]; then
+              echo "EVENT_SITE_PUBLISHER_JOB=site-publisher"
+            fi
           } > "functions/.env.${EVENT_FIREBASE_PROJECT_ID}"
       - name: Deploy functions
         env:
@@ -267,6 +287,230 @@ jobs:
           --only functions
           --project "$EVENT_FIREBASE_PROJECT_ID"
           --non-interactive
+
+  publisher:
+    name: Provision the site-publisher Cloud Run job
+    needs: [guard, shared, validate-env]
+    # Off unless the client's Environment opts in. The job needs an
+    # Artifact Registry repository, the Cloud Run and Artifact Registry
+    # APIs, and a dedicated runtime service account, none of which exist
+    # in a project that has not been through docs/DEPLOY_RUNBOOK.md §9 —
+    # so an existing client deploys exactly as it did before phase 5.
+    # Skipped on a bootstrap run for the same reason `content` is: a fresh
+    # project has no config/event, so the job would have nothing to
+    # snapshot on its first execution anyway.
+    if: vars.EVENT_SITE_PUBLISHER_ENABLED == 'true' && inputs.bootstrap != true
+    environment: ${{ inputs.client }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          # publisher/Dockerfile runs `npm ci` over the whole workspace, and
+          # functions/package.json depends on this tarball by path — without
+          # it the install cannot resolve the tree.
+          name: shared-tgz-${{ inputs.client }}
+          path: functions/vendor
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Ensure the Artifact Registry repository exists
+        # Per client, in the CLIENT'S OWN project. A shared operator
+        # registry would put a read grant on one image path into every
+        # client project and make each Cloud Run job pull across a project
+        # boundary — §8.4 is explicit that the job runs "under the project's
+        # own service account", and the image it pulls is part of that
+        # boundary. describe-then-create rather than `create || true`, so a
+        # genuine failure (no permission, API not enabled) still fails the
+        # run instead of being swallowed by a shell fallback.
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+        run: |
+          set -euo pipefail
+          region="${EVENT_FIREBASE_REGION:-us-central1}"
+          if gcloud artifacts repositories describe run-of-show \
+              --location "$region" --project "$EVENT_FIREBASE_PROJECT_ID" >/dev/null 2>&1; then
+            echo "artifact registry: run-of-show already exists in $region"
+          else
+            gcloud artifacts repositories create run-of-show \
+              --repository-format=docker \
+              --location "$region" \
+              --project "$EVENT_FIREBASE_PROJECT_ID" \
+              --description="Run of Show site-publisher images"
+          fi
+      - name: Build and push the site-publisher image
+        # Built on the runner and pushed straight to Artifact Registry
+        # rather than through Cloud Build: the deploy service account then
+        # needs artifactregistry.writer and nothing more, instead of the
+        # Cloud Build service agent, a staging bucket, and the broader
+        # permissions a Cloud Build submission carries.
+        #
+        # Tagged with the commit SHA, never a floating tag: the Cloud Run
+        # job below pins that exact digest-bearing tag, so what a client's
+        # publisher runs is always identifiable from the deploy that put it
+        # there, and a rollback is a redeploy of the older commit.
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+        run: |
+          set -euo pipefail
+          region="${EVENT_FIREBASE_REGION:-us-central1}"
+          image="${region}-docker.pkg.dev/${EVENT_FIREBASE_PROJECT_ID}/run-of-show/site-publisher:${GITHUB_SHA}"
+          gcloud auth configure-docker "${region}-docker.pkg.dev" --quiet
+          docker build -f publisher/Dockerfile -t "$image" .
+          docker push "$image"
+          echo "PUBLISHER_IMAGE=$image" >> "$GITHUB_ENV"
+      - name: Write the Cloud Run job environment
+        # jq emits the env file rather than `--set-env-vars`, because
+        # EVENT_ALLOWED_ORIGINS is comma-separated and gcloud's flag parser
+        # splits on commas. --env-vars-file takes YAML, and JSON is valid
+        # YAML, so jq's output is consumed as-is with every value quoted
+        # correctly. The file REPLACES the job's environment on every
+        # deploy, so a variable removed from the Environment is removed
+        # from the job rather than lingering.
+        #
+        # This is the same per-client environment deploy-client.yml's
+        # `build` step consumes: the publisher is orthogonal to per-client
+        # subdomains, and EVENT_PUBLIC_URL and friends reach the job as
+        # ordinary per-client env.
+        env:
+          EVENT_SLUG: ${{ vars.EVENT_SLUG }}
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+          EVENT_HOSTING_SITE: ${{ vars.EVENT_HOSTING_SITE }}
+          EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
+          EVENT_STORAGE_BUCKET: ${{ vars.EVENT_STORAGE_BUCKET }}
+          EVENT_ALLOWED_ORIGINS: ${{ vars.EVENT_ALLOWED_ORIGINS }}
+          EVENT_EMAIL_PROVIDER: ${{ vars.EVENT_EMAIL_PROVIDER }}
+          EVENT_TICKETING_PROVIDER: ${{ vars.EVENT_TICKETING_PROVIDER }}
+          EVENT_TICKETING_EVENT_ID: ${{ vars.EVENT_TICKETING_EVENT_ID }}
+          EVENT_OPERATOR_NOTIFIER: ${{ vars.EVENT_OPERATOR_NOTIFIER }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_FIREBASE_APP_CHECK_SITE_KEY: ${{ vars.VITE_FIREBASE_APP_CHECK_SITE_KEY }}
+          VITE_ENABLE_CLIENT_ERROR_REPORTING: ${{ vars.VITE_ENABLE_CLIENT_ERROR_REPORTING }}
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg EVENT_SLUG "$EVENT_SLUG" \
+            --arg EVENT_FIREBASE_PROJECT_ID "$EVENT_FIREBASE_PROJECT_ID" \
+            --arg EVENT_FIREBASE_REGION "${EVENT_FIREBASE_REGION:-us-central1}" \
+            --arg EVENT_HOSTING_SITE "$EVENT_HOSTING_SITE" \
+            --arg EVENT_PUBLIC_URL "$EVENT_PUBLIC_URL" \
+            --arg EVENT_STORAGE_BUCKET "$EVENT_STORAGE_BUCKET" \
+            --arg EVENT_ALLOWED_ORIGINS "$EVENT_ALLOWED_ORIGINS" \
+            --arg EVENT_EMAIL_PROVIDER "$EVENT_EMAIL_PROVIDER" \
+            --arg EVENT_TICKETING_PROVIDER "$EVENT_TICKETING_PROVIDER" \
+            --arg EVENT_TICKETING_EVENT_ID "$EVENT_TICKETING_EVENT_ID" \
+            --arg EVENT_OPERATOR_NOTIFIER "$EVENT_OPERATOR_NOTIFIER" \
+            --arg VITE_FIREBASE_API_KEY "$VITE_FIREBASE_API_KEY" \
+            --arg VITE_FIREBASE_AUTH_DOMAIN "$VITE_FIREBASE_AUTH_DOMAIN" \
+            --arg VITE_FIREBASE_PROJECT_ID "$VITE_FIREBASE_PROJECT_ID" \
+            --arg VITE_FIREBASE_STORAGE_BUCKET "$VITE_FIREBASE_STORAGE_BUCKET" \
+            --arg VITE_FIREBASE_MESSAGING_SENDER_ID "$VITE_FIREBASE_MESSAGING_SENDER_ID" \
+            --arg VITE_FIREBASE_APP_ID "$VITE_FIREBASE_APP_ID" \
+            --arg VITE_FIREBASE_MEASUREMENT_ID "$VITE_FIREBASE_MEASUREMENT_ID" \
+            --arg VITE_FIREBASE_APP_CHECK_SITE_KEY "$VITE_FIREBASE_APP_CHECK_SITE_KEY" \
+            --arg VITE_ENABLE_CLIENT_ERROR_REPORTING "$VITE_ENABLE_CLIENT_ERROR_REPORTING" \
+            '{
+              EVENT_SLUG: $EVENT_SLUG,
+              EVENT_FIREBASE_PROJECT_ID: $EVENT_FIREBASE_PROJECT_ID,
+              EVENT_FIREBASE_REGION: $EVENT_FIREBASE_REGION,
+              EVENT_HOSTING_SITE: $EVENT_HOSTING_SITE,
+              EVENT_PUBLIC_URL: $EVENT_PUBLIC_URL,
+              EVENT_STORAGE_BUCKET: $EVENT_STORAGE_BUCKET,
+              EVENT_ALLOWED_ORIGINS: $EVENT_ALLOWED_ORIGINS,
+              EVENT_EMAIL_PROVIDER: $EVENT_EMAIL_PROVIDER,
+              EVENT_TICKETING_PROVIDER: $EVENT_TICKETING_PROVIDER,
+              EVENT_TICKETING_EVENT_ID: $EVENT_TICKETING_EVENT_ID,
+              EVENT_OPERATOR_NOTIFIER: $EVENT_OPERATOR_NOTIFIER,
+              VITE_FIREBASE_API_KEY: $VITE_FIREBASE_API_KEY,
+              VITE_FIREBASE_AUTH_DOMAIN: $VITE_FIREBASE_AUTH_DOMAIN,
+              VITE_FIREBASE_PROJECT_ID: $VITE_FIREBASE_PROJECT_ID,
+              VITE_FIREBASE_STORAGE_BUCKET: $VITE_FIREBASE_STORAGE_BUCKET,
+              VITE_FIREBASE_MESSAGING_SENDER_ID: $VITE_FIREBASE_MESSAGING_SENDER_ID,
+              VITE_FIREBASE_APP_ID: $VITE_FIREBASE_APP_ID,
+              VITE_FIREBASE_MEASUREMENT_ID: $VITE_FIREBASE_MEASUREMENT_ID,
+              VITE_FIREBASE_APP_CHECK_SITE_KEY: $VITE_FIREBASE_APP_CHECK_SITE_KEY,
+              VITE_ENABLE_CLIENT_ERROR_REPORTING: $VITE_ENABLE_CLIENT_ERROR_REPORTING,
+              VITE_EVENT_PUBLIC_URL: $EVENT_PUBLIC_URL
+            }' > "$RUNNER_TEMP/publisher-env.json"
+          echo "wrote $(jq -r 'keys | length' "$RUNNER_TEMP/publisher-env.json") variables"
+      - name: Create or update the Cloud Run job
+        # `gcloud run jobs deploy` is create-or-update, so this is the same
+        # command on a first provision and on every deploy after it.
+        #
+        # --service-account is the whole least-privilege story: the job runs
+        # as an account scoped to this one project's Firestore, Storage, and
+        # Hosting (docs/DEPLOY_RUNBOOK.md §9), never as the deploy identity
+        # and never with a credential that can reach another client.
+        #
+        # --max-retries=0: publish-site.cjs is idempotent, but a retry that
+        # silently succeeds would hide a flapping publish from the operator,
+        # and cmsPublish already records the failure and alerts. An operator
+        # re-runs deliberately.
+        # --task-timeout=30m: generate + vite build + hosting deploy is
+        # single-digit minutes; 30 leaves headroom without letting a wedged
+        # execution sit past the 90-minute stranded-row sweep.
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+          EVENT_PUBLISHER_SERVICE_ACCOUNT: ${{ vars.EVENT_PUBLISHER_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          region="${EVENT_FIREBASE_REGION:-us-central1}"
+          gcloud run jobs deploy site-publisher \
+            --image "$PUBLISHER_IMAGE" \
+            --region "$region" \
+            --project "$EVENT_FIREBASE_PROJECT_ID" \
+            --service-account "$EVENT_PUBLISHER_SERVICE_ACCOUNT" \
+            --env-vars-file "$RUNNER_TEMP/publisher-env.json" \
+            --task-timeout=30m \
+            --max-retries=0 \
+            --parallelism=1 \
+            --tasks=1 \
+            --cpu=2 \
+            --memory=4Gi
+      - name: Grant the functions runtime service account run.invoker on the job
+        # The narrowest grant that lets cmsPublish start this job: one role,
+        # on this ONE job resource, for one identity — not project-level,
+        # and not on every Cloud Run resource in the project. add-iam-policy-
+        # binding is idempotent, so re-running a deploy is a no-op.
+        #
+        # The default is the project's default COMPUTE service account —
+        # what Cloud Functions v2 runs as unless a function sets
+        # `serviceAccount` (none in this repo do), and the same identity
+        # docs/DEPLOY_RUNBOOK.md §3 binds secretAccessor to. It is derived
+        # from the project number, not the project id, so it is looked up
+        # rather than guessed. EVENT_FUNCTIONS_SERVICE_ACCOUNT overrides it
+        # for a project that does pin a runtime account.
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+          EVENT_FUNCTIONS_SERVICE_ACCOUNT: ${{ vars.EVENT_FUNCTIONS_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          region="${EVENT_FIREBASE_REGION:-us-central1}"
+          runtime_sa="${EVENT_FUNCTIONS_SERVICE_ACCOUNT:-}"
+          if [ -z "$runtime_sa" ]; then
+            project_number="$(gcloud projects describe "$EVENT_FIREBASE_PROJECT_ID" --format='value(projectNumber)')"
+            runtime_sa="${project_number}-compute@developer.gserviceaccount.com"
+          fi
+          gcloud run jobs add-iam-policy-binding site-publisher \
+            --region "$region" \
+            --project "$EVENT_FIREBASE_PROJECT_ID" \
+            --member "serviceAccount:${runtime_sa}" \
+            --role roles/run.invoker
+          echo "run.invoker granted to ${runtime_sa} on site-publisher"
 
   content:
     name: Generate content snapshot
@@ -491,6 +735,7 @@ jobs:
           EVENT_OPERATOR_NOTIFIER: ${{ vars.EVENT_OPERATOR_NOTIFIER }}
           EVENT_APP_CHECK_ENFORCED: ${{ vars.EVENT_APP_CHECK_ENFORCED }}
           EVENT_OTP_SEND_CEILING_PER_HOUR: ${{ vars.EVENT_OTP_SEND_CEILING_PER_HOUR }}
+          EVENT_SITE_PUBLISHER_ENABLED: ${{ vars.EVENT_SITE_PUBLISHER_ENABLED }}
         run: |
           set -euo pipefail
           {
@@ -506,6 +751,17 @@ jobs:
             echo "EVENT_OPERATOR_NOTIFIER=$EVENT_OPERATOR_NOTIFIER"
             echo "EVENT_APP_CHECK_ENFORCED=${EVENT_APP_CHECK_ENFORCED:-false}"
             echo "EVENT_OTP_SEND_CEILING_PER_HOUR=${EVENT_OTP_SEND_CEILING_PER_HOUR:-500}"
+            # Presence-of-config gate for the site publisher (spec §8.4):
+            # cms/publisher.cjs treats an unset EVENT_SITE_PUBLISHER_JOB as
+            # "this deployment has no publisher" and skips cleanly. The key
+            # is written ONLY for a client whose publisher job this workflow
+            # actually creates, so a client without one never invokes a job
+            # that does not exist. The value is the fixed job name — see
+            # SITE_PUBLISHER_JOB_NAME in packages/shared/src/config/deploy.cjs
+            # and the `publisher` job below.
+            if [ "${EVENT_SITE_PUBLISHER_ENABLED:-false}" = "true" ]; then
+              echo "EVENT_SITE_PUBLISHER_JOB=site-publisher"
+            fi
           } > "functions/.env.${EVENT_FIREBASE_PROJECT_ID}"
       - name: Redeploy updatesMeta only
         env:

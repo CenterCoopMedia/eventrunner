@@ -271,6 +271,108 @@ test('cmsPublish resume of a still-running row → 409, no writes', async () => 
   assert.equal(db.writes.length, 0); // no revision bump, no history row
 });
 
+// --- site-publisher hook (spec §8.4 phase 5, issue #36) -------------------------
+
+const PUBLISHER_ENV = {
+  EVENT_SITE_PUBLISHER_JOB: 'site-publisher',
+  EVENT_FIREBASE_PROJECT_ID: 'demo-project',
+  EVENT_FIREBASE_REGION: 'us-central1',
+};
+
+function dirtyDb() {
+  return makeFakeDb({
+    'cmsContent_drafts/hero__title': { value: 'v1', visible: true, status: 'dirty' },
+  });
+}
+
+const publishOne = { collection: 'cmsContent', docIds: ['hero__title'] };
+
+test('cmsPublish skips the publisher when none is configured, and publishes anyway', async () => {
+  const db = dirtyDb();
+  const res = fakeRes();
+  await createCmsPublishHandler({ ...deps(db), env: {} })(req({ body: publishOne }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.publisher, { status: 'skipped', reason: 'no-job-configured' });
+  assert.equal(db.read('cmsPublishQueue', res.body.queueId).publisher, undefined);
+  assert.equal(db.read('cmsContent', 'hero__title').revision, 1);
+});
+
+test('cmsPublish invokes the publisher after the revision copy commits', async () => {
+  const db = dirtyDb();
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    if (url.startsWith('http://metadata')) {
+      return { ok: true, status: 200, async json() { return { access_token: 't' }; } };
+    }
+    return { ok: true, status: 200, async json() { return { metadata: { name: 'exec-1' } }; } };
+  };
+  const res = fakeRes();
+  await createCmsPublishHandler({ ...deps(db), env: PUBLISHER_ENV, fetchImpl })(
+    req({ body: publishOne }), res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.publisher.status, 'invoked');
+  assert.ok(calls.some((u) => u.endsWith('/jobs/site-publisher:run')));
+
+  const row = db.read('cmsPublishQueue', res.body.queueId);
+  assert.equal(row.status, 'done');
+  assert.equal(row.publisher.invoke.status, 'invoked');
+});
+
+test('a publisher invoke failure never fails the publish response', async () => {
+  const db = dirtyDb();
+  const events = [];
+  const fetchImpl = async (url) => (
+    url.startsWith('http://metadata')
+      ? { ok: true, status: 200, async json() { return { access_token: 't' }; } }
+      : { ok: false, status: 403, async text() { return 'missing run.invoker'; } }
+  );
+  const res = fakeRes();
+  await createCmsPublishHandler({
+    ...deps(db),
+    env: PUBLISHER_ENV,
+    fetchImpl,
+    notifyOperator: async (event) => { events.push(event); },
+  })(req({ body: publishOne }), res);
+
+  assert.equal(res.statusCode, 200, 'the publish committed; the snapshot refresh is best-effort');
+  assert.equal(res.body.status, 'done');
+  assert.equal(res.body.publisher.status, 'failed');
+  assert.equal(db.read('cmsContent', 'hero__title').revision, 1);
+  assert.equal(db.read('cmsPublishQueue', res.body.queueId).status, 'done');
+  assert.equal(events.length, 1);
+  assert.match(events[0].title, /Site publisher/);
+});
+
+test('a publish with nothing dirty creates no row and never invokes the publisher', async () => {
+  const db = makeFakeDb();
+  let invoked = false;
+  const res = fakeRes();
+  await createCmsPublishHandler({
+    ...deps(db),
+    env: PUBLISHER_ENV,
+    fetchImpl: async () => { invoked = true; throw new Error('must not be called'); },
+  })(req({ body: { all: true } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.queueId, null);
+  assert.equal(invoked, false);
+});
+
+test('a failed publish never invokes the publisher — there is no new snapshot to build', async () => {
+  const db = dirtyDb();
+  db.failAtCommit = 1;
+  let invoked = false;
+  const res = fakeRes();
+  await createCmsPublishHandler({
+    ...deps(db),
+    env: PUBLISHER_ENV,
+    fetchImpl: async () => { invoked = true; throw new Error('must not be called'); },
+  })(req({ body: publishOne }), res);
+  assert.equal(res.statusCode, 500);
+  assert.equal(invoked, false);
+});
+
 test('publish endpoints: 400 on a queueId the real SDK would throw on', async () => {
   const db = makeFakeDb();
   for (const [create, extra] of [

@@ -10,6 +10,12 @@
  */
 
 const SLUG_RE = /^[a-z0-9-]+$/;
+/**
+ * Google service-account email. Deliberately narrow: a bare account id, a
+ * user email, or a typo'd domain would be accepted by `gcloud run jobs
+ * deploy` only to fail at execution time, long after the deploy is green.
+ */
+const SERVICE_ACCOUNT_RE = /^[a-z0-9-]+@[a-z0-9.-]+\.(iam\.)?gserviceaccount\.com$/;
 
 const EMAIL_PROVIDERS = ['postmark', 'webhook', 'console'];
 const TICKETING_PROVIDERS = ['eventbrite', 'manual', 'none'];
@@ -46,7 +52,21 @@ const DEFAULTS = {
   // .env.example. Mirrored by challenges.cjs SEND_CEILING_MAX.
   EVENT_APP_CHECK_ENFORCED: 'false',
   EVENT_OTP_SEND_CEILING_PER_HOUR: '500',
+  // Site publisher (spec §8.4 phase 5, issue #36). Off by default: the job
+  // needs an Artifact Registry repository, a Cloud Run job, and a dedicated
+  // runtime service account that no existing client project has, and a
+  // deployment without them must keep deploying exactly as before.
+  EVENT_SITE_PUBLISHER_ENABLED: 'false',
 };
+
+/**
+ * Cloud Run job name for the site publisher (spec §8.4). Fixed rather than
+ * configurable: one job per client project, named the same everywhere, so
+ * the workflow, the runbook, and the `run.invoker` grant cannot drift apart
+ * — and so the functions runtime learns "a publisher exists here" from the
+ * presence of EVENT_SITE_PUBLISHER_JOB alone.
+ */
+const SITE_PUBLISHER_JOB_NAME = 'site-publisher';
 
 /** @param {*} v @returns {boolean} */
 function present(v) {
@@ -123,6 +143,29 @@ function validateDeployEnv(env = process.env) {
     missing.push('VITE_FIREBASE_APP_CHECK_SITE_KEY');
   }
 
+  // Site publisher (spec §8.4 phase 5). Same reasoning as the App Check
+  // flag above: a deployment that believes it enabled the publisher and did
+  // not is the worst outcome, so an unparseable flag fails the build rather
+  // than reverting to 'false'.
+  if (present(source.EVENT_SITE_PUBLISHER_ENABLED) &&
+      !['true', 'false'].includes(source.EVENT_SITE_PUBLISHER_ENABLED.trim().toLowerCase())) {
+    errors.push('EVENT_SITE_PUBLISHER_ENABLED: must be true or false');
+  }
+  const publisherEnabled = present(source.EVENT_SITE_PUBLISHER_ENABLED) &&
+    source.EVENT_SITE_PUBLISHER_ENABLED.trim().toLowerCase() === 'true';
+  if (publisherEnabled && !present(source.EVENT_PUBLISHER_SERVICE_ACCOUNT)) {
+    // No default. The job must run as a service account scoped to exactly
+    // this project's Firestore/Storage/Hosting (§8.4: "under the project's
+    // own service account"); silently falling back to a broadly-scoped
+    // default account is the failure mode that rule exists to prevent.
+    missing.push('EVENT_PUBLISHER_SERVICE_ACCOUNT');
+  }
+  for (const key of ['EVENT_PUBLISHER_SERVICE_ACCOUNT', 'EVENT_FUNCTIONS_SERVICE_ACCOUNT']) {
+    if (present(source[key]) && !SERVICE_ACCOUNT_RE.test(source[key].trim())) {
+      errors.push(`${key}: must be a service-account email (name@<project>.iam.gserviceaccount.com)`);
+    }
+  }
+
   // Conditionally required: the external event id only exists for a
   // provider that filters against one (spec §2.1, §3.3).
   if (present(source.EVENT_TICKETING_PROVIDER) &&
@@ -148,6 +191,7 @@ module.exports = {
   validateDeployEnv,
   REQUIRED_ALWAYS,
   DEFAULTS,
+  SITE_PUBLISHER_JOB_NAME,
   EMAIL_PROVIDERS,
   TICKETING_PROVIDERS,
   OPERATOR_NOTIFIERS,

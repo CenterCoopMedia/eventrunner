@@ -1,0 +1,14 @@
+# Build context for publisher/Dockerfile (spec §8.4 phase 5).
+#
+# node_modules is excluded so the image's dependency tree always comes from
+# `npm ci` against the committed lockfile rather than from whatever the
+# builder happened to have installed — a runner's tree can contain
+# platform-specific binaries and, on a local build, uncommitted changes.
+
+node_modules
+**/node_modules
+.git
+.github
+apps/web/dist
+functions/.env.*
+*.log

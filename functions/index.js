@@ -43,6 +43,7 @@ const ticketingRegistration = require('./src/ticketing/registration.cjs');
 const ticketingCsvImport = require('./src/ticketing/csvImport.cjs');
 const ticketingEntitlement = require('./src/ticketing/entitlement.cjs');
 const ticketingRegistrationPrompt = require('./src/ticketing/registrationPrompt.cjs');
+const maintenanceCleanup = require('./src/maintenance/cleanup.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -84,4 +85,5 @@ module.exports = {
   ...ticketingCsvImport.handlers,
   ...ticketingEntitlement.handlers,
   ...ticketingRegistrationPrompt.handlers,
+  ...maintenanceCleanup.handlers,
 };
