@@ -38,11 +38,18 @@
  * for. It is deliberately distinct from the plural `speakers` directory
  * route above; both are reserved.
  *
+ * `ticket` is the self-service ticket claim area (issue #33): /ticket/claim
+ * is statically mounted, and it is the address `ticket.claim_prompt`'s CTA
+ * links to for every provider that resolves one (manual.cjs, eventbrite.cjs
+ * getRegistrationPrompt). Same reasoning as `speaker`: mail already sent
+ * with this link must keep working.
+ *
  * Keep in sync with the static <Route path="..."> segments in App.jsx by
  * hand — there is no build-time check tying the two together.
  */
 const RESERVED_PATH_SEGMENTS = Object.freeze([
   'schedule', 'speakers', 'speaker', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin', 'updates',
+  'ticket',
 ]);
 
 /**

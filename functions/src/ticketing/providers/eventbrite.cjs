@@ -134,6 +134,19 @@ function deliveryIdFor(rawBody) {
 }
 
 /**
+ * The self-service claim page (issue #33): `/ticket/claim`, reserved in
+ * `shared/routing` alongside `/speaker/accept`. Same helper as
+ * `providers/manual.cjs`'s claimUrl — kept as a small duplicate rather than
+ * a shared import, since the two providers otherwise share no code and a
+ * one-line URL join is not worth a new module.
+ * @param {object|null} config @returns {string|null}
+ */
+function claimUrl(config) {
+  const site = typeof config?.tierA?.publicUrl === 'string' ? config.tierA.publicUrl.replace(/\/+$/, '') : '';
+  return site ? `${site}/ticket/claim` : null;
+}
+
+/**
  * @param {{ env?: Record<string, string|undefined>, fetchImpl?: typeof fetch,
  *           getConfig?: () => Promise<object> }} [deps]
  * @returns {object} TicketingProvider (spec §3.3)
@@ -401,9 +414,7 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
      * Registration messaging (§3.5 eventbrite row). `ctaUrl` for the
      * no-ticket case is the client's configured checkout URL
      * (`config/event.registration.externalUrl`); for the unclaimed-ticket
-     * case it is left null, same as `manual` — the self-service claim page
-     * (issue #33) does not exist yet, and the template renders no CTA
-     * button when `ctaUrl` is null (§6.2).
+     * case it is the self-service claim page (issue #33), same as `manual`.
      *
      * @param {object} ctx RegistrationPromptContext (§3.5)
      */
@@ -414,11 +425,12 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       if (ctx?.isSpeaker === true || ctx?.hasClaimedTicket === true) return suppressed;
 
       if (ctx?.trigger === 'ticket_unclaimed') {
+        const config = typeof getConfig === 'function' ? await getConfig() : null;
         return {
           send: true,
           templateId: 'ticket.claim_prompt',
           ctaLabel: 'Claim your ticket',
-          ctaUrl: null,
+          ctaUrl: claimUrl(config),
           action: 'claim',
           bodyNote: null,
         };
@@ -451,5 +463,6 @@ module.exports = {
     signBody,
     deliveryIdFor,
     header,
+    claimUrl,
   },
 };

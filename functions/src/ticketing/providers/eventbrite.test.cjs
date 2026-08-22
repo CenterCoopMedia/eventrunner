@@ -446,12 +446,18 @@ test('getRegistrationPrompt: account_created, no ticket → purchase, ctaUrl fro
   assert.equal(prompt.ctaUrl, 'https://eventbrite.com/e/demo');
 });
 
-test('getRegistrationPrompt: ticket_unclaimed → claim, no CTA url yet (issue #33 builds the page)', async () => {
-  const p = provider();
+test('getRegistrationPrompt: ticket_unclaimed → claim, ctaUrl points at /ticket/claim (issue #33)', async () => {
+  const p = provider({ getConfig: async () => ({ tierA: { publicUrl: 'https://summit.example.org' } }) });
   const prompt = await p.getRegistrationPrompt({ trigger: 'ticket_unclaimed' });
   assert.equal(prompt.send, true);
   assert.equal(prompt.action, 'claim');
   assert.equal(prompt.templateId, 'ticket.claim_prompt');
+  assert.equal(prompt.ctaUrl, 'https://summit.example.org/ticket/claim');
+});
+
+test('getRegistrationPrompt: ticket_unclaimed with no configured public URL degrades to no CTA', async () => {
+  const p = provider();
+  const prompt = await p.getRegistrationPrompt({ trigger: 'ticket_unclaimed' });
   assert.equal(prompt.ctaUrl, null);
 });
 
