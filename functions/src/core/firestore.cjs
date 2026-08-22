@@ -15,7 +15,16 @@ function getDb() {
   if (cachedDb) return cachedDb;
   const { initializeApp, getApps } = require('firebase-admin/app');
   const { getFirestore } = require('firebase-admin/firestore');
-  if (getApps().length === 0) initializeApp();
+  // The DEFAULT app specifically, not "any app": getFirestore() with no
+  // argument resolves `[DEFAULT]` and throws if only named apps exist. A
+  // bare length check reads a named app somebody else registered as
+  // "already initialized" and then throws on the very next line — which is
+  // what happens to every background trigger under the Functions emulator,
+  // where the runtime registers its own app before our handler runs. The
+  // observable symptom is a Firestore trigger that fails on every delivery
+  // ("The default Firebase app does not exist"), so the projection it
+  // maintains never appears.
+  if (!getApps().some((app) => app?.name === '[DEFAULT]')) initializeApp();
   cachedDb = getFirestore();
   return cachedDb;
 }

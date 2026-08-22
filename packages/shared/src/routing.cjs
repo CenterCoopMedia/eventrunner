@@ -30,11 +30,19 @@
  * squatting it would break both the route and every previously-shared
  * update link's unfurl.
  *
+ * `speaker` (singular) is the invite-acceptance area (issue #21):
+ * /speaker/accept is statically mounted and it is the address every speaker
+ * invitation email links to. A generic page claiming the segment would
+ * break every invitation already in an inbox, including ones sent before
+ * the page existed — which is exactly the class of collision this list is
+ * for. It is deliberately distinct from the plural `speakers` directory
+ * route above; both are reserved.
+ *
  * Keep in sync with the static <Route path="..."> segments in App.jsx by
  * hand — there is no build-time check tying the two together.
  */
 const RESERVED_PATH_SEGMENTS = Object.freeze([
-  'schedule', 'speakers', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin', 'updates',
+  'schedule', 'speakers', 'speaker', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin', 'updates',
 ]);
 
 /**

@@ -9,6 +9,14 @@
       ]
     },
     {
+      "collectionGroup": "speaker_invites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "speakerId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "system_errors",
       "queryScope": "COLLECTION",
       "fields": [

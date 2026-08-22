@@ -80,6 +80,15 @@ const SERVER_OWNED_SPEAKER_FIELDS = Object.freeze([
   'uid',
   'inviteToken',
   'approvedAt',
+  // The rest of the invite pipeline's bookkeeping (issue #21): when the
+  // invitation was accepted, which address accepted it, and the per-speaker
+  // invite-mail send budget. All three are written only by
+  // functions/src/speakers/invites.cjs, so an admin payload naming any of
+  // them is rejected by name rather than silently merged — the same
+  // treatment `inviteToken` gets, for the same reason.
+  'acceptedAt',
+  'acceptedEmail',
+  'inviteSends',
   'createdAt',
   'updatedAt',
   'updatedBy',

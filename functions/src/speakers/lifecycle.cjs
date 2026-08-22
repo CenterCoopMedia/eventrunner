@@ -49,12 +49,13 @@ const SESSION_DRAFTS = 'cmsSchedule_drafts';
 const USERS = 'users';
 
 /**
- * Firestore's per-transaction write ceiling. The unlink spends up to three
- * writes on the speaker itself (user link, projection, record), so the
- * session budget is what is left.
+ * Firestore's per-transaction write ceiling. The unlink spends up to five
+ * writes on the speaker itself (user link, projection, record, slug
+ * reservation, outstanding invitation), so the session budget is what is
+ * left.
  */
 const MAX_TRANSACTION_WRITES = 500;
-const FIXED_WRITES = 3;
+const FIXED_WRITES = 5;
 const MAX_UNLINKED_SESSIONS = MAX_TRANSACTION_WRITES - FIXED_WRITES;
 
 /**
@@ -142,10 +143,18 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
         // halves go in this commit, which is exactly the seam-#3 rule: the
         // pair is written by the invite/acceptance transaction and by the
         // delete paths, never independently.
+        //
+        // It also kills any outstanding invitation (issue #21): a removed
+        // speaker must not leave a `pending` row in the admin invite list,
+        // and the same one-commit rule applies to the token as to the pair.
         const linked = await readLinkedUser({ tx, db, speaker });
+        const { invalidateInviteInTx } = require('./inviteTokens.cjs');
+        const invalidation = invalidateInviteInTx({
+          tx, db, speaker, at, status: 'superseded', actorEmail: actor.email,
+        });
         tx.set(
           speakerRef,
-          { status: 'removed', uid: null, updatedAt: at, updatedBy: actor.email },
+          { ...invalidation, status: 'removed', uid: null, updatedAt: at, updatedBy: actor.email },
           { merge: true },
         );
         if (linked) tx.set(linked.ref, { speakerId: null, updatedAt: at }, { merge: true });
@@ -204,6 +213,14 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
       if (typeof speaker.slug === 'string' && speaker.slug) {
         tx.delete(db.collection(SPEAKER_SLUGS).doc(speaker.slug));
       }
+      // Same for the outstanding invitation, if any: the speaker record it
+      // names is gone, so the row is not history any admin can act on —
+      // deleting it keeps `speaker_invites` free of invitations pointing at
+      // documents that no longer exist (issue #21).
+      if (typeof speaker.inviteToken === 'string' && speaker.inviteToken) {
+        const { SPEAKER_INVITES } = require('./inviteTokens.cjs');
+        tx.delete(db.collection(SPEAKER_INVITES).doc(speaker.inviteToken));
+      }
 
       return {
         mode: 'hard',
@@ -244,6 +261,99 @@ async function unlinkSpeakerFromUser({ db, speakerId, now = Date.now }) {
   return writeSpeakerLink({ db, speakerId, uid: null, now });
 }
 
+/**
+ * Write both halves of the `users.speakerId` ↔ `speakers.uid` pair inside
+ * the CALLER'S transaction (seam #3), returning the patch the caller must
+ * merge onto the speaker document.
+ *
+ * This is the primitive; `linkSpeakerToUser` below is the standalone
+ * one-transaction wrapper around it. The acceptance path (issue #21) needs
+ * the in-transaction form specifically: validating the invite in one
+ * transaction and writing the pair in another leaves a window where an
+ * admin cancel, resend, or removal lands in between — and the pair write
+ * would then commit against a speaker who is no longer invited, leaving an
+ * account permanently holding speaker identity (and the attendee access
+ * §3.4 grants for `speakerId != null`) for a record the organizer just
+ * revoked. One commit closes it.
+ *
+ * Reads before writes, as Firestore requires: this does all of its own
+ * reads before any tx.set, so a caller may call it after its own reads and
+ * write the returned patch afterwards.
+ *
+ * Throws an Error carrying `.conflict` ({ status, code, message }) for the
+ * two refusals — `link-target-missing` and `link-occupied` — so a caller
+ * that already catches conflicts handles them the same way as its own.
+ *
+ * @param {{ tx: object, db: object, speakerId: string, speaker: object,
+ *           uid: string|null, at: Date }} args
+ * @returns {Promise<{ uid: string|null }>} the speakers/{id} patch
+ */
+async function applySpeakerLinkInTx({ tx, db, speakerId, speaker, uid, at }) {
+  const previousUid = typeof speaker?.uid === 'string' ? speaker.uid : null;
+  const targetUid = uid;
+
+  // Reads first, all of them: the account losing the link and the one
+  // gaining it are both read before anything is written.
+  const refs = [...new Set([previousUid, targetUid].filter(Boolean))]
+    .map((id) => [id, db.collection(USERS).doc(id)]);
+  const snaps = await Promise.all(refs.map(([, ref]) => tx.get(ref)));
+  const snapFor = (id) => snaps[refs.findIndex(([candidate]) => candidate === id)] ?? null;
+
+  if (targetUid) {
+    const targetSnap = snapFor(targetUid);
+    // A link to an account document that does not exist yet must FAIL,
+    // not half-apply. The account is seeded asynchronously by the auth
+    // onCreate trigger, so during a sign-in race there is genuinely
+    // nothing to write the other half onto — and writing speakers.uid
+    // anyway would leave a permanent one-sided link that no later write
+    // repairs, because every writer of this pair assumes both halves
+    // move together. Refusing leaves the caller free to retry once the
+    // account exists.
+    if (!targetSnap?.exists) {
+      const err = new Error('LINK_TARGET_MISSING');
+      err.conflict = {
+        status: 409,
+        code: 'link-target-missing',
+        message:
+          `No account document for uid "${targetUid}" yet. Nothing was changed; ` +
+          'retry once the account has been created.',
+      };
+      throw err;
+    }
+    // The account is already claimed by a DIFFERENT speaker record.
+    // Refuse rather than steal the link: `users.speakerId` is
+    // single-valued, so taking it would silently orphan the other
+    // record (its `uid` would still name this account) or, if we
+    // cleared that too, silently revoke a third party's speaker access
+    // as a side effect of somebody accepting an invitation. Either is a
+    // data problem an operator has to resolve deliberately, and
+    // unlinkSpeakerFromUser is how they do it — so refusing loses no
+    // capability and keeps the evidence.
+    const occupant = targetSnap.data()?.speakerId;
+    if (typeof occupant === 'string' && occupant && occupant !== speakerId) {
+      const err = new Error('LINK_OCCUPIED');
+      err.conflict = {
+        status: 409,
+        code: 'link-occupied',
+        message:
+          `Account "${targetUid}" is already linked to speaker "${occupant}". ` +
+          'Nothing was changed; unlink that speaker first.',
+      };
+      throw err;
+    }
+  }
+
+  snaps.forEach((snap, i) => {
+    const [id, ref] = refs[i];
+    // A previous account that no longer exists needs no clearing — the
+    // link is already broken in that direction. Only the TARGET must
+    // exist, and that was checked above.
+    if (!snap.exists) return;
+    tx.set(ref, { speakerId: id === targetUid ? speakerId : null, updatedAt: at }, { merge: true });
+  });
+  return { uid: targetUid };
+}
+
 async function writeSpeakerLink({ db, speakerId, uid, now }) {
   if (!isValidDocId(speakerId)) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
@@ -262,69 +372,10 @@ async function writeSpeakerLink({ db, speakerId, uid, now }) {
         err.conflict = { status: 404, code: 'not-found', message: `No speaker with id "${speakerId}".` };
         throw err;
       }
-      const previousUid = typeof speakerSnap.data().uid === 'string' ? speakerSnap.data().uid : null;
-      const targetUid = uid;
-
-      // Reads first, all of them: the account losing the link and the one
-      // gaining it are both read before anything is written.
-      const refs = [...new Set([previousUid, targetUid].filter(Boolean))]
-        .map((id) => [id, db.collection(USERS).doc(id)]);
-      const snaps = await Promise.all(refs.map(([, ref]) => tx.get(ref)));
-      const snapFor = (id) => snaps[refs.findIndex(([candidate]) => candidate === id)] ?? null;
-
-      if (targetUid) {
-        const targetSnap = snapFor(targetUid);
-        // A link to an account document that does not exist yet must FAIL,
-        // not half-apply. The account is seeded asynchronously by the auth
-        // onCreate trigger, so during a sign-in race there is genuinely
-        // nothing to write the other half onto — and writing speakers.uid
-        // anyway would leave a permanent one-sided link that no later write
-        // repairs, because every writer of this pair assumes both halves
-        // move together. Refusing leaves the caller free to retry once the
-        // account exists.
-        if (!targetSnap?.exists) {
-          const err = new Error('LINK_TARGET_MISSING');
-          err.conflict = {
-            status: 409,
-            code: 'link-target-missing',
-            message:
-              `No account document for uid "${targetUid}" yet. Nothing was changed; ` +
-              'retry once the account has been created.',
-          };
-          throw err;
-        }
-        // The account is already claimed by a DIFFERENT speaker record.
-        // Refuse rather than steal the link: `users.speakerId` is
-        // single-valued, so taking it would silently orphan the other
-        // record (its `uid` would still name this account) or, if we
-        // cleared that too, silently revoke a third party's speaker access
-        // as a side effect of somebody accepting an invitation. Either is a
-        // data problem an operator has to resolve deliberately, and
-        // unlinkSpeakerFromUser is how they do it — so refusing loses no
-        // capability and keeps the evidence.
-        const occupant = targetSnap.data()?.speakerId;
-        if (typeof occupant === 'string' && occupant && occupant !== speakerId) {
-          const err = new Error('LINK_OCCUPIED');
-          err.conflict = {
-            status: 409,
-            code: 'link-occupied',
-            message:
-              `Account "${targetUid}" is already linked to speaker "${occupant}". ` +
-              'Nothing was changed; unlink that speaker first.',
-          };
-          throw err;
-        }
-      }
-
-      snaps.forEach((snap, i) => {
-        const [id, ref] = refs[i];
-        // A previous account that no longer exists needs no clearing — the
-        // link is already broken in that direction. Only the TARGET must
-        // exist, and that was checked above.
-        if (!snap.exists) return;
-        tx.set(ref, { speakerId: id === targetUid ? speakerId : null, updatedAt: at }, { merge: true });
+      const patch = await applySpeakerLinkInTx({
+        tx, db, speakerId, speaker: speakerSnap.data(), uid, at,
       });
-      tx.set(speakerRef, { uid: targetUid, updatedAt: at }, { merge: true });
+      tx.set(speakerRef, { ...patch, updatedAt: at }, { merge: true });
     });
   } catch (err) {
     if (err?.conflict) return { ok: false, ...err.conflict };
@@ -412,6 +463,7 @@ function buildHandlers() {
 
 module.exports = {
   applyDeleteSpeaker,
+  applySpeakerLinkInTx,
   linkSpeakerToUser,
   unlinkSpeakerFromUser,
   readLinkedUser,
