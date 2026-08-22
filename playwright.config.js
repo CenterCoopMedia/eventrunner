@@ -41,10 +41,21 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    command: 'npm run dev -w apps/web -- --port 5173 --strictPort',
+    // --host 127.0.0.1 pins the bind address explicitly. Without it, Vite 5
+    // binds "localhost", and on ubuntu-latest runners Node's DNS resolution
+    // of "localhost" can land on ::1 while Playwright's own webServer probe
+    // (and baseURL/APP_URL above) hit 127.0.0.1 — a bind/probe mismatch that
+    // reads as a plain timeout ("Timed out waiting ... from
+    // config.webServer") with no other clue, since the server logs "ready"
+    // regardless. Binding and probing the SAME literal address removes the
+    // ambiguity instead of papering over it with a longer timeout.
+    command: 'npm run dev -w apps/web -- --host 127.0.0.1 --port 5173 --strictPort',
     url: APP_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    // Modest headroom for a cold CI cache (first Vite dependency
+    // pre-bundle) — the bind fix above is the actual cure; this alone
+    // would not have helped a mismatched bind that never becomes reachable.
+    timeout: 120_000,
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
