@@ -70,6 +70,28 @@ const EDITABLE_SPEAKER_FIELDS = Object.freeze([
 ]);
 
 /**
+ * The subset of EDITABLE_SPEAKER_FIELDS a speaker may write about
+ * THEMSELVES through updateOwnSpeakerProfile (spec §4.3, §9 "Speaker
+ * profile wizard", issue #22). `slug` stays admin-only: it addresses the
+ * public page, and a self-service name edit re-deriving it would move a URL
+ * already shared (a programme page, a social post) out from under the
+ * speaker without an admin's say-so. `email` and `status` stay admin-only
+ * for the same reason profile.cjs's applyUpdateSpeaker treats them as
+ * pipeline-sensitive: email is the invite/acceptance security boundary and
+ * status is the publish gate, neither of which a speaker should move on
+ * their own.
+ */
+const SELF_EDITABLE_SPEAKER_FIELDS = Object.freeze([
+  'firstName',
+  'lastName',
+  'bio',
+  'headshotPath',
+  'organization',
+  'jobTitle',
+  'socialHandles',
+]);
+
+/**
  * Server-owned fields, rejected BY NAME when a payload carries them
  * (§4.3 rule 3): `uid` is one half of the users.speakerId ↔ speakers.uid
  * pair, which only the invite/acceptance transaction and deleteSpeaker may
@@ -197,11 +219,20 @@ function buildPublicSpeaker(speaker) {
  * With `partial: true` (the update path) only the keys present are
  * checked; without it (create) firstName and lastName are required.
  *
+ * `fieldsAllowed` narrows which of EDITABLE_SPEAKER_FIELDS the caller may
+ * send — the admin CRUD in profile.cjs leaves it at the default (every
+ * editable field); updateOwnSpeakerProfile passes
+ * SELF_EDITABLE_SPEAKER_FIELDS, so a self-service payload naming `slug`,
+ * `email`, or `status` is rejected by name with the SAME "not editable
+ * here" treatment SERVER_OWNED_SPEAKER_FIELDS gets for "read-only" —
+ * distinct wording because the field genuinely is editable, just not by
+ * this caller.
+ *
  * @param {unknown} payload
- * @param {{ partial?: boolean }} [options]
+ * @param {{ partial?: boolean, fieldsAllowed?: readonly string[] }} [options]
  * @returns {{ ok: true, fields: object } | { ok: false, errors: string[] }}
  */
-function validateSpeaker(payload, { partial = false } = {}) {
+function validateSpeaker(payload, { partial = false, fieldsAllowed = EDITABLE_SPEAKER_FIELDS } = {}) {
   if (!isPlainObject(payload)) {
     return { ok: false, errors: ['speaker: must be an object'] };
   }
@@ -217,9 +248,13 @@ function validateSpeaker(payload, { partial = false } = {}) {
     }
   }
   for (const key of Object.keys(payload)) {
-    if (!EDITABLE_SPEAKER_FIELDS.includes(key) && !SERVER_OWNED_SPEAKER_FIELDS.includes(key)) {
-      errors.push(`${key}: unknown speaker field`);
-    }
+    if (SERVER_OWNED_SPEAKER_FIELDS.includes(key)) continue; // already reported above
+    if (fieldsAllowed.includes(key)) continue;
+    errors.push(
+      EDITABLE_SPEAKER_FIELDS.includes(key)
+        ? `${key}: not editable here`
+        : `${key}: unknown speaker field`,
+    );
   }
   if (errors.length > 0) return { ok: false, errors };
 
@@ -335,6 +370,7 @@ module.exports = {
   ADMIN_SETTABLE_STATUSES,
   PUBLISHED_SPEAKER_STATUSES,
   EDITABLE_SPEAKER_FIELDS,
+  SELF_EDITABLE_SPEAKER_FIELDS,
   SERVER_OWNED_SPEAKER_FIELDS,
   PUBLIC_SPEAKER_FIELDS,
   speakerDisplayName,

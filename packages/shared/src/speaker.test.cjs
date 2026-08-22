@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   ADMIN_SETTABLE_STATUSES,
   PUBLIC_SPEAKER_FIELDS,
+  SELF_EDITABLE_SPEAKER_FIELDS,
   speakerDisplayName,
   isPubliclyVisibleSpeaker,
   buildPublicSpeaker,
@@ -148,4 +149,31 @@ test('null clears the optional scalars rather than storing a string', () => {
 test('a non-object payload is refused', () => {
   assert.deepEqual(validateSpeaker(null).errors, ['speaker: must be an object']);
   assert.deepEqual(validateSpeaker([]).errors, ['speaker: must be an object']);
+});
+
+// --- fieldsAllowed (self-service narrowing, issue #22) ----------------------
+
+test('fieldsAllowed accepts a field on the allowed list', () => {
+  const verdict = validateSpeaker(
+    { bio: 'New bio.' },
+    { partial: true, fieldsAllowed: SELF_EDITABLE_SPEAKER_FIELDS },
+  );
+  assert.equal(verdict.ok, true);
+  assert.deepEqual(verdict.fields, { bio: 'New bio.' });
+});
+
+test('fieldsAllowed rejects an otherwise-editable field with "not editable here"', () => {
+  for (const payload of [{ slug: 'x' }, { email: 'a@example.org' }, { status: 'approved' }]) {
+    const verdict = validateSpeaker(payload, { partial: true, fieldsAllowed: SELF_EDITABLE_SPEAKER_FIELDS });
+    assert.equal(verdict.ok, false);
+    assert.match(verdict.errors[0], /not editable here/);
+  }
+});
+
+test('fieldsAllowed still rejects a genuinely unknown field, and server-owned fields the same as always', () => {
+  const unknown = validateSpeaker({ sessionInfo: {} }, { partial: true, fieldsAllowed: SELF_EDITABLE_SPEAKER_FIELDS });
+  assert.match(unknown.errors[0], /unknown speaker field/);
+
+  const serverOwned = validateSpeaker({ approvedAt: 1 }, { partial: true, fieldsAllowed: SELF_EDITABLE_SPEAKER_FIELDS });
+  assert.match(serverOwned.errors[0], /read-only — server-owned/);
 });
