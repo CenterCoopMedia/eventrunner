@@ -413,17 +413,38 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
 }
 
 /**
- * Write a speaker's headshot object at its fixed per-speaker path. Fixed
- * filename per content type — like `uploadProfilePhoto` on the web side —
- * so replacing a photo overwrites the one object instead of accumulating
- * every headshot a speaker has ever picked.
+ * Write a speaker's headshot object at a FRESH versioned path —
+ * `speaker-photos/{speakerId}/{assetId}/{name}`, the same shape mediaUpload
+ * uses for cms-images/branding (issue #22 review finding P1-2).
+ *
+ * NOT a fixed `speaker-photos/{speakerId}/photo.<ext>` path, on purpose:
+ * that path IS `speakers.headshotPath` the moment it is approved and
+ * published, so a fixed path would mean choosing a file in the wizard
+ * overwrites the LIVE public object instantly — before the speaker ever
+ * clicks "Save", and even if they abandon the edit. A versioned path is an
+ * ordinary orphan-until-referenced upload, exactly like the media library's:
+ * invisible until `headshotPath` is saved to point at it (and, once a
+ * speaker is `approved`, until an admin applies the staged edit — see
+ * profile.cjs's applyApplySpeakerPendingEdits, which is what deletes the
+ * now-superseded old object once the new one actually goes live).
  *
  * @param {{ bucket: object, speakerId: string, contentType: string,
- *           buffer: Buffer, actor: { uid: string, email: string } }} args
+ *           buffer: Buffer, filename: unknown,
+ *           actor: { uid: string, email: string }, newId?: () => string }} args
  * @returns {Promise<{ path: string }>}
  */
-async function storeSpeakerPhoto({ bucket, speakerId, contentType, buffer, actor }) {
-  const path = `speaker-photos/${speakerId}/photo.${EXTENSIONS[contentType]}`;
+async function storeSpeakerPhoto({
+  bucket,
+  speakerId,
+  contentType,
+  buffer,
+  filename,
+  actor,
+  newId = () => require('node:crypto').randomBytes(12).toString('hex'),
+}) {
+  const assetId = newId();
+  const name = safeObjectName(filename, contentType);
+  const path = `speaker-photos/${speakerId}/${assetId}/${name}`;
   await bucket.file(path).save(buffer, {
     resumable: false,
     contentType,
@@ -454,7 +475,14 @@ async function storeSpeakerPhoto({ bucket, speakerId, contentType, buffer, actor
  * uses for attendee photos (an object with no record pointing at it is
  * cheap and invisible; a saved path with no object is a broken image).
  */
-function createSpeakerPhotoUploadHandler({ db, bucket, auth, getConfig, log = console }) {
+function createSpeakerPhotoUploadHandler({
+  db,
+  bucket,
+  auth,
+  getConfig,
+  newId = () => require('node:crypto').randomBytes(12).toString('hex'),
+  log = console,
+}) {
   return async function speakerPhotoUpload(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
@@ -500,13 +528,78 @@ function createSpeakerPhotoUploadHandler({ db, bucket, auth, getConfig, log = co
         speakerId,
         contentType,
         buffer: decodedUpload.buffer,
+        filename: req.body?.filename,
         actor: { uid: decoded.uid, email: typeof decoded.email === 'string' ? decoded.email : '' },
+        newId,
       });
     } catch (err) {
       log.error('speakerPhotoUpload failed', err);
       return internal(res, 'The photo could not be uploaded.');
     }
     res.status(200).json({ path: stored.path });
+  };
+}
+
+/**
+ * `speakerPhotoDelete`: remove one object under a speaker's own
+ * `speaker-photos/{speakerId}/` prefix (issue #22 review finding P2-3).
+ *
+ * Exists because deferred deletion — "delete the OLD object once a save no
+ * longer points at it", the same rule ProfilePhotoField follows for
+ * attendee photos — needs a delete PATH for a namespace storage.rules
+ * closes to every client (`write, delete: if false`). Without this, a
+ * removed or replaced headshot stayed in the bucket, publicly readable
+ * (`allow get: if true`), forever.
+ *
+ * Same two-way authorization as the upload: an admin, or the speaker who
+ * owns the record. The path is additionally checked to actually be under
+ * THIS speaker's prefix — belt-and-suspenders against a caller (or a client
+ * bug) naming a path outside their own folder, since the object's speakerId
+ * segment is client-supplied even though the caller is authorized for that
+ * segment specifically.
+ */
+function createSpeakerPhotoDeleteHandler({ db, bucket, auth, getConfig, log = console }) {
+  return async function speakerPhotoDelete(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+
+    const decoded = await verifyAuthToken({ auth }, req);
+    if (!decoded?.uid) return sendError(res, 401, 'unauthorized', 'Authentication required.');
+
+    const speakerId = typeof req.body?.speakerId === 'string' ? req.body.speakerId.trim() : '';
+    if (!speakerId) return badRequest(res, 'speakerId: required');
+    const path = typeof req.body?.path === 'string' ? req.body.path.trim() : '';
+    const prefix = `speaker-photos/${speakerId}/`;
+    if (!path || !path.startsWith(prefix) || path.includes('..')) {
+      return badRequest(res, `path: must be under ${prefix}`);
+    }
+
+    let isAdmin = false;
+    const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
+    if (email && decoded.email_verified === true) {
+      const config = await getConfig();
+      const adminEmails = Array.isArray(config?.bootstrap?.adminEmails) ? config.bootstrap.adminEmails : [];
+      isAdmin = adminEmails.some((entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email);
+    }
+    if (!isAdmin) {
+      const snap = await db.collection('speakers').doc(speakerId).get();
+      if (!snap.exists) return notFound(res, `No speaker with id "${speakerId}".`);
+      const stored = snap.data() || {};
+      if (typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
+        return sendError(res, 403, 'forbidden', 'You may only delete a photo from your own speaker profile.');
+      }
+    }
+
+    try {
+      // ignoreNotFound: an object already gone (a retried request, or the
+      // caller's own baseline pointing at something never actually
+      // uploaded) must not surface as a failure to a caller only trying to
+      // clean up.
+      await bucket.file(path).delete({ ignoreNotFound: true });
+    } catch (err) {
+      log.error('speakerPhotoDelete failed', err);
+      return internal(res, 'The photo could not be deleted.');
+    }
+    res.status(200).json({ path, deleted: true });
   };
 }
 
@@ -518,6 +611,7 @@ function buildHandlers() {
     mediaUpload: onRequest({ region, memory: '512MiB' }, withMediaDeps(createMediaUploadHandler)),
     mediaDelete: onRequest({ region }, withMediaDeps(createMediaDeleteHandler)),
     speakerPhotoUpload: onRequest({ region, memory: '512MiB' }, withMediaDeps(createSpeakerPhotoUploadHandler)),
+    speakerPhotoDelete: onRequest({ region }, withMediaDeps(createSpeakerPhotoDeleteHandler)),
   };
 }
 
@@ -525,6 +619,7 @@ module.exports = {
   createMediaUploadHandler,
   createMediaDeleteHandler,
   createSpeakerPhotoUploadHandler,
+  createSpeakerPhotoDeleteHandler,
   storeAsset,
   storeSpeakerPhoto,
   get handlers() {

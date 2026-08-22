@@ -82,16 +82,21 @@ service firebase.storage {
     }
 
     // --- server-authorized uploads -----------------------------------------
-    // Speaker headshots. Written by speakerPhotoUpload
-    // (functions/src/media/upload.cjs, Admin SDK, §9 speaker wizard, issue
-    // #22) after it verifies the caller is either an admin or the speaker
-    // who owns `speakers/{speakerId}` (`speakers.uid == request.auth.uid`)
-    // — an ownership test that reads Firestore and therefore cannot live in
-    // these rules.
+    // Speaker headshots. Written by speakerPhotoUpload and removed by
+    // speakerPhotoDelete (functions/src/media/upload.cjs, Admin SDK, §9
+    // speaker wizard, issue #22), both of which verify the caller is either
+    // an admin or the speaker who owns `speakers/{speakerId}`
+    // (`speakers.uid == request.auth.uid`) — an ownership test that reads
+    // Firestore and therefore cannot live in these rules. Every upload lands
+    // at a FRESH `{speakerId}/{assetId}/{name}` path (not a fixed one) so
+    // picking a file never overwrites the object `speakers.headshotPath`
+    // currently points at; speakerPhotoDelete is what removes an object once
+    // nothing references it any more (see profile.cjs's
+    // applySpeakerPendingEdits and apps/web's SpeakerProfile.jsx).
     match /speaker-photos/{speakerId}/{allPaths=**} {
       allow get: if true;
       allow list: if false;
-      allow write, delete: if false;   // via speakerPhotoUpload (Admin SDK)
+      allow write, delete: if false;   // via speakerPhotoUpload / speakerPhotoDelete (Admin SDK)
     }
 
     // CMS images and branding assets: the media library's namespaces.
