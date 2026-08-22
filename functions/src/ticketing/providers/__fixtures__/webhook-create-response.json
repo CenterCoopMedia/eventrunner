@@ -1,0 +1,6 @@
+{
+  "id": "hook-6666",
+  "endpoint_url": "https://us-central1-demo-event.cloudfunctions.net/ticketingWebhook",
+  "actions": "order.placed,order.updated,attendee.updated",
+  "event_id": "evt-1"
+}

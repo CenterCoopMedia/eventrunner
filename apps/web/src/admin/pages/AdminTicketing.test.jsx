@@ -50,6 +50,48 @@ describe('AdminTicketing', () => {
     expect(callMock).toHaveBeenCalledWith('getTicketingStatus', {});
   });
 
+  it('does not show a webhook registration row when the provider does not support webhooks', async () => {
+    render(<AdminTicketing />);
+    await waitFor(() => expect(screen.getByText('manual')).toBeInTheDocument());
+    expect(screen.queryByText('Webhook registration')).not.toBeInTheDocument();
+  });
+
+  it('shows "not registered" plus the operator command for a webhook-capable provider with no registration yet', async () => {
+    callMock.mockImplementation((name) => {
+      if (name === 'getTicketingStatus') {
+        return Promise.resolve({
+          ...STATUS, provider: 'eventbrite', webhookSupported: true, webhookRegisteredAt: null, webhookId: null,
+        });
+      }
+      if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+    render(<AdminTicketing />);
+    await waitFor(() => expect(screen.getByText('eventbrite')).toBeInTheDocument());
+    expect(screen.getByText('Webhook registration')).toBeInTheDocument();
+    expect(screen.getByText(/Not registered/)).toBeInTheDocument();
+    expect(screen.getByText('node scripts/register-ticketing-webhook.cjs')).toBeInTheDocument();
+  });
+
+  it('shows the registration timestamp and webhook id once registered', async () => {
+    callMock.mockImplementation((name) => {
+      if (name === 'getTicketingStatus') {
+        return Promise.resolve({
+          ...STATUS,
+          provider: 'eventbrite',
+          webhookSupported: true,
+          webhookRegisteredAt: '2026-08-20T12:00:00.000Z',
+          webhookId: 'hook-42',
+        });
+      }
+      if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+    render(<AdminTicketing />);
+    await waitFor(() => expect(screen.getByText('eventbrite')).toBeInTheDocument());
+    expect(screen.getByText(/Registered 2026-08-20T12:00:00\.000Z \(id hook-42\)/)).toBeInTheDocument();
+  });
+
   it('surfaces a status load error without crashing the page', async () => {
     callMock.mockImplementation((name) => {
       if (name === 'getTicketingStatus') return Promise.reject(new Error('The server is unreachable.'));

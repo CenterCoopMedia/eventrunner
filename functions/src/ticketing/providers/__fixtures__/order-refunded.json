@@ -1,0 +1,26 @@
+{
+  "id": "ord-3003",
+  "event_id": "evt-1",
+  "email": "marie.curie@example.com",
+  "name": "Marie Curie",
+  "first_name": "Marie",
+  "last_name": "Curie",
+  "created": "2026-08-02T09:15:00Z",
+  "changed": "2026-08-05T16:40:00Z",
+  "status": "placed",
+  "resource_uri": "https://www.eventbriteapi.com/v3/orders/ord-3003/",
+  "attendees": [
+    {
+      "id": "att-7001",
+      "order_id": "ord-3003",
+      "status": "Not Attending",
+      "refunded": true,
+      "ticket_class_name": "General Admission",
+      "profile": {
+        "first_name": "Marie",
+        "last_name": "Curie",
+        "email": "marie.curie@example.com"
+      }
+    }
+  ]
+}

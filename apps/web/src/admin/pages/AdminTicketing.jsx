@@ -72,6 +72,23 @@ function StatusCard({ status, error, onRefresh, busy }) {
               {status.webhookSupported ? 'Supported' : 'Not applicable for this provider'}
             </dd>
           </div>
+          {status.webhookSupported ? (
+            <div>
+              <dt className="font-semibold text-brand-ink">Webhook registration</dt>
+              <dd className="text-brand-ink-muted">
+                {status.webhookRegisteredAt ? (
+                  <>Registered {status.webhookRegisteredAt}{status.webhookId ? ` (id ${status.webhookId})` : ''}</>
+                ) : (
+                  <>
+                    Not registered —{' '}
+                    <code className="rounded-brand bg-brand-surface-alt px-1.5 py-0.5 text-xs">
+                      node scripts/register-ticketing-webhook.cjs
+                    </code>
+                  </>
+                )}
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt className="font-semibold text-brand-ink">Last webhook delivery</dt>
             <dd className="text-brand-ink-muted">{status.lastDeliveryAt ?? 'None'}</dd>

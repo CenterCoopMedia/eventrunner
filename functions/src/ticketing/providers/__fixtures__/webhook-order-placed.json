@@ -1,0 +1,9 @@
+{
+  "config": {
+    "action": "order.placed",
+    "webhook_id": "998877",
+    "user_id": "112233445566",
+    "endpoint_url": "https://us-central1-demo-event.cloudfunctions.net/ticketingWebhook"
+  },
+  "api_url": "https://www.eventbriteapi.com/v3/events/evt-1/orders/ord-2001/"
+}

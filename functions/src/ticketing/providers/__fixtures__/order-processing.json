@@ -1,0 +1,12 @@
+{
+  "id": "ord-2001",
+  "event_id": "evt-1",
+  "email": "ada.lovelace@example.com",
+  "name": "Ada Lovelace",
+  "first_name": "Ada",
+  "last_name": "Lovelace",
+  "created": "2026-08-01T12:00:00Z",
+  "changed": "2026-08-01T12:00:01Z",
+  "status": "placed",
+  "resource_uri": "https://www.eventbriteapi.com/v3/orders/ord-2001/"
+}
