@@ -7,13 +7,25 @@
 // invites, soft-deleted records), and `speakers_public` holds only the
 // approved ones by design (spec §4.3).
 //
-// Invite actions map one-to-one onto the endpoints:
+// Pipeline actions map one-to-one onto the endpoints, and together they are
+// the whole path from a new record to the public site:
 //   draft     → Invite      (sendSpeakerInvite)
 //   invited   → Resend      (resendSpeakerInvite)
 //               Cancel      (cancelSpeakerInvite; reverts to draft)
+//   accepted  → Approve     (updateSpeaker { status: 'approved' }, which is
+//               what publishes `speakers_public` through the onSpeakerWritten
+//               projection, spec §4.3)
 //   otherwise → no action, because the server refuses those transitions and
 //               offering a button the server will reject is worse than
 //               offering none.
+//
+// Approve lives HERE rather than in the editor because the editor shows a
+// mid-pipeline status read-only — the pipeline states belong to the
+// invitation flow, not to a form that saves every field at once. Without
+// this button an accepted speaker had no route to `approved` anywhere in the
+// product, so the last step of the pipeline could only be done from a
+// console. Removal stays in the editor, which owns the delete/soft-delete
+// pair and its too-many-references fallback.
 //
 // Delivery state comes from listSpeakerInvites rather than from the speaker
 // record: `speakers.status` says a speaker was invited, but only the invite
@@ -89,17 +101,20 @@ export default function AdminSpeakersList() {
     refreshInvites();
   }, [refreshInvites]);
 
-  async function run(action, endpoint, speaker) {
+  const ACTION_NOTICES = {
+    cancel: (name) => `Invitation to ${name} cancelled.`,
+    approve: (name) => `${name} approved — they now appear on the public site.`,
+  };
+
+  async function run(action, endpoint, speaker, body = {}) {
     setBusy(`${speaker.id}:${action}`);
     setNotice(null);
+    const name = speaker.displayName || speaker.id;
     try {
-      await call(endpoint, { speakerId: speaker.id });
+      await call(endpoint, { speakerId: speaker.id, ...body });
       setNotice({
         kind: 'ok',
-        message:
-          action === 'cancel'
-            ? `Invitation to ${speaker.displayName || speaker.id} cancelled.`
-            : `Invitation emailed to ${speaker.displayName || speaker.id}.`,
+        message: (ACTION_NOTICES[action] ?? ((who) => `Invitation emailed to ${who}.`))(name),
       });
       await refreshInvites();
     } catch (err) {
@@ -232,6 +247,18 @@ export default function AdminSpeakersList() {
                           {busy === `${speaker.id}:cancel` ? 'Cancelling…' : 'Cancel invite'}
                         </button>
                       </>
+                    ) : null}
+                    {speaker.status === 'accepted' ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          run('approve', 'updateSpeaker', speaker, { speaker: { status: 'approved' } })
+                        }
+                        disabled={busy === `${speaker.id}:approve`}
+                        className={primaryButtonClass}
+                      >
+                        {busy === `${speaker.id}:approve` ? 'Approving…' : 'Approve'}
+                      </button>
                     ) : null}
                     <Link to={speaker.id} className={secondaryButtonClass}>
                       Edit

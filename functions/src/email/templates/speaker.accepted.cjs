@@ -29,15 +29,26 @@
 const { wrap } = require('./layout.cjs');
 const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
 
+// COPY NOTE (issue #21 → #22): {{profile_wizard_url}} currently resolves to
+// /profile, which edits the ATTENDEE record (users/{uid}) — not the
+// canonical `speakers/{id}` document an organizer approves. So the copy
+// below promises exactly that and no more: the account details, plus "an
+// organizer will be in touch about your speaker details". Issue #22 ships
+// the speaker profile wizard; when it lands, this body gains the "write your
+// speaker bio" instruction and the caller
+// (functions/src/speakers/invites.cjs) points the token at the wizard route.
+// Promising the wizard now would send every accepted speaker to a page that
+// cannot do what the mail said.
 const html = wrap(
   [
     '<p style="margin:0 0 16px 0;">Hi {{speaker_name}},</p>',
     '<p style="margin:0 0 16px 0;">Thank you — your place at {{event_name}} is confirmed, and this invitation is now linked to your account.</p>',
-    '<p style="margin:0 0 16px 0;">Next, fill in the profile the programme and the website will use: a short biography, your role and organization, and a photograph.</p>',
+    '<p style="margin:0 0 16px 0;">An organizer will be in touch about your session and the biography and photograph we publish on the programme.</p>',
+    '<p style="margin:0 0 16px 0;">In the meantime you can check your account details — your name, pronouns, and how you appear to other attendees:</p>',
     '<p style="margin:0 0 16px 0;text-align:center;">',
-    '<a href="{{profile_wizard_url}}" style="display:inline-block;padding:12px 24px;background-color:{{brand_primary}};color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-weight:bold;text-decoration:none;">Complete your speaker profile</a>',
+    '<a href="{{profile_wizard_url}}" style="display:inline-block;padding:12px 24px;background-color:{{brand_primary}};color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-weight:bold;text-decoration:none;">Check your account details</a>',
     '</p>',
-    '<p style="margin:0;">Your profile appears publicly once an organizer has reviewed it.</p>',
+    '<p style="margin:0;">Your speaker profile appears publicly once an organizer has reviewed it.</p>',
   ].join('\n')
 );
 
@@ -46,12 +57,12 @@ const text = [
   '',
   'Thank you — your place at {{event_name}} is confirmed, and this invitation is now linked to your account.',
   '',
-  'Next, fill in the profile the programme and the website will use: a short biography, your role and organization, and a photograph.',
+  'An organizer will be in touch about your session and the biography and photograph we publish on the programme.',
   '',
-  'Complete your speaker profile:',
+  'In the meantime you can check your account details — your name, pronouns, and how you appear to other attendees:',
   '{{profile_wizard_url}}',
   '',
-  'Your profile appears publicly once an organizer has reviewed it.',
+  'Your speaker profile appears publicly once an organizer has reviewed it.',
   '',
   '--',
   '{{postal_address_html}}',

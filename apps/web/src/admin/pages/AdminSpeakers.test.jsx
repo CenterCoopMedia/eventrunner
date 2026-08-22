@@ -421,6 +421,39 @@ describe('invite actions', () => {
     );
   });
 
+  it('offers Approve for an accepted speaker — the last step of the pipeline', async () => {
+    // Without this the pipeline dead-ended: the editor shows a mid-pipeline
+    // status read-only, so an accepted speaker had no route to `approved`
+    // anywhere in the product, and `speakers_public` was unreachable.
+    speakerDocs = [{ ...RAE, id: 'accepted-one', firstName: 'Accepted', lastName: 'One', status: 'accepted' }];
+    routeInviteFetch({ action: okResponse({ speakerId: 'accepted-one' }) });
+    await renderAt('/admin/speakers');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    });
+
+    await waitFor(() => expect(callTo('updateSpeaker')).toBeTruthy());
+    expect(JSON.parse(callTo('updateSpeaker')[1].body)).toEqual({
+      speakerId: 'accepted-one',
+      speaker: { status: 'approved' },
+    });
+    expect(screen.getByText(/now appear on the public site/)).toBeInTheDocument();
+  });
+
+  it('offers no pipeline action for a published or removed speaker', async () => {
+    speakerDocs = [
+      { ...RAE, id: 'published-one', firstName: 'Published', lastName: 'One', status: 'approved' },
+      { ...RAE, id: 'removed-one', firstName: 'Removed', lastName: 'One', status: 'removed' },
+    ];
+    routeInviteFetch();
+    await renderAt('/admin/speakers');
+
+    for (const name of ['Invite', 'Resend invite', 'Cancel invite', 'Approve']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
+  });
+
   it('shows an invitation that was recorded but never delivered', async () => {
     speakerDocs = [{ ...RAE, id: 'invited-one', firstName: 'Invited', lastName: 'One', status: 'invited' }];
     routeInviteFetch({
