@@ -33,6 +33,7 @@ import {
   valueFieldsOf,
 } from '../contentDoc.js';
 import { summarizePublish } from '../publishResult.js';
+import ImagePicker from '../../components/media/ImagePicker.jsx';
 import {
   CheckboxField,
   Panel,
@@ -100,6 +101,23 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
           );
         }
         if (field.type === 'url') {
+          // Only the image block's `url` names a Storage object path (spec
+          // §5.2) — route it through the media library picker, exactly as
+          // AdminBranding's logo slots do. cta and link_group's `url` are
+          // real external links and stay plain text inputs.
+          if (blockTypeId === 'image' && field.id === 'url') {
+            return (
+              <div key={field.id} className="sm:col-span-2">
+                <ImagePicker
+                  label={label}
+                  folder="cms-images"
+                  value={value}
+                  onChange={(next) => onChange(field.id, next)}
+                  error={error}
+                />
+              </div>
+            );
+          }
           return (
             <TextField
               key={field.id}
