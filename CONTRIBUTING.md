@@ -70,6 +70,12 @@ No `.env` and no cloud credentials are required for any of these — `test:rules
 
 `packages/shared` is CommonJS first. Add a `.mjs` re-export shim next to every new `.cjs` module.
 
+### There is exactly one queue
+
+`ticket_sync_queue` is the only queue in this system, and it is not a precedent. It exists for one reason the code cannot work around: the ticketing provider's own read APIs are eventually consistent, so an order a webhook announces is often not readable yet. It is scoped to `functions/src/ticketing/`, capped at six attempts, and raises an operator alert when it gives up — nothing is ever dropped silently.
+
+Everything else sends, writes, or fails in the request that asked for it. Email in particular has no queue: a managed provider owns retry and pacing (spec §3.1). A pull request that adds a second queue, a scheduled retry collection, a "pending work" document set, or a drain function needs an ADR first — say what makes the work impossible to do inline, and why a provider or a trigger cannot do it. See [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md) §3.3 and §10 question 9.
+
 ### Accessibility
 
 UI changes need a keyboard path and visible focus. If you change a flow that attendees or staff use, say how you checked it (keyboard, zoom, or a screen reader). Do not rely on color alone.
