@@ -34,6 +34,7 @@ const {
   internals: storeInternals,
 } = require('./store.cjs');
 const { validateSpeakerReferences } = require('../speakers/references.cjs');
+const { deleteMaterialsForSession } = require('../materials/store.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
@@ -365,6 +366,21 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
       collection: target.collection,
       docId: target.docId,
     });
+
+    // Cascade cleanup (issue #23 follow-up, spec §4.4): deleting a
+    // cmsSchedule doc must not orphan its session_materials /
+    // session_materials_public rows — without this, listSessionMaterials
+    // 404s on the now-gone session (so the admin UI can never reach them
+    // again) while the public projection keeps serving metadata for a
+    // session that no longer exists. Only cmsSchedule carries materials;
+    // every other GENERIC_COLLECTIONS member is a no-op-safe call away
+    // from this (deleteMaterialsForSession would just find nothing), but
+    // scoping it to cmsSchedule keeps the intent explicit and skips the
+    // query entirely for the collections that never have materials.
+    if (target.collection === 'cmsSchedule') {
+      await deleteMaterialsForSession({ db, sessionId: target.docId });
+    }
+
     await logAdminAction({ db, action: 'cms-delete-content', docPath: livePath, actor, now, log });
     res.status(200).json({ deleted: [livePath, draftPath] });
   };

@@ -18,6 +18,7 @@ const TABS = [
   { to: 'features', label: 'Features' },
   { to: 'badges', label: 'Badges' },
   { to: 'branding', label: 'Branding' },
+  { to: 'materials', label: 'Materials' },
   { to: 'live-updates', label: 'Live updates' },
   { to: 'feedback', label: 'Feedback' },
   { to: 'system-errors', label: 'System errors' },

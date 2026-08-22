@@ -33,6 +33,14 @@
     "saveLiveUpdate",
     "deleteLiveUpdate",
     "submitFeedback",
-    "updateFeedbackStatus"
+    "updateFeedbackStatus",
+    "addSessionMaterialLink",
+    "uploadSessionMaterial",
+    "updateSessionMaterial",
+    "deleteSessionMaterial",
+    "setMaterialReviewStatus",
+    "getSessionMaterialUrl",
+    "listSessionMaterials",
+    "downloadSessionMaterial"
   ]
 }
