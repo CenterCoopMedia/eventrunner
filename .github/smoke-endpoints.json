@@ -64,6 +64,8 @@
     "createUserFromTicket",
     "getTicketingStatus",
     "ticketingImportCsv",
-    "ticketingListTickets"
+    "ticketingListTickets",
+    "approveUser",
+    "revokeUser"
   ]
 }

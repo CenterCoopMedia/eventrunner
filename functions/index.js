@@ -23,6 +23,7 @@ const publicOg = require('./src/public/og.cjs');
 const scheduleReactions = require('./src/schedule/reactions.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
+const usersApproval = require('./src/users/approval.cjs');
 const speakersProfile = require('./src/speakers/profile.cjs');
 const speakersLifecycle = require('./src/speakers/lifecycle.cjs');
 const speakersProjection = require('./src/speakers/projection.cjs');
@@ -40,6 +41,7 @@ const ticketingWebhook = require('./src/ticketing/webhook.cjs');
 const ticketingSync = require('./src/ticketing/sync.cjs');
 const ticketingRegistration = require('./src/ticketing/registration.cjs');
 const ticketingCsvImport = require('./src/ticketing/csvImport.cjs');
+const ticketingEntitlement = require('./src/ticketing/entitlement.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -61,6 +63,7 @@ module.exports = {
   ...scheduleReactions.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
+  ...usersApproval.handlers,
   ...speakersProfile.handlers,
   ...speakersLifecycle.handlers,
   ...speakersProjection.handlers,
@@ -78,4 +81,5 @@ module.exports = {
   ...ticketingSync.handlers,
   ...ticketingRegistration.handlers,
   ...ticketingCsvImport.handlers,
+  ...ticketingEntitlement.handlers,
 };
