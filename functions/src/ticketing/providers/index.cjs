@@ -9,10 +9,12 @@
  *      REQUIRED_ALWAYS key (packages/shared/src/config/deploy.cjs), and
  *      `none` is already the safe, fully functional value — so an unset
  *      variable is a misconfiguration to surface, not a hole to paper over.
- *   2. The eventbrite (#30) and manual (#31) adapters are separate issues.
- *      They are wired here by name so adding the file is the whole change;
- *      until then, selecting one fails with a message that says so rather
- *      than with a raw MODULE_NOT_FOUND.
+ *   2. The eventbrite (#30) and manual (#31) adapters were separate issues,
+ *      both now landed. They are wired here by NAME rather than by an
+ *      explicit map entry — adding `providers/<name>.cjs` exporting
+ *      `create<Name>Provider` is the whole registration (loadAdapterFactory,
+ *      below). A future name not yet backed by a file still fails with a
+ *      message that says so, rather than with a raw MODULE_NOT_FOUND.
  *
  * `externalEventId` is read once, at construction, from
  * EVENT_TICKETING_EVENT_ID (§3.3) — one field, so the two-name duplication
@@ -72,10 +74,12 @@ function loadAdapterFactory(name) {
 
 /**
  * Built-in factories. `none` is the only one: it must work with no adapter
- * file present (the safe default, spec §3.3). `manual` is resolved lazily
- * by loadAdapterFactory below — providers/manual.cjs existing and exporting
- * `createManualProvider` is the whole registration; this registry needed no
- * edit for issue #31 to land, exactly as the module doc above promises.
+ * file present (the safe default, spec §3.3). `manual` and `eventbrite` are
+ * both resolved lazily by loadAdapterFactory below — providers/manual.cjs
+ * and providers/eventbrite.cjs existing and exporting `createManualProvider`
+ * / `createEventbriteProvider` was the whole registration for issues #31
+ * and #30, exactly as the module doc above promises. This registry needed
+ * no edit for either to land.
  */
 const BUILT_IN_FACTORIES = { none: createNoneProvider };
 

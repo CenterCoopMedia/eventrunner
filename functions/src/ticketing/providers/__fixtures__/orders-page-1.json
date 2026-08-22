@@ -1,0 +1,56 @@
+{
+  "pagination": {
+    "object_count": 3,
+    "page_size": 2,
+    "has_more_items": true,
+    "continuation": "cont-token-2"
+  },
+  "orders": [
+    {
+      "id": "ord-4001",
+      "event_id": "evt-1",
+      "email": "rosalind.franklin@example.com",
+      "first_name": "Rosalind",
+      "last_name": "Franklin",
+      "created": "2026-07-20T10:00:00Z",
+      "status": "placed",
+      "attendees": [
+        {
+          "id": "att-9001",
+          "order_id": "ord-4001",
+          "status": "Attending",
+          "refunded": false,
+          "ticket_class_name": "General Admission",
+          "profile": {
+            "first_name": "Rosalind",
+            "last_name": "Franklin",
+            "email": "rosalind.franklin@example.com"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ord-4002",
+      "event_id": "evt-1",
+      "email": "katherine.johnson@example.com",
+      "first_name": "Katherine",
+      "last_name": "Johnson",
+      "created": "2026-07-21T11:30:00Z",
+      "status": "placed",
+      "attendees": [
+        {
+          "id": "att-9002",
+          "order_id": "ord-4002",
+          "status": "Attending",
+          "refunded": false,
+          "ticket_class_name": "VIP",
+          "profile": {
+            "first_name": "Katherine",
+            "last_name": "Johnson",
+            "email": "katherine.johnson@example.com"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -53,10 +53,12 @@ test('an unknown provider names the valid set', () => {
 });
 
 test('selecting an adapter that is not in the build says so, not MODULE_NOT_FOUND', () => {
-  // manual (#31) has landed; only eventbrite (#30) is still unbuilt.
+  // manual (#31) and eventbrite (#30) have both landed; only their file
+  // naming convention is exercised here now, against a name that will
+  // never be a real adapter.
   assert.throws(
-    () => getTicketingProvider({ env: { EVENT_TICKETING_PROVIDER: 'eventbrite' } }),
-    /is "eventbrite", but that adapter is not part of this build/,
+    () => getTicketingProvider({ env: { EVENT_TICKETING_PROVIDER: 'ticketmaster', factories: undefined } }),
+    /Unknown EVENT_TICKETING_PROVIDER/,
   );
 });
 
@@ -72,6 +74,27 @@ test('manual is resolved by convention — adding providers/manual.cjs was the w
   assert.equal(typeof provider.getRegistrationPrompt, 'function');
   // No registerWebhook (§3.3 capability gate).
   assert.equal(typeof provider.registerWebhook, 'undefined');
+});
+
+test('eventbrite is resolved by convention — adding providers/eventbrite.cjs was the whole registration (issue #30)', () => {
+  const provider = getTicketingProvider({
+    env: {
+      EVENT_TICKETING_PROVIDER: 'eventbrite',
+      EVENT_TICKETING_EVENT_ID: 'evt-1',
+      TICKETING_API_TOKEN: 'tok',
+      TICKETING_WEBHOOK_SECRET: 'sekrit',
+    },
+  });
+  assert.equal(provider.name, 'eventbrite');
+  assert.equal(provider.externalEventId, 'evt-1');
+  assert.equal(typeof provider.verifyWebhook, 'function');
+  assert.equal(typeof provider.fetchOrder, 'function');
+  assert.equal(typeof provider.listTickets, 'function');
+  assert.equal(typeof provider.lookupByOrderNumber, 'function');
+  assert.equal(typeof provider.getRegistrationPrompt, 'function');
+  // registerWebhook IS present — eventbrite is the one webhook-capable
+  // provider (§3.3, WEBHOOK_CAPABLE_PROVIDERS).
+  assert.equal(typeof provider.registerWebhook, 'function');
 });
 
 test('a registered adapter factory is used and contract-checked', () => {
