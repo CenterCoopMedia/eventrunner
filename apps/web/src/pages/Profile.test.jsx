@@ -24,6 +24,18 @@ vi.mock('../contexts/ProfileContext.jsx', () => ({
 vi.mock('../contexts/ToastContext.jsx', () => ({
   useToast: () => ({ showToast: showToastMock }),
 }));
+const deleteOwnPhotoMock = vi.fn(() => Promise.resolve());
+const uploadProfilePhotoMock = vi.fn(async ({ uid }) => ({
+  path: `profile-photos/${uid}/photo.png`,
+}));
+vi.mock('../lib/mediaSource.js', async () => {
+  const actual = await vi.importActual('../lib/mediaSource.js');
+  return {
+    ...actual,
+    deleteOwnPhoto: (...args) => deleteOwnPhotoMock(...args),
+    uploadProfilePhoto: (...args) => uploadProfilePhotoMock(...args),
+  };
+});
 
 const { default: Profile } = await import('./Profile.jsx');
 
@@ -56,6 +68,8 @@ beforeEach(() => {
   profileValue = { profile: SEEDED_PROFILE, status: 'ready', needsProfileSetup: false };
   saveProfileMock.mockClear();
   showToastMock.mockClear();
+  deleteOwnPhotoMock.mockClear();
+  uploadProfilePhotoMock.mockClear();
 });
 
 describe('Profile', () => {
@@ -89,6 +103,9 @@ describe('Profile', () => {
       bio: '',
       profileVisibility: 'attendees_only',
       badges: [],
+      // photoPath is on the self-editable allowlist (firestore.rules); with
+      // no photo chosen it saves as null, never as an empty string.
+      photoPath: null,
     });
     expect(showToastMock).toHaveBeenCalledWith('Profile saved.');
   });
@@ -227,5 +244,52 @@ describe('Profile', () => {
     };
     renderPage();
     expect(screen.queryByText(/close to the platform/)).toBeNull();
+  });
+});
+
+// The photo's delete ordering (issue #24 review follow-up): the object that
+// a saved profile — and the users_public projection built from it — still
+// references must survive an abandoned edit, so nothing is deleted until a
+// save has actually committed.
+describe('the profile photo lifecycle', () => {
+  const withPhoto = { ...SEEDED_PROFILE, photoPath: 'profile-photos/u1/old.png' };
+
+  it('deletes nothing when a removal is never saved', async () => {
+    profileValue = { profile: withPhoto, status: 'ready', needsProfileSetup: false };
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+    expect(deleteOwnPhotoMock).not.toHaveBeenCalled();
+  });
+
+  it('deletes the previous object once the save commits', async () => {
+    profileValue = { profile: withPhoto, status: 'ready', needsProfileSetup: false };
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(saveProfileMock.mock.calls[0][0].photoPath).toBeNull();
+    await waitFor(() =>
+      expect(deleteOwnPhotoMock).toHaveBeenCalledWith('profile-photos/u1/old.png'),
+    );
+  });
+
+  it('keeps the object when a save fails', async () => {
+    saveProfileMock.mockRejectedValueOnce(new Error('permission denied'));
+    profileValue = { profile: withPhoto, status: 'ready', needsProfileSetup: false };
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+    await waitFor(() => expect(showToastMock).toHaveBeenCalled());
+    expect(deleteOwnPhotoMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves an unchanged photo alone across a save', async () => {
+    profileValue = { profile: withPhoto, status: 'ready', needsProfileSetup: false };
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(deleteOwnPhotoMock).not.toHaveBeenCalled();
   });
 });

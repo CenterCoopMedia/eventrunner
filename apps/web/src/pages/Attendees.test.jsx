@@ -81,6 +81,21 @@ describe('Attendees', () => {
       .toBeInTheDocument();
   });
 
+  it('renders each card’s photo, and a lettered avatar for a profile without one', () => {
+    renderPage();
+    pushProfiles([
+      { id: 'u1', displayName: 'Amara Diallo', photoPath: 'profile-photos/u1/photo.png' },
+      { id: 'u2', displayName: 'Zeke Alvarez' },
+    ]);
+    const directory = within(screen.getByRole('article'));
+    expect(directory.getByText('Z')).toBeInTheDocument();
+    const images = screen.getByRole('article').querySelectorAll('img');
+    expect(images).toHaveLength(1);
+    expect(images[0].getAttribute('src')).toContain(
+      encodeURIComponent('profile-photos/u1/photo.png'),
+    );
+  });
+
   it('renders profile cards linked to the individual profile page, sorted by name', () => {
     renderPage();
     pushProfiles([

@@ -199,7 +199,8 @@ function makeFakeDb(seed = {}) {
         },
         // Unfiltered read of the whole collection — real Firestore's
         // CollectionReference supports `.get()` directly (it IS an
-        // unfiltered Query), so the fake must too.
+        // unfiltered Query), so the fake must too. Used by the speaker
+        // seam and by media/usage.cjs, which walks the content corpus.
         get() {
           return query(name, [], null, undefined, undefined).get();
         },

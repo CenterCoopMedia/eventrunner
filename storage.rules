@@ -1,8 +1,133 @@
 rules_version = '2';
+
+// v1 Storage rules per docs/adr/0001-event-platform-v1.md §8.5.
+//
+// The shape of the boundary: exactly one namespace accepts a client write —
+// `profile-photos/{uid}/**`, and only from its owner, only an image, only
+// under 2 MiB. Every other admin- or speaker-authored upload path is
+// server-authorized: the client posts to `mediaUpload`
+// (functions/src/media/upload.cjs), which verifies the caller's ID token
+// against config/bootstrap.adminEmails and writes the object through the
+// Admin SDK — which bypasses these rules by design. The role check is a
+// verified token on the server, never a React conditional (§8.5).
+//
+// Reads are split into `get` and `list`, and only `get` is granted. Public
+// rendering needs exactly one thing — fetch THIS object by its known path —
+// and the site knows those paths from Firestore. `list` is the enumeration
+// verb, and granting it would let any visitor walk `cms-images/` and read
+// back every asset the event has ever uploaded, including files referenced
+// only by unpublished drafts: precisely the leak that keeps the
+// `media_assets` index admin-only in firestore.rules. Nothing in the product
+// calls listAll(); the library lists Firestore rows, never the bucket.
+//
+// `get` is deliberately permissive on the public asset namespaces (branding,
+// CMS images, speaker and profile photos, the exported schedule PDF): they
+// are rendered by an anonymously readable site, and an object that needs a
+// credential to load is an object the public site cannot show. The web app
+// builds token-free download URLs (apps/web/src/lib/mediaSource.js), so
+// these rules — not an unrevocable download token — are what decide who can
+// fetch an object.
+// `session-materials/` is the exception — it stays fully closed at the rules
+// layer because materials access is an embargo decision made per request by
+// functions/src/materials/access.cjs (§4.4), not a static grant.
+//
+// Anything not matched below is denied by the trailing catch-all. New
+// namespaces must be added deliberately, with tests, in tests/storage.rules.test.js.
 service firebase.storage {
   match /b/{bucket}/o {
-    // Scaffold default. Feature ports replace this with the hardened
-    // owner/admin rules from spec §8.5.
+
+    // --- helpers -----------------------------------------------------------
+    // Storage rules cannot read Firestore, so "is this caller an admin?"
+    // cannot be asked here at all. That is not a gap being papered over: it
+    // is why every admin-authored path below is `write: if false` and goes
+    // through the server instead.
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Image types the product accepts everywhere a client may upload.
+    // SVG is NOT on the list on purpose: an SVG served from the bucket is a
+    // script-execution surface, and a user-supplied one would be stored XSS.
+    // The seeded branding placeholders are SVG, but those arrive through the
+    // Admin SDK (scripts/lib/branding.cjs), never through this rule.
+    function isAllowedImage() {
+      return request.resource != null
+        && request.resource.contentType is string
+        && request.resource.contentType.matches('image/(png|jpeg|webp)');
+    }
+
+    function underSizeLimit(maxBytes) {
+      return request.resource != null && request.resource.size < maxBytes;
+    }
+
+    // --- attendee-owned uploads --------------------------------------------
+    // The ONLY client-writable namespace. Owner-bound by uid path segment:
+    // `request.auth.uid == userId` is what keeps one signed-in attendee from
+    // overwriting another's photo (§8.5). Public read because the photo is
+    // rendered on `users_public` profile cards, which are anonymously
+    // readable when the owner chose `profileVisibility: 'public'`.
+    //
+    // Delete is stated separately from write: on a delete `request.resource`
+    // is null, so the size/content-type predicate that guards writes would
+    // evaluate false and lock an owner out of removing their own photo. The
+    // grant is the same principal and the same object either way.
+    match /profile-photos/{userId}/{allPaths=**} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if isOwner(userId)
+        && underSizeLimit(2 * 1024 * 1024)
+        && isAllowedImage();
+      allow delete: if isOwner(userId);
+    }
+
+    // --- server-authorized uploads -----------------------------------------
+    // Speaker headshots. Written by updateSpeakerProfile (Admin SDK, §9
+    // speaker wizard) after it verifies that the caller owns the speaker
+    // record — an ownership test that reads Firestore and therefore cannot
+    // live in these rules. The rule is defined now so the namespace is
+    // closed before its writer exists, rather than after.
+    match /speaker-photos/{speakerId}/{allPaths=**} {
+      allow get: if true;
+      allow list: if false;
+      allow write, delete: if false;   // via updateSpeakerProfile (Admin SDK)
+    }
+
+    // CMS images and branding assets: the media library's namespaces.
+    // Uploaded by mediaUpload and removed by mediaDelete, both admin-gated
+    // server side; init seeds `branding/` through the Admin SDK as well
+    // (scripts/lib/branding.cjs).
+    match /cms-images/{allPaths=**} {
+      allow get: if true;
+      allow list: if false;
+      allow write, delete: if false;   // via mediaUpload / mediaDelete
+    }
+
+    match /branding/{allPaths=**} {
+      allow get: if true;
+      allow list: if false;
+      allow write, delete: if false;   // via mediaUpload / mediaDelete
+    }
+
+    // Session materials are embargoed until their session has run, and the
+    // gate is per-request (functions/src/materials/access.cjs hands out a
+    // short-lived signed URL). No static read grant can express that, so the
+    // namespace is closed to clients entirely — including to admins, who
+    // read it through the same server path.
+    match /session-materials/{sessionId}/{allPaths=**} {
+      allow read, write, delete: if false;
+    }
+
+    // Generated artifacts (the schedule PDF, §9): world-readable output of
+    // generateSchedulePdf, never client-written.
+    match /exports/{allPaths=**} {
+      allow get: if true;
+      allow list: if false;
+      allow write, delete: if false;
+    }
+
+    // Everything else — including any namespace a future feature adds
+    // before its rule does — stays denied.
     match /{allPaths=**} {
       allow read, write: if false;
     }

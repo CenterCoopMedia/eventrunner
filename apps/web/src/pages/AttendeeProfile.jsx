@@ -14,6 +14,7 @@ import { badgeLabel, visibleBadgeIds } from '../lib/badgeDisplay.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
+import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
 
 /**
  * Render only strings — the projection coerces these fields and the rules
@@ -94,20 +95,29 @@ export default function AttendeeProfile() {
   return (
     <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
       <article>
-        <h1 className="font-heading text-3xl font-semibold text-brand-ink">
-          {text(profile.displayName)}
-        </h1>
-        {text(profile.pronouns) ? (
-          <p className="mt-1 text-brand-ink-muted">{text(profile.pronouns)}</p>
-        ) : null}
-        {text(profile.jobTitle) || text(profile.organization) ? (
-          <p className="mt-2 text-brand-ink-muted">
-            {[text(profile.jobTitle), text(profile.organization)].filter(Boolean).join(' · ')}
-          </p>
-        ) : null}
-        {profile.speakerId ? (
-          <p className="mt-2 font-semibold text-brand-primary-dark">Speaker at this event</p>
-        ) : null}
+        <div className="flex items-start gap-4">
+          <ProfilePhoto
+            size="lg"
+            photoPath={profile.photoPath}
+            displayName={text(profile.displayName)}
+          />
+          <div>
+            <h1 className="font-heading text-3xl font-semibold text-brand-ink">
+              {text(profile.displayName)}
+            </h1>
+            {text(profile.pronouns) ? (
+              <p className="mt-1 text-brand-ink-muted">{text(profile.pronouns)}</p>
+            ) : null}
+            {text(profile.jobTitle) || text(profile.organization) ? (
+              <p className="mt-2 text-brand-ink-muted">
+                {[text(profile.jobTitle), text(profile.organization)].filter(Boolean).join(' · ')}
+              </p>
+            ) : null}
+            {profile.speakerId ? (
+              <p className="mt-2 font-semibold text-brand-primary-dark">Speaker at this event</p>
+            ) : null}
+          </div>
+        </div>
         {text(profile.bio) ? (
           <p className="mt-6 max-w-prose whitespace-pre-line text-brand-ink">
             {text(profile.bio)}

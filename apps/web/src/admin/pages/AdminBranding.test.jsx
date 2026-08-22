@@ -228,8 +228,8 @@ describe('branding save', () => {
     expect(theme.fonts).toEqual(LIVE_THEME.fonts);
     expect(theme.texture).toBe('paper');
     expect(theme.radius).toBe('soft');
-    // No upload backend yet: the stored slots ride along untouched rather
-    // than being dropped by a whole-doc replace.
+    // Untouched slots ride along rather than being dropped by the whole-doc
+    // replace.
     expect(theme.logos).toEqual(LIVE_THEME.logos);
     expect(await screen.findByText(/no deploy needed/i)).toBeInTheDocument();
   });
@@ -252,10 +252,15 @@ describe('branding save', () => {
     expect(screen.getByLabelText('Primary')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('marks logo upload as unbuilt rather than inventing a storage path', async () => {
+  // Issue #24 closed the "no upload backend" TODO: each slot is now an
+  // ImagePicker over the branding/ namespace. The path stays editable by
+  // hand, because the four placeholders init seeds have no library row.
+  it('edits each logo slot through the media picker, path still typeable', async () => {
     await renderBranding();
-    expect(screen.getByText(/asset upload has no backend yet/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('primary asset path')).toHaveValue('branding/logo.svg');
-    expect(screen.queryByLabelText(/upload/i)).toBeNull();
+    expect(screen.queryByText(/asset upload has no backend yet/i)).toBeNull();
+    expect(screen.getByLabelText('Primary logo')).toHaveValue('branding/logo.svg');
+    expect(
+      screen.getAllByRole('button', { name: 'Choose or upload…' }).length,
+    ).toBe(5);
   });
 });

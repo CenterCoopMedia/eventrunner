@@ -28,6 +28,7 @@ import AdminEventSettings from './pages/AdminEventSettings.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminBranding from './pages/AdminBranding.jsx';
+import AdminMedia from './pages/AdminMedia.jsx';
 import AdminMaterialsTab from './pages/AdminMaterialsTab.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
@@ -108,6 +109,7 @@ export default function AdminApp() {
           <Route path="features" element={<AdminFeatureSettings />} />
           <Route path="badges" element={<AdminBadgeSettings />} />
           <Route path="branding" element={<AdminBranding />} />
+          <Route path="media" element={<AdminMedia />} />
           <Route path="materials" element={<AdminMaterialsTab />} />
           <Route path="live-updates" element={<AdminLiveUpdates />} />
           <Route path="feedback" element={<AdminFeedback />} />

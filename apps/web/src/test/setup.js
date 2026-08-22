@@ -11,6 +11,11 @@ vi.mock('@/firebase.js', () => ({
   auth: {},
   db: {},
   storage: {},
+  // lib/mediaSource.js builds object URLs from these two rather than calling
+  // getDownloadURL (Admin-SDK-written objects carry no download token), so a
+  // test run needs them or every asset resolves to "missing".
+  storageBucketName: 'demo-run-of-show.appspot.com',
+  storageDownloadOrigin: 'https://firebasestorage.googleapis.com',
   // App Check is unconfigured in a credential-free test run, which is also
   // its production default: no site key, no attestation header.
   appCheckEnabled: false,
@@ -27,6 +32,18 @@ vi.mock('firebase/auth', () => ({
   signInWithPopup: vi.fn(async () => ({ user: {} })),
   signInWithCustomToken: vi.fn(async () => ({ user: {} })),
   signOut: vi.fn(async () => {}),
+}));
+
+// Storage is mocked for every test file the same way: the media components
+// resolve object paths to download URLs on mount (lib/mediaSource.js), and
+// an unmocked SDK reaches for a real bucket the credential-free run has no
+// configuration for. Individual tests override this per file when they need
+// to assert on an upload.
+vi.mock('firebase/storage', () => ({
+  ref: vi.fn((_storage, path) => ({ path })),
+  getDownloadURL: vi.fn(async (reference) => `https://example.test/${reference?.path ?? ''}`),
+  uploadBytes: vi.fn(async () => ({})),
+  deleteObject: vi.fn(async () => {}),
 }));
 
 vi.mock('firebase/firestore', () => {

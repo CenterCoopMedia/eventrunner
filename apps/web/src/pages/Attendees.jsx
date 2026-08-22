@@ -19,6 +19,7 @@ import { badgeLabel, visibleBadgeIds } from '../lib/badgeDisplay.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
+import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
 
 /**
  * Render only strings. The rules type-check these fields and the projection
@@ -141,39 +142,49 @@ export default function Attendees() {
                   key={profile.id}
                   className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
                 >
-                  <h2 className="font-heading text-lg text-brand-ink">
-                    <Link
-                      to={`/attendees/${profile.id}`}
-                      className="rounded-brand underline-offset-4 hover:underline"
-                    >
-                      {profile.displayName}
-                    </Link>
-                  </h2>
-                  {text(profile.pronouns) ? (
-                    <p className="text-sm text-brand-ink-muted">{text(profile.pronouns)}</p>
-                  ) : null}
-                  {text(profile.jobTitle) || text(profile.organization) ? (
-                    <p className="mt-1 text-sm text-brand-ink-muted">
-                      {[text(profile.jobTitle), text(profile.organization)]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                  ) : null}
-                  {profile.speakerId ? (
-                    <p className="mt-2 text-sm font-semibold text-brand-primary-dark">Speaker</p>
-                  ) : null}
-                  {badges.length > 0 ? (
-                    <ul className="mt-2 flex flex-wrap gap-1.5">
-                      {badges.map((badgeId) => (
-                        <li
-                          key={badgeId}
-                          className="rounded-brand border border-brand-ink/10 bg-brand-surface px-2 py-0.5 text-xs text-brand-ink"
+                  <div className="flex items-start gap-3">
+                    <ProfilePhoto
+                      photoPath={profile.photoPath}
+                      displayName={profile.displayName}
+                    />
+                    <div className="min-w-0">
+                      <h2 className="font-heading text-lg text-brand-ink">
+                        <Link
+                          to={`/attendees/${profile.id}`}
+                          className="rounded-brand underline-offset-4 hover:underline"
                         >
-                          {badgeLabel(badgesConfig, badgeId)}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
+                          {profile.displayName}
+                        </Link>
+                      </h2>
+                      {text(profile.pronouns) ? (
+                        <p className="text-sm text-brand-ink-muted">{text(profile.pronouns)}</p>
+                      ) : null}
+                      {text(profile.jobTitle) || text(profile.organization) ? (
+                        <p className="mt-1 text-sm text-brand-ink-muted">
+                          {[text(profile.jobTitle), text(profile.organization)]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      ) : null}
+                      {profile.speakerId ? (
+                        <p className="mt-2 text-sm font-semibold text-brand-primary-dark">
+                          Speaker
+                        </p>
+                      ) : null}
+                      {badges.length > 0 ? (
+                        <ul className="mt-2 flex flex-wrap gap-1.5">
+                          {badges.map((badgeId) => (
+                            <li
+                              key={badgeId}
+                              className="rounded-brand border border-brand-ink/10 bg-brand-surface px-2 py-0.5 text-xs text-brand-ink"
+                            >
+                              {badgeLabel(badgesConfig, badgeId)}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  </div>
                 </li>
               );
             })}

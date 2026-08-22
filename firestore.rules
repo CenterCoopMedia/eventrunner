@@ -335,6 +335,25 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // media_assets: the index of uploaded Storage objects behind the media
+    // library (spec §4.1, §8.5). Admin-readable so the library can list and
+    // search without a callable per keystroke; never client-written — every
+    // row is created by mediaUpload and edited by mediaUpdateMetadata /
+    // mediaDelete through the Admin SDK, in the same transaction-adjacent
+    // step that touches the bucket.
+    //
+    // Admin-only READ, not public: the objects themselves are fetchable in
+    // Storage (storage.rules §8.5 grants `get`, never `list`), but this
+    // index enumerates every asset an event has ever uploaded — including
+    // assets attached to nothing yet, or to unpublished drafts — which is
+    // exactly the kind of pre-announcement leak the draft collections above
+    // are separated to prevent. Public pages render an asset by the path
+    // stored on the content doc; they never need to list the library.
+    match /media_assets/{assetId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Emoji reaction aggregate + per-user dedup (spec §4.1, §9). The
     // aggregate is a counts-by-emoji object, harmless to read publicly
     // (same reasoning as sessionBookmarks above); only reactToSession
