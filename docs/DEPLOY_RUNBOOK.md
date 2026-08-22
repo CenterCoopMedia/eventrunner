@@ -203,6 +203,9 @@ bearer token, and none of the Tier A values are confidential either.
 | `EVENT_OTP_SEND_CEILING_PER_HOUR` | positive integer; defaults to `500` |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_MEASUREMENT_ID` | from Firebase Console → Project settings → your web app's SDK config |
 | `VITE_FIREBASE_APP_CHECK_SITE_KEY` | reCAPTCHA v3 site key; set this before enabling App Check enforcement |
+| `EVENT_SITE_PUBLISHER_ENABLED` | `false` by default. `true` provisions the site-publisher Cloud Run job — do §8 first |
+| `EVENT_PUBLISHER_SERVICE_ACCOUNT` | required when the publisher is enabled; the job's own runtime identity (§8) |
+| `EVENT_FUNCTIONS_SERVICE_ACCOUNT` | optional; overrides the default compute service account that receives `run.invoker` (§8) |
 
 App Check activation requires two successful deploys. First set
 `VITE_FIREBASE_APP_CHECK_SITE_KEY` and wait for that deploy to finish. Then set
@@ -381,3 +384,184 @@ client already past step 3 never needs it again.
 There is no key to rotate. To revoke a client's deploy access, remove the IAM policy binding from
 §2 (`gcloud iam service-accounts remove-iam-policy-binding`) or delete the GitHub Environment; both
 take effect on the next run, immediately.
+
+## 8. Site publisher (optional, per client)
+
+**What it does.** The frontend reads CMS content from Firestore at runtime, so a publish is already
+live for human visitors the moment `cmsPublish` commits (spec §2.4, §8.4). What lags is the static
+snapshot in the deployed bundle — the first paint, and the only thing a crawler that does not run
+JavaScript ever sees. The `site-publisher` Cloud Run job closes that gap on demand: after a
+successful publish, `cmsPublish` starts one execution, which runs `generate-content.cjs` against
+this project's **published** collections, rebuilds the bundle with this client's `VITE_*` values,
+and runs `firebase deploy --only hosting`. Entirely inside the client's own project, under the
+job's own service account — no GitHub token, no `repository_dispatch`, no cross-project credential
+(spec §8.4 phase 5; the container is `publisher/Dockerfile`, the logic is
+`scripts/publish-site.cjs`).
+
+**It is optional.** With `EVENT_SITE_PUBLISHER_ENABLED` unset or `false`, nothing below exists, the
+`publisher` deploy job is skipped, `EVENT_SITE_PUBLISHER_JOB` is never written into the functions
+env, and `cmsPublish` skips the invoke without writing anything. That is the phase 2–4 behavior:
+publishes work, and the crawler snapshot refreshes at the next deploy.
+
+### 8.1 One-time setup per client
+
+Enable the two APIs the job needs (`run.googleapis.com` is already in §2's list):
+
+```sh
+gcloud services enable \
+  run.googleapis.com \
+  artifactregistry.googleapis.com \
+  --project=<GCP_PROJECT_ID>
+```
+
+Create the job's runtime service account. **This is a different identity from the deploy service
+account (§2) and from the functions runtime account (§3).** It is the account the job runs as, and
+its grants are the entire blast radius of a compromised publisher image:
+
+```sh
+gcloud iam service-accounts create site-publisher \
+  --project=<GCP_PROJECT_ID> \
+  --display-name="Run of Show site publisher (<CLIENT_ENV>)"
+
+PUBLISHER_SA_EMAIL="site-publisher@<GCP_PROJECT_ID>.iam.gserviceaccount.com"
+
+for role in \
+  roles/datastore.user \
+  roles/firebasehosting.admin \
+  roles/storage.objectViewer \
+  roles/serviceusage.serviceUsageConsumer
+do
+  gcloud projects add-iam-policy-binding <GCP_PROJECT_ID> \
+    --member="serviceAccount:${PUBLISHER_SA_EMAIL}" \
+    --role="${role}" \
+    --condition=None
+done
+```
+
+Why exactly those four, and nothing more:
+
+- `datastore.user` — `generate-content.cjs` reads `config/*` and the published CMS collections, and
+  `publish-site.cjs` writes its terminal status back to the `cmsPublishQueue` row. Read-only
+  (`datastore.viewer`) is not enough for that status write.
+- `firebasehosting.admin` — the one thing the job exists to do. It cannot deploy functions, rules,
+  or indexes: `publish-site.cjs` only ever runs `firebase deploy --only hosting:site`, and no role
+  here would let it do otherwise.
+- `storage.objectViewer` — branding assets under `EVENT_STORAGE_BUCKET` that the snapshot
+  references. **Viewer, not admin**: the job never writes to Storage.
+- `serviceUsageConsumer` — required for the Firebase CLI's API calls to bill against this project.
+
+Notably absent: no `run.admin` (the job does not manage itself), no `artifactregistry` role (it does
+not push images; the deploy service account does that), no `iam.serviceAccountUser`, and no
+`secretmanager.secretAccessor` — the job needs no secrets.
+
+The deploy service account (§2) already carries `artifactregistry.writer` and `run.developer`, which
+is what the `publisher` job needs to push the image and create the Cloud Run job. It also needs
+`iam.serviceAccountUser` **on the publisher account** in order to deploy a job that runs as it —
+§2's project-level `iam.serviceAccountUser` covers this, but the narrower binding is better:
+
+```sh
+gcloud iam service-accounts add-iam-policy-binding "${PUBLISHER_SA_EMAIL}" \
+  --project=<GCP_PROJECT_ID> \
+  --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
+  --role="roles/iam.serviceAccountUser"
+```
+
+Then set the two GitHub Environment variables from §3:
+
+| Variable | Value |
+|---|---|
+| `EVENT_SITE_PUBLISHER_ENABLED` | `true` |
+| `EVENT_PUBLISHER_SERVICE_ACCOUNT` | `site-publisher@<GCP_PROJECT_ID>.iam.gserviceaccount.com` |
+
+`validateDeployEnv` fails the deploy if the flag is `true` and the account is unset — there is
+deliberately no default, because a blank would hand the job whatever identity Cloud Run picks.
+
+The next deploy from `main` provisions everything else automatically: the `run-of-show` Artifact
+Registry repository in this project, the image (tagged with the commit SHA), the `site-publisher`
+Cloud Run job with this client's environment, and `roles/run.invoker` for the functions runtime
+account **on that one job**. Nothing is granted project-wide.
+
+**Ordering on the first enable.** The `publisher` job and the `functions` job run independently in
+the same workflow run, so for a short window the deployed `cmsPublish` may know the job's name
+before the job exists. A publish in that window still succeeds — the invoke fails soft, records
+`publisher.invoke.status: 'failed'` on the queue row, and raises an operator alert. Re-publish
+after the run completes.
+
+### 8.2 Verifying it
+
+```sh
+# The job exists, runs as the right identity, and carries this client's env.
+gcloud run jobs describe site-publisher \
+  --region=<EVENT_FIREBASE_REGION> --project=<GCP_PROJECT_ID> \
+  --format="yaml(spec.template.template.serviceAccountName, spec.template.template.containers[0].image)"
+
+# run.invoker is bound on THE JOB, to the functions runtime account only.
+gcloud run jobs get-iam-policy site-publisher \
+  --region=<EVENT_FIREBASE_REGION> --project=<GCP_PROJECT_ID> --format="json(bindings)"
+
+# End to end, without going through the CMS: start one execution by hand.
+gcloud run jobs execute site-publisher --wait \
+  --region=<EVENT_FIREBASE_REGION> --project=<GCP_PROJECT_ID>
+```
+
+A hand-started execution takes no `PUBLISH_QUEUE_ID`, so it publishes the site and writes no status
+row — which makes it the safe way to test the container itself.
+
+Then the real path: make a trivial CMS edit, publish it, and check that
+`cmsGetPublishQueue` shows the row with `publisher.invoke.status: 'invoked'` followed by
+`publisher.status: 'done'`, and that the deployed HTML source (not the rendered page —
+`curl -s <EVENT_PUBLIC_URL> | grep`) carries the new content.
+
+The exit code names the stage, so triage rarely needs the log:
+
+| Exit | Meaning |
+|---|---|
+| `0` | published |
+| `2` | the job's environment is invalid — nothing ran; compare `gcloud run jobs describe` against §3 |
+| `3` | `generate-content.cjs` failed — usually `datastore.user` missing, or `config/event` absent |
+| `4` | the vite build failed — a missing `VITE_*` value, or the task ran out of memory |
+| `5` | `firebase deploy --only hosting` failed — usually `firebasehosting.admin` missing |
+| `1` | an unexpected error in the entrypoint itself |
+
+Common failures on the invoke side, from the queue row's `publisher.invoke.error`:
+
+- `Cloud Run responded 403` — the `run.invoker` grant is missing or was applied to the wrong
+  identity. Re-check the runtime account against §3's `RUNTIME_SA_EMAIL`.
+- `Cloud Run responded 404` — the job does not exist in that region. Check
+  `EVENT_FIREBASE_REGION` matches where the deploy created it.
+
+### 8.3 Interaction with rollback
+
+The publisher deploys hosting from **whatever commit built its image**, not from the currently
+deployed bundle. Two consequences worth knowing before an incident:
+
+- **Rolling back hosting alone does not stick.** A Firebase Hosting rollback in the console is
+  undone by the next CMS publish, because the job rebuilds from its image and redeploys. To hold a
+  rollback, either disable the publisher (`EVENT_SITE_PUBLISHER_ENABLED=false`, then deploy) or roll
+  the code back properly — revert on `main` and let the deploy rebuild the image.
+- **Rolling back the code is a deploy.** Reverting on `main` rebuilds and repushes the image under
+  the new commit SHA and updates the job, so the next publish uses the rolled-back code. The old
+  image stays in Artifact Registry under its own SHA tag; nothing is overwritten.
+
+Stranded rows are not an incident. If neither `cmsPublish` nor the job reports a result, the
+`cleanupStrandedPublishRows` sweep (`functions/src/maintenance/cleanup.cjs`, every 30 minutes) marks
+the row failed after 90 minutes and alerts once — a failed publish row is resumable from the CMS,
+and a failed publisher row just means the snapshot is stale until the next publish or deploy.
+
+### 8.4 Cost
+
+The job runs on demand — once per CMS publish, plus whatever an operator starts by hand. There is
+no idle cost: a Cloud Run job bills only while an execution is running, and it has no minimum
+instances and no request-serving footprint between executions. One execution is a few minutes of 2
+vCPU / 4 GiB, so a normal editing day costs cents. What accumulates instead is Artifact Registry
+storage, one image per deployed commit — prune old tags if a client's project has years of them:
+
+```sh
+gcloud artifacts docker images list \
+  "<EVENT_FIREBASE_REGION>-docker.pkg.dev/<GCP_PROJECT_ID>/run-of-show/site-publisher" \
+  --project=<GCP_PROJECT_ID>
+```
+
+The alternative — putting the snapshot refresh on a nightly schedule — is what phases 2–4 specified
+and costs a build a day whether or not anything changed (spec §8.4, §10 Q7). Nothing in this repo
+implements it: the refresh went straight from "next deploy" to this on-demand job.

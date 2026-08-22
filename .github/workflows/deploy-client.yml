@@ -486,9 +486,13 @@ jobs:
         # and not on every Cloud Run resource in the project. add-iam-policy-
         # binding is idempotent, so re-running a deploy is a no-op.
         #
-        # The default is the App Engine default service account, which is
-        # what Cloud Functions v2 runs as unless the project overrides it;
-        # EVENT_FUNCTIONS_SERVICE_ACCOUNT is the override.
+        # The default is the project's default COMPUTE service account —
+        # what Cloud Functions v2 runs as unless a function sets
+        # `serviceAccount` (none in this repo do), and the same identity
+        # docs/DEPLOY_RUNBOOK.md §3 binds secretAccessor to. It is derived
+        # from the project number, not the project id, so it is looked up
+        # rather than guessed. EVENT_FUNCTIONS_SERVICE_ACCOUNT overrides it
+        # for a project that does pin a runtime account.
         env:
           EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
           EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
@@ -496,7 +500,11 @@ jobs:
         run: |
           set -euo pipefail
           region="${EVENT_FIREBASE_REGION:-us-central1}"
-          runtime_sa="${EVENT_FUNCTIONS_SERVICE_ACCOUNT:-${EVENT_FIREBASE_PROJECT_ID}@appspot.gserviceaccount.com}"
+          runtime_sa="${EVENT_FUNCTIONS_SERVICE_ACCOUNT:-}"
+          if [ -z "$runtime_sa" ]; then
+            project_number="$(gcloud projects describe "$EVENT_FIREBASE_PROJECT_ID" --format='value(projectNumber)')"
+            runtime_sa="${project_number}-compute@developer.gserviceaccount.com"
+          fi
           gcloud run jobs add-iam-policy-binding site-publisher \
             --region "$region" \
             --project "$EVENT_FIREBASE_PROJECT_ID" \

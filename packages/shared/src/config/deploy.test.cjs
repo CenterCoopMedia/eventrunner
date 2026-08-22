@@ -189,11 +189,11 @@ test('service-account variables must be service-account emails', () => {
     assert.equal(result.ok, false, `${key}="${bad}" must fail the build`);
     assert.ok(result.errors.some((e) => e.startsWith(key)));
   }
-  // The App Engine default account (the functions runtime default) is a
+  // The default compute account (what Cloud Functions v2 runs as) is a
   // gserviceaccount.com address without the `iam.` label — it must pass.
-  const appspot = validateDeployEnv({
+  const compute = validateDeployEnv({
     ...VALID_ENV,
-    EVENT_FUNCTIONS_SERVICE_ACCOUNT: 'demo-project@appspot.gserviceaccount.com',
+    EVENT_FUNCTIONS_SERVICE_ACCOUNT: '123456789-compute@developer.gserviceaccount.com',
   });
-  assert.equal(appspot.ok, true);
+  assert.equal(compute.ok, true);
 });
