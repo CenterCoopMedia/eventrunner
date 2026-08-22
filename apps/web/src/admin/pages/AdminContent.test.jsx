@@ -8,7 +8,10 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
-vi.mock('../../lib/contentSource.js', () => ({ subscribeContentCollection: () => () => {} }));
+vi.mock('../../lib/contentSource.js', () => ({
+  subscribeContentCollection: () => () => {},
+  subscribeSpeakersPublic: () => () => {},
+}));
 vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 
 // The admin CMS reads all four revisions (cmsPages/_drafts, cmsContent/_drafts);

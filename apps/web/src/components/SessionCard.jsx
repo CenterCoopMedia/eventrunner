@@ -20,11 +20,15 @@ import {
   icsFileName,
 } from '../utils/calendar.js';
 
-// TODO(m3-speakers): resolve speakerIds to speaker names (and links to the
-// speakers page) once the speaker directory tranche lands in M3. Kept as a
-// hook called from SessionCard's top level so the card markup gains speaker
-// rows without restructuring; useContent().speakers already carries the
-// snapshot shape this will read from.
+// TODO(#22): resolve speakerIds to speaker names and link them to the
+// speaker pages. The data side is now in place — the speaker store (#20)
+// landed, so `useContent().speakers` carries the live `speakers_public`
+// projection keyed by the same ids `session.speakerIds` holds — and what
+// is left is the rendering half that ships with the speaker pages, since
+// a name here should be a link to the page that issue creates.
+//
+// Kept as a hook called from SessionCard's top level so the card markup
+// gains speaker rows without restructuring when it does.
 export function useSessionSpeakerNames() {
   return null;
 }

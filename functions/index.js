@@ -20,6 +20,9 @@ const publicOg = require('./src/public/og.cjs');
 const scheduleReactions = require('./src/schedule/reactions.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
+const speakersProfile = require('./src/speakers/profile.cjs');
+const speakersLifecycle = require('./src/speakers/lifecycle.cjs');
+const speakersProjection = require('./src/speakers/projection.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
 const systemErrors = require('./src/telemetry/systemErrors.cjs');
 const systemErrorsAdmin = require('./src/telemetry/systemErrorsAdmin.cjs');
@@ -46,6 +49,9 @@ module.exports = {
   ...scheduleReactions.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
+  ...speakersProfile.handlers,
+  ...speakersLifecycle.handlers,
+  ...speakersProjection.handlers,
   ...clientErrors.handlers,
   ...systemErrors.handlers,
   ...systemErrorsAdmin.handlers,

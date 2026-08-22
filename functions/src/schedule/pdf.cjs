@@ -33,6 +33,8 @@
  * new judgment call, not a port of the reference's dependency.
  */
 
+const { speakerDisplayName, isPubliclyVisibleSpeaker } = require('shared/speaker');
+
 const DEFAULT_COLORS = Object.freeze({
   // Fallback palette (spec §7.6 allowlist path) — used only for the fields
   // a configured `config/theme.colors` doc omits. A fully-configured theme
@@ -200,26 +202,28 @@ function resolveSpeakerLine(speakerIds, namesById) {
 }
 
 // The one speaker status this file will resolve a public display name for.
-// Everything else (invited/pending/declined, the soft-delete 'removed'
-// status — ADR §4.3) is treated the same as an unresolved id: silently
-// dropped from the printed session, never a placeholder.
-const PUBLIC_SPEAKER_STATUSES = Object.freeze(new Set(['approved']));
-
 /**
  * Derive a speaker's public display name from the canonical `speakers/{id}`
- * record shape (spec §4.3: `firstName`, `lastName`, `status`). The in-flight
- * speaker directory tranche (PR #74, a parallel branch not yet merged here)
- * additionally carries an optional `displayName` override, preferred when
- * present.
+ * record (spec §4.3).
  *
- * NOTE: PR #74 introduces `shared/speaker`'s `speakerDisplayName` helper for
- * exactly this derivation. This duplicates that logic locally, deliberately,
- * so issue #27 does not depend on an unmerged branch — consolidate onto the
- * shared helper once both land, rather than keeping two implementations.
+ * Both halves come from `shared/speaker`, which the speaker tranche (#20)
+ * made the single definition of this vocabulary — the local copies this
+ * replaced were written against that then-unmerged branch and carried a
+ * note to consolidate once both landed. `isPubliclyVisibleSpeaker` owns
+ * which statuses publish and `speakerDisplayName` owns the name join, so
+ * the printed schedule cannot disagree with the public directory about
+ * either.
  *
- * Only an **approved** speaker's name is ever resolved; every other status
- * resolves to '' (dropped by {@link resolveSpeakerLine}'s isNonEmptyString
- * filter), same as an id with no matching document at all.
+ * Only a publishable speaker's name is ever resolved; every other status —
+ * invited, accepted, and the soft-delete 'removed' tombstone — resolves to
+ * '' and is dropped by {@link resolveSpeakerLine}'s isNonEmptyString
+ * filter, exactly like an id with no matching document. Never a
+ * placeholder.
+ *
+ * `displayName` is still preferred when a record carries one. The canonical
+ * document does not store it — it is derived, and lives only on the
+ * `speakers_public` projection — but honouring it costs nothing and keeps
+ * this correct if it is ever handed a projection document.
  *
  * @param {{ firstName?: string, lastName?: string, displayName?: string,
  *           status?: string } | null | undefined} record
@@ -227,10 +231,9 @@ const PUBLIC_SPEAKER_STATUSES = Object.freeze(new Set(['approved']));
  */
 function deriveApprovedSpeakerName(record) {
   if (!record || typeof record !== 'object') return '';
-  if (!PUBLIC_SPEAKER_STATUSES.has(record.status)) return '';
+  if (!isPubliclyVisibleSpeaker(record)) return '';
   if (isNonEmptyString(record.displayName)) return record.displayName.trim();
-  const parts = [record.firstName, record.lastName].filter(isNonEmptyString);
-  return parts.length > 0 ? parts.join(' ').trim() : '';
+  return speakerDisplayName(record);
 }
 
 /** "09:30" -> "9:30 AM" display, 24h wall-clock in, 12h out. Malformed input passes through unchanged. */

@@ -29,6 +29,38 @@ import { subscribeWithRetry } from './retrySubscription.js';
  * @param {'published'|'draft'} readSource
  * @param {(docs: Array<object>) => void} onNext
  */
+/**
+ * Subscribe to `speakers_public`, the one-way projection of the canonical
+ * speaker store (spec §4.3).
+ *
+ * Its own function rather than a case in subscribeContentCollection,
+ * because none of that function's shape applies: speakers are not under
+ * the two-revision publish model, so there is no `_drafts` sibling and no
+ * `visible` field to filter on. A speaker who is not `approved` simply has
+ * no document here — the projection trigger deletes it — so the whole
+ * collection is exactly the published set, and the query is unfiltered.
+ *
+ * That also means draft/preview mode reads the same documents: there is no
+ * draft revision of a speaker to preview.
+ *
+ * @param {(docs: Array<object>) => void} onNext receives `{ id, ...data }`
+ */
+export function subscribeSpeakersPublic(onNext) {
+  return subscribeWithRetry(
+    (onError) =>
+      onSnapshot(
+        collection(db, 'speakers_public'),
+        (snapshot) => {
+          onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+        },
+        onError,
+      ),
+    (error) => {
+      console.warn('speakers_public subscription failed; keeping snapshot values and retrying.', error);
+    },
+  );
+}
+
 export function subscribeContentCollection(name, readSource, onNext) {
   const target =
     readSource === 'draft'

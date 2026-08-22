@@ -25,7 +25,10 @@ const { subscriptions, subscribeContentCollection } = vi.hoisted(() => {
 vi.mock('../lib/configSource.js', () => ({
   subscribeConfigDoc: () => () => {},
 }));
-vi.mock('../lib/contentSource.js', () => ({ subscribeContentCollection }));
+vi.mock('../lib/contentSource.js', () => ({
+  subscribeContentCollection,
+  subscribeSpeakersPublic: () => () => {},
+}));
 vi.mock('../firebase.js', () => ({
   app: {}, auth: {}, db: {}, storage: {},
   // App Check is unconfigured in a credential-free run, which is also its

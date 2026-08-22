@@ -29,6 +29,11 @@ vi.mock('./lib/contentSource.js', () => ({
       if (current && current.readSource === readSource) contentSubscriptions.delete(name);
     };
   }),
+  // speakers_public has no draft revision, so it takes no readSource.
+  subscribeSpeakersPublic: vi.fn((onNext) => {
+    contentSubscriptions.set('speakers_public', { readSource: 'published', onNext });
+    return () => contentSubscriptions.delete('speakers_public');
+  }),
 }));
 // … and AuthProvider imports firebase.js at module scope, whose getAuth()
 // throws without a real API key. Stub the instances plus the auth entry
@@ -192,7 +197,10 @@ describe('app shell', () => {
     );
     // Signed-out is the default auth state from the mock — no admin probe
     // resolves true, so App must not have asked for drafts.
-    for (const { readSource } of contentSubscriptions.values()) {
+    for (const [name, { readSource }] of contentSubscriptions.entries()) {
+      // speakers_public has no draft revision (spec §4.3), so it stays on
+      // the published subscription in every mode.
+      if (name === 'speakers_public') continue;
       expect(readSource).toBe('published');
     }
   });
@@ -214,7 +222,10 @@ describe('app shell', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    for (const { readSource } of contentSubscriptions.values()) {
+    for (const [name, { readSource }] of contentSubscriptions.entries()) {
+      // speakers_public has no draft revision (spec §4.3), so it stays on
+      // the published subscription in every mode.
+      if (name === 'speakers_public') continue;
       expect(readSource).toBe('draft');
     }
     // Push a draft-only headline through the live draft overlay.
@@ -247,7 +258,10 @@ describe('app shell', () => {
     expect(
       screen.queryByRole('heading', { level: 1, name: 'Draft-only headline' }),
     ).toBeNull();
-    for (const { readSource } of contentSubscriptions.values()) {
+    for (const [name, { readSource }] of contentSubscriptions.entries()) {
+      // speakers_public has no draft revision (spec §4.3), so it stays on
+      // the published subscription in every mode.
+      if (name === 'speakers_public') continue;
       expect(readSource).toBe('published');
     }
     // The snapshot's real hero title is back (overlay reset to null on
@@ -272,7 +286,10 @@ describe('app shell', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    for (const { readSource } of contentSubscriptions.values()) {
+    for (const [name, { readSource }] of contentSubscriptions.entries()) {
+      // speakers_public has no draft revision (spec §4.3), so it stays on
+      // the published subscription in every mode.
+      if (name === 'speakers_public') continue;
       expect(readSource).toBe('draft');
     }
     act(() => {

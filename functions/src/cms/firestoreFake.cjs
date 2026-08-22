@@ -208,6 +208,83 @@ function makeFakeDb(seed = {}) {
     async getAll(...refs) {
       return refs.map((ref) => snapshot(ref._col, ref.id));
     },
+    /**
+     * Optimistic transaction with a real READ SET, because that is the
+     * property the session-save seam depends on: reading `speakers/{id}`
+     * inside the transaction that writes the draft is what makes a
+     * concurrent deleteSpeaker abort and retry us instead of leaving a
+     * dangling reference.
+     *
+     * Writes are buffered and applied on commit, so a body that throws
+     * changes nothing. Every document read records the version it saw
+     * (undefined for an absent document — Firestore tracks non-existence
+     * too, which is what makes a deterministic reservation doc a lock);
+     * at commit, any version that moved aborts and re-runs the body.
+     *
+     * `db.beforeCommit` is a one-shot test hook fired after the body and
+     * before the conflict check, so a test can interleave a competing
+     * write at exactly the moment that matters.
+     *
+     * Query reads are NOT tracked (a documented limitation of this fake,
+     * not of Firestore): the modules under test rely on document reads
+     * for conflict detection, and every test that needs interleaving uses
+     * one.
+     */
+    async runTransaction(fn, { maxAttempts = 5 } = {}) {
+      for (let attempt = 1; ; attempt += 1) {
+        const readVersions = new Map();
+        const ops = [];
+        const trackRead = (col, id) => {
+          readVersions.set(`${col}/${id}`, updateTimes.get(`${col}/${id}`));
+          return snapshot(col, id);
+        };
+        const tx = {
+          async get(target) {
+            if (target && target._kind === 'query') return target.get();
+            return trackRead(target._col, target.id);
+          },
+          async getAll(...refs) {
+            return refs.map((ref) => trackRead(ref._col, ref.id));
+          },
+          create(ref, data) {
+            ops.push({ type: 'create', col: ref._col, id: ref.id, data: clone(data) });
+          },
+          set(ref, data, opts = {}) {
+            ops.push({ type: 'set', col: ref._col, id: ref.id, data: clone(data), merge: opts.merge === true });
+          },
+          update(ref, data) {
+            ops.push({ type: 'update', col: ref._col, id: ref.id, data: clone(data) });
+          },
+          delete(ref) {
+            ops.push({ type: 'delete', col: ref._col, id: ref.id });
+          },
+        };
+
+        const result = await fn(tx);
+
+        if (typeof db.beforeCommit === 'function') {
+          const hook = db.beforeCommit;
+          db.beforeCommit = null;
+          await hook();
+        }
+
+        let conflicted = false;
+        for (const [key, version] of readVersions) {
+          if (updateTimes.get(key) !== version) {
+            conflicted = true;
+            break;
+          }
+        }
+        if (conflicted) {
+          if (attempt >= maxAttempts) throw new Error('ABORTED: too much contention');
+          continue;
+        }
+        for (const op of ops) applyWrite(op);
+        return result;
+      }
+    },
+    /** One-shot hook fired between a transaction body and its commit. */
+    beforeCommit: null,
     batch() {
       const ops = [];
       return {

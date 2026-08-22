@@ -18,6 +18,8 @@ import LoadingState from '../components/LoadingState.jsx';
 import AdminLayout from './AdminLayout.jsx';
 import AdminPagesList from './pages/AdminPagesList.jsx';
 import AdminPageEditor from './pages/AdminPageEditor.jsx';
+import AdminSpeakersList from './pages/AdminSpeakersList.jsx';
+import AdminSpeakerEditor from './pages/AdminSpeakerEditor.jsx';
 import AdminContentPages from './pages/AdminContentPages.jsx';
 import AdminContentSections from './pages/AdminContentSections.jsx';
 import AdminContentSection from './pages/AdminContentSection.jsx';
@@ -80,6 +82,9 @@ export default function AdminApp() {
           <Route path="pages" element={<AdminPagesList />} />
           <Route path="pages/new" element={<AdminPageEditor mode="create" />} />
           <Route path="pages/:pageId" element={<AdminPageEditor mode="edit" />} />
+          <Route path="speakers" element={<AdminSpeakersList />} />
+          <Route path="speakers/new" element={<AdminSpeakerEditor mode="create" />} />
+          <Route path="speakers/:speakerId" element={<AdminSpeakerEditor mode="edit" />} />
           <Route path="content" element={<AdminContentPages />} />
           <Route path="content/:pageId" element={<AdminContentSections />} />
           <Route path="content/:pageId/:sectionId" element={<AdminContentSection />} />

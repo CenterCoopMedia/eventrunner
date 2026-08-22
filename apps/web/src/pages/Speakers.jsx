@@ -1,5 +1,10 @@
-// Speakers page — placeholder the speakers tranche replaces.
-// TODO(m2-speakers): speaker detail routes, headshot rendering from Storage
+// Speakers page — the public directory, rendered from the `speakers_public`
+// projection (spec §4.3). Every field here is one the projection carries;
+// the canonical `speakers/{id}` record (email, uid, inviteToken, pipeline
+// status) is server-only and never reaches this bundle, and a speaker who
+// is not `approved` has no projection at all — which is why there is no
+// visibility filter to apply.
+// TODO(#22): speaker detail routes, headshot rendering from Storage
 // branding paths, session cross-links.
 // Feature-gated by config/features.speakers — the nav link already hides
 // when the feature is off, but the route itself must gate too, since direct
@@ -12,7 +17,6 @@ import EmptyState from '../components/EmptyState.jsx';
 export default function Speakers() {
   const { features } = useEventConfig();
   const { speakers } = useContent();
-  const visible = speakers.filter((s) => s.visible);
 
   if (!features.speakers) {
     return (
@@ -34,7 +38,7 @@ export default function Speakers() {
   return (
     <article>
       <h1 className="font-heading text-3xl font-semibold text-brand-ink">Speakers</h1>
-      {visible.length === 0 ? (
+      {speakers.length === 0 ? (
         <div className="mt-6">
           <EmptyState
             title="Speakers have not been announced yet"
@@ -43,16 +47,26 @@ export default function Speakers() {
         </div>
       ) : (
         <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((speaker) => (
-            <li
-              key={speaker.id}
-              className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
-            >
-              <h2 className="font-heading text-lg text-brand-ink">{speaker.name}</h2>
-              <p className="mt-1 text-sm text-brand-ink-muted">{speaker.title}</p>
-              <p className="mt-2 text-brand-ink-muted">{speaker.bio}</p>
-            </li>
-          ))}
+          {speakers.map((speaker) => {
+            // jobTitle and organization are separate canonical fields, not
+            // the one free-text "Role, Organization" string the old
+            // name-joined store carried. Either may be blank.
+            const affiliation = [speaker.jobTitle, speaker.organization]
+              .filter(Boolean)
+              .join(', ');
+            return (
+              <li
+                key={speaker.id}
+                className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
+              >
+                <h2 className="font-heading text-lg text-brand-ink">{speaker.displayName}</h2>
+                {affiliation ? (
+                  <p className="mt-1 text-sm text-brand-ink-muted">{affiliation}</p>
+                ) : null}
+                {speaker.bio ? <p className="mt-2 text-brand-ink-muted">{speaker.bio}</p> : null}
+              </li>
+            );
+          })}
         </ul>
       )}
     </article>

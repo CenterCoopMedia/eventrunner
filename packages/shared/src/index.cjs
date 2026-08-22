@@ -13,6 +13,7 @@ module.exports = {
   ...require('./badges.cjs'),
   ...require('./profile.cjs'),
   ...require('./slug.cjs'),
+  ...require('./speaker.cjs'),
   ...require('./urlSafety.cjs'),
   ...require('./routing.cjs'),
 };
