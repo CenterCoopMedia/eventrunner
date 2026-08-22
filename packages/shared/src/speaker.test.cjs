@@ -134,6 +134,41 @@ test('field shapes are validated with messages that name the field', () => {
   }
 });
 
+test('socialHandles caps each label and handle length, not just the entry count', () => {
+  const { internals } = require('./speaker.cjs');
+  const tooLongLabel = validateSpeaker(
+    { socialHandles: { ['x'.repeat(internals.MAX_SOCIAL_LABEL_LENGTH + 1)]: 'ok' } },
+    { partial: true },
+  );
+  assert.equal(tooLongLabel.ok, false);
+  assert.match(tooLongLabel.errors[0], /^socialHandles: every label must be at most \d+ characters$/);
+
+  const tooLongHandle = validateSpeaker(
+    { socialHandles: { web: 'x'.repeat(internals.MAX_SOCIAL_HANDLE_LENGTH + 1) } },
+    { partial: true },
+  );
+  assert.equal(tooLongHandle.ok, false);
+  assert.match(tooLongHandle.errors[0], /^socialHandles: every handle must be at most \d+ characters$/);
+
+  const atCap = validateSpeaker(
+    {
+      socialHandles: {
+        [`x`.repeat(internals.MAX_SOCIAL_LABEL_LENGTH)]: 'y'.repeat(internals.MAX_SOCIAL_HANDLE_LENGTH),
+      },
+    },
+    { partial: true },
+  );
+  assert.equal(atCap.ok, true);
+});
+
+test('pendingEdits and its stamps are server-owned, rejected by name (issue #22 review P1-1)', () => {
+  for (const key of ['pendingEdits', 'pendingEditsAt', 'pendingEditsBy']) {
+    const verdict = validateSpeaker({ firstName: 'A', lastName: 'B', [key]: {} }, { partial: true });
+    assert.equal(verdict.ok, false);
+    assert.match(verdict.errors[0], new RegExp(`^${key}: read-only`));
+  }
+});
+
 test('an explicitly cleared slug is re-derived from the names in the same payload', () => {
   const verdict = validateSpeaker({ firstName: 'Sam', lastName: 'Example', slug: '' });
   assert.equal(verdict.ok, true);

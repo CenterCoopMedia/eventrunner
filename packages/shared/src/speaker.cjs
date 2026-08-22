@@ -114,6 +114,17 @@ const SERVER_OWNED_SPEAKER_FIELDS = Object.freeze([
   'createdAt',
   'updatedAt',
   'updatedBy',
+  // Staged self-service edits (§4.3, issue #22 review finding P1-1). Once a
+  // speaker is `approved`, a self-service save must not write straight onto
+  // the fields onSpeakerWritten republishes — the wizard's own copy tells
+  // the speaker an organizer reviews changes, and a direct write would
+  // republish speakers_public before that review happens. The queued patch
+  // and its stamps are written only by applyUpdateOwnSpeakerProfile (queuing)
+  // and applySpeakerPendingEdits / applyDiscardSpeakerPendingEdits
+  // (resolving) — never accepted in a client payload.
+  'pendingEdits',
+  'pendingEditsAt',
+  'pendingEditsBy',
 ]);
 
 /**
@@ -136,6 +147,15 @@ const MAX_NAME_LENGTH = 120;
 const MAX_SHORT_TEXT_LENGTH = 200;
 const MAX_BIO_LENGTH = 4000;
 const MAX_SOCIAL_HANDLES = 12;
+// Per-entry caps (issue #22 review finding P2-5): MAX_SOCIAL_HANDLES bounds
+// the COUNT of entries, but nothing previously bounded any one entry's
+// length — a self-service payload (or an admin one) could carry an
+// arbitrarily long label or handle string straight into speakers_public,
+// which is anonymously readable. A handle is a short "@name" or a URL, not
+// a document, so the caps are generous for a legitimate value and small
+// enough to cap the blast radius of an abusive one.
+const MAX_SOCIAL_LABEL_LENGTH = 40;
+const MAX_SOCIAL_HANDLE_LENGTH = 200;
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -334,6 +354,10 @@ function validateSpeaker(payload, { partial = false, fieldsAllowed = EDITABLE_SP
       errors.push(`socialHandles: must have at most ${MAX_SOCIAL_HANDLES} entries`);
     } else if (Object.values(value).some((v) => typeof v !== 'string')) {
       errors.push('socialHandles: every value must be a string');
+    } else if (Object.keys(value).some((label) => label.length > MAX_SOCIAL_LABEL_LENGTH)) {
+      errors.push(`socialHandles: every label must be at most ${MAX_SOCIAL_LABEL_LENGTH} characters`);
+    } else if (Object.values(value).some((handle) => handle.length > MAX_SOCIAL_HANDLE_LENGTH)) {
+      errors.push(`socialHandles: every handle must be at most ${MAX_SOCIAL_HANDLE_LENGTH} characters`);
     } else {
       fields.socialHandles = { ...value };
     }
@@ -382,6 +406,8 @@ module.exports = {
     MAX_SHORT_TEXT_LENGTH,
     MAX_BIO_LENGTH,
     MAX_SOCIAL_HANDLES,
+    MAX_SOCIAL_LABEL_LENGTH,
+    MAX_SOCIAL_HANDLE_LENGTH,
     SLUG_RE,
     EMAIL_RE,
   },
