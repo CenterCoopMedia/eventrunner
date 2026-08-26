@@ -94,7 +94,7 @@ test('Pages checks map the Eventrunner base and scan generated HTML', () => {
   });
 });
 
-test('generated documentation pages require complete public metadata while the #109 demo remains excluded', () => {
+test('generated documentation pages require complete public metadata while the issue 109 demo remains excluded', () => {
   withTempRoot((root) => {
     fs.mkdirSync(path.join(root, 'docs', 'docs', 'guide'), { recursive: true });
     fs.mkdirSync(path.join(root, 'docs', 'demo'), { recursive: true });
@@ -103,7 +103,7 @@ test('generated documentation pages require complete public metadata while the #
       path.join(root, 'docs', 'index.html'),
       '<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width"><meta name="description" content="Docs"><title>Docs</title><link rel="icon" type="image/svg+xml" href="favicon.svg"></head><body></body></html>',
     );
-    fs.writeFileSync(path.join(root, 'docs', 'demo', 'index.html'), '<html><body>Demo metadata is owned by #109.</body></html>');
+    fs.writeFileSync(path.join(root, 'docs', 'demo', 'index.html'), '<html><body>Demo metadata is owned by issue 109.</body></html>');
     fs.writeFileSync(
       path.join(root, 'docs', 'docs', 'guide', 'index.html'),
       '<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width"><meta name="description" content="Guide"><title>Guide</title><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body></body></html>',
