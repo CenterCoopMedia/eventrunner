@@ -331,7 +331,8 @@ variables and secrets, one environment per client deployment. `.env.example` doc
 | `VITE_FIREBASE_*` (7) | var | build | unchanged set from `apps/web/src/firebase.js` |
 | `VITE_EVENT_PUBLIC_URL` | var | build | mirrors `EVENT_PUBLIC_URL` into the bundle |
 | `FIREBASE_SERVICE_ACCOUNT` | secret | deploy, generate-content | |
-| `EMAIL_PROVIDER_API_KEY` | secret | functions | Secret Manager via `defineSecret` |
+| `EMAIL_PROVIDER_API_KEY` | secret | functions | server token; Secret Manager via `defineSecret`; only when provider is `postmark` |
+| `EMAIL_ACCOUNT_API_KEY` | secret | scripts | account token; only when provider is `postmark` — Postmark's domains API reports verification state only to an account token, so `verifySenderDomain()` needs this in addition to the server token (§3.1) |
 | `EMAIL_WEBHOOK_BASIC_AUTH` | secret | functions | `user:pass` for the delivery-event endpoint; only when provider is `postmark` **and** delivery ingest is enabled (§3.1) |
 | `EMAIL_WEBHOOK_URL` / `EMAIL_WEBHOOK_SECRET` | secret | functions | only when provider is `webhook` |
 | `TICKETING_API_TOKEN` | secret | functions | only when ticketing provider is not `none` |
@@ -1813,7 +1814,8 @@ environment-scoped. Full v1 secret surface per environment:
 | Secret | Required when |
 |---|---|
 | `FIREBASE_SERVICE_ACCOUNT` | always |
-| `EMAIL_PROVIDER_API_KEY` | provider = `postmark` |
+| `EMAIL_PROVIDER_API_KEY` | provider = `postmark` (server token) |
+| `EMAIL_ACCOUNT_API_KEY` | provider = `postmark` (account token; `verify-sender-domain.cjs`) |
 | `EMAIL_WEBHOOK_BASIC_AUTH` | provider = `postmark` and delivery-event ingest enabled |
 | `EMAIL_WEBHOOK_URL`, `EMAIL_WEBHOOK_SECRET` | provider = `webhook` |
 | `TICKETING_API_TOKEN` | ticketing provider ≠ `none` |

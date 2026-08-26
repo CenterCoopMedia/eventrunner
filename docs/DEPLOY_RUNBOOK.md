@@ -220,7 +220,8 @@ only the rows that apply to the providers selected above:
 
 | Secret | Required when |
 |---|---|
-| `EMAIL_PROVIDER_API_KEY` | `EVENT_EMAIL_PROVIDER = postmark` |
+| `EMAIL_PROVIDER_API_KEY` | `EVENT_EMAIL_PROVIDER = postmark` (server token) |
+| `EMAIL_ACCOUNT_API_KEY` | `EVENT_EMAIL_PROVIDER = postmark` (account token; needed by `scripts/verify-sender-domain.cjs` — Postmark's domains API reports verification state only to an account token) |
 | `EMAIL_WEBHOOK_BASIC_AUTH` | `EVENT_EMAIL_PROVIDER = postmark` and delivery-event ingest is enabled |
 | `EMAIL_WEBHOOK_URL`, `EMAIL_WEBHOOK_SECRET` | `EVENT_EMAIL_PROVIDER = webhook` |
 | `TICKETING_API_TOKEN` | `EVENT_TICKETING_PROVIDER != none` |
