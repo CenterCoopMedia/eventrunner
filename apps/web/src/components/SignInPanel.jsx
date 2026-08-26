@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { OtpRequestError, useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
+import { IS_DEMO } from '../lib/demoMode.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -92,7 +93,7 @@ export function FormError({ id, message, errorRef }) {
  *   acceptance page). `initialEmail` prefills the address the invitation
  *   was sent to, when the caller knows it.
  */
-export default function SignInPanel({ onSignedIn, initialEmail = '' }) {
+function SignInForm({ onSignedIn, initialEmail = '' }) {
   const { signInWithGoogle, sendOtpCode, verifyOtpCode } = useAuth();
   const { showToast } = useToast();
 
@@ -412,4 +413,37 @@ export default function SignInPanel({ onSignedIn, initialEmail = '' }) {
       )}
     </div>
   );
+}
+
+/**
+ * The demo build's stand-in for the whole sign-in panel: there is no Firebase
+ * project behind the static site, so both paths would fail at the network.
+ * Saying so plainly beats a form that cannot work — and it keeps every
+ * existing "Sign in" link in the app (SessionCard, Attendees, MySchedule,
+ * Profile, the admin gate) landing somewhere honest, without touching any of
+ * them.
+ */
+function DemoSignInNotice() {
+  return (
+    <div className="space-y-3 rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-6">
+      <p className="font-heading text-lg font-semibold text-brand-ink">
+        Sign-in is disabled in this demo
+      </p>
+      <p className="text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+        This is a read-only tour of a fictional event. Accounts, bookmarks,
+        the attendee directory, and the admin CMS all work on a real
+        deployment — ask us for a walkthrough.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * @param {{ onSignedIn?: () => void, initialEmail?: string }} props
+ */
+export default function SignInPanel(props) {
+  // A plain branch rather than an early return inside SignInForm: the form
+  // is a hooks-heavy component and rules-of-hooks forbids returning before
+  // them. In a normal client build IS_DEMO is a compile-time `false`.
+  return IS_DEMO ? <DemoSignInNotice /> : <SignInForm {...props} />;
 }

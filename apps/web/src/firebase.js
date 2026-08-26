@@ -4,8 +4,13 @@
 // dev-only and opt-in via VITE_USE_EMULATORS=true.
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import {
+  getFirestore,
+  connectFirestoreEmulator,
+  disableNetwork,
+} from 'firebase/firestore';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import { IS_DEMO } from './lib/demoMode.js';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -22,6 +27,27 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 
 const useEmulators = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true';
+
+// --- Demo mode (VITE_DEMO_MODE=1, lib/demoMode.js) --------------------------
+// The static GitHub Pages demo has no Firebase project behind it, so every
+// Firestore listener the providers attach would fail and spam the console.
+// Taking the client offline before any of them attaches is the smallest
+// intervention that makes the whole app inert: `disableNetwork` is queued on
+// the SDK's internal async queue ahead of every later onSnapshot/getDocs, so
+// each of them is answered from the (empty) local cache instead of the
+// network. Listeners then simply never report a document, which is exactly
+// the "no runtime doc yet" state every provider already renders from the
+// committed snapshot (spec §2.4 fail-soft first paint) — no error path, no
+// retry loop, no request. Writes reject locally, which the read-only demo
+// never attempts. Auth stays signed out: with no persisted user the SDK
+// issues no request either, and sign-in is disabled in the UI
+// (components/SignInPanel.jsx).
+if (IS_DEMO) {
+  disableNetwork(db).catch(() => {
+    // Nothing to fall back to and nothing to report: the demo renders from
+    // the snapshot whether or not the SDK acknowledged going offline.
+  });
+}
 
 if (useEmulators) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
@@ -56,7 +82,11 @@ export const storageDownloadOrigin = useEmulators
 // the request is sent unattested and the server decides, which keeps a
 // misconfigured reCAPTCHA from becoming a client-side sign-in outage with no
 // server-side trace.
-const appCheckSiteKey = (import.meta.env.VITE_FIREBASE_APP_CHECK_SITE_KEY || '').trim();
+// Never in the demo build: reCAPTCHA is a third-party network fetch, and the
+// demo has no OTP endpoint to attest to in the first place.
+const appCheckSiteKey = IS_DEMO
+  ? ''
+  : (import.meta.env.VITE_FIREBASE_APP_CHECK_SITE_KEY || '').trim();
 
 export const appCheckEnabled = Boolean(appCheckSiteKey);
 

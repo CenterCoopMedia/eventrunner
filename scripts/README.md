@@ -152,6 +152,32 @@ Exit codes name the stage — `2` configuration, `3` generation, `4` build, `5` 
 `gcloud run jobs executions describe` is usually enough to triage without opening the log. Setup,
 verification, and the rollback interaction: `docs/DEPLOY_RUNBOOK.md` §9.
 
+### `build-demo.cjs`
+
+Builds the public click-through demo and syncs it into `docs/demo/`, which GitHub Pages serves at
+`https://centercoopmedia.github.io/run-of-show/demo/`. The one script here that touches no
+Firestore at all: it is `vite build` with `VITE_DEMO_MODE=1` and `--base /run-of-show/demo/`, run
+against the committed synthetic snapshot.
+
+```sh
+npm run build:demo                              # build + sync into docs/demo/
+node scripts/build-demo.cjs --dry-run           # print the plan, execute nothing
+node scripts/build-demo.cjs --base /x/ --out docs/preview
+```
+
+`VITE_DEMO_MODE` (read once, in `apps/web/src/lib/demoMode.js`) is what makes the output safe to
+serve with no backend: HashRouter instead of BrowserRouter (GitHub Pages has no rewrites, and the
+site-root `404.html` shim would belong to the docs site, not to this build), the Firestore client
+taken offline before any listener attaches, the content overlay not subscribed at all (an empty
+offline read would otherwise wholesale-replace the snapshot), App Check never initialized, sign-in
+replaced with a "disabled in this demo" notice, and a standing demo banner. A normal client build
+never sets the flag, so every one of those branches compiles away — `deploy-client.yml` and
+`publish-site.cjs` are unaffected.
+
+`GENERATED_DIR` is cleared for the child process: the demo is the committed fixture, never a
+deploy-time export of a real client (§8.6). `--out` is refused outside the repository, because the
+destination is deleted before the copy. The script commits nothing.
+
 ### `verify-sender-domain.cjs`
 
 Wraps the configured EmailProvider's `verifySenderDomain()` as the onboarding checklist command

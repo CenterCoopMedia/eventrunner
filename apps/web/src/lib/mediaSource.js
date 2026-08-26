@@ -33,6 +33,7 @@
 // thumbnail costs no metadata round trip.
 import { deleteObject, ref, uploadBytes } from 'firebase/storage';
 import { storage, storageBucketName, storageDownloadOrigin } from '../firebase.js';
+import { IS_DEMO } from './demoMode.js';
 
 /** Mirrors storage.rules for `profile-photos/{uid}/**` — keep in step. */
 export const PROFILE_PHOTO_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/webp']);
@@ -137,7 +138,19 @@ export function storagePath(value) {
  */
 export function assetUrl(path) {
   const object = storagePath(path);
-  if (!object || !storageBucketName) return null;
+  if (!object) return null;
+  // Static demo build: there is no Storage bucket behind the site, so a
+  // built URL would be a request to firebasestorage.googleapis.com that can
+  // only fail. The only object paths the synthetic snapshot uses are the
+  // flat `branding/*` placeholders, and identical copies ship in the bundle
+  // under public/branding — resolve those bundle-relative (the same thing
+  // brandingSrc() does for them) and treat everything else as absent.
+  if (IS_DEMO) {
+    return object.startsWith('branding/') && object.split('/').length === 2
+      ? `${import.meta.env.BASE_URL}${object}`
+      : null;
+  }
+  if (!storageBucketName) return null;
   return `${storageDownloadOrigin}/v0/b/${encodeURIComponent(
     storageBucketName,
   )}/o/${encodeURIComponent(object)}?alt=media`;
@@ -166,7 +179,12 @@ export function assetUrl(path) {
 export function brandingSrc(value) {
   const path = storagePath(value);
   if (!path) return null;
-  return path.split('/').length > 2 ? assetUrl(path) : `/${path}`;
+  // BASE_URL is '/' for every Hosting deploy (Vite's default base), so this
+  // is the same `/branding/…` path it has always been; it only differs for a
+  // build deployed under a subpath, such as the static demo.
+  return path.split('/').length > 2
+    ? assetUrl(path)
+    : `${import.meta.env.BASE_URL}${path}`;
 }
 
 /**

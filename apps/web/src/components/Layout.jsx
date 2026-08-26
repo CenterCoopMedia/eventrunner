@@ -6,6 +6,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
 import FeedbackModal from './FeedbackModal.jsx';
+import DemoBanner from './DemoBanner.jsx';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', end: true },
@@ -51,6 +52,7 @@ export default function Layout() {
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
+      <DemoBanner />
       <header className="border-b border-brand-ink/10 bg-brand-surface">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
           <NavLink
