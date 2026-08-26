@@ -128,9 +128,8 @@ five alternatives is **"Eventrunner"** — clean on the federal trademark regist
 
 `runofshow.net` is CCM's own domain and the current, working sender domain (per
 `docs/POSTMARK_PROVISIONING.md`, this is the first/dev-demo deployment, sender address
-`events@runofshow.net`). Its DNS is in the maintainer's Cloudflare account (`jamditis@gmail`), so
-every DNS-editing step below needs that account's login — the human present holds those
-credentials.
+`events@runofshow.net`). Its DNS is in CCM's Cloudflare account, so every DNS-editing step below
+needs that account's login — the human present holds those credentials.
 
 This workstream depends on Workstream C step 1 for its actual DNS record *values* (Postmark
 generates them once the domain is added to a Server) — do Workstream C step 1 first if starting
@@ -139,7 +138,8 @@ order; `docs/POSTMARK_PROVISIONING.md` §4 has the fuller version of this with a
 form alongside the concrete one — read that section for the exact field-by-field table if anything
 below is ambiguous.
 
-1. **[HUMAN] Log into the Cloudflare account (`jamditis@gmail`) that holds `runofshow.net`'s DNS.**
+1. **[HUMAN] Log in to the Cloudflare account that manages `runofshow.net` — account identity per
+   operator records.**
    **Success check:** the `runofshow.net` zone's DNS → Records page loads.
 
 2. **[AGENT] Add the DKIM TXT record.** Postmark (from Workstream C step 1) shows a host like
@@ -253,11 +253,14 @@ by heading, not a duplicate. Read each referenced section before doing its step.
    you to publish an SPF record. If SPF shows `unknown` or `FAIL` while DKIM and Return-Path are
    green, the domain is verified — **do not re-check or publish DNS records over it**.
 
-   **Success check:** `node scripts/verify-sender-domain.cjs --domain runofshow.net` exits `0`.
-   Exit `1` = not verified (DNS not propagated yet or a record is wrong); exit `2` = misconfigured
-   (a required key is missing — check both `EMAIL_PROVIDER_API_KEY` and `EMAIL_ACCOUNT_API_KEY`
-   are set, since a missing account token makes every check report "unknown" rather than failing
-   outright).
+   **Success check:** `node scripts/verify-sender-domain.cjs --domain runofshow.net` exits `0`
+   (verified). Exit `1` means the domain is not verified — this covers DNS not propagated yet, a
+   wrong record, *and* a missing or rejected `EMAIL_ACCOUNT_API_KEY` (the provider then reports
+   DKIM/Return-Path as `unknown` instead of `fail`, which still isn't a pass, so the script still
+   exits `1`). Exit `2` is reserved for setup/provider failures that keep the script from checking
+   DNS at all — e.g. a missing or invalid `EMAIL_PROVIDER_API_KEY` (server token), no sender domain
+   configured, or the provider call itself erroring — not for an account-key problem, which is
+   exit `1`.
 
 4. **[AGENT] Register the delivery webhook** (`docs/POSTMARK_PROVISIONING.md` §5, "Register the
    delivery webhook").

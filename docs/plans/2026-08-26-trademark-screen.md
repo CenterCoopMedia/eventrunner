@@ -3,7 +3,7 @@
 **Date:** 2026-08-26
 **Status:** Preliminary research screen complete. Not legal advice — see §5.
 **Tracks:** [Issue #2](https://github.com/CenterCoopMedia/run-of-show/issues/2), milestone M1.
-**Prior work in this issue:** `runofshow.net` purchased and registered (Cloudflare, jamditis@gmail).
+**Prior work in this issue:** `runofshow.net` purchased and registered (the operator's Cloudflare account).
 GitHub org decided — staying under the existing paid Center for Cooperative Media organization.
 This document closes the remaining two items: the knockout trademark screen and the npm
 availability check.
