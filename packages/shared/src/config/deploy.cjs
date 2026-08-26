@@ -31,7 +31,7 @@ const REQUIRED_ALWAYS = [
   'EVENT_TICKETING_PROVIDER',
   'EVENT_OPERATOR_NOTIFIER',
   'EVENT_HOSTING_SITE',
-  // Frontend build keys (.env.example): a missing VITE_FIREBASE_* value
+  // Required frontend build keys (.env.example): a missing value
   // ships a bundle that dies at runtime with auth/invalid-api-key — the
   // validator exists to fail the build loudly instead.
   'VITE_FIREBASE_API_KEY',
@@ -40,7 +40,6 @@ const REQUIRED_ALWAYS = [
   'VITE_FIREBASE_STORAGE_BUCKET',
   'VITE_FIREBASE_MESSAGING_SENDER_ID',
   'VITE_FIREBASE_APP_ID',
-  'VITE_FIREBASE_MEASUREMENT_ID',
   'VITE_EVENT_PUBLIC_URL',
 ];
 

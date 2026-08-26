@@ -49,4 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Playwright end-to-end suite on the Firebase emulators (#38): four critical journeys — OTP sign-in, CMS publish/isolation, the speaker invite pipeline, and ticket-claim-to-bookmark — seeded once per run via the same `init-event.cjs`/`seed-demo-event.cjs` operator scripts a real deployment uses, driven through `scripts/dev/run-e2e.sh` (`firebase emulators:exec` wrapping `vite`) and a new `e2e` CI job that clones the rules job's emulator/Java setup. OTP and invite-token capture reads a dedicated `E2E_MAIL_FILE` sink the console email provider appends to, replacing an unreliable scrape of colorized emulator stdout.
 - `docs/POSTMARK_PROVISIONING.md`: an end-to-end Postmark account/server/stream provisioning runbook plus the missing `EMAIL_ACCOUNT_API_KEY` secret documentation in `.env.example` and the ADR/deploy-runbook secret tables (#4).
 
+### Fixed
+
+- Firebase deployment validation no longer requires `VITE_FIREBASE_MEASUREMENT_ID` when Google Analytics is disabled (#101).
+
 The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.

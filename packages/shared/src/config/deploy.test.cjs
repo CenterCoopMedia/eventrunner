@@ -31,6 +31,13 @@ test('valid env passes', () => {
   assert.deepEqual(result.errors, []);
 });
 
+test('a Firebase web app without Google Analytics does not require a measurement id', () => {
+  const { VITE_FIREBASE_MEASUREMENT_ID, ...withoutMeasurementId } = VALID_ENV;
+  const result = validateDeployEnv(withoutMeasurementId);
+  assert.equal(result.ok, true);
+  assert.equal(result.missing.includes('VITE_FIREBASE_MEASUREMENT_ID'), false);
+});
+
 test('missing VITE frontend build key fails', () => {
   const { VITE_FIREBASE_API_KEY, ...rest } = VALID_ENV;
   const result = validateDeployEnv(rest);
