@@ -1,0 +1,10 @@
+# Normalize line endings so a Windows checkout (core.autocrlf=true) does
+# not turn every text file into CRLF and make committed-vs-generated
+# diffs, workflow-file lookups, and `git diff` all noisy (issue #102).
+# Binary files are still detected by git's own heuristic and left alone.
+* text=auto eol=lf
+
+# Fonts are binary; git usually detects this on its own, but the woff2
+# files already carry a stray CRLF byte sequence inside their binary
+# payload, which git's heuristic could otherwise misread as text.
+*.woff2 binary

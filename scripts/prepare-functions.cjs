@@ -29,31 +29,42 @@ const vendorDir = path.join(root, 'functions', 'vendor');
 const target = path.join(vendorDir, 'shared.tgz');
 const tmp = `${target}.tmp`;
 
+/**
+ * Resolve how to invoke npm on the current platform.
+ *
+ * There is no `npm` executable on Windows — only `npm.cmd`, a shim — so
+ * `execFileSync('npm', ...)` throws ENOENT there. Running it through a
+ * shell would "fix" that but reopens command injection the moment any
+ * argument stops being a literal in this file, so instead this runs
+ * node's own bundled npm-cli.js directly, the same way
+ * scripts/build-demo.cjs already does. That also sidesteps `npm.cmd`
+ * itself being just another shell script Windows must find on PATH.
+ *
+ * @param {string[]} args
+ * @param {{ platform?: string, execPath?: string }} [opts]
+ * @returns {{ command: string, args: string[] }}
+ */
+function npmCommand(args, { platform = process.platform, execPath = process.execPath } = {}) {
+  if (platform === 'win32') {
+    return {
+      command: execPath,
+      args: [
+        path.win32.join(path.win32.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+        ...args,
+      ],
+    };
+  }
+  return { command: 'npm', args };
+}
+
 function npm(args, opts = {}) {
   // npm_config_* vars from an outer npm invocation (e.g. --package-lock-only
   // leaking into the pack step) must not change behavior here.
   const env = { ...process.env };
   delete env.npm_config_package_lock_only;
-  return execFileSync('npm', args, { cwd: root, encoding: 'utf8', env, ...opts });
+  const { command, args: resolvedArgs } = npmCommand(args);
+  return execFileSync(command, resolvedArgs, { cwd: root, encoding: 'utf8', env, ...opts });
 }
-
-mkdirSync(vendorDir, { recursive: true });
-
-// `npm pack --json` reports the tarball filename it wrote.
-const packOutput = npm([
-  'pack',
-  './packages/shared',
-  '--pack-destination',
-  vendorDir,
-  '--json',
-]);
-const [{ filename }] = JSON.parse(packOutput);
-// npm may report the raw name with a scope slash; the file on disk is escaped.
-const writtenName = filename.replace('/', '-');
-
-renameSync(path.join(vendorDir, writtenName), tmp);
-rmSync(target, { force: true });
-renameSync(tmp, target);
 
 // npm's --package-lock-only reuses an existing file: entry instead of
 // re-hashing the freshly packed archive, which would leave a changed
@@ -71,15 +82,41 @@ function dropSharedEntries(lockPath) {
   writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
 }
 
-dropSharedEntries(path.join(root, 'functions', 'package-lock.json'));
-dropSharedEntries(path.join(root, 'package-lock.json'));
+function main() {
+  mkdirSync(vendorDir, { recursive: true });
 
-// Refresh functions/package-lock.json so it pins the tarball's integrity
-// hash without installing anything, then the root workspace lockfile,
-// which pins the same tarball through the functions workspace.
-npm(['install', '--prefix', path.join(root, 'functions'), '--package-lock-only'], {
-  cwd: path.join(root, 'functions'),
-});
-npm(['install', '--package-lock-only']);
+  // `npm pack --json` reports the tarball filename it wrote.
+  const packOutput = npm([
+    'pack',
+    './packages/shared',
+    '--pack-destination',
+    vendorDir,
+    '--json',
+  ]);
+  const [{ filename }] = JSON.parse(packOutput);
+  // npm may report the raw name with a scope slash; the file on disk is escaped.
+  const writtenName = filename.replace('/', '-');
 
-console.log(`prepare-functions: wrote ${path.relative(root, target)}`);
+  renameSync(path.join(vendorDir, writtenName), tmp);
+  rmSync(target, { force: true });
+  renameSync(tmp, target);
+
+  dropSharedEntries(path.join(root, 'functions', 'package-lock.json'));
+  dropSharedEntries(path.join(root, 'package-lock.json'));
+
+  // Refresh functions/package-lock.json so it pins the tarball's integrity
+  // hash without installing anything, then the root workspace lockfile,
+  // which pins the same tarball through the functions workspace.
+  npm(['install', '--prefix', path.join(root, 'functions'), '--package-lock-only'], {
+    cwd: path.join(root, 'functions'),
+  });
+  npm(['install', '--package-lock-only']);
+
+  console.log(`prepare-functions: wrote ${path.relative(root, target)}`);
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = { npmCommand, main };

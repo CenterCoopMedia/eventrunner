@@ -156,7 +156,9 @@ function buildGlobalTokens(config, { now = () => new Date() } = {}) {
     brand_primary: theme.colors?.primary || '',
     brand_ink: theme.colors?.ink || '',
     logo_url: theme.logoUrl || '',
-    current_year: String(now().getFullYear()),
+    // UTC, not the local clock: a laptop and a CI runner in different
+    // timezones must render the same token for the same instant.
+    current_year: String(now().getUTCFullYear()),
   };
 }
 

@@ -188,7 +188,11 @@ async function main(argv) {
     for (const [name, contents] of Object.entries(files)) {
       const target = path.join(outDir, name);
       const existing = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
-      if (existing !== contents) differences.push(name);
+      // Compare on content, not line endings: a CRLF checkout (the Windows
+      // git default) rewrites every LF this script wrote to CRLF on disk,
+      // which would otherwise report every file as stale for no reason.
+      const normalize = (text) => (text === null ? null : text.replace(/\r\n/g, '\n'));
+      if (normalize(existing) !== normalize(contents)) differences.push(name);
     }
     // A byte-for-byte match on the expected file set is not the whole
     // hygiene gate: it says nothing about an EXTRA file sitting in the
