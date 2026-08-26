@@ -349,6 +349,7 @@ jobs:
     # classifier explicitly did not select them. DCO is intentionally skipped
     # on pushes to main because it already ran on the merged pull request.
     steps:
+      - uses: actions/checkout@v4
       - name: Verify the selected CI tiers passed
         env:
           EVENT_NAME: ${{ github.event_name }}

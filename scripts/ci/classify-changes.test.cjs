@@ -114,13 +114,15 @@ test('PR change collection uses the merge base and retains both sides of renames
   assert.deepEqual(invocation.options, { encoding: 'buffer' });
 });
 
-test('the documentation job requires a focused test when the Pages generator exists', () => {
+test('the documentation and gate jobs retain their required checks', () => {
   const workflowPath = path.resolve(__dirname, '..', '..', '.github', 'workflows', 'ci.yml');
   const workflow = fs.readFileSync(workflowPath, 'utf8');
 
   assert.match(workflow, /if \[ -f scripts\/build-pages\.cjs \]; then\s+test -f scripts\/build-pages\.test\.cjs\s+node --test scripts\/build-pages\.test\.cjs/s);
   assert.doesNotMatch(workflow, /if \[ -f scripts\/build-pages\.test\.cjs \]; then/);
   assert.match(workflow, /run: node scripts\/ci\/verify-gate\.cjs/);
+  const gate = workflow.slice(workflow.indexOf('\n  gate:'));
+  assert.match(gate, /steps:\s+- uses: actions\/checkout@v4\s+- name: Verify the selected CI tiers passed[\s\S]*run: node scripts\/ci\/verify-gate\.cjs/);
 });
 
 test('workflow, configuration, and dependency changes select the full matrix', () => {
