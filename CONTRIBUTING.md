@@ -122,6 +122,12 @@ that the classifier did not select is expected to be skipped. Pushes to `main`
 fail open to the full matrix. All tiers remain credential-free so fork pull
 requests can run them without secrets.
 
+The documentation check validates local links and the Pages entrypoint's basic
+metadata. Generated pages under `docs/docs/**` must also carry an SVG favicon,
+canonical URL, and complete Open Graph and Twitter metadata. `docs/demo/**`
+remains outside that generated-page metadata rule until the demo redesign in
+#109; its metadata is owned there. Root-page social metadata is tracked in #105.
+
 | Changed paths | Selected tier |
 |---|---|
 | Markdown, `docs/**` except `docs/demo/**`, handbook files, and issue/discussion templates | Documentation checks: local links and generated Pages HTML markup |

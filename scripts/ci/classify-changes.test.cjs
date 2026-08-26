@@ -120,6 +120,7 @@ test('the documentation job requires a focused test when the Pages generator exi
 
   assert.match(workflow, /if \[ -f scripts\/build-pages\.cjs \]; then\s+test -f scripts\/build-pages\.test\.cjs\s+node --test scripts\/build-pages\.test\.cjs/s);
   assert.doesNotMatch(workflow, /if \[ -f scripts\/build-pages\.test\.cjs \]; then/);
+  assert.match(workflow, /run: node scripts\/ci\/verify-gate\.cjs/);
 });
 
 test('workflow, configuration, and dependency changes select the full matrix', () => {

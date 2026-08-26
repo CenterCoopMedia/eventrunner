@@ -21,7 +21,31 @@ const MARKDOWN_LINK_RE = /!?\[[^\]]*\]\(\s*(?:<([^>\n]+)>|([^\s)]+))/g;
 const MARKDOWN_REFERENCE_DEFINITION_RE = /^[ \t]{0,3}\[([^\]\n]+)\]:\s*(?:<([^>\n]+)>|(\S+))/gm;
 const MARKDOWN_REFERENCE_USE_RE = /!?\[([^\]\n]+)\](?:\[([^\]\n]*)\])?/g;
 const HTML_REFERENCE_RE = /\b(?:href|src)=['"]([^'"]+)['"]/gi;
-const LOCAL_SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
+const URL_SCHEME_RE = /^([a-z][a-z\d+.-]*:)/i;
+const SAFE_EXTERNAL_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+const GENERATED_DOCS_PREFIX = 'docs/docs/';
+
+const BASE_PAGE_METADATA = [
+  ['doctype', /^<!doctype html>/i],
+  ['language', /<html\b[^>]*\blang=['"][^'"]+['"]/i],
+  ['viewport', /<meta\b[^>]*name=['"]viewport['"]/i],
+  ['title', /<title>[^<]+<\/title>/i],
+  ['description', /<meta\b[^>]*name=['"]description['"]/i],
+  ['favicon', /<link\b(?=[^>]*\brel=['"]icon['"])(?=[^>]*\btype=['"]image\/svg\+xml['"])(?=[^>]*\bhref=['"][^'"]+\.svg(?:[?#][^'"]*)?['"])[^>]*>/i],
+];
+
+const GENERATED_PAGE_METADATA = [
+  ['canonical', /<link\b(?=[^>]*\brel=['"]canonical['"])(?=[^>]*\bhref=['"][^'"]+['"])[^>]*>/i],
+  ['og:title', /<meta\b(?=[^>]*\bproperty=['"]og:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['og:description', /<meta\b(?=[^>]*\bproperty=['"]og:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['og:type', /<meta\b(?=[^>]*\bproperty=['"]og:type['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['og:url', /<meta\b(?=[^>]*\bproperty=['"]og:url['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['og:image', /<meta\b(?=[^>]*\bproperty=['"]og:image['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:card', /<meta\b(?=[^>]*\bname=['"]twitter:card['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:title', /<meta\b(?=[^>]*\bname=['"]twitter:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:description', /<meta\b(?=[^>]*\bname=['"]twitter:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:image', /<meta\b(?=[^>]*\bname=['"]twitter:image['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+];
 
 function listFiles(root, predicate, relativeRoot = root) {
   const files = [];
@@ -38,12 +62,17 @@ function listFiles(root, predicate, relativeRoot = root) {
 }
 
 function localTargetPath(sourcePath, target, root) {
-  if (!target || target.startsWith('#') || LOCAL_SCHEME_RE.test(target)) return null;
+  if (!target || target.startsWith('#')) return null;
   let decoded;
   try {
     decoded = decodeURIComponent(target);
   } catch {
     decoded = target;
+  }
+  const scheme = decoded.match(URL_SCHEME_RE)?.[1].toLowerCase();
+  if (scheme) {
+    if (SAFE_EXTERNAL_SCHEMES.has(scheme)) return null;
+    return { path: target, error: `unsupported URL scheme: ${scheme}` };
   }
   const withoutFragment = decoded.split('#', 1)[0].split('?', 1)[0];
   if (!withoutFragment) return null;
@@ -145,20 +174,21 @@ function checkPages(root) {
     return relativePath.startsWith('docs/') && relativePath.endsWith('.html');
   });
   const text = fs.readFileSync(pagePath, 'utf8');
-  const required = [
-    ['doctype', /^<!doctype html>/i],
-    ['language', /<html\b[^>]*\blang=['"][^'"]+['"]/i],
-    ['viewport', /<meta\b[^>]*name=['"]viewport['"]/i],
-    ['title', /<title>[^<]+<\/title>/i],
-    ['description', /<meta\b[^>]*name=['"]description['"]/i],
-    ['favicon', /<link\b[^>]*rel=['"]icon['"]/i],
-  ];
-  const errors = required
+  const errors = BASE_PAGE_METADATA
     .filter(([, expression]) => !expression.test(text))
     .map(([name]) => `docs/index.html: missing ${name}`);
   for (const relativePath of pagePaths) {
     const currentPath = path.join(root, relativePath);
     const currentText = currentPath === pagePath ? text : fs.readFileSync(currentPath, 'utf8');
+    const publicPath = relativePath.replaceAll(path.sep, '/');
+    // This deliberately scopes the generated-page policy to docs/docs. The
+    // demo's public metadata is owned by the dedicated redesign tracked in #109.
+    if (publicPath.startsWith(GENERATED_DOCS_PREFIX)) {
+      errors.push(...BASE_PAGE_METADATA
+        .concat(GENERATED_PAGE_METADATA)
+        .filter(([, expression]) => !expression.test(currentText))
+        .map(([name]) => `${publicPath}: missing ${name}`));
+    }
     errors.push(...checkLocalTargets(currentPath, extractTargets(currentText, HTML_REFERENCE_RE), root, true));
   }
   return errors;

@@ -373,41 +373,4 @@ jobs:
           RULES_RESULT: ${{ needs.rules.result }}
           E2E_SELECTED: ${{ needs.changes.outputs.e2e }}
           E2E_RESULT: ${{ needs.e2e.result }}
-        run: |
-          set -euo pipefail
-
-          test "$CHANGES_RESULT" = success
-          test "$SECRETS_RESULT" = success
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            test "$DCO_RESULT" = success
-          elif [ "$DCO_RESULT" != "skipped" ]; then
-            echo "::error::DCO must be skipped on a push, got $DCO_RESULT" >&2
-            exit 1
-          fi
-
-          check_selected() {
-            local label="$1"
-            local selected="$2"
-            local result="$3"
-            if [ "$selected" = "true" ]; then
-              if [ "$result" != "success" ]; then
-                echo "::error::$label was selected but finished with $result" >&2
-                exit 1
-              fi
-            elif [ "$result" != "skipped" ]; then
-              echo "::error::$label was not selected but finished with $result" >&2
-              exit 1
-            fi
-          }
-
-          check_selected docs "$DOCS_SELECTED" "$DOCS_RESULT"
-          check_selected demo "$DEMO_SELECTED" "$DEMO_RESULT"
-          check_selected lint "$LINT_SELECTED" "$LINT_RESULT"
-          check_selected unit "$UNIT_SELECTED" "$UNIT_RESULT"
-          check_selected unit-web "$UNIT_WEB_SELECTED" "$UNIT_WEB_RESULT"
-          check_selected build "$BUILD_SELECTED" "$BUILD_RESULT"
-          check_selected hygiene "$HYGIENE_SELECTED" "$HYGIENE_RESULT"
-          check_selected rules "$RULES_SELECTED" "$RULES_RESULT"
-          check_selected e2e "$E2E_SELECTED" "$E2E_RESULT"
-
-          echo "CI gate passed: every selected tier succeeded."
+        run: node scripts/ci/verify-gate.cjs
