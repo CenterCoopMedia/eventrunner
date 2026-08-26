@@ -18,6 +18,13 @@
 //
 // Disabled by default outside a production build (spec: "disabled in
 // dev/emulator unless configured") — see isClientErrorReportingEnabled.
+//
+// Also off entirely in the static demo build (lib/demoMode.js): that build IS
+// a production build and it carries a placeholder VITE_FIREBASE_PROJECT_ID,
+// so resolveFunctionsOrigin would happily resolve and the first uncaught
+// error in the tab would POST a stack trace to a cloudfunctions.net host that
+// is not ours. Firestore being offline does not cover a bare fetch.
+import { IS_DEMO } from './demoMode.js';
 
 const SAFELINKS_RE = /safelinks\.protection\.outlook\.com/i;
 const STALE_BUNDLE_RE = new RegExp(
@@ -93,6 +100,9 @@ export function resolveFunctionsOrigin(env = import.meta.env) {
  * @param {Record<string, string|boolean|undefined>} [env]
  */
 export function isClientErrorReportingEnabled(env = import.meta.env) {
+  // Not even an explicit opt-in turns telemetry on in the demo: there is no
+  // endpoint to receive it. Compile-time `false` in a normal client build.
+  if (IS_DEMO) return false;
   const explicit = env.VITE_ENABLE_CLIENT_ERROR_REPORTING;
   if (explicit === 'true') return true;
   if (explicit === 'false') return false;
@@ -110,6 +120,10 @@ export function isClientErrorReportingEnabled(env = import.meta.env) {
 export async function reportClientError(report, deps = {}) {
   const { env = import.meta.env, fetchImpl = typeof fetch === 'function' ? fetch : null, now = Date.now } = deps;
   try {
+    // Backstop for any direct caller: initErrorReporting already declines to
+    // install its listeners in the demo, but the sender itself must never be
+    // the thing that reaches the network there.
+    if (IS_DEMO) return;
     if (!report || typeof report.message !== 'string' || report.message.length === 0) return;
     if (isBenignClientError(report)) return;
     if (!fetchImpl) return;

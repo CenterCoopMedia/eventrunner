@@ -13,6 +13,7 @@
 // `response.ok`.
 import { functionsOrigin } from '../contexts/AuthContext.jsx';
 import { appCheckHeaders } from '../firebase.js';
+import { IS_DEMO } from './demoMode.js';
 
 /**
  * Error shape both calls normalize to. `code` mirrors the server's
@@ -33,6 +34,23 @@ export class SpeakerInviteError extends Error {
 }
 
 async function post(name, body, { idToken = null } = {}) {
+  // Static demo build: there is no functions origin behind it, and unlike
+  // Firestore (taken offline wholesale in firebase.js) a bare fetch has
+  // nothing switching it off. Refusing here is what makes the claim true at
+  // the seam rather than only at each call site: /speaker/accept is reached
+  // from an emailed link, so a `?token=` deep link into the demo would
+  // otherwise POST that token to a cloudfunctions.net host that is not ours.
+  // pages/SpeakerAccept.jsx never gets this far — it renders its own demo
+  // state — so this is the backstop, not the user-facing path.
+  // In a normal client build IS_DEMO is a compile-time `false` and the
+  // bundler drops the branch.
+  if (IS_DEMO) {
+    throw new SpeakerInviteError({
+      code: 'demo',
+      status: 0,
+      message: 'Invitations are disabled in this demo.',
+    });
+  }
   const attestation = await appCheckHeaders();
   let response;
   try {
