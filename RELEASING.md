@@ -38,8 +38,8 @@ called out plainly in the changelog entry — SemVer's normal pre-1.0 allowance.
 
 ## Cutting a tag
 
-1. Confirm `main` is green: CI (lint, unit, web unit, build, hygiene, rules, DCO, secret scan) —
-   see [CONTRIBUTING.md](CONTRIBUTING.md)'s test table.
+1. Confirm `main` is green: CI (lint, unit, web unit, build, hygiene, demo, rules, DCO, secret scan)
+   — see [CONTRIBUTING.md](CONTRIBUTING.md)'s test table.
 2. Open a PR that:
    - Retitles `## [Unreleased]` in `CHANGELOG.md` to `## [x.y.z] - YYYY-MM-DD`, and adds a fresh
      empty `## [Unreleased]` above it.
@@ -78,3 +78,31 @@ that ref before dispatching, or passes it to whatever provisioning mechanism rea
 `main` (§1–2 of the runbook, and the WIF binding in particular is scoped to `refs/heads/main`), so
 deploying from an arbitrary tag currently means merging that tag's tree to `main` first, not
 dispatching against the tag directly.
+
+## The demo build (`docs/demo/`)
+
+`docs/demo/` is committed output, not generated at deploy time: `npm run build:demo`
+(`scripts/build-demo.cjs`) runs a demo-mode `vite build` of `apps/web` against the committed
+synthetic snapshot in `apps/web/src/generated/` and syncs the result into `docs/demo/`, which
+GitHub Pages serves at `https://centercoopmedia.github.io/run-of-show/demo/`. Nobody runs this at
+deploy time — it has to be rebuilt and committed by hand whenever its inputs change.
+
+- **Rebuild and commit `docs/demo/` before tagging** whenever a PR touched `apps/web/src/**` or
+  `apps/web/src/generated/**` since the last rebuild: `npm run build:demo`, review the diff, commit
+  it (a normal DCO-signed commit, same as any other change).
+- **CI catches a forgotten rebuild for you** — the `demo` job (`.github/workflows/ci.yml`) runs
+  `node scripts/build-demo.cjs --check` on every push and PR and fails if a fresh build differs
+  from the committed `docs/demo/` (issue #94). Treat a red `demo` job as "rebuild and commit",
+  never as a reason to touch `docs/demo/` by hand.
+- **The build is deterministic**: repeated builds of unchanged input, including Vite's
+  content-hashed asset filenames, come out byte-for-byte identical (verified by hand; see
+  `scripts/build-demo.test.cjs` for the directory-diff logic `--check` is built on). That is what
+  makes the CI gate viable without flaking on unrelated reruns.
+- **The `--base` / rename caveat**: `scripts/build-demo.cjs` defaults `--base` to
+  `/run-of-show/demo/`, matching this repo's current name and the fact that GitHub Pages serves
+  `docs/` from the repo root. Renaming the repository, or moving the demo to a different Pages
+  path, changes that URL — rerun with `--base /new-path/` (and `--out` if the destination
+  directory changes too) and recommit `docs/demo/`, or every asset URL the built `index.html`
+  emits will 404 under the new address. Nothing checks this automatically: `--check` only proves
+  the committed output matches a fresh build at the *current* `--base`, not that the `--base` is
+  still correct.

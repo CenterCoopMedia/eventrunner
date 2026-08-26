@@ -159,6 +159,32 @@ jobs:
       - name: Check the committed snapshot against the demo fixture
         run: node scripts/generate-content.cjs --demo --check
 
+  demo:
+    name: Demo build hygiene
+    runs-on: ubuntu-latest
+    # Rebuilds the static demo (spec issue #94) and fails on any byte-for-byte
+    # difference from the committed docs/demo/, so the GitHub Pages demo
+    # cannot drift from apps/web source or the committed synthetic snapshot
+    # (see the `hygiene` job above for the snapshot itself). The build is
+    # deterministic — verified by hand: three consecutive builds of unchanged
+    # input, including Vite's content-hashed asset filenames, come out
+    # byte-identical (see scripts/build-demo.test.cjs and RELEASING.md).
+    # No credentials — same demo-mode build scripts/build-demo.cjs always
+    # runs, with its own placeholder VITE_FIREBASE_* values — so this runs on
+    # fork PRs too.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Check the committed demo against a fresh build
+        run: node scripts/build-demo.cjs --check
+
   rules:
     name: Security rules on emulators
     runs-on: ubuntu-latest

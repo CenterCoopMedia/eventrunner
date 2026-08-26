@@ -34,11 +34,23 @@
  *   node scripts/build-demo.cjs --base /other/path/ # different subpath
  *   node scripts/build-demo.cjs --out docs/demo     # different destination
  *   node scripts/build-demo.cjs --dry-run           # print the plan only
+ *   node scripts/build-demo.cjs --check             # build to a temp dir,
+ *                                                    # diff against --out,
+ *                                                    # write nothing (CI)
  *
- * Exit codes: 0 ok, 1 unexpected error, 2 bad arguments, 4 build failed.
+ * --check exists to catch the committed docs/demo/ going stale relative to
+ * apps/web source or the committed synthetic snapshot (issue #94): the
+ * build is deterministic (verified: repeated builds of unchanged input are
+ * byte-for-byte identical, including the content-hashed asset filenames
+ * Vite derives from file contents, not from a clock or build counter), so
+ * any diff here means someone edited source or the snapshot and forgot to
+ * rerun `npm run build:demo` and commit the result.
+ *
+ * Exit codes: 0 ok, 1 unexpected error / drift found, 2 bad arguments, 4 build failed.
  */
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
@@ -70,11 +82,13 @@ const DEMO_FIREBASE_ENV = Object.freeze({
 });
 
 function parseArgs(argv) {
-  const options = { base: DEFAULT_BASE, out: DEFAULT_OUT, dryRun: false };
+  const options = { base: DEFAULT_BASE, out: DEFAULT_OUT, dryRun: false, check: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--dry-run') {
       options.dryRun = true;
+    } else if (arg === '--check') {
+      options.check = true;
     } else if (arg === '--base' || arg === '--out') {
       const value = argv[i + 1];
       if (!value || value.startsWith('--')) {
@@ -180,6 +194,102 @@ function ensureJekyllSafety(outDir, dryRun) {
   return { offenders, created: true };
 }
 
+/**
+ * Recursively list every file under `dir`, as paths relative to it
+ * (POSIX-style separators so the output reads the same on any OS). Used by
+ * --check to build the file sets it diffs.
+ */
+function listFilesRecursive(dir) {
+  const out = [];
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else {
+        out.push(path.relative(dir, full).split(path.sep).join('/'));
+      }
+    }
+  };
+  if (fs.existsSync(dir)) walk(dir);
+  return out;
+}
+
+/**
+ * Byte-for-byte comparison of two directory trees. Returns the relative
+ * paths that are missing, extra, or differ in content, all rolled into one
+ * `drifted` list (sorted, for stable output) — a renamed content-hashed
+ * asset shows up as one path in `missing` and a different one in `extra`,
+ * which is exactly the signal a stale commit produces.
+ */
+function compareDirs(expectedDir, actualDir) {
+  const expected = new Set(listFilesRecursive(expectedDir));
+  const actual = new Set(listFilesRecursive(actualDir));
+  const missing = [...expected].filter((f) => !actual.has(f));
+  const extra = [...actual].filter((f) => !expected.has(f));
+  const differing = [...expected]
+    .filter((f) => actual.has(f))
+    .filter((f) => !fs.readFileSync(path.join(expectedDir, f)).equals(
+      fs.readFileSync(path.join(actualDir, f)),
+    ));
+  const drifted = [
+    ...missing.map((f) => `missing:  ${f}`),
+    ...extra.map((f) => `extra:    ${f}`),
+    ...differing.map((f) => `changed:  ${f}`),
+  ].sort();
+  return { missing, extra, differing, drifted };
+}
+
+/**
+ * --check: build into a throwaway directory outside the repo (so a drifted
+ * build can never partially overwrite the committed docs/demo/ it is being
+ * compared against, and so resolveOutDir's inside-repo rule is irrelevant
+ * here) and diff it against the committed output. Writes nothing to the
+ * working tree either way.
+ */
+function runCheck({ base, expectedOutDir }) {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'run-of-show-demo-check-'));
+  try {
+    console.log(`Building demo to a scratch dir for comparison: ${tmpRoot}`);
+    runBuild({ base, dryRun: false });
+    if (!fs.existsSync(DIST_DIR)) {
+      console.error(`Expected build output at ${DIST_DIR}; it is not there.`);
+      return 4;
+    }
+    fs.cpSync(DIST_DIR, tmpRoot, { recursive: true });
+
+    if (!fs.existsSync(expectedOutDir)) {
+      console.error(
+        `--check: ${path.relative(REPO_ROOT, expectedOutDir)} does not exist. ` +
+          'Run `npm run build:demo` and commit the result.',
+      );
+      return 1;
+    }
+
+    const { drifted } = compareDirs(expectedOutDir, tmpRoot);
+    if (drifted.length > 0) {
+      console.error(
+        `build-demo --check: ${path.relative(REPO_ROOT, expectedOutDir)} is stale ` +
+          `relative to a fresh build (${drifted.length} path(s) differ):\n` +
+          drifted.map((d) => `  - ${d}`).join('\n') +
+          '\n\nRegenerate with: npm run build:demo\n' +
+          'then commit the updated docs/demo/.',
+      );
+      return 1;
+    }
+    console.log(
+      `build-demo --check: docs/demo/ matches a fresh build ` +
+        `(${listFilesRecursive(expectedOutDir).length} file(s)).`,
+    );
+    return 0;
+  } finally {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+    // Vite's own dist/ is scratch too — leaving a demo-mode build sitting
+    // there would be surprising the next time someone builds apps/web.
+    fs.rmSync(DIST_DIR, { recursive: true, force: true });
+  }
+}
+
 function directorySize(dir) {
   let bytes = 0;
   let files = 0;
@@ -208,6 +318,14 @@ function main(argv) {
       return 2;
     }
     throw error;
+  }
+
+  if (options.check) {
+    if (options.dryRun) {
+      console.error('--check and --dry-run are mutually exclusive.');
+      return 2;
+    }
+    return runCheck({ base: options.base, expectedOutDir: options.outDir });
   }
 
   console.log(`Demo build → ${path.relative(REPO_ROOT, options.outDir)}`);
@@ -257,6 +375,8 @@ if (require.main === module) {
 module.exports = {
   parseArgs,
   resolveOutDir,
+  compareDirs,
+  listFilesRecursive,
   DEFAULT_BASE,
   DEFAULT_OUT,
   DEMO_FIREBASE_ENV,
