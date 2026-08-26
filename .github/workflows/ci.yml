@@ -11,6 +11,34 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Classify changed paths
+    runs-on: ubuntu-latest
+    # The classifier is repository-owned so path selection is reviewable with
+    # the rest of the change. Pushes to main fail open to the full matrix;
+    # only pull requests use the path-specific tiers.
+    outputs:
+      docs: ${{ steps.classify.outputs.docs }}
+      demo: ${{ steps.classify.outputs.demo }}
+      lint: ${{ steps.classify.outputs.lint }}
+      unit: ${{ steps.classify.outputs.unit }}
+      unitWeb: ${{ steps.classify.outputs.unitWeb }}
+      build: ${{ steps.classify.outputs.build }}
+      hygiene: ${{ steps.classify.outputs.hygiene }}
+      rules: ${{ steps.classify.outputs.rules }}
+      e2e: ${{ steps.classify.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Classify the changed paths
+        id: classify
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/ci/classify-changes.cjs
+
   dco:
     name: DCO sign-off
     runs-on: ubuntu-latest
@@ -62,8 +90,31 @@ jobs:
         if: github.event_name == 'push'
         run: ./gitleaks detect --source . --log-opts="--all" --redact -v
 
+  docs:
+    name: Documentation checks
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    # This tier intentionally uses only the runner's Node installation. It
+    # checks local links and generated Pages HTML without an npm install.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check documentation links and Pages markup
+        run: node scripts/check-docs.cjs
+      - name: Run documentation checker tests
+        run: node --test scripts/check-docs.test.cjs
+      - name: Run focused documentation generator tests
+        run: |
+          if [ -f scripts/build-pages.test.cjs ]; then
+            node --test scripts/build-pages.test.cjs
+          else
+            echo "No documentation generator tests are present in this revision."
+          fi
+
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.lint == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,6 +131,8 @@ jobs:
 
   unit:
     name: Shared package tests
+    needs: changes
+    if: needs.changes.outputs.unit == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -96,6 +149,8 @@ jobs:
 
   unit-web:
     name: Web unit tests
+    needs: changes
+    if: needs.changes.outputs.unitWeb == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +167,8 @@ jobs:
 
   build:
     name: Web build
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-latest
     # Credential-free (spec §8.1): the committed synthetic snapshot in
     # apps/web/src/generated/ feeds the build, and VITE_FIREBASE_* values are
@@ -140,6 +197,8 @@ jobs:
 
   hygiene:
     name: Generated-content hygiene
+    needs: changes
+    if: needs.changes.outputs.hygiene == 'true'
     runs-on: ubuntu-latest
     # Regenerates apps/web/src/generated/* from the synthetic demo fixture
     # (spec §8.6) and fails on any byte-for-byte difference, so the
@@ -161,6 +220,8 @@ jobs:
 
   demo:
     name: Demo build hygiene
+    needs: changes
+    if: needs.changes.outputs.demo == 'true'
     runs-on: ubuntu-latest
     # Rebuilds the static demo (spec issue #94) and fails on any byte-for-byte
     # difference from the committed docs/demo/, so the GitHub Pages demo
@@ -182,11 +243,15 @@ jobs:
         run: npm run prepare:functions
       - name: Install dependencies
         run: npm ci
+      - name: Run demo generator tests
+        run: node --test scripts/build-demo.test.cjs
       - name: Check the committed demo against a fresh build
         run: node scripts/build-demo.cjs --check
 
   rules:
     name: Security rules on emulators
+    needs: changes
+    if: needs.changes.outputs.rules == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -213,6 +278,8 @@ jobs:
 
   e2e:
     name: E2E on emulators
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     # Credential-free (spec §8.1, issue #38): Playwright drives the real app
     # against the full emulator suite (auth, firestore, storage, functions)
@@ -272,3 +339,76 @@ jobs:
             playwright-report/
             e2e/.tmp/
           retention-days: 7
+
+  gate:
+    name: CI gate
+    if: always()
+    needs: [changes, dco, secrets, docs, demo, lint, unit, unit-web, build, hygiene, rules, e2e]
+    runs-on: ubuntu-latest
+    # Keep this job's name stable and require it in branch protection. The
+    # selected jobs must pass; skipped jobs are acceptable only when the
+    # classifier explicitly did not select them. DCO is intentionally skipped
+    # on pushes to main because it already ran on the merged pull request.
+    steps:
+      - name: Verify the selected CI tiers passed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DCO_RESULT: ${{ needs.dco.result }}
+          SECRETS_RESULT: ${{ needs.secrets.result }}
+          DOCS_SELECTED: ${{ needs.changes.outputs.docs }}
+          DOCS_RESULT: ${{ needs.docs.result }}
+          DEMO_SELECTED: ${{ needs.changes.outputs.demo }}
+          DEMO_RESULT: ${{ needs.demo.result }}
+          LINT_SELECTED: ${{ needs.changes.outputs.lint }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          UNIT_SELECTED: ${{ needs.changes.outputs.unit }}
+          UNIT_RESULT: ${{ needs.unit.result }}
+          UNIT_WEB_SELECTED: ${{ needs.changes.outputs.unitWeb }}
+          UNIT_WEB_RESULT: ${{ needs['unit-web'].result }}
+          BUILD_SELECTED: ${{ needs.changes.outputs.build }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          HYGIENE_SELECTED: ${{ needs.changes.outputs.hygiene }}
+          HYGIENE_RESULT: ${{ needs.hygiene.result }}
+          RULES_SELECTED: ${{ needs.changes.outputs.rules }}
+          RULES_RESULT: ${{ needs.rules.result }}
+          E2E_SELECTED: ${{ needs.changes.outputs.e2e }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: |
+          set -euo pipefail
+
+          test "$CHANGES_RESULT" = success
+          test "$SECRETS_RESULT" = success
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test "$DCO_RESULT" = success
+          elif [ "$DCO_RESULT" != "skipped" ]; then
+            echo "::error::DCO must be skipped on a push, got $DCO_RESULT" >&2
+            exit 1
+          fi
+
+          check_selected() {
+            local label="$1"
+            local selected="$2"
+            local result="$3"
+            if [ "$selected" = "true" ]; then
+              if [ "$result" != "success" ]; then
+                echo "::error::$label was selected but finished with $result" >&2
+                exit 1
+              fi
+            elif [ "$result" != "skipped" ]; then
+              echo "::error::$label was not selected but finished with $result" >&2
+              exit 1
+            fi
+          }
+
+          check_selected docs "$DOCS_SELECTED" "$DOCS_RESULT"
+          check_selected demo "$DEMO_SELECTED" "$DEMO_RESULT"
+          check_selected lint "$LINT_SELECTED" "$LINT_RESULT"
+          check_selected unit "$UNIT_SELECTED" "$UNIT_RESULT"
+          check_selected unit-web "$UNIT_WEB_SELECTED" "$UNIT_WEB_RESULT"
+          check_selected build "$BUILD_SELECTED" "$BUILD_RESULT"
+          check_selected hygiene "$HYGIENE_SELECTED" "$HYGIENE_RESULT"
+          check_selected rules "$RULES_SELECTED" "$RULES_RESULT"
+          check_selected e2e "$E2E_SELECTED" "$E2E_RESULT"
+
+          echo "CI gate passed: every selected tier succeeded."
