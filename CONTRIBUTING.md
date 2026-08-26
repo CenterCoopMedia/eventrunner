@@ -110,7 +110,39 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 | `node scripts/check-dco.cjs <base> <head>` | Every non-merge commit in the pull request's range carries a DCO `Signed-off-by` trailer — see [Sign your commits](#sign-your-commits-dco) |
 | `node scripts/dev/login-smoke.mjs` | Live Playwright smoke test of the emailed-code sign-in flow against the Functions/Firestore/Auth emulators (dev tool, not run by CI) |
 
-CI runs everything above except the dev-only smoke test on every pull request and every push to `main`, credential-free. Fork PRs must be able to run every check without credentials.
+CI runs the trust checks and selected tiers on every pull request, credential-free. Every push to `main` runs the full matrix. Fork PRs must be able to run every check without credentials.
+
+### Proportional CI
+
+Pull requests run the trust checks (DCO and secret scanning) plus the smallest
+path-selected tier. The repository-owned `scripts/ci/classify-changes.cjs`
+classifier emits the selections; mixed changes take the union of their tiers.
+The `CI gate` job is the stable aggregate check for branch protection. A job
+that the classifier did not select is expected to be skipped. Pushes to `main`
+fail open to the full matrix. All tiers remain credential-free so fork pull
+requests can run them without secrets.
+
+The documentation check validates local links and the Pages entrypoint's basic
+metadata. Generated pages under `docs/docs/**` must also carry an SVG favicon,
+canonical URL, and complete Open Graph and Twitter metadata. `docs/demo/**`
+remains outside that generated-page metadata rule until the demo redesign in
+#109; its metadata is owned there. Root-page social metadata is tracked in #105.
+
+| Changed paths | Selected tier |
+|---|---|
+| Markdown, `docs/**` except `docs/demo/**`, handbook files, and issue/discussion templates | Documentation checks: local links and generated Pages HTML markup |
+| Documentation generators (`scripts/build-pages.cjs`, `scripts/build-pages.test.cjs`, `scripts/lib/pages-*.cjs`, `scripts/lib/markdown-pages.cjs`) | Documentation checks and lint |
+| `scripts/build-demo.cjs`, `scripts/build-demo.test.cjs`, or `docs/demo/**` | Lint, demo generator tests, and committed-demo hygiene |
+| `apps/web/**` | Lint, web unit tests, web build, generated-content hygiene, demo hygiene, and E2E |
+| `functions/**` | Lint, shared/functions unit tests, rules emulators, and E2E |
+| `packages/shared/**` | Lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
+| `firestore.rules` or `storage.rules` | Rules emulators and E2E |
+| Workflows, tool configuration, package manifests or locks, Firebase configuration, `e2e/**`, `publisher/**`, other scripts, or an unrecognized path | Full matrix: documentation checks, lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
+
+Changes that match more than one row run the union of the selected tiers. The
+main branch protection rule should require `CI gate` after this workflow is
+merged; the existing `Shared package tests` requirement remains unchanged
+until that operator update is made.
 
 `npm run test:e2e` needs Java 21+ (the same Firestore/Storage emulators `test:rules` uses) and a Chromium build Playwright can find. It never runs `playwright install` itself: point `PLAYWRIGHT_BROWSERS_PATH` at an existing install, or run `npx playwright install --with-deps chromium` once yourself first — `.github/workflows/ci.yml`'s `e2e` job does the latter, cached.
 
