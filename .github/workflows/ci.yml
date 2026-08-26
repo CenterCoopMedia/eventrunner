@@ -105,10 +105,9 @@ jobs:
         run: node --test scripts/check-docs.test.cjs
       - name: Run focused documentation generator tests
         run: |
-          if [ -f scripts/build-pages.test.cjs ]; then
+          if [ -f scripts/build-pages.cjs ]; then
+            test -f scripts/build-pages.test.cjs
             node --test scripts/build-pages.test.cjs
-          else
-            echo "No documentation generator tests are present in this revision."
           fi
 
   lint:

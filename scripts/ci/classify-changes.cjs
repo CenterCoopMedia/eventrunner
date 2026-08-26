@@ -75,8 +75,11 @@ function isAppPath(path) {
 }
 
 function isBackendPath(path) {
-  return (path.startsWith('functions/') || path.startsWith('packages/shared/')) &&
-    !isMarkdownPath(path);
+  return path.startsWith('functions/') && !isMarkdownPath(path);
+}
+
+function isSharedPath(path) {
+  return path.startsWith('packages/shared/') && !isMarkdownPath(path);
 }
 
 function isRulesPath(path) {
@@ -111,21 +114,23 @@ function resultForPaths(paths, mode, categories) {
     docs,
     demo,
     demoGenerator,
+    docsGenerator,
     app,
     backend,
+    shared,
     rules,
     full,
   } = categories;
   const jobs = {
     docs: docs || full,
-    demo: demo || app || full,
-    lint: demoGenerator || app || backend || full,
-    unit: backend || full,
-    unitWeb: app || full,
-    build: app || full,
-    hygiene: app || full,
-    rules: rules || backend || full,
-    e2e: app || backend || rules || full,
+    demo: demo || app || shared || full,
+    lint: demoGenerator || docsGenerator || app || backend || shared || full,
+    unit: backend || shared || full,
+    unitWeb: app || shared || full,
+    build: app || shared || full,
+    hygiene: app || shared || full,
+    rules: rules || backend || shared || full,
+    e2e: app || backend || shared || rules || full,
   };
   return { paths, mode, jobs };
 }
@@ -140,14 +145,16 @@ function classifyPaths(input) {
     docs: paths.some(isDocsPath),
     demo: paths.some(isDemoPath),
     demoGenerator: paths.some((path) => DEMO_GENERATOR_PATHS.has(path)),
+    docsGenerator: paths.some(isDocsGeneratorPath),
     app: paths.some(isAppPath),
     backend: paths.some(isBackendPath),
+    shared: paths.some(isSharedPath),
     rules: paths.some(isRulesPath),
     full: paths.some(isFullPath),
   };
 
   const recognized = categories.docs || categories.demo || categories.app ||
-    categories.backend || categories.rules || categories.full;
+    categories.backend || categories.shared || categories.rules || categories.full;
   if (!recognized) categories.full = true;
 
   // A workflow, tool configuration, dependency manifest, or unknown path is
@@ -161,6 +168,7 @@ function classifyPaths(input) {
     ['demo', categories.demo],
     ['app', categories.app],
     ['backend', categories.backend],
+    ['shared', categories.shared],
     ['rules', categories.rules],
     ['full', categories.full],
   ].filter(([, selected]) => selected).map(([name]) => name);
@@ -173,7 +181,7 @@ function changedPaths(base, head, runGit = execFileSync) {
   if (!/^[0-9a-f]{7,64}$/i.test(String(base)) || !/^[0-9a-f]{7,64}$/i.test(String(head))) {
     throw new Error('base and head must be commit ids');
   }
-  const output = runGit('git', ['diff', '--name-only', '-z', base, head], {
+  const output = runGit('git', ['diff', '--name-only', '-z', '--no-renames', `${base}...${head}`], {
     encoding: 'buffer',
   });
   return output.toString('utf8').split('\0').filter(Boolean);

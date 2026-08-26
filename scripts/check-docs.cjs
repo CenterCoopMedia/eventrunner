@@ -18,6 +18,8 @@ const SKIP_DIRS = new Set([
   'tasks',
 ]);
 const MARKDOWN_LINK_RE = /!?\[[^\]]*\]\(\s*(?:<([^>\n]+)>|([^\s)]+))/g;
+const MARKDOWN_REFERENCE_DEFINITION_RE = /^[ \t]{0,3}\[([^\]\n]+)\]:\s*(?:<([^>\n]+)>|(\S+))/gm;
+const MARKDOWN_REFERENCE_USE_RE = /!?\[([^\]\n]+)\](?:\[([^\]\n]*)\])?/g;
 const HTML_REFERENCE_RE = /\b(?:href|src)=['"]([^'"]+)['"]/gi;
 const LOCAL_SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
 
@@ -65,7 +67,10 @@ function localTargetPath(sourcePath, target, root) {
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
     return { path: candidate, error: 'target escapes the repository' };
   }
-  return { path: candidate, pagesRoute: withoutFragment.startsWith('/') };
+  return {
+    path: candidate,
+    pagesRoute: withoutFragment.startsWith('/'),
+  };
 }
 
 function extractTargets(text, expression) {
@@ -76,19 +81,42 @@ function extractTargets(text, expression) {
   return targets;
 }
 
+function normalizeReferenceLabel(label) {
+  return label.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function extractMarkdownTargets(text) {
+  const targets = extractTargets(text, MARKDOWN_LINK_RE);
+  const definitions = new Map();
+  for (const match of text.matchAll(MARKDOWN_REFERENCE_DEFINITION_RE)) {
+    definitions.set(normalizeReferenceLabel(match[1]), match[2] || match[3]);
+  }
+  const content = text.replace(MARKDOWN_REFERENCE_DEFINITION_RE, '');
+  for (const match of content.matchAll(MARKDOWN_REFERENCE_USE_RE)) {
+    const referenceLabel = match[2] === undefined ? match[1] : match[2] || match[1];
+    const target = definitions.get(normalizeReferenceLabel(referenceLabel));
+    if (target) targets.push(target);
+  }
+  return targets;
+}
+
 function displayPath(root, sourcePath) {
   return path.relative(root, sourcePath).replaceAll(path.sep, '/');
 }
 
-function checkLocalTargets(sourcePath, targets, root) {
+function checkLocalTargets(sourcePath, targets, root, htmlReferences = false) {
   const errors = [];
   for (const target of targets) {
     const resolved = localTargetPath(sourcePath, target, root);
     if (!resolved) continue;
     if (resolved.error) {
       errors.push(`${displayPath(root, sourcePath)}: ${target} (${resolved.error})`);
-    } else if (!targetExists(resolved.path, resolved.pagesRoute)) {
-      errors.push(`${displayPath(root, sourcePath)}: missing ${target}`);
+    } else {
+      const withoutFragment = target.split('#', 1)[0].split('?', 1)[0];
+      const directoryRoute = htmlReferences && withoutFragment.endsWith('/');
+      if (!targetExists(resolved.path, resolved.pagesRoute || directoryRoute)) {
+        errors.push(`${displayPath(root, sourcePath)}: missing ${target}`);
+      }
     }
   }
   return errors;
@@ -104,7 +132,7 @@ function checkMarkdownLinks(root) {
   for (const relativePath of listFiles(root, (file) => /\.mdx?$/.test(file))) {
     const sourcePath = path.join(root, relativePath);
     const text = fs.readFileSync(sourcePath, 'utf8');
-    errors.push(...checkLocalTargets(sourcePath, extractTargets(text, MARKDOWN_LINK_RE), root));
+    errors.push(...checkLocalTargets(sourcePath, extractMarkdownTargets(text), root));
   }
   return errors;
 }
@@ -131,7 +159,7 @@ function checkPages(root) {
   for (const relativePath of pagePaths) {
     const currentPath = path.join(root, relativePath);
     const currentText = currentPath === pagePath ? text : fs.readFileSync(currentPath, 'utf8');
-    errors.push(...checkLocalTargets(currentPath, extractTargets(currentText, HTML_REFERENCE_RE), root));
+    errors.push(...checkLocalTargets(currentPath, extractTargets(currentText, HTML_REFERENCE_RE), root, true));
   }
   return errors;
 }
@@ -158,6 +186,7 @@ module.exports = {
   checkPages,
   checkRepository,
   extractTargets,
+  extractMarkdownTargets,
   localTargetPath,
   main,
 };

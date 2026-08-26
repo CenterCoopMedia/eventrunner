@@ -124,10 +124,12 @@ requests can run them without secrets.
 
 | Changed paths | Selected tier |
 |---|---|
-| Markdown, `docs/**` except `docs/demo/**`, handbook files, issue/discussion templates, and the reserved documentation-generator paths (`scripts/build-pages.cjs`, `scripts/build-pages.test.cjs`, `scripts/lib/pages-*.cjs`, `scripts/lib/markdown-pages.cjs`) | Documentation checks: local links and generated Pages HTML markup |
+| Markdown, `docs/**` except `docs/demo/**`, handbook files, and issue/discussion templates | Documentation checks: local links and generated Pages HTML markup |
+| Documentation generators (`scripts/build-pages.cjs`, `scripts/build-pages.test.cjs`, `scripts/lib/pages-*.cjs`, `scripts/lib/markdown-pages.cjs`) | Documentation checks and lint |
 | `scripts/build-demo.cjs`, `scripts/build-demo.test.cjs`, or `docs/demo/**` | Lint, demo generator tests, and committed-demo hygiene |
 | `apps/web/**` | Lint, web unit tests, web build, generated-content hygiene, demo hygiene, and E2E |
-| `functions/**` or `packages/shared/**` | Lint, shared/functions unit tests, rules emulators, and E2E |
+| `functions/**` | Lint, shared/functions unit tests, rules emulators, and E2E |
+| `packages/shared/**` | Lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
 | `firestore.rules` or `storage.rules` | Rules emulators and E2E |
 | Workflows, tool configuration, package manifests or locks, Firebase configuration, `e2e/**`, `publisher/**`, other scripts, or an unrecognized path | Full matrix: documentation checks, lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
 

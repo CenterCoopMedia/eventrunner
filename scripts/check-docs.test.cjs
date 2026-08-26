@@ -30,6 +30,17 @@ test('missing relative Markdown targets are reported', () => {
   });
 });
 
+test('missing reference-style Markdown targets are reported through their definitions', () => {
+  withTempRoot((root) => {
+    fs.writeFileSync(
+      path.join(root, 'README.md'),
+      'Read the [staff guide][guide].\n\n[guide]: handbook/missing.md\n',
+    );
+
+    assert.deepEqual(checkMarkdownLinks(root), ['README.md: missing handbook/missing.md']);
+  });
+});
+
 test('local task and agent-state notes are outside the published documentation scope', () => {
   withTempRoot((root) => {
     for (const directory of ['tasks', '.claude']) {
@@ -92,5 +103,17 @@ test('Pages checks reject unsupported root-relative paths', () => {
     assert.deepEqual(checkPages(root), [
       'docs/index.html: /other-site/app.js (unsupported root-relative path (expected /eventrunner/))',
     ]);
+  });
+});
+
+test('Pages checks require index.html for relative directory links', () => {
+  withTempRoot((root) => {
+    fs.mkdirSync(path.join(root, 'docs', 'guide'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'docs', 'index.html'),
+      '<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width"><meta name="description" content="Docs"><title>Docs</title><link rel="icon" href="data:image/svg+xml,%3Csvg%3E%3C/svg%3E"></head><body><a href="guide/">Guide</a></body></html>',
+    );
+
+    assert.deepEqual(checkPages(root), ['docs/index.html: missing guide/']);
   });
 });

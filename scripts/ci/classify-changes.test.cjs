@@ -2,8 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
-const { classifyPaths, JOB_NAMES } = require('./classify-changes.cjs');
+const { changedPaths, classifyPaths, JOB_NAMES } = require('./classify-changes.cjs');
 
 function selected(result) {
   return JOB_NAMES.filter((name) => result.jobs[name]);
@@ -41,23 +43,25 @@ test('demo generator and committed Pages output select demo checks without emula
   assert.deepEqual(selected(output), ['demo']);
 });
 
-test('reserved documentation generator paths stay in the documentation tier', () => {
+test('Pages generator paths select documentation checks and lint', () => {
   for (const path of [
     'scripts/build-pages.cjs',
     'scripts/build-pages.test.cjs',
     'scripts/lib/pages-index.cjs',
     'scripts/lib/markdown-pages.cjs',
-    'docs/docs/index.html',
   ]) {
     const result = classifyPaths([path]);
     assert.equal(result.mode, 'docs', path);
-    assert.deepEqual(selected(result), ['docs'], path);
+    assert.deepEqual(selected(result), ['docs', 'lint'], path);
   }
+
+  assert.deepEqual(selected(classifyPaths(['docs/docs/index.html'])), ['docs']);
 });
 
 test('application and backend changes select their relevant suites', () => {
   const app = classifyPaths(['apps/web/src/App.jsx']);
   const backend = classifyPaths(['functions/src/core/auth.cjs']);
+  const shared = classifyPaths(['packages/shared/src/registration.cjs']);
 
   assert.equal(app.mode, 'app');
   assert.deepEqual(selected(app), ['demo', 'lint', 'unitWeb', 'build', 'hygiene', 'e2e']);
@@ -68,6 +72,54 @@ test('application and backend changes select their relevant suites', () => {
   assert.deepEqual(selected(backend), ['lint', 'unit', 'rules', 'e2e']);
   assert.equal(backend.jobs.unitWeb, false);
   assert.equal(backend.jobs.build, false);
+
+  assert.equal(shared.mode, 'shared');
+  assert.deepEqual(selected(shared), [
+    'demo',
+    'lint',
+    'unit',
+    'unitWeb',
+    'build',
+    'hygiene',
+    'rules',
+    'e2e',
+  ]);
+});
+
+test('PR change collection uses the merge base and retains both sides of renames', () => {
+  let invocation;
+  const paths = changedPaths('abcdef1', '1234567', (command, args, options) => {
+    invocation = { command, args, options };
+    return Buffer.from('docs/old-guide.md\0apps/web/src/Guide.jsx\0');
+  });
+
+  assert.deepEqual(paths, ['docs/old-guide.md', 'apps/web/src/Guide.jsx']);
+  assert.deepEqual(selected(classifyPaths(paths)), [
+    'docs',
+    'demo',
+    'lint',
+    'unitWeb',
+    'build',
+    'hygiene',
+    'e2e',
+  ]);
+  assert.equal(invocation.command, 'git');
+  assert.deepEqual(invocation.args, [
+    'diff',
+    '--name-only',
+    '-z',
+    '--no-renames',
+    'abcdef1...1234567',
+  ]);
+  assert.deepEqual(invocation.options, { encoding: 'buffer' });
+});
+
+test('the documentation job requires a focused test when the Pages generator exists', () => {
+  const workflowPath = path.resolve(__dirname, '..', '..', '.github', 'workflows', 'ci.yml');
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+
+  assert.match(workflow, /if \[ -f scripts\/build-pages\.cjs \]; then\s+test -f scripts\/build-pages\.test\.cjs\s+node --test scripts\/build-pages\.test\.cjs/s);
+  assert.doesNotMatch(workflow, /if \[ -f scripts\/build-pages\.test\.cjs \]; then/);
 });
 
 test('workflow, configuration, and dependency changes select the full matrix', () => {
