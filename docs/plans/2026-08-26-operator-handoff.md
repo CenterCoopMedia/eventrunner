@@ -275,6 +275,103 @@ by heading, not a duplicate. Read each referenced section before doing its step.
 
 ---
 
+## Workstream D — Repository rename (execute now)
+
+**Decision: the repo renames from `run-of-show` to `eventrunner` now, not gated on counsel.**
+This is different from the product-name decision in Workstream A: the repo slug/URLs are
+infrastructure, not public product marketing, and the maintainer has explicitly accepted the
+timing risk of moving the repo ahead of counsel's review — counsel still reviews trademark
+exposure per Workstream A step 3, in parallel, not as a blocker to this workstream. The repo
+**stays under the `CenterCoopMedia` GitHub org** — no org change. The "claim the name as an org"
+piece of this is the `@eventrunner` npm scope already covered in Workstream A step 1, not a GitHub
+org move.
+
+**Explicitly out of scope for this workstream:** the visible product name. Page copy, UI strings,
+and prose that say "Run of Show" as the *product name* (as opposed to a repo/URL reference) stay
+exactly as they are for now — that visible rename is a separate, later pass, gated on counsel
+per Workstream A. This workstream only touches the repo slug and the URLs/paths that are
+mechanically tied to it.
+
+1. **[HUMAN or AGENT with org admin rights] Rename the repo on GitHub.** Repo Settings → General →
+   Repository name → change `run-of-show` to `eventrunner`, same `CenterCoopMedia` org. GitHub
+   automatically redirects the old web URL, git remotes, and API calls made against the old
+   `owner/repo` path to the new one, and open PRs/issues/milestones carry over untouched — none of
+   that needs separate handling.
+   **Success check:** `https://github.com/CenterCoopMedia/run-of-show` redirects (HTTP 301) to
+   `https://github.com/CenterCoopMedia/eventrunner`; the repo's Settings page shows the new name.
+
+2. **[AGENT] Update local clone remotes.** GitHub's redirect makes this optional for correctness,
+   but leaving remotes pointed at the old name is confusing and one day the redirect could be
+   retired, so do it anyway:
+   ```sh
+   git remote set-url origin https://github.com/CenterCoopMedia/eventrunner.git
+   # or, for an SSH remote:
+   git remote set-url origin git@github.com:CenterCoopMedia/eventrunner.git
+   ```
+   **Success check:** `git remote -v` shows `eventrunner`, not `run-of-show`, and `git fetch`
+   succeeds against it.
+
+3. **[AGENT] CRITICAL — GitHub Pages does not redirect.** Unlike the repo's web/git/API URLs, the
+   Pages site does not follow the rename: it physically moves from
+   `https://centercoopmedia.github.io/run-of-show/` to
+   `https://centercoopmedia.github.io/eventrunner/` with no redirect from the old path. Two
+   follow-up changes are needed in a commit after the rename:
+
+   a. **Update the greppable set of repo-URL references in prose/docs.** These were found by
+      grepping the repo for `run-of-show` on 2026-08-26 (pre-computed here so the agent doesn't
+      need to re-derive the list) — the codebase deliberately keeps the product *name* out of code
+      identifiers, so this is a short, entirely prose/doc set, no code or config: `README.md`,
+      `CONTRIBUTING.md`, `SUPPORT.md`, `GOVERNANCE.md`, `SECURITY.md`, `docs/index.html`,
+      `docs/handbook/README.md`. In each, every `run-of-show` occurrence is part of a GitHub URL
+      of the shape `github.com/CenterCoopMedia/run-of-show[/...]` or the Pages URL
+      `centercoopmedia.github.io/run-of-show[/...]` — replace `run-of-show` with `eventrunner` in
+      both URL patterns; do not touch any prose that says "Run of Show" as a *name* (there isn't
+      any in this specific `run-of-show`-token grep, but scan the same files' diffs before
+      committing to be sure a stray one didn't get swept in). Re-grep after editing to confirm
+      nothing was missed:
+      ```sh
+      grep -rn "run-of-show" README.md CONTRIBUTING.md SUPPORT.md GOVERNANCE.md SECURITY.md \
+        docs/index.html docs/handbook/README.md
+      ```
+      **Note:** `apps/web/README.md` also matches a `run-of-show` grep, but its occurrences are
+      the Firebase demo project id `demo-run-of-show` (an unrelated literal used by the local
+      emulator instructions, not a repo URL) — leave that file alone; renaming that id is a
+      separate concern with its own blast radius (Firestore/Storage emulator config, `.env`
+      examples) and is not part of this workstream.
+      **Success check:** the grep above returns nothing for the seven listed files; every link in
+      those files that used to point at `.../run-of-show...` now points at `.../eventrunner...`.
+
+   b. **Rebuild the static demo under `docs/demo/` with the new Pages base path.** The demo is
+      built by `scripts/build-demo.cjs`, which takes `--base <path>` (default
+      `/run-of-show/demo/`, hardcoded as `DEFAULT_BASE` in that script, reasoned there as "Pages
+      project site root is `/run-of-show/`; the demo lives beside the docs") and syncs Vite's
+      output into `docs/demo/`, deleting stale contents first so no renamed hashed asset lingers.
+      Run it with the new base and commit the regenerated output:
+      ```sh
+      node scripts/build-demo.cjs --base /eventrunner/demo/
+      git add docs/demo/
+      git commit -m "Rebuild demo for /eventrunner/demo/ Pages base after repo rename"
+      ```
+      **Success check:** `docs/demo/index.html` and its asset references use `/eventrunner/demo/`
+      paths, not `/run-of-show/demo/`; `git status` shows only `docs/demo/` changed by this step
+      (plus whatever 3a touched, if committed together).
+
+4. **[AGENT] Verify end to end, after both the GitHub rename and the 3a/3b commit are live.**
+   - Old web URL redirects: `curl -sI https://github.com/CenterCoopMedia/run-of-show` shows a
+     redirect to the `eventrunner` path.
+   - Pages serves at the new URL: `https://centercoopmedia.github.io/eventrunner/` loads (the old
+     `.../run-of-show/` Pages URL will 404 — expected, per 3 above, not a bug to chase).
+   - Demo loads at the new path: `https://centercoopmedia.github.io/eventrunner/demo/` loads and
+     is interactive (not a blank page or broken asset paths — confirms 3b's base path took).
+   - PR #90 is still open and still attached to this repo (now at its `eventrunner` URL) —
+     `gh pr view 90 --repo CenterCoopMedia/eventrunner` shows it open with its original commits
+     and comments intact.
+   **Success check:** all four of the above are true. If Pages hasn't rebuilt yet, GitHub Pages
+   deploys can lag a few minutes behind the push — re-check before treating a blank/404 result as
+   a real failure.
+
+---
+
 ## Results — fill this in as you go
 
 Local agent: update this section in place as each workstream's steps complete. Do not paste any
@@ -302,6 +399,17 @@ token, password, or API key value into this document — name only *where* it wa
 - [ ] Known SPF-field caveat hit: yes/no — if yes, this is expected, not a new bug
 - [ ] Delivery webhook registered with triggers Delivery/Bounce/SpamComplaint: yes/no
 - [ ] Round-trip test (send + bounce) confirmed via `sent_emails` row: yes/no
+
+### Workstream D
+- [ ] Repo renamed `run-of-show` → `eventrunner` under `CenterCoopMedia` (no org change): yes/no
+- [ ] Local clone remotes updated: yes/no
+- [ ] Prose/doc repo-URL references updated in the seven listed files (grep confirms none
+      remain): yes/no
+- [ ] Demo rebuilt with `--base /eventrunner/demo/` and `docs/demo/` committed: yes/no
+- [ ] Old repo URL redirects: yes/no
+- [ ] Pages serves at `centercoopmedia.github.io/eventrunner/`: yes/no
+- [ ] Demo loads at `centercoopmedia.github.io/eventrunner/demo/`: yes/no
+- [ ] PR #90 still open and attached at the new repo URL: yes/no
 
 ### Anything blocked
 List anything that couldn't be completed and why (e.g. waiting on human 2FA, waiting on counsel,
