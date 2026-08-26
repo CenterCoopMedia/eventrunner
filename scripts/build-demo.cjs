@@ -134,7 +134,7 @@ function buildCommand(base, { platform = process.platform, execPath = process.ex
     return {
       command: execPath,
       args: [
-        path.join(path.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+        path.win32.join(path.win32.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
         ...npmArgs,
       ],
     };
