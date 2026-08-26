@@ -29,7 +29,7 @@ Upload or link files on the session. Embargo holds them until the session ends. 
 
 ## Tickets
 
-Your operator chose Eventbrite, a spreadsheet import, or no ticketing. Signup email should match that choice. If a new person is told to "buy on Eventbrite" and you are not using Eventbrite, that is a product bug — [file it](https://github.com/CenterCoopMedia/run-of-show/issues/new?template=bug.yml).
+Your operator chose Eventbrite, a spreadsheet import, or no ticketing. Signup email should match that choice. If a new person is told to "buy on Eventbrite" and you are not using Eventbrite, that is a product bug — [file it](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml).
 
 ## When to email CCM instead of posting
 

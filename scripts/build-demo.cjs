@@ -3,7 +3,7 @@
 
 /**
  * Static showcase build — the click-through demo published from GitHub Pages
- * at https://centercoopmedia.github.io/run-of-show/demo/.
+ * at https://centercoopmedia.github.io/eventrunner/demo/.
  *
  * It is the ordinary `vite build` of apps/web with two switches thrown:
  *
@@ -58,8 +58,8 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const WEB_DIR = path.join(REPO_ROOT, 'apps', 'web');
 const DIST_DIR = path.join(WEB_DIR, 'dist');
 
-/** Pages project site root is /run-of-show/; the demo lives beside the docs. */
-const DEFAULT_BASE = '/run-of-show/demo/';
+/** Pages project site root is /eventrunner/; the demo lives beside the docs. */
+const DEFAULT_BASE = '/eventrunner/demo/';
 const DEFAULT_OUT = path.join('docs', 'demo');
 
 /**
@@ -128,18 +128,44 @@ function resolveOutDir(out) {
   return abs;
 }
 
+function buildCommand(base, { platform = process.platform, execPath = process.execPath } = {}) {
+  const npmArgs = ['run', 'build', '-w', 'apps/web', '--', '--base', base];
+  if (platform === 'win32') {
+    return {
+      command: execPath,
+      args: [
+        path.win32.join(path.win32.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+        ...npmArgs,
+      ],
+    };
+  }
+  return { command: 'npm', args: npmArgs };
+}
+
+function normalizeLineEndings(text) {
+  return text.replace(/\r\n?/g, '\n');
+}
+
+function normalizeGeneratedHtml(outDir) {
+  const indexPath = path.join(outDir, 'index.html');
+  if (!fs.existsSync(indexPath)) return;
+  const original = fs.readFileSync(indexPath, 'utf8');
+  const normalized = normalizeLineEndings(original);
+  if (normalized !== original) fs.writeFileSync(indexPath, normalized);
+}
+
 function runBuild({ base, dryRun }) {
   const env = { ...process.env, ...DEMO_FIREBASE_ENV, VITE_DEMO_MODE: '1' };
   // See the header: the demo is the committed synthetic snapshot, never a
   // deploy-time export of a real project.
   delete env.GENERATED_DIR;
 
-  const args = ['run', 'build', '-w', 'apps/web', '--', '--base', base];
+  const { command, args } = buildCommand(base);
   if (dryRun) {
-    console.log(`[dry-run] npm ${args.join(' ')}  (VITE_DEMO_MODE=1)`);
+    console.log(`[dry-run] npm run build -w apps/web -- --base ${base}  (VITE_DEMO_MODE=1)`);
     return;
   }
-  const result = spawnSync('npm', args, {
+  const result = spawnSync(command, args, {
     cwd: REPO_ROOT,
     env,
     stdio: 'inherit',
@@ -257,6 +283,7 @@ function runCheck({ base, expectedOutDir }) {
       return 4;
     }
     fs.cpSync(DIST_DIR, tmpRoot, { recursive: true });
+    normalizeGeneratedHtml(tmpRoot);
 
     if (!fs.existsSync(expectedOutDir)) {
       console.error(
@@ -351,6 +378,7 @@ function main(argv) {
   fs.rmSync(options.outDir, { recursive: true, force: true });
   fs.mkdirSync(options.outDir, { recursive: true });
   fs.cpSync(DIST_DIR, options.outDir, { recursive: true });
+  normalizeGeneratedHtml(options.outDir);
 
   ensureJekyllSafety(options.outDir, options.dryRun);
 
@@ -374,6 +402,8 @@ if (require.main === module) {
 
 module.exports = {
   parseArgs,
+  buildCommand,
+  normalizeLineEndings,
   resolveOutDir,
   compareDirs,
   listFilesRecursive,

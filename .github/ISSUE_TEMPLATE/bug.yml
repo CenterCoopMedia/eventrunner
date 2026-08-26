@@ -9,9 +9,9 @@ body:
       value: |
         Use this form when the **shared product** misbehaves.
 
-        - How-to ("how do I bookmark a session"): [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a)
+        - How-to ("how do I bookmark a session"): [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a)
         - CCM is operating your site and you need access or a content fix: email info@collaborativejournalism.org
-        - Security: [private report](https://github.com/CenterCoopMedia/run-of-show/security/advisories/new)
+        - Security: [private report](https://github.com/CenterCoopMedia/eventrunner/security/advisories/new)
 
         Do not paste attendee names, emails, ticket IDs, or other client data.
   - type: dropdown
@@ -112,11 +112,11 @@ body:
     attributes:
       label: Before you submit
       options:
-        - label: I searched [existing issues](https://github.com/CenterCoopMedia/run-of-show/issues) and did not find a duplicate.
+        - label: I searched [existing issues](https://github.com/CenterCoopMedia/eventrunner/issues) and did not find a duplicate.
           required: true
         - label: This report contains no real attendee, speaker, or client personal data.
           required: true
         - label: This is a product bug, not a request for CCM to change content on a hosted site.
           required: true
-        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/run-of-show/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md).
           required: true

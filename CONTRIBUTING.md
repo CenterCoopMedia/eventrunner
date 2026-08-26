@@ -6,15 +6,15 @@ By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). Reports
 
 ## Where to start
 
-Pick the path that matches what you are doing. If you are not changing code, you probably want [Discussions](https://github.com/CenterCoopMedia/run-of-show/discussions) or the [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki), not a pull request.
+Pick the path that matches what you are doing. If you are not changing code, you probably want [Discussions](https://github.com/CenterCoopMedia/eventrunner/discussions) or the [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki), not a pull request.
 
 | You are… | Do this |
 |---|---|
-| An attendee who cannot sign in, find a session, or open materials | [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a) |
-| Event staff stuck in the CMS, schedule, or speaker tools | [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a) |
-| An organization that wants CCM to run your event | [General](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=general) or email info@collaborativejournalism.org |
-| Reporting a bug in the shared product | [Bug form](https://github.com/CenterCoopMedia/run-of-show/issues/new?template=bug.yml) |
-| Asking for a product change | [Feature form](https://github.com/CenterCoopMedia/run-of-show/issues/new?template=feature.yml) |
+| An attendee who cannot sign in, find a session, or open materials | [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) |
+| Event staff stuck in the CMS, schedule, or speaker tools | [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) |
+| An organization that wants CCM to run your event | [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) or email info@collaborativejournalism.org |
+| Reporting a bug in the shared product | [Bug form](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml) |
+| Asking for a product change | [Feature form](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=feature.yml) |
 | Sending code or docs | Open or link an issue, then a pull request |
 
 If CCM is operating the event site for you and the problem is access, content, or your specific deployment, email info@collaborativejournalism.org. That is support, not a public ticket.
@@ -122,10 +122,10 @@ One lint rule to know about before it bites you: hex color literals (`#336699`) 
 
 ## Security
 
-Do not open a public issue for a vulnerability. Use [private reporting](https://github.com/CenterCoopMedia/run-of-show/security) or see [SECURITY.md](SECURITY.md).
+Do not open a public issue for a vulnerability. Use [private reporting](https://github.com/CenterCoopMedia/eventrunner/security) or see [SECURITY.md](SECURITY.md).
 
 ## Questions
 
-- Product and "how do I": [Discussions](https://github.com/CenterCoopMedia/run-of-show/discussions)
-- Handbook for attendees, staff, and clients: [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki)
+- Product and "how do I": [Discussions](https://github.com/CenterCoopMedia/eventrunner/discussions)
+- Handbook for attendees, staff, and clients: [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki)
 - Hosted-event support: info@collaborativejournalism.org

@@ -1,17 +1,17 @@
 blank_issues_enabled: false
 contact_links:
   - name: I am using an event site (attendee or staff)
-    url: https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a
+    url: https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a
     about: How-to questions and "is this supposed to work this way." Not a bug in the shared code.
   - name: We want CCM to run our event
-    url: https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=general
+    url: https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general
     about: Hosting, licensing, and onboarding. You can also email info@collaborativejournalism.org.
   - name: Hosted-event support
     url: mailto:info@collaborativejournalism.org
     about: If CCM already operates your site, email for access, content, and outages. Do not file that here.
   - name: Report a vulnerability
-    url: https://github.com/CenterCoopMedia/run-of-show/security/advisories/new
+    url: https://github.com/CenterCoopMedia/eventrunner/security/advisories/new
     about: Private disclosure only. Do not file a public issue.
   - name: Read the handbook
-    url: https://github.com/CenterCoopMedia/run-of-show/wiki
+    url: https://github.com/CenterCoopMedia/eventrunner/wiki
     about: Attendee, staff, and client guides.

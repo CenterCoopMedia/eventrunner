@@ -17,6 +17,8 @@ const path = require('node:path');
 
 const {
   parseArgs,
+  buildCommand,
+  normalizeLineEndings,
   resolveOutDir,
   compareDirs,
   listFilesRecursive,
@@ -30,15 +32,36 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 
 test('defaults target the Pages subpath and docs/demo', () => {
   const options = parseArgs([]);
-  assert.equal(options.base, DEFAULT_BASE);
+  assert.equal(DEFAULT_BASE, '/eventrunner/demo/');
+  assert.equal(options.base, '/eventrunner/demo/');
   assert.equal(options.out, DEFAULT_OUT);
   assert.equal(options.dryRun, false);
   assert.ok(DEFAULT_BASE.endsWith('/'));
 });
 
 test('a base without a trailing slash is normalized', () => {
-  assert.equal(parseArgs(['--base', '/run-of-show/demo']).base, '/run-of-show/demo/');
+  assert.equal(parseArgs(['--base', '/eventrunner/demo']).base, '/eventrunner/demo/');
   assert.equal(parseArgs(['--base=/x']).base, '/x/');
+});
+
+test('uses the bundled npm CLI without a Windows shell', () => {
+  assert.deepEqual(
+    buildCommand('/eventrunner/demo/', {
+      platform: 'win32',
+      execPath: 'C:\\Program Files\\nodejs\\node.exe',
+    }),
+    {
+      command: 'C:\\Program Files\\nodejs\\node.exe',
+      args: [
+        path.win32.join('C:\\Program Files\\nodejs', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+        'run', 'build', '-w', 'apps/web', '--', '--base', '/eventrunner/demo/',
+      ],
+    },
+  );
+});
+
+test('normalizes generated text output to LF line endings', () => {
+  assert.equal(normalizeLineEndings('first\r\nsecond\rthird\n'), 'first\nsecond\nthird\n');
 });
 
 test('--out and --dry-run parse in both forms', () => {

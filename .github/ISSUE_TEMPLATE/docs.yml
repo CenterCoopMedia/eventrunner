@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this for the [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki) and contributor docs. How-to questions still belong in [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a).
+        Use this for the [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki) and contributor docs. How-to questions still belong in [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a).
   - type: dropdown
     id: surface
     attributes:
@@ -38,5 +38,5 @@ body:
     attributes:
       label: Before you submit
       options:
-        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/run-of-show/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md).
           required: true

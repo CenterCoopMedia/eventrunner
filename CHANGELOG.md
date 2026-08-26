@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Updated canonical repository and GitHub Pages paths to `CenterCoopMedia/eventrunner` (#97).
+
 ### Added
 
 - Public repository under the Center for Cooperative Media, Apache-2.0.
