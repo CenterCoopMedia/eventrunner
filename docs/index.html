@@ -3,9 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Run of Show — event CMS for conferences &amp; gatherings</title>
+  <title>Event Runner — event CMS for conferences &amp; gatherings</title>
   <meta name="description" content="White-label event CMS. One Firebase project per event. Staff run the site. The Center for Cooperative Media operates it.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Event Runner — event CMS for conferences &amp; gatherings">
+  <meta property="og:description" content="White-label event CMS. One Firebase project per event. Staff run the site. The Center for Cooperative Media operates it.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Event Runner — event CMS for conferences &amp; gatherings">
+  <meta name="twitter:description" content="White-label event CMS. One Firebase project per event. Staff run the site. The Center for Cooperative Media operates it.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
@@ -39,95 +52,63 @@
       <a class="brand" href="./">
         <svg class="brand-mark" viewBox="0 0 96 96" aria-hidden="true" focusable="false"><use href="#mark"/></svg>
         <span class="brand-text">
-          <strong>Run of Show</strong>
+          <strong>Event Runner</strong>
           <span>Event CMS for conferences &amp; gatherings</span>
         </span>
       </a>
-      <span class="lamp"><i aria-hidden="true"></i>Tech rehearsal</span>
       <nav aria-label="Site">
-        <a href="#what">What it is</a>
-        <a href="./demo/">Demo</a>
-        <a href="#progress">Progress</a>
+        <a href="#hero">What it is</a>
+        <a href="#demo">Demo</a>
+        <a href="#status">Status</a>
         <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
-        <a href="https://github.com/CenterCoopMedia/eventrunner/discussions">Discussions</a>
       </nav>
     </header>
 
     <main id="main">
-      <section class="hero">
+      <section class="hero" id="hero">
         <div class="thesis">
-          <svg class="hero-mark" viewBox="0 0 96 96" role="img" aria-label="Run of Show calendar mark"><use href="#mark"/></svg>
-          <h1>The show still runs when the developer is not in the room.</h1>
-          <p class="lede">Run of Show is a white-label event CMS. Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates it. Your staff run the site from the admin panel.</p>
-          <div class="actions">
-            <a class="btn" href="./demo/">Click through the demo</a>
-            <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner">Open the repository</a>
-            <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0001-event-platform-v1.md">Read the spec</a>
-          </div>
+          <svg class="hero-mark" viewBox="0 0 96 96" role="img" aria-label="Event Runner calendar mark"><use href="#mark"/></svg>
+          <h1>An event CMS your staff run without a developer in the room</h1>
+          <p class="lede">Event Runner is a white-label event CMS. Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates it. Your staff run the site — schedule, speakers, pages, and registration — from the admin panel, without touching code.</p>
         </div>
 
-        <aside class="cuesheet" aria-label="Build status cue sheet">
-          <header class="cuesheet-head">
-            <span class="cuesheet-title">Cue sheet</span>
-            <span class="cuesheet-meta">Build status · v1</span>
+        <aside class="status-panel" aria-label="Build status">
+          <header class="status-panel-head">
+            <span class="status-panel-title">Build status</span>
+            <span class="status-panel-meta">v1</span>
           </header>
-          <ol class="cues" role="list">
-            <li class="cue">
-              <span class="cue-num">01</span>
-              <span class="cue-name">Email core &amp; adapters</span>
-              <span class="chip chip-go">Go</span>
+          <ul class="status-list" role="list">
+            <li class="status-row">
+              <span class="status-row-name">Email core &amp; adapters</span>
+              <span class="status-label status-label-done">Done</span>
             </li>
-            <li class="cue">
-              <span class="cue-num">02</span>
-              <span class="cue-name">Emailed-code sign-in</span>
-              <span class="chip chip-go">Go</span>
+            <li class="status-row">
+              <span class="status-row-name">Emailed-code sign-in</span>
+              <span class="status-label status-label-done">Done</span>
             </li>
-            <li class="cue">
-              <span class="cue-num">03</span>
-              <span class="cue-name">Block CMS</span>
-              <span class="chip chip-go">Go</span>
+            <li class="status-row">
+              <span class="status-row-name">Block CMS</span>
+              <span class="status-label status-label-done">Done</span>
             </li>
-            <li class="cue">
-              <span class="cue-num">04</span>
-              <span class="cue-name">Schedule &amp; speakers</span>
-              <span class="chip chip-go">Go</span>
+            <li class="status-row">
+              <span class="status-row-name">Schedule &amp; speakers</span>
+              <span class="status-label status-label-done">Done</span>
             </li>
-            <li class="cue">
-              <span class="cue-num">05</span>
-              <span class="cue-name">Ticketing adapters</span>
-              <span class="chip chip-go">Go</span>
+            <li class="status-row">
+              <span class="status-row-name">Ticketing adapters</span>
+              <span class="status-label status-label-done">Done</span>
             </li>
-            <li class="cue cue-current" aria-current="step">
-              <span class="cue-num">06</span>
-              <span class="cue-name">Packaging &amp; demo</span>
-              <span class="chip chip-live">In progress</span>
+            <li class="status-row">
+              <span class="status-row-name">Packaging &amp; demo</span>
+              <span class="status-label status-label-progress">In progress</span>
             </li>
-          </ol>
+          </ul>
         </aside>
       </section>
 
-      <section class="section" id="what">
-        <h2>Built for people who already produce events</h2>
-        <div class="card-grid">
-          <article class="card">
-            <h3>Staff-run CMS</h3>
-            <p>Pages, schedule, speakers, materials, and branding live in the admin. Clients never touch a repo.</p>
-          </article>
-          <article class="card">
-            <h3>One project per event</h3>
-            <p>Deploy-per-client. Your data, sender domain, and ticket provider stay in your deployment.</p>
-          </article>
-          <article class="card">
-            <h3>Open code, licensed name</h3>
-            <p>Apache-2.0. CCM sells the operated service. The trademark is what stays exclusive.</p>
-          </article>
-        </div>
-        <p class="note">The reference implementation is the 2026 Collaborative Journalism Summit site. That repo stays the live event. This repo is the extract.</p>
-      </section>
-
       <section class="section" id="demo">
-        <h2>Click through it before you deploy anything</h2>
-        <p>The public site, rendered from a fictional event — schedule, speakers, pages, and registration, all clickable with no sign-up. Read-only: it's the attendee experience, not the admin.</p>
+        <h2>Open the demo</h2>
+        <p>The public site, rendered from a fictional event: schedule, speakers, pages, and registration, all clickable, with no sign-up. It's the attendee experience, read-only — not the admin panel.</p>
         <div class="actions">
           <a class="btn" href="./demo/">Open the demo</a>
           <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/ADMIN_GUIDE.md">See the admin guide</a>
@@ -135,48 +116,94 @@
         <p class="note">Synthetic event, synthetic attendees, nothing from a real client. Staff run the actual show from the admin panel — the guide above walks every screen of it.</p>
       </section>
 
-      <section class="section" id="progress">
-        <h2>v1 in five milestones</h2>
+      <section class="section" id="capabilities">
+        <h2>What v1 includes</h2>
+        <div class="card-grid">
+          <article class="card">
+            <h3>Schedule &amp; speakers</h3>
+            <p>Sessions, bookmarks, and ICS calendar links. Speaker invite, accept, profile, and approval, plus an attendee directory.</p>
+          </article>
+          <article class="card">
+            <h3>Block CMS &amp; sign-in</h3>
+            <p>A draft/publish block CMS for pages and content. Google sign-in and emailed 6-digit OTP codes for attendees.</p>
+          </article>
+          <article class="card">
+            <h3>Ticketing</h3>
+            <p>Eventbrite and manual/CSV adapters on one provider-neutral registration state machine.</p>
+          </article>
+        </div>
+        <p class="note">Full feature list, including what v1 leaves out, is in the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">triage record</a>.</p>
+      </section>
+
+      <section class="section" id="deployment">
+        <h2>How it's deployed</h2>
+        <p>Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates it — your data, sender domain, and ticket provider stay inside your deployment. Client staff run the site from the admin panel; they never touch a repo or a server.</p>
+        <p class="note">The code is Apache-2.0 and free to read, fork, or self-host. "Event Runner" as a product name is reserved to CCM: that's the part that stays exclusive, not the code.</p>
+      </section>
+
+      <section class="section" id="operators">
+        <h2>For operators</h2>
+        <p>Built for nonprofits, newsrooms, universities, and event producers who want a staff-run event site — schedule, speakers, registration, and materials — without hiring developers or running infrastructure.</p>
+        <div class="actions">
+          <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general">Start a conversation with CCM</a>
+        </div>
+        <p class="note">That's the General discussion category — it's where CCM staff pick up hosting requests from prospective operators.</p>
+      </section>
+
+      <section class="section" id="contribute">
+        <h2>For contributors</h2>
+        <p>The reference implementation is the 2026 Collaborative Journalism Summit site. That repo stays the live event; this repo is the extract, and it's open for contribution under Apache-2.0.</p>
+        <div class="actions">
+          <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner">Open the repository</a>
+          <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0001-event-platform-v1.md">Read the spec</a>
+          <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CONTRIBUTING.md">Read CONTRIBUTING</a>
+        </div>
+        <p class="note">Licensed <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>.</p>
+      </section>
+
+      <section class="section" id="status">
+        <h2>Project status</h2>
+        <p>v1 is five milestones. M1 through M4 are complete. M5 packaging is in progress — the public demo instance and Eventbrite sandbox verification are what's left before v1 ships.</p>
         <ol class="milestones" role="list">
           <li class="milestone">
-            <span class="milestone-id">M1</span>
+            <span class="milestone-id">Milestone 1</span>
             <div class="milestone-body">
               <h3>Prerequisites</h3>
-              <p>Copyright, org, trademark screen, Postmark, first public commit. Two residual operator tasks closing today.</p>
+              <p>Copyright, org, trademark screen, Postmark, first public commit.</p>
             </div>
-            <span class="chip chip-done">Complete</span>
+            <span class="status-label status-label-done">Done</span>
           </li>
           <li class="milestone">
-            <span class="milestone-id">M2</span>
+            <span class="milestone-id">Milestone 2</span>
             <div class="milestone-body">
               <h3>Core port</h3>
               <p>Config, email, OTP, CMS, schedule, profiles. A fresh project boots to a generic event site.</p>
             </div>
-            <span class="chip chip-done">Complete</span>
+            <span class="status-label status-label-done">Done</span>
           </li>
           <li class="milestone">
-            <span class="milestone-id">M3</span>
+            <span class="milestone-id">Milestone 3</span>
             <div class="milestone-body">
               <h3>Feature wave</h3>
               <p>Speakers, materials, media library, reactions, badges, PDF, live updates.</p>
             </div>
-            <span class="chip chip-done">Complete</span>
+            <span class="status-label status-label-done">Done</span>
           </li>
           <li class="milestone">
-            <span class="milestone-id">M4</span>
+            <span class="milestone-id">Milestone 4</span>
             <div class="milestone-body">
               <h3>Ticketing</h3>
               <p>Eventbrite and manual/CSV adapters on a provider-neutral registration state machine.</p>
             </div>
-            <span class="chip chip-done">Complete</span>
+            <span class="status-label status-label-done">Done</span>
           </li>
           <li class="milestone">
-            <span class="milestone-id">M5</span>
+            <span class="milestone-id">Milestone 5</span>
             <div class="milestone-body">
               <h3>Packaging</h3>
               <p>Runbooks, demo instance, community scaffolding, e2e in CI. Left: the public demo instance and Eventbrite sandbox verification.</p>
             </div>
-            <span class="chip chip-live">In progress</span>
+            <span class="status-label status-label-progress">In progress</span>
           </li>
         </ol>
         <p class="note">
@@ -187,11 +214,6 @@
           <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">Triage record</a>
         </p>
       </section>
-
-      <p class="program-note">
-        <strong>Program notes</strong>
-        <span>Latest: M1–M4 are complete — email core, emailed-code sign-in, the block CMS, schedule and speakers, and both ticketing adapters are landed and verified on emulators. M5 packaging is in progress: the public demo instance and Eventbrite sandbox verification are what's left before v1 ships.</span>
-      </p>
     </main>
 
     <footer class="site-footer">
