@@ -309,8 +309,8 @@ admin can change afterward without a developer.
 
 No per-client file is committed to the public repo. Deploy-time values live as GitHub **Environment**
 variables and secrets, one environment per client deployment. `.env.example` documents the full set;
-`packages/shared/src/config/deploy.cjs` validates it and fails the build loudly on a missing key
-(the current build already does a one-off version of this for `VITE_FIREBASE_MEASUREMENT_ID`).
+`packages/shared/src/config/deploy.cjs` validates required values and fails the build loudly when one
+is missing.
 
 | Variable | Kind | Consumer | Notes |
 |---|---|---|---|
@@ -328,7 +328,7 @@ variables and secrets, one environment per client deployment. `.env.example` doc
 | `EVENT_APP_CHECK_ENFORCED` | var | functions | `true` \| `false`, default `false`. Enforces App Check on the OTP endpoints (§3.1). Requires `VITE_FIREBASE_APP_CHECK_SITE_KEY`. |
 | `EVENT_OTP_SEND_CEILING_PER_HOUR` | var | functions | positive integer, default `500`. Deployment-wide OTP send ceiling (§3.1). |
 | `VITE_FIREBASE_APP_CHECK_SITE_KEY` | var | build | reCAPTCHA v3 site key, non-secret. Absent → the App Check SDK is never loaded. |
-| `VITE_FIREBASE_*` (7) | var | build | unchanged set from `apps/web/src/firebase.js` |
+| Firebase web app config (six values) | var | build | required settings read by `apps/web/src/firebase.js` |
 | `VITE_EVENT_PUBLIC_URL` | var | build | mirrors `EVENT_PUBLIC_URL` into the bundle |
 | `FIREBASE_SERVICE_ACCOUNT` | secret | deploy, generate-content | |
 | `EMAIL_PROVIDER_API_KEY` | secret | functions | server token; Secret Manager via `defineSecret`; only when provider is `postmark` |

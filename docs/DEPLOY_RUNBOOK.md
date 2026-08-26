@@ -201,7 +201,8 @@ bearer token, and none of the Tier A values are confidential either.
 | `EVENT_OPERATOR_NOTIFIER` | `webhook` \| `email` \| `none` |
 | `EVENT_APP_CHECK_ENFORCED` | `false` by default; set the App Check site key before changing this to `true` |
 | `EVENT_OTP_SEND_CEILING_PER_HOUR` | positive integer; defaults to `500` |
-| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_MEASUREMENT_ID` | from Firebase Console → Project settings → your web app's SDK config |
+| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` | from Firebase Console → Project settings → your web app's SDK config |
+| `VITE_FIREBASE_MEASUREMENT_ID` | optional; Firebase omits it when Google Analytics is disabled, and Eventrunner does not use it |
 | `VITE_FIREBASE_APP_CHECK_SITE_KEY` | reCAPTCHA v3 site key; set this before enabling App Check enforcement |
 | `EVENT_SITE_PUBLISHER_ENABLED` | `false` by default. `true` provisions the site-publisher Cloud Run job — do §9 first |
 | `EVENT_PUBLISHER_SERVICE_ACCOUNT` | required when the publisher is enabled; the job's own runtime identity (§9) |
