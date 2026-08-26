@@ -247,11 +247,11 @@ by heading, not a duplicate. Read each referenced section before doing its step.
    after the record is correctly published (Cloudflare itself typically propagates in minutes, so
    a long wait points at Postmark's own verification cadence, not a DNS problem).
 
-   **Known caveat, don't chase this if it happens:** `scripts/README.md` notes the sender-domain
-   check still requires the deprecated SPF field to resolve before it reports fully verified. If
-   verification stalls with everything else (DKIM, Return-Path) green and only SPF unresolved,
-   that is this known issue — **do not spend time re-checking or re-publishing DNS records over
-   it**; report it back in the results section below instead so it can be tracked separately.
+   **SPF is informational, don't chase it:** the verification gate is DKIM + Return-Path only
+   (issue #93). Postmark's Domains API deprecates its SPF field and satisfies SPF through the
+   Return-Path CNAME, so the script reports the SPF verdict but never blocks on it and never asks
+   you to publish an SPF record. If SPF shows `unknown` or `FAIL` while DKIM and Return-Path are
+   green, the domain is verified — **do not re-check or publish DNS records over it**.
 
    **Success check:** `node scripts/verify-sender-domain.cjs --domain runofshow.net` exits `0`.
    Exit `1` = not verified (DNS not propagated yet or a record is wrong); exit `2` = misconfigured
@@ -381,6 +381,217 @@ mechanically tied to it.
 
 ---
 
+## Workstream E — Public demo instance (issue #35)
+
+The sales artifact: a live Firebase deployment, seeded entirely with fiction, that a prospective
+client can click through. It is onboarded as an ordinary client — `docs/CLIENT_ONBOARDING.md` →
+`docs/DEPLOY_RUNBOOK.md` — with demo-specific substitutions at a few points, not a separate
+pipeline. Issue #35's own approved deploy-plan comment (2026-08-22) has the fuller version of this
+checklist; what's below is this doc's sequenced pointer into it, same pattern as Workstream C's
+pointer into `docs/POSTMARK_PROVISIONING.md`.
+
+1. **[HUMAN] Create the demo Firebase/GCP project, with billing.** The project id needs a
+   **delimited `demo` token** — `run-of-show-demo`, not `ros-demonstration` — because step 4's seed
+   script refuses to run against a project id that doesn't match (see that step). Add Firebase to
+   it (Firestore Native mode, Storage, a Hosting site) per `docs/DEPLOY_RUNBOOK.md` §2's Firebase
+   prerequisites block.
+   **Success check:** the project exists, Firebase is added, and `gcloud services list
+   --project=<DEMO_PROJECT_ID>` shows the APIs `docs/DEPLOY_RUNBOOK.md` §2 enables.
+
+2. **[AGENT] Configure the demo as a client via the standard per-client pipeline.** Work
+   `docs/DEPLOY_RUNBOOK.md` §0–§3 exactly as for any client (WIF pool/provider reuse if one already
+   exists, per-client deploy service account bound to `refs/heads/main` only, a GitHub Environment
+   named for the demo, e.g. `demo`) — see `docs/CLIENT_ONBOARDING.md` §1 for the same steps read as
+   an onboarding checklist rather than raw IAM commands. Two deviations from a normal client, both
+   from issue #35's scope:
+   - `EVENT_EMAIL_PROVIDER = console` or `none`, `EVENT_TICKETING_PROVIDER = none` (or `manual` if
+     showing the Ticketing tab in the walkthrough matters), `EVENT_OPERATOR_NOTIFIER = none`. This
+     means the demo needs **no provider secrets** — it deploys credential-free. **If Workstream C
+     (Postmark) is done by the time this runs**, a dedicated Postmark message stream for the demo is
+     an option instead of `console`, so a prospect can see a real OTP email — not required, just an
+     upgrade path issue #35 explicitly allows; don't block this workstream on C to get it.
+   - `EVENT_PUBLIC_URL` is just the `.web.app` Hosting URL — no custom domain to provision for a
+     demo.
+   Keep it on manual `workflow_dispatch` (do not add to `AUTO_DEPLOY_ENVIRONMENTS` yet — that's step
+   7). Run the **bootstrap dispatch** (`docs/DEPLOY_RUNBOOK.md` §5 step 1) and confirm it's green
+   before continuing.
+   **Success check:** the GitHub Environment exists with the values above, no secrets are required
+   by `deploy-client.yml`'s env validation, and the bootstrap dispatch succeeds.
+
+3. **[AGENT] Seed the demo content.** Two scripts, in order, against the demo project (not the
+   emulator):
+   ```sh
+   export GOOGLE_APPLICATION_CREDENTIALS=<operator ADC, for this one-time step>
+   export EVENT_FIREBASE_PROJECT_ID=<DEMO_PROJECT_ID>
+   node scripts/init-event.cjs --answers demo-answers.json --admin <operator-admin@ccm-domain>
+   node scripts/seed-demo-event.cjs
+   ```
+   `demo-answers.json` doesn't exist in the repo yet as of this handoff — build it from
+   `scripts/lib/answers.cjs`'s prompt list (event name/dates/timezone/venue can come straight from
+   the demo fixture, `scripts/lib/demo-event.cjs`). `seed-demo-event.cjs` is the script with the
+   project-id guard from `scripts/README.md`: it refuses to run against a project id that isn't an
+   exact `DEMO_PROJECT_ID` or doesn't contain a delimited `demo` component, unless
+   `--i-know-this-is-not-a-demo-project` is passed — that override should never be needed here if
+   step 1's project id was chosen correctly, and reaching for it is a sign to stop and recheck the
+   project id, not push through. Both scripts are idempotent on `seeded: true` — re-running never
+   clobbers an admin-UI edit.
+   **Success check:** both commands exit 0; `node scripts/init-event.cjs --check` shows the seeded
+   rows (legal/admins/etc. still pending until step 5).
+
+4. **[AGENT] Verify the committed `apps/web/src/generated` snapshot matches the seed output.** This
+   is the CI hygiene fixture requirement issue #35 names explicitly: `scripts/seed-demo-event.cjs`
+   and `generate-content.cjs --demo` read the same fixture (`scripts/lib/demo-event.cjs`) by
+   construction, so this should already hold — the point of this step is confirming it, not fixing
+   a drift that shouldn't exist.
+   ```sh
+   node scripts/generate-content.cjs --demo --check
+   ```
+   **Success check:** exits 0 (no diff). If it doesn't, something edited `apps/web/src/generated/*`
+   or `scripts/lib/demo-event.cjs` out of sync — fix that before continuing, in a normal PR (see
+   Workstream F step 5's note on this repo's no-direct-push posture; it applies here too), not by
+   force-regenerating and committing straight to this branch.
+
+5. **[AGENT] Readiness gate.** `node scripts/init-event.cjs --check` until it exits 0: enable Google
+   sign-in (optional for a demo, but exercise it if the walkthrough should show it) and add the
+   `.web.app` domain to Authorized domains, then `--attest-auth`
+   (`docs/CLIENT_ONBOARDING.md` §3 items 1–2); `verify-sender-domain.cjs --attest` for the
+   `console`/`none` provider case, which has no domain API to check automatically
+   (`docs/CLIENT_ONBOARDING.md` §3 item 4); clear `legal.reviewRequired` in admin Settings after a
+   skim (a prospect will see these pages, so don't skip the skim even though it's fiction); sign in
+   as the first admin and grant a second through the admin UI.
+   **Success check:** `node scripts/init-event.cjs --check` exits 0.
+
+6. **[AGENT] Go live.** Run the **normal dispatch** (`docs/DEPLOY_RUNBOOK.md` §5 step 3) now that
+   `config/event` exists — this is the first run where `content`/`build`/`hosting`/`post`/`smoke`
+   actually execute. Confirm the smoke job passes and a fresh sign-in works
+   (`docs/DEPLOY_RUNBOOK.md` §6).
+   **Success check:** the dispatch succeeds end to end, including `smoke`.
+
+7. **[AGENT/HUMAN] Verify the demo URL is publicly browsable, and fill in the README's pending
+   link.** `README.md` currently notes: "A public demo instance and README screenshots are pending
+   the operator's deploy of that instance" — this step is what clears that note. Load the URL from
+   a machine with no special access (not the operator's authenticated session) to confirm it's
+   really public, then add the demo URL and screenshots to `README.md` in the normal PR flow (this
+   doc's file is the only direct-edit exception this handoff carries — `README.md` goes through a
+   PR like any other change).
+   **Note on the interim artifact:** the static GitHub Pages demo at `/demo/` (built by
+   `scripts/build-demo.cjs`, a `vite build --base .../demo/` against the same committed synthetic
+   snapshot, served with no backend) already exists and is click-through today — it's the interim
+   sales artifact until this live Firebase deployment lands. Once this workstream's demo URL is
+   live, decide whether the README links one or both (the Pages demo has no live backend — no real
+   sign-in, no CMS — while this deployment is a full, if credential-free, client instance); either
+   is a reasonable answer, but don't let "the Pages demo already exists" be a reason to skip this
+   workstream — issue #35 is asking for the live deployment specifically, precisely because it's a
+   permanent integration test as well as a sales artifact (it IS a client).
+   Optionally add the demo environment to `AUTO_DEPLOY_ENVIRONMENTS` (`docs/DEPLOY_RUNBOOK.md` §4)
+   so every merge to `main` redeploys it — a live regression check, on top of being a sales page.
+   **Success check:** the demo URL loads from an unauthenticated browser/network path and is
+   interactive; `README.md`'s pending-demo note is replaced with the real link (and screenshots, if
+   captured).
+
+**Done when** (mirrors issue #35): the demo URL is publicly browsable, and the committed
+`apps/web/src/generated` snapshot matches the seed output.
+
+---
+
+## Workstream F — Eventbrite sandbox verification (issue #79)
+
+The Eventbrite adapter ships verified against hand-authored synthetic fixtures
+(`functions/src/ticketing/providers/__fixtures__/`) written to Eventbrite's *documented* schemas,
+not captured from a live account — that fixtures README says so explicitly and names six numbered
+judgment calls the adapter's module doc also numbers (signing header/scheme, delivery-id
+derivation, `api_url` resource shape, `order.refunded` folding, the "complete" signal, and
+`registerWebhook`'s org-discovery call). This workstream is what confirms or corrects those six
+against reality. It needs no relationship to Workstream E beyond both being M5 operator follow-ups
+— it runs against a normal dev deployment, not the demo project.
+
+1. **[HUMAN] Create an Eventbrite account with a test/sandbox event.** Free tier is fine; the goal
+   is an event this workstream can place, refund, and cancel real orders against without touching a
+   real one. Note the event's numeric id (`EVENT_TICKETING_EVENT_ID`) and generate an API token
+   (`TICKETING_API_TOKEN`) from the account's API keys page.
+   **Success check:** the sandbox event exists in the Eventbrite account and both values are in
+   hand.
+
+2. **[AGENT] Register the webhook against a dev deployment.** Not the demo project from Workstream
+   E (that one's `EVENT_TICKETING_PROVIDER` is `none`) — use an existing dev/staging client
+   deployment (e.g. the same `runofshow-dev` environment Workstream C provisions Postmark against,
+   if that naming is still in use) with `EVENT_TICKETING_PROVIDER=eventbrite` and this sandbox
+   event's id and token set (`docs/CLIENT_ONBOARDING.md` §3 item 5's `eventbrite` row):
+   ```sh
+   EVENT_TICKETING_PROVIDER=eventbrite EVENT_TICKETING_EVENT_ID=<sandbox event id> \
+   TICKETING_API_TOKEN=<from step 1> TICKETING_WEBHOOK_SECRET=<generate one, store it like
+     EMAIL_WEBHOOK_BASIC_AUTH in Workstream C step 4b> \
+   EVENT_FIREBASE_PROJECT_ID=<dev project id> \
+     node scripts/register-ticketing-webhook.cjs
+   ```
+   **Success check:** the script exits 0 (registered); confirm via `getTicketingStatus` (admin
+   Settings) or the Cloud Functions log for the registration call, per
+   `docs/CLIENT_ONBOARDING.md` §3 item 5.
+
+3. **[AGENT] Exercise order placed / refunded / cancelled end to end.** Through the sandbox event's
+   real Eventbrite checkout flow (or Eventbrite's own test-order tooling if the sandbox account
+   offers one): place an order, then refund one, then cancel one — three separate deliveries so all
+   three actionable webhook actions actually fire against the registered callback, not just
+   `order.placed`. Confirm each one lands: a `ticket_sync_queue` row is created and processed, and
+   the resulting ticket/entitlement state in the dev project's Firestore matches what the order
+   actually did (placed → entitled, refunded → revoked, cancelled → revoked).
+   **Success check:** all three flows produce the expected end state, observable in the dev
+   project's admin Ticketing tab or directly in Firestore.
+
+4. **[AGENT] Capture real payloads and sanitize them before they leave the sandbox account.** Pull
+   the raw webhook delivery bodies and the `GET /orders/{id}/` responses your dev project actually
+   received (Cloud Functions logs, or the ticketing sync queue rows the deliveries produced) for
+   each of the three flows. Before these payloads touch this repo or any doc:
+   - **Strip every real identifier.** Attendee/organizer names, email addresses, the sandbox
+     Eventbrite account's organization name and id, real order/ticket numeric ids, phone numbers,
+     and any free-text fields (order notes, custom question answers) a real person could have typed
+     — replace each with an obviously-fake placeholder in the same shape (a fake name, a
+     `@example.org` address, a renumbered id sequence), not with `[REDACTED]` blocks that would
+     break the JSON's field-shape value for testing.
+   - **Keep the shape, not the content.** The entire point of this capture is confirming field
+     *names*, *nesting*, and *types* match what the synthetic fixtures assumed — sanitizing values
+     while preserving structure is what makes the diff in step 5 meaningful. Do not summarize or
+     restructure the payload; sanitize in place.
+   - **Never commit an unsanitized payload, even temporarily** — sanitize before the first `git add`,
+     not after, and don't paste an unsanitized payload into this doc's results section either (same
+     rule this doc already states for tokens/passwords).
+   - **Mark every fixture file clearly as sanitized-real, distinct from the existing synthetic
+     ones.** The existing `__fixtures__/README.md` header says "hand-authored synthetic JSON... none
+     of it was captured from a real Eventbrite account" — that sentence stops being true the moment
+     a sanitized-real fixture is added, so it needs updating, and each new file's provenance must be
+     unambiguous at a glance. Concretely: a `-sanitized` suffix on new/replacement filenames (e.g.
+     `webhook-order-placed-sanitized.json`) and a one-line header comment or a new README table
+     column stating "captured from a real Eventbrite sandbox delivery on <date>, values sanitized"
+     — so nobody six months from now mistakes a sanitized-real fixture for the original
+     documentation-derived synthetic one, or vice versa.
+   **Success check:** sanitized payloads exist locally for all three flows, each one visibly marked
+   with its provenance, and a second read-through finds no real name/email/org-identifying value
+   left in any of them.
+
+5. **[AGENT] Compare against the committed synthetic fixtures; update in a PR if shapes drifted.**
+   Diff the sanitized captures against the matching files in
+   `functions/src/ticketing/providers/__fixtures__/` field by field, specifically checking the six
+   numbered assumptions from the adapter's module doc and the fixtures README (signing header name
+   and scheme, delivery-id stability across retries, `api_url`'s resource path for `attendee.*`
+   deliveries, whether `order.refunded` really has no distinct webhook action in practice, what
+   signals order completeness, and whether `registerWebhook`'s org-discovery call still holds for
+   this account). **This repo's changes go through a normal PR, not a direct push to this branch**
+   — this workstream's file edits belong in `functions/src/ticketing/providers/__fixtures__/` (and,
+   if a fixture's assumed shape was wrong, the adapter code and its module-doc comments in
+   `functions/src/ticketing/providers/eventbrite.cjs` plus the affected tests) on a separate branch
+   with its own PR, same as any other code change — this doc's "sole file I edit" instruction is
+   specific to this handoff document, not a license to push fixture/adapter changes straight to
+   `main` or this branch.
+   **Success check:** each of the six numbered assumptions has an explicit written verdict
+   (confirmed / corrected, with what changed) recorded in the results section below; if any fixture
+   or adapter code changed, a PR is open with that diff and this doc's results section links it.
+
+**Done when** (mirrors issue #79): the real sandbox run has produced a written verdict — confirmed
+or corrected — on each of the six numbered API-shape assumptions, and any resulting fixture/adapter
+changes are in an open (or merged) PR.
+
+---
+
 ## Results — fill this in as you go
 
 Local agent: update this section in place as each workstream's steps complete. Do not paste any
@@ -406,7 +617,8 @@ token, password, or API key value into this document — name only *where* it wa
       (project id). `EMAIL_ACCOUNT_API_KEY` confirmed in operator storage only (not this project's
       GitHub Environment or Secret Manager): yes/no
 - [ ] `verify-sender-domain.cjs` output: (paste exit code and summary line, not any secret)
-- [ ] Known SPF-field caveat hit: yes/no — if yes, this is expected, not a new bug
+- [ ] SPF line in that output (informational only — any value is fine when DKIM and Return-Path
+      pass; no SPF record to publish): (paste the SPF verdict)
 - [ ] Delivery webhook registered with triggers Delivery/Bounce/SpamComplaint: yes/no
 - [ ] Round-trip test (send + bounce) confirmed via `sent_emails` row: yes/no
 
@@ -420,6 +632,33 @@ token, password, or API key value into this document — name only *where* it wa
 - [ ] Pages serves at `centercoopmedia.github.io/eventrunner/`: yes/no
 - [ ] Demo loads at `centercoopmedia.github.io/eventrunner/demo/`: yes/no
 - [ ] PR #90 still open and attached at the new repo URL: yes/no
+
+### Workstream E
+- [ ] Demo GCP/Firebase project created with a delimited `demo` project id; billing enabled: yes/no
+      (project id, or where it's recorded)
+- [ ] Demo configured as a client (GitHub Environment name, providers used —
+      console/none/Postmark stream, ticketing none/manual, notifier none): (fill in)
+- [ ] Bootstrap dispatch green: yes/no
+- [ ] `init-event.cjs` + `seed-demo-event.cjs` run against the demo project: yes/no
+- [ ] `generate-content.cjs --demo --check` exits 0 (committed snapshot matches seed output): yes/no
+- [ ] Readiness gate (`init-event.cjs --check`) exits 0: yes/no
+- [ ] Normal dispatch succeeded, smoke passed: yes/no
+- [ ] Demo URL confirmed publicly browsable from an unauthenticated path: yes/no (URL)
+- [ ] README's pending demo-link/screenshots note replaced (PR link): yes/no
+- [ ] Added to `AUTO_DEPLOY_ENVIRONMENTS` (optional): yes/no
+
+### Workstream F
+- [ ] Eventbrite sandbox account + test event created: yes/no
+- [ ] Webhook registered via `register-ticketing-webhook.cjs` against a dev deployment
+      (environment/project used): (fill in)
+- [ ] Order placed / refunded / cancelled exercised end to end, each confirmed in Firestore/admin
+      Ticketing tab: yes/no
+- [ ] Payloads captured and sanitized (no real names/emails/org identifiers remain), filed as
+      `-sanitized` fixtures with provenance noted: yes/no
+- [ ] Verdict on each of the six numbered assumptions (signing header/scheme, delivery-id
+      stability, `api_url` shape for `attendee.*`, `order.refunded` folding, completeness signal,
+      `registerWebhook` org discovery): confirmed/corrected — (one line each)
+- [ ] Fixture/adapter PR opened (if any drift found): yes/no (PR link)
 
 ### Anything blocked
 List anything that couldn't be completed and why (e.g. waiting on human 2FA, waiting on counsel,
