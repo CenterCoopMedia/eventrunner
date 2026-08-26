@@ -204,8 +204,8 @@ by heading, not a duplicate. Read each referenced section before doing its step.
    (in writing, e.g. a note back to the agent or in this doc's results section below) which plan
    tier was chosen and how many Servers it supports.
 
-2. **[AGENT] Create the dev/demo Server and stream, store both tokens as GitHub Environment
-   secrets** (`docs/POSTMARK_PROVISIONING.md` §2 "Per deployment: create the Server" and §3 "Store
+2. **[AGENT] Create the dev/demo Server and stream, store the server token as a GitHub Environment
+   secret** (`docs/POSTMARK_PROVISIONING.md` §2 "Per deployment: create the Server" and §3 "Store
    the tokens for this environment"; also `docs/DEPLOY_RUNBOOK.md` §3 for the GitHub Environment
    secrets table and the Secret Manager mirroring commands).
    a. Postmark → Servers → Add server, name it `runofshow-dev` (confirm this matches `EVENT_SLUG`
@@ -213,19 +213,23 @@ by heading, not a duplicate. Read each referenced section before doing its step.
       assuming), type **Live** (not demo/test).
    b. Open the Server → API Tokens tab → copy the Server Token. This is `EMAIL_PROVIDER_API_KEY`
       for this environment.
-   c. Store `EMAIL_PROVIDER_API_KEY` (this Server's token) and `EMAIL_ACCOUNT_API_KEY` (the
-      account token from step 1) as GitHub Environment **secrets** (not variables) on this
-      client's environment — Settings → Environments → `<CLIENT_ENV>` → Secrets — per
-      `docs/DEPLOY_RUNBOOK.md` §3.
-   d. Mirror both into Secret Manager and bind `secretAccessor` to the *runtime* service account
-      (the project's default compute SA, `<PROJECT_NUMBER>-compute@developer.gserviceaccount.com`
-      — not the deploy SA) per the `gcloud secrets create` / `add-iam-policy-binding` commands in
+   c. Store `EMAIL_PROVIDER_API_KEY` (this Server's token) as a GitHub Environment **secret** (not
+      variable) on this client's environment — Settings → Environments → `<CLIENT_ENV>` → Secrets —
+      per `docs/DEPLOY_RUNBOOK.md` §3. Do **not** store `EMAIL_ACCOUNT_API_KEY` (the account token
+      from step 1) here or anywhere client-scoped — no deployed function binds it, only the
+      operator-run `scripts/verify-sender-domain.cjs` does (step 3 below), so it stays in operator
+      storage instead (`docs/POSTMARK_PROVISIONING.md` §3).
+   d. Mirror `EMAIL_PROVIDER_API_KEY` into Secret Manager and bind `secretAccessor` to the
+      *runtime* service account (the project's default compute SA,
+      `<PROJECT_NUMBER>-compute@developer.gserviceaccount.com` — not the deploy SA) per the
+      `gcloud secrets create` / `add-iam-policy-binding` commands in
       `docs/POSTMARK_PROVISIONING.md` §3.
-   **Success check:** the Server exists in Postmark named after `EVENT_SLUG`; both secrets show up
-   in `gh secret list --env <CLIENT_ENV>` (or the GitHub UI) and in
+   **Success check:** the Server exists in Postmark named after `EVENT_SLUG`; `EMAIL_PROVIDER_API_KEY`
+   shows up in `gh secret list --env <CLIENT_ENV>` (or the GitHub UI) and in
    `gcloud secrets list --project=<GCP_PROJECT_ID>`; `gcloud secrets get-iam-policy
    EMAIL_PROVIDER_API_KEY --project=<GCP_PROJECT_ID>` shows the runtime SA with
-   `roles/secretmanager.secretAccessor`.
+   `roles/secretmanager.secretAccessor`. `EMAIL_ACCOUNT_API_KEY` is confirmed available in operator
+   storage, not in `gh secret list` or `gcloud secrets list` output for this project.
 
 3. **[AGENT] Verify the sender domain** (`docs/POSTMARK_PROVISIONING.md` §4, all subsections).
    §4a is "add the domain in Postmark" (this is what produces the DKIM/Return-Path values
@@ -235,7 +239,7 @@ by heading, not a duplicate. Read each referenced section before doing its step.
    ```sh
    EVENT_EMAIL_PROVIDER=postmark \
    EMAIL_PROVIDER_API_KEY=<server token from step 2b> \
-   EMAIL_ACCOUNT_API_KEY=<account token from step 1> \
+   EMAIL_ACCOUNT_API_KEY=<account token from step 1, operator storage> \
    EVENT_FIREBASE_PROJECT_ID=<this deployment's GCP project id> \
      node scripts/verify-sender-domain.cjs --domain runofshow.net
    ```
@@ -261,12 +265,17 @@ by heading, not a duplicate. Read each referenced section before doing its step.
       `printf 'runofshow-dev:%s\n' "$(openssl rand -hex 20)"`.
    b. Store the whole `user:pass` string as `EMAIL_WEBHOOK_BASIC_AUTH` — GitHub Environment secret
       + Secret Manager, same pattern as step 2c/2d above.
-   c. In Postmark, this Server → the stream from step 2 → Webhooks → add webhook, URL:
+   c. Confirm which stream sends actually use before registering anything: check this
+      deployment's `config/providers.email.messageStream` — unset means the Server's default
+      `Outbound` stream, set means that named stream instead (`docs/POSTMARK_PROVISIONING.md`
+      §2.4/§5). In Postmark, this Server → that stream → Webhooks → add webhook, URL:
       `https://<user>:<pass>@<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook`
       — using this environment's actual `EVENT_FIREBASE_REGION` / `EVENT_FIREBASE_PROJECT_ID`
       GitHub Environment variables, not a guess. Enable the **Delivery**, **Bounce**, and
-      **SpamComplaint** triggers; leave **Open** and **Click** off (nothing in this repo consumes
-      them).
+      **SpamComplaint** triggers only; leave **Open**, **Click**, and **SubscriptionChange** off
+      (nothing in this repo consumes the first two, and `parseDeliveryEvent()` 400s a
+      `SubscriptionChange` payload whose `SuppressSending` isn't exactly `true` —
+      `docs/POSTMARK_PROVISIONING.md` §5).
    **Success check:** the webhook shows registered in Postmark's Server → Webhooks list with the
    three triggers enabled; a test send followed by an intentionally-invalid-recipient bounce
    produces both a `sent_emails` Activity entry and a bounce event that patches `deliveryStatus`
@@ -392,9 +401,10 @@ token, password, or API key value into this document — name only *where* it wa
 
 ### Workstream C
 - [ ] Postmark account created; plan tier and Server capacity confirmed: (plan name / Server limit)
-- [ ] Server `runofshow-dev` created; tokens stored as GitHub Environment secrets at:
-      (name the environment, not the values) and mirrored to Secret Manager at project:
-      (project id)
+- [ ] Server `runofshow-dev` created; `EMAIL_PROVIDER_API_KEY` stored as a GitHub Environment
+      secret at: (name the environment, not the value) and mirrored to Secret Manager at project:
+      (project id). `EMAIL_ACCOUNT_API_KEY` confirmed in operator storage only (not this project's
+      GitHub Environment or Secret Manager): yes/no
 - [ ] `verify-sender-domain.cjs` output: (paste exit code and summary line, not any secret)
 - [ ] Known SPF-field caveat hit: yes/no — if yes, this is expected, not a new bug
 - [ ] Delivery webhook registered with triggers Delivery/Bounce/SpamComplaint: yes/no

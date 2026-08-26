@@ -51,6 +51,8 @@ end. Roughly:
 1. Sign up for the Postmark account under an org-owned CCM email (not a personal address).
 2. Note the account's Account Token (Account → API Tokens) — this is `EMAIL_ACCOUNT_API_KEY`,
    shared across every client deployment (it is account-scoped by design; there is only one).
+   It stays in operator-controlled storage only (§3) — no deployed function binds it, so it never
+   goes into a client's GitHub Environment or Secret Manager.
 3. Set up billing for the account's plan and confirm it covers the expected number of Servers —
    each client is a Server, so the plan needs to scale with the client count, not just message
    volume.
@@ -68,45 +70,56 @@ end. Roughly:
    `EMAIL_PROVIDER_API_KEY` for this deployment's environment.
 4. (Optional) Rename the Server's default `Outbound` stream, or add a custom Transactional stream,
    if you want the stream name in Postmark's UI to read as the deployment's rather than the generic
-   default. The code does not require this — `createPostmarkProvider` only sets `MessageStream` on
-   a send when the caller passes one, and nothing in this repo currently does, so the default
-   stream is what every send in v1 uses unless that changes.
+   default. Whether the code actually sends on that stream depends on `config/providers.email.
+   messageStream` (Tier B, `functions/src/email/send.cjs`): every send falls back to that config
+   value when the call site doesn't pass its own `messageStream`, and `createPostmarkProvider` (in
+   `postmark.cjs`) only omits `MessageStream` from the API payload — letting Postmark use the
+   Server's default stream — when that value is unset. Note whatever you name or rename the stream
+   to here; §5 needs it to register the webhook on the stream sends actually land on.
 
 ## 3. Store the tokens for this environment
 
-Per `docs/DEPLOY_RUNBOOK.md` §3: these are GitHub Environment **secrets** (not variables) on the
-client's `<CLIENT_ENV>` environment, then mirrored into Secret Manager for the deployed functions
-to read via `defineSecret`.
+These two tokens are stored differently — only one of them is a deployment secret.
+
+`EMAIL_PROVIDER_API_KEY` (the send path, `functions/src/email/providers/postmark.cjs`) is a
+per-deployment GitHub Environment **secret** (not variable) on the client's `<CLIENT_ENV>`
+environment, per `docs/DEPLOY_RUNBOOK.md` §3, then mirrored into Secret Manager for the deployed
+`emailDeliveryWebhook` function to read via `defineSecret`:
 
 ```sh
-# GitHub Environment secrets (Settings → Environments → <CLIENT_ENV> → Secrets):
+# GitHub Environment secret (Settings → Environments → <CLIENT_ENV> → Secrets):
 #   EMAIL_PROVIDER_API_KEY  = the Server Token from step 2.3 (per-client)
-#   EMAIL_ACCOUNT_API_KEY   = the Account Token from step 1.2 (same value on every client
-#                             environment — it is the one account-scoped credential)
 
 # Secret Manager, once per client project (docs/DEPLOY_RUNBOOK.md §3):
 echo -n "<server token>" | gcloud secrets create EMAIL_PROVIDER_API_KEY \
   --project=<GCP_PROJECT_ID> --data-file=- --replication-policy=automatic
-echo -n "<account token>" | gcloud secrets create EMAIL_ACCOUNT_API_KEY \
-  --project=<GCP_PROJECT_ID> --data-file=- --replication-policy=automatic
 
-# Then bind secretAccessor on BOTH to the function's runtime service account
+# Then bind secretAccessor to the function's runtime service account
 # (docs/DEPLOY_RUNBOOK.md §3 — the deploy SA and the runtime SA are different principals):
 PROJECT_NUMBER=$(gcloud projects describe <GCP_PROJECT_ID> --format="value(projectNumber)")
 RUNTIME_SA_EMAIL="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-for secret in EMAIL_PROVIDER_API_KEY EMAIL_ACCOUNT_API_KEY; do
-  gcloud secrets add-iam-policy-binding "${secret}" \
-    --project=<GCP_PROJECT_ID> \
-    --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
-    --role="roles/secretmanager.secretAccessor"
-done
+gcloud secrets add-iam-policy-binding EMAIL_PROVIDER_API_KEY \
+  --project=<GCP_PROJECT_ID> \
+  --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
+  --role="roles/secretmanager.secretAccessor"
 ```
 
-`EMAIL_PROVIDER_API_KEY` (the send path, `functions/src/email/providers/postmark.cjs`) and
-`EMAIL_ACCOUNT_API_KEY` (the sender-domain check, same file's `verifySenderDomain`) are both
-required for a `postmark` deployment — without the account token, `verifySenderDomain()` reports
-every check `unknown` rather than failing, so a missing key reads as "can't tell" in
-`scripts/verify-sender-domain.cjs`'s output, not as an error. Set both.
+`EMAIL_ACCOUNT_API_KEY` (the sender-domain check, `verifySenderDomain()` in the same provider file)
+is **not** a deployment secret — no deployed function binds it via `defineSecret` (grep
+`functions/src/email/send.cjs`'s `SEND_SECRETS_BY_PROVIDER`/`INGEST_SECRETS_BY_PROVIDER`: it isn't
+in either list). Its only consumer is the operator-run `scripts/verify-sender-domain.cjs`. Keep it
+in operator-controlled storage (the team password manager, or wherever this account's other
+credentials already live) and inject it only as a local environment variable when running that
+script (§4c) — do **not** create it as a GitHub Environment secret, do **not** mirror it into a
+client's Secret Manager, and do **not** grant any runtime service account access to it. It is the
+one account-scoped credential shared across every client deployment, which is exactly why it does
+not belong inside a per-client project's trust boundary: granting a client's runtime SA access to
+it would let that deployment's functions reach Postmark's account-wide domains API, far beyond
+what any of them need.
+
+Without `EMAIL_ACCOUNT_API_KEY` set when the script runs, `verifySenderDomain()` reports every
+check `unknown` rather than failing, so a missing key reads as "can't tell" in
+`scripts/verify-sender-domain.cjs`'s output, not as an error. Have it ready before §4c.
 
 ## 4. Verify the sender domain
 
@@ -167,13 +180,14 @@ adding them differs.
 
 ### 4c. Confirm with the script
 
-From an operator (or provisioning-agent) machine with this deployment's environment variables
-loaded:
+From an operator (or provisioning-agent) machine, with this deployment's `EMAIL_PROVIDER_API_KEY`
+loaded and the account token from operator storage (§3) — not from the client's GitHub Environment
+or Secret Manager, since it doesn't live there:
 
 ```sh
 EVENT_EMAIL_PROVIDER=postmark \
 EMAIL_PROVIDER_API_KEY=<server token from §2.3> \
-EMAIL_ACCOUNT_API_KEY=<account token from §1.2> \
+EMAIL_ACCOUNT_API_KEY=<account token from §1.2, operator storage> \
 EVENT_FIREBASE_PROJECT_ID=<GCP_PROJECT_ID for this deployment> \
   node scripts/verify-sender-domain.cjs --domain runofshow.net
 ```
@@ -205,7 +219,14 @@ HTTP Basic credentials embedded in the webhook URL itself, checked against
 
 2. Store it as the `EMAIL_WEBHOOK_BASIC_AUTH` GitHub Environment secret for `<CLIENT_ENV>`
    (`docs/DEPLOY_RUNBOOK.md` §3), then in Secret Manager the same way as step 3 above.
-3. In this deployment's Postmark **Server** → the stream from step 2.4 → **Webhooks** → add webhook:
+3. Before registering anything, confirm which stream sends actually use: check this deployment's
+   `config/providers.email.messageStream` (Tier B) — if it's unset, sends use the Server's default
+   `Outbound` stream; if it's set, they use that named stream instead (§2.4). Register the webhook
+   on **that** stream, not on whichever one happens to be open, or delivery events will never reach
+   `emailDeliveryWebhook`.
+
+   In this deployment's Postmark **Server** → the stream identified above → **Webhooks** → add
+   webhook:
 
    ```
    https://<user>:<pass>@<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook
@@ -216,9 +237,13 @@ HTTP Basic credentials embedded in the webhook URL itself, checked against
    (`EVENT_FIREBASE_REGION`, `EVENT_FIREBASE_PROJECT_ID`) — copy those from the environment rather
    than guessing.
 
-   Enable the **Delivery**, **Bounce**, and **SpamComplaint** triggers (`SubscriptionChange` too, if
-   this deployment sends anything Postmark treats as a broadcast stream — `parseDeliveryEvent()`
-   already handles it). Leave **Open** and **Click** off; nothing in this repo consumes those events.
+   Enable the **Delivery**, **Bounce**, and **SpamComplaint** triggers only. Leave **Open**, **Click**,
+   and **SubscriptionChange** off: `parseDeliveryEvent()` in `functions/src/email/providers/
+   postmark.cjs` returns `null` for a `SubscriptionChange` record unless `SuppressSending` is
+   exactly `true`, and `emailDeliveryWebhook` treats a `null` parse as a bad request (`400`) — an
+   info-only `SubscriptionChange` payload (`SuppressSending: false`, sent for e.g. a manual
+   resubscribe) would 400 what is otherwise a legitimate webhook call. Nothing in this repo
+   consumes `Open`/`Click` either.
 4. This webhook registration is scoped to the Server (and, within it, the stream you attached it
    to) — it does not need repeating for other deployments' Servers, and other deployments' webhooks
    do not need repeating here.
@@ -230,7 +255,9 @@ Before calling a deployment's Postmark setup done:
 - [ ] The deployment has its own Server under the shared CCM account, named after `EVENT_SLUG`.
 - [ ] `EMAIL_PROVIDER_API_KEY` (this Server's token) is set as a GitHub Environment secret on
       `<CLIENT_ENV>` and mirrored to Secret Manager, with `secretAccessor` bound to the runtime SA.
-- [ ] `EMAIL_ACCOUNT_API_KEY` (the one shared account token) is set the same way.
+- [ ] `EMAIL_ACCOUNT_API_KEY` (the one shared account token) is available in operator storage —
+      **not** a GitHub Environment secret or Secret Manager entry on this (or any) client project,
+      since no deployed function binds it.
 - [ ] `node scripts/verify-sender-domain.cjs` exits `0` for this deployment's sender domain
       (`runofshow.net` for the dev/demo deployment) — not just "unknown"; unknown means one of the
       two keys above is missing or wrong, not that the domain is fine.
