@@ -12,7 +12,7 @@ Please do **not** open a public GitHub issue for security problems.
 
 **Primary channel:** use GitHub's private vulnerability reporting — the
 "Report a vulnerability" button on the
-[Security tab](https://github.com/CenterCoopMedia/run-of-show/security) of this
+[Security tab](https://github.com/CenterCoopMedia/eventrunner/security) of this
 repository. Reports filed there are visible only to maintainers.
 
 **Fallback:** if you cannot use GitHub's reporting flow, email

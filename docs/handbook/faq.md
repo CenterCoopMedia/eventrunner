@@ -22,7 +22,7 @@ Only if a client pays for them after v1. They were cut because they need moderat
 
 ## Where is the demo?
 
-Not up yet. That is [issue 35](https://github.com/CenterCoopMedia/run-of-show/issues/35).
+Not up yet. That is [issue 35](https://github.com/CenterCoopMedia/eventrunner/issues/35).
 
 ## Who do I talk to about money or a contract?
 

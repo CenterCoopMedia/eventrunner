@@ -84,7 +84,7 @@ dispatching against the tag directly.
 `docs/demo/` is committed output, not generated at deploy time: `npm run build:demo`
 (`scripts/build-demo.cjs`) runs a demo-mode `vite build` of `apps/web` against the committed
 synthetic snapshot in `apps/web/src/generated/` and syncs the result into `docs/demo/`, which
-GitHub Pages serves at `https://centercoopmedia.github.io/run-of-show/demo/`. Nobody runs this at
+GitHub Pages serves at `https://centercoopmedia.github.io/eventrunner/demo/`. Nobody runs this at
 deploy time — it has to be rebuilt and committed by hand whenever its inputs change.
 
 - **Rebuild and commit `docs/demo/` before tagging** whenever a PR touched `apps/web/src/**` or
@@ -99,7 +99,7 @@ deploy time — it has to be rebuilt and committed by hand whenever its inputs c
   `scripts/build-demo.test.cjs` for the directory-diff logic `--check` is built on). That is what
   makes the CI gate viable without flaking on unrelated reruns.
 - **The `--base` / rename caveat**: `scripts/build-demo.cjs` defaults `--base` to
-  `/run-of-show/demo/`, matching this repo's current name and the fact that GitHub Pages serves
+  `/eventrunner/demo/`, matching this repo's current name and the fact that GitHub Pages serves
   `docs/` from the repo root. Renaming the repository, or moving the demo to a different Pages
   path, changes that URL — rerun with `--base /new-path/` (and `--out` if the destination
   directory changes too) and recommit `docs/demo/`, or every asset URL the built `index.html`

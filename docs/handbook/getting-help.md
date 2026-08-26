@@ -6,13 +6,13 @@ Use the smallest door that fits. Public posts should not include ticket IDs, oth
 
 | Situation | Where |
 |---|---|
-| "How do I sign in / bookmark / publish / invite a speaker?" | [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a) |
-| "We want CCM to host our event" or a licensing question | [General](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=general) |
-| "I wish the product did…" | [Ideas](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=ideas) |
-| "Our event is running on this" | [Show and tell](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=show-and-tell) |
-| The shared product is wrong | [Bug form](https://github.com/CenterCoopMedia/run-of-show/issues/new?template=bug.yml) |
+| "How do I sign in / bookmark / publish / invite a speaker?" | [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) |
+| "We want CCM to host our event" or a licensing question | [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) |
+| "I wish the product did…" | [Ideas](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=ideas) |
+| "Our event is running on this" | [Show and tell](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=show-and-tell) |
+| The shared product is wrong | [Bug form](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml) |
 | CCM already hosts you, and you need access or a content fix | info@collaborativejournalism.org |
-| A security problem in the code | [Private report](https://github.com/CenterCoopMedia/run-of-show/security/advisories/new) |
+| A security problem in the code | [Private report](https://github.com/CenterCoopMedia/eventrunner/security/advisories/new) |
 
 ## Discussions vs issues
 

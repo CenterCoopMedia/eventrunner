@@ -6,11 +6,11 @@ A white-label event CMS for conferences and gatherings. Each client event gets i
 
 **Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2).
 
-Site: [centercoopmedia.github.io/run-of-show](https://centercoopmedia.github.io/run-of-show/)
-Handbook: [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki)
+Site: [centercoopmedia.github.io/eventrunner](https://centercoopmedia.github.io/eventrunner/)
+Handbook: [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki)
 
 A public demo instance and README screenshots are pending the operator's deploy of that instance
-(see [#35](https://github.com/CenterCoopMedia/run-of-show/issues/35)) — this section gets the link
+(see [#35](https://github.com/CenterCoopMedia/eventrunner/issues/35)) — this section gets the link
 and images once that deployment exists.
 
 ## Who it is for
@@ -82,7 +82,7 @@ Apache-2.0 does not grant trademark rights. "Run of Show" as a product name is r
 
 ## Security
 
-Do not open a public issue for a vulnerability. Use [private vulnerability reporting](https://github.com/CenterCoopMedia/run-of-show/security) or email info@collaborativejournalism.org. See [SECURITY.md](SECURITY.md).
+Do not open a public issue for a vulnerability. Use [private vulnerability reporting](https://github.com/CenterCoopMedia/eventrunner/security) or email info@collaborativejournalism.org. See [SECURITY.md](SECURITY.md).
 
 Operator-run client deployments are out of scope for public reports. Email the operator of that deployment.
 
@@ -90,12 +90,12 @@ Operator-run client deployments are out of scope for public reports. Email the o
 
 | You are… | Start here |
 |---|---|
-| Attendee or event staff with a how-to | [Q&A](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=q-a) |
-| An organization that wants a hosted event | [General](https://github.com/CenterCoopMedia/run-of-show/discussions/new?category=general) |
-| Reporting a product bug | [Bug form](https://github.com/CenterCoopMedia/run-of-show/issues/new?template=bug.yml) |
+| Attendee or event staff with a how-to | [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) |
+| An organization that wants a hosted event | [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) |
+| Reporting a product bug | [Bug form](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml) |
 | CCM already hosts your site | info@collaborativejournalism.org |
 | Changing the code | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
-The [wiki](https://github.com/CenterCoopMedia/run-of-show/wiki) is the handbook for attendees, staff, and clients. [GOVERNANCE.md](GOVERNANCE.md) is who decides.
+The [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki) is the handbook for attendees, staff, and clients. [GOVERNANCE.md](GOVERNANCE.md) is who decides.
 
 An initiative of the Center for Cooperative Media at Montclair State University.

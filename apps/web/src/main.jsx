@@ -16,7 +16,7 @@ initErrorReporting();
 // Real deployments are served by Firebase Hosting, which rewrites every path
 // to index.html, so the app uses real URLs (BrowserRouter). The static demo
 // build (VITE_DEMO_MODE=1) is served by GitHub Pages, which has no rewrite
-// rules at all: a reload of /run-of-show/demo/schedule would 404. HashRouter
+// rules at all: a reload of /eventrunner/demo/schedule would 404. HashRouter
 // keeps every route inside the fragment, so deep links and reloads work with
 // zero server config. The alternative — basename + a 404.html SPA shim —
 // cannot be scoped to this build: Pages only serves the SITE-root 404.html,

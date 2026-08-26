@@ -155,8 +155,8 @@ verification, and the rollback interaction: `docs/DEPLOY_RUNBOOK.md` §9.
 ### `build-demo.cjs`
 
 Builds the public click-through demo and syncs it into `docs/demo/`, which GitHub Pages serves at
-`https://centercoopmedia.github.io/run-of-show/demo/`. The one script here that touches no
-Firestore at all: it is `vite build` with `VITE_DEMO_MODE=1` and `--base /run-of-show/demo/`, run
+`https://centercoopmedia.github.io/eventrunner/demo/`. The one script here that touches no
+Firestore at all: it is `vite build` with `VITE_DEMO_MODE=1` and `--base /eventrunner/demo/`, run
 against the committed synthetic snapshot.
 
 ```sh
