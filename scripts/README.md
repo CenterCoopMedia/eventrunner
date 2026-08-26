@@ -195,9 +195,13 @@ node scripts/verify-sender-domain.cjs --domain example.org --no-write
 (`sender.domainVerifiedBy = 'operator-attested'`) after you have checked the relay's DNS yourself —
 without it the launch-readiness sender row could never be cleared and a webhook deployment would be
 permanently unlaunchable. A capable provider refuses `--attest`; its own check is the answer. A
-definitive SPF/DKIM/return-path failure on the configured domain also CLEARS a previously stored
+definitive DKIM/return-path failure on the configured domain also CLEARS a previously stored
 verification, so `--check` can never pass on a stamp that live DNS has just contradicted (an
 inconclusive "unknown" result never clears it).
+
+The verification gate is **DKIM + return-path**. SPF is reported for information only and never
+decides the verdict: Postmark's Domains API deprecates the field and satisfies SPF through the
+return-path CNAME, so there is no separate SPF record to publish (issue #93).
 
 Exit codes: `0` verified (or the provider has no domain to verify), `1` not verified, `2`
 misconfigured. Postmark reports domain state only to an **account** token, so

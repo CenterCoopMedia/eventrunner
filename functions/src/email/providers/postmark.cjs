@@ -300,12 +300,18 @@ function createPostmarkProvider({ env = process.env, fetchImpl = globalThis.fetc
       };
     }
     const detail = await detailResponse.json();
+    // SPF is reported but NOT gated on: Postmark's current Domains API
+    // deprecates SPFVerified, and their guidance no longer asks clients to
+    // publish a separate SPF record — SPF is satisfied through the
+    // Return-Path CNAME. The field is deprecated, not removed, so it stays
+    // in the reported detail as informational; when it is absent, passFail
+    // maps undefined to 'unknown' and nothing fails on it (issue #93).
     const spf = passFail(detail?.SPFVerified);
     const dkim = passFail(detail?.DKIMVerified);
     const returnPath = passFail(detail?.ReturnPathDomainVerified);
     return {
       domain,
-      verified: spf === 'pass' && dkim === 'pass' && returnPath === 'pass',
+      verified: dkim === 'pass' && returnPath === 'pass',
       spf,
       dkim,
       returnPath,
