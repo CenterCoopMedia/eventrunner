@@ -362,7 +362,7 @@ test('verifySenderDomain lists domains, matches case-insensitively, maps flags',
   });
 });
 
-test('verifySenderDomain is verified only when all three checks pass', async () => {
+test('verifySenderDomain is verified when DKIM and Return-Path pass', async () => {
   const fetchImpl = fakeFetch([
     fakeResponse({ status: 200, jsonBody: { Domains: [{ ID: 7, Name: 'mail.example.com' }] } }),
     fakeResponse({
@@ -376,6 +376,70 @@ test('verifySenderDomain is verified only when all three checks pass', async () 
   });
   const status = await provider.verifySenderDomain('mail.example.com');
   assert.equal(status.verified, true);
+});
+
+test('verifySenderDomain verifies on DKIM + Return-Path even when SPF fails', async () => {
+  // Postmark's Domains API deprecates SPFVerified — SPF is satisfied through
+  // the Return-Path CNAME, so gating on it would stall verification over a
+  // record the provider no longer asks anyone to publish (issue #93).
+  const fetchImpl = fakeFetch([
+    fakeResponse({ status: 200, jsonBody: { Domains: [{ ID: 7, Name: 'mail.example.com' }] } }),
+    fakeResponse({
+      status: 200,
+      jsonBody: { ID: 7, SPFVerified: false, DKIMVerified: true, ReturnPathDomainVerified: true },
+    }),
+  ]);
+  const provider = createPostmarkProvider({
+    env: { ...ENV, EMAIL_ACCOUNT_API_KEY: 'account-token' },
+    fetchImpl,
+  });
+  assert.deepEqual(await provider.verifySenderDomain('mail.example.com'), {
+    domain: 'mail.example.com',
+    verified: true,
+    spf: 'fail',
+    dkim: 'pass',
+    returnPath: 'pass',
+  });
+});
+
+test('verifySenderDomain verifies when the SPF field is absent entirely', async () => {
+  // Deprecated, not removed: an omitted field must report 'unknown' and
+  // neither throw nor drag the verdict down.
+  const fetchImpl = fakeFetch([
+    fakeResponse({ status: 200, jsonBody: { Domains: [{ ID: 7, Name: 'mail.example.com' }] } }),
+    fakeResponse({
+      status: 200,
+      jsonBody: { ID: 7, DKIMVerified: true, ReturnPathDomainVerified: true },
+    }),
+  ]);
+  const provider = createPostmarkProvider({
+    env: { ...ENV, EMAIL_ACCOUNT_API_KEY: 'account-token' },
+    fetchImpl,
+  });
+  assert.deepEqual(await provider.verifySenderDomain('mail.example.com'), {
+    domain: 'mail.example.com',
+    verified: true,
+    spf: 'unknown',
+    dkim: 'pass',
+    returnPath: 'pass',
+  });
+});
+
+test('verifySenderDomain stays unverified when DKIM fails, whatever SPF says', async () => {
+  const fetchImpl = fakeFetch([
+    fakeResponse({ status: 200, jsonBody: { Domains: [{ ID: 7, Name: 'mail.example.com' }] } }),
+    fakeResponse({
+      status: 200,
+      jsonBody: { ID: 7, SPFVerified: true, DKIMVerified: false, ReturnPathDomainVerified: true },
+    }),
+  ]);
+  const provider = createPostmarkProvider({
+    env: { ...ENV, EMAIL_ACCOUNT_API_KEY: 'account-token' },
+    fetchImpl,
+  });
+  const status = await provider.verifySenderDomain('mail.example.com');
+  assert.equal(status.verified, false);
+  assert.equal(status.dkim, 'fail');
 });
 
 test('verifySenderDomain reports unknown when the domain is not in the account', async () => {

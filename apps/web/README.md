@@ -106,6 +106,7 @@ log to drive the sign-in flow end to end without any real inbox; see below.
 | `VITE_FUNCTIONS_ORIGIN` | Overrides the whole functions origin — point it at the Functions emulator in dev |
 | `VITE_USE_EMULATORS` | `'true'` connects Auth/Firestore/Storage to local emulators (dev only) |
 | `GENERATED_DIR` | Points the `@generated` alias at an out-of-tree deploy-time snapshot instead of the committed `src/generated` (spec §8.6) |
+| `VITE_DEMO_MODE` | `'1'` builds the static, read-only GitHub Pages demo (see "Demo mode" below). Never set by a client build. |
 
 CI supplies dummy `VITE_FIREBASE_*` values so `npm run build -w apps/web`
 stays credential-free (spec §8.1) — see the root `README`/CI workflow.
@@ -120,6 +121,39 @@ same file shapes from the real client's Firestore data into `GENERATED_DIR`;
 Vite reads from there instead when that env var is set. Never hand-edit the
 committed snapshot to match a specific event — it must stay event-neutral
 so a fresh clone (and CI) never leaks a real client's identity.
+
+## Demo mode (`VITE_DEMO_MODE=1`)
+
+`node scripts/build-demo.cjs` (`npm run build:demo`) produces the public
+click-through demo committed under `docs/demo/` and served from GitHub Pages
+at `/run-of-show/demo/`. It is this same app with one env var set, read in
+exactly one place — `src/lib/demoMode.js` — and consumed at five points:
+
+| Where | In demo mode |
+| --- | --- |
+| `src/main.jsx` | `HashRouter` instead of `BrowserRouter` |
+| `src/firebase.js` | `disableNetwork(db)` before any listener attaches; App Check never initialized |
+| `src/lib/contentSource.js` | the CMS/speaker subscriptions are not attached at all |
+| `src/lib/mediaSource.js` | `assetUrl()` resolves bundled `branding/*` placeholders, everything else is absent |
+| `src/components/SignInPanel.jsx`, `src/pages/Login.jsx`, `src/components/DemoBanner.jsx` | sign-in replaced with a "disabled in this demo" notice; standing demo banner |
+
+Two of those are worth the detail:
+
+- **Why not `basename` + a `404.html` SPA shim.** GitHub Pages serves only
+  the SITE-root `404.html`, and this repo's site root is `docs/` — the
+  project's documentation site. A shim there would hijack 404 handling for
+  every unrelated docs page. HashRouter keeps deep links inside the fragment
+  and needs no server behaviour at all.
+- **Why the content overlay is skipped rather than left to fail.** With the
+  Firestore client offline, a collection query is answered from an empty
+  local cache — a *successful, empty* result, which `ContentProvider`
+  documents as replacing the snapshot wholesale. Not subscribing leaves each
+  overlay slot `null`, which is the "no runtime result yet" state that keeps
+  the committed snapshot in charge.
+
+Nothing else changes. A client build never sets `VITE_DEMO_MODE`, so every
+branch above folds to a constant and drops out of the bundle — the
+`deploy-client.yml` / `scripts/publish-site.cjs` pipeline is untouched.
 
 ## Fonts (spec §7.4)
 

@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "build": "npm run build -w apps/web",
+    "build:demo": "node scripts/build-demo.cjs",
     "lint": "eslint .",
     "prepare:functions": "node scripts/prepare-functions.cjs",
     "test": "node --test \"packages/shared/src/**/*.test.cjs\" \"functions/src/**/*.test.cjs\" \"scripts/**/*.test.cjs\"",

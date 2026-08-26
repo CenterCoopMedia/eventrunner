@@ -13,6 +13,7 @@ import SignInPanel, {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/SignInPanel.jsx';
+import { IS_DEMO } from '../lib/demoMode.js';
 
 export default function Login() {
   const { user, loading, signOut } = useAuth();
@@ -48,10 +49,15 @@ export default function Login() {
   return (
     <article className="mx-auto max-w-md">
       <h1 className="text-3xl font-semibold text-brand-ink">Sign in</h1>
-      <p className="mt-2 text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
-        Use your Google account, or get a one-time code by email. No password
-        needed.
-      </p>
+      {/* The demo build has no Firebase project, so SignInPanel renders a
+          "disabled in this demo" notice instead of the form — promising a
+          Google button and an emailed code above it would contradict it. */}
+      {IS_DEMO ? null : (
+        <p className="mt-2 text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+          Use your Google account, or get a one-time code by email. No password
+          needed.
+        </p>
+      )}
 
       <div className="mt-6">
         <SignInPanel onSignedIn={() => navigate('/', { replace: true })} />

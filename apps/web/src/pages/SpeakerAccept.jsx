@@ -31,6 +31,7 @@ import {
   acceptSpeakerInvite,
   validateSpeakerInvite,
 } from '../lib/speakerInvites.js';
+import { IS_DEMO } from '../lib/demoMode.js';
 
 const primaryButtonClass =
   'touch-target inline-flex items-center justify-center rounded-brand ' +
@@ -48,6 +49,34 @@ const Panel = ({ children }) => (
   </div>
 );
 
+/**
+ * Static demo build only (lib/demoMode.js). Says what this page does on a
+ * real deployment rather than claiming the visitor's link is expired or
+ * invalid — nothing about it was checked, and pretending otherwise would be
+ * the one demo state that reads as a bug.
+ */
+function DemoInviteNotice() {
+  return (
+    <article className="mx-auto max-w-md">
+      <h1 className="text-3xl font-semibold text-brand-ink">Your invitation</h1>
+      <Panel>
+        <p className="font-heading text-lg font-semibold text-brand-ink">
+          Invitations are disabled in this demo
+        </p>
+        <p className="text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+          On a real deployment this page checks the invitation link an
+          organizer emailed you, then links it to the account you sign in
+          with. This is a read-only tour of a fictional event, so no
+          invitation is checked and nothing leaves your browser.
+        </p>
+        <Link to="/" className={primaryButtonClass}>
+          Back to the event
+        </Link>
+      </Panel>
+    </article>
+  );
+}
+
 export default function SpeakerAccept() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
@@ -64,6 +93,15 @@ export default function SpeakerAccept() {
   }, [error]);
 
   useEffect(() => {
+    // Static demo build (lib/demoMode.js): every other read path in the app
+    // is inert because Firestore is offline, but validating an invitation is
+    // a plain POST to the functions origin, which nothing else switches off.
+    // The token comes from the URL, so merely opening a shared
+    // /speaker/accept?token=… link in the demo would send it offsite. Never
+    // call out; DemoInviteNotice below is what renders instead. In a normal
+    // client build IS_DEMO is a compile-time `false` and this branch is
+    // dropped.
+    if (IS_DEMO) return undefined;
     if (!token) {
       setCheck({ state: 'invalid', invite: null, reason: 'missing' });
       return undefined;
@@ -126,6 +164,18 @@ export default function SpeakerAccept() {
       setAccepting(false);
     }
   }, [token, user]);
+
+  // Every hook above has run, so this early return is safe — and it must
+  // come before the `checking` branch below, because the demo never leaves
+  // that state: the effect returns without validating anything, so the page
+  // would otherwise sit on the spinner forever.
+  //
+  // Written as a bare `IS_DEMO` test rather than a branch on `check.state`
+  // so the bundler can fold it: with the flag unset the condition is a
+  // literal `false`, the branch goes, and DemoInviteNotice becomes an
+  // unreferenced top-level function that tree-shakes out — the same shape,
+  // and the same reason, as components/SignInPanel.jsx's DemoSignInNotice.
+  if (IS_DEMO) return <DemoInviteNotice />;
 
   if (loading || check.state === 'checking') {
     return (

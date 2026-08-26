@@ -220,7 +220,7 @@ only the rows that apply to the providers selected above:
 
 | Secret | Required when |
 |---|---|
-| `EMAIL_PROVIDER_API_KEY` | `EVENT_EMAIL_PROVIDER = postmark` |
+| `EMAIL_PROVIDER_API_KEY` | `EVENT_EMAIL_PROVIDER = postmark` (server token) |
 | `EMAIL_WEBHOOK_BASIC_AUTH` | `EVENT_EMAIL_PROVIDER = postmark` and delivery-event ingest is enabled |
 | `EMAIL_WEBHOOK_URL`, `EMAIL_WEBHOOK_SECRET` | `EVENT_EMAIL_PROVIDER = webhook` |
 | `TICKETING_API_TOKEN` | `EVENT_TICKETING_PROVIDER != none` |
@@ -229,6 +229,12 @@ only the rows that apply to the providers selected above:
 
 There is deliberately no `FIREBASE_SERVICE_ACCOUNT` secret in this list — WIF (§1–2) replaces the
 service-account-key deploy credential entirely.
+
+There is also deliberately no `EMAIL_ACCOUNT_API_KEY` here: it's the Postmark **account** token,
+consumed only by the operator-run `scripts/verify-sender-domain.cjs`, not by any deployed function
+— none of the `defineSecret` lists below bind it. It stays in operator-controlled storage and is
+never provisioned into a client's GitHub Environment or Secret Manager; see
+`docs/POSTMARK_PROVISIONING.md` §3.
 
 These provider secrets are consumed by the deployed Cloud Functions through `defineSecret` (Secret
 Manager), not baked into the functions env file the `functions` job writes — create them in Secret

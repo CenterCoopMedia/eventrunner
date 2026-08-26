@@ -331,7 +331,8 @@ variables and secrets, one environment per client deployment. `.env.example` doc
 | `VITE_FIREBASE_*` (7) | var | build | unchanged set from `apps/web/src/firebase.js` |
 | `VITE_EVENT_PUBLIC_URL` | var | build | mirrors `EVENT_PUBLIC_URL` into the bundle |
 | `FIREBASE_SERVICE_ACCOUNT` | secret | deploy, generate-content | |
-| `EMAIL_PROVIDER_API_KEY` | secret | functions | Secret Manager via `defineSecret` |
+| `EMAIL_PROVIDER_API_KEY` | secret | functions | server token; Secret Manager via `defineSecret`; only when provider is `postmark` |
+| `EMAIL_ACCOUNT_API_KEY` | secret | scripts | account token; only when provider is `postmark` — Postmark's domains API reports verification state only to an account token, so `verifySenderDomain()` needs this in addition to the server token (§3.1). Consumer is genuinely `scripts` only, not `functions`: no `defineSecret` list in `functions/src/email/send.cjs` binds it, so it stays in operator-controlled storage and is never provisioned into a client's GitHub Environment, Secret Manager, or runtime service account (`docs/POSTMARK_PROVISIONING.md` §3) |
 | `EMAIL_WEBHOOK_BASIC_AUTH` | secret | functions | `user:pass` for the delivery-event endpoint; only when provider is `postmark` **and** delivery ingest is enabled (§3.1) |
 | `EMAIL_WEBHOOK_URL` / `EMAIL_WEBHOOK_SECRET` | secret | functions | only when provider is `webhook` |
 | `TICKETING_API_TOKEN` | secret | functions | only when ticketing provider is not `none` |
@@ -1813,7 +1814,7 @@ environment-scoped. Full v1 secret surface per environment:
 | Secret | Required when |
 |---|---|
 | `FIREBASE_SERVICE_ACCOUNT` | always |
-| `EMAIL_PROVIDER_API_KEY` | provider = `postmark` |
+| `EMAIL_PROVIDER_API_KEY` | provider = `postmark` (server token) |
 | `EMAIL_WEBHOOK_BASIC_AUTH` | provider = `postmark` and delivery-event ingest enabled |
 | `EMAIL_WEBHOOK_URL`, `EMAIL_WEBHOOK_SECRET` | provider = `webhook` |
 | `TICKETING_API_TOKEN` | ticketing provider ≠ `none` |
@@ -1826,7 +1827,10 @@ secrets, and a placeholder secret in a secret store is worse than an absent one 
 provisioned.
 
 Absent by design: broadcast unsubscribe HMAC, Telegram bot token and chat id, Slack's four,
-Airtable key, GitHub PAT, deploy secret.
+Airtable key, GitHub PAT, deploy secret. Also absent, and for the same reason as those: the
+Postmark account token (`EMAIL_ACCOUNT_API_KEY`, §2.1) — it isn't environment-scoped, it's a
+single operator-held credential consumed only by `scripts/verify-sender-domain.cjs`, so it does
+not belong in this per-environment secret set at all (`docs/POSTMARK_PROVISIONING.md` §3).
 
 ### 8.3 Indexes and storage rules
 

@@ -211,3 +211,48 @@ test('the output names each failing record and what to publish', () => {
   assert.match(remediation, /DMARC/);
   assert.match(internals.formatStatus(FAIL), /DKIM:\s+FAIL/);
 });
+
+test('remediation never tells an operator to publish an SPF record', () => {
+  // Postmark satisfies SPF through the return-path CNAME (issue #93);
+  // sending someone to add an SPF record is a chase that cannot change the
+  // verdict. A non-passing SPF earns a note saying exactly that instead.
+  const spfDown = { ...FAIL, spf: 'fail', dkim: 'pass', returnPath: 'pass' };
+  const remediation = internals.remediation(spfDown);
+  assert.doesNotMatch(remediation, /Publish the provider SPF record/);
+  assert.doesNotMatch(remediation, /- Publish[^\n]*SPF/);
+  assert.match(remediation, /SPF needs no action/);
+  assert.match(remediation, /return-path CNAME/);
+  assert.match(internals.formatStatus(spfDown), /SPF:\s+FAIL\s+\(informational/);
+});
+
+test('a failing SPF alone is not a definitive failure', () => {
+  // The gate is DKIM + return-path; SPF is reported, never decisive, so it
+  // must not tear down a stored verification on its own.
+  assert.equal(
+    internals.isDefinitiveFailure({ spf: 'fail', dkim: 'pass', returnPath: 'pass' }),
+    false,
+  );
+  assert.equal(
+    internals.isDefinitiveFailure({ dkim: 'pass', returnPath: 'fail' }),
+    true,
+    'an absent SPF field must not break the check either',
+  );
+});
+
+test('DKIM + return-path passing is verified even with SPF unresolved', async () => {
+  // The end-to-end shape of issue #93: the provider says verified with SPF
+  // still unknown, and the script stamps rather than stalling.
+  const db = dbWithSender('hello@example.org');
+  const spfUnknown = {
+    domain: 'example.org', verified: true, spf: 'unknown', dkim: 'pass', returnPath: 'pass',
+  };
+  const code = await run({
+    args: {},
+    env: { EVENT_EMAIL_PROVIDER: 'postmark' },
+    deps: fakeDeps({ provider: { name: 'postmark', verifySenderDomain: async () => spfUnknown }, db }),
+  });
+  assert.equal(code, 0);
+  const sender = (await db.collection('config').doc('event').get()).data().sender;
+  assert.equal(sender.domainVerified, true);
+  assert.equal(sender.domainVerifiedBy, 'provider-check');
+});

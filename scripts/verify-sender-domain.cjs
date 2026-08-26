@@ -6,9 +6,9 @@
  *
  * Wraps the configured EmailProvider's `verifySenderDomain()` as an
  * operator command, because that check is an onboarding checklist item,
- * not a code path any request takes: SPF, DKIM, and DMARC are published in
- * the client's DNS by a human, and somebody has to be able to ask "did
- * that land yet?" from a terminal. It matters more than it sounds —
+ * not a code path any request takes: DKIM, the return-path CNAME, and DMARC
+ * are published in the client's DNS by a human, and somebody has to be able
+ * to ask "did that land yet?" from a terminal. It matters more than it sounds —
  * emailed one-time codes are the platform's only sign-in path that depends
  * on mail, and an unauthenticated sender domain is exactly the condition
  * that gets those codes quarantined by institutional mail filters.
@@ -70,11 +70,15 @@ async function stampVerification({ db, verified, method, domain, now = Date.now 
  * everything unknown" says nothing about the domain and must not silently
  * un-verify a deployment that is fine.
  *
- * @param {{ spf: string, dkim: string, returnPath: string }} status
+ * SPF is excluded on purpose: it is informational only (issue #93), so a
+ * reported SPF failure alongside passing DKIM and return-path is not a
+ * reason to tear down a verification the gate itself still considers good.
+ *
+ * @param {{ spf?: string, dkim: string, returnPath: string }} status
  * @returns {boolean}
  */
 function isDefinitiveFailure(status) {
-  return [status.spf, status.dkim, status.returnPath].includes('fail');
+  return [status.dkim, status.returnPath].includes('fail');
 }
 
 function usage() {
@@ -95,12 +99,18 @@ function usage() {
   ].join('\n');
 }
 
-/** One status line per DNS record, aligned. */
+/**
+ * One status line per DNS record, aligned.
+ *
+ * SPF is printed with its verdict but labelled informational: Postmark's
+ * Domains API deprecates the field and satisfies SPF through the
+ * return-path CNAME, so it is reported, never gated on (issue #93).
+ */
 function formatStatus(status) {
   const mark = (v) => (v === 'pass' ? 'pass   ' : v === 'fail' ? 'FAIL   ' : 'unknown');
   return [
     `  Domain:      ${status.domain}`,
-    `  SPF:         ${mark(status.spf)}`,
+    `  SPF:         ${mark(status.spf)} (informational — satisfied via the return-path CNAME)`,
     `  DKIM:        ${mark(status.dkim)}`,
     `  Return-Path: ${mark(status.returnPath)}`,
     `  Verified:    ${status.verified ? 'YES' : 'no'}`,
@@ -108,13 +118,25 @@ function formatStatus(status) {
   ].filter(Boolean).join('\n');
 }
 
-/** Remediation text for whatever is not passing yet. */
+/**
+ * Remediation text for whatever is not passing yet.
+ *
+ * There is deliberately no "publish an SPF record" step: the provider no
+ * longer asks for one (issue #93), and sending an operator to add a record
+ * that cannot change the verdict is the exact wild-goose chase this script
+ * exists to prevent. A non-passing SPF gets a note saying so, nothing more.
+ */
 function remediation(status) {
   const lines = [];
-  if (status.spf !== 'pass') lines.push('  - Publish the provider SPF record (or include) on the sender domain.');
   if (status.dkim !== 'pass') lines.push('  - Publish the provider DKIM TXT record and confirm it in the provider console.');
   if (status.returnPath !== 'pass') lines.push('  - Publish the return-path CNAME so bounces are authenticated.');
   lines.push('  - Publish a DMARC policy (§5.6 item 4), then re-run this script.');
+  if (status.spf !== 'pass') {
+    lines.push(
+      '  - (SPF needs no action: it is informational here, satisfied through the',
+      '    return-path CNAME. Do not publish a separate SPF record for it.)',
+    );
+  }
   return lines.join('\n');
 }
 

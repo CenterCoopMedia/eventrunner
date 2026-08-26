@@ -2,63 +2,64 @@
 
 v1 is five phases. The architecture spec and triage record are the contract. Issues in this repo are the queue.
 
-## M1: Prerequisites and repo bootstrap
+## M1: Prerequisites and repo bootstrap — effectively complete
 
-Legal and operator setup that gated the public repo.
+Legal and operator setup that gated the public repo. Two residual operator tasks are closing today.
 
-- Copyright holder and LICENSE grantor: Center for Cooperative Media
-- CCM GitHub organization with operator admin
-- Trademark screen and domain acquisition for the working name
-- Postmark account (one account, per-client message streams)
-- Workspaces layout, day-one legal files, credential-free CI
+- [x] Copyright holder and LICENSE grantor: Center for Cooperative Media
+- [x] CCM GitHub organization with operator admin
+- [x] Trademark screen and domain acquisition for the working name
+- [x] Postmark account (one account, per-client message streams)
+- [x] Workspaces layout, day-one legal files, credential-free CI
 
-## M2: Scaffold and core port
+## M2: Scaffold and core port — complete
 
 A fresh Firebase project boots to a working generic event site, including event-neutral emailed-code login.
 
-- Event configuration layer (deploy-time env + runtime `config/*`)
-- Shared workspace package with functions vendor packing
-- Email core and adapters (Postmark, webhook, console)
-- Operator notifier and telemetry
-- OTP authentication with tokenized templates
-- CMS content with two-revision draft/publish
-- Pages-as-data
-- Admin config mutation endpoints
-- Theming
-- Schedule and bookmarks
-- Attendee profiles
-- `init-event` bootstrap
-- Credential-free CI and per-client deploy matrix
+- [x] Event configuration layer (deploy-time env + runtime `config/*`)
+- [x] Shared workspace package with functions vendor packing
+- [x] Email core and adapters (Postmark, webhook, console)
+- [x] Operator notifier and telemetry
+- [x] OTP authentication with tokenized templates
+- [x] CMS content with two-revision draft/publish
+- [x] Pages-as-data
+- [x] Admin config mutation endpoints
+- [x] Theming
+- [x] Schedule and bookmarks
+- [x] Attendee profiles
+- [x] `init-event` bootstrap
+- [x] Credential-free CI and per-client deploy matrix
 
-## M3: Feature port wave
+## M3: Feature port wave — complete
 
-- Speaker canonical store and invite pipeline
-- Speaker profile wizard and public pages
-- Session materials (two collections, embargo)
-- Media library with Storage rules hardening
-- Session reactions
-- Badges from per-event config
-- Schedule PDF and `updatesMeta` SSR
-- Live-updates admin form and feedback inbox
+- [x] Speaker canonical store and invite pipeline
+- [x] Speaker profile wizard and public pages
+- [x] Session materials (two collections, embargo)
+- [x] Media library with Storage rules hardening
+- [x] Session reactions
+- [x] Badges from per-event config
+- [x] Schedule PDF and `updatesMeta` SSR
+- [x] Live-updates admin form and feedback inbox
 
-## M4: Ticketing adapter
+## M4: Ticketing adapter — complete
 
 Last, because everything else has to be stable first.
 
-- TicketingProvider core (tickets collection, webhook dedup, sync queue)
-- Eventbrite adapter
-- Manual/CSV adapter
-- Registration state machine
-- Provider-owned registration prompts and ticket templates
+- [x] TicketingProvider core (tickets collection, webhook dedup, sync queue)
+- [x] Eventbrite adapter
+- [x] Manual/CSV adapter
+- [x] Registration state machine
+- [x] Provider-owned registration prompts and ticket templates
 
-## M5: Packaging and transfer
+## M5: Packaging and transfer — in progress (~77%)
 
-- Operator documentation (deploy runbook, client onboarding, admin guide)
-- Public demo instance with synthetic event
-- Cloud Run site-publisher
-- Community scaffolding completion
-- E2E suite on emulators in CI
-- First public push and issue migration (this repository)
+- [x] Operator documentation (deploy runbook, client onboarding, admin guide)
+- [ ] Public demo instance with synthetic event (#35)
+- [x] Cloud Run site-publisher
+- [x] Community scaffolding completion
+- [x] E2E suite on emulators in CI
+- [x] First public push and issue migration (this repository)
+- [ ] Eventbrite sandbox verification (#79)
 
 ## After v1
 

@@ -5,6 +5,7 @@
 // for the modal to show inline, the same fail-soft contract as
 // lib/errorReporting.js's reportClientError.
 import { resolveFunctionsOrigin } from './errorReporting.js';
+import { IS_DEMO } from './demoMode.js';
 
 /**
  * @param {{ message: string, email?: string, category?: string,
@@ -18,6 +19,15 @@ import { resolveFunctionsOrigin } from './errorReporting.js';
  */
 export async function submitFeedback(payload, deps = {}) {
   const { env = import.meta.env, fetchImpl = typeof fetch === 'function' ? fetch : null } = deps;
+  // Static demo build (lib/demoMode.js): unauthenticated by design, so
+  // nothing else gates this — the modal is only reachable when the event
+  // config turns the feature on (Layout.jsx), which the demo snapshot does
+  // not, but the seam must not depend on that staying true. Answered with
+  // the module's ordinary fail-soft shape so the modal shows it inline.
+  // Compile-time `false` in a normal client build.
+  if (IS_DEMO) {
+    return { ok: false, error: 'Feedback is disabled in this read-only demo.' };
+  }
   if (!fetchImpl) {
     return { ok: false, error: 'This browser cannot send feedback right now.' };
   }
