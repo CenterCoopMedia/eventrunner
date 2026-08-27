@@ -10,7 +10,7 @@ import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
-import Schedule, { transferTarget } from './Schedule.jsx';
+import Schedule from './Schedule.jsx';
 import { formatSessionTimeRange, zonedDateTime } from '../lib/eventTime.js';
 
 // Non-UTC zone on purpose: America/Chicago is UTC−5 (CDT) on the fixture
@@ -309,31 +309,17 @@ describe('SchedulePage editorial register', () => {
     expect(screen.getByText(/Plate II \u00b7/)).toBeInTheDocument();
   });
 
-  it('states a transfer only where the room actually changes', () => {
-    // Visual story, Atlas, moment 2. The first session of a day is an
-    // arrival, not a transfer; two sessions in one room are not a move.
+  it('states the room and never infers a movement from it', () => {
+    // A room that differs from the one before it is not a recorded
+    // transfer, and the schema records none. So the room is stated and the
+    // page says nothing about moving between the two.
     renderSchedule();
     const rows = [...document.querySelectorAll('section ul li')];
-    expect(rows[0].querySelector('.transfer-line')).toBeNull();
-    expect(rows[1].querySelector('.transfer-line').textContent).toBe('Transfer to Room B');
-  });
-});
-
-describe('transferTarget', () => {
-  const day = [
-    { location: 'Main hall' },
-    { location: 'Room B' },
-    { location: 'Room B' },
-    { location: '  ' },
-    { location: 42 },
-  ];
-
-  it('names the room a reader moves to, and nothing else', () => {
-    expect(transferTarget(day, 0)).toBeNull();
-    expect(transferTarget(day, 1)).toBe('Room B');
-    expect(transferTarget(day, 2)).toBeNull();
-    expect(transferTarget(day, 3)).toBeNull();
-    expect(transferTarget(day, 4)).toBeNull();
+    expect(rows[0].textContent).toContain('Main hall');
+    expect(rows[1].textContent).toContain('Room B');
+    expect(document.body.textContent).not.toMatch(/transfer/i);
+    expect(document.body.textContent).not.toMatch(/min walk/i);
+    expect(document.querySelector('.transfer-line')).toBeNull();
   });
 });
 

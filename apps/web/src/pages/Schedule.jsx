@@ -49,34 +49,6 @@ function dayClass(isActive) {
   ].join(' ');
 }
 
-/**
- * The room a reader moves to, for the session at `index` of a sorted day
- * (design brief §4.6; visual story, Atlas, moment 2).
- *
- * A transfer is a real move: it exists only when this session sits in a
- * different room from the one before it, and only when both rooms are
- * stated. The first session of a day is an arrival, not a transfer, and two
- * sessions in the same room are not a move at all.
- *
- * Both are runtime CMS values, so a non-string room is treated as absent
- * rather than compared.
- *
- * @param {object[]} sessions the day's sessions, already sorted
- * @param {number} index
- * @returns {string|null}
- */
-export function transferTarget(sessions, index) {
-  const room = (session) =>
-    typeof session?.location === 'string' && session.location.trim()
-      ? session.location.trim()
-      : null;
-  if (index < 1) return null;
-  const here = room(sessions[index]);
-  const before = room(sessions[index - 1]);
-  if (!here || !before || here === before) return null;
-  return here;
-}
-
 /** Sort sessions the same way everywhere they're grouped by day (Schedule
  * and MySchedule both use this). Start time first, then explicit `order`,
  * then title as a stable tiebreaker. */
@@ -156,10 +128,6 @@ export default function Schedule() {
   // views render from this, so a child session appears under its parent in
   // the grid and in the list, and never as a row of its own.
   const entries = withCallingPoints(activeSessions);
-  // The top-level sessions in programme order. A transfer is a move between
-  // two of THESE: a calling point is inside its parent, not a room change
-  // after it.
-  const entrySessions = entries.map((entry) => entry.session);
   // The event's lines, in the client's own order (config/event.tracks). No
   // lines means no second axis, so there is nothing for a grid to be.
   const columns = resolveTracks(eventConfig);
@@ -320,7 +288,7 @@ export default function Schedule() {
                 // No gap: every row opens with its own hairline, so the rules
                 // are the separation a card border used to be.
                 <ul className="mt-sm">
-                  {entries.map((entry, index) => (
+                  {entries.map((entry) => (
                     <SessionCard
                       key={entry.session.id}
                       session={entry.session}
@@ -328,7 +296,6 @@ export default function Schedule() {
                       features={features}
                       bookmarked={bookmarkedIds.has(entry.session.id)}
                       backIssue={backIssue}
-                      transferTo={transferTarget(entrySessions, index)}
                       callingPoints={entry.children}
                     />
                   ))}

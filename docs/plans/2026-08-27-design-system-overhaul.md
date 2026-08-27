@@ -680,9 +680,13 @@ theme's whole idea:
 - Concurrent tracks are **lines**, lettered A, B, C. Each line carries a route mark: the letter in
   the heading face inside a survey-drawn shape, always with the line's name beside it.
 - Rooms and venues are **stations**. A station has a name, a symbol, and a place on the sheet.
-- Moving between sessions is a **transfer**, and the site states it plainly in signage voice:
-  "Transfer to Line B · Hall 2 · 6 min walk." State where you are, where it is, and how long it
-  takes.
+- Moving between sessions is a **transfer**, and where the data records one the site states it
+  plainly in signage voice: "Transfer to Line B · Hall 2 · 6 min walk." State where you are, where
+  it is, and how long it takes. **A transfer is never inferred.** The schedule schema records no
+  movement — a session carries a day, a time, a title, a room, a track, and its speakers — so
+  today nothing is stated and the room renders plainly. Comparing one session's room string with
+  the next one's is a guess in the voice of a fact, and the reader cannot tell the two apart. The
+  statement returns when the schema carries a stated transfer to read from.
 
 Bind the safety rule: a line is told apart by its letter and its name first. A line colour, where a
 client sets one, is a second signal and never the only one (§8.1). Read the Atlas visual story in

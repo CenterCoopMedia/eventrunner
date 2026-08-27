@@ -880,7 +880,6 @@ const PRESETS = Object.freeze({
     tokens: {
       '--map-grid-size': 'var(--space-xl)',
       '--schedule-trace-width': 'var(--rule-strong-width)',
-      '--transfer-line-display': 'block',
       '--route-mark-radius': 'var(--radius-base)',
       '--session-card-pad-block': 'var(--space-xs)',
       '--folio-font': 'var(--font-data)',

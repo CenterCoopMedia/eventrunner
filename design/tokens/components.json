@@ -98,10 +98,6 @@
     "--route-mark-ink-rgb": "--color-surface-rgb",
     "--route-mark-radius": "0"
   },
-  "$transfer-note": "The Atlas transfer line (brief §4.6): moving between sessions is a transfer, and the site states it plainly in signage voice. Transfers are Atlas's vocabulary rather than the system's, so `none` keeps the statement out of the document — and out of the accessibility tree — in the five presets whose story has no transfers in it.",
-  "transfer-line": {
-    "--transfer-line-display": "none"
-  },
   "$callout-note": "Zine's handwritten callout (brief §4.3). --callout-font is a component token, not a fifth semantic role (§3.1, §3.2): one callout per page, real copy, at one fixed angle. A client may point it at var(--font-heading) and drop the script face. Every other preset holds the heading face and a zero angle.",
   "callout": {
     "--callout-rgb": "--color-text-primary-rgb",

@@ -580,15 +580,6 @@
     mask-image: url('/icons/wayfinding/step-free.svg');
   }
 
-  /* Transfer line: "where you are, where it is" in signage voice (brief
-     §4.6). It is Atlas's vocabulary, not the system's, so it is set only
-     where --transfer-line-display says the schedule is a network — which
-     also keeps it out of the accessibility tree in the five presets whose
-     story has no transfers in it. */
-  .transfer-line {
-    display: var(--transfer-line-display);
-  }
-
   /* Botanical plate: a framed opener, drawn as a DOUBLE hairline (brief
      §4.5). The border is the inner rule and the outline is the outer one,
      both at --plate-frame-width, so the doubling needs no second element.

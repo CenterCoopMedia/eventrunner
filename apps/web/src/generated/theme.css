@@ -201,9 +201,6 @@
   /* Tier 3 — route-mark contract (brief §3.1). */
   --route-mark-radius: 0;
 
-  /* Tier 3 — transfer-line contract (brief §3.1). */
-  --transfer-line-display: none;
-
   /* Tier 3 — callout contract (brief §3.1). */
   --callout-font: var(--font-heading);
   --callout-angle: 0deg;

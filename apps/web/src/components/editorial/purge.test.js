@@ -49,7 +49,6 @@ const DEVICE_CLASSES = [
   '.specimen-label__key',
   '.session-block',
   '.session-block__face',
-  '.transfer-line',
   '.callout',
   '.nameplate__coordinate',
   // The hybrid page shell and its density variant (brief §6.1, §6.2).

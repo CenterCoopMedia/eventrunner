@@ -652,8 +652,9 @@ You are moving through a mapped city on its transit network. Two things are true
 they are the same system: the sheet, with its survey grid, its contour marks, and its title block;
 and the network drawn on top of it, with lettered lines, stations, and a board that tells you what
 leaves next. Rooms are stations. Concurrent tracks are lines — Line A, Line B, Line C — each with its
-own route mark. Going from one session to the next is a transfer, and the site tells you so in the
-plain voice of station signage: where you are, where it is, how long it takes. For an event spread
+own route mark. Going from one session to the next is a transfer, and where the programme records
+one the site tells you so in the plain voice of station signage: where you are, where it is, how
+long it takes. It says nothing where nothing is recorded. For an event spread
 across a city, this is not a description of the place; it is the map and the timetable you actually
 travel with.
 
@@ -672,8 +673,12 @@ travel with.
 - **Stations** — the rooms and venues. A station has a name, a symbol, and a place on the sheet.
 - **Departure board** — the schedule. Time down the left as departures, lines across the head, each
   cell a service. A parent session and its children read as a service and its calling points.
-- **Transfer** — moving between sessions. Where two sessions sit on different lines or in different
-  venues, the site states the transfer plainly: "Transfer to Line B · Hall 2 · 6 min walk."
+- **Transfer** — moving between sessions, **stated only from recorded data**. Where the programme
+  records a transfer, the site states it plainly: "Transfer to Line B · Hall 2 · 6 min walk." Two
+  rooms with different names are not a recorded transfer: they may be the same door, and a reader
+  who skipped the earlier session is not moving from anywhere. The schedule schema records no
+  movement today, so the board states the station and stops there. Lines are different — a track
+  letter and its name are recorded in `config/event.tracks`, which is why route marks render.
 - **Wayfinding icons** — the sign set: venue, room, line, transit, step-free access. These carry
   meaning, so they are labelled icons, never motifs and never decorative pills.
 - **Folios** — the map key headings: LINES, STATIONS, DAY ONE, GETTING AROUND. Small caps on a
@@ -708,9 +713,10 @@ travel with.
    the same line as the title, then the station name, the room code, and the departure time in the
    data face at fixed positions
    and fixed widths, so the column of times and rooms runs down the page like a timetable. Child
-   sessions list under their parent as calling points. Where the next session needs a move, the
-   transfer line states the line, the station, and the walking minutes. Every icon is labelled;
-   nothing signals status by colour alone.
+   sessions list under their parent as calling points. Where the programme records a move, the
+   transfer line states the line, the station, and the walking minutes; where it records none —
+   which is everywhere, until the schema carries one — the row states the station and says no more.
+   Every icon is labelled; nothing signals status by colour alone.
 3. **Tracing a line is the signature interaction.** The departure board is Atlas's one expressive
    moment: on a user action, one line's column reads as a traced route — its cells come forward and
    its route marks connect down the column while the map grid behind stays put. It starts from a user

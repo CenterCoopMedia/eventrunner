@@ -21,7 +21,6 @@ import {
   icsFileName,
 } from '../utils/calendar.js';
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';
-import WayfindingIcon from './editorial/WayfindingIcon.jsx';
 import Tag from './editorial/Tag.jsx';
 import CallingPoints from './CallingPoints.jsx';
 
@@ -396,40 +395,29 @@ export function SessionPills({
 }
 
 /**
- * The transfer line (design brief §4.6; visual story, Atlas, moment 2).
+ * MOVEMENT IS NOT INFERRED (design brief §4.6; visual story, Atlas).
  *
- * "Moving between sessions is a transfer, and the site states it plainly in
- * signage voice: where you are, where it is, how long it takes." The
- * schedule passes `transferTo` when this session sits in a different room
- * from the one before it, so the statement is drawn from real data or it is
- * not made at all.
+ * The schedule used to compare one session's room string with the previous
+ * one's and, when they differed, print "Transfer to <room>". That was a
+ * guess wearing the voice of a fact. Two rooms with different names may be
+ * the same door; a reader who never sat in the earlier session is not
+ * transferring from anywhere; and the sentence claimed a movement the data
+ * never recorded.
  *
- * WHAT IS MISSING, AND WHY THE LINE IS SHORTER THAN THE STORY'S. The story
- * writes "Transfer to Line B · Hall 2 · 6 min walk". The data model carries
- * no line letter and no walking minutes — a session has a day, a time, a
- * title, a room, and its speakers — so this states the room move and stops.
- * Inventing a walking time would be a made-up fact on a page whose whole
- * promise is accuracy. The line and the minutes land when the schema
- * carries them (PR3).
+ * So movement facts — transfers, walking guidance, movement instructions —
+ * render ONLY from explicit data. A session carries a day, a time, a title,
+ * a room, a track, and its speakers. None of those is a movement, so the
+ * room renders plainly and the page says nothing more. When the schema
+ * gains a stated transfer, the statement comes back and reads from it.
  *
- * The icon is labelled by the words beside it, which is the rule the whole
- * sign set follows.
+ * Track letters stay: a track IS explicit data (config/event.tracks, one
+ * letter and one name), which is why RouteMark still renders in the grid.
  */
-function TransferLine({ to }) {
-  if (!to) return null;
-  return (
-    <p className="transfer-line mt-2xs font-data text-caption text-text-secondary">
-      <WayfindingIcon name="room" className="me-2xs" />
-      Transfer to {to}
-    </p>
-  );
-}
 
 /**
  * @param {{ session: object, eventConfig: object, features?: object,
  *           bookmarked?: boolean, linkToDetail?: boolean,
- *           transferTo?: string | null, callingPoints?: object[],
- *           backIssue?: boolean }} props
+ *           callingPoints?: object[], backIssue?: boolean }} props
  */
 export default function SessionCard({
   session,
@@ -437,7 +425,6 @@ export default function SessionCard({
   features = {},
   bookmarked = false,
   linkToDetail = true,
-  transferTo = null,
   callingPoints = [],
   backIssue = false,
 }) {
@@ -498,7 +485,6 @@ export default function SessionCard({
             className="mt-2xs"
             fields={[{ key: 'Place', value: session.location }]}
           />
-          <TransferLine to={transferTo} />
           {session.description ? (
             <p
               className="mt-xs max-w-prose text-body text-text-secondary"
