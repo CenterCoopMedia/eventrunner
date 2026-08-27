@@ -23,12 +23,6 @@ function replaceOnce(relativePath, before, after) {
 }
 
 replaceOnce(
-  '.github/workflows/ci.yml',
-  `      - name: Run ESLint\n        run: npm run lint\n`,
-  `      - name: Run ESLint\n        run: npm run lint\n      - name: Check user-facing copy\n        run: npm run check:copy\n`,
-);
-
-replaceOnce(
   'docs/ADMIN_GUIDE.md',
   `On a phone — and for anyone reading with a screen reader — the same day reads as a time-ordered list, which is a designed view rather than a lesser one.`,
   `On a phone — and for anyone reading with a screen reader — the same day is a time-ordered list. It contains the same sessions in the same order as the wide-screen grid.`,
