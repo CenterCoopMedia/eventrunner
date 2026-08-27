@@ -47,7 +47,7 @@ export const BLOCK_TYPES = Object.freeze({
     description:
       'A number that carries evidence: the figure and its caption, plus the four parts ' +
       'every stat must state — the finding in words, what it counts, where it came from, ' +
-      'and what a screen reader hears.',
+      'and what a screen reader hears. All six are required to write one.',
     fields: [
       { id: 'value', type: 'string', required: true },
       { id: 'label', type: 'string', required: true },
@@ -93,12 +93,14 @@ export const BLOCK_TYPES = Object.freeze({
 /**
  * What to write in each part of the stat contract (design brief §2.1.1),
  * shown under that field in the block editor. The server enforces the same
- * four parts and rejects a write that misses one (blockTypes.cjs
+ * parts and rejects a write that misses one (blockTypes.cjs
  * statContractErrors); blockTypes.test.js pins the two field sets together,
  * so the editor can never prompt for a part the server ignores, or stay
  * silent about one it demands.
  */
 export const STAT_CONTRACT_HINTS = Object.freeze({
+  value: 'The figure itself, as it should read. “420”, “2×”, “68%”.',
+  label: 'Caption the figure in a few words. “Attendees expected”.',
   takeaway: 'State the finding in words. “Two thirds of sessions are workshops”, not “Session types”.',
   description: 'Say what the number counts, and over what period.',
   source: 'Name where the number came from, and the date you read it.',

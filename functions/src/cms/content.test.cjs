@@ -702,6 +702,24 @@ const FULL_STAT = Object.freeze({
   alt: 'Confirmed registrations stand at 420 of 450 seats.',
 });
 
+test('a stat block with evidence but no figure is rejected, naming the figure and its caption', async () => {
+  // The registry has always marked value and label required; the write
+  // contract now enforces them, so "all the evidence, no number" — a
+  // caption with a hole where the figure goes — cannot be written.
+  const db = makeFakeDb();
+  const { value, label, ...evidenceOnly } = FULL_STAT;
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: evidenceOnly } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  for (const part of ['value:', 'label:']) {
+    assert.ok(res.body.error.message.includes(part), `names ${part}`);
+  }
+  assert.equal(db.read('cmsContent_drafts', 'stats__attendees'), undefined);
+});
+
 test('creating a stat block without its four parts is rejected, naming each one', async () => {
   const db = makeFakeDb();
   const res = fakeRes();

@@ -52,13 +52,22 @@ describe('admin block palette', () => {
 
   // The stat contract (design brief §2.1.1) is enforced on write from PR3
   // on, so the editor must ask for exactly the parts the server demands —
-  // no silent fifth prompt, and no part the operator is never told about.
-  it('prompts for exactly the four parts the server enforces', () => {
+  // no silent extra prompt, and no part the operator is never told about.
+  it('prompts for exactly the parts the server enforces', () => {
     const enforced = Object.keys(blockTypesCjs.internals.STAT_CONTRACT);
     expect(Object.keys(STAT_CONTRACT_HINTS).sort()).toEqual([...enforced].sort());
     for (const id of enforced) {
       expect(BLOCK_TYPES.stat.fields.find((field) => field.id === id)?.required, id).toBe(true);
     }
+  });
+
+  it('counts the figure and its caption among the enforced parts', () => {
+    // The registry has always marked both required; the write contract now
+    // says so too, so a stat block cannot be written with evidence and no
+    // number.
+    const enforced = Object.keys(blockTypesCjs.internals.STAT_CONTRACT);
+    expect(enforced).toContain('value');
+    expect(enforced).toContain('label');
   });
 
   it('keeps the legacy figure and caption on the stat block', () => {
