@@ -36,6 +36,13 @@ export const PREVIEW_STYLE_ID = 'admin-theme-preview';
 /** The id the scoped preview writes its selectors against. */
 export const PREVIEW_SCOPE_ID = 'admin-theme-proof';
 
+/**
+ * The second frame's id, used by the preview's light-and-dark comparison
+ * (owner review, 2026-08-27). Two frames need two ids, because the scoped
+ * CSS is written against an id and an id may appear once in a document.
+ */
+export const PREVIEW_COMPARE_SCOPE_ID = 'admin-theme-proof-compare';
+
 let savedTexture = null;
 let savedMode = null;
 let savedPresetTheme = null;
@@ -62,12 +69,17 @@ export function scopeThemeCss(css, scopeId) {
  * Apply a candidate config/theme document.
  *
  * @param {object} themeDoc
- * @param {{ scope?: Element|null, mode?: 'light'|'dark'|null }} [options]
+ * @param {{ scope?: Element|null, mode?: 'light'|'dark'|null,
+ *           scopes?: Array<{ element: Element, id: string,
+ *                            mode?: 'light'|'dark'|null }>|null }} [options]
  *   `scope` confines the candidate to one element (the preview frame).
  *   `mode` renders the frame in that mode whatever the document's policy
  *   says, so the light and dark tabs are two proofs of the same forme.
+ *   `scopes` is the same thing for more than one frame at once, which is
+ *   what the comparison state renders: one candidate, two grounds, side by
+ *   side. One style element carries a block per frame.
  */
-export function applyThemePreview(themeDoc, { scope = null, mode = null } = {}) {
+export function applyThemePreview(themeDoc, { scope = null, mode = null, scopes = null } = {}) {
   let styleEl = document.getElementById(PREVIEW_STYLE_ID);
   if (!styleEl) {
     styleEl = document.createElement('style');
@@ -82,17 +94,25 @@ export function applyThemePreview(themeDoc, { scope = null, mode = null } = {}) 
   const shape = resolveShape(themeDoc);
   const { theme, motifSet } = resolveRootAttributes(themeDoc);
 
-  if (scope) {
-    scope.id = PREVIEW_SCOPE_ID;
-    styleEl.textContent = scopeThemeCss(css, PREVIEW_SCOPE_ID);
-    if (shape.texture) scope.dataset.texture = shape.texture;
-    if (theme) scope.dataset.theme = theme;
-    else delete scope.dataset.theme;
-    scope.dataset.motifSet = motifSet;
-    // The frame states its own mode. Nothing is written to the document, so
-    // the room around it keeps the mode the operator is working in.
-    scope.dataset.mode =
-      mode ?? resolveMode(themeDoc?.mode, prefersDark());
+  const targets =
+    scopes ?? (scope ? [{ element: scope, id: PREVIEW_SCOPE_ID, mode }] : null);
+  if (targets) {
+    styleEl.textContent = targets
+      .map((target) => scopeThemeCss(css, target.id))
+      .join('\n');
+    for (const target of targets) {
+      const { element } = target;
+      element.id = target.id;
+      if (shape.texture) element.dataset.texture = shape.texture;
+      else delete element.dataset.texture;
+      if (theme) element.dataset.theme = theme;
+      else delete element.dataset.theme;
+      element.dataset.motifSet = motifSet;
+      // Each frame states its own mode. Nothing is written to the document,
+      // so the room around them keeps the mode the operator is working in.
+      element.dataset.mode =
+        target.mode ?? resolveMode(themeDoc?.mode, prefersDark());
+    }
     return;
   }
 

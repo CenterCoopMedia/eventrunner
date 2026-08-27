@@ -362,6 +362,112 @@ export function buildRuntimeThemeCss(themeDoc) {
 }
 
 /**
+ * The first family in a set's stack — the bundled face — and the rest, which
+ * is what a reader sees if that face has not arrived.
+ *
+ * @param {string} setId
+ * @returns {{ family: string, fallback: string }|null}
+ */
+export function fontSetFaces(setId) {
+  const stack = FONT_SETS[setId];
+  if (!stack) return null;
+  const families = stack.split(',').map((part) => part.trim().replace(/^['"]|['"]$/g, ''));
+  return { family: families[0], fallback: families.slice(1).join(', ') };
+}
+
+/**
+ * Whether a font family is available to render right now.
+ *
+ * `document.fonts.check` answers for the whole stack of loaded and system
+ * faces, which is exactly the question. Where the API is missing — jsdom, an
+ * old browser — the answer is "assume it is there": a preview must never
+ * invent a warning it cannot substantiate.
+ *
+ * @param {string} family
+ * @returns {boolean}
+ */
+export function isFontAvailable(family) {
+  const fonts = typeof document !== 'undefined' ? document.fonts : null;
+  if (!fonts || typeof fonts.check !== 'function') return true;
+  try {
+    return fonts.check(`16px "${family}"`);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * What this document asks for that will NOT render as asked, in plain words
+ * (owner review, 2026-08-27).
+ *
+ * The page preview shows the truth about a candidate, and two kinds of
+ * request fall back silently:
+ *
+ *   • A COLOUR the resolver cannot read. `config/theme` carries hex strings
+ *     as data, and anything that is not `#RGB` or `#RRGGBB` is skipped —
+ *     the style's own value renders instead, and nothing on screen says so.
+ *   • A FONT the browser does not have. A role resolves to a bundled family;
+ *     if that face has not loaded, the reader gets the next family in the
+ *     stack. Worth saying, because the preview then shows a page set in a
+ *     face the client never chose.
+ *
+ * @param {object} themeDoc
+ * @param {{ fontAvailable?: (family: string) => boolean }} [options]
+ * @returns {Array<{ kind: 'color'|'font', field: string, message: string }>}
+ */
+export function themeFallbackWarnings(themeDoc, { fontAvailable = isFontAvailable } = {}) {
+  const warnings = [];
+  if (!isPlainObject(themeDoc)) return warnings;
+
+  const colorWarning = (field, value, instead) => {
+    if (typeof value !== 'string' || !value.trim()) return;
+    if (hexToChannels(value) !== null) return;
+    warnings.push({
+      kind: 'color',
+      field,
+      message: `${field} is not a colour this system can read (${value.trim()}). ${instead}`,
+    });
+  };
+
+  colorWarning(
+    'Main brand colour',
+    themeDoc.brandColor,
+    'The style\u2019s own colour is showing instead.',
+  );
+  for (const mode of THEME_MODES) {
+    for (const [key, value] of Object.entries(themeDoc.tokens?.[mode] ?? {})) {
+      colorWarning(
+        `${key} (${mode})`,
+        value,
+        'The worked-out value is showing instead.',
+      );
+    }
+  }
+  if (!themePresetId(themeDoc)) {
+    for (const [key, value] of Object.entries(themeDoc.colors ?? {})) {
+      colorWarning(key, value, 'The value this deployment was built with is showing instead.');
+    }
+  }
+
+  const roles = resolveFontRoles(themeDoc);
+  const seen = new Set();
+  for (const role of THEME_FONT_ROLES) {
+    const faces = fontSetFaces(roles[role]);
+    if (!faces || seen.has(faces.family)) continue;
+    seen.add(faces.family);
+    if (fontAvailable(faces.family)) continue;
+    warnings.push({
+      kind: 'font',
+      field: role,
+      message:
+        `${faces.family} has not loaded, so the ${role} text is showing in ` +
+        `${faces.fallback || 'the browser\u2019s own face'}.`,
+    });
+  }
+  return warnings;
+}
+
+/**
  * The root-element attributes a document resolves to (brief §3.4, §3.8).
  * EventConfigProvider writes these; the mode attribute is modeRuntime's,
  * because it also follows a media query.

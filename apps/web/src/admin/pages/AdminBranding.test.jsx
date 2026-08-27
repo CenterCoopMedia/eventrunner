@@ -51,10 +51,15 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+  // The stress fixture puts real session rows on the schedule, and a session
+  // row subscribes to its own reaction counts. Without this the frame's
+  // Schedule page throws inside the preview rather than rendering.
+  doc: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
 }));
 
 import App from '../../App.jsx';
-import { PREVIEW_SCOPE_ID, PREVIEW_STYLE_ID } from '../themePreview.js';
+import { PREVIEW_COMPARE_SCOPE_ID, PREVIEW_SCOPE_ID, PREVIEW_STYLE_ID } from '../themePreview.js';
 
 // Hex values are DATA here, never literals in source (spec §7.6 forbids hex
 // literals outside the allowlist — including in tests).
@@ -193,12 +198,15 @@ describe('the proof', () => {
     expect({ ...document.documentElement.dataset }).toEqual(room);
   });
 
-  it('states the page, the mode, and the draft below the frame', async () => {
+  it('states the page, the mode, the width, and the draft below the frame', async () => {
     await renderBranding();
-    expect(screen.getByText('Home · light · published theme')).toBeInTheDocument();
+    expect(screen.getByText('Home · light · 1440px · published theme')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Schedule' }));
-    expect(screen.getByText('Schedule · light · published theme')).toBeInTheDocument();
+    expect(screen.getByText('Schedule · light · 1440px · published theme')).toBeInTheDocument();
+    // And the FRAME really moved. `initialEntries` is read once, so the
+    // router has to remount or the line and the picture disagree.
+    expect(within(frame()).getByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
   });
 
   it('switches light and dark instantly, as two proofs of one forme', async () => {
@@ -206,10 +214,54 @@ describe('the proof', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dark' }));
 
     expect(frame().dataset.mode).toBe('dark');
-    expect(screen.getByText('Home · dark · published theme')).toBeInTheDocument();
+    expect(screen.getByText('Home · dark · 1440px · published theme')).toBeInTheDocument();
     // The room is not dragged into dark mode with it: the admin obeys the
     // mode the OPERATOR is working in, never the one being previewed.
     expect(document.documentElement.dataset.mode).not.toBe('dark');
+  });
+
+  it('renders a phone at a phone’s real width, so its own breakpoints fire', async () => {
+    await renderBranding();
+    fireEvent.click(screen.getByRole('button', { name: 'Phone (390px)' }));
+    expect(frame().style.width).toBe('390px');
+    // Twice on purpose: the visible identification line and the screen-reader
+    // description of the frame carry the same facts.
+    expect(screen.getAllByText(/Home · light · 390px/).length).toBeGreaterThan(0);
+  });
+
+  it('shows light and dark side by side, on one candidate', async () => {
+    // Dark mode is its own palette, and it is where a brand colour usually
+    // fails. Flipping a toggle and remembering is not the same as looking.
+    await renderBranding(PRESET_THEME);
+    fireEvent.click(screen.getByRole('button', { name: 'Compare light and dark' }));
+
+    const compared = document.getElementById(PREVIEW_COMPARE_SCOPE_ID);
+    expect(frame().dataset.mode).toBe('light');
+    expect(compared.dataset.mode).toBe('dark');
+    // One candidate, two frames: both carry the same style.
+    expect(compared.dataset.theme).toBe(frame().dataset.theme);
+    expect(previewCss()).toContain(`#${PREVIEW_COMPARE_SCOPE_ID}`);
+    expect(screen.getAllByText(/Home · dark · 1440px/).length).toBeGreaterThan(0);
+  });
+
+  it('swaps in a long title and a dense day on request, and says it is doing it', async () => {
+    await renderBranding(PRESET_THEME);
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stress test' }));
+
+    expect(screen.getByText(/Nothing here is saved or published/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Schedule · light · 1440px · stress test/).length)
+      .toBeGreaterThan(0);
+    // The frame is rendering the fixture, not the real programme.
+    // The frame is rendering the fixture, not the real programme.
+    expect(frame().textContent).toContain('Roundtable: sustaining multi-newsroom');
+  });
+
+  it('names a colour it cannot read and says what is showing instead', async () => {
+    await renderBranding({ ...PRESET_THEME, brandColor: 'brand blue' });
+    expect(screen.getByText(/Main brand colour is not a colour this system can read/))
+      .toBeInTheDocument();
+    expect(screen.getByText(/style’s own colour is showing instead/)).toBeInTheDocument();
   });
 
   it('discards the preview when the tab is left', async () => {
