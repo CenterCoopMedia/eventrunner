@@ -14,6 +14,12 @@
 // module doc) and instead goes through downloadSessionMaterialFile, which
 // fetches the bytes through the embargo-gated downloadSessionMaterial
 // endpoint and triggers the browser's save/open behavior locally.
+//
+// Presentation reads the tier 2 role names, the named type scale, and the
+// named spacing steps (design brief §3.1, §3.7): a hairline rule bounds each
+// row, the filename is the prose-link treatment .rich-text sets, and the
+// type sits beside it in the data face — metadata, never furniture above a
+// heading (§2.4).
 import { useCallback, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { downloadSessionMaterialFile, fetchSessionMaterialUrl } from '../lib/materialsSource.js';
@@ -52,20 +58,24 @@ function MaterialRow({ material }) {
   }, [user, material.id, material.type, material.filename]);
 
   return (
-    <li className="flex flex-col gap-1 rounded-brand border border-brand-ink/10 bg-brand-surface-alt p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <li className="flex flex-col gap-2xs rounded-brand border-hairline border-rule-hairline bg-surface-alt p-sm">
+      <div className="flex flex-wrap items-center justify-between gap-xs">
         <button
           type="button"
           onClick={onOpen}
           disabled={state.status === 'loading'}
-          className="touch-target text-start font-medium text-brand-primary-dark hover:underline disabled:opacity-50"
+          className="touch-target text-start text-body font-medium text-accent hover:text-accent-strong hover:underline disabled:opacity-60"
         >
           {material.filename}
         </button>
-        <span className="text-xs text-brand-ink-muted">{TYPE_LABEL[material.type] ?? material.type}</span>
+        <span className="font-data text-caption text-text-secondary">
+          {TYPE_LABEL[material.type] ?? material.type}
+        </span>
       </div>
       {state.status === 'error' ? (
-        <p role="status" className="text-sm text-brand-ink-muted">{state.message}</p>
+        <p role="status" className="text-caption text-text-secondary">
+          {state.message}
+        </p>
       ) : null}
     </li>
   );
@@ -79,9 +89,9 @@ export default function SessionMaterialsList({ session, features = {} }) {
   if (!features.sessionMaterials || materials.length === 0) return null;
 
   return (
-    <section id="session-materials" className="mt-6">
-      <h2 className="font-heading text-lg font-semibold text-brand-ink">Materials</h2>
-      <ul className="mt-2 flex flex-col gap-2">
+    <section id="session-materials" className="mt-xl">
+      <h2 className="font-heading text-h3 font-semibold text-text-primary">Materials</h2>
+      <ul className="mt-sm flex flex-col gap-xs">
         {materials.map((material) => (
           <MaterialRow key={material.id} material={material} />
         ))}

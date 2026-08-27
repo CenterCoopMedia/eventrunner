@@ -37,10 +37,13 @@ const { resolveLegacyColors } = require('shared/theme');
  *
  * The demo used to carry a hand-written blue-teal palette of its own. A
  * preset replaces it: the fixture is a media summit for cooperative
- * newsrooms, Newsroom modern is the story written for exactly that, and it
- * brings a designed dark palette the hand-written one never had. Running
- * the default preset also means the public demo shows what a client gets on
- * a fresh deployment rather than a look only the demo has.
+ * newsrooms, Newsroom is the story written for exactly that, and it brings
+ * a designed dark palette the hand-written one never had.
+ *
+ * The demo does NOT follow `DEFAULT_PRESET_ID`. A fresh deployment starts on
+ * Institutional (owner review, 2026-08-27); the demo stays on Newsroom
+ * because the demo's job is to show a real event dressed in the style that
+ * fits it, not to show the onboarding default twice.
  */
 const DEMO_PRESET_ID = 'newsroom';
 
@@ -158,11 +161,15 @@ const DEMO_ANSWERS = Object.freeze({
       organizerName: '[Demo] Harborlight Cooperative',
     },
   },
-  // Overlaid on `defaultTheme()` (spec §2.2, §7.2). The demo runs a named
-  // preset rather than a bespoke palette: Newsroom modern is the story
-  // written for a publication that publishes every day, which is what the
-  // fixture is. Its cool newsprint ground is not the warm tan canvas the
-  // anti-pattern checklist (#105) rejects.
+  // Overlaid on `defaultTheme()` (spec §2.2, §7.2). The product default is
+  // neutral; this fixture is not, and that is the point of the showcase —
+  // it is what a deployment looks like when a client takes the expressive
+  // choices the system offers (design brief §2.5.5).
+  //
+  // The demo runs a named preset rather than a bespoke palette: Newsroom is
+  // the story written for a publication that publishes every day, which is
+  // what the fixture is. Its cool newsprint ground is not the warm tan
+  // canvas the anti-pattern checklist (#105) rejects.
   theme: {
     preset: DEMO_PRESET_ID,
     // `colors` is an OUTPUT for a preset document (design brief §5.2): the
@@ -173,7 +180,10 @@ const DEMO_ANSWERS = Object.freeze({
     // The preset names the type map, the shape, and the motif default, so
     // the fixture states none of them. `mode` is light, so the demo renders
     // the same way it always has; the dark palette is generated beside it.
+    // The header is the one treatment the preset does not name, and the
+    // showcase takes the masthead.
     mode: 'light',
+    header: 'masthead',
   },
 });
 
@@ -305,7 +315,7 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-1',
     startTime: '10:30',
     endTime: '12:00',
-    title: 'Workshop: collaborative reporting basics',
+    title: 'Workshop: Collaborative reporting basics',
     description:
       'Setting up a cross-newsroom reporting partnership, from shared documents to shared ' +
       'bylines.',
@@ -323,7 +333,7 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-2',
     startTime: '09:30',
     endTime: '10:45',
-    title: 'Panel: sustaining local partnerships',
+    title: 'Panel: Sustaining local partnerships',
     description:
       'Three newsroom leaders on what it actually takes to keep a shared-coverage partnership ' +
       'funded past year one.',
@@ -340,7 +350,7 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-2',
     startTime: '13:30',
     endTime: '15:00',
-    title: 'Workshop: audience research on a small budget',
+    title: 'Workshop: Audience research on a small budget',
     description:
       'Simple survey and interview methods for newsrooms with no research budget and no ' +
       'research team.',

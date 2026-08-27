@@ -7,7 +7,7 @@ export default function UnknownBlock({ block }) {
   return (
     <div
       role="note"
-      className="rounded-brand border border-warning/50 bg-warning/10 p-3 text-sm text-brand-ink"
+      className="rounded-brand border-hairline border-warning/50 bg-warning/10 p-sm text-caption text-text-primary"
     >
       Unknown block type “{String(block?.blockType)}” — no renderer is
       registered for it. Register one in components/blocks/registry.jsx.

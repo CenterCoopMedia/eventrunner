@@ -446,7 +446,7 @@ export default function AdminContentBlockEditor({ mode }) {
 
       <Panel
         title="Block"
-        description="The field id ties this block to the public page's block slot."
+        description="The field id ties this block to the public page’s block slot."
       >
         <div className="grid gap-sm sm:grid-cols-2">
           <TextField

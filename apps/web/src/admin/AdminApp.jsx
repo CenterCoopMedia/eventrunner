@@ -70,7 +70,7 @@ export function AdminGate({ children }) {
         <div className="mx-auto w-full max-w-3xl px-md py-lg">
           <AdminEmptyState
             title="You don’t have admin access"
-            description="This area is limited to the event's administrators. If you think that's wrong, ask an organizer to add your address to the admin list."
+            description="This area is limited to the event’s administrators. If you think that’s wrong, ask an organizer to add your address to the admin list."
           />
         </div>
       </div>

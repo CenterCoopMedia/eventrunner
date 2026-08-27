@@ -91,7 +91,7 @@ OFL 1.1 text in their upstream Google Fonts repository.
   `wdth=75`, the condensed cut the map-label option asks for.
 - **Static families.** Where the family has no `wght` axis, each weight the
   system uses ships as its own file, and `@font-face` declares that exact
-  weight. Merriweather ships as two statics rather than one variable: its
+  weight. Merriweather ships as two statics rather than one variable: Its
   variable Latin subset is 94 KB, over the 60 KB bar, and two 47 KB statics
   clear it.
 - **Not on Google Fonts.** Karrik, Bagnard, Avara, and Fragment Mono were

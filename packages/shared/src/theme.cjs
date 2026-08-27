@@ -34,10 +34,10 @@ const DEFAULT_MODE_POLICY = 'light';
  * Font roles (brief §3.2). Tokens name a role, never a family.
  *
  * `data` carries tabular data and captions. `mono` carries figures,
- * timestamps, and code. They are two roles, not one: a preset normally
+ * timestamps, and code. They are two roles, not one: A preset normally
  * pairs a sans for captions with a mono for numbers, and one token cannot
- * say both. Until PR2 bundles a mono face, `mono` falls back to the data
- * face.
+ * say both. All six presets name a mono face; a document that names none
+ * falls the role through to the data face.
  *
  * `accent` is NOT a role. PR2 removed the `--font-accent` alias and the
  * grandfathered `accent` key with it (brief §3.2, §7). Zine's handwritten
@@ -65,8 +65,39 @@ const THEME_FONT_SET_IDS = Object.freeze([
   'besley', 'vollkorn', 'overpass', 'overpass-mono', 'libre-franklin',
 ]);
 
-/** What `config/theme.texture` may say (spec §7.2). */
-const THEME_TEXTURES = Object.freeze(['paper', 'flat']);
+/**
+ * What `config/theme.texture` may say (spec §7.2). `flat` is first because
+ * it is the base default: a texture is a theme opt-in, never a base
+ * treatment (design brief §2.5).
+ */
+const THEME_TEXTURES = Object.freeze(['flat', 'paper']);
+
+/** The texture a theme document without a `texture` field renders. */
+const DEFAULT_TEXTURE = 'flat';
+
+/**
+ * What `config/theme.header` may say (design brief §2.1). The active theme
+ * names the default header for its deployment; `standard` is the base.
+ */
+const THEME_HEADERS = Object.freeze(['standard', 'masthead', 'compact', 'minimal']);
+
+/** The header a theme that names none renders. */
+const DEFAULT_HEADER = 'standard';
+
+/**
+ * Resolve the header a page renders. The theme supplies the default and a
+ * page's stated header wins over it; anything unrecognized falls to the base
+ * rather than rendering no header at all.
+ *
+ * @param {unknown} themeHeader what `config/theme.header` says
+ * @param {unknown} [pageHeader] what the page's `layout.header` says
+ * @returns {'standard'|'masthead'|'compact'|'minimal'}
+ */
+function resolveHeader(themeHeader, pageHeader) {
+  if (THEME_HEADERS.includes(pageHeader)) return pageHeader;
+  if (THEME_HEADERS.includes(themeHeader)) return themeHeader;
+  return DEFAULT_HEADER;
+}
 
 /**
  * What `config/theme.radius` may say (spec §7.2). `small` is the 2px-to-4px
@@ -103,6 +134,33 @@ const THEME_NAV_PLACEMENTS = Object.freeze(['top', 'side']);
 /** What a site with no stated navigation placement renders at. */
 const DEFAULT_NAV_PLACEMENT = 'top';
 
+/**
+ * What each density step is worth, as a multiplier the stylesheet can do
+ * arithmetic with.
+ *
+ * `--density` is the word, and a word is not something CSS can measure: a
+ * custom property holding `tight` cannot set a padding. So the generator
+ * emits this beside it, and the public devices multiply their own spacing
+ * contract by it — one step for the whole page, rather than a per-component
+ * table nobody can keep in step.
+ *
+ * The spread is deliberately small. A style already states its own spacing
+ * in its tier-3 tokens (Broadsheet sets a smaller session-card padding than
+ * Institutional does), so this is the reader's adjustment ON TOP of the
+ * style's, not a second design. A wider spread would either crush a tight
+ * style or let a loose one drift off the page.
+ *
+ * The ADMIN never reads this. The room has one fixed identity and a client
+ * does not get to set its measure (brief §5.2), which is why the step is
+ * applied at the public device rules in index.css rather than to the shared
+ * `--space-*` scale both surfaces draw on.
+ */
+const THEME_DENSITY_STEPS = Object.freeze({
+  tight: '0.85',
+  comfortable: '1',
+  loose: '1.15',
+});
+
 /** The branding slots `config/theme.logos` may fill (spec §7.2). */
 const THEME_LOGO_SLOTS = Object.freeze(['primary', 'mark', 'footer', 'ogDefault', 'favicon']);
 
@@ -113,10 +171,18 @@ const THEME_LOGO_SLOTS = Object.freeze(['primary', 'mark', 'footer', 'ogDefault'
  * records which curated option the operator chose in each group, `tokens`
  * carries the advanced per-mode token overrides, and `motifSet` names the
  * motif set the root element switches to.
+ *
+ * `brandColor` is the owner review's one colour decision: the client's main
+ * brand colour, from which the supporting brand steps are DERIVED in both
+ * modes (`deriveBrandSteps`). `adminAccent` is gone with the same change —
+ * the admin position marker now derives from the resolved brand colour and
+ * keeps its legibility floor, so there is no second colour to pick and no
+ * way to pick one that renders as nothing.
  */
 const THEME_DOC_KEYS = Object.freeze([
-  'colors', 'fonts', 'texture', 'radius', 'mode', 'logos', 'placeholderLogos',
-  'preset', 'optionPicks', 'tokens', 'motifSet', 'adminAccent', 'navPlacement',
+  'colors', 'fonts', 'texture', 'radius', 'density', 'mode', 'header',
+  'logos', 'placeholderLogos', 'preset', 'optionPicks', 'tokens', 'motifSet',
+  'brandColor', 'navPlacement',
 ]);
 
 /**
@@ -215,9 +281,10 @@ function overrideTokenKey(name) {
  *
  * These four are DESIGNED, not derived. A dark ground computed from a
  * client's light surface would land wherever that surface happened to be —
- * a warm tan surface would give a brown ground. So PR1 pins one neutral
- * dark ground, slightly cool and never pure black, with a warm off-white
- * ink on it. PR2 replaces these per preset.
+ * a warm tan surface would give a brown ground. So one neutral dark ground
+ * is pinned here, slightly cool and never pure black, with a warm off-white
+ * ink on it. Every preset authors its own dark palette and never reaches
+ * this; it is the ground a document that names no preset falls back to.
  *
  * Measured against each other: ink on surface is 14.6:1, muted ink on
  * surface is 7.9:1, and both clear the bar on the alternate surface too.
@@ -369,8 +436,10 @@ const DARK_SOFT_STEP = 0.35;
  * `primaryDark` means "more emphasis", and more emphasis on a dark ground
  * is brighter, not darker.
  *
- * Presets bring hand-designed dark palettes in PR2. This is the
- * conservative derivation that makes dark mode complete in PR1.
+ * Every preset ships a hand-designed dark palette, so this derivation runs
+ * only for a document that names no preset — one written before presets
+ * existed, or a palette an operator set by hand under Advanced. It is the
+ * conservative path that keeps dark mode complete for those.
  *
  * @param {Record<string, readonly number[]>} light role → `[r, g, b]`
  * @returns {Record<string, number[]>} the same roles, dark values
@@ -400,6 +469,136 @@ function deriveDarkColors(light) {
     }
   }
   return dark;
+}
+
+/* -------------------------------------------------------------------------
+ * The brand colour and the supporting steps derived from it (owner review,
+ * 2026-08-27).
+ * ---------------------------------------------------------------------- */
+
+/**
+ * How far the emphasis step moves further from the ground than `primary`.
+ * Small on purpose: `primaryDark` is a hover state and a link, so it has to
+ * read as the same colour with more weight, not as a different colour.
+ */
+const BRAND_EMPHASIS_STEP = 0.22;
+
+/** How far the soft step settles back toward the ground. */
+const BRAND_SOFT_STEP = 0.42;
+
+/** The bar a brand step that carries TEXT must clear on its own ground. */
+const BRAND_MIN_CONTRAST = 4.5;
+
+/**
+ * The bar the soft step must clear. It never carries text — it is a fill, a
+ * chart band, a hairline tint — so it holds the WCAG 1.4.11 non-text bar.
+ */
+const BRAND_MIN_CONTRAST_UI = 3;
+
+/**
+ * The direction that ADDS contrast on a ground: toward black on a light
+ * ground, toward white on a dark one.
+ *
+ * @param {readonly number[]} ground
+ * @returns {number[]}
+ */
+function contrastDirection(ground) {
+  return relativeLuminance(ground) > 0.5 ? [0, 0, 0] : [255, 255, 255];
+}
+
+/**
+ * Move a colour away from a ground, in fixed steps, until it clears a bar.
+ *
+ * The general form of `liftToContrast`, which only ever lightens: this one
+ * picks its direction from the ground, so the same call works on a light
+ * page and on a dark one. A colour that already clears the bar comes back
+ * untouched, so a brand colour that is already legible is used exactly as
+ * the client gave it.
+ *
+ * @param {readonly number[]} rgb
+ * @param {readonly number[]} ground
+ * @param {number} minContrast
+ * @returns {number[]}
+ */
+function stepToContrast(rgb, ground, minContrast) {
+  const start = rgb.map(clampChannel);
+  if (contrastRatio(start, ground) >= minContrast) return start;
+  const target = contrastDirection(ground);
+  for (let step = 1; step <= 200; step += 1) {
+    const candidate = mixRgb(start, target, step / 200);
+    if (contrastRatio(candidate, ground) >= minContrast) return candidate;
+  }
+  return target;
+}
+
+/**
+ * The three brand steps a client's main brand colour resolves to on one
+ * ground — CONTRAST-SAFE BY CONSTRUCTION.
+ *
+ * A client picks one colour. Asking them to pick three more that hold
+ * against each other in two modes is asking them to do colour science, and
+ * what actually happened is that they picked three and one of them failed
+ * the publish gate. So the supporting steps are derived:
+ *
+ *   1. `primary` is the brand colour itself, moved away from the ground only
+ *      as far as the 4.5:1 text bar requires. A legible brand colour is
+ *      returned unchanged, so a client who picked well sees their own value.
+ *   2. `primaryDark` is one emphasis step further from the ground, then held
+ *      at the same 4.5:1 bar. It is the hover fill under a `surface` label
+ *      and it is a link on `surface`, and contrast is symmetric, so one bar
+ *      covers both readings.
+ *   3. `primaryLight` settles back toward the ground and is then pushed out
+ *      until it clears the 3:1 non-text bar. It carries no text.
+ *
+ * Every step ends at least at its bar, and moving away from a ground can
+ * only raise contrast, so the loop cannot leave a value below its bar: the
+ * extreme is pure black on white or pure white on black. That is what
+ * "safe by construction" means here — `findThemeContrastFailures` cannot
+ * report a brand pair for a derived palette, and `theme.test.cjs` measures
+ * every style against a set of deliberately awful brand colours to say so.
+ *
+ * The hue is never rotated and the chroma is never boosted. Blending toward
+ * black or white only, in fixed steps, keeps the result the client's colour.
+ *
+ * @param {readonly number[]} brand the client's main brand colour
+ * @param {readonly number[]} ground the surface it must read on
+ * @returns {{ primary: number[], primaryDark: number[], primaryLight: number[] }}
+ */
+function deriveBrandSteps(brand, ground) {
+  const away = contrastDirection(ground);
+  const primary = stepToContrast(brand, ground, BRAND_MIN_CONTRAST);
+  return {
+    primary,
+    primaryDark: stepToContrast(
+      mixRgb(primary, away, BRAND_EMPHASIS_STEP),
+      ground,
+      BRAND_MIN_CONTRAST,
+    ),
+    primaryLight: stepToContrast(
+      mixRgb(primary, ground, BRAND_SOFT_STEP),
+      ground,
+      BRAND_MIN_CONTRAST_UI,
+    ),
+  };
+}
+
+/**
+ * A palette with its three brand steps replaced by the ones derived from a
+ * client brand colour. Returns the palette untouched when the document names
+ * no brand colour, or when the palette has no ground to measure against.
+ *
+ * The accent and the five semantic roles are NOT derived. They belong to the
+ * style — Field Guide's clay, Newsroom's desk blue, the one red that means
+ * danger — and deriving them from a client's brand would make the six styles
+ * one style in six hues.
+ *
+ * @param {Record<string, number[]>} palette
+ * @param {readonly number[]|null} brand
+ * @returns {Record<string, number[]>}
+ */
+function withBrandSteps(palette, brand) {
+  if (!isRgb(brand) || !isRgb(palette?.surface)) return palette;
+  return { ...palette, ...deriveBrandSteps(brand, palette.surface) };
 }
 
 /**
@@ -441,10 +640,53 @@ const { PRESETS, ADMIN_TOKENS, MOTIF_SET_IDS } = require('./presetCatalog.cjs');
 const THEME_PRESET_IDS = Object.freeze(Object.keys(PRESETS));
 
 /**
- * The preset a new deployment gets. Brief §4.2: "Use it as the default
- * preset for new deployments."
+ * ALL SIX STYLES ARE FIRST-CLASS (owner calibration, 2026-08-27).
+ *
+ * An earlier pass split the catalog into a `stable` launch surface and an
+ * `experimental` group. That is withdrawn. Every style is complete,
+ * accessible, responsive, and offered without a warning label. What replaces
+ * the tier is progressive disclosure:
+ *
+ *   - `THEME_PRESET_IDS` is the picker order, and order is the only ranking.
+ *     It is a recommendation, not a verdict.
+ *   - Every style ships ONE recommended configuration — the option defaults
+ *     in its preset file — that works the moment it is picked.
+ *     `recommendedConfiguration` builds the `config/theme` a fresh pick
+ *     produces, and `theme.test.cjs` measures all six against the contrast
+ *     bar in both modes.
+ *   - Everything past that first excellent configuration lives behind the
+ *     editor's Advanced disclosure.
  */
-const DEFAULT_PRESET_ID = 'newsroom';
+
+/**
+ * The `config/theme` a staff member gets the moment they pick a style: the
+ * style id and its recommended option picks, nothing else.
+ *
+ * @param {string} id a preset id
+ * @returns {{ preset: string, optionPicks: Record<string, string> }|null}
+ */
+function recommendedConfiguration(id) {
+  const preset = getPreset(id);
+  if (!preset) return null;
+  const optionPicks = {};
+  for (const [group, spec] of Object.entries(preset.options || {})) {
+    optionPicks[group] = spec.default;
+  }
+  return { preset: id, optionPicks };
+}
+
+/**
+ * The style a new deployment gets (owner review, 2026-08-27; kept by the
+ * calibration).
+ *
+ * The brief §4.2 named Newsroom. Institutional is the onboarding default
+ * instead: it is the plainest of the six, it targets the highest
+ * accessibility bar, and it is the look a client is least likely to have to
+ * undo. That is a decision about where a client STARTS, not a ranking of the
+ * six. The demo fixture stays on Newsroom, which is the story written for
+ * exactly that event.
+ */
+const DEFAULT_PRESET_ID = 'civic';
 
 /** The motif sets `config/theme.motifSet` may name (brief §3.8). */
 const THEME_MOTIF_SET_IDS = Object.freeze([...MOTIF_SET_IDS]);
@@ -620,9 +862,11 @@ function resolveShape(theme) {
   return {
     radius: pick(theme?.radius, shape.radius, THEME_RADIUS_IDS),
     texture: pick(theme?.texture, shape.texture, THEME_TEXTURES),
-    // A document with no preset predates the setting, so it takes the
-    // middle step — which is what the pre-preset surfaces already render.
-    density: pick(null, shape.density, THEME_DENSITIES) || 'comfortable',
+    // Density is an Advanced setting like the other two (owner review,
+    // 2026-08-27): the style states one, and a client may name another. A
+    // document that names neither — one made before presets existed — takes
+    // the middle step, which is what those surfaces already render.
+    density: pick(theme?.density, shape.density, THEME_DENSITIES) || 'comfortable',
   };
 }
 
@@ -707,18 +951,22 @@ function readPaletteMap(colors) {
 function resolveThemePalettes(theme) {
   const preset = getPreset(themePresetId(theme));
   const overrides = isPlainObject(theme?.tokens) ? theme.tokens : {};
+  const brand = hexToRgb(theme?.brandColor);
 
   if (preset) {
     return {
-      light: { ...preset.palette.light, ...readPaletteMap(overrides.light) },
-      dark: { ...preset.palette.dark, ...readPaletteMap(overrides.dark) },
+      light: { ...withBrandSteps(preset.palette.light, brand), ...readPaletteMap(overrides.light) },
+      dark: { ...withBrandSteps(preset.palette.dark, brand), ...readPaletteMap(overrides.dark) },
     };
   }
 
   const stored = isPlainObject(theme?.colors) ? theme.colors : {};
   const perMode = isPlainObject(stored.light) || isPlainObject(stored.dark);
   const light = {
-    ...readPaletteMap(perMode ? stored.light : stored),
+    // A pre-preset document takes the brand steps too, on its own stored
+    // ground. Its dark palette is derived from the resolved light one, so
+    // the brand colour reaches dark mode through that same path.
+    ...withBrandSteps(readPaletteMap(perMode ? stored.light : stored), brand),
     ...readPaletteMap(overrides.light),
   };
   const dark = {
@@ -846,22 +1094,33 @@ const ADMIN_TOKEN_SET = ADMIN_TOKENS;
 const ADMIN_ACCENT_MIN_CONTRAST = DARK_MIN_CONTRAST_UI;
 
 /**
- * The client accent's legibility floor (admin story part 6f).
+ * The admin position marker's colour, and its legibility floor (admin story
+ * part 6f, owner review 2026-08-27).
  *
- * A client picks `config/theme.adminAccent`, so it may be unreadable on an
- * admin ground. Measure it against `--admin-ground` in the mode. When it
- * fails, both accent slots fall back to `--admin-ink` and the editor says
- * so, naming what it fell back to. The value is never clamped: clamping
- * silently changes what the client chose.
+ * THERE IS NO SEPARATE ADMIN MARKER COLOUR ANY MORE. The editable
+ * `config/theme.adminAccent` field is gone. The admin's two client-owned
+ * slots — the marker beside the section you are in, and the mark on the
+ * page-header rule — take the RESOLVED brand colour for the mode, which is
+ * the same value the site paints. One colour decision, used in both places,
+ * so the admin cannot drift from the site it is editing and nobody has to
+ * pick a second colour whose only job is to sit on an admin ground.
+ *
+ * The floor is unchanged and still does the work. The brand colour is
+ * measured against `--admin-ground` in the mode; a marker is non-text user
+ * interface, so it holds 3:1. When it fails, both slots fall back to
+ * `--admin-ink` and the editor says so. Nothing is clamped: the site keeps
+ * painting the client's colour, and it is only the admin marker that steps
+ * aside.
  *
  * @param {object} theme config/theme
  * @param {'light'|'dark'} mode
  * @returns {{ rgb: number[]|null, ratio: number|null, fellBack: boolean }}
- *   `rgb` null means the document names no accent, so the token keeps its
- *   declared default of `--admin-ink-rgb`.
+ *   `rgb` null means the document resolves no brand colour at all, so the
+ *   token keeps its declared default of `--admin-ink-rgb`.
  */
 function resolveAdminAccent(theme, mode) {
-  const accent = hexToRgb(theme?.adminAccent);
+  const palette = resolveThemePalettes(theme)[mode];
+  const accent = isRgb(palette?.primary) ? palette.primary.map(clampChannel) : null;
   if (!accent) return { rgb: null, ratio: null, fellBack: false };
   const ground = ADMIN_TOKENS.colors['--admin-ground-rgb'][mode];
   const ink = ADMIN_TOKENS.colors['--admin-ink-rgb'][mode];
@@ -877,8 +1136,13 @@ module.exports = {
   THEME_FONT_ROLES,
   THEME_FONT_SET_IDS,
   THEME_TEXTURES,
+  DEFAULT_TEXTURE,
+  THEME_HEADERS,
+  DEFAULT_HEADER,
+  resolveHeader,
   THEME_RADIUS_IDS,
   THEME_DENSITIES,
+  THEME_DENSITY_STEPS,
   THEME_LOGO_SLOTS,
   THEME_DOC_KEYS,
   THEME_NAV_PLACEMENTS,
@@ -890,6 +1154,7 @@ module.exports = {
   canonicalColorKey,
   overrideTokenKey,
   THEME_PRESET_IDS,
+  recommendedConfiguration,
   DEFAULT_PRESET_ID,
   THEME_MOTIF_SET_IDS,
   PRESETS,
@@ -912,6 +1177,13 @@ module.exports = {
   resolveAdminAccent,
   hexToRgb,
   rgbToHex,
+  BRAND_EMPHASIS_STEP,
+  BRAND_SOFT_STEP,
+  BRAND_MIN_CONTRAST,
+  BRAND_MIN_CONTRAST_UI,
+  stepToContrast,
+  deriveBrandSteps,
+  withBrandSteps,
   DARK_GROUND_RGB,
   DARK_MIN_CONTRAST,
   DARK_MIN_CONTRAST_UI,

@@ -25,7 +25,7 @@ with three changes that come from the brief:
 - **Part 6 is a token contract, not an option list.** The admin is not configurable, so there is
   nothing for a picker to pick. Part 6 states the `admin-*` token families PR2 must ship instead.
 
-Everything else carries over unchanged: tonal grounds, near-black ink, tint elevation, no eyebrows
+Everything else carries over unchanged: Tonal grounds, near-black ink, tint elevation, no eyebrows
 anywhere, dark mode authored as its own place.
 
 ---
@@ -36,7 +36,7 @@ anywhere, dark mode authored as its own place.
 
 You are not on the paper. You are in the room where the paper gets made.
 
-This is the composing room: the long bench, the steel imposing stone, the standing racks of matter
+This is the composing room: The long bench, the steel imposing stone, the standing racks of matter
 waiting to run. A page here is a physical thing being assembled — set, proofed, marked up, corrected,
 locked, and sent to press. Nothing in this room is for the public. The surfaces are hard and
 close-toned, the light is even, the labels are exact, and every measurement is written down because
@@ -45,7 +45,7 @@ this event twice a day has earned information, not whitespace.
 
 The room and the paper belong to the same trade — the same rules, the same folios, the same ink
 that is never spent on decoration — but they are made of different material. The public presets are
-paper: warm stock, wide measure, generous air. The admin is the *metal* that prints the paper: lead
+paper: Warm stock, wide measure, generous air. The admin is the *metal* that prints the paper: Lead
 alloy, oiled steel, graphite, proof stock pulled rough off the galley. That single material
 difference is what keeps the two surfaces recognisably related and never confusable. An operator
 switching between them always knows which side of the press they are standing on.
@@ -56,10 +56,10 @@ change if you press the thing you are about to press.
 
 ### 2. The vocabulary
 
-- **The room** — the admin shell. One base ground, one ink, hairline rules, one density: tight. The
+- **The room** — the admin shell. One base ground, one ink, hairline rules, one density: Tight. The
   room has no hero, no dashboard, no landing panel. Signing in puts you on a work surface.
 - **The docket** — the navigation. Fourteen named sections do not fit a tab row honestly, so they
-  read as a standing list down the leading edge, grouped by what the operator came to do: content,
+  read as a standing list down the leading edge, grouped by what the operator came to do: Content,
   people, operations, system. Group heads are folios on a hairline. Every item is a word. No icon
   rail, no collapse-to-mystery-glyphs, no counts in bubbles.
 - **The stone** — the main work surface. One column of the current job at full measure, ruled into
@@ -96,19 +96,19 @@ change if you press the thing you are about to press.
   face. The thumbnail is evidence; the metadata is the point.
 - **The proof** — the live-preview theme editor. See moment 2.
 - **Type roles** — the UI face is **Source Sans 3**, already bundled, and it carries everything a
-  person reads as language: labels, headings, hints, buttons, prose. The data face is **IBM Plex
-  Mono** with `font-variant-numeric: tabular-nums`, and it carries everything the machine owns: ids,
+  person reads as language: Labels, headings, hints, buttons, prose. The data face is **IBM Plex
+  Mono** with `font-variant-numeric: tabular-nums`, and it carries everything the machine owns: Ids,
   paths, slugs, timestamps, counts, hex values, token names, storage keys, states. The dividing rule
   is one sentence: **if an operator would ever copy it, paste it, or compare it character by
   character, it is set in the mono.** There is no third face and no configurable face.
 - **Motifs** — none, in any slot, ever. `--motif-set` does not reach this surface, and
   `data-motif-set` never lands on an admin root (§3.8). A workroom does not ornament itself.
-- **The job mark** — the client logo, in the top-left slot. It is the shop's job ticket: whose work is
+- **The job mark** — the client logo, in the top-left slot. It is the shop's job ticket: Whose work is
   on the stone right now. One fixed height, on the base ground, no frame, no glow, no card. It
   answers "which deployment am I in" at a glance and does nothing else.
 - **The shop's spot ink** — `--admin-client-accent`. A print shop runs one job's spot colour at a time,
   and the ink stays on the job; it never gets spread across the furniture. This accent appears in
-  exactly two named places (§5.2): the active-docket marker and the page-header mark. Nowhere else.
+  exactly two named places (§5.2): The active-docket marker and the page-header mark. Nowhere else.
   Not on buttons, not on links, not on rules, not on focus rings, not on charts, not on states. Two
   places is a rule a reviewer can grep for.
 - **Dark mode** — **the night side.** The day crew has gone and one lamp is over the stone. The
@@ -125,7 +125,7 @@ transition. The admin has no signature interaction by design.
    Every record list carries a state column in the data face at a fixed position: `Draft`,
    `Live`, or `Live · unpublished changes`, with the timestamp and the operator beside it. A record
    with unpublished changes sits on `--admin-ground-proof` — a distinctly toned band, the rough stock
-   a proof is pulled on — while live records sit on the base ground. Bind it: the tint is the second
+   a proof is pulled on — while live records sit on the base ground. Bind it: The tint is the second
    signal, never the first; the word is always present; the ground shift is a tint, not a colour
    fill, not a left edge, not a badge. On a successful publish the row resolves from the proof ground
    to the base ground over 160ms on `opacity` only, the state word swaps to `Live`, and a stated line
@@ -135,7 +135,7 @@ transition. The admin has no signature interaction by design.
    learns it once.
 
 2. **The theme editor puts the client's page on the stone.**
-   The branding editor is a split view: the controls bench on one side, the client's real rendered
+   The branding editor is a split view: The controls bench on one side, the client's real rendered
    page on the other. The preview is framed as a forme locked in a chase — a hairline frame on the
    room's ground, held at true scale, with the page identification line set **below** the frame on a
    hairline in the data face: `Home · light · unpublished draft`. Below, not above, because a label
@@ -145,7 +145,7 @@ transition. The admin has no signature interaction by design.
    client's theme; the client's design is contained inside the frame, which is precisely the point —
    you can tell at a glance where their work ends and your tooling begins.
 
-   The bench has two depths (§5.2). The curated option pickers come first: the preset, then its
+   The bench has two depths (§5.2). The curated option pickers come first: The preset, then its
    heading face, its nameplate treatment, and its component variants. Raw per-mode token override
    sits behind its own disclosure as the advanced path. Most operators never open it.
 
@@ -163,7 +163,7 @@ transition. The admin has no signature interaction by design.
    in the version history"). The confirm button repeats the consequence — "Delete this page", never
    "Confirm" — and it is a normal-sized button, because an oversized primary action is the pattern
    §2.4 rejects and a destructive one is the worst place to start. Nothing animates in a destructive
-   moment: no shake, no pulse, no countdown, no colour transition. A still surface reads as serious;
+   moment: No shake, no pulse, no countdown, no colour transition. A still surface reads as serious;
    a moving one reads as a game. Where an action cannot be undone, the sentence says so in the same
    words every time.
 
@@ -175,16 +175,16 @@ transition. The admin has no signature interaction by design.
 - **Dark:** night-side charcoal, cast-bone type, banked lead rule, lamp graphite, night galley tint,
   lit-steel focus, held oxide red, held green, held amber, dead-matter grey.
 
-Bind: the light ground is a warm-leaning grey pulled toward lead and proof stock, not a cool
+Bind: The light ground is a warm-leaning grey pulled toward lead and proof stock, not a cool
 blue-grey. The distance from generic dashboard slate is a stated design requirement, not a taste
 preference — see part 5.
 
 ### 5. What this story refuses
 
-- **Refuses the slate SaaS dashboard, by name.** The CJS2026 production admin fell into it: a
+- **Refuses the slate SaaS dashboard, by name.** The CJS2026 production admin fell into it: A
   blue-grey `slate-50` canvas, white rounded cards floating on soft grey shadows, coloured status
   pills, an icon sidebar, and a stat-tile row across the top. It was indistinguishable from every
-  template of its year. Every one of those devices is refused here individually: the ground is warm
+  template of its year. Every one of those devices is refused here individually: The ground is warm
   lead, not cool slate; panels are ruled and tinted regions, not floating cards; elevation is tint,
   never shadow; states are words in the data face, never pills; navigation is words, never an icon
   rail. If a reviewer can screenshot the admin and mistake it for a generic dashboard, this story has
@@ -272,11 +272,11 @@ Each ships as a colour plus a width pair, as §3.7 requires. No rule ever carrie
 2. `--admin-state-draft` — ink and ground for the unpublished state; the ground is
    `--admin-ground-proof`.
 3. `--admin-state-error` — ink for a rejection; the ground is `--admin-ground-alarm`.
-4. `--admin-state-caution` — ink for a warning that is not a failure: a low-contrast pair the
+4. `--admin-state-caution` — ink for a warning that is not a failure: A low-contrast pair the
    publish validator does not cover, an unverified sender, an unreviewed legal template.
 5. `--admin-state-ok` — ink for a completed action.
 
-Bind: every state token pairs with a required word in the UI. A component that renders a state token
+Bind: Every state token pairs with a required word in the UI. A component that renders a state token
 without its word fails review (§8.1, never signal status with colour alone).
 
 **(e) Focus — the one ring.**
@@ -285,7 +285,7 @@ without its word fails review (§8.1, never signal status with colour alone).
    `--admin-ground-input` in both modes.
 2. `--admin-focus-offset` — the offset width, so the ring never collides with a hairline.
 
-Bind: focus is never the client accent, because the client accent is not guaranteed to clear
+Bind: Focus is never the client accent, because the client accent is not guaranteed to clear
 anything. `:focus-visible` is styled everywhere; an outline is never removed without a replacement.
 
 **(f) The client slots — exactly two, and named as such.**
@@ -295,16 +295,16 @@ anything. `:focus-visible` is styled everywhere; an outline is never removed wit
 2. `--admin-client-accent-ink` — the ink that reads *on* the accent, for the rare case the marker is
    filled behind a glyph.
 3. `--admin-nav-active-marker` — component token, defaults to `var(--admin-client-accent)`. The
-   active docket item's marker: a short solid accent rule at the item's leading edge, full item
+   active docket item's marker: A short solid accent rule at the item's leading edge, full item
    height, 2px. This is not the banned coloured card edge — it marks the operator's current position,
    it never appears on a card or a button, and it never appears on an inactive item. Colour is not
-   the only signal: the active item also carries the semibold weight, a ground shift, and
+   the only signal: The active item also carries the semibold weight, a ground shift, and
    `aria-current="page"`.
 4. `--admin-page-header-mark` — component token, defaults to `var(--admin-client-accent)`. A small
    solid mark sitting **on** `--admin-rule-header` at its leading end, beside the section name. The
    ink dot a compositor puts on the chase. Never above the name.
 
-Bind: these two component tokens exist so the two-places rule is enforceable and greppable. Any other
+Bind: These two component tokens exist so the two-places rule is enforceable and greppable. Any other
 reference to `--admin-client-accent` in `apps/web` fails review.
 
 Bind: **the accent has a legibility floor.** A client picks the value, so it may be unreadable on one
@@ -325,7 +325,7 @@ dividing rule above is a single sentence.
 3. `--admin-radius` — one small radius for the whole surface. There is no second radius token and no
    pill radius, which is what stops `rounded-brand` and `TypeBadge`-style shapes from arriving here.
 
-Bind: no `--admin-font-*` token is ever writable from `config/theme`. The pairing is the identity
+Bind: No `--admin-font-*` token is ever writable from `config/theme`. The pairing is the identity
 (§5.2).
 
 ---

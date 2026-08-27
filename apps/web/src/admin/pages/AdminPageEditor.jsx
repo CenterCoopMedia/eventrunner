@@ -54,6 +54,7 @@ import { summarizePublish } from '../publishResult.js';
 import {
   CheckboxField,
   DestructiveConfirm,
+  FieldError,
   Panel,
   SaveStatus,
   SelectField,
@@ -61,6 +62,7 @@ import {
   TextAreaField,
   TextField,
   dangerButtonClass,
+  fieldLabelClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -69,21 +71,6 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
-
-/** A field-level error, spelled like formControls.jsx's own FieldError: a
- * mark, a word, in the data-adjacent alarm ink. Used for the group-level
- * errors (allowed block types) that have no single input of their own. */
-function InlineFieldError({ message }) {
-  if (!message) return null;
-  return (
-    <p className="text-folio text-admin-state-error">
-      <span aria-hidden="true" className="font-semibold">
-        !{' '}
-      </span>
-      {message}
-    </p>
-  );
-}
 
 // THE OPERATOR PICKS A TASK, NOT A LAYOUT (this review).
 //
@@ -678,13 +665,13 @@ export default function AdminPageEditor({ mode }) {
                   </div>
 
                   <fieldset className="mt-sm">
-                    <legend className="text-caption font-semibold text-admin-ink">
+                    <legend className={fieldLabelClass}>
                       Allowed block types
                     </legend>
                     <p className="text-caption text-admin-ink-secondary">
                       Which of the registry’s block types this section accepts.
                     </p>
-                    <InlineFieldError message={errorFor(`${at}.allowedBlocks`)} />
+                    <FieldError message={errorFor(`${at}.allowedBlocks`)} />
                     <div className="mt-2xs grid gap-2xs sm:grid-cols-2">
                       {BLOCK_TYPE_IDS.map((blockTypeId) => (
                         <CheckboxField

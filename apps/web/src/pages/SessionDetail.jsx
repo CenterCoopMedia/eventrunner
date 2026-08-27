@@ -14,6 +14,7 @@ import SessionActions from '../components/session/SessionActions.jsx';
 import SessionFormat from '../components/session/SessionFormat.jsx';
 import SessionMaterialsList from '../components/SessionMaterialsList.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 function NotFoundState({ search }) {
   return (
@@ -23,7 +24,7 @@ function NotFoundState({ search }) {
       action={
         <Link
           to={{ pathname: '/schedule', search }}
-          className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
+          className={primaryActionClass}
         >
           Back to the schedule
         </Link>
@@ -55,10 +56,7 @@ export default function SessionDetail() {
         title="This event doesn’t have a public schedule"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -69,7 +67,7 @@ export default function SessionDetail() {
   if (loading) {
     return (
       <div className="mt-lg">
-        <LoadingState label="Loading the session" />
+        <LoadingState label="Loading the session…" />
       </div>
     );
   }
@@ -107,7 +105,7 @@ export default function SessionDetail() {
                   –<time dateTime={range.endIso}>{range.endLabel}</time>
                 </>
               ) : null}
-              {range.zone ? <span className="ms-1">{range.zone}</span> : null}
+              {range.zone ? <span className="ms-2xs">{range.zone}</span> : null}
             </span>
           ) : !day ? (
             'Time to be announced'
@@ -120,7 +118,7 @@ export default function SessionDetail() {
       </header>
 
       {session.description ? (
-        <p className="mt-md max-w-prose text-lead text-text-secondary" style={{ textWrap: 'pretty' }}>
+        <p className="mt-md max-w-prose text-lead text-text-secondary text-pretty">
           {session.description}
         </p>
       ) : null}

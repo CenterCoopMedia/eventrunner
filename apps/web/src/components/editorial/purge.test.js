@@ -29,7 +29,14 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '..', '..', '..', '..', '..');
 const ASSETS = path.join(REPO_ROOT, 'docs', 'demo', 'assets');
 
-/** Every class the preset devices draw with, including every modifier. */
+/**
+ * Every class the preset devices draw with, including every modifier.
+ *
+ * Every modifier, because a family that is only half listed is a family the
+ * next person can break in the half nobody checks: the session block was
+ * pinned down to `__title` while the masthead beside it was pinned at one
+ * class out of six.
+ */
 const DEVICE_CLASSES = [
   '.motif',
   '.motif--section-mark',
@@ -55,13 +62,28 @@ const DEVICE_CLASSES = [
   '.specimen-label',
   '.specimen-label__key',
   '.session-block',
+  '.session-block--lead',
   '.session-block__face',
+  '.session-block__data',
+  '.session-block__text',
+  '.session-block__number',
+  '.session-block__title',
+  '.section-head',
+  '.section-rule',
   // The transfer line: a RECORDED move between two places (brief §4.6).
   // Not preset-gated any more — a surveyed walking time is a fact, and a
   // fact five presets hide is a fact withheld from the reader who needed
   // it. So it has to survive the build in every preset.
   '.transfer-line',
   '.callout',
+  '.folio',
+  '.folio-line',
+  '.folio__rule',
+  '.nameplate',
+  '.nameplate--compact',
+  '.nameplate__name',
+  '.nameplate__lockup',
+  '.nameplate__meta',
   '.nameplate__coordinate',
   // The hybrid page shell and its density variant (brief §6.1, §6.2).
   '.page-section',
@@ -96,6 +118,8 @@ const DEVICE_CLASSES = [
   '.schedule-print__day-head',
   '.schedule-print__calls',
   '.no-print',
+  '.nameplate__coordinate--start',
+  '.nameplate__coordinate--end',
 ];
 
 describe('the built stylesheet', () => {

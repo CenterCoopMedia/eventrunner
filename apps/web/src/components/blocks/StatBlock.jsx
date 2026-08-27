@@ -77,7 +77,7 @@ export default function StatBlock({ block }) {
         ) : null}
         {alt ? <span className="sr-only">{alt}</span> : null}
         {description ? (
-          <p className="mt-2xs max-w-prose text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+          <p className="mt-2xs max-w-prose text-body text-text-secondary text-pretty">
             {description}
           </p>
         ) : null}

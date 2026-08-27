@@ -3,7 +3,7 @@
        slots (spec §7.2 logos). Deliberately generic — not any product's or
        event's real logo. Grayscale only; rgb() notation keeps apps/web
        hex-free outside generated/theme.css. -->
-  <rect x="4" y="4" width="56" height="56" rx="14" fill="rgb(92 107 122)"/>
-  <circle cx="32" cy="32" r="17" fill="none" stroke="rgb(245 245 244)" stroke-width="4"/>
-  <circle cx="32" cy="32" r="6" fill="rgb(245 245 244)"/>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="rgb(91 93 97)"/>
+  <circle cx="32" cy="32" r="17" fill="none" stroke="rgb(250 250 249)" stroke-width="4"/>
+  <circle cx="32" cy="32" r="6" fill="rgb(250 250 249)"/>
 </svg>

@@ -1,27 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 320 420">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="96 48 128 310">
+  <!--
+    The unlabelled plate (visual story, Field Guide, moment 3): a frond
+    mounted on a herbarium sheet, with the label line left blank.
+
+    DRAWN FOR THE SIZE IT IS SEEN AT. The slot renders this at 8rem tall
+    under `mask-size: contain`, so what the viewBox says is what the scale
+    is. The box is drawn to the ink with one small even margin: an earlier
+    pass left a 320 by 420 sheet around a drawing 100 by 282, which was two
+    thirds empty and shrank the frond to three tenths for nothing. The plate
+    device around it supplies the margin a mounted specimen needs; the file
+    should not supply it twice.
+
+    Every stroke below is chosen so that it lands as a line at the scale
+    that leaves — the thinnest here is 1.2, and nothing thinner ships. An
+    earlier pass carried six vein ticks per pinna at 0.6, a hundred and
+    twenty of them, which no display could resolve and which greyed the
+    frond into a smudge. Detail a reader cannot see is not detail; it is
+    dirt.
+
+    No frame either. EmptyState mounts this inside the plate device, and
+    under Field Guide that device draws the double hairline itself. A second
+    frame inside the first is a doubling a plate does not do.
+  -->
   <defs>
     <g id="es-pinna">
       <path fill="none" stroke="currentColor" stroke-width="2" d="M0,0 C8,-4 20,-5.5 30,-3 C34,-1.8 36,-0.8 36,0 C34,1.5 24,3.3 15,3.6 C7,3.8 1.5,2.2 0,0 Z"/>
-      <path fill="none" stroke="currentColor" stroke-width="1" d="M2,-0.3 C12,-1 24,-1 33,-0.4"/>
-      <path fill="none" stroke="currentColor" stroke-width="0.6" d="M9,-0.7 L11,-3.6"/>
-      <path fill="none" stroke="currentColor" stroke-width="0.6" d="M17,-1 L19,-4.2"/>
-      <path fill="none" stroke="currentColor" stroke-width="0.6" d="M25,-0.8 L26,-2.8"/>
-      <path fill="none" stroke="currentColor" stroke-width="0.6" d="M9,-0.6 L10,2.4"/>
-      <path fill="none" stroke="currentColor" stroke-width="0.6" d="M17,-0.8 L17,3.1"/>
-      <path fill="none" stroke="currentColor" stroke-width="0.6" d="M25,-0.7 L24,2.4"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.2" d="M2,-0.3 C12,-1 24,-1 33,-0.4"/>
     </g>
-    <path id="es-corner" fill="none" stroke="currentColor" stroke-width="0.6" d="M0,10 L0,0 L10,0"/>
   </defs>
-
-  <use xlink:href="#es-corner" href="#es-corner" transform="translate(14,14)"/>
-  <use xlink:href="#es-corner" href="#es-corner" transform="translate(306,14) scale(-1,1)"/>
-  <use xlink:href="#es-corner" href="#es-corner" transform="translate(14,406) scale(1,-1)"/>
-  <use xlink:href="#es-corner" href="#es-corner" transform="translate(306,406) scale(-1,-1)"/>
 
   <g fill="none" stroke="currentColor">
     <path stroke-width="1.6" d="M160,316 C160,312 159,309 159,306"/>
-    <path stroke-width="2.4" d="M159,306 C158,268 161,224 163,184 C165,149 168,114 169,84 C170,64 171,50 172,40"/>
-    <path stroke-width="1.3" d="M172,40 C171,36 172,32 173,26"/>
+    <path stroke-width="2.4" d="M159,306 C158,268 161,224 163,184 C165,152 167,120 168,80"/>
+    <path stroke-width="1.8" d="M168,80 C168,74 169,70 170,62"/>
   </g>
 
   <g>
@@ -35,17 +46,17 @@
     <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(162,214) rotate(34) scale(-0.92,0.92)"/>
     <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(164,190) rotate(-40) scale(0.8)"/>
     <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(164,190) rotate(40) scale(-0.8,0.8)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(165,166) rotate(-46) scale(0.68)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(165,166) rotate(46) scale(-0.68,0.68)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(167,142) rotate(-52) scale(0.56)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(167,142) rotate(52) scale(-0.56,0.56)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(168,118) rotate(-58) scale(0.44)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(168,118) rotate(58) scale(-0.44,0.44)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(169,94) rotate(-64) scale(0.33)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(169,94) rotate(64) scale(-0.33,0.33)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(171,72) rotate(-70) scale(0.24)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(171,72) rotate(70) scale(-0.24,0.24)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(165,164) rotate(-46) scale(0.68)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(165,164) rotate(46) scale(-0.68,0.68)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(167,136) rotate(-52) scale(0.56)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(167,136) rotate(52) scale(-0.56,0.56)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(168,110) rotate(-58) scale(0.44)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(168,110) rotate(58) scale(-0.44,0.44)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(169,88) rotate(-64) scale(0.34)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(169,88) rotate(64) scale(-0.34,0.34)"/>
   </g>
 
-  <path fill="none" stroke="currentColor" stroke-width="0.5" d="M110,344 L210,344"/>
+  <!-- The mounting line the label would sit on. It is left blank: this is
+       the empty state, and the sentence beside the drawing is the label. -->
+  <path fill="none" stroke="currentColor" stroke-width="1.4" d="M110,344 L210,344"/>
 </svg>

@@ -113,7 +113,14 @@ export function SpeakerNames({
 /**
  * @param {{ session: object, eventConfig: object, features?: object,
  *           bookmarked?: boolean, linkToDetail?: boolean,
- *           callingPoints?: object[], backIssue?: boolean }} props
+ *           callingPoints?: object[], backIssue?: boolean,
+ *           position?: number | null, lead?: boolean }} props
+ *
+ * `position` is the session's real place in its day, counted from one. It
+ * renders only where the Schedule style numbers the programme, and it is
+ * sequence data rather than decoration — the same rule the plate number
+ * follows (brief §2.4). `lead` marks the first session of a day, which the
+ * lead-and-rest Schedule style sets larger than the rest.
  */
 export default function SessionCard({
   session,
@@ -123,6 +130,8 @@ export default function SessionCard({
   linkToDetail = true,
   callingPoints = [],
   backIssue = false,
+  position = null,
+  lead = false,
 }) {
   const speakerNames = useSessionSpeakerNames(session.speakerIds);
   const range = formatSessionTimeRange(eventConfig, session);
@@ -138,22 +147,31 @@ export default function SessionCard({
     // left-hand column with tabular figures, and the type is a word beside
     // the title. Issue #113: the colored left edge is gone, and nothing
     // replaces it — a rule does the dividing a card border used to.
-    <li className="session-block border-t-hairline border-t-rule-hairline">
+    // The literal modifier matters: Tailwind scans for class names as
+    // whole strings, so `session-block--lead` is written out rather than
+    // assembled (components/editorial/purge.test.js).
+    //
+    // The title comes first in the source and the time follows it. The time
+    // is a label beside a heading, so it must never stack above one: the
+    // eyebrow ban holds at every size (brief §2.4), and one column is what
+    // this row becomes below `sm`. Reading the title first is also the
+    // better order to hear. At `sm` and up the grid places the time back in
+    // its own left-hand column beside the title, which is where the eye
+    // wants it once there is room for a column.
+    //
+    // The time column carries row-span-2 so its own two rows of height
+    // (a time range that wraps, e.g. "10:30 AM–12:00 PM EDT") cannot inflate
+    // row 1 — the row the title/badge cell alone should size — and push the
+    // location/description cell in row 2 down with it.
+    <li className={lead ? 'session-block session-block--lead' : 'session-block'}>
       {/* The face is the first ink pass; the stamp behind it is the second,
           printed off register (brief §2.4, "Exception two", Zine only). At
           the zero offset every other preset holds, the face covers the
           stamp exactly and this is the plain ruled row it has always
           been. */}
-      {/* The title comes first in the source and the time follows it. Below
-          `sm` this row is one column, and a time set directly above a
-          heading is an eyebrow — the ban holds at every size (brief §2.4).
-          Reading the title first is also the better order to hear. At `sm`
-          and up the grid puts the time back in its own left-hand column
-          beside the title, which is where the eye wants it once there is
-          room for a column, so the wide row is unchanged to the pixel. */}
-      <article className="session-block__face grid sm:grid-cols-[9.5rem,1fr] sm:gap-x-md">
+      <article className="session-block__face grid sm:grid-cols-[9.5rem,1fr]">
         <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs sm:col-start-2 sm:row-start-1">
-          <h3 className="font-heading text-h3 font-semibold text-text-primary">
+          <h3 className="session-block__title font-heading font-semibold text-text-primary">
             {linkToDetail ? (
               <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
                 {session.title}
@@ -164,12 +182,8 @@ export default function SessionCard({
           </h3>
           <SessionFormat format={session.type} />
         </div>
-        {/* The time spans both rows of the wide layout, which is the single
-            cell it had when the title and everything under it were one
-            element: a two-line time then sizes itself against the whole
-            entry, not against the title alone, and cannot push the room and
-            the description down a line. */}
-        <p className="mt-2xs font-mono text-caption text-text-secondary sm:col-start-1 sm:row-span-2 sm:row-start-1 sm:mt-0">
+        <p className="session-block__data mt-2xs font-mono text-text-secondary sm:col-start-1 sm:row-start-1 sm:row-span-2 sm:mt-0">
+          {position ? <span className="session-block__number">{position}</span> : null}
           {range ? (
             <>
               <time dateTime={range.startIso}>{range.startLabel}</time>
@@ -178,7 +192,7 @@ export default function SessionCard({
                   –<time dateTime={range.endIso}>{range.endLabel}</time>
                 </>
               ) : null}
-              {range.zone ? <span className="ms-1">{range.zone}</span> : null}
+              {range.zone ? <span className="ms-2xs">{range.zone}</span> : null}
             </>
           ) : (
             <span>Time to be announced</span>
@@ -194,10 +208,7 @@ export default function SessionCard({
             fields={[{ key: 'Place', value: session.location }]}
           />
           {session.description ? (
-            <p
-              className="mt-xs max-w-prose text-body text-text-secondary"
-              style={{ textWrap: 'pretty' }}
-            >
+            <p className="session-block__text mt-xs max-w-prose text-text-secondary text-pretty">
               {session.description}
             </p>
           ) : null}

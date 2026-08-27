@@ -24,11 +24,16 @@ export const BLOCK_TYPES = Object.freeze({
   image: {
     id: 'image',
     label: 'Image',
-    description: 'An image by URL. Alt text is required, not optional.',
+    description:
+      'An image by URL. Alt text is required, not optional. focalX and focalY name ' +
+      'the part of the picture a fixed crop must keep, as percentages from the top ' +
+      'left; both default to the centre.',
     fields: [
       { id: 'url', type: 'url', required: true },
       { id: 'alt', type: 'string', required: true },
       { id: 'caption', type: 'string', required: false },
+      { id: 'focalX', type: 'number', required: false },
+      { id: 'focalY', type: 'number', required: false },
     ],
   },
   cta: {

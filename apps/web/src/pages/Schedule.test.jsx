@@ -286,7 +286,7 @@ describe('SchedulePage', () => {
 
   it('shows the loading state while runtime content is loading', () => {
     renderSchedule({ loading: true });
-    expect(screen.getByRole('status', { name: 'Loading the schedule' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading the schedule…' })).toBeInTheDocument();
   });
 });
 
@@ -315,7 +315,8 @@ describe('SchedulePage editorial register', () => {
     const { container } = renderSchedule();
     const list = container.querySelector('section ul');
     expect(list.className).not.toContain('gap-3');
-    expect(list.querySelector('li')).toHaveClass('border-t-hairline');
+    // The rule is the --session-card-rule-* contract, drawn in index.css.
+    expect(list.querySelector('li')).toHaveClass('session-block');
   });
 
   it('sets the day head plate number from the day’s real position', () => {

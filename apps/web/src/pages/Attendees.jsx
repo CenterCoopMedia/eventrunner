@@ -43,6 +43,7 @@ import SystemPage from '../components/SystemPage.jsx';
 import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import Tag from '../components/editorial/Tag.jsx';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 /**
  * Render only strings. The rules type-check these fields and the projection
@@ -93,10 +94,7 @@ export function groupByLetter(sorted) {
 }
 
 const homeLink = (
-  <Link
-    to="/"
-    className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-  >
+  <Link to="/" className={primaryActionClass}>
     Go to the home page
   </Link>
 );
@@ -157,10 +155,7 @@ export default function Attendees() {
         title="Sign in to see who’s attending"
         description="The attendee directory is open to registered attendees and speakers."
         action={
-          <Link
-            to="/signin"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-          >
+          <Link to="/signin" className={primaryActionClass}>
             Go to sign in
           </Link>
         }
@@ -181,7 +176,7 @@ export default function Attendees() {
 
         {loading ? (
           <div className="mt-lg">
-            <LoadingState label="Loading the attendee directory" />
+            <LoadingState label="Loading the attendee directory…" />
           </div>
         ) : failed ? (
           <div className="mt-lg">

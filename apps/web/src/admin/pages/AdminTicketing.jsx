@@ -25,9 +25,10 @@ import {
   Notice,
   Panel,
   SelectField,
+  fieldLabelClass,
+  inputClass,
   primaryButtonClass,
   secondaryButtonClass,
-  inputClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminEmptyState, AdminLoadingState } from '../components/adminChrome.jsx';
 
@@ -278,7 +279,7 @@ function ImportPanel({ call, onImported }) {
     >
       <div className="flex flex-col gap-md">
         <div className="flex flex-col gap-3xs">
-          <label htmlFor="ticketing-csv-file" className="text-caption font-semibold text-admin-ink">
+          <label htmlFor="ticketing-csv-file" className={fieldLabelClass}>
             CSV file
           </label>
           <input
@@ -369,7 +370,7 @@ function TicketList({ call, refreshToken }) {
         }}
       >
         <div className="flex flex-col gap-3xs">
-          <label htmlFor="ticketing-search-email" className="text-caption font-semibold text-admin-ink">
+          <label htmlFor="ticketing-search-email" className={fieldLabelClass}>
             Email
           </label>
           <input

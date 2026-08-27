@@ -65,6 +65,8 @@ function renderCard({
   initialEntries = ['/schedule'],
   content = { speakers: [] },
   session = fixtureSession,
+  position = null,
+  lead = false,
 } = {}) {
   return render(
     <MemoryRouter
@@ -81,6 +83,8 @@ function renderCard({
                   eventConfig={fixtureConfig}
                   features={features}
                   bookmarked={bookmarked}
+                  position={position}
+                  lead={lead}
                 />
               </ul>
             </ToastProvider>
@@ -195,11 +199,46 @@ describe('the row keeps its shape rules', () => {
     expect(screen.getByText('keynote')).toBeInTheDocument();
   });
 
-  it('opens the row with a hairline instead of boxing it in a card', () => {
+  it('opens the row with a rule instead of boxing it in a card', () => {
+    // The rule is the --session-card-rule-* contract now, drawn in
+    // index.css rather than by a border utility: a style moves the width
+    // (Zine sets the strong rule), and a utility in a later cascade layer
+    // would beat the token every time.
     const { container } = renderCard();
     const row = container.querySelector('li');
-    expect(row).toHaveClass('border-t-hairline', 'border-t-rule-hairline');
+    expect(row).toHaveClass('session-block');
+    expect(row.className).not.toContain('border-t-hairline');
     expect(row.querySelector('article').className).not.toContain('rounded-brand');
+  });
+
+  it('reads its measure and its steps from the tier-3 contract, not utilities', () => {
+    // A Schedule style is a data change (brief §3.4): picking one remaps
+    // these tokens and the row has to follow. A `py-md`/`text-h3` utility
+    // on the markup would silently outrank every one of them.
+    const { container } = renderCard();
+    const face = container.querySelector('.session-block__face');
+    expect(face.className).not.toContain('py-md');
+    expect(container.querySelector('.session-block__data')).not.toBeNull();
+    expect(container.querySelector('.session-block__title').className).not.toContain('text-h3');
+  });
+
+  it('numbers the row only from a real position, never a decorative one', () => {
+    // §2.4 rejects zero-padded decorative numbers. This is the session's
+    // real place in its day, and the five styles that do not number their
+    // programme hide it with --schedule-number-display.
+    const { container } = renderCard();
+    expect(container.querySelector('.session-block__number')).toBeNull();
+    const numbered = renderCard({ position: 3 });
+    expect(numbered.container.querySelector('.session-block__number').textContent).toBe('3');
+  });
+
+  it('marks the first row of a day so lead-and-rest can set it larger', () => {
+    expect(renderCard().container.querySelector('li').className).not.toContain(
+      'session-block--lead',
+    );
+    expect(renderCard({ lead: true }).container.querySelector('li')).toHaveClass(
+      'session-block--lead',
+    );
   });
 
   it('renders the session format as a small rectangle, never a pill', () => {
@@ -265,5 +304,26 @@ describe('the row keeps its shape rules', () => {
     const heading = container.querySelector('h3');
     expect(heading.parentElement.className).toContain('sm:col-start-2');
     expect(heading.parentElement.className).toContain('sm:row-start-1');
+  });
+
+  it('puts the title before the time, so the time never stacks above the heading', () => {
+    // The eyebrow ban is absolute and holds at every size (design brief
+    // §2.4). This row is one column below `sm`, so the title has to come
+    // first in the source; the grid moves the time back into its own
+    // left-hand column once there is room for one.
+    const { container } = renderCard();
+    const heading = container.querySelector('h3');
+    const time = container.querySelector('time');
+    expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('spans the time cell across both rows, so a wrapped time cannot push row 2 down', () => {
+    // Row 1 holds the title/badge cell and row 2 holds the location and
+    // description. Without row-span-2 the time cell sizes row 1 on its own,
+    // and a time range long enough to wrap (e.g. "10:30 AM–12:00 PM EDT")
+    // grows row 1 taller than the title needs and pushes row 2 with it.
+    const { container } = renderCard();
+    const time = container.querySelector('time');
+    expect(time.closest('p').className).toContain('sm:row-span-2');
   });
 });

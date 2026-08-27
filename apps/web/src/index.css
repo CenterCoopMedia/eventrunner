@@ -14,7 +14,7 @@
   }
 
   body {
-    @apply bg-brand-surface font-body text-brand-ink;
+    @apply bg-surface font-body text-text-primary;
   }
 
   h1,
@@ -31,7 +31,7 @@
 
   /* Never remove outlines without replacing them (interface guidelines). */
   :focus-visible {
-    @apply outline outline-2 outline-offset-2 outline-brand-primary;
+    @apply outline outline-2 outline-offset-2 outline-accent;
   }
 
   [id] {
@@ -48,55 +48,68 @@
 @layer components {
   /* Skip link: first focusable element on every page (Layout.jsx). */
   .skip-link {
-    @apply sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-50
-      focus:rounded-brand focus:bg-brand-primary focus:px-4 focus:py-3 focus:text-brand-surface;
+    @apply sr-only focus:not-sr-only focus:absolute focus:start-md focus:top-md focus:z-50
+      focus:rounded-brand focus:bg-accent focus:px-md focus:py-sm focus:text-surface;
   }
 
-  /* Texture treatment driven by config/theme.texture (spec §7.2). CSS custom
-     properties can't be tested for equality in a selector, so
-     EventConfigProvider mirrors the resolved texture onto
-     documentElement.dataset.texture (snapshot value at first paint, runtime
-     value once config/theme lands) and this rule gates the overlay on that
-     attribute: 'paper' (the default — matches generated/theme.css) paints
-     the dot pattern, 'flat' suppresses it. The overlay is decorative, so it
-     must never intercept the pointer. */
-  .bg-paper {
-    @apply relative bg-brand-surface;
+  /* The page ground. Flat is the base; a texture arrives only when
+     config/theme.texture opts into one.
+
+     The selector reads documentElement.dataset.texture, which
+     EventConfigProvider mirrors the resolved value onto, because a custom
+     property cannot be compared for equality in a selector.
+
+     The gate is an OPT-IN, and it has to be. The overlay used to paint by
+     default and be suppressed under [data-texture='flat'], so any surface
+     that reached a reader before the attribute was written — or with no
+     attribute at all, which is what a document naming no texture resolves
+     to — got the dot pattern nobody asked for. An opt-in cannot leak; an
+     opt-out always can.
+
+     The overlay is decorative, so it never intercepts the pointer. */
+  .page-surface {
+    @apply relative bg-surface;
   }
-  .bg-paper::before {
+  :root[data-texture='paper'] .page-surface::before {
     content: '';
     position: absolute;
     inset: 0;
     pointer-events: none;
     background-image: radial-gradient(
-      rgb(var(--brand-ink-rgb) / 0.04) 1px,
+      rgb(var(--color-text-primary-rgb) / 0.04) 1px,
       transparent 1px
     );
     background-size: 24px 24px;
   }
-  :root[data-texture='flat'] .bg-paper::before {
-    content: none;
-  }
 
-  /* Editorial devices (design brief §2.1). Each class is the rendered form
-     of one tier-3 component contract, so a preset can retune the device by
-     remapping its tokens and no component has to change. The React
-     primitives in components/editorial/ compose these with Tailwind for
-     layout only.
+  /* Editorial devices. Each class is the rendered form of one tier-3
+     component contract, so a preset retunes a device by remapping its
+     tokens and no component changes. What each device is for, and the rules
+     a review applies to it: docs/interface-guidelines.md, Editorial devices.
 
      Rules are drawn with `border-block-*`, not a height, so the width token
      (1px / 2px / 3px) is the property it was written for and the device
      stays a hairline on a fractional-pixel display. */
 
-  /* Masthead nameplate: the rule-bounded title block that carries the event
-     name, the dates, and the edition line. Type and rules only — never a
-     hero banner, never a photo behind the name. */
+  /* Masthead nameplate: the rule-bounded title block. */
   .nameplate {
     position: relative;
     border-block-start: var(--nameplate-rule-width) solid rgb(var(--nameplate-rule-rgb));
     border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
-    padding-block: var(--nameplate-gap);
+    padding-block: calc(var(--nameplate-gap) * var(--density-step, 1));
     text-align: var(--nameplate-align);
+    /* The second rule of the double-rule treatment: a line drawn just under
+       the first, the way a masthead is ruled twice. It is the nameplate's
+       twin of the struck folio below, and it is drawn as a background sized
+       from its own width, so the zero width every other treatment holds
+       paints nothing and takes no space — the same way the coordinate marks
+       turn themselves off. The distance below the first rule comes from the
+       width too, so the pair reads as one device at any weight. */
+    background-image:
+      linear-gradient(rgb(var(--nameplate-rule-rgb)), rgb(var(--nameplate-rule-rgb)));
+    background-repeat: no-repeat;
+    background-position: 0 calc(var(--nameplate-rule-top-width) * 3);
+    background-size: 100% var(--nameplate-rule-top-width);
   }
   /* The frame of a title page (Field Guide) or a title block (Atlas). It is
      drawn OUTSIDE the flow, so a preset that leaves --nameplate-frame-width
@@ -147,31 +160,139 @@
     color: rgb(var(--nameplate-text-rgb));
     text-wrap: balance;
   }
-  /* The compact treatment is the same device at running-header size: it
-     keeps both rules and the edition line, and only the name steps down. */
+  /* The same device at running-header size: both rules and the edition line
+     stay, and only the name steps down. */
   .nameplate--compact .nameplate__name {
     font-size: var(--text-h3);
     line-height: var(--text-h3-leading);
     letter-spacing: var(--text-h3-tracking);
   }
+  /* Where the dates and the edition line sit INSIDE the rule-bounded block.
+     Both places are the nameplate device, never an eyebrow (brief §2.4).
 
-  /* Folio: a small-caps plain-text label that sits ON a rule at a section
-     boundary. Never a chip, never a pill, never a colored badge — and never
-     directly above a heading (brief §2.4, the absolute eyebrow ban). */
+     A Header style states the choice as --nameplate-meta-placement, and the
+     value is the design word for it: `block` puts the line on its own line
+     under the name, `inline` puts it on the name's baseline at the far end
+     of the measure. All eighteen header styles set it, and until now nothing
+     read it — a token an option offers that nothing renders is a promise the
+     interface does not keep (design/tokens/components.json, scope note).
+
+     The lockup is one flex row either way, and the switch is one
+     declaration: metadata told to fill the line takes the whole of it and
+     wraps under the name. The switch is a style query, which is how CSS
+     branches a layout on a custom property's value — the property is
+     inherited from :root and the nearest style container is the .nameplate
+     around this lockup. Everything outside the query is what shipped
+     before, so a browser too old to read one gets the masthead it got
+     before rather than nothing.
+
+     It reaches the FULL treatment only. A Header style is the masthead's
+     treatment, and the running header is the same device at running-header
+     size: turning every inner page's header into two lines is a bigger
+     change than picking a masthead is asking for, and five of the six
+     styles ask for `block`. The compact line stays beside the name. */
+  .nameplate__lockup {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: var(--space-md);
+    row-gap: var(--space-2xs);
+  }
+  .nameplate__meta {
+    flex-basis: 100%;
+  }
+  .nameplate--compact .nameplate__meta {
+    flex-basis: auto;
+  }
+  @container style(--nameplate-meta-placement: inline) {
+    .nameplate:not(.nameplate--compact) .nameplate__meta {
+      flex-basis: auto;
+    }
+  }
+  /* The lockup is laid out the way the block is set. `space-between` is what
+     a masthead set to the start wants: the name at one end of the measure and
+     the dateline at the other. A CENTRED masthead wants neither end — it
+     wants one centred lockup, and a dateline that wraps under a long name
+     wants to centre under it.
+
+     Without this, `space-between` sent the wrapped line to the start of a
+     row the centred name above it does not use, which read as a stray line
+     rather than as part of the block. `text-align` could not fix it: it sets
+     the text inside a flex item, and the item itself was the thing in the
+     wrong place. */
+  @container style(--nameplate-align: center) {
+    .nameplate__lockup {
+      justify-content: center;
+    }
+  }
+
+  /* Lead image: beside the opening copy at wide viewports, below it at
+     narrow ones. The crop is fixed by token so swapping the picture never
+     reflows the page. */
+  .lead-image {
+    display: block;
+    inline-size: 100%;
+    aspect-ratio: var(--lead-image-aspect);
+    object-fit: cover;
+  }
+  .lead-image-slot {
+    inline-size: 100%;
+  }
+  @media (min-width: 64rem) {
+    .lead-image-slot {
+      flex: 0 0 var(--lead-image-width);
+      max-inline-size: var(--lead-image-width);
+    }
+  }
+
+  /* Folio: a small-caps plain-text label that sits ON a rule. Never above a
+     heading — the eyebrow ban is absolute. */
   .folio {
+    font-family: var(--folio-font);
     font-size: var(--folio-size);
     line-height: var(--text-folio-leading);
     letter-spacing: var(--folio-tracking);
+    /* A folio names a day, a plate, or a page, so it carries figures that
+       change: they set in tabular figures like every other value on the
+       page (brief §3.2). The `font-data` utility used to bring this, and
+       the face with it; the face is now the --folio-font contract's job,
+       so the figures are stated here rather than lost with it. */
+    font-variant-numeric: tabular-nums;
     text-transform: uppercase;
     color: rgb(var(--folio-text-rgb));
+    /* The struck folio (Zine): a rule above the word as well as the one
+       running out beside it — the typewriter section break of a
+       photocopied programme. Every other style holds a zero width, and a
+       zero width draws no rule and takes no space, so the padding is
+       computed from the width rather than switched on beside it. */
+    border-block-start: var(--folio-rule-top-width) solid rgb(var(--folio-rule-rgb));
+    padding-block-start: calc(var(--folio-rule-top-width) * 3);
   }
   .folio__rule {
     border-block-start: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
   }
+  /* The row the word and its rule share. The distance between them is the
+     --folio-gap contract rather than a utility: a utility sits in a later
+     cascade layer and would outrank the token, so a style that retuned the
+     gap would never reach the page. */
+  .folio-line {
+    display: flex;
+    align-items: center;
+    column-gap: var(--folio-gap);
+  }
 
-  /* Section rule: the one strong rule that opens a section (brief §2.1). */
+  /* Section rule: the one strong rule that opens a section. */
   .section-rule {
     border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
+  }
+  /* The head that follows it, at the distance the style sets. This is one of
+     the three surfaces `config/theme.density` has to reach — a section
+     boundary is where a reader feels a page as tight or as open — so the gap
+     takes the density step the same way the nameplate and the schedule row
+     do. */
+  .section-head {
+    margin-block-start: calc(var(--section-rule-gap) * var(--density-step, 1));
   }
 
   /* A composable section on a system page (brief §6.2). The gap above it is
@@ -234,17 +355,6 @@
     inset-block-start: 0;
     z-index: 1;
     background-color: rgb(var(--color-surface-rgb));
-    /* The ground has to be opaque: a name scrolls under this head while the
-       group is on screen and must not read through it. On the Atlas sheet an
-       opaque band would scrub the coordinate columns off the page as the
-       head travels down it, so the head reprints the columns it covers. The
-       size is the sheet's own token, which is zero in every preset but
-       Atlas, and a background sized zero is not painted — so this is off
-       everywhere else with no theme test. The sheet's rows are not reprinted:
-       the head moves against them, and a row it drew would be wrong the
-       moment the reader scrolled. */
-    background-image: var(--map-grid-columns);
-    background-size: var(--map-grid-size) var(--map-grid-size);
     padding-block-end: var(--space-3xs);
   }
   .attendee-index__entry {
@@ -350,9 +460,14 @@
      box-behind-box layering this system allows, and it is a printing
      artefact, not depth). The six tests it ships against:
 
-     1. FLAT. The layer is the block's own shape in one token colour. No
-        blur, no gradient, no grey — none of those three words appears in
-        these rules, and a reviewer can check that by reading them.
+     1. FLAT. The layer is the block's own shape in one token colour at one
+        token strength. No blur, no gradient, no grey — none of those three
+        words appears in these rules, and a reviewer can check that by
+        reading them. The strength is what keeps the layer a TINT of the
+        accent rather than the accent: Zine spends the accent at full
+        strength twice a page, and a stamp prints on every row, so full
+        strength here would both spend the rare accent twenty times and
+        turn the misregistration into the coloured card edge §2.4 rejects.
      2. A FIXED SMALL DISTANCE. The offset is --session-card-stamp-offset.
         It never scales with the pointer and never follows it: nothing here
         reads a pointer position at all.
@@ -373,13 +488,26 @@
         adds nothing to what tells a reader the block is interactive. */
   .session-block {
     position: relative;
+    /* The rule that opens the row. It is the tier-3 contract, not a utility,
+       because a style moves it: Zine sets the strong rule where the other
+       five hold the hairline, and a cut-and-pasted programme is what that
+       width says. */
+    border-block-start: var(--session-card-rule-width) solid rgb(var(--session-card-rule-rgb));
+    /* Each stamp is its own misregistration. Without this the rows abut,
+       every offset layer is covered by the next row's face, and the twenty
+       separate artefacts merge into ONE continuous coloured edge down the
+       trailing side of the programme — which is the coloured card edge
+       §2.4 rejects, not the second print pass §2.4 allows. The gap is the
+       offset itself, so it is zero in every style but Zine's stamped
+       block and nothing else moves. */
+    margin-block-end: var(--session-card-stamp-offset);
   }
   .session-block::before {
     content: '';
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background-color: rgb(var(--session-card-stamp-rgb));
+    background-color: rgb(var(--session-card-stamp-rgb) / var(--session-card-stamp-alpha));
     transform: translate(var(--session-card-stamp-offset), var(--session-card-stamp-offset));
   }
   /* The face is the first pass, and it prints its own ground ONLY where
@@ -391,7 +519,13 @@
      shows only where it is misregistered. */
   .session-block__face {
     position: relative;
-    padding-block: var(--session-card-pad-block);
+    /* The row's own measure. Every value here is a tier-3 contract a
+       Schedule style moves, so picking "Agate block" or "Field notes
+       column" changes the page without a component edit — which is what
+       makes an option a data change (brief §3.4, §4). */
+    padding-block: calc(var(--session-card-pad-block) * var(--density-step, 1));
+    padding-inline: var(--session-card-pad-inline);
+    column-gap: var(--session-card-gap);
     background-image: linear-gradient(
       rgb(var(--session-card-surface-rgb)),
       rgb(var(--session-card-surface-rgb))
@@ -420,6 +554,51 @@
         calc(var(--session-card-stamp-offset) * -0.25)
       );
     }
+  }
+
+  /* The parts of a schedule row a Schedule style retunes. They read the
+     tier-3 contract in CSS rather than through a Tailwind utility on
+     purpose: a utility sits in a later cascade layer and would win over
+     the token every time, so an option a client picked would never reach
+     the page.
+
+     The three the six styles move: the leading of the row's running text,
+     the size of its listings column, and whether the programme is
+     numbered. */
+  .session-block__data {
+    font-size: var(--schedule-data-size);
+    line-height: var(--schedule-row-leading);
+    letter-spacing: var(--text-caption-tracking);
+  }
+  .session-block__text {
+    font-size: var(--text-body);
+    line-height: var(--schedule-row-leading);
+    letter-spacing: var(--text-body-tracking);
+  }
+  /* The agenda number is the session's real position in the day, the same
+     rule the plate number follows: real sequence data, never a decorative
+     zero-padded one (brief §2.4). `none` keeps it out of the document, and
+     out of the accessibility tree, in the five styles whose programme is
+     not numbered. */
+  .session-block__number {
+    display: var(--schedule-number-display);
+    /* A number and a time on one line have to read as two things. The gap
+       and the weight are what keep "1" from being mistaken for the first
+       digit of "19:30". */
+    padding-inline-end: var(--space-xs);
+    font-weight: var(--weight-semibold);
+  }
+  .session-block__title {
+    font-size: var(--text-h3);
+    line-height: var(--text-h3-leading);
+    letter-spacing: var(--text-h3-tracking);
+  }
+  /* Lead and rest: the first session of a day sets larger and the rest of
+     the day holds its step. Every other style holds a scale of 1, where the
+     lead row and an ordinary row are the same row. */
+  .session-block--lead .session-block__title {
+    font-size: calc(var(--text-h3) * var(--session-card-lead-scale));
+
   }
 
   /* The schedule grid (brief §2.1 "Grid schedule", §4.6): time down the
@@ -623,31 +802,18 @@
      they paint above the grid rather than under it. */
   .map-grid {
     position: relative;
-    /* The sheet's column rules, named so that a section which has to lay an
-       opaque ground ON the sheet can reprint them and keep the columns
-       running through it. .attendee-index__letter is the one that does. */
-    --map-grid-columns: linear-gradient(
-      to right,
-      rgb(var(--map-grid-rgb) / 0.45) var(--rule-hairline-width),
-      transparent var(--rule-hairline-width)
-    );
   }
   .map-grid::before {
     content: '';
     position: absolute;
     inset: 0;
-    /* The sheet is drawn from the corner of the CONTENT column, not from the
-       corner of the page gutter, so anything sitting in that column lines
-       its own copy of the columns up at `0 0` with no arithmetic and no
-       knowledge of how wide the gutter happens to be. `inherit` takes the
-       gutter from the element this sheet belongs to, so the two layouts
-       Layout.jsx draws — the padded centre column and the flush rail — both
-       land on the same rule. */
-    padding-inline: inherit;
-    background-origin: content-box;
     pointer-events: none;
     background-image:
-      var(--map-grid-columns),
+      linear-gradient(
+        to right,
+        rgb(var(--map-grid-rgb) / 0.45) var(--rule-hairline-width),
+        transparent var(--rule-hairline-width)
+      ),
       linear-gradient(
         to bottom,
         rgb(var(--map-grid-rgb) / 0.45) var(--rule-hairline-width),
@@ -748,7 +914,7 @@
     border: var(--plate-frame-width) solid rgb(var(--plate-frame-rgb));
     outline: var(--plate-frame-width) solid rgb(var(--plate-frame-rgb));
     outline-offset: var(--space-3xs);
-    padding: var(--plate-pad);
+    padding: calc(var(--plate-pad) * var(--density-step, 1));
   }
 
   /* The plate number in a folio (visual story, Field Guide, moment 1):
@@ -859,10 +1025,16 @@
     mask-image: var(--motif-divider);
   }
   /* The empty-state drawing sits above the sentence and aligns with it, so
-     it reads as part of the same block rather than as a centred illustration. */
+     it reads as part of the same block rather than as a centred illustration.
+
+     8rem, not 5rem. This slot is the one place the site renders a whole
+     drawing rather than a mark, and the portrait sets — the botanical
+     frond is 320 by 420 — were being fitted into 80px of height, which
+     put the WHOLE drawing under a pixel a stroke and greyed it into a
+     smudge. A plate drawn at thumbnail size is not a plate. */
   .motif--empty-state {
     display: block;
-    block-size: 5rem;
+    block-size: 8rem;
     inline-size: 100%;
     -webkit-mask-position: left center;
     mask-position: left center;
@@ -922,9 +1094,9 @@
   .rich-text a:hover {
     @apply text-accent-strong;
   }
-  /* The quote rule is a typographic device (brief §2.1's hairline-rules
-     row), not the banned colored card edge (§2.4): it draws in rule-token
-     ink, at the strong rule width, and never in brand/accent color. */
+  /* The quote rule draws in rule-token ink at the strong rule width, never
+     in brand or accent color, so it is a typographic rule and not the
+     rejected colored card edge. */
   .rich-text blockquote {
     @apply border-s-strong border-rule-strong ps-md text-text-secondary;
   }

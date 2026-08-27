@@ -25,6 +25,7 @@ import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 import { sessionMovement } from 'shared/venue';
+import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
 // THIS IS THE ONE LIST A TRANSFER BELONGS IN (design brief §4.6;
 // shared/venue.cjs).
@@ -41,12 +42,6 @@ import { sessionMovement } from 'shared/venue';
 // state the walk — if, and only if, somebody recorded that exact move.
 // Where nothing was recorded the gap says nothing, which is what an
 // unrecorded route honestly looks like.
-//
-// Page actions in the editorial register: a ruled rectangle on the theme
-// radius, never a filled pill (design brief §2.4) — the same class
-// Schedule.jsx's own page actions use.
-const ACTION_CLASS =
-  'touch-target inline-flex items-center rounded-brand border-hairline border-rule-hairline px-md py-2xs font-data text-caption font-medium text-text-primary hover:bg-brand-surface-alt';
 
 export default function MySchedule() {
   const { eventConfig, features } = useEventConfig();
@@ -97,7 +92,7 @@ export default function MySchedule() {
         title="This event doesn’t have a personal schedule"
         description="Everything else about the event is on the schedule page."
         action={
-          <Link to="/schedule" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+          <Link to="/schedule" className={primaryActionClass}>
             Go to the schedule
           </Link>
         }
@@ -108,7 +103,7 @@ export default function MySchedule() {
   if (authLoading) {
     return (
       <div className="mt-lg">
-        <LoadingState label="Loading your schedule" />
+        <LoadingState label="Loading your schedule…" />
       </div>
     );
   }
@@ -119,7 +114,7 @@ export default function MySchedule() {
         title="Sign in to see your schedule"
         description="Bookmark sessions from the schedule page and they’ll show up here."
         action={
-          <Link to="/signin" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+          <Link to="/signin" className={primaryActionClass}>
             Sign in
           </Link>
         }
@@ -137,14 +132,14 @@ export default function MySchedule() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-xs">
-          <Link to="/schedule" className={ACTION_CLASS}>
+          <Link to="/schedule" className={quietActionClass}>
             Full schedule
           </Link>
           {features.icsExport && mySessions.length > 0 ? (
             <button
               type="button"
               onClick={() => downloadIcs(icsFileName('my-schedule'), buildIcsCalendar(eventConfig, mySessions))}
-              className={ACTION_CLASS}
+              className={quietActionClass}
             >
               Download my schedule (.ics)
             </button>
@@ -154,7 +149,7 @@ export default function MySchedule() {
 
       {loading || bookmarksLoading ? (
         <div className="mt-lg">
-          <LoadingState label="Loading your schedule" />
+          <LoadingState label="Loading your schedule…" />
         </div>
       ) : mySessions.length === 0 ? (
         <div className="mt-lg">
@@ -162,7 +157,7 @@ export default function MySchedule() {
             title="No bookmarked sessions yet"
             description="Browse the schedule and bookmark the sessions you don’t want to miss."
             action={
-              <Link to="/schedule" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+              <Link to="/schedule" className={primaryActionClass}>
                 Browse the schedule
               </Link>
             }
@@ -172,7 +167,9 @@ export default function MySchedule() {
         days
           .filter((day) => (myByDay.get(day.id) ?? []).length > 0)
           .map((day) => (
-            <section key={day.id} aria-labelledby={`my-day-${day.id}`} className="mt-xl">
+            // The Atlas sheet, on the one surface that holds a programme
+            // (owner review, 2026-08-27). See Schedule.jsx for the rule.
+            <section key={day.id} aria-labelledby={`my-day-${day.id}`} className="map-grid mt-xl">
               {/* The same folio-on-a-rule day head Schedule.jsx uses (brief
                   §2.1): the standing head of the day, with the date sitting
                   on the same rule rather than stacked above it. */}

@@ -24,6 +24,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 /** First path segment ('' for '/'), no leading/trailing slash. */
 function firstSegment(path) {
@@ -78,7 +79,7 @@ export default function ContentPage() {
           className="mb-xl border-hairline border-warning/40 bg-warning/10 p-md font-data text-caption text-text-primary"
         >
           This page is an unreviewed template. It has not been reviewed by the
-          organizer&rsquo;s legal counsel and does not yet state their policy.
+          organizer’s legal counsel and does not yet state their policy.
         </p>
       ) : null}
       {sections.length === 0 ? (
@@ -86,10 +87,7 @@ export default function ContentPage() {
           title="Nothing here yet"
           description="This page is published but has no visible content. Check back soon."
           action={
-            <Link
-              to="/"
-              className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
-            >
+            <Link to="/" className={primaryActionClass}>
               Go to the home page
             </Link>
           }

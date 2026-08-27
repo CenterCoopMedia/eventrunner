@@ -31,6 +31,7 @@ import Rule from '../components/editorial/Rule.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 function text(value) {
   return typeof value === 'string' ? value : '';
@@ -42,10 +43,7 @@ function NotFoundState() {
       title="This speaker isn’t available"
       description="They may not have been announced yet, or the link may be out of date."
       action={
-        <Link
-          to="/speakers"
-          className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
-        >
+        <Link to="/speakers" className={primaryActionClass}>
           Back to speakers
         </Link>
       }
@@ -64,10 +62,7 @@ export default function SpeakerDetail() {
         title="This event doesn’t have a public speaker directory"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -151,10 +146,7 @@ export default function SpeakerDetail() {
       <Rule weight="hairline" />
 
       {text(speaker.bio) ? (
-        <p
-          className="mt-md max-w-prose whitespace-pre-line text-lead text-text-secondary"
-          style={{ textWrap: 'pretty' }}
-        >
+        <p className="mt-md max-w-prose whitespace-pre-line text-lead text-text-secondary text-pretty">
           {text(speaker.bio)}
         </p>
       ) : null}
@@ -168,27 +160,36 @@ export default function SpeakerDetail() {
             {sessions.map((session) => {
               const range = formatSessionTimeRange(eventConfig, session);
               return (
-                <li key={session.id} className="border-t-hairline border-t-rule-hairline py-sm">
-                  <p className="font-mono text-caption text-text-secondary">
-                    {range ? (
-                      <>
-                        <time dateTime={range.startIso}>{range.startLabel}</time>
-                        {range.endLabel ? (
-                          <>
-                            –<time dateTime={range.endIso}>{range.endLabel}</time>
-                          </>
-                        ) : null}
-                        {range.zone ? <span className="ms-1">{range.zone}</span> : null}
-                      </>
-                    ) : (
-                      'Time to be announced'
-                    )}
-                  </p>
-                  <h3 className="mt-2xs font-heading text-h3 font-semibold text-text-primary">
-                    <Link to={`/schedule/${session.id}`} className="hover:underline">
-                      {session.title}
-                    </Link>
-                  </h3>
+                <li key={session.id} className="border-t-hairline border-t-rule-hairline">
+                  {/* Title first in the source, time second — the same order
+                      SessionCard.jsx and Updates.jsx use, and for the same
+                      reason: this is one column below `sm`, and a time
+                      stacked above a heading is an eyebrow (brief §2.4).
+                      Reading the title first is also the better order to
+                      hear. At `sm` and up the grid puts the time back in its
+                      own left-hand column. */}
+                  <div className="grid py-sm sm:grid-cols-[9.5rem,1fr] sm:gap-x-md">
+                    <h3 className="font-heading text-h3 font-semibold text-text-primary sm:col-start-2 sm:row-start-1">
+                      <Link to={`/schedule/${session.id}`} className="hover:underline">
+                        {session.title}
+                      </Link>
+                    </h3>
+                    <p className="mt-2xs font-mono text-caption text-text-secondary sm:col-start-1 sm:row-start-1 sm:mt-0">
+                      {range ? (
+                        <>
+                          <time dateTime={range.startIso}>{range.startLabel}</time>
+                          {range.endLabel ? (
+                            <>
+                              –<time dateTime={range.endIso}>{range.endLabel}</time>
+                            </>
+                          ) : null}
+                          {range.zone ? <span className="ms-2xs">{range.zone}</span> : null}
+                        </>
+                      ) : (
+                        'Time to be announced'
+                      )}
+                    </p>
+                  </div>
                 </li>
               );
             })}

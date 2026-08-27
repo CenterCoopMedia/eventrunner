@@ -13,7 +13,9 @@ describe('Folio', () => {
     const { container } = render(<Folio>Day one</Folio>);
     const label = container.querySelector('.folio');
     expect(label.textContent).toBe('Day one');
-    expect(label).toHaveClass('font-data');
+    // The face is --folio-font's job, not a utility's: Zine's struck folio
+    // moves it to the mono role, and `font-data` would outrank the token.
+    expect(label.className).not.toContain('font-data');
     expect(container.querySelector('.folio__rule')).not.toBeNull();
   });
 

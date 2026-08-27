@@ -171,7 +171,7 @@ describe('SessionDetail', () => {
 
   it('shows the loading state while runtime content is loading', () => {
     renderDetail('fx-early', { loading: true });
-    expect(screen.getByRole('status', { name: 'Loading the session' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading the session…' })).toBeInTheDocument();
   });
 
   it('renders no pill row when every relevant feature flag is off', () => {

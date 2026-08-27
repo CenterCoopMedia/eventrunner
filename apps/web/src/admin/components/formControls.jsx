@@ -21,6 +21,15 @@ import { useId, useState } from 'react';
 // control's boundary is non-text user interface under WCAG 1.4.11 and needs
 // 3:1 against its own ground, which the hairline (tuned for row separators)
 // does not clear.
+/**
+ * The label above a field, and the hint under the label. One source each:
+ * these strings appear on every control in this file and on the hand-built
+ * fields elsewhere in the room, and a copy that drifts is a control that
+ * stops matching its neighbours.
+ */
+export const fieldLabelClass = 'text-caption font-semibold text-admin-ink';
+export const fieldHintClass = 'text-folio text-admin-ink-secondary';
+
 export const inputClass =
   'admin-target w-full rounded-admin border-admin-hairline border-admin-rule-strong ' +
   'bg-admin-ground-input px-sm py-2xs font-admin-ui text-caption text-admin-ink ' +
@@ -72,11 +81,11 @@ export function TextField({
     .join(' ');
   return (
     <div className="flex flex-col gap-3xs">
-      <label htmlFor={id} className="text-caption font-semibold text-admin-ink">
+      <label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className="text-folio text-admin-ink-secondary">
+        <p id={hintId} className={fieldHintClass}>
           {hint}
         </p>
       ) : null}
@@ -105,11 +114,11 @@ export function TextAreaField({ label, value, onChange, error, hint, rows = 3, .
     .join(' ');
   return (
     <div className="flex flex-col gap-3xs">
-      <label htmlFor={id} className="text-caption font-semibold text-admin-ink">
+      <label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className="text-folio text-admin-ink-secondary">
+        <p id={hintId} className={fieldHintClass}>
           {hint}
         </p>
       ) : null}
@@ -138,11 +147,11 @@ export function SelectField({ label, value, onChange, options, error, hint, ...r
     .join(' ');
   return (
     <div className="flex flex-col gap-3xs">
-      <label htmlFor={id} className="text-caption font-semibold text-admin-ink">
+      <label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className="text-folio text-admin-ink-secondary">
+        <p id={hintId} className={fieldHintClass}>
           {hint}
         </p>
       ) : null}
@@ -182,11 +191,11 @@ export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
         {...rest}
       />
       <div className="flex flex-col">
-        <label htmlFor={id} className="text-caption font-semibold text-admin-ink">
+        <label htmlFor={id} className={fieldLabelClass}>
           {label}
         </label>
         {hint ? (
-          <p id={hintId} className="text-folio text-admin-ink-secondary">
+          <p id={hintId} className={fieldHintClass}>
             {hint}
           </p>
         ) : null}
@@ -195,10 +204,26 @@ export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
   );
 }
 
-/** A field's own query: a mark, a word, and the reason under the field. */
-function FieldError({ id, message }) {
+/**
+ * A field's own query: a mark, a word, and the reason under the field.
+ *
+ * Exported, because the room has fields this file does not build — a group
+ * of checkboxes with one shared error, a list with no single input of its
+ * own — and a second spelling of this markup is a second answer to "what
+ * does a rejected field look like". Renders nothing without a message, so a
+ * caller can pass one through unconditionally.
+ *
+ * `role` is normally left off: a form with several fields that fires several
+ * alerts at once is noise, which is why a rejected save is announced once,
+ * by ServerErrorSummary. A surface with ONE thing that can be rejected — the
+ * upload modal's file — has no summary to carry the announcement, so it asks
+ * for role="alert" here. The markup and the appearance stay the same either
+ * way, which is the whole point of this component.
+ */
+export function FieldError({ id, message, role }) {
+  if (!message) return null;
   return (
-    <p id={id} className="text-folio text-admin-state-error">
+    <p id={id} role={role} className="text-folio text-admin-state-error">
       <span aria-hidden="true" className="font-semibold">
         !{' '}
       </span>

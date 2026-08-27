@@ -17,6 +17,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import SpecimenLabel from '../components/editorial/SpecimenLabel.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function Speakers() {
   const { features } = useEventConfig();
@@ -28,10 +29,7 @@ export default function Speakers() {
         title="This event doesn’t have a public speaker directory"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -124,8 +122,7 @@ export default function Speakers() {
                       />
                       {speaker.bio ? (
                         <p
-                          className="mt-xs max-w-prose text-body text-text-secondary"
-                          style={{ textWrap: 'pretty' }}
+                          className="mt-xs max-w-prose text-body text-text-secondary text-pretty"
                         >
                           {speaker.bio}
                         </p>

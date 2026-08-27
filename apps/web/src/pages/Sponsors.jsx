@@ -35,6 +35,7 @@ import SystemPage from '../components/SystemPage.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 /**
  * The mark size for a tier group, by its rank in the operator's ordering.
@@ -99,10 +100,7 @@ export default function Sponsors() {
         title="This event doesn’t have public sponsors"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -159,8 +157,7 @@ export default function Sponsors() {
                           what says how much of a supporter this is, so the
                           name does not have to shout it a second time. */}
                       <h3
-                        className="mt-2xs font-heading text-body font-semibold text-text-primary"
-                        style={{ textWrap: 'pretty' }}
+                        className="mt-2xs font-heading text-body font-semibold text-text-primary text-pretty"
                       >
                         <SponsorName org={org} />
                       </h3>
@@ -173,8 +170,7 @@ export default function Sponsors() {
                           sponsor's own site, one link away. */}
                       {arrangement === 'grid' || !org.description ? null : (
                         <p
-                          className="mt-2xs max-w-prose text-body text-text-secondary"
-                          style={{ textWrap: 'pretty' }}
+                          className="mt-2xs max-w-prose text-body text-text-secondary text-pretty"
                         >
                           {org.description}
                         </p>

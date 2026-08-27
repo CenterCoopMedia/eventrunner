@@ -5,7 +5,12 @@
 // url is CMS-authored data (the published collection is world-readable and
 // unvalidated server-side beyond reserved-key checks), so it goes through
 // the same href allowlist as richtext links before it ever reaches the DOM.
+//
+// The shape is the site's one filled action, so it reads that class string
+// from controlClasses.js rather than restating it. Restating it is exactly
+// how the drift that module's header describes got started.
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
+import { primaryActionClass } from '../controlClasses.js';
 
 export default function CtaBlock({ block }) {
   if (!block?.url || !block?.label || !isSafeHref(block.url)) return null;
@@ -13,7 +18,7 @@ export default function CtaBlock({ block }) {
     <a
       href={block.url}
       {...(block.external ? { target: '_blank', rel: 'noreferrer' } : {})}
-      className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-6 py-3 font-semibold text-brand-surface hover:bg-brand-primary-dark"
+      className={primaryActionClass}
     >
       {block.label}
     </a>

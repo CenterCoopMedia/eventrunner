@@ -4,11 +4,14 @@
  * The default `config/theme` document (spec §2.2, §7.2) and the font/radius
  * vocabularies the CSS generator resolves it against.
  *
- * A fresh deployment starts on the **Newsroom modern** preset. Brief §4.2
- * names it: "Use it as the default preset for new deployments." That
- * replaces the hand-written teal-on-warm-paper palette this file used to
- * carry — a preset IS the designed neutral starting point, and it brings a
- * designed dark palette with it, which a single light palette never could.
+ * A fresh deployment starts on the **Institutional** preset (owner review,
+ * 2026-08-27). The brief §4.2 named Newsroom; the review moved the default
+ * to Institutional because it is the plainest of the six, targets the
+ * highest accessibility bar, and is the look a client is least likely to
+ * have to undo. That replaces the hand-written teal-on-warm-paper palette
+ * this file used to carry — a preset IS the designed neutral starting
+ * point, and it brings a designed dark palette with it, which a single
+ * light palette never could.
  *
  * The seeded `colors` map is materialized from that preset by the one shared
  * resolver, exactly as `updateTheme` materializes it on every publish
@@ -24,9 +27,9 @@
  */
 
 const {
+  DEFAULT_HEADER,
   DEFAULT_MODE_POLICY,
   DEFAULT_PRESET_ID,
-  getPreset,
   hexToRgb,
   resolveLegacyColors,
   rgbToHex,
@@ -227,7 +230,6 @@ const PLACEHOLDER_LOGOS = Object.freeze({
  * @returns {object} config/theme
  */
 function defaultTheme() {
-  const preset = getPreset(DEFAULT_PRESET_ID);
   return {
     // The base look (design brief §4). Every other field below either comes
     // from it or refines it.
@@ -246,15 +248,22 @@ function defaultTheme() {
     optionPicks: {},
     // Per-mode raw token overrides, the advanced path (brief §5.2).
     tokens: {},
-    texture: preset.shape.texture,
-    radius: preset.shape.radius,
-    // The motif set the root element switches to (brief §3.8). Newsroom
-    // ships with none; Field Guide and Atlas turn one on.
-    motifSet: preset.motifSet,
+    // Texture, corners, spacing, and the illustration set are DELIBERATELY
+    // absent (owner review, 2026-08-27). The style states all four, and a
+    // seed that copied them into the document would pin the FIRST style's
+    // shape onto every later one: switch from Institutional to Zine and the
+    // copier grain would be suppressed by a `texture: 'flat'` nobody chose.
+    // A field the document does not name is a field the style decides, and
+    // the theme editor writes one only when an operator picks it under
+    // Advanced.
+    //
     // Mode policy (design brief §3.3): 'light' | 'dark' | 'system'. A fresh
     // deployment starts light, which is what every deployment made before
     // the field existed also renders.
     mode: DEFAULT_MODE_POLICY,
+    // Which header the public pages render (design brief §2.1). The theme
+    // states the deployment default; a page may override it.
+    header: DEFAULT_HEADER,
     logos: { ...PLACEHOLDER_LOGOS },
     placeholderLogos: Object.keys(PLACEHOLDER_LOGOS),
   };

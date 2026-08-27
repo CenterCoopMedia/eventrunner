@@ -105,7 +105,7 @@ describe('SpeakerProfile', () => {
   it('waits without erroring while the account document is still being seeded', () => {
     profileValue = { profile: null, status: 'pending-account' };
     renderPage();
-    expect(screen.getByText('Setting up your account')).toBeInTheDocument();
+    expect(screen.getByText('Setting up your account…')).toBeInTheDocument();
   });
 
   it('loads the caller’s own speaker record and seeds the form from it', async () => {

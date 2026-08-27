@@ -44,24 +44,28 @@ export default function SectionHead({
   return (
     <div className={className}>
       {rule === 'none' ? null : <Rule weight={rule} />}
+      {/* The distance between the rule and the head is the section-rule
+          contract, and it takes the density step with it, so a client who
+          asks for a tighter or a more open page gets one at every section
+          boundary (brief §4, §6.1). */}
       <div
         className={[
-          'flex flex-wrap gap-x-md gap-y-3xs',
-          isFolioHead ? 'mt-xs items-center' : 'mt-sm items-baseline',
+          'section-head flex flex-wrap gap-x-md gap-y-3xs',
+          isFolioHead ? 'items-center' : 'items-baseline',
         ].join(' ')}
       >
         <Tag
           id={id}
           className={
             isFolioHead
-              ? 'folio whitespace-nowrap font-data font-medium'
+              ? 'folio whitespace-nowrap font-medium'
               : 'font-heading text-h2 font-semibold text-text-primary'
           }
         >
           {title}
         </Tag>
         <span aria-hidden="true" className="folio__rule flex-1 self-center" />
-        {folio ? <p className="folio font-data font-medium">{folio}</p> : null}
+        {folio ? <p className="folio font-medium">{folio}</p> : null}
       </div>
     </div>
   );

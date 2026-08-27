@@ -21,9 +21,11 @@ const {
   THEME_COLOR_KEYS,
   THEME_FONT_ROLES,
   THEME_FONT_SET_IDS,
+  THEME_HEADERS,
   THEME_LOGO_SLOTS,
   THEME_MODE_POLICIES,
   THEME_RADIUS_IDS,
+  THEME_DENSITIES,
   THEME_TEXTURES,
   THEME_PRESET_IDS,
   THEME_MOTIF_SET_IDS,
@@ -465,7 +467,7 @@ function validateTheme(theme) {
         const spec = preset.options?.[group];
         if (!spec) {
           errors.push(
-            `theme.optionPicks.${group}: the ${preset.label} preset has no option group ` +
+            `theme.optionPicks.${group}: the ${preset.id} preset has no option group ` +
             `by that name (expected ${Object.keys(preset.options || {}).join(', ')})`,
           );
           continue;
@@ -526,21 +528,25 @@ function validateTheme(theme) {
     );
   }
 
-  // The one client-owned colour in the admin identity (admin story part 6f).
-  // Its legibility floor is applied at render time, not here: the value is
-  // never clamped, so a failing accent saves and the editor states what it
-  // fell back to.
-  if (theme.adminAccent != null
-    && (typeof theme.adminAccent !== 'string' || !HEX_COLOR_RE.test(theme.adminAccent))) {
+  // The client's main brand colour (owner review, 2026-08-27). It is the
+  // ONE colour decision the normal workflow asks for: the supporting brand
+  // steps are derived from it in both modes, contrast-safe by construction
+  // (shared/theme deriveBrandSteps), and the admin position marker takes the
+  // resolved value with its own legibility floor. There is no separate
+  // adminAccent field any more, so a document carrying one is rejected by
+  // name like any other unknown field.
+  if (theme.brandColor != null
+    && (typeof theme.brandColor !== 'string' || !HEX_COLOR_RE.test(theme.brandColor))) {
     errors.push(
-      'theme.adminAccent: must be a hex color (#RGB or #RRGGBB), ' +
-      `got ${JSON.stringify(theme.adminAccent)}`,
+      'theme.brandColor: must be a hex color (#RGB or #RRGGBB), ' +
+      `got ${JSON.stringify(theme.brandColor)}`,
     );
   }
 
   const enums = [
     ['texture', THEME_TEXTURES],
     ['radius', THEME_RADIUS_IDS],
+    ['density', THEME_DENSITIES],
     ['mode', THEME_MODE_POLICIES],
     // Where the site puts its navigation. Site-level, because a shell that
     // moves between pages stops being a shell (shared/theme
@@ -548,6 +554,7 @@ function validateTheme(theme) {
     // the placement to whatever a page document already stored, and then to
     // the default.
     ['navPlacement', THEME_NAV_PLACEMENTS],
+    ['header', THEME_HEADERS],
   ];
   for (const [field, allowed] of enums) {
     if (theme[field] == null) continue;

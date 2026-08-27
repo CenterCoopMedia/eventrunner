@@ -1662,7 +1662,7 @@
           letting a client theme it is a support liability.</p>
           <h3 id="74-fonts">7.4 Fonts<a class="heading-anchor" href="#74-fonts" aria-label="Link to this section">#</a></h3>
           <p>Font families are chosen from a <strong>bundled allowlist</strong> of self-hosted sets shipped as woff2 in
-          <code>apps/web/public/fonts</code>, not from arbitrary remote URLs. Reasons: no third-party request on every
+          <code>apps/web/public/fonts</code>, not from arbitrary remote URLs. Reasons: No third-party request on every
           page load (a real objection from institutional clients), no CSP exception, and no dependency on a
           font CDN&#39;s availability. <code>config/theme.fonts</code> names a set id, and a preset&#39;s type map names one for
           each of the four roles; <code>theme.css</code> emits the matching <code>@font-face</code> blocks and the

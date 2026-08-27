@@ -197,7 +197,7 @@ export default function AdminSpeakersList() {
       ) : speakers.length === 0 ? (
         <AdminEmptyState
           title="No speakers yet"
-          description="Add the first speaker — a name is all that's required; the rest can follow."
+          description="Add the first speaker — a name is all that’s required; the rest can follow."
           action={
             <Link to="new" className={primaryButtonClass}>
               Create a speaker

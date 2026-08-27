@@ -1,7 +1,7 @@
 {
   "$schema-note": "Tier 3 of the design brief (2026-08-27) §3.1. One component contract each. A component token exists when a component needs a value the theme may change on its own, and it defaults to a tier 2 token.",
   "$shape-note": "A token whose name ends in -rgb names the tier 2 color token it defaults to; the generator emits it in both mode blocks so it follows the mode. Every other token holds a literal CSS value, normally a var() pointing at tier 2.",
-  "$scope-note": "PR1 shipped the session card, the masthead nameplate, and the two rule contracts. PR2 adds the contracts the six presets and their curated options remap: an option remaps existing tokens and NEVER adds a property name (brief §3.4), so every name a preset file mentions is declared here first. The components that read the PR2 additions land with the schedule and the preset devices in PR3; declaring the contract now is what lets the option data exist as data.",
+  "$scope-note": "PR1 shipped the session card, the masthead nameplate, the lead image, and the two rule contracts. PR2 adds the contracts the six presets and their curated options remap: an option remaps existing tokens and NEVER adds a property name (brief §3.4), so every name a preset file mentions is declared here first. Every token here is read by a render path in apps/web/src/index.css — a token an option offers but nothing renders is a promise the interface does not keep, so a new contract lands with the rule that draws it. The two-axis schedule grid itself still lands in PR3; these values are what the row is set in either way.",
   "session-card": {
     "--session-card-rule-rgb": "--rule-hairline-rgb",
     "--session-card-surface-rgb": "--color-surface-rgb",
@@ -9,8 +9,11 @@
     "--session-card-stamp-rgb": "--color-accent-rgb",
     "--session-card-rule-width": "var(--rule-hairline-width)",
     "--session-card-stamp-offset": "0",
+    "$stamp-tint-note": "How much of that ink the second pass lays down. The brief calls the layer 'tinted with theme ink or the accent' and the Zine story spends the accent at full strength twice a page, never more — so a stamp on every row of a programme has to be a tint, not the full accent. Full ink is the contract default here because it is the neutral value; Zine's stamped block, the one choice that ever draws the layer, sets the tint it wants. Flat still means flat: a tint is one colour at one strength, with no blur and no gradient.",
+    "--session-card-stamp-alpha": "1",
     "--session-card-lead-scale": "1",
-    "--session-card-gap": "var(--space-xs)",
+    "$gap-note": "The gutter between the listings column and the row's text at wide viewports. At narrow ones the row is a single column and the gutter is not drawn.",
+    "--session-card-gap": "var(--space-md)",
     "--session-card-pad-block": "var(--space-md)",
     "--session-card-pad-inline": "0"
   },
@@ -31,10 +34,15 @@
     "--nameplate-tracking": "var(--text-nameplate-tracking)",
     "--nameplate-gap": "var(--space-sm)"
   },
+  "lead-image": {
+    "--lead-image-aspect": "3 / 2",
+    "--lead-image-width": "22rem"
+  },
+  "$section-rule-note": "The section boundary (brief §2.1): the rule, then the gap, then the head. The gap is one of the three surfaces config/theme.density reaches, so index.css multiplies it by --density-step.",
   "section-rule": {
     "--section-rule-rgb": "--rule-strong-rgb",
     "--section-rule-width": "var(--rule-strong-width)",
-    "--section-rule-gap": "var(--space-lg)"
+    "--section-rule-gap": "var(--space-sm)"
   },
   "$page-note": "The hybrid page shell (brief §6.1, §6.2). A system page's composable sections sit at --page-section-gap from what comes before them, and a ruled directory row is padded at --page-row-pad-block. Both are what the `density` layout variant moves: tight, comfortable, and loose remap them in index.css, and a page that states no density keeps the preset's own.",
   "page": {

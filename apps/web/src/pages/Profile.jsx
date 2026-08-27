@@ -28,7 +28,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import ProfilePhotoField from '../components/media/ProfilePhotoField.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { deleteOwnPhoto } from '../lib/mediaSource.js';
-import { inputClass, primaryButtonClass } from '../components/forms/publicForm.jsx';
+import { inputClass, primaryActionClass } from '../components/controlClasses.js';
 
 const VISIBILITY_COPY = {
   public: {
@@ -133,7 +133,7 @@ export default function Profile() {
         title="Sign in to set up your profile"
         description="Your profile is part of your account, so it lives behind sign-in."
         action={
-          <Link to="/signin" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+          <Link to="/signin" className={primaryActionClass}>
             Go to sign in
           </Link>
         }
@@ -381,7 +381,7 @@ export default function Profile() {
           </section>
         ) : null}
 
-        <button type="submit" className={primaryButtonClass} disabled={saving}>
+        <button type="submit" className={primaryActionClass} disabled={saving}>
           {saving ? 'Saving…' : 'Save profile'}
         </button>
       </form>
