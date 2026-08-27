@@ -81,18 +81,22 @@ test('a color the document does not carry emits no token at all', () => {
   assert.deepEqual(names, []);
 });
 
-test('the font roles fall back so a document from before the data role still resolves', () => {
-  const { stacks, families } = resolveFonts({
-    fonts: { heading: 'serif-editorial', body: 'sans-humanist', accent: 'script-casual' },
-  });
-  for (const role of THEME_FONT_ROLES) {
-    assert.ok(stacks[role], `--font-${role} resolves`);
-  }
-  assert.equal(stacks.data, stacks.body, 'data falls back to the body face');
-  assert.equal(stacks.mono, stacks.data, 'mono falls back to the data face');
+test('a document from before the data role still resolves every font role', () => {
+  const legacy = { fonts: { heading: 'serif-editorial', body: 'sans-humanist', accent: 'script-casual' } };
+  const { stacks, families } = resolveFonts(legacy);
+  // Only the roles the document names resolve to a stack here.
+  assert.deepEqual(Object.keys(stacks).sort(), ['body', 'heading']);
   // The retired accent set is not requested by any live role, so its file
   // is not pulled into the build.
   assert.deepEqual(families.map((f) => f.family).sort(), ['Source Sans 3', 'Source Serif 4']);
+
+  // The alias list covers the rest, so the stylesheet still defines all four.
+  const css = buildTokenCss({ ...THEME, ...legacy });
+  for (const role of THEME_FONT_ROLES) {
+    assert.match(css, new RegExp(`--font-${role}:`), `--font-${role} is defined`);
+  }
+  assert.match(css, /--font-data: var\(--font-body\);/);
+  assert.match(css, /--font-mono: var\(--font-data\);/);
 });
 
 test('the mode policy defaults to light and refuses an unknown value', () => {

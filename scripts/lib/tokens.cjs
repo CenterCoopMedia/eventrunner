@@ -56,18 +56,6 @@ const TOKEN_FILES = Object.freeze({
 /** Tier 1 property prefix (brief §3.1: `--er-<family>-<step>`). */
 const PRIMITIVE_PREFIX = '--er';
 
-/**
- * Which config/theme.fonts role each emitted font role falls back to when
- * the document does not name a set for it. `data` and `mono` are new in
- * PR1, so every deployment that predates them lands on the body face
- * rather than on nothing.
- */
-const FONT_ROLE_FALLBACKS = Object.freeze({
-  heading: [],
-  body: [],
-  data: ['body', 'heading'],
-  mono: ['data', 'body', 'heading'],
-});
 
 /**
  * Read the token JSON. A file that is missing or unparseable fails the
@@ -202,7 +190,13 @@ function primitiveColor(primitives, ref) {
 }
 
 /**
- * The font stack for each role, after the fallback chain.
+ * The font stack for each role the document actually names.
+ *
+ * A role the document leaves out is NOT resolved here. It falls through to
+ * the alias list in `semantic.json` instead — `--font-data` follows
+ * `--font-body`, `--font-mono` follows `--font-data` — so a deployment made
+ * before the data and mono roles existed still resolves every role, and a
+ * runtime override of one role carries to the roles that follow it.
  *
  * @param {object} theme
  * @returns {{ stacks: Record<string, string>, families: Array<{family: string, fileBase: string}> }}
@@ -213,16 +207,12 @@ function resolveFonts(theme) {
   const families = [];
   const seen = new Set();
   for (const role of THEME_FONT_ROLES) {
-    const chain = [role, ...(FONT_ROLE_FALLBACKS[role] || [])];
-    for (const candidate of chain) {
-      const set = FONT_SETS[configured[candidate]];
-      if (!set) continue;
-      stacks[role] = set.stack;
-      if (set.fileBase && !seen.has(set.family)) {
-        seen.add(set.family);
-        families.push({ family: set.family, fileBase: set.fileBase });
-      }
-      break;
+    const set = FONT_SETS[configured[role]];
+    if (!set) continue;
+    stacks[role] = set.stack;
+    if (set.fileBase && !seen.has(set.family)) {
+      seen.add(set.family);
+      families.push({ family: set.family, fileBase: set.fileBase });
     }
   }
   return { stacks, families };
@@ -457,6 +447,5 @@ module.exports = {
   modePolicy,
   TOKENS_DIR,
   TOKEN_FILES,
-  FONT_ROLE_FALLBACKS,
   internals: { lightPalette, tokenEntries, primitiveColor },
 };

@@ -9,13 +9,17 @@
 // recompute — and a save is picked up by the provider's listener as usual.
 //
 // The texture treatment is gated on documentElement.dataset.texture (index.css
-// cannot compare a custom property in a selector), so preview mirrors that
-// attribute too and restores the previous value when it clears.
+// cannot compare a custom property in a selector), and the mode is gated on
+// documentElement.dataset.mode (design brief §3.3), so preview mirrors both
+// attributes too and restores the previous values when it clears.
 import { buildRuntimeThemeCss } from '../lib/themeRuntime.js';
+import { applyMode, prefersDark } from '../lib/modeRuntime.js';
+import { resolveMode } from 'shared/theme';
 
 export const PREVIEW_STYLE_ID = 'admin-theme-preview';
 
 let savedTexture = null;
+let savedMode = null;
 
 /**
  * Apply a candidate config/theme document to the live page.
@@ -29,10 +33,16 @@ export function applyThemePreview(themeDoc) {
     styleEl.id = PREVIEW_STYLE_ID;
     document.head.appendChild(styleEl);
     savedTexture = document.documentElement.dataset.texture ?? null;
+    savedMode = document.documentElement.dataset.mode ?? null;
   }
   styleEl.textContent = buildRuntimeThemeCss(themeDoc);
   if (typeof themeDoc?.texture === 'string' && themeDoc.texture) {
     document.documentElement.dataset.texture = themeDoc.texture;
+  }
+  // The mode policy previews too: picking "Always dark" has to show the dark
+  // palette, not just save it.
+  if (typeof themeDoc?.mode === 'string' && themeDoc.mode) {
+    applyMode(resolveMode(themeDoc.mode, prefersDark()));
   }
 }
 
@@ -42,5 +52,9 @@ export function clearThemePreview() {
   if (savedTexture !== null) {
     document.documentElement.dataset.texture = savedTexture;
     savedTexture = null;
+  }
+  if (savedMode !== null) {
+    applyMode(savedMode);
+    savedMode = null;
   }
 }

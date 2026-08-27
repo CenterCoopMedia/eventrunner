@@ -141,6 +141,14 @@
   .touch-target {
     @apply min-h-11 min-w-11;
   }
+
+  /* The data and mono roles carry changing values — figures, timestamps,
+     schedule columns — so they set tabular figures wherever they are used
+     (design brief §3.2; interface guidelines, Typography). */
+  .font-data,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

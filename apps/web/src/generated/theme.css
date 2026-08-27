@@ -107,8 +107,8 @@
   --font-heading: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-body: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-data: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-accent: var(--font-heading);
+  --font-mono: var(--font-data);
 
   /* Tier 2 — radius scale: config/theme.radius = 'sharp'. ('sharp' → 0 / 2px, 'soft' → 8px / 16px, 'round' → 16px / 28px.) */
   --radius-base: 0;
@@ -186,7 +186,7 @@
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
   --rule-hairline-rgb: 216 217 217;
-  --rule-strong-rgb: 146 151 155;
+  --rule-strong-rgb: 123 129 134;
   --rule-nameplate-rgb: 22 33 44;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
@@ -222,7 +222,7 @@
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
   --rule-hairline-rgb: 216 217 217;
-  --rule-strong-rgb: 146 151 155;
+  --rule-strong-rgb: 123 129 134;
   --rule-nameplate-rgb: 22 33 44;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
@@ -258,7 +258,7 @@
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
   --rule-hairline-rgb: 54 56 60;
-  --rule-strong-rgb: 120 121 122;
+  --rule-strong-rgb: 142 142 141;
   --rule-nameplate-rgb: 238 236 231;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);

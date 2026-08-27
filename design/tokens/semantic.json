@@ -95,9 +95,10 @@
     "nameplate": { "width": "var(--er-width-nameplate)" }
   },
 
-  "$font-note": "Roles, never family names (brief §3.2). The three live roles — heading, body, data — plus mono for figures, timestamps, and code, all resolve from config/theme.fonts through the bundled-set allowlist (spec §7.4). The aliases below are the compatibility layer: --font-accent is the retired role, kept for one release, and --font-mono falls back to the data face until a mono ships in PR2.",
+  "$font-note": "Roles, never family names (brief §3.2). The three live roles — heading, body, data — plus mono for figures, timestamps, and code, all resolve from config/theme.fonts through the bundled-set allowlist (spec §7.4). A role config/theme.fonts does not name falls through to the alias list below instead: --font-accent is the retired role, kept for one release; --font-data follows the body face; --font-mono follows the data face until a mono ships in PR2.",
   "font": {
     "--font-accent": "var(--font-heading)",
+    "--font-data": "var(--font-body)",
     "--font-mono": "var(--font-data)"
   },
 

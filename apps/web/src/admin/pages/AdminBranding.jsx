@@ -1,9 +1,9 @@
 // Branding tab (issue #15 — "changing colors/logo in the Branding tab
 // restyles the public site with no deploy"), wired to updateTheme.
 //
-// Editable: the palette (config/theme.colors), the three font roles from the
+// Editable: the palette (config/theme.colors), the four font roles from the
 // bundled font-set allowlist (spec §7.4 — no arbitrary remote fonts), the
-// texture treatment, and the corner-radius scale. Every change is previewed
+// texture treatment, the corner-radius scale, and the light/dark mode policy. Every change is previewed
 // LIVE before saving by running the candidate document through the same
 // lib/themeRuntime.js builder the runtime override uses, so what you see is
 // what the public site will render — no deploy, no rebuild.
@@ -18,13 +18,15 @@
 // carried through every save verbatim.
 //
 // config/theme is a WHOLE-DOC replace, so the payload always carries colors,
-// fonts, texture, radius, and logos together.
+// fonts, texture, radius, mode, and logos together.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import {
+  DEFAULT_MODE_POLICY,
   FONT_SET_IDS,
+  MODE_POLICY_IDS,
   RADIUS_IDS,
   THEME_COLOR_KEYS,
   THEME_COLOR_PROPERTIES,
@@ -117,6 +119,9 @@ function toForm(theme) {
     logos,
     texture: TEXTURE_IDS.includes(theme?.texture) ? theme.texture : TEXTURE_IDS[0],
     radius: RADIUS_IDS.includes(theme?.radius) ? theme.radius : RADIUS_IDS[1] ?? RADIUS_IDS[0],
+    // A stored document that predates the mode policy has no `mode`, and
+    // light is what it renders, so light is what the form starts on.
+    mode: MODE_POLICY_IDS.includes(theme?.mode) ? theme.mode : DEFAULT_MODE_POLICY,
   };
 }
 
@@ -136,6 +141,7 @@ function toThemeDoc(form) {
     logos,
     texture: form.texture,
     radius: form.radius,
+    mode: form.mode,
   };
 }
 
@@ -163,6 +169,21 @@ const FONT_SET_LABELS = {
 
 const RADIUS_LABELS = { sharp: 'Sharp', soft: 'Soft', round: 'Round' };
 const TEXTURE_LABELS = { paper: 'Paper', flat: 'Flat' };
+
+/** config/theme.mode, in words an operator can act on (design brief §3.3). */
+const MODE_LABELS = {
+  light: 'Always light',
+  dark: 'Always dark',
+  system: 'Follow the reader’s setting',
+};
+
+/** What each font role is FOR — the role name alone does not say. */
+const FONT_ROLE_LABELS = {
+  heading: 'Heading font',
+  body: 'Body font',
+  data: 'Data font',
+  mono: 'Figures and code font',
+};
 
 export default function AdminBranding() {
   const { theme, sources } = useEventConfig();
@@ -291,7 +312,7 @@ export default function AdminBranding() {
           {THEME_FONT_ROLES.map((role) => (
             <SelectField
               key={role}
-              label={`${role.charAt(0).toUpperCase()}${role.slice(1)} font`}
+              label={FONT_ROLE_LABELS[role] ?? `${role} font`}
               value={form.fonts[role]}
               options={FONT_SET_IDS.map((id) => ({
                 value: id,
@@ -314,6 +335,13 @@ export default function AdminBranding() {
             value={form.radius}
             options={RADIUS_IDS.map((id) => ({ value: id, label: RADIUS_LABELS[id] ?? id }))}
             onChange={(value) => setForm((c) => ({ ...c, radius: value }))}
+          />
+          <SelectField
+            label="Light or dark"
+            value={form.mode}
+            options={MODE_POLICY_IDS.map((id) => ({ value: id, label: MODE_LABELS[id] ?? id }))}
+            onChange={(value) => setForm((c) => ({ ...c, mode: value }))}
+            hint="Every theme defines both. Follow the reader lets each visitor’s own setting decide."
           />
         </div>
       </Panel>

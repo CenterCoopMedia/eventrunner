@@ -21,6 +21,7 @@ import {
 } from '@generated/eventConfig.js';
 import { subscribeConfigDoc } from '../lib/configSource.js';
 import { buildRuntimeThemeCss } from '../lib/themeRuntime.js';
+import { startModeSync } from '../lib/modeRuntime.js';
 
 const EventConfigContext = createContext(null);
 
@@ -139,6 +140,13 @@ export function EventConfigProvider({ children }) {
   useEffect(() => {
     document.documentElement.dataset.texture = value.theme.texture;
   }, [value.theme.texture]);
+
+  // Light or dark (design brief §3.3). config/theme.mode states the policy;
+  // this writes data-mode on <html>, which is what picks between the two
+  // color blocks in the generated stylesheet. Under the 'system' policy the
+  // subscription stays open, so the page follows the reader's setting when
+  // it changes. A document with no `mode` renders light.
+  useEffect(() => startModeSync(value.theme.mode), [value.theme.mode]);
 
   return (
     <EventConfigContext.Provider value={value}>

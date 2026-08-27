@@ -56,9 +56,15 @@ const RUST = hex('c84b31');
 
 const LIVE_THEME = {
   colors: { primary: TEAL, ink: hex('2c3e50') },
-  fonts: { heading: 'serif-editorial', body: 'sans-humanist', accent: 'script-casual' },
+  fonts: {
+    heading: 'serif-editorial',
+    body: 'sans-humanist',
+    data: 'serif-editorial',
+    mono: 'script-casual',
+  },
   texture: 'paper',
   radius: 'soft',
+  mode: 'system',
   logos: { primary: 'branding/logo.svg', mark: 'branding/mark.svg' },
 };
 
@@ -234,6 +240,9 @@ describe('branding save', () => {
     expect(theme.fonts).toEqual(LIVE_THEME.fonts);
     expect(theme.texture).toBe('paper');
     expect(theme.radius).toBe('soft');
+    // The mode policy rides along too — a whole-doc replace that dropped it
+    // would silently move a dark deployment back to light.
+    expect(theme.mode).toBe('system');
     // Untouched slots ride along rather than being dropped by the whole-doc
     // replace.
     expect(theme.logos).toEqual(LIVE_THEME.logos);

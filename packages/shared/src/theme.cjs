@@ -144,10 +144,14 @@ const DARK_MIN_CONTRAST = 4.5;
  * How much ink each rule weight carries (brief §3.7). A rule is structure,
  * so its color is ink mixed into the surface rather than a palette entry of
  * its own — that keeps a rule readable in both modes with no extra tokens.
+ *
+ * The hairline is deliberately low contrast: it separates without drawing
+ * the eye. The strong rule is a section divider a reader should see, so it
+ * carries enough ink to clear the 3:1 non-text bar on either ground.
  */
 const RULE_INK_SHARE = Object.freeze({
   hairline: 0.14,
-  strong: 0.45,
+  strong: 0.55,
   nameplate: 1,
 });
 

@@ -57,7 +57,52 @@ describe('buildRuntimeThemeCss', () => {
     expect(css).toContain('--brand-ink-muted-rgb: 92 107 122;');
     expect(css).toContain('--semantic-success-rgb: 22 101 52;');
     expect(css).toContain('--semantic-keynote-rgb: 94 53 177;');
-    expect(css.startsWith(':root {')).toBe(true);
+    // Colors are mode-scoped now (design brief §3.3), so the light block
+    // carries two selectors: the attribute-free one beats the generated
+    // baseline that first paint uses, and the [data-mode='light'] one beats
+    // the generated light block once the runtime has written the attribute.
+    expect(css.startsWith(":root,\n:root[data-mode='light'] {")).toBe(true);
+    expect(css).toContain(":root[data-mode='dark'] {");
+  });
+
+  it('derives a dark block from a document that names one palette', () => {
+    const css = buildRuntimeThemeCss({
+      colors: { surface: hex('F7F7F5'), ink: hex('16212C'), primary: hex('155E75') },
+    });
+    const [light, dark] = css.split(":root[data-mode='dark'] {");
+    // The designed dark ground replaces the light surface, and the brand
+    // color is lifted rather than reused.
+    expect(light).toContain('--brand-surface-rgb: 247 247 245;');
+    expect(dark).toContain('--brand-surface-rgb: 24 27 32;');
+    expect(dark).not.toContain('--brand-primary-rgb: 21 94 117;');
+    expect(dark).toMatch(/--brand-primary-rgb: \d+ \d+ \d+;/);
+  });
+
+  it('accepts per-mode overrides, and a named dark token wins over the derivation', () => {
+    const css = buildRuntimeThemeCss({
+      colors: {
+        light: { surface: hex('F7F7F5'), ink: hex('16212C') },
+        dark: { surface: hex('101418') },
+      },
+    });
+    const [light, dark] = css.split(":root[data-mode='dark'] {");
+    expect(light).toContain('--brand-surface-rgb: 247 247 245;');
+    expect(dark).toContain('--brand-surface-rgb: 16 20 24;');
+    // Ink is not named for dark, so the derivation still supplies it.
+    expect(dark).toContain('--brand-ink-rgb: 238 236 231;');
+  });
+
+  it('moves the rule colors with the ink and surface it derives them from', () => {
+    const css = buildRuntimeThemeCss({
+      colors: { surface: hex('F7F7F5'), ink: hex('16212C') },
+    });
+    expect(css).toContain('--rule-hairline-rgb: 216 217 217;');
+    expect(css).toContain('--rule-nameplate-rgb: 22 33 44;');
+    // Without both ends of the mix there is nothing to derive from, so the
+    // build-time rules stand.
+    expect(buildRuntimeThemeCss({ colors: { ink: hex('16212C') } })).not.toContain(
+      '--rule-hairline-rgb',
+    );
   });
 
   it('skips malformed colors instead of emitting broken CSS', () => {
@@ -76,6 +121,14 @@ describe('buildRuntimeThemeCss', () => {
     expect(css).not.toContain('--font-body');
   });
 
+  it('resolves the data and mono roles too', () => {
+    const css = buildRuntimeThemeCss({
+      fonts: { data: 'serif-editorial', mono: 'sans-humanist' },
+    });
+    expect(css).toContain("--font-data: 'Source Serif 4'");
+    expect(css).toContain("--font-mono: 'Source Sans 3'");
+  });
+
   it('maps radius and texture ids', () => {
     const css = buildRuntimeThemeCss({ radius: 'round', texture: 'flat' });
     expect(css).toContain('--radius-base: 16px;');
@@ -87,6 +140,8 @@ describe('buildRuntimeThemeCss', () => {
     expect(buildRuntimeThemeCss(null)).toBe('');
     expect(buildRuntimeThemeCss({})).toBe('');
     expect(buildRuntimeThemeCss({ radius: 'unknown', texture: 'velvet' })).toBe('');
+    // The mode policy is an attribute, not CSS, so it alone overrides nothing.
+    expect(buildRuntimeThemeCss({ mode: 'dark' })).toBe('');
   });
 });
 
