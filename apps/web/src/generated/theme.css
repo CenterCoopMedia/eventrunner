@@ -150,6 +150,10 @@
   --nameplate-tracking: var(--text-nameplate-tracking);
   --nameplate-gap: var(--space-sm);
 
+  /* Tier 3 — lead-image contract (brief §3.1). */
+  --lead-image-aspect: 3 / 2;
+  --lead-image-width: 22rem;
+
   /* Tier 3 — section-rule contract (brief §3.1). */
   --section-rule-width: var(--rule-strong-width);
   --section-rule-gap: var(--space-lg);

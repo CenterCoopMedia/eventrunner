@@ -1,7 +1,7 @@
 {
   "$schema-note": "Tier 3 of the design brief (2026-08-27) §3.1. One component contract each. A component token exists when a component needs a value the theme may change on its own, and it defaults to a tier 2 token.",
   "$shape-note": "A token whose name ends in -rgb names the tier 2 color token it defaults to; the generator emits it in both mode blocks so it follows the mode. Every other token holds a literal CSS value, normally a var() pointing at tier 2.",
-  "$scope-note": "PR1 ships the minimum the editorial base needs: the session card, the masthead nameplate, and the two rule contracts (section rule and folio rule). PR2 and PR3 add the rest as their components land.",
+  "$scope-note": "PR1 ships the minimum the base needs: the session card, the masthead nameplate, the lead image, and the two rule contracts (section rule and folio rule). PR2 and PR3 add the rest as their components land.",
   "session-card": {
     "--session-card-rule-rgb": "--rule-hairline-rgb",
     "--session-card-surface-rgb": "--color-surface-rgb",
@@ -18,6 +18,10 @@
     "--nameplate-leading": "var(--text-nameplate-leading)",
     "--nameplate-tracking": "var(--text-nameplate-tracking)",
     "--nameplate-gap": "var(--space-sm)"
+  },
+  "lead-image": {
+    "--lead-image-aspect": "3 / 2",
+    "--lead-image-width": "22rem"
   },
   "section-rule": {
     "--section-rule-rgb": "--rule-strong-rgb",

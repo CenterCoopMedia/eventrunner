@@ -53,11 +53,16 @@ const BLOCK_TYPES = Object.freeze({
   image: blockType({
     id: 'image',
     label: 'Image',
-    description: 'An image by URL. Alt text is required, not optional.',
+    description:
+      'An image by URL. Alt text is required, not optional. focalX and focalY name ' +
+      'the part of the picture a fixed crop must keep, as percentages from the top ' +
+      'left; both default to the centre.',
     fields: [
       field('url', 'url', true),
       field('alt', 'string', true),
       field('caption', 'string', false),
+      field('focalX', 'number', false),
+      field('focalY', 'number', false),
     ],
   }),
   cta: blockType({

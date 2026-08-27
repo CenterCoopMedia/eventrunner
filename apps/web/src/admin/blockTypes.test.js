@@ -45,7 +45,8 @@ describe('admin block palette', () => {
 
   it('summarizes a block type’s fields for the editor', () => {
     expect(blockTypeFieldSummary('image')).toBe(
-      'url (url) · alt (string) · caption (string, optional)',
+      'url (url) · alt (string) · caption (string, optional) · ' +
+        'focalX (number, optional) · focalY (number, optional)',
     );
   });
 });

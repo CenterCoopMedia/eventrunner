@@ -8,11 +8,16 @@
 // The page owns its own <h1>: the shell's header carries the running site
 // identity, not this page's subject. No text sits above that heading — the
 // tagline and the supporting line follow it (brief §2.4).
+//
+// The opening section may carry one lead image, beside the copy at wide
+// viewports and below it at narrow ones (brief §2.5.2). There is no hero
+// banner: text never sits over a picture.
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import CtaBlock from '../components/blocks/CtaBlock.jsx';
+import LeadImage from '../components/LeadImage.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
@@ -41,9 +46,11 @@ export default function Home() {
     typeof title?.value === 'string' && title.value.trim()
       ? title.value
       : eventConfig.name;
-  const heroCtas = getSectionBlocks('hero').filter(
-    (block) => block.blockType === 'cta',
-  );
+  const heroBlocks = getSectionBlocks('hero');
+  const heroCtas = heroBlocks.filter((block) => block.blockType === 'cta');
+  // One lead image at most. An editor who stores several images in the
+  // opening section gets the first one, never a gallery.
+  const lead = heroBlocks.find((block) => block.blockType === 'image') ?? null;
   const otherSections = (page?.sections ?? []).filter(
     (section) => section.id !== 'hero',
   );
@@ -61,36 +68,44 @@ export default function Home() {
         className="pb-xl"
         {...(leadTitle ? { 'aria-labelledby': 'hero-title' } : { 'aria-label': 'Introduction' })}
       >
-        {leadTitle ? (
-          <h1 id="hero-title" className="font-heading text-h1 font-semibold text-text-primary">
-            {leadTitle}
-          </h1>
-        ) : null}
-        {typeof eventConfig.tagline === 'string' ? (
-          <p
-            className={[
-              'max-w-prose text-lead text-text-secondary',
-              leadTitle ? 'mt-sm' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            style={{ textWrap: 'pretty' }}
-          >
-            {eventConfig.tagline}
-          </p>
-        ) : null}
-        {subtitle ? (
-          <p className="mt-sm max-w-prose text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
-            {subtitle.value}
-          </p>
-        ) : null}
-        {heroCtas.length ? (
-          <div className="mt-lg flex flex-wrap gap-sm">
-            {heroCtas.map((block) => (
-              <CtaBlock key={`${block.section}__${block.field}`} block={block} />
-            ))}
+        <div className="flex flex-col gap-lg lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1">
+            {leadTitle ? (
+              <h1 id="hero-title" className="font-heading text-h1 font-semibold text-text-primary">
+                {leadTitle}
+              </h1>
+            ) : null}
+            {typeof eventConfig.tagline === 'string' ? (
+              <p
+                className={[
+                  'max-w-prose text-lead text-text-secondary',
+                  leadTitle ? 'mt-sm' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                style={{ textWrap: 'pretty' }}
+              >
+                {eventConfig.tagline}
+              </p>
+            ) : null}
+            {subtitle ? (
+              <p
+                className="mt-sm max-w-prose text-body text-text-secondary"
+                style={{ textWrap: 'pretty' }}
+              >
+                {subtitle.value}
+              </p>
+            ) : null}
+            {heroCtas.length ? (
+              <div className="mt-lg flex flex-wrap gap-sm">
+                {heroCtas.map((block) => (
+                  <CtaBlock key={`${block.section}__${block.field}`} block={block} />
+                ))}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+          {lead ? <LeadImage block={lead} /> : null}
+        </div>
       </section>
 
       {features?.liveUpdates ? (

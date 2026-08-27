@@ -106,6 +106,25 @@
     letter-spacing: var(--text-h3-tracking);
   }
 
+  /* Lead image: the one optional image that opens a page. The crop is fixed
+     by token so swapping the picture never reflows the page, and the focal
+     point comes from the block's own data. Text never sits over it. */
+  .lead-image {
+    display: block;
+    inline-size: 100%;
+    aspect-ratio: var(--lead-image-aspect);
+    object-fit: cover;
+  }
+  .lead-image-slot {
+    inline-size: 100%;
+  }
+  @media (min-width: 64rem) {
+    .lead-image-slot {
+      flex: 0 0 var(--lead-image-width);
+      max-inline-size: var(--lead-image-width);
+    }
+  }
+
   /* Folio: a small-caps plain-text label that sits ON a rule at a section
      boundary. Never a chip, never a pill, never a colored badge — and never
      directly above a heading (brief §2.4, the absolute eyebrow ban). */
