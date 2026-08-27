@@ -26,7 +26,20 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     // this page can tell "still on the snapshot" apart from "the runtime
     // listener resolved" the way this attribute can.
     const liveContent = page.locator('article[data-content-source="live"]');
-    const subtitle = page.locator('p.mt-4.max-w-prose');
+    // Home.jsx's lead section is always the FIRST <section> under the
+    // content article, and the hero subtitle is always the LAST <p> inside
+    // it — an optional tagline paragraph (present here as an empty <p>,
+    // since this fixture's eventConfig has no tagline) comes before it, and
+    // the CTAs render as a <div>, not a <p>. That structural position holds
+    // independent of restyle-era utility classes, unlike the aria-label on
+    // the section itself: it reads "Introduction" only when the CMS hero
+    // title happens to equal eventConfig.name, which is NOT the case for
+    // this fixture (seed-demo-event.cjs's demo title overlay differs from
+    // e2e/fixtures/answers.json's event name), so the section instead gets
+    // aria-labelledby pointing at that (fixture-specific) heading text —
+    // not a stable string to match on here.
+    const heroSection = page.locator('article[data-content-source] > section').first();
+    const subtitle = heroSection.locator('p').last();
 
     // Baseline: wait for the live cmsContent overlay to actually resolve —
     // not just whatever the build-time snapshot happens to render on first
