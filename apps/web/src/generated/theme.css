@@ -103,19 +103,21 @@
   --rule-strong-width: var(--er-width-strong);
   --rule-nameplate-width: var(--er-width-nameplate);
 
-  /* Tier 2 — font roles (brief §3.2). config/theme.fonts names a bundled set id (spec §7.4); the generator wrote the matching stacks. */
+  /* Tier 2 — font roles (brief §3.2). The active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright — all resolved to a bundled set id (spec §7.4). Preset: Newsroom modern. */
   --font-heading: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-body: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-data: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
-  --font-accent: var(--font-heading);
-  --font-mono: var(--font-data);
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Tier 2 — radius scale: config/theme.radius = 'sharp'. ('sharp' → 0 / 2px, 'soft' → 8px / 16px, 'round' → 16px / 28px.) */
+  /* Tier 2 — radius scale: 'sharp'. ('sharp' → 0 / 2px, 'small' → 2px / 4px, 'soft' → 8px / 16px, 'round' → 16px / 28px.) */
   --radius-base: 0;
   --radius-large: 2px;
 
-  /* Tier 2 — texture treatment: config/theme.texture = 'paper' | 'flat'. Components read this through the bg-paper utility layer in index.css. */
+  /* Tier 2 — texture treatment: 'paper' | 'flat'. Components read this through the bg-paper utility layer in index.css. */
   --texture: flat;
+
+  /* Tier 2 — density: 'tight' | 'comfortable' | 'loose' (brief §4). The preset states its own; a page may still set its own layout density in PR3. */
+  --density: comfortable;
 
   /* Tier 2 — motion (brief §2.2). Functional 120–200ms; one signature under 600ms. */
   --motion-fast: var(--er-duration-fast);
@@ -130,7 +132,7 @@
   --weight-semibold: var(--er-weight-semibold);
   --weight-bold: var(--er-weight-bold);
 
-  /* Motif layer (brief §3.8). PR1 ships the `none` set only. */
+  /* Motif layer (brief §3.8) — the active set, 'none', as the attribute-free baseline. The [data-motif-set] blocks below carry every set. */
   --motif-set: none;
   --motif-section-mark: none;
   --motif-divider: none;
@@ -139,12 +141,18 @@
 
   /* Tier 3 — session-card contract (brief §3.1). */
   --session-card-rule-width: var(--rule-hairline-width);
+  --session-card-stamp-offset: 0;
+  --session-card-lead-scale: 1;
   --session-card-gap: var(--space-xs);
   --session-card-pad-block: var(--space-md);
   --session-card-pad-inline: 0;
 
   /* Tier 3 — nameplate contract (brief §3.1). */
   --nameplate-rule-width: var(--rule-nameplate-width);
+  --nameplate-rule-top-width: 0;
+  --nameplate-frame-width: 0;
+  --nameplate-align: start;
+  --nameplate-meta-placement: block;
   --nameplate-size: var(--text-nameplate);
   --nameplate-leading: var(--text-nameplate-leading);
   --nameplate-tracking: var(--text-nameplate-tracking);
@@ -156,26 +164,71 @@
 
   /* Tier 3 — folio-rule contract (brief §3.1). */
   --folio-rule-width: var(--rule-hairline-width);
+  --folio-rule-top-width: 0;
+  --folio-font: var(--font-data);
   --folio-size: var(--text-folio);
   --folio-tracking: var(--text-folio-tracking);
   --folio-gap: var(--space-xs);
+
+  /* Tier 3 — schedule contract (brief §3.1). */
+  --schedule-row-leading: var(--text-body-leading);
+  --schedule-data-size: var(--text-caption);
+  --schedule-number-display: none;
+
+  /* Tier 3 — plate contract (brief §3.1). */
+  --plate-frame-width: 0;
+  --plate-pad: var(--space-md);
+
+  /* Tier 3 — map-grid contract (brief §3.1). */
+  --map-grid-size: 0;
+
+  /* Tier 3 — route-mark contract (brief §3.1). */
+  --route-mark-radius: 0;
+
+  /* Tier 3 — callout contract (brief §3.1). */
+  --callout-font: var(--font-heading);
+  --callout-angle: 0deg;
+  --callout-size: var(--text-lead);
+
+  /* Tier 3 — marginalia contract (brief §3.1). */
+  --marginalia-display: none;
+
+  /* Preset remaps — Newsroom modern and its picked options. An option remaps existing tier 2 and tier 3 tokens and never adds a property name (brief §3.4), so every name here is declared above. */
+  --folio-font: var(--font-data);
+  --section-rule-width: var(--rule-strong-width);
+  --nameplate-align: start;
+  --nameplate-rule-width: var(--rule-strong-width);
+  --nameplate-meta-placement: inline;
+  --session-card-lead-scale: 1;
+  --session-card-rule-width: var(--rule-hairline-width);
+
+  /* Admin identity — fixed type and shape (admin story part 6g). Never writable from config/theme: the pairing is the identity. */
+  --admin-font-ui: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+  --admin-font-data: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --admin-rule-hairline-width: var(--er-width-hairline);
+  --admin-rule-strong-width: var(--er-width-strong);
+  --admin-rule-header-width: var(--er-width-nameplate);
+  --admin-rule-alarm-width: var(--er-width-strong);
+  --admin-focus-offset: 2px;
+  --admin-radius: 2px;
+  --admin-nav-active-marker-width: var(--er-width-strong);
 }
 
 /* Light palette, attribute-free baseline — what first paint renders before the runtime writes data-mode. */
 :root {
-  --brand-primary-rgb: 21 94 117;
-  --brand-primary-dark-rgb: 12 66 82;
-  --brand-primary-light-rgb: 79 147 166;
-  --brand-accent-rgb: 154 52 18;
-  --brand-surface-rgb: 247 247 245;
-  --brand-surface-alt-rgb: 236 236 234;
-  --brand-ink-rgb: 22 33 44;
-  --brand-ink-muted-rgb: 71 82 94;
-  --semantic-success-rgb: 22 101 52;
-  --semantic-warning-rgb: 180 83 9;
-  --semantic-danger-rgb: 185 28 28;
-  --semantic-highlight-rgb: 161 98 7;
-  --semantic-keynote-rgb: 109 40 217;
+  --brand-primary-rgb: 178 30 50;
+  --brand-primary-dark-rgb: 140 20 38;
+  --brand-primary-light-rgb: 224 148 158;
+  --brand-accent-rgb: 46 84 126;
+  --brand-surface-rgb: 246 247 249;
+  --brand-surface-alt-rgb: 236 238 242;
+  --brand-ink-rgb: 22 24 29;
+  --brand-ink-muted-rgb: 88 95 108;
+  --semantic-success-rgb: 22 96 62;
+  --semantic-warning-rgb: 134 82 10;
+  --semantic-danger-rgb: 170 32 44;
+  --semantic-highlight-rgb: 124 90 14;
+  --semantic-keynote-rgb: 82 54 140;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -185,34 +238,43 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 216 217 217;
-  --rule-strong-rgb: 123 129 134;
-  --rule-nameplate-rgb: 22 33 44;
-  --color-border-control-rgb: 130 136 140;
+  --rule-hairline-rgb: 215 216 218;
+  --rule-strong-rgb: 123 124 128;
+  --rule-nameplate-rgb: 22 24 29;
+  --color-border-control-rgb: 130 131 135;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
   --nameplate-rule-rgb: var(--rule-nameplate-rgb);
   --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
   --section-rule-rgb: var(--rule-strong-rgb);
   --folio-rule-rgb: var(--rule-hairline-rgb);
   --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
 /* Light palette (brief §3.3). Every color token is defined in both mode blocks. */
 :root[data-mode='light'] {
-  --brand-primary-rgb: 21 94 117;
-  --brand-primary-dark-rgb: 12 66 82;
-  --brand-primary-light-rgb: 79 147 166;
-  --brand-accent-rgb: 154 52 18;
-  --brand-surface-rgb: 247 247 245;
-  --brand-surface-alt-rgb: 236 236 234;
-  --brand-ink-rgb: 22 33 44;
-  --brand-ink-muted-rgb: 71 82 94;
-  --semantic-success-rgb: 22 101 52;
-  --semantic-warning-rgb: 180 83 9;
-  --semantic-danger-rgb: 185 28 28;
-  --semantic-highlight-rgb: 161 98 7;
-  --semantic-keynote-rgb: 109 40 217;
+  --brand-primary-rgb: 178 30 50;
+  --brand-primary-dark-rgb: 140 20 38;
+  --brand-primary-light-rgb: 224 148 158;
+  --brand-accent-rgb: 46 84 126;
+  --brand-surface-rgb: 246 247 249;
+  --brand-surface-alt-rgb: 236 238 242;
+  --brand-ink-rgb: 22 24 29;
+  --brand-ink-muted-rgb: 88 95 108;
+  --semantic-success-rgb: 22 96 62;
+  --semantic-warning-rgb: 134 82 10;
+  --semantic-danger-rgb: 170 32 44;
+  --semantic-highlight-rgb: 124 90 14;
+  --semantic-keynote-rgb: 82 54 140;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -222,34 +284,43 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 216 217 217;
-  --rule-strong-rgb: 123 129 134;
-  --rule-nameplate-rgb: 22 33 44;
-  --color-border-control-rgb: 130 136 140;
+  --rule-hairline-rgb: 215 216 218;
+  --rule-strong-rgb: 123 124 128;
+  --rule-nameplate-rgb: 22 24 29;
+  --color-border-control-rgb: 130 131 135;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
   --nameplate-rule-rgb: var(--rule-nameplate-rgb);
   --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
   --section-rule-rgb: var(--rule-strong-rgb);
   --folio-rule-rgb: var(--rule-hairline-rgb);
   --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Dark palette (brief §3.3). Its own palette, never light mode reversed: a designed neutral ground with the brand colors lifted until they clear the contrast bar on it. */
+/* Dark palette (brief §3.3). Its own palette, never light mode reversed. */
 :root[data-mode='dark'] {
-  --brand-primary-rgb: 85 138 155;
-  --brand-primary-dark-rgb: 122 164 177;
-  --brand-primary-light-rgb: 74 107 119;
-  --brand-accent-rgb: 184 112 88;
-  --brand-surface-rgb: 24 27 32;
-  --brand-surface-alt-rgb: 35 39 45;
-  --brand-ink-rgb: 238 236 231;
-  --brand-ink-muted-rgb: 170 176 184;
-  --semantic-success-rgb: 85 143 107;
-  --semantic-warning-rgb: 192 110 47;
-  --semantic-danger-rgb: 206 97 97;
-  --semantic-highlight-rgb: 174 120 42;
-  --semantic-keynote-rgb: 153 105 228;
+  --brand-primary-rgb: 240 122 134;
+  --brand-primary-dark-rgb: 248 168 176;
+  --brand-primary-light-rgb: 118 56 66;
+  --brand-accent-rgb: 130 172 216;
+  --brand-surface-rgb: 23 25 30;
+  --brand-surface-alt-rgb: 34 37 44;
+  --brand-ink-rgb: 232 235 240;
+  --brand-ink-muted-rgb: 160 168 180;
+  --semantic-success-rgb: 116 200 150;
+  --semantic-warning-rgb: 228 174 88;
+  --semantic-danger-rgb: 242 136 142;
+  --semantic-highlight-rgb: 222 190 108;
+  --semantic-keynote-rgb: 186 164 240;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -259,25 +330,702 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 54 56 60;
-  --rule-strong-rgb: 142 142 141;
-  --rule-nameplate-rgb: 238 236 231;
-  --color-border-control-rgb: 135 136 135;
+  --rule-hairline-rgb: 52 54 59;
+  --rule-strong-rgb: 138 141 146;
+  --rule-nameplate-rgb: 232 235 240;
+  --color-border-control-rgb: 132 134 139;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
   --nameplate-rule-rgb: var(--rule-nameplate-rgb);
   --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
   --section-rule-rgb: var(--rule-strong-rgb);
   --folio-rule-rgb: var(--rule-hairline-rgb);
   --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Theme presets (brief §3.4, §4). A theme remaps the same custom
+   properties: no block below introduces a property name the blocks
+   above do not already carry. data-theme picks which one wins. */
+
+/* Broadsheet — light. */
+:root[data-theme='broadsheet'][data-mode='light'] {
+  --brand-primary-rgb: 26 58 110;
+  --brand-primary-dark-rgb: 17 40 80;
+  --brand-primary-light-rgb: 126 150 192;
+  --brand-accent-rgb: 72 84 102;
+  --brand-surface-rgb: 247 244 238;
+  --brand-surface-alt-rgb: 239 235 227;
+  --brand-ink-rgb: 24 26 32;
+  --brand-ink-muted-rgb: 88 92 102;
+  --semantic-success-rgb: 26 94 60;
+  --semantic-warning-rgb: 138 84 12;
+  --semantic-danger-rgb: 162 34 42;
+  --semantic-highlight-rgb: 128 92 16;
+  --semantic-keynote-rgb: 78 52 130;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 216 213 209;
+  --rule-strong-rgb: 124 124 125;
+  --rule-nameplate-rgb: 24 26 32;
+  --color-border-control-rgb: 131 131 131;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Broadsheet — dark. */
+:root[data-theme='broadsheet'][data-mode='dark'] {
+  --brand-primary-rgb: 130 170 226;
+  --brand-primary-dark-rgb: 172 200 240;
+  --brand-primary-light-rgb: 70 96 138;
+  --brand-accent-rgb: 154 166 184;
+  --brand-surface-rgb: 28 27 26;
+  --brand-surface-alt-rgb: 40 38 36;
+  --brand-ink-rgb: 237 232 222;
+  --brand-ink-muted-rgb: 170 165 155;
+  --semantic-success-rgb: 124 198 148;
+  --semantic-warning-rgb: 226 172 88;
+  --semantic-danger-rgb: 240 138 140;
+  --semantic-highlight-rgb: 220 186 106;
+  --semantic-keynote-rgb: 186 162 236;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 57 56 53;
+  --rule-strong-rgb: 143 140 134;
+  --rule-nameplate-rgb: 237 232 222;
+  --color-border-control-rgb: 137 134 128;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Newsroom modern — light, the active preset, with this deployment's overrides. */
+:root[data-theme='newsroom'][data-mode='light'] {
+  --brand-primary-rgb: 178 30 50;
+  --brand-primary-dark-rgb: 140 20 38;
+  --brand-primary-light-rgb: 224 148 158;
+  --brand-accent-rgb: 46 84 126;
+  --brand-surface-rgb: 246 247 249;
+  --brand-surface-alt-rgb: 236 238 242;
+  --brand-ink-rgb: 22 24 29;
+  --brand-ink-muted-rgb: 88 95 108;
+  --semantic-success-rgb: 22 96 62;
+  --semantic-warning-rgb: 134 82 10;
+  --semantic-danger-rgb: 170 32 44;
+  --semantic-highlight-rgb: 124 90 14;
+  --semantic-keynote-rgb: 82 54 140;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 215 216 218;
+  --rule-strong-rgb: 123 124 128;
+  --rule-nameplate-rgb: 22 24 29;
+  --color-border-control-rgb: 130 131 135;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Newsroom modern — dark, the active preset, with this deployment's overrides. */
+:root[data-theme='newsroom'][data-mode='dark'] {
+  --brand-primary-rgb: 240 122 134;
+  --brand-primary-dark-rgb: 248 168 176;
+  --brand-primary-light-rgb: 118 56 66;
+  --brand-accent-rgb: 130 172 216;
+  --brand-surface-rgb: 23 25 30;
+  --brand-surface-alt-rgb: 34 37 44;
+  --brand-ink-rgb: 232 235 240;
+  --brand-ink-muted-rgb: 160 168 180;
+  --semantic-success-rgb: 116 200 150;
+  --semantic-warning-rgb: 228 174 88;
+  --semantic-danger-rgb: 242 136 142;
+  --semantic-highlight-rgb: 222 190 108;
+  --semantic-keynote-rgb: 186 164 240;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 52 54 59;
+  --rule-strong-rgb: 138 141 146;
+  --rule-nameplate-rgb: 232 235 240;
+  --color-border-control-rgb: 132 134 139;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Zine / indie — light. */
+:root[data-theme='zine'][data-mode='light'] {
+  --brand-primary-rgb: 198 26 84;
+  --brand-primary-dark-rgb: 156 16 64;
+  --brand-primary-light-rgb: 240 148 182;
+  --brand-accent-rgb: 44 58 110;
+  --brand-surface-rgb: 250 249 244;
+  --brand-surface-alt-rgb: 240 238 230;
+  --brand-ink-rgb: 20 19 18;
+  --brand-ink-muted-rgb: 86 84 80;
+  --semantic-success-rgb: 24 92 58;
+  --semantic-warning-rgb: 136 80 8;
+  --semantic-danger-rgb: 176 28 40;
+  --semantic-highlight-rgb: 126 88 12;
+  --semantic-keynote-rgb: 88 48 142;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 218 217 212;
+  --rule-strong-rgb: 123 122 120;
+  --rule-nameplate-rgb: 20 19 18;
+  --color-border-control-rgb: 130 129 126;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Zine / indie — dark. */
+:root[data-theme='zine'][data-mode='dark'] {
+  --brand-primary-rgb: 244 124 166;
+  --brand-primary-dark-rgb: 250 170 198;
+  --brand-primary-light-rgb: 118 42 74;
+  --brand-accent-rgb: 144 160 226;
+  --brand-surface-rgb: 21 20 22;
+  --brand-surface-alt-rgb: 33 32 35;
+  --brand-ink-rgb: 242 240 236;
+  --brand-ink-muted-rgb: 168 164 160;
+  --semantic-success-rgb: 122 202 150;
+  --semantic-warning-rgb: 230 176 90;
+  --semantic-danger-rgb: 244 138 142;
+  --semantic-highlight-rgb: 224 192 110;
+  --semantic-keynote-rgb: 190 166 244;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 52 51 52;
+  --rule-strong-rgb: 143 141 140;
+  --rule-nameplate-rgb: 242 240 236;
+  --color-border-control-rgb: 136 134 133;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Civic / institutional — light. */
+:root[data-theme='civic'][data-mode='light'] {
+  --brand-primary-rgb: 26 82 150;
+  --brand-primary-dark-rgb: 16 56 106;
+  --brand-primary-light-rgb: 126 164 208;
+  --brand-accent-rgb: 64 80 98;
+  --brand-surface-rgb: 250 250 249;
+  --brand-surface-alt-rgb: 240 240 239;
+  --brand-ink-rgb: 23 24 26;
+  --brand-ink-muted-rgb: 80 83 89;
+  --semantic-success-rgb: 20 92 56;
+  --semantic-warning-rgb: 124 74 6;
+  --semantic-danger-rgb: 162 26 36;
+  --semantic-highlight-rgb: 116 84 10;
+  --semantic-keynote-rgb: 76 48 132;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 218 218 218;
+  --rule-strong-rgb: 125 126 126;
+  --rule-nameplate-rgb: 23 24 26;
+  --color-border-control-rgb: 132 132 133;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Civic / institutional — dark. */
+:root[data-theme='civic'][data-mode='dark'] {
+  --brand-primary-rgb: 128 178 238;
+  --brand-primary-dark-rgb: 172 208 248;
+  --brand-primary-light-rgb: 56 90 134;
+  --brand-accent-rgb: 152 168 184;
+  --brand-surface-rgb: 25 26 28;
+  --brand-surface-alt-rgb: 37 39 42;
+  --brand-ink-rgb: 238 238 236;
+  --brand-ink-muted-rgb: 174 178 184;
+  --semantic-success-rgb: 126 204 152;
+  --semantic-warning-rgb: 234 180 92;
+  --semantic-danger-rgb: 246 142 146;
+  --semantic-highlight-rgb: 228 196 114;
+  --semantic-keynote-rgb: 190 168 244;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 55 56 57;
+  --rule-strong-rgb: 142 143 142;
+  --rule-nameplate-rgb: 238 238 236;
+  --color-border-control-rgb: 136 136 136;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Field Guide — light. */
+:root[data-theme='field-guide'][data-mode='light'] {
+  --brand-primary-rgb: 43 86 54;
+  --brand-primary-dark-rgb: 27 60 37;
+  --brand-primary-light-rgb: 140 172 136;
+  --brand-accent-rgb: 136 72 40;
+  --brand-surface-rgb: 247 243 234;
+  --brand-surface-alt-rgb: 240 235 223;
+  --brand-ink-rgb: 42 33 25;
+  --brand-ink-muted-rgb: 102 90 74;
+  --semantic-success-rgb: 34 88 52;
+  --semantic-warning-rgb: 140 86 12;
+  --semantic-danger-rgb: 158 44 36;
+  --semantic-highlight-rgb: 124 92 18;
+  --semantic-keynote-rgb: 86 60 124;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 218 214 205;
+  --rule-strong-rgb: 134 127 119;
+  --rule-nameplate-rgb: 42 33 25;
+  --color-border-control-rgb: 140 134 125;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Field Guide — dark. */
+:root[data-theme='field-guide'][data-mode='dark'] {
+  --brand-primary-rgb: 142 192 142;
+  --brand-primary-dark-rgb: 180 216 176;
+  --brand-primary-light-rgb: 64 94 64;
+  --brand-accent-rgb: 216 152 112;
+  --brand-surface-rgb: 26 30 26;
+  --brand-surface-alt-rgb: 38 43 37;
+  --brand-ink-rgb: 237 232 220;
+  --brand-ink-muted-rgb: 170 168 150;
+  --semantic-success-rgb: 130 200 144;
+  --semantic-warning-rgb: 228 178 96;
+  --semantic-danger-rgb: 238 142 128;
+  --semantic-highlight-rgb: 220 192 118;
+  --semantic-keynote-rgb: 186 168 232;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 56 58 53;
+  --rule-strong-rgb: 142 141 133;
+  --rule-nameplate-rgb: 237 232 220;
+  --color-border-control-rgb: 136 135 127;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Atlas — light. */
+:root[data-theme='atlas'][data-mode='light'] {
+  --brand-primary-rgb: 180 38 34;
+  --brand-primary-dark-rgb: 142 26 24;
+  --brand-primary-light-rgb: 226 148 144;
+  --brand-accent-rgb: 34 88 122;
+  --brand-surface-rgb: 245 247 247;
+  --brand-surface-alt-rgb: 234 238 239;
+  --brand-ink-rgb: 20 26 30;
+  --brand-ink-muted-rgb: 84 94 100;
+  --semantic-success-rgb: 20 92 66;
+  --semantic-warning-rgb: 130 78 8;
+  --semantic-danger-rgb: 168 30 34;
+  --semantic-highlight-rgb: 118 86 12;
+  --semantic-keynote-rgb: 72 54 138;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 214 216 217;
+  --rule-strong-rgb: 121 125 128;
+  --rule-nameplate-rgb: 20 26 30;
+  --color-border-control-rgb: 128 132 134;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Atlas — dark. */
+:root[data-theme='atlas'][data-mode='dark'] {
+  --brand-primary-rgb: 244 122 112;
+  --brand-primary-dark-rgb: 250 166 158;
+  --brand-primary-light-rgb: 118 46 42;
+  --brand-accent-rgb: 124 178 216;
+  --brand-surface-rgb: 22 27 32;
+  --brand-surface-alt-rgb: 33 40 46;
+  --brand-ink-rgb: 231 238 242;
+  --brand-ink-muted-rgb: 154 168 178;
+  --semantic-success-rgb: 116 202 158;
+  --semantic-warning-rgb: 230 178 92;
+  --semantic-danger-rgb: 244 138 138;
+  --semantic-highlight-rgb: 224 192 112;
+  --semantic-keynote-rgb: 182 166 244;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 51 57 61;
+  --rule-strong-rgb: 137 143 148;
+  --rule-nameplate-rgb: 231 238 242;
+  --color-border-control-rgb: 131 137 141;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* Admin identity — light (admin story part 6). Emitted once per mode, never once per theme: the admin obeys data-mode and ignores data-theme. */
+:root,
+:root[data-mode='light'] {
+  --admin-ground-rgb: 234 232 227;
+  --admin-ground-raised-rgb: 243 241 237;
+  --admin-ground-proof-rgb: 234 223 194;
+  --admin-ground-input-rgb: 251 250 247;
+  --admin-ground-alarm-rgb: 246 231 228;
+  --admin-ink-rgb: 28 27 25;
+  --admin-ink-secondary-rgb: 82 79 74;
+  --admin-ink-data-rgb: 56 54 50;
+  --admin-ink-inverse-rgb: 246 244 240;
+  --admin-ink-disabled-rgb: 98 95 89;
+  --admin-ink-link-rgb: 26 70 126;
+  --admin-rule-hairline-rgb: 204 200 192;
+  --admin-rule-strong-rgb: 136 131 122;
+  --admin-rule-header-rgb: 92 88 81;
+  --admin-rule-alarm-rgb: 166 74 62;
+  --admin-state-live-rgb: 24 88 56;
+  --admin-state-draft-rgb: 112 74 8;
+  --admin-state-error-rgb: 150 28 32;
+  --admin-state-caution-rgb: 118 76 8;
+  --admin-state-ok-rgb: 24 88 56;
+  --admin-focus-ring-rgb: 26 66 116;
+  --admin-client-accent-ink-rgb: 246 244 240;
+  --admin-client-accent-rgb: var(--admin-ink-rgb);
+  --admin-nav-active-marker-rgb: var(--admin-client-accent-rgb);
+  --admin-page-header-mark-rgb: var(--admin-client-accent-rgb);
+}
+
+/* Admin identity — dark, the night side. Authored value by value. */
+:root[data-mode='dark'] {
+  --admin-ground-rgb: 31 30 28;
+  --admin-ground-raised-rgb: 43 42 39;
+  --admin-ground-proof-rgb: 56 49 32;
+  --admin-ground-input-rgb: 23 22 21;
+  --admin-ground-alarm-rgb: 56 31 29;
+  --admin-ink-rgb: 236 231 222;
+  --admin-ink-secondary-rgb: 173 168 158;
+  --admin-ink-data-rgb: 201 196 186;
+  --admin-ink-inverse-rgb: 24 23 22;
+  --admin-ink-disabled-rgb: 150 145 136;
+  --admin-ink-link-rgb: 142 182 234;
+  --admin-rule-hairline-rgb: 63 61 57;
+  --admin-rule-strong-rgb: 114 110 102;
+  --admin-rule-header-rgb: 158 153 144;
+  --admin-rule-alarm-rgb: 186 100 90;
+  --admin-state-live-rgb: 122 198 148;
+  --admin-state-draft-rgb: 228 178 94;
+  --admin-state-error-rgb: 246 142 140;
+  --admin-state-caution-rgb: 232 182 96;
+  --admin-state-ok-rgb: 122 198 148;
+  --admin-focus-ring-rgb: 130 180 236;
+  --admin-client-accent-ink-rgb: 24 23 22;
+  --admin-client-accent-rgb: var(--admin-ink-rgb);
+  --admin-nav-active-marker-rgb: var(--admin-client-accent-rgb);
+  --admin-page-header-mark-rgb: var(--admin-client-accent-rgb);
+}
+
+/* Motif sets (brief §3.8). Each block resolves every slot token to that
+   set's asset. Render a slot as a mask-image painted with
+   background-color: rgb(var(--color-ink-motif-rgb)), or inline the SVG as a
+   symbol reading currentColor. Never an <img>, never a url() fill. */
+
+:root[data-motif-set='none'] {
+  --motif-set: none;
+  --motif-section-mark: none;
+  --motif-divider: none;
+  --motif-nameplate-mark: none;
+  --motif-empty-state: none;
+}
+
+:root[data-motif-set='botanical'] {
+  --motif-set: botanical;
+  --motif-section-mark: url('/motifs/botanical/section-mark.svg');
+  --motif-divider: url('/motifs/botanical/divider.svg');
+  --motif-nameplate-mark: url('/motifs/botanical/nameplate-mark.svg');
+  --motif-empty-state: url('/motifs/botanical/empty-state.svg');
+}
+
+:root[data-motif-set='fauna'] {
+  --motif-set: fauna;
+  --motif-section-mark: url('/motifs/fauna/section-mark.svg');
+  --motif-divider: url('/motifs/fauna/divider.svg');
+  --motif-nameplate-mark: url('/motifs/fauna/nameplate-mark.svg');
+  --motif-empty-state: url('/motifs/fauna/empty-state.svg');
+}
+
+:root[data-motif-set='cartographic'] {
+  --motif-set: cartographic;
+  --motif-section-mark: url('/motifs/cartographic/section-mark.svg');
+  --motif-divider: url('/motifs/cartographic/divider.svg');
+  --motif-nameplate-mark: url('/motifs/cartographic/nameplate-mark.svg');
+  --motif-empty-state: url('/motifs/cartographic/empty-state.svg');
 }
 
 /* Self-hosted font faces (spec §7.4): woff2 only, no font CDN at runtime.
-   Files live in apps/web/public/fonts/. */
+   Files live in apps/web/public/fonts/. Only the ACTIVE preset's picked
+   faces plus the two fixed admin faces are declared here, so a reader
+   downloads what this deployment uses and nothing else (brief §4). */
 @font-face {
   font-family: 'Source Sans 3';
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
   src: url('/fonts/source-sans-3-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-400-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-600-latin.woff2') format('woff2');
 }

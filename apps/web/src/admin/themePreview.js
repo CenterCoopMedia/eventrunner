@@ -8,18 +8,22 @@
 // it is removed. Discarding a preview is therefore a DOM removal, not a
 // recompute — and a save is picked up by the provider's listener as usual.
 //
-// The texture treatment is gated on documentElement.dataset.texture (index.css
-// cannot compare a custom property in a selector), and the mode is gated on
-// documentElement.dataset.mode (design brief §3.3), so preview mirrors both
-// attributes too and restores the previous values when it clears.
-import { buildRuntimeThemeCss } from '../lib/themeRuntime.js';
+// Four things are attributes on the root element rather than custom
+// properties, so preview mirrors all four and restores them when it clears:
+// the texture treatment (index.css cannot compare a custom property in a
+// selector), the mode (design brief §3.3), the preset (§3.4), and the motif
+// set (§3.8). The last two decide which generated block wins, and a custom
+// property cannot do that job.
+import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeRuntime.js';
 import { applyMode, prefersDark } from '../lib/modeRuntime.js';
-import { resolveMode } from 'shared/theme';
+import { resolveMode, resolveShape } from 'shared/theme';
 
 export const PREVIEW_STYLE_ID = 'admin-theme-preview';
 
 let savedTexture = null;
 let savedMode = null;
+let savedPresetTheme = null;
+let savedMotifSet = null;
 
 /**
  * Apply a candidate config/theme document to the live page.
@@ -34,11 +38,16 @@ export function applyThemePreview(themeDoc) {
     document.head.appendChild(styleEl);
     savedTexture = document.documentElement.dataset.texture ?? null;
     savedMode = document.documentElement.dataset.mode ?? null;
+    savedPresetTheme = document.documentElement.dataset.theme ?? null;
+    savedMotifSet = document.documentElement.dataset.motifSet ?? null;
   }
   styleEl.textContent = buildRuntimeThemeCss(themeDoc);
-  if (typeof themeDoc?.texture === 'string' && themeDoc.texture) {
-    document.documentElement.dataset.texture = themeDoc.texture;
-  }
+  const shape = resolveShape(themeDoc);
+  if (shape.texture) document.documentElement.dataset.texture = shape.texture;
+  const { theme, motifSet } = resolveRootAttributes(themeDoc);
+  if (theme) document.documentElement.dataset.theme = theme;
+  else delete document.documentElement.dataset.theme;
+  document.documentElement.dataset.motifSet = motifSet;
   // The mode policy previews too: picking "Always dark" has to show the dark
   // palette, not just save it.
   if (typeof themeDoc?.mode === 'string' && themeDoc.mode) {
@@ -56,5 +65,15 @@ export function clearThemePreview() {
   if (savedMode !== null) {
     applyMode(savedMode);
     savedMode = null;
+  }
+  if (savedPresetTheme !== null) {
+    document.documentElement.dataset.theme = savedPresetTheme;
+    savedPresetTheme = null;
+  } else {
+    delete document.documentElement.dataset.theme;
+  }
+  if (savedMotifSet !== null) {
+    document.documentElement.dataset.motifSet = savedMotifSet;
+    savedMotifSet = null;
   }
 }

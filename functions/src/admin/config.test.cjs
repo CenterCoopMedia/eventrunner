@@ -10,6 +10,7 @@ const {
   createUpdateBadgesHandler,
   internals: { applyConfigWrite, findReadOnlyViolations },
 } = require('./config.cjs');
+const { resolveLegacyColors, THEME_COLOR_KEYS } = require('shared/theme');
 
 // ---------------------------------------------------------------- fixtures
 
@@ -313,14 +314,17 @@ test('a valid theme write lands with stamps, audit row, and admin log', async ()
   assert.deepEqual(res.body, { docPath: 'config/theme' });
 
   const written = deps.db.docs.get('config/theme');
-  assert.deepEqual(written.colors, validTheme().colors);
+  // Publish MATERIALIZES the resolved legacy colors map (design brief §5.2),
+  // so what lands is the resolver's answer, not the payload verbatim: three
+  // digit hex arrives expanded to six, which is the form email and PDF read.
+  assert.deepEqual(written.colors, { primary: hex('112233'), accent: hex('aabbcc') });
   assert.equal('legacy' in written.colors, false, 'replace semantics: removed fields go away');
   assert.deepEqual(written.updatedAt, new Date(NOW));
   assert.equal(written.updatedBy, ADMIN_EMAIL);
 
   const [history] = deps.db.rows('cmsVersionHistory');
   assert.equal(history.docPath, 'config/theme');
-  assert.deepEqual(history.fields.colors, validTheme().colors);
+  assert.deepEqual(history.fields.colors, written.colors);
   assert.equal(history.updatedBy, ADMIN_EMAIL);
 
   const [log] = deps.db.rows('admin_logs');
@@ -331,6 +335,57 @@ test('a valid theme write lands with stamps, audit row, and admin log', async ()
     email: ADMIN_EMAIL,
     at: new Date(NOW),
   });
+});
+
+test('a preset-only theme publishes with a full colors map', async () => {
+  // Design brief §5.2. email/render.cjs and schedule/pdf.cjs render outside a
+  // browser and read config/theme.colors directly. A client who runs a preset
+  // with no overrides stores no colors, so publish resolves the preset down
+  // to the legacy map and writes it in — otherwise those two consumers would
+  // render from nothing.
+  const deps = makeDeps();
+  const res = makeRes();
+  await createUpdateThemeHandler(deps)(makeReq({ theme: { preset: 'zine', colors: {} } }), res);
+
+  assert.equal(res.statusCode, 200);
+  const written = deps.db.docs.get('config/theme');
+  assert.deepEqual(written.colors, resolveLegacyColors({ preset: 'zine' }));
+  assert.deepEqual(Object.keys(written.colors).sort(), [...THEME_COLOR_KEYS].sort());
+  for (const value of Object.values(written.colors)) assert.match(value, /^#[0-9a-f]{6}$/);
+  assert.equal(written.preset, 'zine');
+});
+
+test('switching presets re-materializes the palette, never keeping the old one', async () => {
+  // For a preset document `colors` is an output. A stale map from the
+  // previous preset must not pin the new one.
+  const deps = makeDeps({ 'config/theme': { preset: 'zine', colors: resolveLegacyColors({ preset: 'zine' }) } });
+  const res = makeRes();
+  await createUpdateThemeHandler(deps)(
+    makeReq({ theme: { preset: 'atlas', colors: resolveLegacyColors({ preset: 'zine' }) } }),
+    res,
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(
+    deps.db.docs.get('config/theme').colors,
+    resolveLegacyColors({ preset: 'atlas' }),
+  );
+});
+
+test('a contrast failure on a defined pair is a publish error, not a warning', async () => {
+  // Design brief §5.2: the rejection names the pair, the mode, and the
+  // measured ratio. A draft may hold a failing value; a published document
+  // may not.
+  const deps = makeDeps();
+  const res = makeRes();
+  await createUpdateThemeHandler(deps)(
+    makeReq({ theme: { colors: { ink: hex('999999'), surface: hex('aaaaaa'), surfaceAlt: hex('b0b0b0') } } }),
+    res,
+  );
+
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /ink on surface in light mode is 1\.\d\d:1, below the 4\.5:1 bar/);
+  assert.equal(deps.db.docs.has('config/theme'), false, 'nothing was written');
 });
 
 test('client-supplied updatedAt/updatedBy are stripped, not trusted', async () => {

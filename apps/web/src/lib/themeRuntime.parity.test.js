@@ -14,14 +14,19 @@ import * as sharedTheme from 'shared/theme';
 import * as generatorTheme from '../../../../scripts/lib/theme.cjs';
 import {
   DEFAULT_MODE_POLICY,
+  DEFAULT_PRESET_ID,
   FONT_SET_IDS,
+  FONT_SET_STACKS,
   MODE_POLICY_IDS,
+  MOTIF_SET_IDS,
+  PRESET_IDS,
   RADIUS_IDS,
   THEME_COLOR_KEYS,
   THEME_COLOR_PROPERTIES,
   THEME_FONT_ROLES,
   TEXTURE_IDS,
 } from './themeRuntime.js';
+import motifs from '../../../../design/tokens/motifs.json';
 
 const { FONT_SETS, RADIUS_SCALES, CSS_VARIABLE_STEM } =
   generatorTheme.default ?? generatorTheme;
@@ -49,6 +54,16 @@ describe('theme vocabulary parity: browser against the shared schema', () => {
   it('edits exactly the color roles the server accepts', () => {
     expect([...THEME_COLOR_KEYS].sort()).toEqual([...sharedTheme.THEME_COLOR_KEYS].sort());
   });
+
+  it('offers exactly the presets and motif sets the server accepts', () => {
+    // A picker that offered a seventh preset would let an operator save a
+    // value updateTheme rejects; one that offered fewer would hide a look
+    // the system can render.
+    expect([...PRESET_IDS]).toEqual([...sharedTheme.THEME_PRESET_IDS]);
+    expect(PRESET_IDS).toContain(DEFAULT_PRESET_ID);
+    expect(DEFAULT_PRESET_ID).toBe(sharedTheme.DEFAULT_PRESET_ID);
+    expect([...MOTIF_SET_IDS]).toEqual([...sharedTheme.THEME_MOTIF_SET_IDS]);
+  });
 });
 
 describe('theme vocabulary parity: browser against the token generator', () => {
@@ -58,6 +73,22 @@ describe('theme vocabulary parity: browser against the token generator', () => {
 
   it('names the same radius scale the generator can emit', () => {
     expect([...RADIUS_IDS].sort()).toEqual(Object.keys(RADIUS_SCALES).sort());
+  });
+
+  it('resolves every bundled set to a stack on both sides', () => {
+    // The browser holds stacks only; the generator holds the family, the
+    // stack, and the files. The stacks must agree exactly, or a runtime
+    // override would swap a role onto a family the stylesheet never
+    // declared an @font-face for.
+    for (const setId of FONT_SET_IDS) {
+      expect(FONT_SETS[setId].stack, setId).toBe(FONT_SET_STACKS[setId]);
+    }
+  });
+
+  it('mirrors the motif sets declared in the token JSON', () => {
+    // design/tokens/motifs.json is the source of truth for the sets; the
+    // browser list is what the editor's motif control offers.
+    expect([...MOTIF_SET_IDS].sort()).toEqual(Object.keys(motifs.sets).sort());
   });
 
   it('overrides the same custom properties the generator writes', () => {

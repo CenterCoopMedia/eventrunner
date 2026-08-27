@@ -20,7 +20,7 @@ import {
   theme as snapshotTheme,
 } from '@generated/eventConfig.js';
 import { subscribeConfigDoc } from '../lib/configSource.js';
-import { buildRuntimeThemeCss } from '../lib/themeRuntime.js';
+import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeRuntime.js';
 import { startModeSync } from '../lib/modeRuntime.js';
 
 const EventConfigContext = createContext(null);
@@ -140,6 +140,25 @@ export function EventConfigProvider({ children }) {
   useEffect(() => {
     document.documentElement.dataset.texture = value.theme.texture;
   }, [value.theme.texture]);
+
+  // Which preset, and which motif set (design brief §3.4, §3.8).
+  //
+  // Both are attributes for the same reason: a theme remaps custom
+  // properties, and a custom property cannot rewrite the asset a second
+  // custom property points at. The generated stylesheet carries one block
+  // per (data-theme, data-mode) pair and one per data-motif-set value, and
+  // these two attributes pick which block wins.
+  //
+  // A document that names no preset gets no data-theme attribute at all, so
+  // it keeps rendering the attribute-free baseline — which is exactly what
+  // it rendered before presets existed.
+  useEffect(() => {
+    const root = document.documentElement;
+    const { theme, motifSet } = resolveRootAttributes(value.theme);
+    if (theme) root.dataset.theme = theme;
+    else delete root.dataset.theme;
+    root.dataset.motifSet = motifSet;
+  }, [value.theme]);
 
   // Light or dark (design brief §3.3). config/theme.mode states the policy;
   // this writes data-mode on <html>, which is what picks between the two

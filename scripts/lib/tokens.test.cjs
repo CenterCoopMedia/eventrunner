@@ -9,14 +9,22 @@ const path = require('node:path');
 const {
   buildTokenCss,
   loadTokens,
+  resolveAdminTokens,
   resolveColorTokens,
   resolveFonts,
   modePolicy,
   TOKENS_DIR,
   TOKEN_FILES,
 } = require('./tokens.cjs');
-const { defaultTheme } = require('./theme.cjs');
-const { DARK_GROUND_RGB, THEME_FONT_ROLES } = require('shared/theme');
+const { defaultTheme, FONT_SETS } = require('./theme.cjs');
+const {
+  DARK_GROUND_RGB,
+  THEME_FONT_ROLES,
+  THEME_FONT_SET_IDS,
+  THEME_MOTIF_SET_IDS,
+  THEME_PRESET_IDS,
+  getPreset,
+} = require('shared/theme');
 
 const THEME = defaultTheme();
 
@@ -64,34 +72,52 @@ test('every color token resolves in both modes, and none is left behind in dark'
 });
 
 test('the seed palette spelling and the admin spelling both resolve', () => {
-  // The seed writes brandPrimary; the Branding tab writes primary.
-  const seeded = resolveColorTokens(THEME, loadTokens());
-  const fromAdmin = resolveColorTokens(
-    { ...THEME, colors: { primary: THEME.colors.brandPrimary } },
-    loadTokens(),
-  );
+  // The seed writes brandPrimary; the Branding tab writes primary. Both
+  // reach the same token on a document that has no preset — the shape every
+  // deployment made before presets existed still has.
+  const legacy = { colors: { brandPrimary: THEME.colors.primary } };
+  const fromAdmin = { colors: { primary: THEME.colors.primary } };
   assert.equal(
-    fromAdmin.values.light['--brand-primary-rgb'],
-    seeded.values.light['--brand-primary-rgb'],
+    resolveColorTokens(legacy, loadTokens()).values.light['--brand-primary-rgb'],
+    resolveColorTokens(fromAdmin, loadTokens()).values.light['--brand-primary-rgb'],
   );
 });
 
-test('a color the document does not carry emits no token at all', () => {
-  const { names } = resolveColorTokens({ ...THEME, colors: {} }, loadTokens());
+test('a document with no preset and no colors emits no color token at all', () => {
+  const { names } = resolveColorTokens({ colors: {} }, loadTokens());
   assert.deepEqual(names, []);
 });
 
+test('naming a preset is enough: the palette needs no stored colors', () => {
+  // Brief §5.2. A client who runs a preset with no overrides stores no
+  // colors, and the stylesheet must still be complete.
+  const { names, values } = resolveColorTokens({ preset: 'zine' }, loadTokens());
+  assert.ok(names.length > 20);
+  const zine = getPreset('zine');
+  assert.equal(values.light['--brand-surface-rgb'], zine.palette.light.surface.join(' '));
+  assert.equal(values.dark['--brand-surface-rgb'], zine.palette.dark.surface.join(' '));
+});
+
+test('for a preset document, stored colors are an output and never an input', () => {
+  // Otherwise a stale colors map from the previous preset would pin the new
+  // one, and switching presets would do nothing (brief §5.2).
+  const stale = { preset: 'atlas', colors: { surface: `#${'ff00ff'}` } };
+  const { values } = resolveColorTokens(stale, loadTokens());
+  assert.equal(values.light['--brand-surface-rgb'], getPreset('atlas').palette.light.surface.join(' '));
+});
+
 test('a document from before the data role still resolves every font role', () => {
-  const legacy = { fonts: { heading: 'serif-editorial', body: 'sans-humanist', accent: 'script-casual' } };
-  const { stacks, families } = resolveFonts(legacy);
+  const legacy = { fonts: { heading: 'serif-editorial', body: 'sans-humanist' } };
+  const { stacks, faces } = resolveFonts(legacy);
   // Only the roles the document names resolve to a stack here.
   assert.deepEqual(Object.keys(stacks).sort(), ['body', 'heading']);
-  // The retired accent set is not requested by any live role, so its file
-  // is not pulled into the build.
-  assert.deepEqual(families.map((f) => f.family).sort(), ['Source Sans 3', 'Source Serif 4']);
+  assert.deepEqual(
+    [...new Set(faces.map((f) => f.family))].sort(),
+    ['Source Sans 3', 'Source Serif 4'],
+  );
 
   // The alias list covers the rest, so the stylesheet still defines all four.
-  const css = buildTokenCss({ ...THEME, ...legacy });
+  const css = buildTokenCss(legacy);
   for (const role of THEME_FONT_ROLES) {
     assert.match(css, new RegExp(`--font-${role}:`), `--font-${role} is defined`);
   }
@@ -118,7 +144,7 @@ test('the stylesheet carries a baseline, both mode blocks, and no hex', () => {
   assert.match(css, /--text-nameplate: clamp\(/);
   assert.match(css, /--space-3xl: var\(--er-space-3xl\);/);
   assert.match(css, /--motif-set: none;/);
-  assert.match(css, /--font-accent: var\(--font-heading\);/);
+  assert.doesNotMatch(css, /--font-accent/, 'PR2 removed the retired role (brief §7)');
 });
 
 test("a light deployment gets no first-paint override; dark and system do", () => {
@@ -131,4 +157,173 @@ test("a light deployment gets no first-paint override; dark and system do", () =
   const system = buildTokenCss({ ...THEME, mode: 'system' });
   assert.match(system, /@media \(prefers-color-scheme: dark\) \{/);
   assert.match(system, /:root:not\(\[data-mode\]\) \{/);
+});
+
+
+// ------------------------------------------------------- presets (brief §4)
+
+test('every preset gets a block per mode, and none introduces a property name', () => {
+  const css = buildTokenCss(THEME);
+  const baseline = new Set(
+    [...css.matchAll(/(--[\w-]+):/g)].map((m) => m[1]),
+  );
+  for (const id of THEME_PRESET_IDS) {
+    for (const mode of ['light', 'dark']) {
+      const block = new RegExp(`:root\\[data-theme='${id}'\\]\\[data-mode='${mode}'\\] \\{([^}]*)\\}`);
+      const found = css.match(block);
+      assert.ok(found, `${id} has a ${mode} block`);
+      const names = [...found[1].matchAll(/(--[\w-]+):/g)].map((m) => m[1]);
+      assert.ok(names.length > 20, `${id} ${mode} is not nearly empty`);
+      for (const name of names) {
+        assert.ok(baseline.has(name), `${name} is already declared: a theme remaps, never adds`);
+      }
+    }
+  }
+});
+
+test("the active preset's block carries this deployment's overrides", () => {
+  // A [data-theme][data-mode] block outranks the attribute-free baselines,
+  // so the active pair has to carry the same resolved palette they do.
+  const override = `#${'123456'}`;
+  const css = buildTokenCss({ preset: 'civic', tokens: { light: { surface: override } } });
+  const active = css.match(/:root\[data-theme='civic'\]\[data-mode='light'\] \{([^}]*)\}/);
+  assert.match(active[1], /--brand-surface-rgb: 18 52 86;/);
+  // A preset that is not active keeps its own designed palette.
+  const other = css.match(/:root\[data-theme='atlas'\]\[data-mode='light'\] \{([^}]*)\}/);
+  assert.match(
+    other[1],
+    new RegExp(`--brand-surface-rgb: ${getPreset('atlas').palette.light.surface.join(' ')};`),
+  );
+});
+
+test('every option a preset offers remaps a token the contracts already declare', () => {
+  // Brief §3.4: an option remaps existing tier 2 and tier 3 tokens. It never
+  // adds a property name, never adds a class, never adds a component type.
+  const declared = new Set(
+    [...buildTokenCss(THEME).matchAll(/(--[\w-]+):/g)].map((m) => m[1]),
+  );
+  for (const id of THEME_PRESET_IDS) {
+    const preset = getPreset(id);
+    const remaps = [
+      ...Object.keys(preset.tokens || {}),
+      ...Object.values(preset.options || {}).flatMap(
+        (group) => group.choices.flatMap((choice) => Object.keys(choice.tokens || {})),
+      ),
+    ];
+    for (const name of remaps) {
+      assert.ok(declared.has(name), `${id} remaps ${name}, which no contract declares`);
+    }
+  }
+});
+
+test('every face a preset or an option names is a bundled set with a real file', () => {
+  for (const id of THEME_PRESET_IDS) {
+    const preset = getPreset(id);
+    const named = [
+      ...Object.values(preset.fonts || {}),
+      ...Object.values(preset.componentFonts || {}),
+      ...Object.values(preset.options || {}).flatMap(
+        (group) => group.choices.flatMap((choice) => Object.values(choice.fonts || {})),
+      ),
+    ];
+    for (const setId of named) {
+      assert.ok(THEME_FONT_SET_IDS.includes(setId), `${id} names the font set ${setId}`);
+      const set = FONT_SETS[setId];
+      assert.ok(set && set.faces.length > 0, `${setId} has at least one face`);
+      for (const face of set.faces) {
+        const file = path.join(
+          __dirname, '..', '..', 'apps', 'web', 'public', 'fonts', `${face.file}.woff2`,
+        );
+        assert.ok(fs.existsSync(file), `${face.file}.woff2 is bundled`);
+        assert.ok(
+          fs.statSync(file).size < 60 * 1024,
+          `${face.file}.woff2 subsets to a Latin woff2 under 60KB (brief §9, test 2)`,
+        );
+      }
+    }
+  }
+});
+
+test('a deployed site declares only the faces its active preset uses', () => {
+  // Brief §4: "A deployed site loads only the faces its active preset and
+  // its picked options use." A build that ships all 23 families to one event
+  // site fails review.
+  const css = buildTokenCss({ preset: 'zine' });
+  const families = [...css.matchAll(/font-family: '([^']+)'/g)].map((m) => m[1]).sort();
+  assert.deepEqual(families, [
+    // The Zine type map: one display face and one mono across three roles.
+    'Caveat', 'Fragment Mono',
+    // The two fixed admin faces, which every deployment ships.
+    'IBM Plex Mono', 'IBM Plex Mono',
+    'Karrik', 'Source Sans 3',
+  ].sort());
+  assert.doesNotMatch(css, /Overpass|Merriweather|Fraunces|Besley/);
+});
+
+test('a picked heading option changes the face and the file that ships', () => {
+  const css = buildTokenCss({ preset: 'zine', optionPicks: { headingFace: 'avara' } });
+  assert.match(css, /--font-heading: 'Avara'/);
+  assert.match(css, /src: url\('\/fonts\/avara-latin\.woff2'\)/);
+  assert.doesNotMatch(css, /karrik-latin/);
+});
+
+// ------------------------------------------------- the admin set (brief §8.2)
+
+test('the admin set is emitted once per mode and never inside a theme block', () => {
+  const css = buildTokenCss(THEME);
+  const { names } = resolveAdminTokens(THEME, loadTokens());
+  assert.ok(names.length > 20, 'the admin set is not nearly empty');
+  for (const name of names) {
+    const occurrences = [...css.matchAll(new RegExp(`${name}:`, 'g'))].length;
+    assert.equal(occurrences, 2, `${name} is declared once per mode, not once per theme`);
+  }
+  // The mechanical statement of "the admin ignores data-theme".
+  for (const block of css.matchAll(/:root\[data-theme='[\w-]+'\]\[data-mode='\w+'\] \{([^}]*)\}/g)) {
+    assert.doesNotMatch(block[1], /--admin-/, 'no admin token rides a theme block');
+  }
+});
+
+test('the client accent falls back to the admin ink when it cannot be read', () => {
+  // Admin story part 6f: never clamp, never render an invisible marker.
+  const unreadable = buildTokenCss({ ...THEME, adminAccent: `#${'ebe8e3'}` });
+  const light = unreadable.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
+  assert.match(light[1], /--admin-client-accent-rgb: 28 27 25;/);
+
+  const readable = buildTokenCss({ ...THEME, adminAccent: `#${'1a5296'}` });
+  const ok = readable.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
+  assert.match(ok[1], /--admin-client-accent-rgb: 26 82 150;/);
+});
+
+// ------------------------------------------------ the motif layer (brief §3.8)
+
+test('every motif set gets a slot-resolution block, and its assets exist', () => {
+  const css = buildTokenCss(THEME);
+  const { motifs } = loadTokens();
+  assert.deepEqual(Object.keys(motifs.sets).sort(), [...THEME_MOTIF_SET_IDS].sort());
+  for (const [setId, set] of Object.entries(motifs.sets)) {
+    const block = css.match(new RegExp(`:root\\[data-motif-set='${setId}'\\] \\{([^}]*)\\}`));
+    assert.ok(block, `${setId} has a slot-resolution block`);
+    assert.match(block[1], new RegExp(`--motif-set: ${setId};`));
+    for (const slot of motifs.slots) {
+      assert.match(block[1], new RegExp(`--motif-${slot}:`), `${setId} resolves ${slot}`);
+      const asset = set.slots[slot];
+      if (!asset) continue;
+      const file = path.join(
+        __dirname, '..', '..', 'apps', 'web', 'public', 'motifs', set.assetDir, asset,
+      );
+      assert.ok(fs.existsSync(file), `${setId}/${asset} is shipped`);
+      const svg = fs.readFileSync(file, 'utf8');
+      // A motif inherits theme ink and carries no color of its own (§2.3).
+      assert.doesNotMatch(svg, /#[0-9a-fA-F]{3,8}\b/, `${setId}/${asset} carries no color literal`);
+      assert.doesNotMatch(svg, /rgb\(/, `${setId}/${asset} carries no color literal`);
+    }
+  }
+});
+
+test('a preset that ships a motif set on gets it as the baseline too', () => {
+  const css = buildTokenCss({ preset: 'field-guide' });
+  assert.match(css, /--motif-set: botanical;/);
+  assert.match(css, /--motif-nameplate-mark: url\('\/motifs\/botanical\/nameplate-mark\.svg'\);/);
+  // A client may switch a set or turn motifs off (brief §3.8).
+  assert.match(buildTokenCss({ preset: 'field-guide', motifSet: 'none' }), /--motif-set: none;/);
 });

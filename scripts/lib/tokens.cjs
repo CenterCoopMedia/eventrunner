@@ -12,13 +12,14 @@
  *
  *   design/tokens/*.json
  *      → scripts/lib/tokens.cjs        (this file)
- *      → config/theme                  (Firestore: palette, fonts, mode)
+ *      → config/theme                  (Firestore: preset, palette, fonts,
+ *                                       options, overrides, motif set, mode)
  *      → generated/theme.css           (build-time custom properties)
  *      → <style id="event-theme-runtime">   (runtime override)
- *      → data-theme + data-mode on <html>
+ *      → data-theme + data-mode + data-motif-set on <html>
  *      → tailwind.config.js maps utilities to var(--…)
  *
- * Two rules bind every value this file writes:
+ * Three rules bind every value this file writes:
  *
  *   1. Colors stay space-separated RGB triples, so Tailwind's
  *      `rgb(var(--…-rgb) / <alpha-value>)` utilities keep their opacity
@@ -26,6 +27,25 @@
  *   2. No hex literal appears in this source. `scripts/**` is not on the
  *      spec §7.6 allowlist, so every channel arrives as a number — from
  *      the token JSON (data, not linted source) or from `config/theme`.
+ *   3. Every resolution of `config/theme` down to a palette, a type map, or
+ *      an option pick runs through `packages/shared/src/theme.cjs`. That is
+ *      the ONE resolver (brief §5.2), shared with the browser runtime and
+ *      the publish path.
+ *
+ * WHICH FONTS SHIP. Brief §4: "A deployed site loads only the faces its
+ * active preset and its picked options use. The bundle lives in the repo. It
+ * never lands on a reader in full." So `@font-face` blocks are emitted for:
+ *
+ *   - the four font roles the ACTIVE `config/theme` resolves to, and
+ *   - the component-token faces that preset asks for (Zine's callout), and
+ *   - the two fixed admin faces, which every deployment ships because the
+ *     admin identity is not configurable (admin story part 6g).
+ *
+ * The other bundled families are never named in the stylesheet, so a browser
+ * never requests them. Switching `data-theme` at runtime swaps the PALETTE,
+ * which is what the dark-mode completeness test walks; the type map, the
+ * shape, and the faces follow the stored preset through this generator and
+ * through `buildRuntimeThemeCss`.
  */
 
 const fs = require('node:fs');
@@ -35,22 +55,31 @@ const {
   THEME_FONT_ROLES,
   THEME_MODES,
   THEME_MODE_POLICIES,
+  THEME_PRESET_IDS,
   DEFAULT_MODE_POLICY,
-  deriveDarkColors,
   deriveRuleColors,
-  canonicalColorKey,
+  getPreset,
+  themePresetId,
+  resolveAdminAccent,
+  resolveComponentFonts,
+  resolveFontRoles,
+  resolveMotifSet,
+  resolvePresetTokens,
+  resolveShape,
+  resolveThemePalettes,
   isRgb,
 } = require('shared/theme');
-const { FONT_SETS, RADIUS_SCALES, hexToRgb } = require('./theme.cjs');
+const { FONT_SETS, RADIUS_SCALES } = require('./theme.cjs');
 
 const TOKENS_DIR = path.resolve(__dirname, '..', '..', 'design', 'tokens');
 
-/** The four token files, in tier order. */
+/** The five token files, in tier order. */
 const TOKEN_FILES = Object.freeze({
   primitives: 'primitives.json',
   semantic: 'semantic.json',
   components: 'components.json',
   motifs: 'motifs.json',
+  admin: 'admin.json',
 });
 
 /** Tier 1 property prefix (brief §3.1: `--er-<family>-<step>`). */
@@ -63,7 +92,8 @@ const PRIMITIVE_PREFIX = '--er';
  * silently empty tier.
  *
  * @param {string} [dir] token directory, for tests
- * @returns {{ primitives: object, semantic: object, components: object, motifs: object }}
+ * @returns {{ primitives: object, semantic: object, components: object,
+ *             motifs: object, admin: object }}
  */
 function loadTokens(dir = TOKENS_DIR) {
   const loaded = {};
@@ -95,39 +125,26 @@ function triple(rgb) {
 }
 
 /**
- * The light palette from `config/theme.colors`, as RGB triples, keyed by
- * canonical role. A color the document does not carry, or carries
- * malformed, is left out — the token that reads it is then not emitted at
- * all, exactly as before this change.
- *
- * Both stored spellings resolve here: the seed path writes `brandPrimary`,
- * the admin Branding tab writes `primary`, and `canonicalColorKey` folds
- * them together.
- *
- * @param {object} theme
- * @returns {Record<string, number[]>}
+ * @param {object} primitives primitives.json
+ * @param {string} ref `family.step`
+ * @returns {number[]|null}
  */
-function lightPalette(theme) {
-  const palette = {};
-  for (const [key, hex] of Object.entries(theme?.colors || {})) {
-    const rgb = hexToRgb(hex);
-    if (rgb) palette[canonicalColorKey(key)] = rgb;
-  }
-  return palette;
+function primitiveColor(primitives, ref) {
+  const [family, step] = String(ref).split('.');
+  const rgb = primitives?.color?.[family]?.[step];
+  return isRgb(rgb) ? rgb : null;
 }
 
 /**
- * Resolve every color token, for both modes.
+ * Resolve every tier 2 and tier 3 color token, for both modes, from one
+ * pair of palettes.
  *
- * @param {object} theme config/theme
+ * @param {{ light: Record<string, number[]>, dark: Record<string, number[]> }} palettes
  * @param {object} tokens loadTokens() result
  * @returns {{ names: string[], values: Record<string, Record<string, string>> }}
  *   `values[mode][token]` is the CSS value to write.
  */
-function resolveColorTokens(theme, tokens) {
-  const palettes = { light: lightPalette(theme) };
-  palettes.dark = deriveDarkColors(palettes.light);
-
+function colorTokensFromPalettes(palettes, tokens) {
   const rules = {};
   for (const mode of THEME_MODES) {
     const { ink, surface } = palettes[mode];
@@ -146,7 +163,7 @@ function resolveColorTokens(theme, tokens) {
 
   for (const [name, spec] of tokenEntries(tokens.semantic.color)) {
     if (spec.themeKey) {
-      if (!isRgb(palettes.light[spec.themeKey])) continue;
+      if (!isRgb(palettes.light[spec.themeKey]) || !isRgb(palettes.dark[spec.themeKey])) continue;
       record(name, {
         light: triple(palettes.light[spec.themeKey]),
         dark: triple(palettes.dark[spec.themeKey]),
@@ -179,48 +196,149 @@ function resolveColorTokens(theme, tokens) {
 }
 
 /**
- * @param {object} primitives primitives.json
- * @param {string} ref `family.step`
- * @returns {number[]|null}
+ * The color tokens for one `config/theme` document — its preset, its stored
+ * palette, and its per-mode overrides, resolved through the shared resolver.
+ *
+ * @param {object} theme config/theme
+ * @param {object} tokens loadTokens() result
  */
-function primitiveColor(primitives, ref) {
-  const [family, step] = String(ref).split('.');
-  const rgb = primitives?.color?.[family]?.[step];
-  return isRgb(rgb) ? rgb : null;
+function resolveColorTokens(theme, tokens) {
+  return colorTokensFromPalettes(resolveThemePalettes(theme), tokens);
 }
 
 /**
- * The font stack for each role the document actually names.
+ * The `admin-*` color tokens, per mode (admin story part 6).
  *
- * A role the document leaves out is NOT resolved here. It falls through to
- * the alias list in `semantic.json` instead — `--font-data` follows
- * `--font-body`, `--font-mono` follows `--font-data` — so a deployment made
- * before the data and mono roles existed still resolves every role, and a
- * runtime override of one role carries to the roles that follow it.
+ * The client accent is the only client-owned value in the set, and it
+ * carries a legibility floor: when the resolved accent fails 3:1 against
+ * `--admin-ground` in a mode, that mode falls back to `--admin-ink`. The
+ * fallback is per mode, because an accent can read on one ground and not on
+ * the other.
  *
- * @param {object} theme
- * @returns {{ stacks: Record<string, string>, families: Array<{family: string, fileBase: string}> }}
+ * @param {object} theme config/theme
+ * @param {object} tokens loadTokens() result
+ * @returns {{ names: string[], values: Record<string, Record<string, string>> }}
  */
-function resolveFonts(theme) {
-  const configured = theme?.fonts || {};
-  const stacks = {};
-  const families = [];
-  const seen = new Set();
-  for (const role of THEME_FONT_ROLES) {
-    const set = FONT_SETS[configured[role]];
-    if (!set) continue;
-    stacks[role] = set.stack;
-    if (set.fileBase && !seen.has(set.family)) {
-      seen.add(set.family);
-      families.push({ family: set.family, fileBase: set.fileBase });
+function resolveAdminTokens(theme, tokens) {
+  const admin = tokens.admin;
+  const names = [];
+  const values = { light: {}, dark: {} };
+
+  for (const [name, spec] of tokenEntries(admin.colors)) {
+    if (!isRgb(spec.light) || !isRgb(spec.dark)) continue;
+    names.push(name);
+    values.light[name] = triple(spec.light);
+    values.dark[name] = triple(spec.dark);
+  }
+
+  for (const [name, target] of tokenEntries(admin.aliases)) {
+    names.push(name);
+    for (const mode of THEME_MODES) {
+      const accent = resolveAdminAccent(theme, mode);
+      values[mode][name] = accent.rgb ? triple(accent.rgb) : `var(${target})`;
     }
   }
-  return { stacks, families };
+
+  for (const [name, target] of tokenEntries(admin.components)) {
+    names.push(name);
+    for (const mode of THEME_MODES) values[mode][name] = `var(${target})`;
+  }
+
+  return { names, values };
+}
+
+/**
+ * The font stacks each role resolves to, and the faces those stacks need.
+ *
+ * A role nothing names is NOT resolved here. It falls through to the alias
+ * list in `semantic.json` instead — `--font-data` follows `--font-body`,
+ * `--font-mono` follows `--font-data` — so a deployment made before the data
+ * and mono roles existed still resolves every role.
+ *
+ * @param {object} theme
+ * @returns {{ stacks: Record<string, string>,
+ *             componentStacks: Record<string, string>,
+ *             faces: Array<{family: string, file: string, weight: string}> }}
+ */
+function resolveFonts(theme) {
+  const stacks = {};
+  const componentStacks = {};
+  const faces = [];
+  const seenFiles = new Set();
+
+  const take = (setId) => {
+    const set = FONT_SETS[setId];
+    if (!set) return null;
+    for (const face of set.faces || []) {
+      if (seenFiles.has(face.file)) continue;
+      seenFiles.add(face.file);
+      faces.push({ family: set.family, file: face.file, weight: face.weight });
+    }
+    return set.stack;
+  };
+
+  const roles = resolveFontRoles(theme);
+  for (const role of THEME_FONT_ROLES) {
+    if (!roles[role]) continue;
+    const stack = take(roles[role]);
+    if (stack) stacks[role] = stack;
+  }
+
+  for (const [name, setId] of Object.entries(resolveComponentFonts(theme))) {
+    const stack = take(setId);
+    if (stack) componentStacks[name] = stack;
+  }
+
+  return { stacks, componentStacks, faces };
+}
+
+/**
+ * The two fixed admin faces. They ship on every deployment, whatever preset
+ * the client runs, because `--admin-font-*` is never writable from
+ * `config/theme` (admin story part 6g).
+ *
+ * @param {object} tokens loadTokens() result
+ * @returns {{ stacks: Record<string, string>,
+ *             faces: Array<{family: string, file: string, weight: string}> }}
+ */
+function resolveAdminFonts(tokens) {
+  const stacks = {};
+  const faces = [];
+  for (const [name, setId] of tokenEntries(tokens.admin.fonts)) {
+    const set = FONT_SETS[setId];
+    if (!set) continue;
+    stacks[name] = set.stack;
+    for (const face of set.faces || []) {
+      faces.push({ family: set.family, file: face.file, weight: face.weight });
+    }
+  }
+  return { stacks, faces };
 }
 
 /** The mode policy this document asks for (brief §3.3). */
 function modePolicy(theme) {
   return THEME_MODE_POLICIES.includes(theme?.mode) ? theme.mode : DEFAULT_MODE_POLICY;
+}
+
+/**
+ * One motif set's slot values (brief §3.8). A slot the set leaves empty
+ * resolves to `none`, so a component's mask-image simply paints nothing.
+ *
+ * @param {object} motifs motifs.json
+ * @param {string} setId
+ * @returns {Array<[string, string]>} property, value
+ */
+function motifSlotValues(motifs, setId) {
+  const set = motifs.sets?.[setId];
+  const lines = [['--motif-set', setId]];
+  for (const slot of motifs.slots || []) {
+    const asset = set?.slots?.[slot];
+    lines.push([
+      `--motif-${slot}`,
+      asset && set.assetDir ? `url('/motifs/${set.assetDir}/${asset}')` : 'none',
+    ]);
+  }
+  return lines;
 }
 
 /**
@@ -265,10 +383,14 @@ function rootBlock(theme, tokens) {
     push(`--rule-${weight}-width`, spec.width);
   }
 
-  const { stacks } = resolveFonts(theme);
+  const presetId = themePresetId(theme);
+  const preset = getPreset(presetId);
+  const { stacks, componentStacks } = resolveFonts(theme);
   group(
-    'Tier 2 — font roles (brief §3.2). config/theme.fonts names a bundled set id ' +
-    '(spec §7.4); the generator wrote the matching stacks.',
+    'Tier 2 — font roles (brief §3.2). The active preset\'s type map, then its ' +
+    'picked heading-face option, then any role config/theme.fonts names ' +
+    'outright — all resolved to a bundled set id (spec §7.4).' +
+    (preset ? ` Preset: ${preset.label}.` : ' No preset: config/theme.fonts only.'),
   );
   for (const role of THEME_FONT_ROLES) {
     if (stacks[role]) push(`--font-${role}`, stacks[role]);
@@ -279,19 +401,26 @@ function rootBlock(theme, tokens) {
     push(name, value);
   }
 
-  const radius = RADIUS_SCALES[theme?.radius] || RADIUS_SCALES.soft;
+  const shape = resolveShape(theme);
+  const radius = RADIUS_SCALES[shape.radius] || RADIUS_SCALES.soft;
   group(
-    `Tier 2 — radius scale: config/theme.radius = '${theme?.radius}'. ` +
-    "('sharp' → 0 / 2px, 'soft' → 8px / 16px, 'round' → 16px / 28px.)",
+    `Tier 2 — radius scale: '${shape.radius}'. ` +
+    "('sharp' → 0 / 2px, 'small' → 2px / 4px, 'soft' → 8px / 16px, 'round' → 16px / 28px.)",
   );
   push('--radius-base', radius.base);
   push('--radius-large', radius.large);
 
   group(
-    "Tier 2 — texture treatment: config/theme.texture = 'paper' | 'flat'. " +
+    "Tier 2 — texture treatment: 'paper' | 'flat'. " +
     'Components read this through the bg-paper utility layer in index.css.',
   );
-  push('--texture', theme?.texture);
+  push('--texture', shape.texture);
+
+  group(
+    "Tier 2 — density: 'tight' | 'comfortable' | 'loose' (brief §4). The preset " +
+    'states its own; a page may still set its own layout density in PR3.',
+  );
+  push('--density', shape.density);
 
   group('Tier 2 — motion (brief §2.2). Functional 120–200ms; one signature under 600ms.');
   for (const [step, value] of tokenEntries(tokens.semantic.motion)) push(`--motion-${step}`, value);
@@ -299,17 +428,12 @@ function rootBlock(theme, tokens) {
   group('Tier 2 — named weights, so a component never writes a raw number.');
   for (const [step, value] of tokenEntries(tokens.semantic.weight)) push(`--weight-${step}`, value);
 
-  group('Motif layer (brief §3.8). PR1 ships the `none` set only.');
-  const setId = tokens.motifs.default;
-  const set = tokens.motifs.sets?.[setId];
-  push('--motif-set', setId);
-  for (const slot of tokens.motifs.slots || []) {
-    const asset = set?.slots?.[slot];
-    push(
-      `--motif-${slot}`,
-      asset && set.assetDir ? `url('/motifs/${set.assetDir}/${asset}')` : 'none',
-    );
-  }
+  const activeSet = resolveMotifSet(theme);
+  group(
+    `Motif layer (brief §3.8) — the active set, '${activeSet}', as the ` +
+    'attribute-free baseline. The [data-motif-set] blocks below carry every set.',
+  );
+  for (const [name, value] of motifSlotValues(tokens.motifs, activeSet)) push(name, value);
 
   for (const [component, contract] of tokenEntries(tokens.components)) {
     const nonColor = tokenEntries(contract).filter(([name]) => !name.endsWith('-rgb'));
@@ -318,11 +442,30 @@ function rootBlock(theme, tokens) {
     for (const [name, value] of nonColor) push(name, value);
   }
 
+  const presetTokens = resolvePresetTokens(theme);
+  if (Object.keys(presetTokens).length > 0 || Object.keys(componentStacks).length > 0) {
+    group(
+      `Preset remaps — ${preset ? preset.label : 'none'} and its picked options. ` +
+      'An option remaps existing tier 2 and tier 3 tokens and never adds a ' +
+      'property name (brief §3.4), so every name here is declared above.',
+    );
+    for (const [name, value] of Object.entries(presetTokens)) push(name, value);
+    for (const [name, value] of Object.entries(componentStacks)) push(name, value);
+  }
+
+  const adminFonts = resolveAdminFonts(tokens);
+  group(
+    'Admin identity — fixed type and shape (admin story part 6g). Never ' +
+    'writable from config/theme: the pairing is the identity.',
+  );
+  for (const [name, value] of Object.entries(adminFonts.stacks)) push(name, value);
+  for (const [name, value] of tokenEntries(tokens.admin.scalars)) push(name, value);
+
   return lines;
 }
 
 /**
- * One mode's color block.
+ * One block of custom properties.
  *
  * @param {string} selector
  * @param {string[]} names token order
@@ -352,6 +495,11 @@ function colorBlock(selector, names, values, comment) {
  * the runtime writes the attribute. Once the attribute lands the block
  * stops matching.
  *
+ * On top of that, PR2 emits one block per (preset, mode) pair (brief §3.4),
+ * one block per motif set (brief §3.8), and the `admin-*` set once per mode
+ * — never once per (theme, mode) pair, which is the mechanical statement of
+ * "the admin ignores data-theme" (brief §8.2).
+ *
  * @param {object} theme config/theme
  * @param {{ tokensDir?: string }} [options]
  * @returns {string}
@@ -360,6 +508,7 @@ function buildTokenCss(theme, { tokensDir } = {}) {
   const tokens = loadTokens(tokensDir);
   const { names, values } = resolveColorTokens(theme, tokens);
   const policy = modePolicy(theme);
+  const activePreset = themePresetId(theme);
 
   const lines = [];
   lines.push(':root {');
@@ -392,9 +541,7 @@ function buildTokenCss(theme, { tokensDir } = {}) {
         ":root[data-mode='dark']",
         names,
         values.dark,
-        'Dark palette (brief §3.3). Its own palette, never light mode reversed: a ' +
-        'designed neutral ground with the brand colors lifted until they clear the ' +
-        'contrast bar on it.',
+        'Dark palette (brief §3.3). Its own palette, never light mode reversed.',
       ),
     );
 
@@ -418,20 +565,102 @@ function buildTokenCss(theme, { tokensDir } = {}) {
       );
       lines.push('}');
     }
+
+    // One block per (preset, mode) pair (brief §3.4). The ACTIVE preset's
+    // pair carries this deployment's resolved palette — its stored colors
+    // and its per-mode overrides — because a [data-theme][data-mode] block
+    // outranks the attribute-free baselines above and would otherwise undo
+    // them. Every other preset carries its own designed palette.
+    lines.push('');
+    lines.push('/* Theme presets (brief §3.4, §4). A theme remaps the same custom');
+    lines.push('   properties: no block below introduces a property name the blocks');
+    lines.push('   above do not already carry. data-theme picks which one wins. */');
+    for (const id of THEME_PRESET_IDS) {
+      const preset = id === activePreset
+        ? { names, values }
+        : colorTokensFromPalettes(getPreset(id).palette, tokens);
+      for (const mode of THEME_MODES) {
+        lines.push('');
+        lines.push(
+          ...colorBlock(
+            `:root[data-theme='${id}'][data-mode='${mode}']`,
+            preset.names,
+            preset.values[mode],
+            `${getPreset(id).label} — ${mode}` +
+            (id === activePreset ? ', the active preset, with this deployment\'s overrides.' : '.'),
+          ),
+        );
+      }
+    }
   }
 
-  const { families } = resolveFonts(theme);
-  if (families.length > 0) {
+  // The admin set, emitted ONCE PER MODE. It never appears inside a
+  // [data-theme] block, and that is the testable form of "the admin ignores
+  // data-theme" (admin story part 6, brief §8.2).
+  const adminTokens = resolveAdminTokens(theme, tokens);
+  if (adminTokens.names.length > 0) {
+    lines.push('');
+    lines.push(
+      ...colorBlock(
+        ":root,\n:root[data-mode='light']",
+        adminTokens.names,
+        adminTokens.values.light,
+        'Admin identity — light (admin story part 6). Emitted once per mode, never ' +
+        'once per theme: the admin obeys data-mode and ignores data-theme.',
+      ),
+    );
+    lines.push('');
+    lines.push(
+      ...colorBlock(
+        ":root[data-mode='dark']",
+        adminTokens.names,
+        adminTokens.values.dark,
+        'Admin identity — dark, the night side. Authored value by value.',
+      ),
+    );
+  }
+
+  // One block per motif set (brief §3.8). A custom property cannot rewrite
+  // the asset a second custom property points at, so the set switch is an
+  // attribute, exactly like data-theme and data-mode.
+  const setIds = Object.keys(tokens.motifs.sets || {});
+  if (setIds.length > 0) {
+    lines.push('');
+    lines.push('/* Motif sets (brief §3.8). Each block resolves every slot token to that');
+    lines.push('   set\'s asset. Render a slot as a mask-image painted with');
+    lines.push('   background-color: rgb(var(--color-ink-motif-rgb)), or inline the SVG as a');
+    lines.push('   symbol reading currentColor. Never an <img>, never a url() fill. */');
+    for (const setId of setIds) {
+      const slots = motifSlotValues(tokens.motifs, setId);
+      lines.push('');
+      lines.push(`:root[data-motif-set='${setId}'] {`);
+      for (const [name, value] of slots) lines.push(`  ${name}: ${value};`);
+      lines.push('}');
+    }
+  }
+
+  const { faces } = resolveFonts(theme);
+  const adminFaces = resolveAdminFonts(tokens).faces;
+  const seen = new Set();
+  const shipped = [];
+  for (const face of [...faces, ...adminFaces]) {
+    if (seen.has(face.file)) continue;
+    seen.add(face.file);
+    shipped.push(face);
+  }
+  if (shipped.length > 0) {
     lines.push('');
     lines.push('/* Self-hosted font faces (spec §7.4): woff2 only, no font CDN at runtime.');
-    lines.push('   Files live in apps/web/public/fonts/. */');
-    for (const { family, fileBase } of families) {
+    lines.push('   Files live in apps/web/public/fonts/. Only the ACTIVE preset\'s picked');
+    lines.push('   faces plus the two fixed admin faces are declared here, so a reader');
+    lines.push('   downloads what this deployment uses and nothing else (brief §4). */');
+    for (const { family, file, weight } of shipped) {
       lines.push('@font-face {');
       lines.push(`  font-family: '${family}';`);
       lines.push('  font-style: normal;');
-      lines.push('  font-weight: 400 700;');
+      lines.push(`  font-weight: ${weight};`);
       lines.push('  font-display: swap;');
-      lines.push(`  src: url('/fonts/${fileBase}.woff2') format('woff2');`);
+      lines.push(`  src: url('/fonts/${file}.woff2') format('woff2');`);
       lines.push('}');
     }
   }
@@ -443,9 +672,11 @@ module.exports = {
   buildTokenCss,
   loadTokens,
   resolveColorTokens,
+  resolveAdminTokens,
   resolveFonts,
+  resolveAdminFonts,
   modePolicy,
   TOKENS_DIR,
   TOKEN_FILES,
-  internals: { lightPalette, tokenEntries, primitiveColor },
+  internals: { tokenEntries, primitiveColor, colorTokensFromPalettes, motifSlotValues },
 };

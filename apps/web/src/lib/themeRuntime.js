@@ -1,4 +1,4 @@
-// Runtime theme CSS builder (spec §7.2, design brief §3.3 and §3.6).
+// Runtime theme CSS builder (spec §7.2, design brief §3.3, §3.6, §4, §5.2).
 //
 // config/theme arrives from Firestore carrying hex color strings as DATA.
 // This module converts them to the same space-separated RGB triples the
@@ -9,28 +9,52 @@
 // included. No color literals appear in this source file (spec §7.6); every
 // value is computed from incoming data.
 //
-// This is the ONE runtime builder (brief §3.6). It now writes mode-scoped
-// blocks, because every color token is defined per mode. Overrides may
-// arrive in either shape:
+// This is the ONE runtime builder (brief §3.6), and it leans on the ONE
+// resolver in shared/theme (brief §5.2). It never decides what a preset
+// means; it asks. What it owns is turning that answer into CSS text.
 //
-//   colors: { primary: '#…', … }                 one palette (the shape
-//                                                 every stored document has
-//                                                 today). The dark values
-//                                                 are derived from it.
-//   colors: { light: { … }, dark: { … } }        per-mode overrides. Dark
-//                                                 starts from the derivation
-//                                                 and the named tokens win,
-//                                                 so a partial dark override
-//                                                 is enough.
+// What a document may say, and what wins:
+//
+//   preset          the base look. Its two authored palettes, its type map,
+//                   its shape, and its motif default (brief §4).
+//   optionPicks     which curated option is picked in each of that preset's
+//                   option groups. An option remaps existing tokens only.
+//   tokens          per-mode raw color overrides — the advanced path.
+//   colors          the legacy palette. For a PRESET document this is an
+//                   output, materialized on publish for email and PDF, and
+//                   the resolver ignores it on the way in. For a document
+//                   with no preset it is still the palette, exactly as
+//                   before, with the dark values derived from it.
+//   fonts           a role named outright, overriding the preset's type map.
+//   motifSet        which motif set data-motif-set switches to (brief §3.8).
+//   adminAccent     the one client-owned colour in the admin identity.
+//
+// SPECIFICITY. The generated stylesheet now carries one block per
+// (preset, mode) pair, and `:root[data-theme='zine'][data-mode='dark']` is
+// more specific than `:root[data-mode='dark']`. So each mode block below
+// names a `[data-theme]` selector too. Attribute-presence and
+// attribute-equals have the same specificity, so the two tie and this
+// element wins on document order — it is appended after the generated
+// stylesheet.
 import {
   THEME_MODES,
   THEME_MODE_POLICIES,
   THEME_FONT_ROLES,
   THEME_TEXTURES,
+  THEME_PRESET_IDS,
+  THEME_MOTIF_SET_IDS,
   DEFAULT_MODE_POLICY,
-  canonicalColorKey,
-  deriveDarkColors,
+  DEFAULT_PRESET_ID,
+  ADMIN_TOKEN_SET,
   deriveRuleColors,
+  resolveAdminAccent,
+  resolveComponentFonts,
+  resolveFontRoles,
+  resolveMotifSet,
+  resolvePresetTokens,
+  resolveShape,
+  resolveThemePalettes,
+  themePresetId,
 } from 'shared/theme';
 
 // config/theme.colors key → custom property it overrides.
@@ -73,11 +97,37 @@ const FONT_SETS = {
   'sans-humanist':
     "'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif",
   'script-casual': "'Caveat', 'Segoe Script', 'Bradley Hand', cursive",
+  'caslon-display':
+    "'Libre Caslon Display', 'Libre Caslon Text', Georgia, 'Times New Roman', serif",
+  'caslon-text': "'Libre Caslon Text', Georgia, 'Times New Roman', serif",
+  baskerville: "'Libre Baskerville', Baskerville, Georgia, 'Times New Roman', serif",
+  spectral: "'Spectral', 'Source Serif 4', Georgia, serif",
+  fraunces: "'Fraunces', 'Source Serif 4', Georgia, serif",
+  newsreader: "'Newsreader', 'Source Serif 4', Georgia, serif",
+  'plex-sans':
+    "'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif",
+  'plex-mono': "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  'archivo-condensed': "'Archivo Condensed', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif",
+  merriweather: "'Merriweather', Georgia, 'Times New Roman', serif",
+  'public-sans':
+    "'Public Sans', 'Helvetica Neue', Helvetica, Arial, ui-sans-serif, system-ui, sans-serif",
+  karrik: "'Karrik', 'Arial Black', Impact, sans-serif",
+  bagnard: "'Bagnard', Georgia, 'Times New Roman', serif",
+  avara: "'Avara', Georgia, 'Times New Roman', serif",
+  'fragment-mono': "'Fragment Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  besley: "'Besley', 'Clarendon', Georgia, 'Times New Roman', serif",
+  vollkorn: "'Vollkorn', Georgia, 'Times New Roman', serif",
+  overpass:
+    "'Overpass', 'Helvetica Neue', Helvetica, Arial, ui-sans-serif, system-ui, sans-serif",
+  'overpass-mono': "'Overpass Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  'libre-franklin':
+    "'Libre Franklin', 'Franklin Gothic', 'Helvetica Neue', Helvetica, Arial, sans-serif",
 };
 
 // config/theme.radius id → [--radius-base, --radius-large] (spec §7.2).
 const RADIUS_SCALES = {
   sharp: ['0px', '2px'],
+  small: ['2px', '4px'],
   soft: ['8px', '16px'],
   round: ['16px', '28px'],
 };
@@ -96,6 +146,8 @@ export const THEME_COLOR_KEYS = Object.freeze(Object.keys(COLOR_PROPS));
 export const THEME_COLOR_PROPERTIES = Object.freeze({ ...COLOR_PROPS });
 /** Bundled font-set ids (spec §7.4 allowlist). */
 export const FONT_SET_IDS = Object.freeze(Object.keys(FONT_SETS));
+/** Set id → the stack a role resolves to. Must match the generator's. */
+export const FONT_SET_STACKS = Object.freeze({ ...FONT_SETS });
 /** config/theme.fonts roles (brief §3.2). */
 export { THEME_FONT_ROLES };
 /** config/theme.radius ids. */
@@ -106,6 +158,12 @@ export const TEXTURE_IDS = Object.freeze([...THEME_TEXTURES]);
 export const MODE_POLICY_IDS = Object.freeze([...THEME_MODE_POLICIES]);
 /** The mode policy a document without a `mode` field renders as. */
 export { DEFAULT_MODE_POLICY };
+/** The six preset ids (brief §4). data-theme carries one of these. */
+export const PRESET_IDS = Object.freeze([...THEME_PRESET_IDS]);
+/** The preset a new deployment starts on. */
+export { DEFAULT_PRESET_ID };
+/** The motif sets data-motif-set switches between (brief §3.8). */
+export const MOTIF_SET_IDS = Object.freeze([...THEME_MOTIF_SET_IDS]);
 
 /**
  * Convert a hex color string (data from config/theme) to `[r, g, b]`.
@@ -184,45 +242,23 @@ function isPlainObject(v) {
 }
 
 /**
- * Read `config/theme.colors` in either shape into one palette per mode.
- *
- * @param {unknown} colors
- * @returns {{ light: Record<string, number[]>, dark: Record<string, number[]> }}
- */
-function readColorOverrides(colors) {
-  const palettes = { light: {}, dark: {} };
-  if (!isPlainObject(colors)) return palettes;
-
-  const perMode = isPlainObject(colors.light) || isPlainObject(colors.dark);
-  const lightSource = perMode ? colors.light : colors;
-  for (const [key, hex] of Object.entries(lightSource || {})) {
-    const channels = hexToChannels(hex);
-    if (channels) palettes.light[canonicalColorKey(key)] = channels;
-  }
-
-  // Dark starts from the same derivation the generator runs, so a document
-  // that names only one palette still restyles both modes.
-  palettes.dark = deriveDarkColors(palettes.light);
-  if (perMode) {
-    for (const [key, hex] of Object.entries(colors.dark || {})) {
-      const channels = hexToChannels(hex);
-      if (channels) palettes.dark[canonicalColorKey(key)] = channels;
-    }
-  }
-  return palettes;
-}
-
-/**
  * Build the override blocks for <style id="event-theme-runtime"> from a
- * config/theme document. Only properties the document validly specifies are
+ * config/theme document. Only properties the document validly resolves are
  * emitted — everything else keeps its build-time value from generated
  * theme.css. Returns '' when there is nothing to override.
  *
- * The light block carries two selectors. `:root` beats the generated
- * attribute-free baseline that first paint uses; `:root[data-mode='light']`
- * beats the generated light block once the runtime has written the
- * attribute. Both win on document order, because this element is appended
- * after the generated stylesheet.
+ * Each block names every selector it has to beat:
+ *
+ *   :root                                    the attribute-free baseline
+ *                                            first paint renders.
+ *   :root[data-mode='light'|'dark']          the generated mode block.
+ *   :root[data-theme][data-mode='…']         the generated (preset, mode)
+ *                                            block, which is more specific
+ *                                            than the one above it.
+ *
+ * All three are in one rule, so a single declaration list serves them and
+ * document order decides — this element is appended after the generated
+ * stylesheet.
  *
  * @param {object} themeDoc
  * @returns {string}
@@ -231,23 +267,52 @@ export function buildRuntimeThemeCss(themeDoc) {
   if (!isPlainObject(themeDoc)) return '';
 
   const rootLines = [];
-  const fonts = themeDoc.fonts || {};
+
+  // The type map: the preset's, then its picked heading-face option, then
+  // any role the document names outright. One resolver answers all three.
+  const roles = resolveFontRoles(themeDoc);
   for (const role of THEME_FONT_ROLES) {
-    const stack = FONT_SETS[fonts[role]];
+    const stack = FONT_SETS[roles[role]];
     if (stack) rootLines.push(`  --font-${role}: ${stack};`);
   }
+  // Component-token faces beyond the four roles. Zine's --callout-font is
+  // the only one at launch: a component token, not a fifth role.
+  for (const [name, setId] of Object.entries(resolveComponentFonts(themeDoc))) {
+    const stack = FONT_SETS[setId];
+    if (stack) rootLines.push(`  ${name}: ${stack};`);
+  }
 
-  const radius = RADIUS_SCALES[themeDoc.radius];
+  // A document that names no preset overrides only what it names outright,
+  // exactly as it did before presets existed: density and the motif-set
+  // record are a preset's to state, so they stay out of the block unless a
+  // preset or the document itself puts them there.
+  const presetId = themePresetId(themeDoc);
+  const shape = resolveShape(themeDoc);
+  const radius = RADIUS_SCALES[shape.radius];
   if (radius) {
     rootLines.push(`  --radius-base: ${radius[0]};`);
     rootLines.push(`  --radius-large: ${radius[1]};`);
   }
+  if (THEME_TEXTURES.includes(shape.texture)) {
+    rootLines.push(`  --texture: ${shape.texture};`);
+  }
+  if (presetId && shape.density) rootLines.push(`  --density: ${shape.density};`);
 
-  if (THEME_TEXTURES.includes(themeDoc.texture)) {
-    rootLines.push(`  --texture: ${themeDoc.texture};`);
+  // The preset's own token remaps, then the picked options'. Every name is
+  // a tier 2 or tier 3 token the generated stylesheet already declares: an
+  // option never adds a property name (brief §3.4).
+  for (const [name, value] of Object.entries(resolvePresetTokens(themeDoc))) {
+    rootLines.push(`  ${name}: ${value};`);
   }
 
-  const palettes = readColorOverrides(themeDoc.colors);
+  // The record of which motif set is active. It does NOT do the switching:
+  // data-motif-set on the root element does, against the [data-motif-set]
+  // blocks in the generated stylesheet (brief §3.8).
+  if (presetId || THEME_MOTIF_SET_IDS.includes(themeDoc.motifSet)) {
+    rootLines.push(`  --motif-set: ${resolveMotifSet(themeDoc)};`);
+  }
+
+  const palettes = resolveThemePalettes(themeDoc);
   const modeLines = { light: [], dark: [] };
   for (const mode of THEME_MODES) {
     const palette = palettes[mode];
@@ -260,16 +325,59 @@ export function buildRuntimeThemeCss(themeDoc) {
         modeLines[mode].push(`  ${prop}: ${rules[weight].join(' ')};`);
       }
     }
+    // The one client-owned colour in the admin identity, with its legibility
+    // floor applied per mode (admin story part 6f). A failing accent falls
+    // back to the admin ink; it is never clamped, and the editor states what
+    // it fell back to.
+    const accent = resolveAdminAccent(themeDoc, mode);
+    if (accent.rgb) {
+      modeLines[mode].push(`  --admin-client-accent-rgb: ${accent.rgb.join(' ')};`);
+    }
   }
 
   const blocks = [];
   if (rootLines.length > 0) blocks.push(`:root {\n${rootLines.join('\n')}\n}`);
-  if (modeLines.light.length > 0) {
-    blocks.push(`:root,\n:root[data-mode='light'] {\n${modeLines.light.join('\n')}\n}`);
-  }
-  if (modeLines.dark.length > 0) {
-    blocks.push(`:root[data-mode='dark'] {\n${modeLines.dark.join('\n')}\n}`);
+  for (const mode of THEME_MODES) {
+    if (modeLines[mode].length === 0) continue;
+    const selectors = mode === 'light'
+      ? [':root', ":root[data-mode='light']", ":root[data-theme][data-mode='light']"]
+      : [":root[data-mode='dark']", ":root[data-theme][data-mode='dark']"];
+    blocks.push(`${selectors.join(',\n')} {\n${modeLines[mode].join('\n')}\n}`);
   }
   if (blocks.length === 0) return '';
   return `${blocks.join('\n')}\n`;
 }
+
+/**
+ * The root-element attributes a document resolves to (brief §3.4, §3.8).
+ * EventConfigProvider writes these; the mode attribute is modeRuntime's,
+ * because it also follows a media query.
+ *
+ * @param {object} themeDoc
+ * @returns {{ theme: string|null, motifSet: string }}
+ */
+export function resolveRootAttributes(themeDoc) {
+  return {
+    theme: themePresetId(themeDoc),
+    motifSet: resolveMotifSet(themeDoc),
+  };
+}
+
+/**
+ * Whether the client accent clears the admin ground in a mode, and what the
+ * marker actually renders (admin story part 6f). The theme editor states
+ * this in words; nothing clamps the stored value.
+ *
+ * @param {object} themeDoc
+ * @param {'light'|'dark'} mode
+ * @returns {{ rgb: number[]|null, ratio: number|null, fellBack: boolean, floor: number }}
+ */
+export function adminAccentVerdict(themeDoc, mode) {
+  return { ...resolveAdminAccent(themeDoc, mode), floor: ADMIN_ACCENT_FLOOR };
+}
+
+/** The contrast the admin position marker must clear: it is non-text UI. */
+const ADMIN_ACCENT_FLOOR = 3;
+
+/** The admin token set, for the editor's own preview surfaces. */
+export { ADMIN_TOKEN_SET };

@@ -55,6 +55,7 @@ const {
   validateTheme,
   validateBadgesConfig,
 } = require('shared/config');
+const { findThemeContrastFailures, resolveLegacyColors } = require('shared/theme');
 
 /** Panel-writable doc ids and their shared-schema validators. */
 const WRITABLE_CONFIG_DOCS = Object.freeze({
@@ -102,6 +103,32 @@ const SENDER_VERIFICATION_FIELDS = Object.freeze(['domainVerified', 'domainVerif
 
 /** Server-stamped bookkeeping — silently stripped from payloads. */
 const STAMP_FIELDS = Object.freeze(['updatedAt', 'updatedBy']);
+
+/**
+ * Publish-time work that only config/theme needs (design brief §5.2).
+ *
+ * `functions/src/email/render.cjs` and `functions/src/schedule/pdf.cjs`
+ * render outside a browser and read `config/theme.colors` directly. A client
+ * running a preset with no overrides stores no colors, so those two
+ * consumers would render from nothing. So publish MATERIALIZES the resolved
+ * legacy colors map into the stored document, using the one shared resolver
+ * in `packages/shared` — the same one the browser runtime and the token
+ * generator use. Never a second resolver.
+ *
+ * For a preset document `colors` is therefore an output, not an input: the
+ * resolver ignores whatever the payload sent and writes the palette the
+ * preset plus the per-mode overrides actually resolve to. That is what makes
+ * switching presets work — a stale colors map from the previous preset can
+ * never pin the new one.
+ *
+ * Pure, so the transaction body may retry.
+ *
+ * @param {object} fields the validated payload
+ * @returns {object} the document to write
+ */
+function materializeThemeColors(fields) {
+  return { ...fields, colors: resolveLegacyColors(fields) };
+}
 
 function isPlainObject(v) {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
@@ -229,6 +256,22 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
     if (!verdict.ok) {
       return { ok: false, status: 400, code: 'bad-request', message: verdict.errors.join('; ') };
     }
+    if (docId === 'theme') {
+      // A contrast failure on a defined foreground and background pair is an
+      // ERROR at publish, not a warning (brief §5.2). The rejection names the
+      // pair, the mode, and the measured ratio, because that is what an
+      // operator needs to fix it. A draft in the editor may hold a failing
+      // value; a published document may not.
+      const failures = findThemeContrastFailures(fields);
+      if (failures.length > 0) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'bad-request',
+          message: failures.map((failure) => failure.message).join('; '),
+        };
+      }
+    }
   }
 
   const ref = db.collection('config').doc(docId);
@@ -243,6 +286,7 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
   try {
     await db.runTransaction(async (tx) => {
       let written = fields;
+      if (docId === 'theme') written = materializeThemeColors(fields);
       if (docId === 'event') {
         const snap = await tx.get(ref);
         const stored = snap.exists ? stripStamps(snap.data()) : {};

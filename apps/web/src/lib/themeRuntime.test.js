@@ -41,6 +41,9 @@ describe('hexToRgbTriple', () => {
   });
 });
 
+const LIGHT_BLOCK = ":root,\n:root[data-mode='light'],\n:root[data-theme][data-mode='light'] {";
+const DARK_BLOCK = ":root[data-mode='dark'],\n:root[data-theme][data-mode='dark'] {";
+
 describe('buildRuntimeThemeCss', () => {
   it('emits brand and semantic RGB-triple overrides from config/theme colors', () => {
     const css = buildRuntimeThemeCss({
@@ -61,15 +64,20 @@ describe('buildRuntimeThemeCss', () => {
     // carries two selectors: the attribute-free one beats the generated
     // baseline that first paint uses, and the [data-mode='light'] one beats
     // the generated light block once the runtime has written the attribute.
-    expect(css.startsWith(":root,\n:root[data-mode='light'] {")).toBe(true);
-    expect(css).toContain(":root[data-mode='dark'] {");
+    // The light block names three selectors and the dark block two, because
+    // the generated stylesheet now carries a (preset, mode) block that is
+    // more specific than the plain mode block (design brief §3.4). Attribute
+    // presence ties with attribute equality, so this element wins on
+    // document order.
+    expect(css.startsWith(LIGHT_BLOCK)).toBe(true);
+    expect(css).toContain(DARK_BLOCK);
   });
 
   it('derives a dark block from a document that names one palette', () => {
     const css = buildRuntimeThemeCss({
       colors: { surface: hex('F7F7F5'), ink: hex('16212C'), primary: hex('155E75') },
     });
-    const [light, dark] = css.split(":root[data-mode='dark'] {");
+    const [light, dark] = css.split(DARK_BLOCK);
     // The designed dark ground replaces the light surface, and the brand
     // color is lifted rather than reused.
     expect(light).toContain('--brand-surface-rgb: 247 247 245;');
@@ -85,7 +93,7 @@ describe('buildRuntimeThemeCss', () => {
         dark: { surface: hex('101418') },
       },
     });
-    const [light, dark] = css.split(":root[data-mode='dark'] {");
+    const [light, dark] = css.split(DARK_BLOCK);
     expect(light).toContain('--brand-surface-rgb: 247 247 245;');
     expect(dark).toContain('--brand-surface-rgb: 16 20 24;');
     // Ink is not named for dark, so the derivation still supplies it.
