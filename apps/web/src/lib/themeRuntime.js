@@ -314,21 +314,30 @@ export function buildRuntimeThemeCss(themeDoc) {
 
   const palettes = resolveThemePalettes(themeDoc);
   const modeLines = { light: [], dark: [] };
+  // The light palette again, without the admin token: what paper gets.
+  const printLines = [];
   for (const mode of THEME_MODES) {
     const palette = palettes[mode];
+    const forPrint = mode === 'light';
     for (const [key, prop] of Object.entries(COLOR_PROPS)) {
-      if (palette[key]) modeLines[mode].push(`  ${prop}: ${palette[key].join(' ')};`);
+      if (!palette[key]) continue;
+      const line = `  ${prop}: ${palette[key].join(' ')};`;
+      modeLines[mode].push(line);
+      if (forPrint) printLines.push(line);
     }
     if (palette.ink && palette.surface) {
       const rules = deriveRuleColors({ ink: palette.ink, surface: palette.surface });
       for (const [weight, prop] of Object.entries(RULE_PROPS)) {
-        modeLines[mode].push(`  ${prop}: ${rules[weight].join(' ')};`);
+        const line = `  ${prop}: ${rules[weight].join(' ')};`;
+        modeLines[mode].push(line);
+        if (forPrint) printLines.push(line);
       }
     }
     // The one client-owned colour in the admin identity, with its legibility
     // floor applied per mode (admin story part 6f). A failing accent falls
     // back to the admin ink; it is never clamped, and the editor states what
-    // it fell back to.
+    // it fell back to. It stays out of the print block: the admin is a screen
+    // tool and no print rule reads its tokens.
     const accent = resolveAdminAccent(themeDoc, mode);
     if (accent.rgb) {
       modeLines[mode].push(`  --admin-client-accent-rgb: ${accent.rgb.join(' ')};`);
@@ -344,8 +353,54 @@ export function buildRuntimeThemeCss(themeDoc) {
       : [":root[data-mode='dark']", ":root[data-theme][data-mode='dark']"];
     blocks.push(`${selectors.join(',\n')} {\n${modeLines[mode].join('\n')}\n}`);
   }
+  if (printLines.length > 0) blocks.push(printBlock(printLines));
   if (blocks.length === 0) return '';
   return `${blocks.join('\n')}\n`;
+}
+
+/**
+ * The `@media print` selectors the generated stylesheet writes, in the same
+ * order (`scripts/lib/tokens.cjs` `printPaletteBlock`).
+ *
+ * Each one leads with the `html` type selector, which is what lifts a print
+ * declaration above its screen twin inside the same stylesheet.
+ */
+const PRINT_SELECTORS = Object.freeze([
+  'html:root',
+  'html:root:not([data-mode])',
+  "html:root[data-mode='dark']",
+  "html:root[data-theme][data-mode='dark']",
+]);
+
+/**
+ * Paper's copy of the LIVE light palette.
+ *
+ * The generated stylesheet already carries a print block, and it is right
+ * about the rule: paper has no dark mode, so a reader printing from a dark
+ * screen gets the light edition. What it cannot be right about is the
+ * VALUES. They are frozen at build time, and `config/theme` arrives over
+ * `onSnapshot` — so an operator who restyles a running site left every
+ * printed page on the palette the deployment shipped with. The screen
+ * updated; the handout did not.
+ *
+ * Worse, it only went wrong in one mode. The generated print selectors lead
+ * with `html`, which beats this element's `[data-mode='dark']` block on
+ * specificity, so a dark screen printed the stale build-time light palette
+ * while a light screen printed the live one. Same document, two editions.
+ *
+ * So this block names the SAME selector list. Selector for selector the
+ * specificity ties, and this element is appended after the generated
+ * stylesheet, so document order decides and the live values win. The
+ * generated block stays exactly where it is: it is what a reader with no
+ * JavaScript, or one printing before the snapshot lands, still gets.
+ *
+ * @param {string[]} lines declarations, already indented
+ * @returns {string}
+ */
+function printBlock(lines) {
+  const selectors = PRINT_SELECTORS.join(',\n  ');
+  const body = lines.map((line) => `  ${line}`).join('\n');
+  return `@media print {\n  ${selectors} {\n${body}\n  }\n}`;
 }
 
 /**

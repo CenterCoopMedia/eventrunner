@@ -199,6 +199,12 @@ test('printing from dark mode gets the light edition', () => {
   // Paper has no backlight. The print rules in apps/web/src/index.css read
   // the ink and rule tokens and nothing else, so the print block re-points
   // those tokens at the light values and no print rule asks about modes.
+  //
+  // These values are frozen at build time, so this block is the FALLBACK:
+  // what a reader with no JavaScript, or one printing before config/theme
+  // arrives, gets. A running page's live palette is printed by the matching
+  // block buildRuntimeThemeCss writes (apps/web/src/lib/themeRuntime.js),
+  // which names this same selector list and wins on document order.
   const { names, values } = resolveColorTokens(THEME, loadTokens());
   const css = buildTokenCss(THEME);
   const query = css.match(/@media print \{([\s\S]*?)\n\}/);

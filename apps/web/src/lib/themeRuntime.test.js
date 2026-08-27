@@ -44,6 +44,13 @@ describe('hexToRgbTriple', () => {
 const LIGHT_BLOCK = ":root,\n:root[data-mode='light'],\n:root[data-theme][data-mode='light'] {";
 const DARK_BLOCK = ":root[data-mode='dark'],\n:root[data-theme][data-mode='dark'] {";
 
+/**
+ * The two screen mode blocks, with the print block that follows them cut
+ * away — it carries the light palette a second time, so leaving it attached
+ * would put light values inside what a test reads as "the dark block".
+ */
+const screenModeBlocks = (css) => css.split('@media print')[0].split(DARK_BLOCK);
+
 describe('buildRuntimeThemeCss', () => {
   it('emits brand and semantic RGB-triple overrides from config/theme colors', () => {
     const css = buildRuntimeThemeCss({
@@ -77,7 +84,7 @@ describe('buildRuntimeThemeCss', () => {
     const css = buildRuntimeThemeCss({
       colors: { surface: hex('F7F7F5'), ink: hex('16212C'), primary: hex('155E75') },
     });
-    const [light, dark] = css.split(DARK_BLOCK);
+    const [light, dark] = screenModeBlocks(css);
     // The designed dark ground replaces the light surface, and the brand
     // color is lifted rather than reused.
     expect(light).toContain('--brand-surface-rgb: 247 247 245;');
@@ -93,7 +100,7 @@ describe('buildRuntimeThemeCss', () => {
         dark: { surface: hex('101418') },
       },
     });
-    const [light, dark] = css.split(DARK_BLOCK);
+    const [light, dark] = screenModeBlocks(css);
     expect(light).toContain('--brand-surface-rgb: 247 247 245;');
     expect(dark).toContain('--brand-surface-rgb: 16 20 24;');
     // Ink is not named for dark, so the derivation still supplies it.
@@ -153,6 +160,80 @@ describe('buildRuntimeThemeCss', () => {
     expect(buildRuntimeThemeCss({ radius: 'unknown', texture: 'velvet' })).toBe('');
     // The mode policy is an attribute, not CSS, so it alone overrides nothing.
     expect(buildRuntimeThemeCss({ mode: 'dark' })).toBe('');
+  });
+});
+
+// The generated stylesheet's print block freezes the palette the deployment
+// shipped with. config/theme arrives live, so paper needs the live one too.
+describe('buildRuntimeThemeCss print block', () => {
+  const printBlockOf = (css) => {
+    const match = css.match(/@media print \{\n([\s\S]*?)\n\}\n?$/);
+    return match ? match[1] : null;
+  };
+
+  it('prints the live light palette, whatever mode the screen is in', () => {
+    const css = buildRuntimeThemeCss({
+      colors: { surface: hex('F7F7F5'), ink: hex('16212C'), primary: hex('C84B31') },
+    });
+    const print = printBlockOf(css);
+    expect(print).not.toBeNull();
+    expect(print).toContain('--brand-surface-rgb: 247 247 245;');
+    expect(print).toContain('--brand-ink-rgb: 22 33 44;');
+    expect(print).toContain('--brand-primary-rgb: 200 75 49;');
+    // The rules move with the ink and surface they are mixed from, on paper
+    // exactly as on screen.
+    expect(print).toContain('--rule-hairline-rgb: 216 217 217;');
+    expect(print).toContain('--color-border-control-rgb: 130 136 140;');
+  });
+
+  it('never lets a dark value reach paper', () => {
+    const css = buildRuntimeThemeCss({
+      colors: {
+        light: { surface: hex('F7F7F5'), ink: hex('16212C') },
+        dark: { surface: hex('101418'), ink: hex('E8EBF0') },
+      },
+    });
+    const print = printBlockOf(css);
+    expect(print).toContain('--brand-surface-rgb: 247 247 245;');
+    expect(print).not.toContain('16 20 24');
+    expect(print).not.toContain('232 235 240');
+  });
+
+  it('names every selector the generated print block names, so it wins on order', () => {
+    // Specificity, selector for selector, is a TIE with the generated block
+    // (scripts/lib/tokens.cjs printPaletteBlock). That is the point: this
+    // element is appended after the generated stylesheet, so the tie is
+    // broken by document order and the live values win. Dropping the leading
+    // `html` would lose to the generated block instead.
+    const print = printBlockOf(buildRuntimeThemeCss({ colors: { primary: hex('C84B31') } }));
+    for (const selector of [
+      'html:root,',
+      'html:root:not([data-mode]),',
+      "html:root[data-mode='dark'],",
+      "html:root[data-theme][data-mode='dark']",
+    ]) {
+      expect(print).toContain(selector);
+    }
+  });
+
+  it('leaves the admin token on screen', () => {
+    // The admin is a screen tool; no print rule reads its tokens. Its own
+    // mode blocks still carry the accent.
+    const css = buildRuntimeThemeCss({
+      colors: { surface: hex('F7F7F5'), ink: hex('16212C') },
+      adminAccent: hex('C84B31'),
+    });
+    expect(css).toContain('--admin-client-accent-rgb:');
+    expect(printBlockOf(css)).not.toContain('--admin-');
+  });
+
+  it('emits no print block when the document overrides no color', () => {
+    // Nothing to say about paper, so the generated block — the no-JavaScript
+    // fallback — is left to do the whole job on its own.
+    expect(buildRuntimeThemeCss({ fonts: { heading: 'sans-humanist' } })).not.toContain(
+      '@media print',
+    );
+    expect(buildRuntimeThemeCss({ radius: 'round' })).not.toContain('@media print');
   });
 });
 

@@ -12,7 +12,9 @@
 import { describe, expect, it } from 'vitest';
 import * as sharedTheme from 'shared/theme';
 import * as generatorTheme from '../../../../scripts/lib/theme.cjs';
+import * as generatorTokens from '../../../../scripts/lib/tokens.cjs';
 import {
+  buildRuntimeThemeCss,
   DEFAULT_MODE_POLICY,
   DEFAULT_PRESET_ID,
   FONT_SET_IDS,
@@ -30,6 +32,7 @@ import motifs from '../../../../design/tokens/motifs.json';
 
 const { FONT_SETS, RADIUS_SCALES, CSS_VARIABLE_STEM } =
   generatorTheme.default ?? generatorTheme;
+const { buildTokenCss } = generatorTokens.default ?? generatorTokens;
 
 describe('theme vocabulary parity: browser against the shared schema', () => {
   it('offers exactly the mode policies the server accepts', () => {
@@ -89,6 +92,31 @@ describe('theme vocabulary parity: browser against the token generator', () => {
     // design/tokens/motifs.json is the source of truth for the sets; the
     // browser list is what the editor's motif control offers.
     expect([...MOTIF_SET_IDS].sort()).toEqual(Object.keys(motifs.sets).sort());
+  });
+
+  it('prints over every selector the generated print block claims', () => {
+    // The generated stylesheet's print block leads each selector with the
+    // `html` type selector so it outranks its own screen twin. That same
+    // lead is what would let it outrank THIS element's dark block, and the
+    // generated values are frozen at build time — so a live restyle would
+    // print stale from a dark screen.
+    //
+    // The runtime print block answers with the same list. Selector for
+    // selector the specificity ties, and this element is appended after the
+    // generated stylesheet, so document order gives the live values the win.
+    // Drop a selector from either side and that tie is gone.
+    const printSelectors = (css) => {
+      const block = css.replace(/\/\*[\s\S]*?\*\//g, '').match(/@media print \{\s*([^{]+)\{/);
+      expect(block, 'a print block is present').not.toBeNull();
+      return block[1].split(',').map((one) => one.trim()).filter(Boolean).sort();
+    };
+
+    // Composed at runtime so no hex color literal appears in source (§7.6).
+    const runtime = printSelectors(buildRuntimeThemeCss({ colors: { primary: `#${'c84b31'}` } }));
+    for (const mode of MODE_POLICY_IDS) {
+      const generated = printSelectors(buildTokenCss({ preset: DEFAULT_PRESET_ID, mode }));
+      for (const selector of generated) expect(runtime, mode).toContain(selector);
+    }
   });
 
   it('overrides the same custom properties the generator writes', () => {
