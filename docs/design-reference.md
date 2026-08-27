@@ -113,7 +113,7 @@ Four header styles, and a site picks one. The header is the site's identity, and
 
 ## Schedule style
 
-How a session is set out on the schedule. Every site style names its own choices, because a session listing is one of the two places a style is most itself — the posted or numbered agenda for Institutional, the hairline row or the lead-and-rest ranking for Newsroom, the flat block, the stamped block, or the struck folio for Zine, the ruled programme or the agate block for Broadsheet, the specimen label or the field-notes column for Field Guide, the departure board, line diagram, or gazetteer list for Atlas.
+How a session is set out on the schedule. Every site style names its own choices, because a session listing is one of the two places a style is most itself — the header is the other, which is why every style above names exactly one of each under **Devices** — the posted or numbered agenda for Institutional, the hairline row or the lead-and-rest ranking for Newsroom, the flat block, the stamped block, or the struck folio for Zine, the ruled programme or the agate block for Broadsheet, the specimen label or the field-notes column for Field Guide, the departure board, line diagram, or gazetteer list for Atlas.
 
 Whichever is picked, the day still reads twice and both readings are first-class: a grid at wide viewports when the event lists tracks, and a time-ordered list everywhere else. A schedule style retunes how a session is drawn. It never decides which of those two views a reader gets.
 
@@ -209,7 +209,7 @@ Semantic colours — success, warning, danger, and the rest — come from the st
 
 Any single colour can be set by hand, per mode, under **Advanced colour settings**. A light tab and a dark tab hold separate values, and a blank field keeps the worked-out one. This is an **exceptional control**: it is there for the client whose brand guide names an exact value that the derivation does not reach, and every use of it takes a token out of the derivation permanently — it will no longer move when the brand colour moves. Most sites should never open it, and a site that has overridden a dozen values has usually picked the wrong style.
 
-There is no second brand colour anywhere in the system. The admin's own marker is worked out from the admin's ink against the admin ground, so there is nothing to set and nothing to get wrong.
+Nothing on the public site takes a second brand colour — the whole palette comes from the one. The admin room has one colour of its own, **Admin marker colour**, which is optional and blank by default, and it reaches exactly two places: the marker beside the section you are in, and the mark on the page-header rule. It derives nothing, so it cannot reach a client's site or move a single site token. See The admin panel is not a site style, below, for what happens when the value is too pale to read.
 
 ### The contrast gate
 
@@ -279,7 +279,7 @@ The admin CMS is its own design surface and it does not restyle. It reads its ow
 - **Two faces, fixed.** Source Sans 3 for everything a person reads as language, IBM Plex Mono with tabular figures for everything the machine owns.
 - **Navigation is the docket**: A grouped standing list of words down the leading edge. No icon rail, no collapse to glyphs, no counts in bubbles.
 - **The active item carries four signals**, never colour alone: the marker, the weight, a ground shift, and the assistive-technology current-page state.
-- **The position marker is derived**, from the admin's own ink against the admin ground. It is not a client setting: there is no marker colour to choose, nothing to get wrong, and no failure state to explain.
+- **The position marker is the admin's own ink until a client says otherwise.** **Admin marker colour** is the one thing a client sets in this room, and most never do. The value is tested against the admin ground in each mode; one that falls below the floor a marker needs sends both slots back to the admin ink, and the editor says so plainly — the ratio it measured, the floor it missed, and what it fell back to. The value is stored exactly as it was typed and is never silently clamped, and the admin never draws a marker nobody can see.
 - **Three state words, everywhere**: Draft, Live, and Live with unpublished changes.
 - **A destructive action stands still and states what it costs.** Nothing animates in a destructive moment.
 

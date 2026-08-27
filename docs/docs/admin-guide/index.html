@@ -134,7 +134,7 @@
           <ol>
           <li><strong>Pick a site style.</strong> Settings → Branding, the first control. Six ship; three are the launch surface and three sit behind a disclosure until you have tried them on your own content. Picking one replaces every value you have not changed yourself, so do this first.</li>
           <li><strong>Add the identity assets.</strong> Five slots: the primary logo and the square icon, then the footer logo, the social sharing image, and the favicon behind <strong>More image slots</strong>. Same picker the Media tab uses. A slot you leave empty falls back to the event name in type, which is a finished look and not a placeholder.</li>
-          <li><strong>Set the Main brand colour.</strong> One colour. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. You do not set them, and there is no second colour to set anywhere.</li>
+          <li><strong>Set the Main brand colour.</strong> One colour. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. You do not set them, and no second colour anywhere changes how the public site looks.</li>
           <li><strong>Preview representative pages.</strong> The <strong>Page preview</strong> beside the controls renders <em>your</em> pages with the draft applied. Look at three: the home page, the schedule on its longest day, and one long text page. Check each light and dark.</li>
           <li><strong>Resolve the warnings.</strong> Anything the editor flags — a colour pair too close to read, a logo the wrong shape — is named with the pair, the mode, and the measurement. Fix what it names.</li>
           <li><strong>Publish.</strong> The live public site restyles with no deploy. This is a config write, not a code change.</li>
@@ -150,6 +150,7 @@
           <p><strong>Schedule style.</strong> How a session is set out on the schedule: a posted agenda, a hairline row, a departure board, and so on, depending on the style. Like the header style, it retunes the site style rather than inventing a value of its own, so you cannot make a combination the house has not looked at.</p>
           <p><strong>Navigation.</strong> Whether the navigation runs across the top or down the leading edge. One choice, every page, for the same reason the header is site-wide.</p>
           <p><strong>Light or dark.</strong> Always light, always dark, or follow the reader&#39;s own setting. Every site style defines both, so there is no wrong answer here.</p>
+          <p><strong>Admin marker colour.</strong> The one colour on this tab that does not touch the public site. It is used in exactly two places in the admin panel — the marker beside the section you are in, and the mark on the page-header rule — and leaving it blank uses the admin&#39;s own ink, which is what most deployments do. If the colour you enter is too pale to read against the admin background, the marker falls back to that ink and the panel tells you the ratio it measured and what it fell back to; your value is stored exactly as you typed it, so you can adjust it rather than start again.</p>
           <p><strong>Advanced.</strong> Everything else the system can do, behind a disclosure, and none of it is needed for a finished site:</p>
           <ul>
           <li><em>Typography</em> — the heading face, picked from the alternates your style offers, and any of the four font roles named outright.</li>
@@ -161,7 +162,7 @@
           <p><strong>A contrast failure stops a publish, not a save.</strong> A draft may hold two colours too close together to read. Publishing that draft is refused, and the message names the pair, the mode, and the ratio it measured. Fix the pair, then publish again.</p>
           <p>Fonts come from the bundled open-licence sets, so no page asks an external font service for anything.</p>
           <h2 id="pages">Pages<a class="heading-anchor" href="#pages" aria-label="Link to this section">#</a></h2>
-          <p>Every page document (About, Travel, Conduct, and anything else seeded or added) shows its publish state in the list: <strong>Never published</strong> (draft only), <strong>Unpublished changes</strong> (a published page with a dirty draft), or fully published. Create, edit, and publish from here.</p>
+          <p>Every page document (About, Travel, Conduct, and anything else seeded or added) shows its state in the list, in the same three words every editor uses: <strong>Draft</strong> (never published), <strong>Live</strong> (published, with nothing pending), or <strong>Live with unpublished changes</strong> (published, with newer edits saved but not published yet). Create, edit, and publish from here.</p>
           <p><strong>Pick what kind of page this is.</strong> Six named tasks, and picking one shapes the page:</p>
           <div class="table-scroll">
           <table>
