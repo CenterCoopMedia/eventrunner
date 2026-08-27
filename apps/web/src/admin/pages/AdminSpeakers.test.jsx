@@ -108,7 +108,7 @@ beforeEach(() => {
 });
 
 describe('speakers list', () => {
-  it('lists every canonical record with its pipeline status', async () => {
+  it('lists every canonical record with its record state and its pipeline status', async () => {
     speakerDocs = [
       RAE,
       { ...RAE, id: 'sam-example', firstName: 'Sam', lastName: 'Example', slug: 'sam-example', status: 'draft', uid: 'u2' },
@@ -116,10 +116,15 @@ describe('speakers list', () => {
     await renderAt('/admin/speakers');
 
     expect(screen.getByRole('link', { name: 'Rae Okonkwo' })).toBeInTheDocument();
-    expect(screen.getByText('Published')).toBeInTheDocument();
+    // Two axes, two words: the record's state in the admin's three-word
+    // vocabulary (brief §5.2), and where the speaker is in the invitation
+    // pipeline, which is a different question.
+    expect(screen.getByText('Live')).toBeInTheDocument();
+    expect(screen.getByText('Approved')).toBeInTheDocument();
     // The list shows unpublished records too — that is why it reads the
     // canonical store rather than the public projection.
     expect(screen.getByRole('link', { name: 'Sam Example' })).toBeInTheDocument();
+    expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(screen.getByText('Not invited')).toBeInTheDocument();
     expect(screen.getByText('Account linked')).toBeInTheDocument();
   });

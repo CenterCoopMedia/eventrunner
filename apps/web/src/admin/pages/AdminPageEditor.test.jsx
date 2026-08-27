@@ -138,8 +138,8 @@ describe('page list', () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages');
 
-    expect(screen.getByText('Published')).toBeInTheDocument();
-    expect(screen.getByText('Never published')).toBeInTheDocument();
+    expect(screen.getByText('Live')).toBeInTheDocument();
+    expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
   });
 
@@ -156,7 +156,7 @@ describe('page list', () => {
     liveDocs = [{ ...SCHOLARSHIPS_DRAFT, status: undefined, revision: 2 }];
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages');
-    expect(screen.getByText('Unpublished changes')).toBeInTheDocument();
+    expect(screen.getByText('Live with unpublished changes')).toBeInTheDocument();
   });
 
   it('publishes only the pages that have something to publish', async () => {
@@ -387,7 +387,7 @@ describe('publish results and recovery', () => {
     await renderAt('/admin/pages');
 
     expect(screen.getByRole('status', { name: 'Loading pages…' })).toBeInTheDocument();
-    expect(screen.queryByText('Never published')).toBeNull();
+    expect(screen.queryByText('Draft')).toBeNull();
     expect(screen.queryByRole('button', { name: /Publish all/ })).toBeNull();
   });
 

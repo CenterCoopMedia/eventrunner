@@ -15,30 +15,13 @@ import { useAdminContent } from '../useAdminContent.js';
 import { blockTypeLabel } from '../blockTypes.js';
 import { summarizePublish } from '../publishResult.js';
 import {
+  DestructiveConfirm,
+  Notice,
   Panel,
-  dangerButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
-
-const STATE_CLASSES = {
-  published: 'border-success/40 bg-success/10 text-success',
-  dirty: 'border-warning/40 bg-warning/10 text-warning',
-  unpublished: 'border-brand-ink/20 bg-brand-surface-alt text-brand-ink-muted',
-  unknown: 'border-brand-ink/20 bg-brand-surface-alt text-brand-ink-muted',
-};
-
-function StateChip({ state }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-brand border px-2 py-1 text-xs font-semibold ${
-        STATE_CLASSES[state.id] ?? STATE_CLASSES.unknown
-      }`}
-    >
-      {state.label}
-    </span>
-  );
-}
+import AdminPageHeader, { RecordState, proofRowClass } from '../components/adminChrome.jsx';
 
 export default function AdminContentSection() {
   const { pageId, sectionId } = useParams();
@@ -48,6 +31,9 @@ export default function AdminContentSection() {
   const { rows: contentRows, loading: contentLoading, error: contentError } = useAdminContent();
   const [busyId, setBusyId] = useState(null);
   const [notice, setNotice] = useState(null);
+  // Blocks published in THIS session: their proof tint resolves to the base
+  // ground rather than vanishing (moment 1).
+  const [resolvedIds, setResolvedIds] = useState(() => new Set());
 
   const page = findPage(pageId);
   const section = (page?.current?.sections ?? []).find((candidate) => candidate.id === sectionId);
@@ -85,7 +71,8 @@ export default function AdminContentSection() {
     try {
       const response = await call('cmsPublish', { collection: 'cmsContent', docIds: [row.id] });
       const verdict = summarizePublish(response, 'cmsContent', [row.id], 'content blocks');
-      setNotice({ tone: verdict.ok ? 'info' : 'error', message: verdict.message });
+      setNotice({ tone: verdict.ok ? 'ok' : 'error', message: verdict.message });
+      if (verdict.ok) setResolvedIds((current) => new Set([...current, row.id]));
       showToast(verdict.message, verdict.ok ? undefined : { tone: 'error' });
     } catch (err) {
       setNotice({ tone: 'error', message: err.message });
@@ -121,58 +108,44 @@ export default function AdminContentSection() {
             : `This section already has its maximum of ${maxBlocks} blocks.`
         }
       >
-        Add block
+        Add a block
       </button>
     ) : (
       // '_new', not 'new' — see AdminApp.jsx's route comment: a field id
       // may legitimately be 'new', so the creation route uses a segment no
       // valid field id can ever match instead.
       <Link to="_new" className={primaryButtonClass}>
-        Add block
+        Add a block
       </Link>
     );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-brand-ink">
-            {section?.label || sectionId} — blocks
-          </h1>
-          <p className="text-sm text-brand-ink-muted">
-            {page?.current?.label} · allows{' '}
-            {allowed.length ? allowed.map(blockTypeLabel).join(', ') : 'no block types yet'}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to="../.." relative="path" className={secondaryButtonClass}>
-            Back to content
-          </Link>
-          {addBlockButton}
-        </div>
-      </div>
+    <div className="flex flex-col gap-md">
+      <AdminPageHeader
+        title={section?.label || sectionId}
+        identifiers={`${pageId} · ${sectionId} · ${blocks.length} block${
+          blocks.length === 1 ? '' : 's'
+        }`}
+        description={`${page?.current?.label ?? pageId} · allows ${
+          allowed.length ? allowed.map(blockTypeLabel).join(', ') : 'no block types yet'
+        }`}
+        actions={
+          <>
+            <Link to="../.." relative="path" className={secondaryButtonClass}>
+              Back to content
+            </Link>
+            {addBlockButton}
+          </>
+        }
+      />
 
       {contentError ? (
-        <p
-          role="status"
-          className="rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
-        >
-          We lost the connection to the content list; showing the last values
-          we received and retrying.
-        </p>
+        <Notice
+          tone="caution"
+          message="We lost the connection to the content list; showing the last values we received and retrying."
+        />
       ) : null}
-      {notice ? (
-        <p
-          role={notice.tone === 'error' ? 'alert' : 'status'}
-          className={
-            notice.tone === 'error'
-              ? 'rounded-brand border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger'
-              : 'rounded-brand border border-success/40 bg-success/10 px-3 py-2 text-sm text-success'
-          }
-        >
-          {notice.message}
-        </p>
-      ) : null}
+      {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 
       {blocks.length === 0 ? (
         <EmptyState
@@ -181,51 +154,62 @@ export default function AdminContentSection() {
           action={addBlockButton}
         />
       ) : (
-        <Panel>
-          <ul className="divide-y divide-brand-ink/10">
+        <Panel className="p-0">
+          <ul>
             {blocks.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      to={row.current.field}
-                      className="touch-target inline-flex items-center rounded-brand font-semibold text-brand-ink underline underline-offset-4 hover:text-brand-primary-dark"
-                    >
-                      {row.current.field}
-                    </Link>
-                    <StateChip state={row.state} />
-                    <span className="rounded-brand border border-brand-ink/20 px-2 py-1 text-xs text-brand-ink-muted">
-                      {blockTypeLabel(row.current.blockType)}
-                    </span>
-                    {row.current.visible === false ? (
-                      <span className="rounded-brand border border-brand-ink/20 px-2 py-1 text-xs text-brand-ink-muted">
-                        Hidden
+              <li
+                key={row.id}
+                className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(
+                  row.state.id,
+                  resolvedIds.has(row.id),
+                )}`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-sm px-md py-xs">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
+                      <Link
+                        to={row.current.field}
+                        className="admin-target inline-flex items-center rounded-admin font-admin-data font-semibold text-admin-ink underline underline-offset-4"
+                      >
+                        {row.current.field}
+                      </Link>
+                      <RecordState state={row.state} />
+                      <span className="text-folio text-admin-ink-secondary">
+                        {blockTypeLabel(row.current.blockType)}
                       </span>
-                    ) : null}
+                      {row.current.visible === false ? (
+                        <span className="font-admin-data text-folio text-admin-ink-secondary">
+                          Hidden
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {row.state.id !== 'published' ? (
-                    <button
-                      type="button"
-                      className={secondaryButtonClass}
+                  <div className="flex flex-wrap items-center gap-xs">
+                    {row.state.id !== 'live' ? (
+                      <button
+                        type="button"
+                        className={secondaryButtonClass}
+                        disabled={busyId !== null}
+                        onClick={() => publishOne(row)}
+                      >
+                        {busyId === row.id ? 'Publishing…' : 'Publish this block'}
+                      </button>
+                    ) : null}
+                    <Link to={row.current.field} className={secondaryButtonClass}>
+                      Edit
+                    </Link>
+                    <DestructiveConfirm
+                      trigger="Delete"
+                      title={`Delete ${row.current.field}`}
+                      confirmLabel="Delete this block"
+                      busyLabel="Deleting…"
+                      busy={busyId === row.id}
                       disabled={busyId !== null}
-                      onClick={() => publishOne(row)}
-                    >
-                      {busyId === row.id ? 'Publishing…' : 'Publish'}
-                    </button>
-                  ) : null}
-                  <Link to={row.current.field} className={secondaryButtonClass}>
-                    Edit
-                  </Link>
-                  <button
-                    type="button"
-                    className={dangerButtonClass}
-                    disabled={busyId !== null}
-                    onClick={() => remove(row)}
-                  >
-                    {busyId === row.id ? 'Deleting…' : 'Delete'}
-                  </button>
+                      consequence={`The live revision of ${row.current.field} and its draft both go, and the section renders without it.`}
+                      permanence="This cannot be undone."
+                      onConfirm={() => remove(row)}
+                    />
+                  </div>
                 </div>
               </li>
             ))}

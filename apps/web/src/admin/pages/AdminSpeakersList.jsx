@@ -39,23 +39,41 @@ import EmptyState from '../../components/EmptyState.jsx';
 import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import { useAdminApi } from '../adminApi.js';
-import { Panel, primaryButtonClass, secondaryButtonClass } from '../components/formControls.jsx';
+import {
+  Notice,
+  Panel,
+  linkButtonClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from '../components/formControls.jsx';
+import AdminPageHeader, { RecordState, proofRowClass } from '../components/adminChrome.jsx';
+import { deadMatter, state } from '../recordState.js';
 
-const STATUS_LABELS = {
+/**
+ * Where a speaker is in the INVITATION pipeline. This is a different axis
+ * from the record's publish state below, and it keeps its own words because
+ * collapsing "invite sent" into "Draft" would throw away the one fact an
+ * organizer is watching for.
+ */
+const PIPELINE_LABELS = {
   draft: 'Not invited',
   invited: 'Invite sent',
   accepted: 'Accepted',
-  approved: 'Published',
+  approved: 'Approved',
   removed: 'Removed',
 };
 
-const STATUS_CLASSES = {
-  approved: 'border-success/40 bg-success/10 text-success',
-  invited: 'border-warning/40 bg-warning/10 text-warning',
-  accepted: 'border-warning/40 bg-warning/10 text-warning',
-  removed: 'border-danger/40 bg-danger/10 text-danger',
-  draft: 'border-brand-ink/20 bg-brand-surface-alt text-brand-ink-muted',
-};
+/**
+ * The speaker's record state, in the admin's three words (brief §5.2). A
+ * speaker is on the public site only once they are approved, and an
+ * approved speaker with self-service edits waiting for review is exactly
+ * the third state. A removed speaker is dead matter: it keeps its word.
+ */
+function speakerRecordState(speaker) {
+  if (speaker.status === 'removed') return deadMatter('Removed');
+  if (speaker.status !== 'approved') return state('draft');
+  return pendingFieldsOf(speaker).length > 0 ? state('dirty') : state('live');
+}
 
 /**
  * Field names queued in `speaker.pendingEdits` (spec §4.3, issue #22
@@ -68,21 +86,14 @@ function pendingFieldsOf(speaker) {
   return pending && typeof pending === 'object' ? Object.keys(pending) : [];
 }
 
-function StatusChip({ status }) {
+/** The pipeline word, in the data face. Never a coloured pill. */
+function PipelineStatus({ status }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-brand border px-2 py-1 text-xs font-semibold ${
-        STATUS_CLASSES[status] ?? STATUS_CLASSES.draft
-      }`}
-    >
-      {STATUS_LABELS[status] ?? status ?? 'Unknown'}
+    <span className="font-admin-data text-folio text-admin-ink-data">
+      {PIPELINE_LABELS[status] ?? status ?? 'Unknown'}
     </span>
   );
 }
-
-const linkButtonClass =
-  'touch-target inline-flex items-center rounded-brand px-2 py-1 underline ' +
-  'underline-offset-2 text-brand-ink-muted hover:text-brand-ink disabled:opacity-60';
 
 export default function AdminSpeakersList() {
   const { speakers, loading, error } = useAdminSpeakers();
@@ -155,38 +166,27 @@ export default function AdminSpeakersList() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-brand-ink">Speakers</h1>
-          <p className="text-sm text-brand-ink-muted">
-            One record per speaker. Sessions reference these records by id, so
-            editing a name here updates it everywhere it appears.
-          </p>
-        </div>
-        <Link to="new" className={primaryButtonClass}>
-          New speaker
-        </Link>
-      </div>
+    <div className="flex flex-col gap-md">
+      <AdminPageHeader
+        title="Speakers"
+        identifiers={`${speakers.length} record${speakers.length === 1 ? '' : 's'}`}
+        description="One record per speaker. Sessions reference these records by id, so editing a name here updates it everywhere it appears."
+        actions={
+          <Link to="new" className={primaryButtonClass}>
+            Create a speaker
+          </Link>
+        }
+      />
 
       {error ? (
-        <p role="status" className="rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
-          We lost the connection to the speaker list; showing the last values we
-          received and retrying.
-        </p>
+        <Notice
+          tone="caution"
+          message="We lost the connection to the speaker list; showing the last values we received and retrying."
+        />
       ) : null}
 
       {notice ? (
-        <p
-          role="status"
-          className={`rounded-brand border px-3 py-2 text-sm ${
-            notice.kind === 'error'
-              ? 'border-danger/40 bg-danger/10 text-danger'
-              : 'border-success/40 bg-success/10 text-success'
-          }`}
-        >
-          {notice.message}
-        </p>
+        <Notice tone={notice.kind === 'error' ? 'error' : 'ok'} message={notice.message} />
       ) : null}
 
       {loading ? (
@@ -197,51 +197,59 @@ export default function AdminSpeakersList() {
           description="Add the first speaker — a name is all that's required; the rest can follow."
           action={
             <Link to="new" className={primaryButtonClass}>
-              New speaker
+              Create a speaker
             </Link>
           }
         />
       ) : (
-        <Panel>
-          <ul className="divide-y divide-brand-ink/10">
+        <Panel className="p-0">
+          <ul>
             {speakers.map((speaker) => {
               const note = inviteNote(speaker);
+              const recordState = speakerRecordState(speaker);
               return (
-                <li key={speaker.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <li
+                  key={speaker.id}
+                  className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(
+                    recordState.id,
+                  )}`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-sm px-md py-xs">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
                       <Link
                         to={speaker.id}
-                        className="touch-target inline-flex items-center rounded-brand font-semibold text-brand-ink underline underline-offset-4 hover:text-brand-primary-dark"
+                        className="admin-target inline-flex items-center rounded-admin font-semibold text-admin-ink underline underline-offset-4"
                       >
                         {speaker.displayName || speaker.id}
                       </Link>
-                      <StatusChip status={speaker.status} />
+                      <RecordState state={recordState} />
+                      <PipelineStatus status={speaker.status} />
                       {speaker.uid ? (
-                        <span className="rounded-brand border border-brand-ink/20 px-2 py-1 text-xs text-brand-ink-muted">
+                        <span className="font-admin-data text-folio text-admin-ink-secondary">
                           Account linked
                         </span>
                       ) : null}
                       {pendingFieldsOf(speaker).length > 0 ? (
-                        <span className="rounded-brand border border-warning/40 bg-warning/10 px-2 py-1 text-xs font-semibold text-warning">
+                        <span className="font-admin-data text-folio text-admin-state-caution">
                           Changes pending review
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-1 truncate text-sm text-brand-ink-muted">
+                    <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
                       {[speaker.jobTitle, speaker.organization].filter(Boolean).join(', ') || '—'}
                       {' · '}
                       {speaker.slug}
                       {note ? ` · ${note}` : ''}
                     </p>
                     {pendingFieldsOf(speaker).length > 0 ? (
-                      <p className="mt-1 text-sm text-brand-ink-muted">
+                      <p className="mt-3xs text-caption text-admin-ink-secondary">
                         Speaker-submitted changes awaiting review:{' '}
                         {pendingFieldsOf(speaker).join(', ')}.
                       </p>
                     ) : null}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-xs">
                     {speaker.status === 'draft' ? (
                       <button
                         type="button"
@@ -307,6 +315,7 @@ export default function AdminSpeakersList() {
                     <Link to={speaker.id} className={secondaryButtonClass}>
                       Edit
                     </Link>
+                  </div>
                   </div>
                 </li>
               );

@@ -8,30 +8,25 @@ import { Link } from 'react-router-dom';
 import EmptyState from '../../components/EmptyState.jsx';
 import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminPages } from '../useAdminPages.js';
-import { Panel } from '../components/formControls.jsx';
+import { Notice, Panel } from '../components/formControls.jsx';
+import AdminPageHeader, { RecordState, proofRowClass } from '../components/adminChrome.jsx';
 
 export default function AdminContentPages() {
   const { rows, loading, error } = useAdminPages();
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-brand-ink">Content</h1>
-        <p className="text-sm text-brand-ink-muted">
-          Pick a page, then a section, to edit the content blocks inside it.
-          To change a page&rsquo;s structure — its sections and which block
-          types they allow — use Pages instead.
-        </p>
-      </div>
+    <div className="flex flex-col gap-md">
+      <AdminPageHeader
+        title="Content"
+        identifiers={`${rows.length} page${rows.length === 1 ? '' : 's'}`}
+        description="Pick a page, then a section, to edit the content blocks inside it. To change a page’s structure — its sections and which block types they allow — use Pages instead."
+      />
 
       {error ? (
-        <p
-          role="status"
-          className="rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
-        >
-          We lost the connection to the page list; showing the last values we
-          received and retrying.
-        </p>
+        <Notice
+          tone="caution"
+          message="We lost the connection to the page list; showing the last values we received and retrying."
+        />
       ) : null}
 
       {loading ? (
@@ -42,22 +37,32 @@ export default function AdminContentPages() {
           description="Create a page first, in Pages, before editing its content."
         />
       ) : (
-        <Panel>
-          <ul className="divide-y divide-brand-ink/10">
+        <Panel className="p-0">
+          <ul>
             {rows.map((row) => {
               const sectionCount = (row.current?.sections ?? []).length;
               return (
-                <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <Link
-                      to={row.id}
-                      className="touch-target inline-flex items-center rounded-brand font-semibold text-brand-ink underline underline-offset-4 hover:text-brand-primary-dark"
-                    >
-                      {row.current?.label || row.id}
-                    </Link>
-                    <p className="mt-1 truncate text-sm text-brand-ink-muted">
-                      {sectionCount} section{sectionCount === 1 ? '' : 's'}
-                    </p>
+                <li
+                  key={row.id}
+                  className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(
+                    row.state.id,
+                  )}`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-sm px-md py-xs">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
+                        <Link
+                          to={row.id}
+                          className="admin-target inline-flex items-center rounded-admin font-semibold text-admin-ink underline underline-offset-4"
+                        >
+                          {row.current?.label || row.id}
+                        </Link>
+                        <RecordState state={row.state} />
+                      </div>
+                      <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
+                        {sectionCount} section{sectionCount === 1 ? '' : 's'}
+                      </p>
+                    </div>
                   </div>
                 </li>
               );

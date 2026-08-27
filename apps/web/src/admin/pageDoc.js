@@ -6,6 +6,7 @@
 // bookkeeping (`seeded`, `seededAt`). So a doc loaded for editing is filtered
 // down to the accepted key set before it goes back over the wire — otherwise
 // every edit of a seeded page would fail with "seeded: unknown field".
+import { recordStateOf } from './recordState.js';
 
 /** Keys a cmsPages doc may carry (mirrors PAGE_KEYS on the server). */
 export const PAGE_KEYS = Object.freeze([
@@ -145,15 +146,14 @@ export function toPagePayload(page) {
  * `dirty` is the draft's own status field (store.cjs writes 'dirty' on every
  * draft write and flips it to 'clean' at publish).
  *
+ * The WORDS are the admin's three, and they live in one place
+ * (admin/recordState.js) so pages, content, speakers, badges, and branding
+ * cannot drift into four spellings of the same fact.
+ *
  * @param {{ live: object|null, draft: object|null }} revisions
  */
 export function publishStateOf({ live, draft }) {
-  if (!live && draft) return { id: 'unpublished', label: 'Never published' };
-  if (live && draft && draft.status === 'dirty') {
-    return { id: 'dirty', label: 'Unpublished changes' };
-  }
-  if (live) return { id: 'published', label: 'Published' };
-  return { id: 'unknown', label: 'Unknown' };
+  return recordStateOf({ live, draft });
 }
 
 /**

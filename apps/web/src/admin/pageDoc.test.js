@@ -82,18 +82,26 @@ describe('toPagePayload', () => {
   });
 });
 
+// The admin says a record's state in exactly three words (admin story part
+// 2, brief §5.2). The words live in admin/recordState.js so pages, content,
+// speakers, badges, and branding cannot drift apart; these cases pin the
+// mapping from the two-revision model onto them.
 describe('publish state', () => {
-  it('reads a draft with no live revision as never published', () => {
-    expect(publishStateOf({ live: null, draft: STORED }).id).toBe('unpublished');
+  it('reads a draft with no live revision as Draft', () => {
+    const state = publishStateOf({ live: null, draft: STORED });
+    expect(state.id).toBe('draft');
+    expect(state.label).toBe('Draft');
   });
 
-  it('reads a dirty draft over a live revision as unpublished changes', () => {
-    expect(publishStateOf({ live: { id: 'x' }, draft: STORED }).id).toBe('dirty');
+  it('reads a dirty draft over a live revision as Live with unpublished changes', () => {
+    const state = publishStateOf({ live: { id: 'x' }, draft: STORED });
+    expect(state.id).toBe('dirty');
+    expect(state.label).toBe('Live with unpublished changes');
   });
 
-  it('reads a clean draft, or no draft at all, as published', () => {
-    expect(publishStateOf({ live: { id: 'x' }, draft: { status: 'clean' } }).id).toBe('published');
-    expect(publishStateOf({ live: { id: 'x' }, draft: null }).id).toBe('published');
+  it('reads a clean draft, or no draft at all, as Live', () => {
+    expect(publishStateOf({ live: { id: 'x' }, draft: { status: 'clean' } }).label).toBe('Live');
+    expect(publishStateOf({ live: { id: 'x' }, draft: null }).id).toBe('live');
   });
 });
 
