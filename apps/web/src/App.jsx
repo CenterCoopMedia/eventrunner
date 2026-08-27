@@ -5,6 +5,7 @@
 // users/{uid} document (issue #17).
 // The Router wraps everything in main.jsx (tests use MemoryRouter), so
 // ContentProvider can later read search params via hooks.
+import { Suspense, lazy } from 'react';
 import { Route, Routes, useSearchParams } from 'react-router-dom';
 import { EventConfigProvider } from './contexts/EventConfigContext.jsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
@@ -27,10 +28,16 @@ import Login from './pages/Login.jsx';
 import SpeakerAccept from './pages/SpeakerAccept.jsx';
 import SpeakerProfile from './pages/SpeakerProfile.jsx';
 import TicketClaim from './pages/TicketClaim.jsx';
-import AdminApp from './admin/AdminApp.jsx';
 import Profile from './pages/Profile.jsx';
 import Attendees from './pages/Attendees.jsx';
 import AttendeeProfile from './pages/AttendeeProfile.jsx';
+import LoadingState from './components/LoadingState.jsx';
+
+// Code-split the admin CMS out of the public bundle (issue #95): AdminApp
+// and everything under src/admin/pages pull in the entire content-editing
+// surface, which ordinary visitors never touch. Loading it lazily keeps that
+// weight out of the chunk every visitor downloads on first paint.
+const AdminApp = lazy(() => import('./admin/AdminApp.jsx'));
 
 export function AppRoutes() {
   return (
@@ -40,7 +47,14 @@ export function AppRoutes() {
           It sits ABOVE the Layout branch because the admin area brings its
           own chrome, and its 'admin' segment is reserved in
           shared/routing so a generic cmsPages path can never claim it. */}
-      <Route path="admin/*" element={<AdminApp />} />
+      <Route
+        path="admin/*"
+        element={
+          <Suspense fallback={<LoadingState label="Loading admin" />}>
+            <AdminApp />
+          </Suspense>
+        }
+      />
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="schedule" element={<Schedule />} />
