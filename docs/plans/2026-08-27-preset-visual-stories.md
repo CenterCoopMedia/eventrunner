@@ -4,9 +4,12 @@
 **Status:** Settled. Read before preset work starts (brief §7, PR2).
 **Binding source:** `docs/plans/2026-08-27-design-system-overhaul.md`. Where this document and the
 brief disagree, the brief wins.
-**Amended:** 2026-08-27 by the owner's design and operator-workflow review. The review retuned
-Zine, Field Guide, and Atlas, and it is recorded in the brief under "Owner review". Where the
-review and either document disagree, the review wins.
+**Amended:** 2026-08-27 by the owner's design and operator-workflow review, and again by the
+owner's calibration of it the same day. The review retuned Zine, Field Guide, and Atlas. The
+calibration holds the retune where it improved a default and reverses it where it cost a style its
+conviction: all six styles ship first-class, complete and visibly distinct, with the expressive
+treatments kept as fully-developed alternates. Where the calibration, the review, and either
+document disagree, the calibration wins, then the review.
 **Companion:** `docs/plans/2026-08-27-admin-identity-story.md`, the fixed admin identity.
 
 ## How to read this document
@@ -328,8 +331,10 @@ playful without being messy, because a good zine is a designed object that prete
 - **Motifs** — off by default. If enabled, hand-drawn linework acts as the marker doodle in the
   margin: one `divider` between long sections, one `empty-state` drawing, nothing more.
 - **Texture** — paper grain at low opacity is allowed here and only here, with
-  `pointer-events: none`. It is the copier, not a filter. It is **off by default**: flat surfaces
-  are the shared default everywhere, and a client turns the grain on under the advanced settings.
+  `pointer-events: none`. It is the copier, not a filter, and it is **on by default** here. Flat is
+  the shared default in the sense that nothing paints a texture it did not ask for — the CSS gate
+  now requires `[data-texture='paper']` explicitly, so an opt-in cannot leak. Zine asks. A client
+  who wants a clean sheet picks Flat under Advanced.
 - **Back issue** — last year's flyer, still up on the wall, sun-faded to the archive tokens.
 - **Dark mode** — the negative. Toner-black ground, paper-white ink, as though the same page were
   photocopied inverted. The accent stays the same hue and drops in chroma so it stays legible.
@@ -574,10 +579,13 @@ of someone who sat still long enough to see something.
   narrative: **Vollkorn**, a warm text serif that reads long and never competes with linework. Data
   and mono both point at the specimen label hand: **IBM Plex Mono** with tabular figures, exact
   enough to tag a collection. A label in this world is a tag, and a tag is set in the exact hand.
-- **Motifs** — **off by default** (owner review). `botanical` is still the theme's set and `fauna`
-  is still supported, both in engraving and botanical-plate linework; a client turns one on under
-  Illustrations where their subject supports it. Drawings on every page of a real programme read as
-  decoration, not as observation. Ink only, `aria-hidden`, at most three per page.
+- **Motifs** — **`botanical` on by default**, as brief §3.8 binds; `fauna` is the supported
+  alternate, both in engraving and botanical-plate linework. The linework is what makes this style
+  observational rather than merely serif, so it is not something a client has to go and find. The
+  site renders a motif in three places only — the masthead mark, the masthead's closing divider,
+  and the public empty state — and the masthead mark yields to a client logo whenever one is set.
+  Ink only, `aria-hidden`, at most three per page. A client who wants none picks `none` under
+  Illustrations.
 - **Back issue** — a pressed specimen. The past day dries to the archive tokens and keeps its label.
 - **Dark mode** — night observation. A deep forest-neutral ground, warm bone-white text, the palette
   of a lamp on a field table. Both accents lift for the dark ground; the light values are never
@@ -644,12 +652,13 @@ Body stays Vollkorn and data stays IBM Plex Mono under every option. Only the he
 
 **(b) Nameplate treatment — the title page.**
 
-1. **Ruled title, no frame** *(default)* — name, dates, and edition line between a double rule above
-   and a hairline below. The title page of a cheaper printing of the same book; quieter, and better
-   for text-heavy events. The owner review made it the default: plate framing is reserved for
-   content that supports it, and an event name is not a plate.
-2. **Framed title page** — name and dates inside a hairline frame with the `nameplate-mark` motif
-   above the name. The opening plate of the handbook, and the alternate the main workflow offers.
+1. **Framed title page** *(default)* — name and dates inside a hairline frame with the
+   `nameplate-mark` motif above the name. The opening plate of the handbook. It renders on the home
+   page alone — every inner page takes the compact nameplate — so the frame lands on exactly the
+   content a frontispiece supports.
+2. **Ruled title, no frame** — name, dates, and edition line between a double rule above and a
+   hairline below. The title page of a cheaper printing of the same book; quieter, and better for
+   text-heavy events.
 3. **Plate-and-label** — a `botanical` plate to one side, the name and dates set as an oversized
    specimen label beside it. It states the book's subject the way a frontispiece plate does, and the
    plate stays drawn linework, never a photo.

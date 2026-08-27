@@ -19,6 +19,11 @@ const {
   recommendedConfiguration,
   findThemeContrastFailures,
   getPreset,
+  resolveComponentFonts,
+  resolveFontRoles,
+  resolveMotifSet,
+  resolvePresetTokens,
+  resolveShape,
   rgbToHex,
   contrastRatio,
   relativeLuminance,
@@ -305,6 +310,63 @@ test('every style ships one recommended configuration that clears contrast in bo
     );
   }
   assert.equal(recommendedConfiguration('not-a-style'), null);
+});
+
+test('each style keeps its own conviction in its recommended configuration', () => {
+  // "Do not homogenize the themes" (owner calibration, 2026-08-27). Refining
+  // a default is allowed; sanding a style down to a neutral one is not. Each
+  // assertion below is the one thing that makes that style recognisable
+  // BEFORE anyone opens Advanced, so a future retune that removes it fails
+  // here and has to argue for itself.
+  const configuration = (id) => ({
+    ...recommendedConfiguration(id),
+    // The picker writes no texture of its own: the style's own shape is what
+    // renders, which is exactly what resolveShape answers for this document.
+  });
+
+  // Zine is handmade: a copier ground, hand-cut display lettering, a
+  // handwritten callout, and strong rules where the others use hairlines.
+  assert.equal(resolveShape(configuration('zine')).texture, 'paper');
+  assert.equal(resolveShape(configuration('zine')).density, 'loose');
+  assert.equal(resolveFontRoles(configuration('zine')).heading, 'karrik');
+  assert.equal(resolveComponentFonts(configuration('zine'))['--callout-font'], 'script-casual');
+  assert.equal(
+    resolvePresetTokens(configuration('zine'))['--session-card-rule-width'],
+    'var(--rule-strong-width)',
+  );
+
+  // Field Guide is observational: plate linework on by default, and the
+  // opening page framed as a frontispiece.
+  assert.equal(resolveMotifSet(configuration('field-guide')), 'botanical');
+  assert.equal(recommendedConfiguration('field-guide').optionPicks.nameplate, 'framed-title-page');
+  assert.equal(
+    resolvePresetTokens(configuration('field-guide'))['--specimen-label-key-display'],
+    'inline',
+  );
+
+  // Atlas is cartographic: survey linework on by default, the coordinate
+  // grid drawn under the timetable, and the departure board as the
+  // recommended way to read it.
+  assert.equal(resolveMotifSet(configuration('atlas')), 'cartographic');
+  assert.equal(recommendedConfiguration('atlas').optionPicks.component, 'departure-board');
+  assert.notEqual(resolvePresetTokens(configuration('atlas'))['--map-grid-size'], '0');
+  assert.equal(resolvePresetTokens(configuration('atlas'))['--transfer-line-display'], 'block');
+
+  // Broadsheet is authoritative: the Caslon masthead across the full
+  // measure, set tight.
+  assert.equal(resolveFontRoles(configuration('broadsheet')).heading, 'caslon-display');
+  assert.equal(resolveShape(configuration('broadsheet')).density, 'tight');
+  assert.equal(recommendedConfiguration('broadsheet').optionPicks.nameplate, 'full-measure');
+
+  // Newsroom names its sections with a strong rule; Institutional stays
+  // plain and roomy, which is its whole argument.
+  assert.equal(
+    resolvePresetTokens(configuration('newsroom'))['--section-rule-width'],
+    'var(--rule-strong-width)',
+  );
+  assert.equal(resolveShape(configuration('civic')).texture, 'flat');
+  assert.equal(resolveShape(configuration('civic')).density, 'comfortable');
+  assert.equal(resolveMotifSet(configuration('civic')), 'none');
 });
 
 test('both spellings of a palette key normalize to the same role', () => {

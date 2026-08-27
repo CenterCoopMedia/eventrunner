@@ -90,24 +90,28 @@ test('every preset states the whole contract the brief §4 requires', () => {
   }
 });
 
-test('only Atlas ships a motif set on; the other five ship none', () => {
-  // Brief §4 defaults, as the owner review left them (2026-08-27). Field
-  // Guide shipped `botanical` on; drawings on every page of a client's real
-  // programme read as decoration rather than observation, so the set became
-  // something a client turns on. Atlas keeps `cartographic`, because its
-  // marks are wayfinding and its schedule is the sheet they belong to.
-  assert.equal(PRESETS['field-guide'].motifSet, 'none');
+test('the two illustrated styles ship their own set on; the other four ship none', () => {
+  // Brief §3.8 binds both: "Field Guide ships with `botanical` on by
+  // default. Atlas ships with `cartographic` on by default." The linework is
+  // what makes those two styles observational and cartographic rather than
+  // merely serif and merely sans, and the site renders a motif in three
+  // slots only, so the §2.3 density cap holds without turning the set off.
+  assert.equal(PRESETS['field-guide'].motifSet, 'botanical');
   assert.equal(PRESETS.atlas.motifSet, 'cartographic');
   for (const id of ['broadsheet', 'newsroom', 'zine', 'civic']) {
     assert.equal(PRESETS[id].motifSet, 'none', `${id} ships motifs off`);
   }
 });
 
-test('every style ships a flat surface; paper texture is something a client turns on', () => {
-  // Owner review 2026-08-27: flat surfaces are the shared default
-  // everywhere. Zine's copier grain and Field Guide's paper tone are both
-  // still available; neither is what a fresh site renders.
+test('a texture is opted into by name; only Zine opts in', () => {
+  // Nothing paints a texture it did not ask for: the CSS gate requires
+  // [data-texture='paper'] explicitly (apps/web/src/index.css), so a style
+  // that names nothing renders flat and a first paint cannot leak a dot
+  // pattern. Zine names `paper` on purpose — the copier grain is what "made
+  // at a copier" looks like, and brief §4.3 allows it there and only there.
+  assert.equal(PRESETS.zine.shape.texture, 'paper');
   for (const id of Object.keys(PRESETS)) {
+    if (id === 'zine') continue;
     assert.equal(PRESETS[id].shape.texture, 'flat', `${id} ships flat`);
   }
 });

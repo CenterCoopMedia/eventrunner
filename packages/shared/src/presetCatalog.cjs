@@ -680,7 +680,7 @@ const PRESETS = Object.freeze({
       texture: 'flat',
       density: 'comfortable',
     },
-    motifSet: 'none',
+    motifSet: 'botanical',
     tokens: {
       '--plate-frame-width': 'var(--rule-hairline-width)',
       '--plate-pad': 'var(--space-md)',
@@ -726,8 +726,18 @@ const PRESETS = Object.freeze({
       nameplate: {
         label: 'Nameplate treatment',
         prompt: 'The title page.',
-        default: 'ruled-title-no-frame',
+        default: 'framed-title-page',
         choices: [
+          {
+            id: 'framed-title-page',
+            label: 'Framed title page',
+            why: 'Name and dates inside a hairline frame with the nameplate-mark motif above the name. The opening plate of the handbook.',
+            tokens: {
+              '--nameplate-align': 'center',
+              '--nameplate-frame-width': 'var(--rule-hairline-width)',
+              '--nameplate-meta-placement': 'block',
+            },
+          },
           {
             id: 'ruled-title-no-frame',
             label: 'Ruled title, no frame',
@@ -736,16 +746,6 @@ const PRESETS = Object.freeze({
               '--nameplate-align': 'start',
               '--nameplate-frame-width': '0',
               '--nameplate-rule-top-width': 'var(--rule-hairline-width)',
-              '--nameplate-meta-placement': 'block',
-            },
-          },
-          {
-            id: 'framed-title-page',
-            label: 'Framed title page',
-            why: 'Name and dates inside a hairline frame with the nameplate-mark motif above the name. The opening plate of the handbook.',
-            tokens: {
-              '--nameplate-align': 'center',
-              '--nameplate-frame-width': 'var(--rule-hairline-width)',
               '--nameplate-meta-placement': 'block',
             },
           },
@@ -861,7 +861,7 @@ const PRESETS = Object.freeze({
     },
     shape: {
       radius: 'sharp',
-      texture: 'flat',
+      texture: 'paper',
       density: 'loose',
     },
     motifSet: 'none',

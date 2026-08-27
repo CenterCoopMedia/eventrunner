@@ -53,8 +53,8 @@
   "$component-fonts-note": "--callout-font is a component token, not a fifth semantic role (brief §3.1, §4.3). It carries the one handwritten callout a page may hold. A client may point it at var(--font-heading) and drop the script face.",
   "componentFonts": { "--callout-font": "script-casual" },
 
-  "$shape-note": "Texture is flat by default (owner review, 2026-08-27): flat surfaces are the shared default everywhere, and a client who wants the copier grain turns it on under the advanced settings. The grain is still the device brief §4.3 allows; it is no longer what a Zine site starts as.",
-  "shape": { "radius": "sharp", "texture": "flat", "density": "loose" },
+  "$shape-note": "The copier grain is ON by default, as brief §4.3 allows (\"paper grain allowed at low opacity\"). An earlier pass turned it off in the name of flat surfaces; that confused two different fixes. The real fix was the CSS gate — the overlay now paints only under [data-texture='paper'], so an opt-in cannot leak onto a style that never asked for it (apps/web/src/index.css). Zine is the one style that DID ask: a page made at a copier has copier grain, and it is the cheapest, quietest way this style says so — a ground treatment, not a per-card artefact. The misregistered stamp stays the alternate, which is the right place for a printing artefact. A client who wants a clean sheet picks Flat under Advanced.",
+  "shape": { "radius": "sharp", "texture": "paper", "density": "loose" },
   "motifSet": "none",
 
   "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). Zine uses the strong rule where the others use hairlines, so the page reads as cut-and-pasted blocks.",

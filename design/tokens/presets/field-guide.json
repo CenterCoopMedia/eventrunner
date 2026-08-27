@@ -54,8 +54,8 @@
 
   "$shape-note": "Texture is flat by default (owner review, 2026-08-27). Brief §4.5 already called it \"flat with an optional light paper tone\"; the optional tone was on. Flat surfaces are the shared default everywhere, and the tone is one advanced setting away.",
   "shape": { "radius": "sharp", "texture": "flat", "density": "comfortable" },
-  "$motif-note": "Motifs are off by default (owner review, 2026-08-27). Brief §3.8 turned `botanical` on for Field Guide. Drawings on every page of a client's real programme read as decoration, not as observation, so the set is now something a client enables when their subject supports it. `botanical` is still the theme's set, and it is one pick away in the Illustrations control.",
-  "motifSet": "none",
+  "$motif-note": "Botanical illustrations are ON by default, as brief §3.8 binds. An earlier pass turned them off on the grounds that drawings appear \"on every page\"; that was wrong about the wiring. The site renders a motif in three places only — the masthead mark, the masthead's closing divider, and the public empty state — and the masthead mark yields to a client logo whenever one is set. Two small drawings on a page is the observational vocabulary this style is FOR, not decoration on top of it, and brief §2.3 caps the page at three. A client who wants none picks `none` in Illustrations; `fauna` is the supported alternate.",
+  "motifSet": "botanical",
 
   "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The plate frame is a hairline; the double rule is the plate device's own doubling. The specimen label is the one preset that turns its rules and its field names on: a label in this world is a tag, and a tag states what each field is.",
   "tokens": {
@@ -98,9 +98,19 @@
     "nameplate": {
       "label": "Nameplate treatment",
       "prompt": "The title page.",
-      "$default-note": "The ruled title is the default (owner review, 2026-08-27). Plate framing is reserved for content that supports it. An event name and a date range are not a botanical plate, so the frame moved to the alternate; the empty-state plate stays, because a blank sheet IS what that content is.",
-      "default": "ruled-title-no-frame",
+      "$default-note": "The framed title page is the default, as it was before. An earlier pass moved it to the alternate on the grounds that a frame belongs only on \"content that supports it\" — but the framed treatment renders on the HOME page alone (Layout.jsx builds the compact nameplate on every inner page), and the opening page of a handbook is exactly the content a frontispiece supports. The plain ruled head stays one pick away for a text-heavy event.",
+      "default": "framed-title-page",
       "choices": [
+        {
+          "id": "framed-title-page",
+          "label": "Framed title page",
+          "why": "Name and dates inside a hairline frame with the nameplate-mark motif above the name. The opening plate of the handbook.",
+          "tokens": {
+            "--nameplate-align": "center",
+            "--nameplate-frame-width": "var(--rule-hairline-width)",
+            "--nameplate-meta-placement": "block"
+          }
+        },
         {
           "id": "ruled-title-no-frame",
           "label": "Ruled title, no frame",
@@ -109,16 +119,6 @@
             "--nameplate-align": "start",
             "--nameplate-frame-width": "0",
             "--nameplate-rule-top-width": "var(--rule-hairline-width)",
-            "--nameplate-meta-placement": "block"
-          }
-        },
-        {
-          "id": "framed-title-page",
-          "label": "Framed title page",
-          "why": "Name and dates inside a hairline frame with the nameplate-mark motif above the name. The opening plate of the handbook.",
-          "tokens": {
-            "--nameplate-align": "center",
-            "--nameplate-frame-width": "var(--rule-hairline-width)",
             "--nameplate-meta-placement": "block"
           }
         },
