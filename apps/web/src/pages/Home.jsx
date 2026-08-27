@@ -144,7 +144,9 @@ export default function Home() {
                 key={day.id}
                 className="flex flex-wrap items-baseline justify-between gap-x-md gap-y-3xs border-t-hairline border-t-rule-hairline py-sm"
               >
-                <h3 className="font-heading text-h3 text-text-primary">{day.label}</h3>
+                <h3 className="font-heading text-h3 font-semibold text-text-primary">
+                  {day.label}
+                </h3>
                 <p className="font-mono text-caption text-text-secondary">
                   <time dateTime={day.date}>
                     {formatDayDate(day, eventConfig.timezone) ?? day.date}

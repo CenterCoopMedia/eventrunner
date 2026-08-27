@@ -116,7 +116,7 @@ export function TypeBadge({ type }) {
 // The feature-flag controls under a session. Rectangles on the theme radius,
 // not pills (brief §2.4): the same shape rule TypeBadge now follows.
 const actionClass =
-  'touch-target inline-flex items-center gap-2xs rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
+  'touch-target inline-flex items-center gap-2xs rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-60';
 
 /**
  * Bookmark toggle pill (spec §9 "Bookmarks"). Feature-gated by

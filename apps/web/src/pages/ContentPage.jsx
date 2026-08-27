@@ -79,7 +79,7 @@ export default function ContentPage() {
           className="mb-xl border-hairline border-warning/40 bg-warning/10 p-md font-data text-caption text-text-primary"
         >
           This page is an unreviewed template. It has not been reviewed by the
-          organizer&rsquo;s legal counsel and does not yet state their policy.
+          organizer’s legal counsel and does not yet state their policy.
         </p>
       ) : null}
       {sections.length === 0 ? (

@@ -90,7 +90,7 @@ describe('FeedbackModal', () => {
     expect(status).toHaveTextContent('We got your feedback.');
     // Receipt-only: it hedges ("try to send"), never claims delivery.
     expect(status.textContent).not.toMatch(/sent a confirmation/i);
-    expect(status).toHaveTextContent("we'll try to send a confirmation");
+    expect(status).toHaveTextContent('we’ll try to send a confirmation');
   });
 
   it('sends a submissionKey and reuses the SAME one across a retry (Codex P2 idempotency)', async () => {

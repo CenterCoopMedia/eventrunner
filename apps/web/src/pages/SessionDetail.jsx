@@ -103,7 +103,7 @@ export default function SessionDetail() {
                   –<time dateTime={range.endIso}>{range.endLabel}</time>
                 </>
               ) : null}
-              {range.zone ? <span className="ms-1">{range.zone}</span> : null}
+              {range.zone ? <span className="ms-2xs">{range.zone}</span> : null}
             </span>
           ) : !day ? (
             'Time to be announced'

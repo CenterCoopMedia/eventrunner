@@ -17,13 +17,12 @@
 //
 // Editorial base restyle (design brief §2.1, §2.4): the dialog's elevation
 // is a tinted ink scrim (--color-text-primary at low alpha, no blur) behind
-// a strong-rule frame — never a shadow, never a rounded card. The two
-// formControls.jsx button classes are local to that file's own (non-full-
-// width) call sites, so this modal keeps its own button classes rather than
-// importing theirs; both read the same tier-2 tokens the rest of the base
-// system uses. Every form `<label>` in SelectField/TextAreaField/TextField
-// stays above its input — a control label is the one exemption the eyebrow
-// ban names (§2.4), never an eyebrow to "fix".
+// a strong-rule frame — never a shadow, never a rounded card. The buttons
+// are the shared action classes from controlClasses.js, sized by their own
+// content rather than stretched across the dialog. Every form `<label>` in
+// SelectField/TextAreaField/TextField stays above its input — a control
+// label is the one exemption the eyebrow ban names (§2.4), never an eyebrow
+// to "fix".
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
 import { SelectField, TextAreaField, TextField } from '../admin/components/formControls.jsx';
@@ -113,7 +112,7 @@ export default function FeedbackModal({ onClose }) {
                   email was actually delivered — only that the message
                   itself was received. */}
               We got your feedback.
-              {email.trim() ? " If you left an email, we'll try to send a confirmation." : null}
+              {email.trim() ? ' If you left an email, we’ll try to send a confirmation.' : null}
             </p>
             <div>
               <button type="button" className={primaryActionClass} onClick={onClose}>
@@ -151,7 +150,7 @@ export default function FeedbackModal({ onClose }) {
               type="email"
               value={email}
               onChange={setEmail}
-              hint="Leave your email if you'd like a reply."
+              hint="Leave your email if you’d like a reply."
             />
 
             {/* Honeypot: visually hidden, out of tab order, and never
