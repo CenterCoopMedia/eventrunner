@@ -15,6 +15,7 @@ export const scheduleData = [
     title: 'Welcome and orientation',
     description: 'Coffee, badge pickup, and a short welcome from the organizing committee before the first sessions begin.',
     location: 'Main hall',
+    placeId: 'main-hall',
     type: 'keynote',
     speakerIds: [
       'speaker-placeholder-1',
@@ -31,6 +32,7 @@ export const scheduleData = [
     title: 'Workshop: collaborative reporting basics',
     description: 'Setting up a cross-newsroom reporting partnership, from shared documents to shared bylines.',
     location: 'Room A',
+    placeId: 'room-a',
     type: 'workshop',
     track: 'A',
     speakerIds: [
@@ -48,6 +50,7 @@ export const scheduleData = [
     title: 'Panel: sustaining local partnerships',
     description: 'Three newsroom leaders on what it actually takes to keep a shared-coverage partnership funded past year one.',
     location: 'Main hall',
+    placeId: 'main-hall',
     type: 'panel',
     speakerIds: [
       'speaker-placeholder-1',
@@ -65,6 +68,7 @@ export const scheduleData = [
     title: 'Workshop: audience research on a small budget',
     description: 'Simple survey and interview methods for newsrooms with no research budget and no research team.',
     location: 'Room B',
+    placeId: 'room-b',
     type: 'workshop',
     track: 'B',
     speakerIds: [
@@ -82,6 +86,7 @@ export const scheduleData = [
     title: 'Workshop: budgets that survive a thin year',
     description: 'Building a newsroom budget that bends instead of breaking when one grant does not renew.',
     location: 'Room A',
+    placeId: 'room-a',
     type: 'workshop',
     track: 'A',
     speakerIds: [
@@ -97,8 +102,9 @@ export const scheduleData = [
     startTime: '14:00',
     endTime: '15:00',
     title: 'Clinic: bring your survey questions',
-    description: 'The second half of the audience workshop splits into small groups — bring a draft survey and leave with it rewritten.',
-    location: 'Room B',
+    description: 'The second half of the audience workshop moves down to the main hall and splits into small groups — bring a draft survey and leave with it rewritten.',
+    location: 'Main hall',
+    placeId: 'main-hall',
     type: 'workshop',
     track: 'B',
     parentId: 'session-workshop-b',
@@ -131,6 +137,7 @@ export const scheduleData = [
     title: 'Closing conversation',
     description: 'A short conversation on what came out of the three days and where the network goes from here.',
     location: 'Main hall',
+    placeId: 'main-hall',
     type: 'plenary',
     speakerIds: [
       'speaker-placeholder-3',

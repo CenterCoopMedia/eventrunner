@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   validateSessionShape,
   checkSessionTrack,
+  checkSessionPlace,
   checkSessionParent,
   checkSessionChildren,
   checkSchedulePublishSet,
@@ -94,6 +95,81 @@ test('the track is read fresh from config/event, not from a cached config', asyn
     tracks: [{ letter: 'A', name: 'Line A' }, { letter: 'C', name: 'Line C' }],
   });
   assert.equal((await checkSessionTrack({ db, fields: session({ track: 'C' }) })).ok, true);
+});
+
+// --- placeId: the reference the movement model resolves through -------------
+
+/** An event whose venue defines the places named. */
+function dbWithPlaces(ids, seed = {}) {
+  return makeFakeDb({
+    'config/event': { venue: { places: ids.map((id) => ({ id, name: id })) } },
+    ...seed,
+  });
+}
+
+test('a session may be in no recorded place at all', () => {
+  // The ordinary state for most events: a venue that has recorded no places
+  // has every session in none of them.
+  for (const placeId of [undefined, null, '']) {
+    assert.equal(validateSessionShape(session({ placeId }), 'session-1').ok, true);
+  }
+});
+
+test('a placeId is a place id, and anything else is rejected by name', () => {
+  assert.equal(validateSessionShape(session({ placeId: 'main-hall' }), 'session-1').ok, true);
+  for (const bad of ['Main Hall', 'main_hall', 'main--hall', '-main', 42, {}]) {
+    const { ok, errors } = validateSessionShape(session({ placeId: bad }), 'session-1');
+    assert.equal(ok, false, `accepted ${JSON.stringify(bad)}`);
+    assert.match(errors[0], /^placeId: /);
+  }
+});
+
+test('a placeId must name one of the venue’s places', async () => {
+  const db = dbWithPlaces(['main-hall', 'room-a']);
+  assert.deepEqual(
+    await checkSessionPlace({ db, fields: session({ placeId: 'room-a' }) }),
+    { ok: true, errors: [] },
+  );
+});
+
+test('a place the venue does not define is rejected, naming the ones it does', async () => {
+  // Silence is what an unrecorded route looks like, so an id nothing
+  // defines would be indistinguishable from "nobody walked that route".
+  // The save is the only place the difference can still be said out loud.
+  const db = dbWithPlaces(['main-hall', 'room-a']);
+  const verdict = await checkSessionPlace({ db, fields: session({ placeId: 'room-z' }) });
+  assert.equal(verdict.ok, false);
+  assert.match(
+    verdict.errors[0],
+    /^placeId: "room-z" is not one of this venue's places \(main-hall, room-a\)/,
+  );
+});
+
+test('a venue with no places accepts no placeId at all', async () => {
+  for (const db of [makeFakeDb(), makeFakeDb({ 'config/event': {} }), dbWithPlaces([])]) {
+    const verdict = await checkSessionPlace({ db, fields: session({ placeId: 'main-hall' }) });
+    assert.equal(verdict.ok, false);
+    assert.match(verdict.errors[0], /^placeId: this event's venue defines no places/);
+  }
+});
+
+test('a session with no place never reads the config', async () => {
+  const db = makeFakeDb();
+  for (const placeId of [undefined, null, '']) {
+    assert.deepEqual(
+      await checkSessionPlace({ db, fields: session({ placeId }) }),
+      { ok: true, errors: [] },
+    );
+  }
+});
+
+test('the place is read fresh from config/event, not from a cached config', async () => {
+  const db = dbWithPlaces(['main-hall']);
+  assert.equal((await checkSessionPlace({ db, fields: session({ placeId: 'room-a' }) })).ok, false);
+  await db.collection('config').doc('event').set({
+    venue: { places: [{ id: 'main-hall', name: 'Main hall' }, { id: 'room-a', name: 'Room A' }] },
+  });
+  assert.equal((await checkSessionPlace({ db, fields: session({ placeId: 'room-a' }) })).ok, true);
 });
 
 // --- parentId ---------------------------------------------------------------

@@ -35,14 +35,24 @@
  * child-side check exists to prevent, so each has its own refusal, and
  * each reads inside the transaction whose write it guards.
  *
- * WALKING MINUTES ARE NOT HERE. "Transfer to Line B · Hall 2 · 6 min walk"
- * (brief §4.6) is a fact about a pair of rooms in a building, not about a
- * session, and a per-session number would be wrong the moment either
- * session moved. It belongs in a venue file, and it is deliberately out of
- * this schema.
+ *   placeId   the id of one of the venue's places (`config/event.venue
+ *             .places`, shared/venue.cjs). Which ROOM this session is in,
+ *             said as a reference rather than as a string — the session's
+ *             free-text `location` stays exactly what it was, a label an
+ *             operator writes for a reader, and is not touched here.
+ *
+ * WALKING MINUTES ARE STILL NOT HERE, and now there is somewhere they are.
+ * "Transfer to Line B · Hall 2 · 6 min walk" (brief §4.6) is a fact about a
+ * PAIR of rooms in a building, not about a session, and a per-session
+ * number would be wrong the moment either session moved. It lives in
+ * `config/event.venue.movements` and is validated by shared/config
+ * validateEventConfig. What a session carries is which place it is in, and
+ * checkSessionPlace below refuses an id the venue does not define — for
+ * exactly the reasons checkSessionTrack refuses an undefined letter.
  */
 
 const { TRACK_LETTER_RE } = require('shared/config');
+const { PLACE_ID_RE } = require('shared/venue');
 const { isValidDocId } = require('../cms/store.cjs');
 
 /** The live sessions collection and its draft sibling (§8.4). */
@@ -59,12 +69,14 @@ function statedTrack(value) {
 }
 
 /**
- * Shape-check the two structural fields without touching Firestore. Pure,
- * so the cheap rejections cost no reads.
+ * Shape-check the three structural fields without touching Firestore.
+ * Pure, so the cheap rejections cost no reads.
  *
- * Both fields are optional and both accept null, which is how an editor
- * clears one: "this session is on no track" and "this session has no
- * parent" are ordinary states, not errors.
+ * All three are optional and all three accept null, which is how an editor
+ * clears one: "this session is on no track", "this session has no parent",
+ * and "this session is in no recorded place" are ordinary states, not
+ * errors. The last one is the ordinary state for most events — a venue that
+ * has recorded no places has every session in none of them.
  *
  * @param {object} fields the session's fields as they will be stored
  * @param {string} docId the session's own document id
@@ -78,6 +90,16 @@ function validateSessionShape(fields, docId) {
       errors.push(
         `track: must be a single capital letter A-Z naming one of the event's tracks, ` +
         `got ${JSON.stringify(track)}`,
+      );
+    }
+  }
+
+  const placeId = fields?.placeId;
+  if (placeId !== undefined && placeId !== null && placeId !== '') {
+    if (typeof placeId !== 'string' || !PLACE_ID_RE.test(placeId)) {
+      errors.push(
+        'placeId: must be a place id — lowercase letters, digits and single hyphens — ' +
+        `got ${JSON.stringify(placeId)}`,
       );
     }
   }
@@ -122,6 +144,71 @@ async function readTrackLetters({ db, tx }) {
   const tracks = snap.exists ? snap.data()?.tracks : null;
   if (!Array.isArray(tracks)) return [];
   return tracks.map((t) => statedTrack(t?.letter)).filter((letter) => letter !== null);
+}
+
+/**
+ * The place ids `config/event.venue.places` defines.
+ *
+ * Read fresh inside the caller's transaction, for every reason
+ * readTrackLetters is: a five-minute-stale config would tell an operator
+ * who has just added a room that the room does not exist, and would go on
+ * accepting sessions in a room they have just deleted. The transactional
+ * read also puts config/event in the write's read set, so a settings save
+ * that drops this place aborts the session write rather than racing it.
+ */
+async function readPlaceIds({ db, tx }) {
+  const ref = db.collection(CONFIG_COLLECTION).doc(CONFIG_EVENT_DOC);
+  const snap = tx ? await tx.get(ref) : await ref.get();
+  const places = snap.exists ? snap.data()?.venue?.places : null;
+  if (!Array.isArray(places)) return [];
+  return places
+    .map((place) => place?.id)
+    .filter((id) => typeof id === 'string' && PLACE_ID_RE.test(id));
+}
+
+/**
+ * The place, checked against the places the venue actually defines.
+ *
+ * A PLACE ID WITH NO DEFINITION IS REFUSED, including when the venue
+ * defines no places at all — the same rule, and the same reasons, as
+ * checkSessionTrack. A place id is what the movement model resolves a
+ * transfer through (shared/venue.cjs resolveMovement): a session pointing
+ * at an id nothing defines resolves to no place, therefore to no movement,
+ * therefore to silence — and the operator who typed it would have no way to
+ * tell that silence apart from "nobody recorded that route". Rejecting at
+ * the save says which it is, while they can still fix it.
+ *
+ * Existing documents are untouched: this runs at the write, so a session
+ * stored before its place was removed keeps publishing and rendering until
+ * someone edits it.
+ *
+ * @param {{ db: object, tx?: object, fields: object }} args
+ * @returns {Promise<{ ok: boolean, errors: string[] }>}
+ */
+async function checkSessionPlace({ db, tx = null, fields }) {
+  const placeId = fields?.placeId;
+  if (typeof placeId !== 'string' || placeId.trim().length === 0) return { ok: true, errors: [] };
+
+  const ids = await readPlaceIds({ db, tx });
+  if (ids.length === 0) {
+    return {
+      ok: false,
+      errors: [
+        `placeId: this event's venue defines no places, so no session can be in "${placeId}" — ` +
+        'add the place in event settings first, or leave this session with no place',
+      ],
+    };
+  }
+  if (!ids.includes(placeId)) {
+    return {
+      ok: false,
+      errors: [
+        `placeId: "${placeId}" is not one of this venue's places (${ids.join(', ')}) — ` +
+        'add it in event settings first, or pick one of those',
+      ],
+    };
+  }
+  return { ok: true, errors: [] };
 }
 
 /**
@@ -502,6 +589,7 @@ async function validateSessionStructure({ db, tx = null, docId, fields }) {
   const errors = [];
   for (const check of [
     () => checkSessionTrack({ db, tx, fields }),
+    () => checkSessionPlace({ db, tx, fields }),
     () => checkSessionParent({ db, tx, docId, fields, children }),
     () => checkSessionChildren({ db, tx, docId, fields, children }),
   ]) {
@@ -515,6 +603,7 @@ async function validateSessionStructure({ db, tx = null, docId, fields }) {
 module.exports = {
   validateSessionShape,
   checkSessionTrack,
+  checkSessionPlace,
   checkSessionParent,
   checkSessionChildren,
   checkSessionDeletable,
@@ -527,6 +616,7 @@ module.exports = {
     findChildren,
     readSession,
     readTrackLetters,
+    readPlaceIds,
     statedTrack,
     checkChildTrack,
   },
