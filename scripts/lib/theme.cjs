@@ -62,10 +62,11 @@ const CSS_VARIABLE_STEM = Object.freeze({
  * A set with no `faces` is system fonts only, so no `@font-face` block is
  * emitted for it.
  *
- * The generator emits the faces of the ACTIVE preset and its picked options
- * only (brief §4: "a deployed site loads only the faces its active preset
- * and its picked options use"), plus the two fixed admin faces. The other
- * families sit in the repo unreferenced.
+ * The generator DECLARES every set here, because config/theme arrives live
+ * and a role can be remapped to any of them without a rebuild. Declaring is
+ * not downloading — `@font-face` is lazy — so brief §4 still holds: a reader
+ * fetches only the faces the rendered preset and its picked options use.
+ * See the header of `scripts/lib/tokens.cjs`.
  */
 const FONT_SETS = Object.freeze({
   'serif-editorial': Object.freeze({

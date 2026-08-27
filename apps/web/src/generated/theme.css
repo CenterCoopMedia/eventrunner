@@ -1023,9 +1023,72 @@
 }
 
 /* Self-hosted font faces (spec §7.4): woff2 only, no font CDN at runtime.
-   Files live in apps/web/public/fonts/. Only the ACTIVE preset's picked
-   faces plus the two fixed admin faces are declared here, so a reader
-   downloads what this deployment uses and nothing else (brief §4). */
+   Files live in apps/web/public/fonts/. Every bundled face is DECLARED,
+   because config/theme arrives live and buildRuntimeThemeCss can resolve
+   a role to any bundled set — a preset published from the admin, a picked
+   heading-face option, a role named outright, or the theme preview. A
+   family with no block here renders the fallback stack instead.
+
+   Declaring is not downloading: @font-face is lazy, so a browser fetches
+   a file only when a rendered element resolves to that family. A reader
+   still downloads only the faces this deployment actually paints with
+   (brief §4) — the cost of the rest is these CSS bytes, not bandwidth. */
+@font-face {
+  font-family: 'Source Serif 4';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/source-serif-4-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/source-sans-3-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/caveat-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Libre Caslon Display';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/libre-caslon-display-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Libre Caslon Text';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/libre-caslon-text-400-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Libre Caslon Text';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/libre-caslon-text-700-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/libre-baskerville-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/spectral-600-latin.woff2') format('woff2');
+}
 @font-face {
   font-family: 'Fraunces';
   font-style: normal;
@@ -1062,9 +1125,93 @@
   src: url('/fonts/ibm-plex-mono-600-latin.woff2') format('woff2');
 }
 @font-face {
-  font-family: 'Source Sans 3';
+  font-family: 'Archivo Condensed';
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
-  src: url('/fonts/source-sans-3-latin.woff2') format('woff2');
+  src: url('/fonts/archivo-condensed-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/merriweather-400-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/merriweather-700-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Public Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/public-sans-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Karrik';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/karrik-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Bagnard';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/bagnard-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Avara';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/avara-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fragment Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/fragment-mono-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Besley';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/besley-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Vollkorn';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/vollkorn-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Overpass';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/overpass-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Overpass Mono';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/overpass-mono-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Libre Franklin';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/libre-franklin-latin.woff2') format('woff2');
 }

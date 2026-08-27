@@ -34,18 +34,37 @@
  *
  * WHICH FONTS SHIP. Brief §4: "A deployed site loads only the faces its
  * active preset and its picked options use. The bundle lives in the repo. It
- * never lands on a reader in full." So `@font-face` blocks are emitted for:
+ * never lands on a reader in full." That is a statement about DOWNLOADS, and
+ * a downloaded face is not the same thing as a declared one.
  *
- *   - the four font roles the ACTIVE `config/theme` resolves to, and
- *   - the component-token faces that preset asks for (Zine's callout), and
- *   - the two fixed admin faces, which every deployment ships because the
- *     admin identity is not configurable (admin story part 6g).
+ * An `@font-face` block is lazy by specification: the browser fetches the
+ * file only once a rendered element resolves to that family. Declaring a
+ * family nothing renders costs the CSS bytes of the block and not one
+ * request. So the declarations here cover EVERY bundled set — the whole of
+ * `FONT_SETS` — plus the two fixed admin faces, which every deployment ships
+ * because the admin identity is not configurable (admin story part 6g).
  *
- * The other bundled families are never named in the stylesheet, so a browser
- * never requests them. Switching `data-theme` at runtime swaps the PALETTE,
- * which is what the dark-mode completeness test walks; the type map, the
- * shape, and the faces follow the stored preset through this generator and
- * through `buildRuntimeThemeCss`.
+ * The reason it has to be every set is that the type map is LIVE. A stored
+ * `config/theme` is not the only thing that picks faces:
+ *
+ *   - `config/theme` arrives over `onSnapshot`, so an operator publishing a
+ *     new preset restyles an open page without a rebuild;
+ *   - a picked heading-face option remaps `--font-heading` the same way;
+ *   - `config/theme.fonts` may name ANY id in `THEME_FONT_SET_IDS` outright;
+ *   - the admin's theme preview renders a candidate document inside a frame.
+ *
+ * All four run through `buildRuntimeThemeCss`, which writes a `--font-*`
+ * stack — and a stack naming a family with no `@font-face` block renders the
+ * fallback. Emitting only the build-time preset's faces meant every one of
+ * those switches silently degraded to Georgia. `themeRuntime.js` says it
+ * outright: "the runtime override only swaps which family a role resolves
+ * to, it never introduces a remote font" — which holds only if the families
+ * it can swap to are all declared here.
+ *
+ * Switching `data-theme` at runtime swaps the PALETTE, which is what the
+ * dark-mode completeness test walks; the type map, the shape, and the faces
+ * follow the resolved document through this generator and through
+ * `buildRuntimeThemeCss`.
  */
 
 const fs = require('node:fs');
@@ -290,6 +309,31 @@ function resolveFonts(theme) {
   }
 
   return { stacks, componentStacks, faces };
+}
+
+/**
+ * Every bundled face a running deployment can reach.
+ *
+ * The union of `FONT_SETS`, because `buildRuntimeThemeCss` can resolve a
+ * role to any of them — through a published preset change, a picked
+ * heading-face option, a `config/theme.fonts` role named outright, or the
+ * admin's live theme preview. A declaration is lazy, so the browser fetches
+ * only the families a rendered element actually resolves to; what this list
+ * decides is which families CAN be resolved at all, not what downloads.
+ *
+ * @returns {Array<{family: string, file: string, weight: string}>}
+ */
+function resolveSelectableFaces() {
+  const faces = [];
+  const seenFiles = new Set();
+  for (const set of Object.values(FONT_SETS)) {
+    for (const face of set.faces || []) {
+      if (seenFiles.has(face.file)) continue;
+      seenFiles.add(face.file);
+      faces.push({ family: set.family, file: face.file, weight: face.weight });
+    }
+  }
+  return faces;
 }
 
 /**
@@ -662,22 +706,28 @@ function buildTokenCss(theme, { tokensDir } = {}) {
     }
   }
 
-  const { faces } = resolveFonts(theme);
   const adminFaces = resolveAdminFonts(tokens).faces;
   const seen = new Set();
-  const shipped = [];
-  for (const face of [...faces, ...adminFaces]) {
+  const declared = [];
+  for (const face of [...resolveSelectableFaces(), ...adminFaces]) {
     if (seen.has(face.file)) continue;
     seen.add(face.file);
-    shipped.push(face);
+    declared.push(face);
   }
-  if (shipped.length > 0) {
+  if (declared.length > 0) {
     lines.push('');
     lines.push('/* Self-hosted font faces (spec §7.4): woff2 only, no font CDN at runtime.');
-    lines.push('   Files live in apps/web/public/fonts/. Only the ACTIVE preset\'s picked');
-    lines.push('   faces plus the two fixed admin faces are declared here, so a reader');
-    lines.push('   downloads what this deployment uses and nothing else (brief §4). */');
-    for (const { family, file, weight } of shipped) {
+    lines.push('   Files live in apps/web/public/fonts/. Every bundled face is DECLARED,');
+    lines.push('   because config/theme arrives live and buildRuntimeThemeCss can resolve');
+    lines.push('   a role to any bundled set — a preset published from the admin, a picked');
+    lines.push('   heading-face option, a role named outright, or the theme preview. A');
+    lines.push('   family with no block here renders the fallback stack instead.');
+    lines.push('');
+    lines.push('   Declaring is not downloading: @font-face is lazy, so a browser fetches');
+    lines.push('   a file only when a rendered element resolves to that family. A reader');
+    lines.push('   still downloads only the faces this deployment actually paints with');
+    lines.push('   (brief §4) — the cost of the rest is these CSS bytes, not bandwidth. */');
+    for (const { family, file, weight } of declared) {
       lines.push('@font-face {');
       lines.push(`  font-family: '${family}';`);
       lines.push('  font-style: normal;');
@@ -697,6 +747,7 @@ module.exports = {
   resolveColorTokens,
   resolveAdminTokens,
   resolveFonts,
+  resolveSelectableFaces,
   resolveAdminFonts,
   modePolicy,
   TOKENS_DIR,

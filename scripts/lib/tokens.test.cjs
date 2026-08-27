@@ -268,27 +268,51 @@ test('every face a preset or an option names is a bundled set with a real file',
   }
 });
 
-test('a deployed site declares only the faces its active preset uses', () => {
-  // Brief §4: "A deployed site loads only the faces its active preset and
-  // its picked options use." A build that ships all 23 families to one event
-  // site fails review.
+test('every face a live switch can reach is declared, whatever the build-time preset', () => {
+  // config/theme arrives over onSnapshot, so the type map is LIVE: publishing
+  // a preset, picking a heading-face option, naming a role outright in
+  // config/theme.fonts, or opening the admin's theme preview all route
+  // through buildRuntimeThemeCss, which writes a --font-* stack. A stack
+  // naming a family this stylesheet never declared renders the FALLBACK. So
+  // the declarations cover every bundled set, not just the one the build
+  // happened to start on.
   const css = buildTokenCss({ preset: 'zine' });
-  const families = [...css.matchAll(/font-family: '([^']+)'/g)].map((m) => m[1]).sort();
-  assert.deepEqual(families, [
-    // The Zine type map: one display face and one mono across three roles.
-    'Caveat', 'Fragment Mono',
-    // The two fixed admin faces, which every deployment ships.
-    'IBM Plex Mono', 'IBM Plex Mono',
-    'Karrik', 'Source Sans 3',
-  ].sort());
-  assert.doesNotMatch(css, /Overpass|Merriweather|Fraunces|Besley/);
+  const declared = new Set([...css.matchAll(/font-family: '([^']+)'/g)].map((m) => m[1]));
+  for (const setId of THEME_FONT_SET_IDS) {
+    const set = FONT_SETS[setId];
+    assert.ok(set, `${setId} is a bundled set`);
+    assert.ok(declared.has(set.family), `${set.family} is declared, so a live switch to it renders`);
+  }
+  // Including the families a document could never have named at build time.
+  assert.match(css, /src: url\('\/fonts\/overpass-latin\.woff2'\)/);
+  assert.match(css, /src: url\('\/fonts\/merriweather-700-latin\.woff2'\)/);
+
+  // Brief §4 — "a deployed site loads only the faces its active preset and
+  // its picked options use" — is a statement about DOWNLOADS, and this test
+  // cannot measure a download. What keeps it true is that @font-face is lazy
+  // by specification: the browser fetches the file only when a rendered
+  // element resolves to the family. So the two facts the generator can be
+  // held to are the ones asserted here — every reachable family is declared,
+  // and each declaration points at a bundled file and nothing else.
+  const files = [...css.matchAll(/src: url\('\/fonts\/([^']+)\.woff2'\)/g)].map((m) => m[1]);
+  assert.equal(new Set(files).size, files.length, 'no file is declared twice');
+  for (const file of files) {
+    const bundled = path.join(
+      __dirname, '..', '..', 'apps', 'web', 'public', 'fonts', `${file}.woff2`,
+    );
+    assert.ok(fs.existsSync(bundled), `${file}.woff2 is bundled, so no request 404s`);
+  }
+  assert.doesNotMatch(css, /src: url\('https?:/, 'no font CDN at runtime (spec §7.4)');
 });
 
-test('a picked heading option changes the face and the file that ships', () => {
+test('a picked heading option changes the face the heading role resolves to', () => {
   const css = buildTokenCss({ preset: 'zine', optionPicks: { headingFace: 'avara' } });
   assert.match(css, /--font-heading: 'Avara'/);
   assert.match(css, /src: url\('\/fonts\/avara-latin\.woff2'\)/);
-  assert.doesNotMatch(css, /karrik-latin/);
+  // Karrik stays DECLARED — the operator can pick it back without a rebuild —
+  // but nothing resolves to it, so nothing renders it and nothing fetches it.
+  assert.match(css, /src: url\('\/fonts\/karrik-latin\.woff2'\)/);
+  assert.doesNotMatch(css, /--font-heading: 'Karrik'/);
 });
 
 // ------------------------------------------------- the admin set (brief §8.2)
