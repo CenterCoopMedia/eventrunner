@@ -17,9 +17,12 @@
 // are the nameplate device rather than an eyebrow — brief §2.4 names this
 // exception explicitly. Nothing else may sit above a title anywhere.
 //
-// The name is not a heading. A running masthead repeats on every page, and
-// the page's own <h1> is the page's subject; making the masthead an <h1> too
-// would give every page two of them (§8.1, semantic heading order).
+// The name is a heading on exactly one page. A running masthead repeats
+// everywhere, so on an inner page it is a <p> and the page's own <h1> is that
+// page's subject. On the home page the masthead IS the subject — the brief's
+// own front-page moment sets the nameplate first and the lead headline after
+// it — so the shell passes `nameAs="h1"` there. Either way a page carries
+// exactly one <h1> (§8.1, semantic heading order).
 import { Link } from 'react-router-dom';
 import { formatEventDateRange } from '../../lib/eventTime.js';
 
@@ -55,6 +58,9 @@ export function buildNameplate(eventConfig, { compact = false } = {}) {
  *   variant?: 'full' | 'compact',
  *   to?: string | null,        // wraps the name in a link when set
  *   mark?: import('react').ReactNode,  // optional branding mark, inline
+ *   nameAs?: string,           // 'p' by default; 'h1' where the masthead
+ *                              // is the page's own subject
+ *   nameId?: string,
  *   className?: string,
  * }} props
  */
@@ -65,6 +71,8 @@ export default function Nameplate({
   variant = 'full',
   to = null,
   mark = null,
+  nameAs: NameTag = 'p',
+  nameId,
   className = '',
 }) {
   const compact = variant === 'compact';
@@ -101,7 +109,7 @@ export default function Nameplate({
           compact ? 'flex flex-wrap items-baseline justify-between gap-x-md gap-y-3xs' : ''
         }
       >
-        <p className="nameplate__name font-heading font-semibold">
+        <NameTag id={nameId} className="nameplate__name font-heading font-semibold">
           {to ? (
             <Link to={to} className="hover:underline">
               {nameBody}
@@ -109,7 +117,7 @@ export default function Nameplate({
           ) : (
             nameBody
           )}
-        </p>
+        </NameTag>
         {dateline}
       </div>
     </div>

@@ -38,6 +38,15 @@ export default function Home() {
   }
 
   const subtitle = getBlock('hero', 'subtitle');
+  // The shell's masthead nameplate carries the event name as this page's
+  // <h1> (design brief §2.1). The stored hero title is the lead headline
+  // that follows it — unless an editor typed the event name into it, in
+  // which case the nameplate has already set those words at nameplate size
+  // and repeating them under it is just the same headline twice.
+  const leadTitle =
+    typeof title?.value === 'string' && title.value !== eventConfig.name
+      ? title.value
+      : null;
   const heroCtas = getSectionBlocks('hero').filter(
     (block) => block.blockType === 'cta',
   );
@@ -54,12 +63,25 @@ export default function Home() {
     // since a freshly-seeded project's live content and the committed demo
     // snapshot render identical text by construction (spec §8.6 hygiene).
     <article data-content-source={source}>
-      <section aria-labelledby="hero-title" className="pb-xl">
-        <h1 id="hero-title" className="font-heading text-h1 font-semibold text-text-primary">
-          {title?.value ?? eventConfig.name}
-        </h1>
+      <section
+        className="pb-xl"
+        {...(leadTitle ? { 'aria-labelledby': 'hero-title' } : { 'aria-label': 'Introduction' })}
+      >
+        {leadTitle ? (
+          <h2 id="hero-title" className="font-heading text-h1 font-semibold text-text-primary">
+            {leadTitle}
+          </h2>
+        ) : null}
         {typeof eventConfig.tagline === 'string' ? (
-          <p className="mt-sm max-w-prose text-lead text-text-secondary" style={{ textWrap: 'pretty' }}>
+          <p
+            className={[
+              'max-w-prose text-lead text-text-secondary',
+              leadTitle ? 'mt-sm' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            style={{ textWrap: 'pretty' }}
+          >
             {eventConfig.tagline}
           </p>
         ) : null}

@@ -109,7 +109,10 @@ beforeEach(() => {
 describe('app shell', () => {
   it('renders the home page from the snapshot', () => {
     renderAt('/');
-    // Hero title comes from the generated snapshot, not hardcoded copy.
+    // Hero title comes from the generated snapshot, not hardcoded copy. The
+    // masthead nameplate is the home page's <h1> (design brief §2.1), and
+    // the snapshot's hero title is the event's own name, so the nameplate
+    // sets it rather than the page repeating it underneath.
     expect(
       screen.getByRole('heading', { level: 1, name: siteContent.hero__title.value }),
     ).toBeInTheDocument();
@@ -242,8 +245,12 @@ describe('app shell', () => {
         },
       ]);
     });
+    // The masthead nameplate carries the home page's <h1> (design brief
+    // §2.1), so a stored hero title is the lead headline under it: level 2,
+    // and only rendered when it differs from the event name the nameplate
+    // has already set.
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Draft-only headline' }),
+      screen.getByRole('heading', { level: 2, name: 'Draft-only headline' }),
     ).toBeInTheDocument();
 
     // Sign out — ?preview=1 is still in the URL, but authorization is gone.
@@ -256,7 +263,7 @@ describe('app shell', () => {
     // overlay: the draft-only headline is gone from the rendered output,
     // and any new subscription for the collection asks for 'published'.
     expect(
-      screen.queryByRole('heading', { level: 1, name: 'Draft-only headline' }),
+      screen.queryByRole('heading', { level: 2, name: 'Draft-only headline' }),
     ).toBeNull();
     for (const [name, { readSource }] of contentSubscriptions.entries()) {
       // speakers_public has no draft revision (spec §4.3), so it stays on
@@ -306,7 +313,7 @@ describe('app shell', () => {
       ]);
     });
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Draft-only headline' }),
+      screen.getByRole('heading', { level: 2, name: 'Draft-only headline' }),
     ).toBeInTheDocument();
   });
 });

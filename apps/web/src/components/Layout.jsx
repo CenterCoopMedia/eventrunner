@@ -10,6 +10,11 @@
 // choice into stored page data (`layout.header`) in PR3; until then the
 // shell picks it from the route.
 //
+// On the home page the masthead is the page's subject, so the nameplate
+// carries the <h1> and the page's own lead headline follows under it. On
+// every other page the masthead is a running header and the page owns its
+// <h1>. Either way there is exactly one per page.
+//
 // Navigation is in the editorial register: text links, no pills, no tinted
 // ground. The active item is marked twice over (§8.1 — never color alone):
 // heavier weight plus a strong rule under the word.
@@ -74,6 +79,7 @@ export default function Layout() {
         <div className="mx-auto w-full max-w-5xl px-4">
           <Nameplate
             variant={isHome ? 'full' : 'compact'}
+            nameAs={isHome ? 'h1' : 'p'}
             name={plate.name}
             dates={plate.dates}
             edition={plate.edition}

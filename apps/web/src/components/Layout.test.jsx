@@ -110,10 +110,19 @@ describe('Layout masthead', () => {
     expect(container.querySelector('[style*="background-image"]')).toBeNull();
   });
 
-  it('keeps the masthead out of the heading outline', () => {
-    // A running masthead repeats on every page; the page's own <h1> is the
-    // page's subject (§8.1, semantic heading order).
+  it('gives the home page exactly one h1, and it is the masthead', () => {
+    // The home page's subject IS the event, so the nameplate carries the
+    // <h1> and the page's stored lead headline follows under it.
     const { container } = renderShell({});
+    const headings = container.querySelectorAll('h1');
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveClass('nameplate__name');
+  });
+
+  it('keeps the running masthead out of the heading outline elsewhere', () => {
+    // On an inner page the masthead repeats, and the page owns its own <h1>
+    // (§8.1, semantic heading order).
+    const { container } = renderShell({}, { path: '/schedule' });
     expect(container.querySelector('header h1')).toBeNull();
   });
 

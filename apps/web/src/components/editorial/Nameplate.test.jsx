@@ -3,9 +3,9 @@
 // Two things are load-bearing here and both are checked below: the block is
 // type and rules only (no banner, no background image), and its dates and
 // edition line sit INSIDE the rule-bounded block, which is the one place
-// brief §2.4 allows metadata near a title. The name is deliberately not a
-// heading — a running masthead repeats on every page, and the page's own
-// <h1> is the page's subject.
+// brief §2.4 allows metadata near a title. The name is a heading on exactly
+// one page: on the home page the masthead IS the subject and carries the
+// <h1>, and on a running header it is a <p> so the page's own <h1> stands.
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -83,9 +83,21 @@ describe('Nameplate', () => {
     expect(container.querySelector('[style*="background-image"]')).toBeNull();
   });
 
-  it('renders no heading, so the page keeps exactly one h1', () => {
+  it('is not a heading on a running header, so a page keeps one h1', () => {
     renderPlate({ name: '[Fixture] Harbour Summit', dates: 'D' });
     expect(screen.queryByRole('heading')).toBeNull();
+  });
+
+  it('carries the h1 where the masthead is the page subject', () => {
+    // The home page: the nameplate IS the title, and the stored lead
+    // headline follows under it (design brief §2.1).
+    renderPlate({ name: '[Fixture] Harbour Summit', nameAs: 'h1', nameId: 'site-title' });
+    const heading = screen.getByRole('heading', {
+      level: 1,
+      name: '[Fixture] Harbour Summit',
+    });
+    expect(heading).toHaveClass('nameplate__name');
+    expect(heading).toHaveAttribute('id', 'site-title');
   });
 
   it('links the name home when a destination is given', () => {
