@@ -1,13 +1,13 @@
 {
-  "$schema-note": "One theme preset (design brief 2026-08-27, §4.4). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
-  "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 4.",
-  "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin. Civic targets the highest contrast bar of the six presets and never trades contrast for mood.",
-  "$first-class-note": "Every one of the six styles is first-class (owner calibration, 2026-08-27). There is no stability tier and no experimental group: Each style is complete, and each ships one recommended configuration — the option defaults below — that works the moment it is picked. The picker's ORDER is the only ranking, and it lives in scripts/build-preset-catalog.cjs.",
-  "$default-note": "Institutional is what a fresh deployment starts on: It is the plainest of the six, it targets the highest accessibility bar, and it is the look a client is least likely to have to undo. That is an onboarding decision, not a verdict on the other five.",
+  "$schema-note": "Defines one complete site style. The file supplies two color palettes, four font roles, shape, texture, density, a default illustration set, and curated options.",
+  "$story": "Design rationale source: docs/plans/2026-08-27-preset-visual-stories.md, page 4.",
+  "$palette-note": "Color channels use [r, g, b] numbers. The generator writes RGB triples. The dark palette is authored separately. Institutional uses the highest contrast targets among the six styles.",
+  "$first-class-note": "All six styles are complete and supported. Each has one default configuration. scripts/build-preset-catalog.cjs defines the picker order.",
+  "$default-note": "A new deployment starts with Institutional because it uses the simplest layout and the strongest accessibility defaults. Clients can select any other style.",
   "id": "civic",
   "label": "Institutional",
-  "summary": "The public record of a public event. Plain, patient, unambiguous, with nothing between the reader and the information.",
-  "bestFor": "Universities, government partners, and any client with a formal accessibility policy.",
+  "summary": "A formal, accessible layout with clear hierarchy, restrained decoration, and large control targets.",
+  "bestFor": "Use this style for universities, public agencies, and organizations with formal accessibility requirements.",
 
   "$palette-words-light": "document off-white, statute near-black, restrained civic blue, form-grey rule, hearing-room slate, plain caution amber, plain confirm green, record grey",
   "$palette-words-dark": "evening-office neutral, high-contrast bone text, retuned civic blue, lamp-grey rule, night slate, caution amber held bright, confirm green held bright, archive grey",
@@ -44,7 +44,7 @@
     }
   },
 
-  "$font-note": "Brief §4.4. This is the USWDS pairing: Merriweather headings, Public Sans body and labels, IBM Plex Mono for times, room codes, and identifiers.",
+  "$font-note": "Uses Merriweather for headings, Public Sans for body text and labels, and IBM Plex Mono for times, room codes, and identifiers.",
   "fonts": {
     "heading": "merriweather",
     "body": "public-sans",
@@ -55,7 +55,7 @@
   "shape": { "radius": "small", "texture": "flat", "density": "comfortable" },
   "motifSet": "none",
 
-  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). Civic runs larger hit areas, so the session row keeps a comfortable block pad.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule uses comfortable vertical padding and the data font for folio text.",
   "tokens": {
     "--session-card-pad-block": "var(--space-md)",
     "--folio-font": "var(--font-data)"
@@ -64,38 +64,38 @@
   "options": {
     "headingFace": {
       "label": "Heading face",
-      "prompt": "The institution’s register.",
+      "prompt": "Choose the heading typeface.",
       "default": "merriweather",
       "choices": [
         {
           "id": "merriweather",
           "label": "Merriweather",
-          "why": "Weight without drama. It is the USWDS pairing and it reads as a body that has existed for a while.",
+          "why": "Uses the standard USWDS serif and sans pairing. It gives headings more weight while Public Sans keeps body text and controls clear.",
           "fonts": { "heading": "merriweather" }
         },
         {
           "id": "source-serif-4",
           "label": "Source Serif 4",
-          "why": "The same document, lighter on its feet: A university or a cultural institution rather than an agency, and the repo already bundles it for Broadsheet.",
+          "why": "Uses a lighter serif for headings. It suits universities and cultural organizations that need a less formal tone.",
           "fonts": { "heading": "serif-editorial" }
         },
         {
           "id": "public-sans-bold",
           "label": "Public Sans bold",
-          "why": "The all-sans document. One face for headings, labels, and data is the plainest possible public notice, which is the story taken to its logical end.",
+          "why": "Uses one sans-serif family for headings, body text, labels, and data. This is the simplest type hierarchy.",
           "fonts": { "heading": "public-sans" }
         }
       ]
     },
     "nameplate": {
       "label": "Header style",
-      "prompt": "The letterhead.",
+      "prompt": "Choose the site header layout.",
       "default": "institutional-letterhead",
       "choices": [
         {
           "id": "institutional-letterhead",
           "label": "Institutional letterhead",
-          "why": "The top of an official document. The organisation line sits below the name, never above it.",
+          "why": "Places the event name first and the organization line below it. Use it for a formal single-organization event.",
           "tokens": {
             "--nameplate-align": "start",
             "--nameplate-meta-placement": "block",
@@ -105,7 +105,7 @@
         {
           "id": "two-part-lockup",
           "label": "Two-part lockup",
-          "why": "The co-signed notice of a partnership, which is the common Civic case: Logo slot left, event name and dates right, divided by a vertical hairline.",
+          "why": "Places the logo at the left and the event details at the right. A vertical rule separates the two parts.",
           "tokens": {
             "--nameplate-align": "start",
             "--nameplate-meta-placement": "inline",
@@ -115,7 +115,7 @@
         {
           "id": "compact-standing-head",
           "label": "Compact standing head",
-          "why": "For inner pages, where the reader wants the content and not the letterhead again.",
+          "why": "Reduces the header size on content-heavy pages so the page title appears sooner.",
           "tokens": {
             "--nameplate-align": "start",
             "--nameplate-size": "var(--text-h1)",
@@ -126,13 +126,13 @@
     },
     "component": {
       "label": "Schedule style",
-      "prompt": "How the agenda is posted.",
+      "prompt": "Choose the schedule layout.",
       "default": "posted-agenda",
       "choices": [
         {
           "id": "posted-agenda",
           "label": "Posted agenda",
-          "why": "Hairline rows, fixed column order, tabular figures. The list is first-class at every width.",
+          "why": "Uses fixed columns, hairline row rules, and tabular figures. It keeps the same order at each screen width.",
           "tokens": {
             "--schedule-number-display": "none",
             "--schedule-row-leading": "var(--text-body-leading)"
@@ -141,7 +141,7 @@
         {
           "id": "numbered-agenda",
           "label": "Numbered agenda",
-          "why": "The numbers are content, not decoration, and they are never zero-padded, so this matches how a formal programme is published.",
+          "why": "Adds plain sequence numbers to the schedule. The numbers are not zero-padded.",
           "tokens": {
             "--schedule-number-display": "inline",
             "--schedule-row-leading": "var(--text-body-leading)"
