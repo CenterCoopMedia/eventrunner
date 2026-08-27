@@ -4,7 +4,7 @@ How to run a client's site from the admin panel, in the order the work happens. 
 
 **Draft and live are separate almost everywhere below.** Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.
 
-## Set the site up: six steps
+## Set the site up: Six steps
 
 This is the whole visual setup, start to finish. It takes about twenty minutes and you do it once.
 
@@ -117,9 +117,9 @@ Approve and revoke always go through the server endpoints. Every registration fi
 
 Provider status, CSV import, and a searchable ticket list. What is here depends on the client's provider choice ([`CLIENT_ONBOARDING.md`](CLIENT_ONBOARDING.md) §3 item 5):
 
-- **Eventbrite**: provider status shows webhook registration state and recent sync activity.
-- **Manual / CSV import**: upload a spreadsheet, map its columns to attendee fields, preview the import as a dry run, then commit it. That is the whole ticketing story for a manual deployment.
-- **None**: nothing to configure.
+- **Eventbrite**: Provider status shows webhook registration state and recent sync activity.
+- **Manual / CSV import**: Upload a spreadsheet, map its columns to attendee fields, preview the import as a dry run, then commit it. That is the whole ticketing story for a manual deployment.
+- **None**: Nothing to configure.
 
 Ticket records are server-only in Firestore. Every list, search, and import here goes through an admin-gated endpoint.
 

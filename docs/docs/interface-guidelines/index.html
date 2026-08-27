@@ -110,7 +110,7 @@
             <p class="contents-title" id="contents-title">On this page</p>
             <ul>
               <li><a href="#how-this-connects-to-the-rest-of-the-repo">How this connects to the rest of the repo</a></li>
-              <li><a href="#vocabulary-the-words-staff-see">Vocabulary: the words staff see</a></li>
+              <li><a href="#vocabulary-the-words-staff-see">Vocabulary: The words staff see</a></li>
               <li><a href="#editorial-devices">Editorial devices</a></li>
               <li><a href="#user-interface">User interface</a></li>
               <li><a href="#animation">Animation</a></li>
@@ -134,7 +134,7 @@
           <li><strong>The reference is the other half.</strong> <a href="/eventrunner/docs/design-reference/"><code>design-reference.md</code></a> documents what the system contains — every site style, option, illustration set, layout axis, token, and extension point. This document is the rules a review applies; that one is the material those rules apply to.</li>
           <li><strong>The design brief binds.</strong> <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-27-design-system-overhaul.md"><code>plans/2026-08-27-design-system-overhaul.md</code></a> is the design contract; this document is the standing rulebook that carries it into review. Where the two disagree, the brief wins and this document gets fixed in the same pull request.</li>
           </ul>
-          <h2 id="vocabulary-the-words-staff-see">Vocabulary: the words staff see<a class="heading-anchor" href="#vocabulary-the-words-staff-see" aria-label="Link to this section">#</a></h2>
+          <h2 id="vocabulary-the-words-staff-see">Vocabulary: The words staff see<a class="heading-anchor" href="#vocabulary-the-words-staff-see" aria-label="Link to this section">#</a></h2>
           <p>Staff meet this system through words, not through token names. One term per flow (Writing, below), and the staff term is the one that ships in every operator-facing surface: admin labels and hints, <code>docs/ADMIN_GUIDE.md</code>, the handbook, and any message a person reads.</p>
           <div class="table-scroll">
           <table>
@@ -198,7 +198,7 @@
           <li><strong>Functional motion</strong> shows a state change: menus, filters, tabs, disclosure, toasts. Keep it between 120ms and 200ms, animate <code>transform</code> and <code>opacity</code> only, and use <code>ease-out</code>. The <code>duration-fast</code> / <code>duration-base</code> / <code>duration-slow</code> and <code>ease-motion</code> utilities map to the motion tokens.</li>
           <li><strong>Expressive motion</strong> is one designed signature interaction per surface. The schedule grid holds that slot on the public site: a track column comes forward when a reader presses or focuses its head. Focus previews it, the press keeps it, and <code>aria-pressed</code> is the record. The state is a tint of the column&#39;s own ground and the motion is a small lift, so the state lands in both motion settings and only the lift is animated — under <code>prefers-reduced-motion</code> the column still comes forward and nothing moves. No other column is dimmed, so no text drops below its contrast bar at any frame.</li>
           </ul>
-          <p>Both classes: never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support <code>prefers-reduced-motion</code> in full; the reduced state is truly static, and a shortened animation is not a fallback.</p>
+          <p>Both classes: Never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support <code>prefers-reduced-motion</code> in full; the reduced state is truly static, and a shortened animation is not a fallback.</p>
           <ul>
           <li>Never <code>transition: all</code>; list the exact properties that change.</li>
           <li>Scale pressed buttons to 0.95–0.98 with <code>transition: scale 200ms ease-out</code>.</li>
@@ -221,7 +221,7 @@
           <li><code>overflow-wrap: break-word</code> wherever long words, links, or IDs might overflow; <code>white-space: nowrap</code> for labels and badges.</li>
           <li>Set <code>-webkit-font-smoothing: antialiased</code> and <code>-moz-osx-font-smoothing: grayscale</code> once, on the root.</li>
           <li>Store copy in natural case; control presentation with <code>text-transform</code>. (This matches the email rule in spec §6 — content and presentation stay separate.)</li>
-          <li>Smart punctuation: curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.</li>
+          <li>Smart punctuation: Curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.</li>
           <li><code>text-underline-position: from-font</code> with <code>text-decoration-skip-ink: auto</code>.</li>
           <li>Truncated text stays fully accessible via tooltip or an expanded view.</li>
           </ul>
@@ -230,7 +230,7 @@
           <li>Every palette step must earn its place — no unused steps.</li>
           <li>Use semantic tokens (<code>--color-text-secondary</code>), never primitives (<code>blue-500</code>). This is the same rule the hex sweep enforces in code: colors resolve through <code>config/theme</code> custom properties (spec §7.2).</li>
           <li>Name tokens by role, never by appearance or first use. Reserve <code>accent</code> for the brand color so <code>primary</code> doesn&#39;t mean both brand and body text.</li>
-          <li><strong>A client sets one color, and the supporting colors are derived from it</strong>: the darker and lighter steps, the three rule weights and the control boundary (ink mixed into the ground at fixed shares), and the whole dark palette (authored from the light one, never inverted). Semantic colors come from the site style and are not part of the brand decision — a client&#39;s color does not get to redefine what &quot;warning&quot; means. A raw per-mode override is an EXCEPTIONAL control for a brand guide that names an exact value: every use takes one token out of the derivation permanently, so it stops moving when the brand color moves. There is no second brand field: <code>adminAccent</code> is gone, and the admin&#39;s marker is derived rather than set.</li>
+          <li><strong>A client sets one color, and the supporting colors are derived from it</strong>: The darker and lighter steps, the three rule weights and the control boundary (ink mixed into the ground at fixed shares), and the whole dark palette (authored from the light one, never inverted). Semantic colors come from the site style and are not part of the brand decision — a client&#39;s color does not get to redefine what &quot;warning&quot; means. A raw per-mode override is an EXCEPTIONAL control for a brand guide that names an exact value: every use takes one token out of the derivation permanently, so it stops moving when the brand color moves. There is no second brand field: <code>adminAccent</code> is gone, and the admin&#39;s marker is derived rather than set.</li>
           <li>Don&#39;t borrow a token from another role; when a role changes color, mint a new token.</li>
           <li>Measure contrast against the actual rendered background, not the page background.</li>
           <li>Dark mode is its own palette, not light mode reversed. Every color token is defined under both <code>:root[data-mode=&#39;light&#39;]</code> and <code>:root[data-mode=&#39;dark&#39;]</code>, and a token missing from either block is a bug (design brief §8.2).</li>
@@ -259,7 +259,7 @@
           <p><code>docs/</code> is the GitHub Pages surface — the landing page and every generated documentation page. It is not an <code>apps/web</code> surface, but it is Event Runner&#39;s own front door, so it is held to the same design language and reviewed against this document.</p>
           <ul>
           <li><strong>It mints no token.</strong> <code>docs/tokens.css</code> is generated by <code>scripts/build-pages.cjs</code> from <code>design/tokens/</code>, through the same generator that writes <code>apps/web/src/generated/theme.css</code>, narrowed to the tokens the site uses. <code>build-pages --check</code> fails on a stale copy, so the site cannot drift from the product&#39;s palette. <code>docs/styles.css</code> is the handwritten half: the three faces the site serves from <code>docs/fonts/</code>, the device contracts it composes, and its measure. Never hand-declare a name the generated file owns.</li>
-          <li><strong>The mark is four strokes</strong>: a stem, then the three rule weights the system ships. It is inline SVG taking the masthead&#39;s own ink, and it sits beside the wordmark, never behind it. <code>docs/favicon.svg</code> carries the same geometry in ink, because a favicon has no page color to inherit, and <code>scripts/dev/build-social-cards.mjs</code> draws the two social cards from it. No stacked cards, no tinted panels, no drawing behind the name.</li>
+          <li><strong>The mark is four strokes</strong>: A stem, then the three rule weights the system ships. It is inline SVG taking the masthead&#39;s own ink, and it sits beside the wordmark, never behind it. <code>docs/favicon.svg</code> carries the same geometry in ink, because a favicon has no page color to inherit, and <code>scripts/dev/build-social-cards.mjs</code> draws the two social cards from it. No stacked cards, no tinted panels, no drawing behind the name.</li>
           <li><strong>A boundary states its own weight, and only one device draws it.</strong> A major boundary opens on the strong rule and takes more air above it than anything else on the page. A secondary one is the heading with a hairline running out beside it. A subsection heading takes no rule at all — the heading face, the step, and the space are the signal. Both devices stay in the vocabulary; what is banned is stacking them, because a strong rule with a second rule two lines under it is what turns a page of boundaries into ruling.</li>
           <li><strong>Where the layout already separates, nothing is drawn.</strong> A row of entries takes one hairline across the row and lets the column gap do the rest; the hairline returns between the items only when the row stacks and the gap is gone.</li>
           <li><strong>The folio floor is caption size.</strong> <code>--text-folio</code> bottoms out at 11px, which suits a running head a reader glances past. Every folio this site renders is a functional label somebody has to read — the docket&#39;s group heads, a table&#39;s column heads, the status words, the pager&#39;s direction labels — so <code>--folio-size</code> resolves to <code>--text-caption</code> here. The tracking, the leading, and the case stay the folio&#39;s.</li>
@@ -330,6 +330,7 @@
           <li>One term per flow: &quot;Continue&quot; or &quot;Next&quot;, not both.</li>
           <li>Links describe their destination: &quot;Read the schedule&quot;, never &quot;Click here&quot;.</li>
           <li>Consistent capitalization everywhere; sentence case is the default.</li>
+          <li>A colon after a standing label capitalizes the word that follows — &quot;Risk: What could break&quot;, &quot;<strong>Illustrations</strong>: None.&quot; A colon inside a sentence does not — &quot;the day reads twice: a grid and a list&quot;. Code, paths, URLs, and token names keep their own case wherever they land.</li>
           <li>Toggles are labeled by their enabled state: &quot;Send read receipts&quot;, not &quot;Disable read receipts&quot;.</li>
           <li>Empty states orient the reader and offer exactly one next action.</li>
           <li>Address readers as &quot;you&quot;, not &quot;the user&quot;.</li>

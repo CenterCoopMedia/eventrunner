@@ -31,70 +31,70 @@ Three of them are the **launch surface** — run against real client content, an
 
 *The public record of a public event.* Plain, patient, unambiguous, with nothing between the reader and the information.
 
-- **Suits**: a government body, a university, a professional association, a public meeting, anything where the reader is checking a fact rather than being persuaded.
+- **Suits**: A government body, a university, a professional association, a public meeting, anything where the reader is checking a fact rather than being persuaded.
 - **Type**: Merriweather over Public Sans. A serif that stays legible at small sizes over a face designed for public documents.
-- **Shape**: near-square corners, flat surfaces, comfortable spacing.
-- **Devices**: the institutional letterhead header; the posted agenda for the schedule.
-- **Illustrations**: none.
-- **Why it is the default**: it is the plainest of the six, it targets the highest accessibility bar, and it is the look a client is least likely to have to undo. A fresh deployment starts here.
-- **Deeper controls**: the heading face can move to Source Serif 4 (warmer) or to Public Sans bold (drops the serif entirely, for an event that is not a document). The header can become a two-part lockup, for an event run by two organizations, or a compact standing head. The schedule can number its agenda items, which a formal proceeding often wants.
+- **Shape**: Near-square corners, flat surfaces, comfortable spacing.
+- **Devices**: The institutional letterhead header; the posted agenda for the schedule.
+- **Illustrations**: None.
+- **Why it is the default**: It is the plainest of the six, it targets the highest accessibility bar, and it is the look a client is least likely to have to undo. A fresh deployment starts here.
+- **Deeper controls**: The heading face can move to Source Serif 4 (warmer) or to Public Sans bold (drops the serif entirely, for an event that is not a document). The header can become a two-part lockup, for an event run by two organizations, or a compact standing head. The schedule can number its agenda items, which a formal proceeding often wants.
 
 ### Newsroom — launch surface
 
 *A well-made news site on a good day.* Named sections, one strong rule each, numbers that never borrow the headline face.
 
-- **Suits**: a conference with a programme worth reading, a summit, a festival — anything with editorial ambition and a lot of sessions.
+- **Suits**: A conference with a programme worth reading, a summit, a festival — anything with editorial ambition and a lot of sessions.
 - **Type**: Fraunces over Newsreader, with IBM Plex Sans carrying data and IBM Plex Mono carrying values. Four roles, four jobs.
-- **Shape**: the small radius, flat surfaces, comfortable spacing.
-- **Devices**: the rule-bounded bar header; the hairline row for a session.
-- **Illustrations**: none.
-- **Deeper controls**: the heading face can move to Newsreader at display weights (one family throughout, quieter) or to Archivo bold condensed (more sessions per screen in a headline). The header can stack with a deck, which suits an event whose name needs a sentence after it, or become section-aware so the running header names where the reader is. Sessions can run as "lead and rest", which gives the first session of a day the room a keynote deserves.
+- **Shape**: The small radius, flat surfaces, comfortable spacing.
+- **Devices**: The rule-bounded bar header; the hairline row for a session.
+- **Illustrations**: None.
+- **Deeper controls**: The heading face can move to Newsreader at display weights (one family throughout, quieter) or to Archivo bold condensed (more sessions per screen in a headline). The header can stack with a deck, which suits an event whose name needs a sentence after it, or become section-aware so the running header names where the reader is. Sessions can run as "lead and rest", which gives the first session of a day the room a keynote deserves.
 
 ### Zine — launch surface
 
 *Made by hand, at a copier, the week before.* One loud display face, an even rhythm under it, and an accent spent twice a page.
 
-- **Suits**: an unconference, a community gathering, a student event, a workshop series — anything whose character is that it is not corporate.
+- **Suits**: An unconference, a community gathering, a student event, a workshop series — anything whose character is that it is not corporate.
 - **Type**: Karrik for headings over Source Sans 3 for reading, with Fragment Mono carrying times, room codes, and identifiers. The mono is the value face, not the page face: a long session description set in a typewriter face is slow to read at any length.
-- **Shape**: sharp corners, loose spacing.
-- **Devices**: the full-sheet header; the flat block for a session.
-- **Illustrations**: none.
+- **Shape**: Sharp corners, loose spacing.
+- **Devices**: The full-sheet header; the flat block for a session.
+- **Illustrations**: None.
 - **The one exception in the whole system**: Zine may print a session block off-register, like a stamp that missed. It is the only place the design brief grants a deliberate imperfection, and it is **off by default** — a printing artefact is something a client turns on, not something they discover on their own schedule page.
-- **Deeper controls**: the heading face can move to Bagnard or Avara. The header can become a stacked block or a boxed bill. The session block can take the off-register stamp or the struck folio. Pen marks — the hand that went over the page afterwards — can be turned on, and they are their own control, so a client can take the stamp without the pen.
+- **Deeper controls**: The heading face can move to Bagnard or Avara. The header can become a stacked block or a boxed bill. The session block can take the off-register stamp or the struck folio. Pen marks — the hand that went over the page afterwards — can be turned on, and they are their own control, so a client can take the stamp without the pen.
 
 ### Broadsheet — being proved
 
 *The paper of record.* The masthead is the loudest thing on the page, and rules do the dividing.
 
-- **Suits**: an annual convening with weight behind it, an anniversary edition, an event that wants to look like it has happened many times before.
+- **Suits**: An annual convening with weight behind it, an anniversary edition, an event that wants to look like it has happened many times before.
 - **Type**: Libre Caslon Display over Libre Caslon Text, with a serif carrying data too. One voice, all the way down.
-- **Shape**: sharp corners, flat surfaces, tight spacing — a broadsheet fits a lot on a page.
-- **Devices**: the full-measure header; the ruled programme for the schedule.
-- **Illustrations**: none.
-- **Deeper controls**: the heading face can move to Libre Baskerville or Spectral semibold. The header can centre itself under a double rule, or compact to the left with a standing edition line. The schedule can drop to an agate block — the dense small-type listing a printed programme uses when the day is long.
+- **Shape**: Sharp corners, flat surfaces, tight spacing — a broadsheet fits a lot on a page.
+- **Devices**: The full-measure header; the ruled programme for the schedule.
+- **Illustrations**: None.
+- **Deeper controls**: The heading face can move to Libre Baskerville or Spectral semibold. The header can centre itself under a double rule, or compact to the left with a standing edition line. The schedule can drop to an agate block — the dense small-type listing a printed programme uses when the day is long.
 
 ### Field Guide — being proved
 
 *A naturalist's expedition handbook.* Plates, specimen labels, and observation notes, with the linework carrying the character.
 
-- **Suits**: a field school, an environmental convening, a residency, a science festival — an event about looking closely at things.
+- **Suits**: A field school, an environmental convening, a residency, a science festival — an event about looking closely at things.
 - **Type**: Besley over Vollkorn, with IBM Plex Mono for data.
-- **Shape**: sharp corners, comfortable spacing, and the paper tone available as an advanced setting.
-- **Devices**: a plain ruled title head; the specimen label for a session.
-- **Illustrations**: the botanical set exists for this style and ships **off**. Drawings on every page of a real programme read as decoration rather than as observation. Turn them on for an event where they mean something.
-- **Deeper controls**: the heading face can move to Vollkorn at display size or to Spectral semibold. The header can become a framed title page or a plate-and-label lockup. Sessions can run as a field-notes column. A pencil line can be turned on in the margins. The empty-state plate stays framed whatever you pick, because a blank sheet really is one.
+- **Shape**: Sharp corners, comfortable spacing, and the paper tone available as an advanced setting.
+- **Devices**: A plain ruled title head; the specimen label for a session.
+- **Illustrations**: The botanical set exists for this style and ships **off**. Drawings on every page of a real programme read as decoration rather than as observation. Turn them on for an event where they mean something.
+- **Deeper controls**: The heading face can move to Vollkorn at display size or to Spectral semibold. The header can become a framed title page or a plate-and-label lockup. Sessions can run as a field-notes column. A pencil line can be turned on in the margins. The empty-state plate stays framed whatever you pick, because a blank sheet really is one.
 
 ### Atlas — being proved
 
 *A mapped city on its transit network.* A survey sheet and a departure board at once: lines, stations, transfers.
 
-- **Suits**: a multi-venue event, a city-wide festival, anything where getting from one thing to the next is part of the problem.
+- **Suits**: A multi-venue event, a city-wide festival, anything where getting from one thing to the next is part of the problem.
 - **Type**: Overpass over Libre Franklin, with Overpass Mono carrying times and codes.
-- **Shape**: sharp corners, flat surfaces, tight spacing.
-- **Devices**: the corner title block; the departure board for the schedule.
-- **Illustrations**: the cartographic set, on by default for this style.
-- **Where the grid is drawn**: the coordinate grid and the route marks sit on the schedule surface only. A grid behind the about page, the speaker bios, and the code of conduct is texture; a grid behind a timetable is a reading device.
-- **Deeper controls**: the heading face can move to Libre Franklin extrabold or Archivo Condensed. The header can take a scale line or become a departure-board header. The schedule can run as a line diagram or a gazetteer list.
+- **Shape**: Sharp corners, flat surfaces, tight spacing.
+- **Devices**: The corner title block; the departure board for the schedule.
+- **Illustrations**: The cartographic set, on by default for this style.
+- **Where the grid is drawn**: The coordinate grid and the route marks sit on the schedule surface only. A grid behind the about page, the speaker bios, and the code of conduct is texture; a grid behind a timetable is a reading device.
+- **Deeper controls**: The heading face can move to Libre Franklin extrabold or Archivo Condensed. The header can take a scale line or become a departure-board header. The schedule can run as a line diagram or a gazetteer list.
 
 ## Header style
 
@@ -277,7 +277,7 @@ The full list of rejected patterns is in [`interface-guidelines.md`](interface-g
 The admin CMS is its own design surface and it does not restyle. It reads its own fixed token set, obeys the mode, and ignores the site style entirely — so the room a staff member works in does not change shape every time a client changes their palette.
 
 - **Two faces, fixed.** Source Sans 3 for everything a person reads as language, IBM Plex Mono with tabular figures for everything the machine owns.
-- **Navigation is the docket**: a grouped standing list of words down the leading edge. No icon rail, no collapse to glyphs, no counts in bubbles.
+- **Navigation is the docket**: A grouped standing list of words down the leading edge. No icon rail, no collapse to glyphs, no counts in bubbles.
 - **The active item carries four signals**, never colour alone: the marker, the weight, a ground shift, and the assistive-technology current-page state.
 - **The position marker is derived**, from the admin's own ink against the admin ground. It is not a client setting: there is no marker colour to choose, nothing to get wrong, and no failure state to explain.
 - **Three state words, everywhere**: Draft, Live, and Live with unpublished changes.
@@ -299,4 +299,4 @@ What a developer can add, and what the system will refuse.
 
 **A new page template.** A template is a named, validated bundle of layout values plus the record of which task the operator meant. Add both, and state every axis: a template that left one unanswered would leave the page following the style for that one value while stating the others, which is the half-configured state templates exist to prevent.
 
-**What a style may never do**: grant itself an exception to a rejected pattern, introduce a property name, ship a remote font, or define a colour in one mode only.
+**What a style may never do**: Grant itself an exception to a rejected pattern, introduce a property name, ship a remote font, or define a colour in one mode only.

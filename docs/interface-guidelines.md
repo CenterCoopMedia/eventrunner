@@ -11,7 +11,7 @@ Foundational rules for every `apps/web` surface — attendee pages, admin panel,
 - **The reference is the other half.** [`design-reference.md`](design-reference.md) documents what the system contains — every site style, option, illustration set, layout axis, token, and extension point. This document is the rules a review applies; that one is the material those rules apply to.
 - **The design brief binds.** [`plans/2026-08-27-design-system-overhaul.md`](plans/2026-08-27-design-system-overhaul.md) is the design contract; this document is the standing rulebook that carries it into review. Where the two disagree, the brief wins and this document gets fixed in the same pull request.
 
-## Vocabulary: the words staff see
+## Vocabulary: The words staff see
 
 Staff meet this system through words, not through token names. One term per flow (Writing, below), and the staff term is the one that ships in every operator-facing surface: admin labels and hints, `docs/ADMIN_GUIDE.md`, the handbook, and any message a person reads.
 
@@ -75,7 +75,7 @@ The system has two motion classes and there is no third (design brief §2.2).
 - **Functional motion** shows a state change: menus, filters, tabs, disclosure, toasts. Keep it between 120ms and 200ms, animate `transform` and `opacity` only, and use `ease-out`. The `duration-fast` / `duration-base` / `duration-slow` and `ease-motion` utilities map to the motion tokens.
 - **Expressive motion** is one designed signature interaction per surface. The schedule grid holds that slot on the public site: a track column comes forward when a reader presses or focuses its head. Focus previews it, the press keeps it, and `aria-pressed` is the record. The state is a tint of the column's own ground and the motion is a small lift, so the state lands in both motion settings and only the lift is animated — under `prefers-reduced-motion` the column still comes forward and nothing moves. No other column is dimmed, so no text drops below its contrast bar at any frame.
 
-Both classes: never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support `prefers-reduced-motion` in full; the reduced state is truly static, and a shortened animation is not a fallback.
+Both classes: Never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support `prefers-reduced-motion` in full; the reduced state is truly static, and a shortened animation is not a fallback.
 
 - Never `transition: all`; list the exact properties that change.
 - Scale pressed buttons to 0.95–0.98 with `transition: scale 200ms ease-out`.
@@ -98,7 +98,7 @@ Both classes: never trigger motion from scroll position, never run ambient anima
 - `overflow-wrap: break-word` wherever long words, links, or IDs might overflow; `white-space: nowrap` for labels and badges.
 - Set `-webkit-font-smoothing: antialiased` and `-moz-osx-font-smoothing: grayscale` once, on the root.
 - Store copy in natural case; control presentation with `text-transform`. (This matches the email rule in spec §6 — content and presentation stay separate.)
-- Smart punctuation: curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.
+- Smart punctuation: Curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.
 - `text-underline-position: from-font` with `text-decoration-skip-ink: auto`.
 - Truncated text stays fully accessible via tooltip or an expanded view.
 
@@ -107,7 +107,7 @@ Both classes: never trigger motion from scroll position, never run ambient anima
 - Every palette step must earn its place — no unused steps.
 - Use semantic tokens (`--color-text-secondary`), never primitives (`blue-500`). This is the same rule the hex sweep enforces in code: colors resolve through `config/theme` custom properties (spec §7.2).
 - Name tokens by role, never by appearance or first use. Reserve `accent` for the brand color so `primary` doesn't mean both brand and body text.
-- **A client sets one color, and the supporting colors are derived from it**: the darker and lighter steps, the three rule weights and the control boundary (ink mixed into the ground at fixed shares), and the whole dark palette (authored from the light one, never inverted). Semantic colors come from the site style and are not part of the brand decision — a client's color does not get to redefine what "warning" means. A raw per-mode override is an EXCEPTIONAL control for a brand guide that names an exact value: every use takes one token out of the derivation permanently, so it stops moving when the brand color moves. There is no second brand field: `adminAccent` is gone, and the admin's marker is derived rather than set.
+- **A client sets one color, and the supporting colors are derived from it**: The darker and lighter steps, the three rule weights and the control boundary (ink mixed into the ground at fixed shares), and the whole dark palette (authored from the light one, never inverted). Semantic colors come from the site style and are not part of the brand decision — a client's color does not get to redefine what "warning" means. A raw per-mode override is an EXCEPTIONAL control for a brand guide that names an exact value: every use takes one token out of the derivation permanently, so it stops moving when the brand color moves. There is no second brand field: `adminAccent` is gone, and the admin's marker is derived rather than set.
 - Don't borrow a token from another role; when a role changes color, mint a new token.
 - Measure contrast against the actual rendered background, not the page background.
 - Dark mode is its own palette, not light mode reversed. Every color token is defined under both `:root[data-mode='light']` and `:root[data-mode='dark']`, and a token missing from either block is a bug (design brief §8.2).
@@ -138,7 +138,7 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 `docs/` is the GitHub Pages surface — the landing page and every generated documentation page. It is not an `apps/web` surface, but it is Event Runner's own front door, so it is held to the same design language and reviewed against this document.
 
 - **It mints no token.** `docs/tokens.css` is generated by `scripts/build-pages.cjs` from `design/tokens/`, through the same generator that writes `apps/web/src/generated/theme.css`, narrowed to the tokens the site uses. `build-pages --check` fails on a stale copy, so the site cannot drift from the product's palette. `docs/styles.css` is the handwritten half: the three faces the site serves from `docs/fonts/`, the device contracts it composes, and its measure. Never hand-declare a name the generated file owns.
-- **The mark is four strokes**: a stem, then the three rule weights the system ships. It is inline SVG taking the masthead's own ink, and it sits beside the wordmark, never behind it. `docs/favicon.svg` carries the same geometry in ink, because a favicon has no page color to inherit, and `scripts/dev/build-social-cards.mjs` draws the two social cards from it. No stacked cards, no tinted panels, no drawing behind the name.
+- **The mark is four strokes**: A stem, then the three rule weights the system ships. It is inline SVG taking the masthead's own ink, and it sits beside the wordmark, never behind it. `docs/favicon.svg` carries the same geometry in ink, because a favicon has no page color to inherit, and `scripts/dev/build-social-cards.mjs` draws the two social cards from it. No stacked cards, no tinted panels, no drawing behind the name.
 - **A boundary states its own weight, and only one device draws it.** A major boundary opens on the strong rule and takes more air above it than anything else on the page. A secondary one is the heading with a hairline running out beside it. A subsection heading takes no rule at all — the heading face, the step, and the space are the signal. Both devices stay in the vocabulary; what is banned is stacking them, because a strong rule with a second rule two lines under it is what turns a page of boundaries into ruling.
 - **Where the layout already separates, nothing is drawn.** A row of entries takes one hairline across the row and lets the column gap do the rest; the hairline returns between the items only when the row stacks and the gap is gone.
 - **The folio floor is caption size.** `--text-folio` bottoms out at 11px, which suits a running head a reader glances past. Every folio this site renders is a functional label somebody has to read — the docket's group heads, a table's column heads, the status words, the pager's direction labels — so `--folio-size` resolves to `--text-caption` here. The tracking, the leading, and the case stay the folio's.
@@ -211,6 +211,7 @@ The brief names exactly two exceptions, both narrow: a bento grid that passes al
 - One term per flow: "Continue" or "Next", not both.
 - Links describe their destination: "Read the schedule", never "Click here".
 - Consistent capitalization everywhere; sentence case is the default.
+- A colon after a standing label capitalizes the word that follows — "Risk: What could break", "**Illustrations**: None." A colon inside a sentence does not — "the day reads twice: a grid and a list". Code, paths, URLs, and token names keep their own case wherever they land.
 - Toggles are labeled by their enabled state: "Send read receipts", not "Disable read receipts".
 - Empty states orient the reader and offer exactly one next action.
 - Address readers as "you", not "the user".
