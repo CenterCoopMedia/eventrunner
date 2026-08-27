@@ -108,6 +108,12 @@ function header(lines) {
  */
 function emitEventConfig({ event, features, theme }) {
   const themeProjection = {
+    // The base look (design brief §4). EventConfigProvider writes it to
+    // data-theme on <html>, and the theme editor seeds its preset picker
+    // from it before config/theme arrives. A document from before presets
+    // existed has none, and the runtime writes no attribute for it.
+    preset: theme.preset,
+    optionPicks: theme.optionPicks,
     fonts: theme.fonts,
     texture: theme.texture,
     radius: theme.radius,
@@ -115,6 +121,10 @@ function emitEventConfig({ event, features, theme }) {
     // write data-mode on <html>; a document from before the field existed
     // has no `mode` and the runtime defaults it to light.
     mode: theme.mode,
+    // The motif set (design brief §3.8), written to data-motif-set on
+    // <html>. Colors stay out of this projection — they go to theme.css as
+    // RGB triples — but the motif set is an attribute, not a color.
+    motifSet: theme.motifSet,
     logos: theme.logos,
   };
   return [
