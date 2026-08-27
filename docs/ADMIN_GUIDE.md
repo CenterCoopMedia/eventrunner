@@ -151,6 +151,22 @@ reader tells two lines apart by the letter and the name, never by colour alone. 
 track by its letter, so renaming a track is one edit here rather than a change to every session.
 Leave the list empty if everything happens in one room.
 
+**What the track list changes on the public site.** Once you list tracks, the schedule draws as a
+grid on a wide screen: time down the left, one column per track, in the order you listed them. On a
+phone — and for anyone reading with a screen reader — the same day reads as a time-ordered list,
+which is a designed view rather than a lesser one. A session with no track runs across the whole
+width, which is what a plenary is. A session that names a parent is listed under it as a stop on
+the way through it rather than as a separate entry, in both views.
+
+**Past days become back issues.** When a day ends, its page keeps every word and quietens: the
+colour drops out, the day head says "Back issue", and the controls that act on a live event —
+bookmarking, reactions, adding to a calendar — go away. Nothing is hidden, and every link still
+works. Setting an **archive date** for the whole event does the same thing to every day at once.
+
+**Printing.** Print any schedule page and you get the handout: every day of the event, every
+session and every stop under it, tracks named by letter and name, no buttons. You do not have to
+prepare anything for it.
+
 ### Features
 
 Feature flags, wired to a **whole-document replace** — every known flag is always sent, and an
