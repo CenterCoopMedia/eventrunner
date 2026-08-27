@@ -1,13 +1,23 @@
 // cmsPages document helpers: what the editor loads, what it sends back, and
 // how the two revisions read as one list.
 import { describe, expect, it } from 'vitest';
+import * as pagesCjs from '../../../../functions/src/cms/pages.cjs';
 import {
   PAGE_KEYS,
+  SECTION_KEYS,
+  DEFAULT_BLOCK_KEYS,
   mergePageRevisions,
   publishStateOf,
   toEditablePage,
   toPagePayload,
 } from './pageDoc.js';
+import {
+  PAGE_LAYOUT_DEFAULTS,
+  PAGE_LAYOUT_VALUES,
+  SECTION_SLOTS,
+} from '../lib/pageLayout.js';
+
+const backend = pagesCjs.default ?? pagesCjs;
 
 const STORED = {
   id: 'scholarships',
@@ -60,6 +70,51 @@ describe('toEditablePage', () => {
     const page = toEditablePage({});
     expect(page).toMatchObject({ id: '', label: '', path: '', order: 0, visible: true });
     expect(page.sections).toEqual([]);
+  });
+});
+
+// The two key lists must stay in step (brief §6.2): validatePageDoc rejects
+// an unknown top-level or section key BY NAME, so a one-sided addition here
+// breaks every save of a seeded page. Imported from the functions source the
+// same way the block-registry parity test does it.
+describe('cmsPages key parity with the server', () => {
+  it('mirrors PAGE_KEYS, SECTION_KEYS, and DEFAULT_BLOCK_KEYS exactly', () => {
+    expect([...PAGE_KEYS]).toEqual([...backend.internals.PAGE_KEYS]);
+    expect([...SECTION_KEYS]).toEqual([...backend.internals.SECTION_KEYS]);
+    expect([...DEFAULT_BLOCK_KEYS]).toEqual([...backend.internals.DEFAULT_BLOCK_KEYS]);
+  });
+
+  it('mirrors the layout variants and the section slots the server accepts', () => {
+    expect(PAGE_LAYOUT_VALUES).toEqual(backend.PAGE_LAYOUT_VALUES);
+    expect([...SECTION_SLOTS]).toEqual([...backend.SECTION_SLOTS]);
+  });
+
+  it('sends a payload the server accepts, layout and slots included', () => {
+    const page = toEditablePage(STORED);
+    page.layout.arrangement = 'grid';
+    page.sections[0].slot = 'below';
+    const verdict = backend.validatePageDoc(toPagePayload(page));
+    expect(verdict.errors).toEqual([]);
+    expect(verdict.ok).toBe(true);
+  });
+});
+
+describe('layout and slot', () => {
+  it('opens a page with no stored layout on the defaults', () => {
+    expect(toEditablePage(STORED).layout).toEqual(PAGE_LAYOUT_DEFAULTS);
+  });
+
+  it('keeps a stored layout and fills in what it leaves out', () => {
+    const page = toEditablePage({ ...STORED, layout: { navPlacement: 'side' } });
+    expect(page.layout.navPlacement).toBe('side');
+    expect(page.layout.density).toBe(PAGE_LAYOUT_DEFAULTS.density);
+  });
+
+  it('reads a section with no slot as main, and sends it back whole', () => {
+    const page = toEditablePage(STORED);
+    expect(page.sections[0].slot).toBe('main');
+    expect(toPagePayload(page).sections[0].slot).toBe('main');
+    expect(toPagePayload(page).layout).toEqual(PAGE_LAYOUT_DEFAULTS);
   });
 });
 

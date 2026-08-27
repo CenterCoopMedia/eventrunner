@@ -261,7 +261,7 @@ describe('page editor', () => {
 
     const { page } = bodyOf(0);
     expect(Object.keys(page).sort()).toEqual(
-      ['icon', 'id', 'label', 'order', 'path', 'sections', 'systemPage', 'visible'].sort(),
+      ['icon', 'id', 'label', 'layout', 'order', 'path', 'sections', 'systemPage', 'visible'].sort(),
     );
     expect(page).not.toHaveProperty('seeded');
     expect(page).not.toHaveProperty('status');
@@ -378,6 +378,61 @@ describe('page editor', () => {
       'closing',
       'body',
     ]);
+  });
+
+  // Layout variants and section slots (design brief §6.1, §6.2).
+  it('sends the layout the operator picked, and offers no headerless option', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+    await renderAt('/admin/pages/scholarships');
+
+    // Every public page keeps a nameplate: compact is the smallest header.
+    const header = screen.getByLabelText('Header');
+    expect(within(header).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Full nameplate',
+      'Compact nameplate',
+    ]);
+
+    fireEvent.change(screen.getByLabelText('Arrangement'), { target: { value: 'grid' } });
+    fireEvent.change(screen.getByLabelText('Navigation'), { target: { value: 'side' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page.layout).toEqual({
+      header: 'nameplate',
+      arrangement: 'grid',
+      density: 'comfortable',
+      navPlacement: 'side',
+    });
+  });
+
+  it('opens a stored layout on what the page says, not on the defaults', async () => {
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, layout: { density: 'tight' } }];
+    await renderAt('/admin/pages/scholarships');
+    expect(screen.getByLabelText('Density')).toHaveValue('tight');
+    expect(screen.getByLabelText('Arrangement')).toHaveValue('list');
+  });
+
+  it('offers a section position on a system page only', async () => {
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'home', label: 'Home page', systemPage: true }];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'home', status: 'dirty' }));
+    await renderAt('/admin/pages/home');
+
+    // A section stored before this schema landed carries no slot; it reads
+    // as main, which is where it has always rendered.
+    const position = screen.getByLabelText('Section 1 position');
+    expect(position).toHaveValue('main');
+    fireEvent.change(position, { target: { value: 'below' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page.sections[0].slot).toBe('below');
+  });
+
+  it('hides the section position on a custom page, which has no core content', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    expect(screen.queryByLabelText('Section 1 position')).toBeNull();
   });
 
   it('offers only the section’s allowed block types in the block picker', async () => {

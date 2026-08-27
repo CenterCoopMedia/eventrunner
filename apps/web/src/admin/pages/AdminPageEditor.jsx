@@ -38,6 +38,12 @@ import {
   blockTypeLabel,
 } from '../blockTypes.js';
 import { blankPage, blankSection, toEditablePage, toPagePayload } from '../pageDoc.js';
+import {
+  PAGE_LAYOUT_DEFAULTS,
+  PAGE_LAYOUT_KEYS,
+  PAGE_LAYOUT_VALUES,
+  SECTION_SLOTS,
+} from '../../lib/pageLayout.js';
 import { summarizePublish } from '../publishResult.js';
 import {
   CheckboxField,
@@ -72,6 +78,41 @@ function InlineFieldError({ message }) {
     </p>
   );
 }
+
+/** Plain words for the layout variants (design brief §6.1, §8.5). */
+const LAYOUT_LABELS = Object.freeze({
+  header: 'Header',
+  arrangement: 'Arrangement',
+  density: 'Density',
+  navPlacement: 'Navigation',
+});
+
+const LAYOUT_HINTS = Object.freeze({
+  header: 'Every page carries a nameplate. Compact makes it smaller; it never turns off.',
+  arrangement: 'How this page lays its items out.',
+  density: 'How much space sits between things on this page.',
+  navPlacement: 'Where this page puts its navigation.',
+});
+
+/** One word per enum value, so a select never reads like a field name. */
+const LAYOUT_VALUE_LABELS = Object.freeze({
+  nameplate: 'Full nameplate',
+  'nameplate-compact': 'Compact nameplate',
+  grid: 'Grid',
+  list: 'List',
+  tight: 'Tight',
+  comfortable: 'Comfortable',
+  loose: 'Loose',
+  top: 'Across the top',
+  side: 'Down the side',
+});
+
+/** Where a section sits around the page's built-in feature component. */
+const SLOT_LABELS = Object.freeze({
+  above: 'Above the main content',
+  main: 'With the main content',
+  below: 'Below the main content',
+});
 
 /** Move item `from` → `to` in a copy of `list`. */
 function moved(list, from, to) {
@@ -331,6 +372,32 @@ export default function AdminPageEditor({ mode }) {
       </Panel>
 
       <Panel
+        title="Layout"
+        description={
+          isSystemPage
+            ? 'How this page is shaped. The page keeps its built-in feature component; these controls change the shape around it.'
+            : 'How this page is shaped.'
+        }
+      >
+        <div className="grid gap-sm sm:grid-cols-2">
+          {PAGE_LAYOUT_KEYS.map((key) => (
+            <SelectField
+              key={key}
+              label={LAYOUT_LABELS[key]}
+              value={page.layout?.[key] ?? PAGE_LAYOUT_DEFAULTS[key]}
+              options={PAGE_LAYOUT_VALUES[key].map((value) => ({
+                value,
+                label: LAYOUT_VALUE_LABELS[value] ?? value,
+              }))}
+              onChange={(value) => update({ layout: { ...page.layout, [key]: value } })}
+              error={errorFor(`layout.${key}`)}
+              hint={LAYOUT_HINTS[key]}
+            />
+          ))}
+        </div>
+      </Panel>
+
+      <Panel
         title="Sections"
         description="Each section is a named slot on the page. Its allowed block types come from the block registry; its default blocks are the blocks it seeds."
         actions={
@@ -433,6 +500,22 @@ export default function AdminPageEditor({ mode }) {
                         }
                       />
                     </div>
+                    {/* A custom page has no built-in feature component, so
+                        there is nothing for a section to sit above or below
+                        — the control only exists on a system page. */}
+                    {isSystemPage ? (
+                      <SelectField
+                        label={`Section ${sectionIndex + 1} position`}
+                        value={section.slot}
+                        options={SECTION_SLOTS.map((slot) => ({
+                          value: slot,
+                          label: SLOT_LABELS[slot],
+                        }))}
+                        onChange={(value) => updateSection(sectionIndex, { slot: value })}
+                        error={errorFor(`${at}.slot`)}
+                        hint="Where this section renders around the page's built-in content."
+                      />
+                    ) : null}
                     <div className="sm:col-span-2">
                       <TextAreaField
                         label={`Section ${sectionIndex + 1} description`}

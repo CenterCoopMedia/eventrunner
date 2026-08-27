@@ -43,9 +43,46 @@ const DOC_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const PATH_SEGMENT_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** Keys a cmsPages doc may carry — anything else is rejected by name. */
-const PAGE_KEYS = Object.freeze(['id', 'label', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections']);
-const SECTION_KEYS = Object.freeze(['id', 'label', 'description', 'allowedBlocks', 'maxBlocks', 'reorderable', 'defaultBlocks']);
+const PAGE_KEYS = Object.freeze(['id', 'label', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout']);
+const SECTION_KEYS = Object.freeze(['id', 'label', 'description', 'allowedBlocks', 'maxBlocks', 'reorderable', 'defaultBlocks', 'slot']);
 const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
+
+/**
+ * The page-level layout variants (design brief §6.1, §6.2). A system page
+ * changes shape from data: no code edit, no new component, no new class.
+ *
+ * Mirrored in apps/web/src/lib/pageLayout.js, which the admin editor and the
+ * public renderer both read; pageDoc.test.js pins the two together.
+ */
+const PAGE_LAYOUT_KEYS = Object.freeze(['header', 'arrangement', 'density', 'navPlacement']);
+
+/**
+ * What each variant may say. Every value is checked on write and an unknown
+ * one is rejected BY NAME, so a typo fails at the save rather than degrading
+ * silently in the renderer.
+ *
+ * `header` carries no `none` (brief §6.2): every public page has a nameplate
+ * (§5.1), so `nameplate-compact` is the minimum. A page that renders no
+ * header at all is not a layout variant.
+ */
+const PAGE_LAYOUT_VALUES = Object.freeze({
+  header: Object.freeze(['nameplate', 'nameplate-compact']),
+  arrangement: Object.freeze(['grid', 'list']),
+  density: Object.freeze(['tight', 'comfortable', 'loose']),
+  navPlacement: Object.freeze(['top', 'side']),
+});
+
+/**
+ * Where a section renders relative to the core feature component
+ * (brief §6.2). `main` is the default and it has stated semantics: the order
+ * down a system page is nameplate, `above` sections, the core component,
+ * `main` sections, `below` sections.
+ *
+ * That default is what keeps existing data working. A section stored before
+ * this schema landed carries no `slot`, so it reads as `main` and renders in
+ * the old position — no migration runs, and no seeded page changes shape.
+ */
+const SECTION_SLOTS = Object.freeze(['above', 'main', 'below']);
 
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
@@ -109,6 +146,29 @@ function validatePageDoc(doc) {
   if (typeof doc.visible !== 'boolean') errors.push('visible: must be a boolean');
   if (typeof doc.systemPage !== 'boolean') errors.push('systemPage: must be a boolean');
 
+  // `layout` is optional: a document written before this schema landed
+  // carries none, reads as the default layout, and keeps working with no
+  // migration (brief §6.2). What it does carry is checked key by key.
+  if (doc.layout !== undefined) {
+    if (typeof doc.layout !== 'object' || doc.layout === null || Array.isArray(doc.layout)) {
+      errors.push('layout: must be an object');
+    } else {
+      for (const key of Object.keys(doc.layout)) {
+        if (!PAGE_LAYOUT_KEYS.includes(key)) errors.push(`layout.${key}: unknown field`);
+      }
+      for (const key of PAGE_LAYOUT_KEYS) {
+        const value = doc.layout[key];
+        if (value === undefined) continue;
+        if (!PAGE_LAYOUT_VALUES[key].includes(value)) {
+          errors.push(
+            `layout.${key}: must be one of ${PAGE_LAYOUT_VALUES[key].join(', ')}, ` +
+            `got ${JSON.stringify(value)}`,
+          );
+        }
+      }
+    }
+  }
+
   if (!Array.isArray(doc.sections)) {
     errors.push('sections: must be an array');
     return { ok: errors.length === 0, errors };
@@ -148,6 +208,15 @@ function validatePageDoc(doc) {
     }
     if (typeof section.reorderable !== 'boolean') {
       errors.push(`${at}.reorderable: must be a boolean`);
+    }
+    // Optional, and absent means `main`. A custom page ignores the slot
+    // because it has no core component, but the value is still checked
+    // there: a page that stops being a system page must not carry a slot
+    // nothing would ever accept back.
+    if (section.slot !== undefined && !SECTION_SLOTS.includes(section.slot)) {
+      errors.push(
+        `${at}.slot: must be one of ${SECTION_SLOTS.join(', ')}, got ${JSON.stringify(section.slot)}`,
+      );
     }
     if (!Array.isArray(section.defaultBlocks)) {
       errors.push(`${at}.defaultBlocks: must be an array`);
@@ -359,5 +428,8 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
+  PAGE_LAYOUT_KEYS,
+  PAGE_LAYOUT_VALUES,
+  SECTION_SLOTS,
   internals: { writeAdminLog, DOC_ID_RE, PAGE_KEYS, SECTION_KEYS, DEFAULT_BLOCK_KEYS },
 };

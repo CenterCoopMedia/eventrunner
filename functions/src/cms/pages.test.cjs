@@ -7,6 +7,8 @@ const {
   validatePageDoc,
   createSavePageHandler,
   createDeletePageHandler,
+  PAGE_LAYOUT_VALUES,
+  SECTION_SLOTS,
 } = require('./pages.cjs');
 const { makeFakeDb } = require('./firestoreFake.cjs');
 
@@ -224,6 +226,67 @@ test('validatePageDoc collects every field error, naming each field', () => {
   for (const field of ['id:', 'label:', 'order:', 'visible:']) {
     assert.ok(errors.some((e) => e.startsWith(field)), `missing ${field} error`);
   }
+});
+
+// -------------------------------------------------- layout variants (§6.2)
+
+test('validatePageDoc accepts a page with no layout at all', () => {
+  const page = validPage();
+  assert.equal('layout' in page, false);
+  assert.equal(validatePageDoc(page).ok, true);
+});
+
+test('validatePageDoc accepts every value of every layout variant', () => {
+  for (const [key, values] of Object.entries(PAGE_LAYOUT_VALUES)) {
+    for (const value of values) {
+      const { ok, errors } = validatePageDoc(validPage({ layout: { [key]: value } }));
+      assert.equal(ok, true, `layout.${key} = ${value}: ${errors.join('; ')}`);
+    }
+  }
+});
+
+test('validatePageDoc rejects an unknown layout value, naming the field and the value', () => {
+  const { ok, errors } = validatePageDoc(validPage({ layout: { arrangement: 'masonry' } }));
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.startsWith('layout.arrangement:') && e.includes('"masonry"')));
+});
+
+test('validatePageDoc rejects header "none" — every public page keeps a nameplate', () => {
+  const { ok, errors } = validatePageDoc(validPage({ layout: { header: 'none' } }));
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.startsWith('layout.header:') && e.includes('"none"')));
+  assert.equal(PAGE_LAYOUT_VALUES.header.includes('none'), false);
+});
+
+test('validatePageDoc names an unknown key inside layout', () => {
+  const { ok, errors } = validatePageDoc(validPage({ layout: { columns: 3 } }));
+  assert.equal(ok, false);
+  assert.ok(errors.includes('layout.columns: unknown field'));
+});
+
+test('validatePageDoc rejects a layout that is not an object', () => {
+  assert.equal(validatePageDoc(validPage({ layout: 'grid' })).ok, false);
+  assert.equal(validatePageDoc(validPage({ layout: ['grid'] })).ok, false);
+  assert.equal(validatePageDoc(validPage({ layout: null })).ok, false);
+});
+
+// ------------------------------------------------------ section slots (§6.2)
+
+test('validatePageDoc accepts a section with no slot, and every named slot', () => {
+  assert.equal(validatePageDoc(validPage()).ok, true);
+  for (const slot of SECTION_SLOTS) {
+    const page = validPage();
+    page.sections[0].slot = slot;
+    assert.equal(validatePageDoc(page).ok, true, `slot ${slot}`);
+  }
+});
+
+test('validatePageDoc rejects an unknown slot by name, naming the section', () => {
+  const page = validPage();
+  page.sections[0].slot = 'beside';
+  const { ok, errors } = validatePageDoc(page);
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.startsWith('sections[0].slot:') && e.includes('"beside"')));
 });
 
 test('validatePageDoc rejects non-objects without throwing', () => {

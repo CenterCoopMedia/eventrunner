@@ -7,6 +7,13 @@
 // down to the accepted key set before it goes back over the wire — otherwise
 // every edit of a seeded page would fail with "seeded: unknown field".
 import { recordStateOf } from './recordState.js';
+import {
+  DEFAULT_SECTION_SLOT,
+  PAGE_LAYOUT_DEFAULTS,
+  PAGE_LAYOUT_KEYS,
+  resolvePageLayout,
+  slotOf,
+} from '../lib/pageLayout.js';
 
 /** Keys a cmsPages doc may carry (mirrors PAGE_KEYS on the server). */
 export const PAGE_KEYS = Object.freeze([
@@ -18,6 +25,7 @@ export const PAGE_KEYS = Object.freeze([
   'visible',
   'systemPage',
   'sections',
+  'layout',
 ]);
 
 export const SECTION_KEYS = Object.freeze([
@@ -28,6 +36,7 @@ export const SECTION_KEYS = Object.freeze([
   'maxBlocks',
   'reorderable',
   'defaultBlocks',
+  'slot',
 ]);
 
 export const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
@@ -58,6 +67,9 @@ export function toEditablePage(doc) {
     order: typeof base.order === 'number' ? base.order : 0,
     visible: base.visible !== false,
     systemPage: base.systemPage === true,
+    // A page with no stored layout opens on the defaults, so the controls
+    // show what it actually renders at rather than four empty selects.
+    layout: resolvePageLayout(base),
     sections: Array.isArray(base.sections)
       ? base.sections.map((section) => {
           const s = pick(section ?? {}, SECTION_KEYS);
@@ -68,6 +80,7 @@ export function toEditablePage(doc) {
             allowedBlocks: Array.isArray(s.allowedBlocks) ? [...s.allowedBlocks] : [],
             maxBlocks: Number.isInteger(s.maxBlocks) ? s.maxBlocks : 1,
             reorderable: s.reorderable !== false,
+            slot: slotOf(s),
             defaultBlocks: Array.isArray(s.defaultBlocks)
               ? s.defaultBlocks.map((block) => {
                   const b = pick(block ?? {}, DEFAULT_BLOCK_KEYS);
@@ -98,6 +111,7 @@ export function blankSection() {
     allowedBlocks: ['text', 'richtext'],
     maxBlocks: 6,
     reorderable: true,
+    slot: DEFAULT_SECTION_SLOT,
     defaultBlocks: [],
   };
 }
@@ -122,6 +136,12 @@ export function toPagePayload(page) {
     order: Number.isFinite(order) ? order : page.order,
     visible: Boolean(page.visible),
     systemPage: Boolean(page.systemPage),
+    // Sent whole, and only with values the server accepts: the editor holds
+    // all four variants, so a save states the page's shape outright rather
+    // than leaving the reader to infer half of it.
+    layout: Object.fromEntries(
+      PAGE_LAYOUT_KEYS.map((key) => [key, page.layout?.[key] ?? PAGE_LAYOUT_DEFAULTS[key]]),
+    ),
     sections: (page.sections ?? []).map((section) => {
       const maxBlocks = Number(section.maxBlocks);
       return {
@@ -131,6 +151,7 @@ export function toPagePayload(page) {
         allowedBlocks: [...(section.allowedBlocks ?? [])],
         maxBlocks: Number.isInteger(maxBlocks) ? maxBlocks : section.maxBlocks,
         reorderable: Boolean(section.reorderable),
+        slot: slotOf(section),
         defaultBlocks: (section.defaultBlocks ?? []).map((block) => ({
           field: block.field ?? '',
           blockType: block.blockType ?? '',
