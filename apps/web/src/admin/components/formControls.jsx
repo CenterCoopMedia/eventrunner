@@ -362,14 +362,33 @@ export function DestructiveConfirm({
  * A ruled region of the stone. Regions are separated by rules and by tint,
  * never by a floating rounded card and never by a shadow: elevation in this
  * room is tint (admin story part 6).
+ *
+ * `flush` drops the panel's own padding so a galley's hairline rows run the
+ * full measure to the panel rule and supply their own gutters. It is a prop
+ * rather than a `p-0` in `className` because Tailwind emits the named
+ * spacing steps AFTER the numeric ones — `p-md` would win the cascade and
+ * the override would silently do nothing.
  */
-export function Panel({ title, description, children, actions, className = '' }) {
+export function Panel({
+  title,
+  description,
+  children,
+  actions,
+  className = '',
+  flush = false,
+}) {
   return (
     <section
-      className={`rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md ${className}`}
+      className={`rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised ${
+        flush ? '' : 'p-md'
+      } ${className}`}
     >
       {title ? (
-        <div className="mb-sm flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline pb-2xs">
+        <div
+          className={`${
+            flush ? 'px-md pt-md ' : ''
+          }mb-sm flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline pb-2xs`}
+        >
           <div>
             <h2 className="font-admin-ui text-lead font-semibold text-admin-ink">{title}</h2>
             {description ? (

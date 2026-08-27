@@ -5,11 +5,40 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import {
   DestructiveConfirm,
+  Panel,
   ServerErrorSummary,
   TextField,
   dangerButtonClass,
   primaryButtonClass,
 } from './formControls.jsx';
+
+describe('a ruled region of the stone', () => {
+  it('is a ruled, tinted region — never a floating card', () => {
+    const { container } = render(<Panel title="Days">body</Panel>);
+    const panel = container.querySelector('section');
+
+    expect(panel.className).toContain('border-admin-rule-hairline');
+    expect(panel.className).toContain('bg-admin-ground-raised');
+    expect(panel.className).toContain('p-md');
+    // Elevation in this room is tint. No shadow family ships.
+    expect(panel.className).not.toMatch(/shadow/);
+  });
+
+  it('drops its own padding when flush, so a galley runs to the rule', () => {
+    // `p-0` in className cannot do this: Tailwind emits the named spacing
+    // steps after the numeric ones, so `p-md` would win the cascade and the
+    // hairline rows would sit inset from the panel edge.
+    const { container } = render(
+      <Panel flush>
+        <ul />
+      </Panel>,
+    );
+    const panel = container.querySelector('section');
+
+    expect(panel.className).not.toMatch(/\bp-md\b/);
+    expect(panel.className).toContain('border-admin-rule-hairline');
+  });
+});
 
 describe('the copy bench', () => {
   it('runs on the admin tokens, never on the client theme', () => {
