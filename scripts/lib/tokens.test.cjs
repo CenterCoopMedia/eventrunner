@@ -195,6 +195,48 @@ test('the admin set gets the first-paint block too, on the same policy', () => {
   assert.ok(queries.some((q) => q[1].includes(`${marker}:`)), 'the admin block is inside the query');
 });
 
+test('printing from dark mode gets the light edition', () => {
+  // Paper has no backlight. The print rules in apps/web/src/index.css read
+  // the ink and rule tokens and nothing else, so the print block re-points
+  // those tokens at the light values and no print rule asks about modes.
+  const { names, values } = resolveColorTokens(THEME, loadTokens());
+  const css = buildTokenCss(THEME);
+  const query = css.match(/@media print \{([\s\S]*?)\n\}/);
+  assert.ok(query, 'the stylesheet carries a print block');
+
+  for (const name of names) {
+    assert.match(
+      query[1],
+      new RegExp(`${name}: ${values.light[name].replace(/[()]/g, '\\$&')};`),
+      `${name} prints its LIGHT value`,
+    );
+  }
+
+  // Every selector leads with the `html` type selector, which is what beats
+  // the screen block it overrides. Document order cannot do it: the runtime
+  // <style id="event-theme-runtime"> is appended after this stylesheet and
+  // writes :root[data-theme][data-mode='dark'] itself, so at equal
+  // specificity the runtime's dark values would win inside print media too.
+  for (const selector of [
+    'html:root',
+    "html:root\\[data-mode='dark'\\]",
+    "html:root\\[data-theme\\]\\[data-mode='dark'\\]",
+  ]) {
+    assert.match(query[1], new RegExp(`${selector}[,\\s]`), `${selector} is overridden in print`);
+  }
+
+  // The first-paint block is named only on the policies that emit one, so a
+  // light deployment's stylesheet never carries the selector at all.
+  assert.doesNotMatch(query[1], /:not\(\[data-mode\]\)/);
+  for (const mode of ['dark', 'system']) {
+    const other = buildTokenCss({ ...THEME, mode }).match(/@media print \{([\s\S]*?)\n\}/);
+    assert.match(other[1], /html:root:not\(\[data-mode\]\),/, `${mode} prints over its first paint`);
+  }
+
+  // The admin is a screen tool and no print rule reads its tokens.
+  assert.doesNotMatch(query[1], /--admin-/);
+});
+
 
 // ------------------------------------------------------- presets (brief §4)
 

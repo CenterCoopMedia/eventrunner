@@ -587,6 +587,64 @@ function firstPaintDarkBlock(policy, names, dark, comment) {
 }
 
 /**
+ * The print palette: the light edition, whatever mode the screen is in.
+ *
+ * Paper has no backlight and no dark mode. A reader who prints the schedule
+ * handout (`components/SchedulePrint.jsx`, the `@media print` block in
+ * `apps/web/src/index.css`) from a dark screen should get the light
+ * edition, not dark ink boxes on a white sheet. The print rules name the
+ * rule and ink tokens and nothing else, so re-pointing those tokens at the
+ * light values is the whole fix — no print rule has to know about modes.
+ *
+ * The selector list names every block that can be carrying dark values:
+ *
+ *   html:root                                   the attribute-free baseline.
+ *   html:root:not([data-mode])                  the first-paint dark block,
+ *                                               named only on the policies
+ *                                               that emit one, so a light
+ *                                               deployment's stylesheet stays
+ *                                               free of the selector.
+ *   html:root[data-mode='dark']                 the generated mode block.
+ *   html:root[data-theme][data-mode='dark']     every generated (preset,
+ *                                               mode) block, and the same
+ *                                               selector buildRuntimeThemeCss
+ *                                               writes into
+ *                                               <style id="event-theme-runtime">.
+ *
+ * Each one leads with the `html` type selector, which is what puts this
+ * block above its screen twin. Document order could not do it: the runtime
+ * <style> element is appended AFTER the generated stylesheet, so at equal
+ * specificity the runtime's dark values would win even inside print media.
+ *
+ * The admin set stays out. The admin is a screen tool, its own tokens are
+ * emitted once per mode (admin story part 6), and nothing in `@media print`
+ * reads them.
+ *
+ * @param {string} policy the mode policy (`light` | `dark` | `system`)
+ * @param {string[]} names token order
+ * @param {Record<string, string>} light the light values
+ * @returns {string[]} CSS lines
+ */
+function printPaletteBlock(policy, names, light) {
+  const selectors = [
+    'html:root',
+    ...(policy === 'light' ? [] : ['html:root:not([data-mode])']),
+    "html:root[data-mode='dark']",
+    "html:root[data-theme][data-mode='dark']",
+  ];
+  return [
+    '',
+    '/* Print palette (brief §2.1, §3.3). Paper has no dark mode: a reader who',
+    '   prints from a dark screen gets the light edition. Every print rule reads',
+    '   these tokens, so re-pointing them here is the whole switch. */',
+    '@media print {',
+    ...colorBlock(selectors.join(',\n  '), names, light, 'The light edition, whatever the screen is in.')
+      .map((line) => `  ${line}`),
+    '}',
+  ];
+}
+
+/**
  * Every custom property `config/theme` resolves to, as CSS text.
  *
  * The color blocks follow brief §3.3 with one addition: an attribute-free
@@ -688,6 +746,8 @@ function buildTokenCss(theme, { tokensDir } = {}) {
         );
       }
     }
+
+    lines.push(...printPaletteBlock(policy, names, values.light));
   }
 
   // The admin set, emitted ONCE PER MODE — plus the same first-paint block
