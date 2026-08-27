@@ -368,7 +368,7 @@ export default function AdminEventSettings() {
 
       <Panel
         title="Registration"
-        description="Naive local datetimes (YYYY-MM-DDTHH:MM) in the event's timezone."
+        description="Naive local datetimes (YYYY-MM-DDTHH:MM) in the event’s timezone."
       >
         <div className="grid gap-sm sm:grid-cols-2">
           <TextField

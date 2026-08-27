@@ -423,7 +423,7 @@ export default function AdminBranding() {
         title="Branding"
         state={<RecordState state={isDirty ? state('dirty') : state('live')} />}
         identifiers="config/theme"
-        description="Six decisions make a finished site: the style, the logo, the brand colour, the header, the schedule, and light or dark. The page preview beside them renders the client's real pages with the draft applied; nothing reaches the public site until you publish."
+        description="Six decisions make a finished site: the style, the logo, the brand colour, the header, the schedule, and light or dark. The page preview beside them renders the client’s real pages with the draft applied; nothing reaches the public site until you publish."
         actions={
           <>
             <button type="submit" className={primaryButtonClass} disabled={saving}>
@@ -567,7 +567,7 @@ export default function AdminBranding() {
                     label="Main brand colour"
                     value={form.brandColor}
                     onChange={(value) => setForm((c) => ({ ...c, brandColor: value }))}
-                    hint="A hex colour, like the one in the client's brand guide. Leave it blank to keep the style's own colour."
+                    hint="A hex colour, like the one in the client’s brand guide. Leave it blank to keep the style’s own colour."
                     error={fieldErrors.get('theme.brandColor')}
                   />
                 </div>
@@ -578,7 +578,7 @@ export default function AdminBranding() {
               {accent.fellBack ? (
                 <Notice
                   tone="caution"
-                  message={`This colour reads at ${accent.ratio.toFixed(2)}:1 against the ${previewMode} admin ground, below the ${accent.floor}:1 floor a position marker needs. The marker beside the section you are in falls back to the admin's own ink. The site itself is unaffected.`}
+                  message={`This colour reads at ${accent.ratio.toFixed(2)}:1 against the ${previewMode} admin ground, below the ${accent.floor}:1 floor a position marker needs. The marker beside the section you are in falls back to the admin’s own ink. The site itself is unaffected.`}
                 />
               ) : null}
             </div>
@@ -698,7 +698,7 @@ export default function AdminBranding() {
                       })),
                     ]}
                     onChange={(value) => setForm((c) => ({ ...c, motifSet: value }))}
-                    hint="Small drawings that carry a style's vocabulary. They take the page's own ink and never carry their own colour, and a page never shows more than three."
+                    hint="Small drawings that carry a style’s vocabulary. They take the page’s own ink and never carry their own colour, and a page never shows more than three."
                     error={fieldErrors.get('theme.motifSet')}
                   />
                 </div>
@@ -818,7 +818,7 @@ export default function AdminBranding() {
                     trigger={`Reset the ${overrideMode} colours`}
                     title={`Reset the ${overrideMode} colours`}
                     confirmLabel="Reset these colours"
-                    consequence={`Every ${overrideMode}-mode colour you have set by hand goes, and that mode falls back to the shades worked out from the main brand colour, or to the style's own palette where there is none.`}
+                    consequence={`Every ${overrideMode}-mode colour you have set by hand goes, and that mode falls back to the shades worked out from the main brand colour, or to the style’s own palette where there is none.`}
                     permanence="The draft keeps everything else. Reverting to the saved theme brings them back until you publish."
                     onConfirm={() =>
                       setForm((c) => ({

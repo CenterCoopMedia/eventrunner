@@ -58,7 +58,7 @@ The public record of a public event. Plain, patient, unambiguous, with nothing b
 
 ### Heading face — `headingFace`
 
-The institution's register.
+The institution’s register.
 
 - **Merriweather** *(recommended)* — Weight without drama. It is the USWDS pairing and it reads as a body that has existed for a while.
 - **Source Serif 4** — The same document, lighter on its feet: a university or a cultural institution rather than an agency, and the repo already bundles it for Broadsheet.
@@ -116,7 +116,7 @@ A well-made news site on a good day. Named sections, one strong rule each, numbe
 
 ### Heading face — `headingFace`
 
-The desk's headline voice.
+The desk’s headline voice.
 
 - **Fraunces** *(recommended)* — The designed headline. Its soft-serif wonk is what makes the site read as edited rather than generated.
 - **Newsreader at display weights** — The wire-service desk. Running the body face up to headline size gives a quieter, more traditional publication that still belongs to the same newsroom.
@@ -174,7 +174,7 @@ The paper of record. The nameplate is the loudest thing on the page and rules do
 
 ### Heading face — `headingFace`
 
-The paper's era.
+The paper’s era.
 
 - **Libre Caslon Display** *(recommended)* — The paper of record founded in the 1820s. It is the canonical masthead voice and the reason the story reads as authority.
 - **Libre Baskerville** — The same paper, founded sixty years later. Its more even colour and open counters keep the authority while reading a shade less antique.
@@ -252,7 +252,7 @@ The title block.
 
 How the board is drawn.
 
-- **Departure board** *(recommended)* — Time down, lettered lines across, faint map grid behind, traced-line signature interaction. The theme's clearest idea.
+- **Departure board** *(recommended)* — Time down, lettered lines across, faint map grid behind, traced-line signature interaction. The theme’s clearest idea.
 - **Line diagram** — The strip map inside a carriage: one line at a time as a Beck-style vertical run, which serves a visitor following one track all day.
 - **Gazetteer list** — A gazetteer indexes a map by place, which serves a visitor choosing where to stand rather than where to go.
 
@@ -260,7 +260,7 @@ How the board is drawn.
 
 `data-theme="field-guide"`
 
-A naturalist's expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.
+A naturalist’s expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.
 
 **Best for.** Environmental events, science communication, and regional gatherings.
 
@@ -303,7 +303,7 @@ The plate caption. Body stays Vollkorn and data stays IBM Plex Mono under every 
 
 - **Besley** *(recommended)* — The printed plate caption. Its Clarendon weight holds a title page and still sits calmly under a drawing, which is the core Field Guide relationship.
 - **Vollkorn bold at display size** — The one-face volume: a pocket handbook rather than a plate book, quieter and closer to the reading, and it adds nothing to the font budget.
-- **Spectral semibold** — The collector's volume. Its finer, sharper serifs read as the frontispiece of a formal edition, so the story gains a more scholarly opening.
+- **Spectral semibold** — The collector’s volume. Its finer, sharper serifs read as the frontispiece of a formal edition, so the story gains a more scholarly opening.
 
 ### Header style — `nameplate`
 
@@ -313,7 +313,7 @@ The title page.
 
 - **Framed title page** *(recommended)* — Name and dates inside a hairline frame with the nameplate-mark motif above the name. The opening plate of the handbook.
 - **Ruled title, no frame** — The title page of a cheaper printing of the same book; quieter, and better for text-heavy events.
-- **Plate and label** — It states the book's subject the way a frontispiece plate does, and the plate stays drawn linework, never a photo.
+- **Plate and label** — It states the book’s subject the way a frontispiece plate does, and the plate stays drawn linework, never a photo.
 
 ### Schedule style — `component`
 
@@ -391,7 +391,7 @@ How a session block is printed.
 **default-note.** Flat is the default (owner review, 2026-08-27). The stamp is the theme's signature and it still ships under the brief §2.4 exception, but a printing artefact is a thing a client turns ON, not a thing they discover on their own schedule page.
 
 - **Flat block** *(recommended)* — The single-pass photocopy, so it stays in the story and gives a client an option that needs no exception to §2.1.
-- **Stamped block** — Misregistration is what a two-pass print looks like, which is the story's whole production method. It ships under the brief §2.4 exception, Zine only.
+- **Stamped block** — Misregistration is what a two-pass print looks like, which is the story’s whole production method. It ships under the brief §2.4 exception, Zine only.
 - **Struck folio** — The typewriter section break of a photocopied programme; plain text plus rules, no chip or badge.
 
 ### Pen marks — `marginalia`

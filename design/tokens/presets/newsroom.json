@@ -63,7 +63,7 @@
   "options": {
     "headingFace": {
       "label": "Heading face",
-      "prompt": "The desk's headline voice.",
+      "prompt": "The desk’s headline voice.",
       "default": "fraunces",
       "choices": [
         {

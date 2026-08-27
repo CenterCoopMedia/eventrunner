@@ -5,7 +5,7 @@
   "$first-class-note": "See design/tokens/presets/civic.json: all six styles are first-class, each with one recommended configuration.",
   "id": "field-guide",
   "label": "Field Guide",
-  "summary": "A naturalist's expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.",
+  "summary": "A naturalist’s expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.",
   "bestFor": "Environmental events, science communication, and regional gatherings.",
 
   "$palette-words-light": "near-neutral plate stock with a trace of warmth, soft bark ink, deep leaf green, muted clay, lichen-grey rule, herbarium cream, pressed archive, pencil grey",
@@ -90,7 +90,7 @@
         {
           "id": "spectral",
           "label": "Spectral semibold",
-          "why": "The collector's volume. Its finer, sharper serifs read as the frontispiece of a formal edition, so the story gains a more scholarly opening.",
+          "why": "The collector’s volume. Its finer, sharper serifs read as the frontispiece of a formal edition, so the story gains a more scholarly opening.",
           "fonts": { "heading": "spectral" }
         }
       ]
@@ -125,7 +125,7 @@
         {
           "id": "plate-and-label",
           "label": "Plate and label",
-          "why": "It states the book's subject the way a frontispiece plate does, and the plate stays drawn linework, never a photo.",
+          "why": "It states the book’s subject the way a frontispiece plate does, and the plate stays drawn linework, never a photo.",
           "tokens": {
             "--nameplate-align": "start",
             "--nameplate-frame-width": "0",

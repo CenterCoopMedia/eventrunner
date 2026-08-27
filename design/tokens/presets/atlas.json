@@ -139,7 +139,7 @@
         {
           "id": "departure-board",
           "label": "Departure board",
-          "why": "Time down, lettered lines across, faint map grid behind, traced-line signature interaction. The theme's clearest idea.",
+          "why": "Time down, lettered lines across, faint map grid behind, traced-line signature interaction. The theme’s clearest idea.",
           "tokens": {
             "--map-grid-size": "var(--space-xl)",
             "--schedule-data-size": "var(--text-caption)"

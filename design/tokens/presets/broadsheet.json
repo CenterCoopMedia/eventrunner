@@ -63,7 +63,7 @@
   "options": {
     "headingFace": {
       "label": "Heading face",
-      "prompt": "The paper's era.",
+      "prompt": "The paper’s era.",
       "default": "libre-caslon-display",
       "choices": [
         {

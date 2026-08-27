@@ -64,7 +64,7 @@
   "options": {
     "headingFace": {
       "label": "Heading face",
-      "prompt": "The institution's register.",
+      "prompt": "The institution’s register.",
       "default": "merriweather",
       "choices": [
         {

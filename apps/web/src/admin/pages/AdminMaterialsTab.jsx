@@ -131,7 +131,7 @@ function MaterialRow({ material, onChanged }) {
           confirmLabel="Delete this material"
           busy={busy}
           disabled={busy}
-          consequence="The file is removed from the session's materials list, and anyone holding its link gets nothing."
+          consequence="The file is removed from the session’s materials list, and anyone holding its link gets nothing."
           permanence="This cannot be undone."
           onConfirm={remove}
         />
@@ -187,7 +187,7 @@ export default function AdminMaterialsTab() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Materials"
-        description="Manage a session's slide decks and links. Materials are visible to attendees only once approved, and the underlying URL stays embargoed until the session ends unless you or the session's speaker are viewing it."
+        description="Manage a session’s slide decks and links. Materials are visible to attendees only once approved, and the underlying URL stays embargoed until the session ends unless you or the session’s speaker are viewing it."
       />
 
       <Panel title="Choose a session">

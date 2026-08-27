@@ -118,7 +118,7 @@ export default function FeedbackModal({ onClose }) {
                   email was actually delivered — only that the message
                   itself was received. */}
               We got your feedback.
-              {email.trim() ? " If you left an email, we'll try to send a confirmation." : null}
+              {email.trim() ? " If you left an email, we’ll try to send a confirmation." : null}
             </p>
             <div>
               <button type="button" className={modalPrimaryButtonClass} onClick={onClose}>
@@ -156,7 +156,7 @@ export default function FeedbackModal({ onClose }) {
               type="email"
               value={email}
               onChange={setEmail}
-              hint="Leave your email if you'd like a reply."
+              hint="Leave your email if you’d like a reply."
             />
 
             {/* Honeypot: visually hidden, out of tab order, and never

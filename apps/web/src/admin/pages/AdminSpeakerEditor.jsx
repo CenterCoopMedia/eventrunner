@@ -305,7 +305,7 @@ export default function AdminSpeakerEditor({ mode }) {
           />
           <TextField
             label="Headshot path"
-            hint="A path in this deployment's Storage bucket, e.g. speakers/name.jpg."
+            hint="A path in this deployment’s Storage bucket, e.g. speakers/name.jpg."
             value={form.headshotPath}
             onChange={(value) => set({ headshotPath: value })}
             error={errorFor('headshotPath')}

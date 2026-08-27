@@ -147,7 +147,7 @@
         {
           "id": "stamped-block",
           "label": "Stamped block",
-          "why": "Misregistration is what a two-pass print looks like, which is the story's whole production method. It ships under the brief §2.4 exception, Zine only.",
+          "why": "Misregistration is what a two-pass print looks like, which is the story’s whole production method. It ships under the brief §2.4 exception, Zine only.",
           "tokens": {
             "--session-card-stamp-offset": "4px",
             "--folio-rule-top-width": "0"

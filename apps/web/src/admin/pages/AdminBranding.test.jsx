@@ -426,7 +426,7 @@ describe('the staff workflow', () => {
       colors: { primary: hex('ebe8e3'), surface: hex('111111'), ink: hex('ffffff') },
     });
     expect(screen.getByText(/below the 3:1 floor a position marker needs/)).toBeInTheDocument();
-    expect(screen.getByText(/falls back to the admin's own ink/)).toBeInTheDocument();
+    expect(screen.getByText(/falls back to the admin’s own ink/)).toBeInTheDocument();
   });
 });
 

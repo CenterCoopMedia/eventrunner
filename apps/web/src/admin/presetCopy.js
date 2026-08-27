@@ -19,7 +19,7 @@ export const PRESET_COPY = Object.freeze({
     options: {
       headingFace: {
         label: 'Heading face',
-        prompt: 'The institution\'s register.',
+        prompt: 'The institution’s register.',
         choices: {
           merriweather: {
             label: 'Merriweather',
@@ -76,7 +76,7 @@ export const PRESET_COPY = Object.freeze({
     options: {
       headingFace: {
         label: 'Heading face',
-        prompt: 'The desk\'s headline voice.',
+        prompt: 'The desk’s headline voice.',
         choices: {
           fraunces: {
             label: 'Fraunces',
@@ -133,7 +133,7 @@ export const PRESET_COPY = Object.freeze({
     options: {
       headingFace: {
         label: 'Heading face',
-        prompt: 'The paper\'s era.',
+        prompt: 'The paper’s era.',
         choices: {
           'libre-caslon-display': {
             label: 'Libre Caslon Display',
@@ -230,7 +230,7 @@ export const PRESET_COPY = Object.freeze({
         choices: {
           'departure-board': {
             label: 'Departure board',
-            why: 'Time down, lettered lines across, faint map grid behind, traced-line signature interaction. The theme\'s clearest idea.',
+            why: 'Time down, lettered lines across, faint map grid behind, traced-line signature interaction. The theme’s clearest idea.',
           },
           'line-diagram': {
             label: 'Line diagram',
@@ -246,7 +246,7 @@ export const PRESET_COPY = Object.freeze({
   },
   'field-guide': {
     label: 'Field Guide',
-    summary: 'A naturalist\'s expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.',
+    summary: 'A naturalist’s expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.',
     bestFor: 'Environmental events, science communication, and regional gatherings.',
     options: {
       headingFace: {
@@ -263,7 +263,7 @@ export const PRESET_COPY = Object.freeze({
           },
           spectral: {
             label: 'Spectral semibold',
-            why: 'The collector\'s volume. Its finer, sharper serifs read as the frontispiece of a formal edition, so the story gains a more scholarly opening.',
+            why: 'The collector’s volume. Its finer, sharper serifs read as the frontispiece of a formal edition, so the story gains a more scholarly opening.',
           },
         },
       },
@@ -281,7 +281,7 @@ export const PRESET_COPY = Object.freeze({
           },
           'plate-and-label': {
             label: 'Plate and label',
-            why: 'It states the book\'s subject the way a frontispiece plate does, and the plate stays drawn linework, never a photo.',
+            why: 'It states the book’s subject the way a frontispiece plate does, and the plate stays drawn linework, never a photo.',
           },
         },
       },
@@ -366,7 +366,7 @@ export const PRESET_COPY = Object.freeze({
           },
           'stamped-block': {
             label: 'Stamped block',
-            why: 'Misregistration is what a two-pass print looks like, which is the story\'s whole production method. It ships under the brief §2.4 exception, Zine only.',
+            why: 'Misregistration is what a two-pass print looks like, which is the story’s whole production method. It ships under the brief §2.4 exception, Zine only.',
           },
           'struck-folio': {
             label: 'Struck folio',
