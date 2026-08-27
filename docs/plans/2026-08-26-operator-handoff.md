@@ -644,13 +644,66 @@ token, password, or API key value into this document — name only *where* it wa
 - [ ] PR #90 still open and attached at the new repo URL: yes/no
 
 ### Workstream E
-- [ ] Demo GCP/Firebase project created with a delimited `demo` project id; billing enabled: yes/no
-      (project id, or where it's recorded)
-- [ ] Demo configured as a client (GitHub Environment name, providers used —
-      console/none/Postmark stream, ticketing none/manual, notifier none): (fill in)
-- [ ] Bootstrap dispatch green: yes/no
-- [ ] `init-event.cjs` + `seed-demo-event.cjs` run against the demo project: yes/no
-- [ ] `generate-content.cjs --demo --check` exits 0 (committed snapshot matches seed output): yes/no
+- [x] Demo GCP/Firebase project created with a delimited `demo` project id; billing enabled: yes —
+      `eventrunner-demo`, same billing account as CCM, Firebase added.
+- [x] Demo configured as a client (GitHub Environment name, providers used —
+      console/none/Postmark stream, ticketing none/manual, notifier none): GitHub Environment
+      `demo`; `EVENT_EMAIL_PROVIDER=console`, `EVENT_TICKETING_PROVIDER=none`,
+      `EVENT_OPERATOR_NOTIFIER=none`, site publisher off for the first deployment; restricted to
+      deployments from `main`.
+- [ ] Bootstrap dispatch green: not yet run — see "Remaining steps for issue #35" below.
+- [ ] `init-event.cjs` + `seed-demo-event.cjs` run against the demo project: not yet run.
+- [ ] `generate-content.cjs --demo --check` exits 0 (committed snapshot matches seed output): not
+      yet run (both scripts read the same `scripts/lib/demo-event.cjs` fixture by construction, so
+      this should already hold once step above runs — this only confirms it).
+
+**Remaining steps for issue #35** (issue #35 stays open on GitHub; this is a progress note, not a
+closing record):
+
+Already done, per the 2026-08-26 progress comment on issue #35: the `eventrunner-demo` project,
+Firestore/Hosting/Storage/web-app registration, Google sign-in with support email
+`info@eventrunner.org`, authorized Auth domains, and 19 non-secret `demo` environment variables.
+
+Two things unblocked since that comment: issue #101 (the config validator wrongly required
+`measurementId` when Analytics is off — confirm it's merged before the bootstrap dispatch below,
+or the functions deploy may fail validation) and the WIF binding (intentionally deferred until the
+repo rename landed — #97 has since merged as `CenterCoopMedia/eventrunner`, so the trust condition
+can now target `repo:CenterCoopMedia/eventrunner:ref:refs/heads/main`).
+
+What's left, in order:
+
+1. Configure WIF and the per-client deploy service account (`docs/DEPLOY_RUNBOOK.md` §1–§2),
+   trust condition `assertion.repository == 'CenterCoopMedia/eventrunner'`, `--project=eventrunner-demo`.
+2. Run the bootstrap dispatch of `deploy-client.yml` against `demo` (provision + functions only);
+   confirm green.
+3. Seed content with [`docs/examples/demo-answers.json`](../examples/demo-answers.json) as the
+   `--answers` file:
+   ```sh
+   export GOOGLE_APPLICATION_CREDENTIALS=<operator ADC, one-time>
+   export EVENT_FIREBASE_PROJECT_ID=eventrunner-demo
+   node scripts/init-event.cjs --answers docs/examples/demo-answers.json --admin <operator-admin@ccm-domain>
+   node scripts/seed-demo-event.cjs
+   ```
+   Pass the real first-admin address as `--admin` — it wins over the template's placeholder
+   `adminEmails` entry.
+4. Confirm `node scripts/generate-content.cjs --demo --check` exits 0 (should already hold by
+   construction; this step confirms it, not fixes a drift).
+5. Readiness gate: attest Google sign-in (`init-event.cjs --attest-auth`) and the sender domain
+   (`verify-sender-domain.cjs --attest`, since `console` has no domain API to check), skim and clear
+   `legal.reviewRequired`, grant a second admin, then re-run `init-event.cjs --check` until it
+   exits 0.
+6. Go live: run the normal dispatch (`deploy-client.yml` against `demo`) and confirm `smoke` passes.
+7. Confirm the demo URL loads from a machine with no special access, then open a normal PR adding
+   the demo URL and screenshots to `README.md`. Optionally add `demo` to
+   `AUTO_DEPLOY_ENVIRONMENTS` (`docs/DEPLOY_RUNBOOK.md` §4).
+8. Issue #35 itself is closed by whoever files that PR, once the demo URL is publicly browsable and
+   `generate-content.cjs --demo --check` passes — not by this document.
+
+Postmark upgrade path (optional, not blocking issue #35): per issues #91/#100, the demo stays on
+`EVENT_EMAIL_PROVIDER=console` until Postmark approves live sending. Once approved,
+[`docs/POSTMARK_PROVISIONING.md`](../POSTMARK_PROVISIONING.md) §7 covers switching the demo to a
+real Postmark stream so a prospect can see a real OTP email — an upgrade, not a requirement for
+closing #35.
 - [ ] Readiness gate (`init-event.cjs --check`) exits 0: yes/no
 - [ ] Normal dispatch succeeded, smoke passed: yes/no
 - [ ] Demo URL confirmed publicly browsable from an unauthenticated path: yes/no (URL)
