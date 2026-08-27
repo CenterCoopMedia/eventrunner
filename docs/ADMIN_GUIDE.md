@@ -9,9 +9,9 @@ How to run a client's site from the admin panel, in the order the work happens. 
 This is the whole visual setup, start to finish. It takes about twenty minutes and you do it once.
 
 1. **Pick a site style.** Settings → Branding, the first control. Six ship; three are the launch surface and three sit behind a disclosure until you have tried them on your own content. Picking one replaces every value you have not changed yourself, so do this first.
-2. **Add the identity assets.** Five slots: primary logo, square mark, footer logo, social sharing image, favicon. Same picker the Media tab uses. A slot you leave empty falls back to the event name in type, which is a finished look and not a placeholder.
-3. **Set the main brand colour.** One colour. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. You do not set them.
-4. **Preview representative pages.** The preview beside the controls renders *your* pages with the draft applied. Look at three: the home page, the schedule on its longest day, and one long text page. Check each light and dark.
+2. **Add the identity assets.** Five slots: the primary logo and the square icon, then the footer logo, the social sharing image, and the favicon behind **More image slots**. Same picker the Media tab uses. A slot you leave empty falls back to the event name in type, which is a finished look and not a placeholder.
+3. **Set the Main brand colour.** One colour. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. You do not set them, and there is no second colour to set anywhere.
+4. **Preview representative pages.** The **Page preview** beside the controls renders *your* pages with the draft applied. Look at three: the home page, the schedule on its longest day, and one long text page. Check each light and dark.
 5. **Resolve the warnings.** Anything the editor flags — a colour pair too close to read, a logo the wrong shape — is named with the pair, the mode, and the measurement. Fix what it names.
 6. **Publish.** The live public site restyles with no deploy. This is a config write, not a code change.
 
@@ -19,25 +19,32 @@ This is the whole visual setup, start to finish. It takes about twenty minutes a
 
 ## Settings → Branding
 
-One tab decides how the whole public site looks. Controls on one side, a **page preview** on the other rendering your own pages with the draft applied. Pick which page to preview and whether to see it light or dark.
+One tab decides how the whole public site looks. Controls on one side, the **Page preview** on the other rendering your own pages with the draft applied. Pick which page to preview and whether to see it light or dark.
 
 Work down the controls in this order.
 
 **Site style.** The base look: a light palette, a dark palette, a type pairing, a shape, a header, and a default set of illustrations. Each one is finished work with a recommended configuration already chosen — you should not have to touch anything else to get a good result. The three on the launch surface have been run against real client content; the other three are fully functional and are grouped separately so you try them on your own event first. Picking a style replaces every value you have not changed yourself.
 
-**Header.** How the site's identity appears at the top of every page. Four choices — the event name with its dates, the full masthead, a compact bar, or just the mark. Your site style comes with the one that suits it. This is a site-wide choice on purpose: the header is furniture a reader should stop noticing, and it stops working the moment it differs page to page.
+**Logos and assets.** Two slots are asked for here — the primary logo and the square icon — and the other three sit behind **More image slots**: the footer logo, the social sharing image, and the favicon. All five use the same image picker the Media tab uses.
 
-**Options.** The curated choices your site style offers — the heading face, the header treatment, how a session is presented. Each retunes the style. None of them invents a value of its own, so you cannot make a combination the house has not looked at.
+**Main brand colour.** One colour, as a hex value. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. Leave it blank to keep the site style's own colour.
 
-**Illustrations.** A set of small drawings that carry the style's vocabulary, or none. They take the site's own ink and never carry a colour of their own, so they cannot fight your palette.
+**Header style.** How the site's identity appears at the top of every page. Each site style offers its own three — a letterhead, a masthead bar, a title page — and comes with the one that suits it. This is a site-wide choice on purpose: the header is furniture a reader should stop noticing, and it stops working the moment it differs page to page.
 
-**Navigation.** Whether the navigation runs across the top or down the leading edge. One choice, every page — see above.
+**Schedule style.** How a session is set out on the schedule: a posted agenda, a hairline row, a departure board, and so on, depending on the style. Like the header style, it retunes the site style rather than inventing a value of its own, so you cannot make a combination the house has not looked at.
+
+**Navigation.** Whether the navigation runs across the top or down the leading edge. One choice, every page, for the same reason the header is site-wide.
 
 **Light or dark.** Always light, always dark, or follow the reader's own setting. Every site style defines both, so there is no wrong answer here.
 
-**Logos and assets.** The five slots, backed by the same image picker the Media tab uses.
+**Advanced.** Everything else the system can do, behind a disclosure, and none of it is needed for a finished site:
 
-**Advanced.** Any single colour by hand, per mode — a light tab and a dark tab hold separate values — plus the four font roles, the texture, and the corner radius. **Most staff never open this**, and that is the intended outcome: every value in here is normally worked out from the site style and the one brand colour. Setting one by hand takes it out of that derivation permanently, so it stops moving when your brand colour moves. Open it when a brand guide names an exact value that the derived one does not reach; not to explore.
+- *Typography* — the heading face, picked from the alternates your style offers, and any of the four font roles named outright.
+- *Illustrations* — a set of small drawings that carry the style's vocabulary, or none. They take the site's own ink and never carry a colour of their own, so they cannot fight your palette.
+- *Surface and shape* — the surface texture, the corners, the spacing, and any extra control your style has of its own.
+- *Advanced colour settings* — any single colour by hand, per mode, with a light tab and a dark tab holding separate values.
+
+**Most staff never open Advanced**, and that is the intended outcome: every value in there is normally worked out from the site style and the one brand colour. Setting a colour by hand takes it out of that derivation permanently, so it stops moving when your brand colour moves. Open **Advanced colour settings** when a brand guide names an exact value that the derived one does not reach; not to explore.
 
 **A contrast failure stops a publish, not a save.** A draft may hold two colours too close together to read. Publishing that draft is refused, and the message names the pair, the mode, and the ratio it measured. Fix the pair, then publish again.
 

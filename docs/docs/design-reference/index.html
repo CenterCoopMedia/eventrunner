@@ -111,7 +111,8 @@
             <ul>
               <li><a href="#how-a-look-is-decided">How a look is decided</a></li>
               <li><a href="#the-six-site-styles">The six site styles</a></li>
-              <li><a href="#headers">Headers</a></li>
+              <li><a href="#header-style">Header style</a></li>
+              <li><a href="#schedule-style">Schedule style</a></li>
               <li><a href="#typography">Typography</a></li>
               <li><a href="#illustrations">Illustrations</a></li>
               <li><a href="#layout">Layout</a></li>
@@ -131,7 +132,7 @@
           <ol>
           <li><strong>The design tokens</strong> (<code>design/tokens/*.json</code>) define every scale, contract, and primitive the system has. Nothing outside them is a value.</li>
           <li><strong>The site style</strong> picks a base: two authored palettes, a type pairing, a shape, a header, a set of illustrations, and its own remaps of the tokens above.</li>
-          <li><strong>The options</strong> inside that style retune it — the heading face, the header treatment, the session presentation. An option remaps tokens the style already declares. It never invents a name.</li>
+          <li><strong>The options</strong> inside that style retune it — the heading face, the header style, the schedule style. An option remaps tokens the style already declares. It never invents a name.</li>
           <li><strong>The overrides</strong> are the exceptional path: one colour, one font role, one radius, named outright.</li>
           </ol>
           <p>Whatever comes out of that is resolved once, in one place, and everything reads the result: the public site, the admin&#39;s page preview, the emails, and the PDF handout.</p>
@@ -170,17 +171,17 @@
           <li><strong>Devices</strong>: the full-sheet header; the flat block for a session.</li>
           <li><strong>Illustrations</strong>: none.</li>
           <li><strong>The one exception in the whole system</strong>: Zine may print a session block off-register, like a stamp that missed. It is the only place the design brief grants a deliberate imperfection, and it is <strong>off by default</strong> — a printing artefact is something a client turns on, not something they discover on their own schedule page.</li>
-          <li><strong>Deeper controls</strong>: the heading face can move to Bagnard or Avara. The header can become a stacked block or a boxed bill. The session block can take the off-register stamp or the struck folio. Marginalia — hand-drawn margin marks — can be turned on.</li>
+          <li><strong>Deeper controls</strong>: the heading face can move to Bagnard or Avara. The header can become a stacked block or a boxed bill. The session block can take the off-register stamp or the struck folio. Pen marks — the hand that went over the page afterwards — can be turned on, and they are their own control, so a client can take the stamp without the pen.</li>
           </ul>
           <h3 id="broadsheet-being-proved">Broadsheet — being proved<a class="heading-anchor" href="#broadsheet-being-proved" aria-label="Link to this section">#</a></h3>
-          <p><em>The paper of record.</em> The nameplate is the loudest thing on the page, and rules do the dividing.</p>
+          <p><em>The paper of record.</em> The masthead is the loudest thing on the page, and rules do the dividing.</p>
           <ul>
           <li><strong>Suits</strong>: an annual convening with weight behind it, an anniversary edition, an event that wants to look like it has happened many times before.</li>
           <li><strong>Type</strong>: Libre Caslon Display over Libre Caslon Text, with a serif carrying data too. One voice, all the way down.</li>
           <li><strong>Shape</strong>: sharp corners, flat surfaces, tight spacing — a broadsheet fits a lot on a page.</li>
-          <li><strong>Devices</strong>: the full-measure nameplate; the ruled programme for the schedule.</li>
+          <li><strong>Devices</strong>: the full-measure header; the ruled programme for the schedule.</li>
           <li><strong>Illustrations</strong>: none.</li>
-          <li><strong>Deeper controls</strong>: the heading face can move to Libre Baskerville or Spectral semibold. The nameplate can centre itself under a double rule, or compact to the left with a standing edition line. The schedule can drop to an agate block — the dense small-type listing a printed programme uses when the day is long.</li>
+          <li><strong>Deeper controls</strong>: the heading face can move to Libre Baskerville or Spectral semibold. The header can centre itself under a double rule, or compact to the left with a standing edition line. The schedule can drop to an agate block — the dense small-type listing a printed programme uses when the day is long.</li>
           </ul>
           <h3 id="field-guide-being-proved">Field Guide — being proved<a class="heading-anchor" href="#field-guide-being-proved" aria-label="Link to this section">#</a></h3>
           <p><em>A naturalist&#39;s expedition handbook.</em> Plates, specimen labels, and observation notes, with the linework carrying the character.</p>
@@ -203,23 +204,27 @@
           <li><strong>Where the grid is drawn</strong>: the coordinate grid and the route marks sit on the schedule surface only. A grid behind the about page, the speaker bios, and the code of conduct is texture; a grid behind a timetable is a reading device.</li>
           <li><strong>Deeper controls</strong>: the heading face can move to Libre Franklin extrabold or Archivo Condensed. The header can take a scale line or become a departure-board header. The schedule can run as a line diagram or a gazetteer list.</li>
           </ul>
-          <h2 id="headers">Headers<a class="heading-anchor" href="#headers" aria-label="Link to this section">#</a></h2>
-          <p>Four treatments, and a site picks one. The header is the site&#39;s identity, and it repeats on every page — which is exactly why it is <strong>not</strong> a heading: every page owns its own <code>h1</code>, and the header sits outside it.</p>
+          <h2 id="header-style">Header style<a class="heading-anchor" href="#header-style" aria-label="Link to this section">#</a></h2>
+          <p>Four header styles, and a site picks one. The header is the site&#39;s identity, and it repeats on every page — which is exactly why it is <strong>not</strong> a heading: every page owns its own <code>h1</code>, and the header sits outside it. Each site style also names its own three, tuned to it — Broadsheet&#39;s full measure, Newsroom&#39;s rule-bounded bar, Zine&#39;s full sheet — and those are the ones the picker offers once a style is chosen.</p>
           <div class="table-scroll">
           <table>
           <thead>
-          <tr><th>Treatment</th><th>What it draws</th><th>Reach for it when</th></tr>
+          <tr><th>Style</th><th>What it draws</th><th>Reach for it when</th></tr>
           </thead>
           <tbody>
           <tr><td><strong>Standard</strong></td><td>The event name at normal weight, the dates and place under it, the navigation.</td><td>The default. The identity is present and the page&#39;s own headline leads.</td></tr>
-          <tr><td><strong>Masthead</strong></td><td>The full nameplate device: a rule-bounded title block at display size.</td><td>The event&#39;s name is the point — a front page, a single-day event, an anniversary.</td></tr>
+          <tr><td><strong>Masthead</strong></td><td>The rule-bounded title block at display size: name, dates, edition line.</td><td>The event&#39;s name is the point — a front page, a single-day event, an anniversary.</td></tr>
           <tr><td><strong>Compact</strong></td><td>The event bar: name and navigation on one line.</td><td>A long document site where every pixel above the text is spent.</td></tr>
           <tr><td><strong>Minimal</strong></td><td>The mark and the navigation. No name.</td><td>The event&#39;s mark is well known, or the page is a utility.</td></tr>
           </tbody>
           </table>
           </div>
           <p><strong>A page may override the site&#39;s choice</strong>, and one usually should not. The site-wide value is what makes the header furniture a reader stops noticing; a page that differs is asking to be noticed, which is right for a front page and wrong for a policy page.</p>
-          <p><strong>Engine.</strong> <code>config/theme.header</code> names one of <code>standard</code>, <code>masthead</code>, <code>compact</code>, <code>minimal</code>; a <code>cmsPages</code> document may state its own <code>layout.header</code>. <code>resolveHeader(themeHeader, pageHeader)</code> returns the one to draw — page first, then theme, then the base. A stored value the validator should never have accepted renders the base rather than no header at all. <code>Nameplate</code> is unchanged in shape; it is now the device the masthead treatment draws rather than the shell&#39;s only header.</p>
+          <p><strong>Engine.</strong> <code>config/theme.header</code> names one of <code>standard</code>, <code>masthead</code>, <code>compact</code>, <code>minimal</code>; a <code>cmsPages</code> document may state its own <code>layout.header</code>. <code>resolveHeader(themeHeader, pageHeader)</code> returns the one to draw — page first, then theme, then the base. A stored value the validator should never have accepted renders the base rather than no header at all. A style&#39;s own three are the <code>nameplate</code> option group (<code>optionPicks.nameplate</code>), which is why the internal name is <code>nameplate</code> and the label is Header style. <code>Nameplate</code> is unchanged in shape; it is now the device the masthead treatment draws rather than the shell&#39;s only header.</p>
+          <h2 id="schedule-style">Schedule style<a class="heading-anchor" href="#schedule-style" aria-label="Link to this section">#</a></h2>
+          <p>How a session is set out on the schedule. Every site style names its own choices, because a session listing is one of the two places a style is most itself — the posted or numbered agenda for Institutional, the hairline row or the lead-and-rest ranking for Newsroom, the flat, stamped, or struck block for Zine, the ruled programme or the agate block for Broadsheet, the specimen label or the field-notes column for Field Guide, the departure board, line diagram, or gazetteer list for Atlas.</p>
+          <p>Whichever is picked, the day still reads twice and both readings are first-class: a grid at wide viewports when the event lists tracks, and a time-ordered list everywhere else. A schedule style retunes how a session is drawn. It never decides which of those two views a reader gets.</p>
+          <p><strong>Engine.</strong> The <code>component</code> option group (<code>optionPicks.component</code>). Like every option, it remaps tokens the style already declares — the session contracts in tier 3 — and introduces no property name of its own.</p>
           <h2 id="typography">Typography<a class="heading-anchor" href="#typography" aria-label="Link to this section">#</a></h2>
           <p><strong>Four roles, never family names.</strong> A component asks for a role and gets whatever the resolved style says that role is.</p>
           <div class="table-scroll">
@@ -272,7 +277,7 @@
           <p><strong>A template is never inferred.</strong> A page whose values happen to match Long read has not chosen Long read; it has values that coincide. The editor reports absence as absence rather than reporting a decision nobody made.</p>
           <h3 id="the-axes-underneath-advanced">The axes underneath (Advanced)<a class="heading-anchor" href="#the-axes-underneath-advanced" aria-label="Link to this section">#</a></h3>
           <ul>
-          <li><strong>Header</strong> — the four treatments above.</li>
+          <li><strong>Header style</strong> — the four above.</li>
           <li><strong>Arrangement</strong> — <code>list</code> or <code>grid</code>. Whether the page&#39;s items run down or across.</li>
           <li><strong>Density</strong> — <code>tight</code>, <code>comfortable</code>, <code>loose</code>. A set of token remaps, never raw values: each step maps the page and session contracts onto the spacing scale, and the block nearest an element wins, which is how a page overrides the style for its own subtree and nowhere else.</li>
           </ul>
@@ -285,7 +290,7 @@
           <p><strong>Engine.</strong> The stored positions are <code>above</code>, <code>main</code>, and <code>below</code>. A section with no position is <code>main</code>. <code>below</code> is a third stored position with no third name in the editor: it renders after every <code>main</code> section, and a section stored that way keeps both its value and its place unless the operator moves the control. A custom page has no built-in feature, so it ignores position entirely.</p>
           <h2 id="colour">Colour<a class="heading-anchor" href="#colour" aria-label="Link to this section">#</a></h2>
           <h3 id="what-a-client-actually-sets">What a client actually sets<a class="heading-anchor" href="#what-a-client-actually-sets" aria-label="Link to this section">#</a></h3>
-          <p><strong>One colour.</strong> The main brand colour, and everything else follows from it:</p>
+          <p><strong>One colour.</strong> The control is <strong>Main brand colour</strong>, and everything else follows from it:</p>
           <ul>
           <li>The <strong>darker and lighter</strong> steps of it, for the states and the surfaces that need them.</li>
           <li>The <strong>rules</strong> — hairline, strong, nameplate — which are the brand ink mixed into the ground at fixed shares, so a restyled site never keeps build-time rules on a new ground.</li>
@@ -294,7 +299,8 @@
           </ul>
           <p>Semantic colours — success, warning, danger, and the rest — come from the style and are not part of the brand decision. They mean what they mean, and a client&#39;s colour does not get to redefine them.</p>
           <h3 id="expert-overrides">Expert overrides<a class="heading-anchor" href="#expert-overrides" aria-label="Link to this section">#</a></h3>
-          <p>Any single colour can be set by hand, per mode, in Advanced. This is an <strong>exceptional control</strong>: it is there for the client whose brand guide names an exact value that the derivation does not reach, and every use of it takes a token out of the derivation permanently — it will no longer move when the brand colour moves. Most sites should never open it, and a site that has overridden a dozen values has usually picked the wrong style.</p>
+          <p>Any single colour can be set by hand, per mode, under <strong>Advanced colour settings</strong>. A light tab and a dark tab hold separate values, and a blank field keeps the worked-out one. This is an <strong>exceptional control</strong>: it is there for the client whose brand guide names an exact value that the derivation does not reach, and every use of it takes a token out of the derivation permanently — it will no longer move when the brand colour moves. Most sites should never open it, and a site that has overridden a dozen values has usually picked the wrong style.</p>
+          <p>There is no second brand colour anywhere in the system. The admin&#39;s own marker is worked out from the admin&#39;s ink against the admin ground, so there is nothing to set and nothing to get wrong.</p>
           <h3 id="the-contrast-gate">The contrast gate<a class="heading-anchor" href="#the-contrast-gate" aria-label="Link to this section">#</a></h3>
           <p>Publishing is refused when any defined foreground/background pair fails its bar, in either mode. Text holds 4.5:1. A form control&#39;s boundary is non-text user interface and holds 3:1, measured against every ground an input actually renders on. Contrast is measured against the real rendered background, not the page background.</p>
           <p><strong>A failure stops a publish, not a save.</strong> A draft may hold two colours too close together to read; publishing that draft is refused, and the message names the pair, the mode, and the ratio it measured.</p>
@@ -327,7 +333,7 @@
           <h2 id="composition-rules">Composition rules<a class="heading-anchor" href="#composition-rules" aria-label="Link to this section">#</a></h2>
           <p>The devices, and the one job each has. The implementations live in <code>apps/web/src/components/editorial/</code>, and each resolves through its tier-3 contract.</p>
           <ul>
-          <li><strong>Header</strong> — the site identity, in one of four treatments. Never a heading, never a photo behind the name.</li>
+          <li><strong>Header</strong> — the site identity, in the picked header style. Never a heading, never a photo behind the name.</li>
           <li><strong>Folio</strong> — a small-caps plain-text label on a hairline. Never a chip, never a pill, never a coloured badge, and <strong>never directly above a heading</strong>.</li>
           <li><strong>Rule</strong> — hairline, strong, or nameplate. A rule replaces a card border. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node.</li>
           <li><strong>Section boundary</strong> — one strong rule, then the heading with the folio beside it. Reach for this rather than composing a folio and a heading by hand.</li>

@@ -12,7 +12,7 @@ One chain, four links, and each one only overrides what it names:
 
 1. **The design tokens** (`design/tokens/*.json`) define every scale, contract, and primitive the system has. Nothing outside them is a value.
 2. **The site style** picks a base: two authored palettes, a type pairing, a shape, a header, a set of illustrations, and its own remaps of the tokens above.
-3. **The options** inside that style retune it — the heading face, the header treatment, the session presentation. An option remaps tokens the style already declares. It never invents a name.
+3. **The options** inside that style retune it — the heading face, the header style, the schedule style. An option remaps tokens the style already declares. It never invents a name.
 4. **The overrides** are the exceptional path: one colour, one font role, one radius, named outright.
 
 Whatever comes out of that is resolved once, in one place, and everything reads the result: the public site, the admin's page preview, the emails, and the PDF handout.
@@ -60,18 +60,18 @@ Three of them are the **launch surface** — run against real client content, an
 - **Devices**: the full-sheet header; the flat block for a session.
 - **Illustrations**: none.
 - **The one exception in the whole system**: Zine may print a session block off-register, like a stamp that missed. It is the only place the design brief grants a deliberate imperfection, and it is **off by default** — a printing artefact is something a client turns on, not something they discover on their own schedule page.
-- **Deeper controls**: the heading face can move to Bagnard or Avara. The header can become a stacked block or a boxed bill. The session block can take the off-register stamp or the struck folio. Marginalia — hand-drawn margin marks — can be turned on.
+- **Deeper controls**: the heading face can move to Bagnard or Avara. The header can become a stacked block or a boxed bill. The session block can take the off-register stamp or the struck folio. Pen marks — the hand that went over the page afterwards — can be turned on, and they are their own control, so a client can take the stamp without the pen.
 
 ### Broadsheet — being proved
 
-*The paper of record.* The nameplate is the loudest thing on the page, and rules do the dividing.
+*The paper of record.* The masthead is the loudest thing on the page, and rules do the dividing.
 
 - **Suits**: an annual convening with weight behind it, an anniversary edition, an event that wants to look like it has happened many times before.
 - **Type**: Libre Caslon Display over Libre Caslon Text, with a serif carrying data too. One voice, all the way down.
 - **Shape**: sharp corners, flat surfaces, tight spacing — a broadsheet fits a lot on a page.
-- **Devices**: the full-measure nameplate; the ruled programme for the schedule.
+- **Devices**: the full-measure header; the ruled programme for the schedule.
 - **Illustrations**: none.
-- **Deeper controls**: the heading face can move to Libre Baskerville or Spectral semibold. The nameplate can centre itself under a double rule, or compact to the left with a standing edition line. The schedule can drop to an agate block — the dense small-type listing a printed programme uses when the day is long.
+- **Deeper controls**: the heading face can move to Libre Baskerville or Spectral semibold. The header can centre itself under a double rule, or compact to the left with a standing edition line. The schedule can drop to an agate block — the dense small-type listing a printed programme uses when the day is long.
 
 ### Field Guide — being proved
 
@@ -96,20 +96,28 @@ Three of them are the **launch surface** — run against real client content, an
 - **Where the grid is drawn**: the coordinate grid and the route marks sit on the schedule surface only. A grid behind the about page, the speaker bios, and the code of conduct is texture; a grid behind a timetable is a reading device.
 - **Deeper controls**: the heading face can move to Libre Franklin extrabold or Archivo Condensed. The header can take a scale line or become a departure-board header. The schedule can run as a line diagram or a gazetteer list.
 
-## Headers
+## Header style
 
-Four treatments, and a site picks one. The header is the site's identity, and it repeats on every page — which is exactly why it is **not** a heading: every page owns its own `h1`, and the header sits outside it.
+Four header styles, and a site picks one. The header is the site's identity, and it repeats on every page — which is exactly why it is **not** a heading: every page owns its own `h1`, and the header sits outside it. Each site style also names its own three, tuned to it — Broadsheet's full measure, Newsroom's rule-bounded bar, Zine's full sheet — and those are the ones the picker offers once a style is chosen.
 
-| Treatment | What it draws | Reach for it when |
+| Style | What it draws | Reach for it when |
 |---|---|---|
 | **Standard** | The event name at normal weight, the dates and place under it, the navigation. | The default. The identity is present and the page's own headline leads. |
-| **Masthead** | The full nameplate device: a rule-bounded title block at display size. | The event's name is the point — a front page, a single-day event, an anniversary. |
+| **Masthead** | The rule-bounded title block at display size: name, dates, edition line. | The event's name is the point — a front page, a single-day event, an anniversary. |
 | **Compact** | The event bar: name and navigation on one line. | A long document site where every pixel above the text is spent. |
 | **Minimal** | The mark and the navigation. No name. | The event's mark is well known, or the page is a utility. |
 
 **A page may override the site's choice**, and one usually should not. The site-wide value is what makes the header furniture a reader stops noticing; a page that differs is asking to be noticed, which is right for a front page and wrong for a policy page.
 
-**Engine.** `config/theme.header` names one of `standard`, `masthead`, `compact`, `minimal`; a `cmsPages` document may state its own `layout.header`. `resolveHeader(themeHeader, pageHeader)` returns the one to draw — page first, then theme, then the base. A stored value the validator should never have accepted renders the base rather than no header at all. `Nameplate` is unchanged in shape; it is now the device the masthead treatment draws rather than the shell's only header.
+**Engine.** `config/theme.header` names one of `standard`, `masthead`, `compact`, `minimal`; a `cmsPages` document may state its own `layout.header`. `resolveHeader(themeHeader, pageHeader)` returns the one to draw — page first, then theme, then the base. A stored value the validator should never have accepted renders the base rather than no header at all. A style's own three are the `nameplate` option group (`optionPicks.nameplate`), which is why the internal name is `nameplate` and the label is Header style. `Nameplate` is unchanged in shape; it is now the device the masthead treatment draws rather than the shell's only header.
+
+## Schedule style
+
+How a session is set out on the schedule. Every site style names its own choices, because a session listing is one of the two places a style is most itself — the posted or numbered agenda for Institutional, the hairline row or the lead-and-rest ranking for Newsroom, the flat, stamped, or struck block for Zine, the ruled programme or the agate block for Broadsheet, the specimen label or the field-notes column for Field Guide, the departure board, line diagram, or gazetteer list for Atlas.
+
+Whichever is picked, the day still reads twice and both readings are first-class: a grid at wide viewports when the event lists tracks, and a time-ordered list everywhere else. A schedule style retunes how a session is drawn. It never decides which of those two views a reader gets.
+
+**Engine.** The `component` option group (`optionPicks.component`). Like every option, it remaps tokens the style already declares — the session contracts in tier 3 — and introduces no property name of its own.
 
 ## Typography
 
@@ -166,7 +174,7 @@ Picking one sets every underlying value at once. The individual axes stay reacha
 
 ### The axes underneath (Advanced)
 
-- **Header** — the four treatments above.
+- **Header style** — the four above.
 - **Arrangement** — `list` or `grid`. Whether the page's items run down or across.
 - **Density** — `tight`, `comfortable`, `loose`. A set of token remaps, never raw values: each step maps the page and session contracts onto the spacing scale, and the block nearest an element wins, which is how a page overrides the style for its own subtree and nowhere else.
 
@@ -188,7 +196,7 @@ A system page — home, schedule, speakers, sponsors — keeps its built-in feat
 
 ### What a client actually sets
 
-**One colour.** The main brand colour, and everything else follows from it:
+**One colour.** The control is **Main brand colour**, and everything else follows from it:
 
 - The **darker and lighter** steps of it, for the states and the surfaces that need them.
 - The **rules** — hairline, strong, nameplate — which are the brand ink mixed into the ground at fixed shares, so a restyled site never keeps build-time rules on a new ground.
@@ -199,7 +207,9 @@ Semantic colours — success, warning, danger, and the rest — come from the st
 
 ### Expert overrides
 
-Any single colour can be set by hand, per mode, in Advanced. This is an **exceptional control**: it is there for the client whose brand guide names an exact value that the derivation does not reach, and every use of it takes a token out of the derivation permanently — it will no longer move when the brand colour moves. Most sites should never open it, and a site that has overridden a dozen values has usually picked the wrong style.
+Any single colour can be set by hand, per mode, under **Advanced colour settings**. A light tab and a dark tab hold separate values, and a blank field keeps the worked-out one. This is an **exceptional control**: it is there for the client whose brand guide names an exact value that the derivation does not reach, and every use of it takes a token out of the derivation permanently — it will no longer move when the brand colour moves. Most sites should never open it, and a site that has overridden a dozen values has usually picked the wrong style.
+
+There is no second brand colour anywhere in the system. The admin's own marker is worked out from the admin's ink against the admin ground, so there is nothing to set and nothing to get wrong.
 
 ### The contrast gate
 
@@ -237,7 +247,7 @@ Three tiers, and each one only reads the one below it.
 
 The devices, and the one job each has. The implementations live in `apps/web/src/components/editorial/`, and each resolves through its tier-3 contract.
 
-- **Header** — the site identity, in one of four treatments. Never a heading, never a photo behind the name.
+- **Header** — the site identity, in the picked header style. Never a heading, never a photo behind the name.
 - **Folio** — a small-caps plain-text label on a hairline. Never a chip, never a pill, never a coloured badge, and **never directly above a heading**.
 - **Rule** — hairline, strong, or nameplate. A rule replaces a card border. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node.
 - **Section boundary** — one strong rule, then the heading with the folio beside it. Reach for this rather than composing a folio and a heading by hand.

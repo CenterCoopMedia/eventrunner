@@ -1632,6 +1632,12 @@ in the custom properties for that reason.
 
 `config/theme`:
 
+[The shape below is the record of this decision, not the current document. The theme vocabulary
+has moved on since — a client now sets one brand colour and the supporting shades are derived, so
+`adminAccent` no longer exists. See the design brief,
+[`plans/2026-08-27-design-system-overhaul.md`](../plans/2026-08-27-design-system-overhaul.md), for
+the current one.]
+
 ```ts
 {
   colors: {
