@@ -18,7 +18,7 @@
  *      (functions/src/core/auth.cjs requireAdmin, firestore.rules isAdmin,
  *      and the web AuthContext probe all read it; nothing reads an
  *      ADMIN_EMAILS env var any more);
- *   d. seeds `cmsPages` with the ten default pages (§5.3);
+ *   d. seeds `cmsPages` with the twelve default pages (§5.3);
  *   e. seeds `cmsContent` with placeholder blocks for every `defaultBlocks`
  *      entry, and the two legal pages from the provider-aware templates
  *      (§5.4, §5.5);

@@ -39,7 +39,7 @@ Packs `packages/shared` into `functions/vendor/shared.tgz` (spec §1.1); run by 
 ### `init-event.cjs`
 
 Bootstraps a fresh deployment (spec §5.1, issue #18). Writes the five `config/*` documents plus
-`config/bootstrap.adminEmails`, seeds the ten default pages (§5.3) and their placeholder content
+`config/bootstrap.adminEmails`, seeds the twelve default pages (§5.3) and their placeholder content
 (§5.4), seeds the provider-aware privacy and terms templates (§5.5), uploads the neutral branding
 placeholders, then prints the manual checklist (§5.6) and the launch-readiness table.
 
