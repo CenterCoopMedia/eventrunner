@@ -19,8 +19,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ADMIN_SETTABLE_STATUSES } from 'shared/speaker';
 import { useToast } from '../../contexts/ToastContext.jsx';
-import EmptyState from '../../components/EmptyState.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import {
@@ -34,6 +32,12 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  RecordState,
+} from '../components/adminChrome.jsx';
+import { deadMatter, state as recordStateWord } from '../recordState.js';
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft — hidden from the public site' },
@@ -45,6 +49,32 @@ const PIPELINE_STATUS_LABELS = {
   invited: 'Invite sent — waiting for this speaker to accept',
   accepted: 'Accepted — waiting for approval',
 };
+
+/**
+ * Field names queued in `speaker.pendingEdits` (spec §4.3, issue #22 review
+ * finding P1-1) — an approved speaker's self-service edit that
+ * onSpeakerWritten deliberately did NOT publish, awaiting an admin's
+ * apply/discard decision. Mirrors AdminSpeakersList's helper of the same
+ * name; that list owns the apply/discard controls, this editor only needs
+ * to know whether any are queued for the job-line state word.
+ */
+function pendingFieldsOf(speaker) {
+  const pending = speaker?.pendingEdits;
+  return pending && typeof pending === 'object' ? Object.keys(pending) : [];
+}
+
+/**
+ * The speaker's record state, in the admin's three words (brief §5.2,
+ * moment 1). A speaker is on the public site only once approved, and an
+ * approved speaker with self-service edits waiting for review is exactly
+ * the third state. A removed speaker is dead matter: it keeps its word.
+ */
+function speakerRecordState(speaker) {
+  if (!speaker) return null;
+  if (speaker.status === 'removed') return deadMatter('Removed');
+  if (speaker.status !== 'approved') return recordStateWord('draft');
+  return pendingFieldsOf(speaker).length > 0 ? recordStateWord('dirty') : recordStateWord('live');
+}
 
 const EMPTY = {
   firstName: '',
@@ -195,10 +225,10 @@ export default function AdminSpeakerEditor({ mode }) {
     }
   }
 
-  if (mode === 'edit' && loading) return <LoadingState label="Loading speaker…" />;
+  if (mode === 'edit' && loading) return <AdminLoadingState label="Loading speaker…" />;
   if (mode === 'edit' && !speaker && speakers.length >= 0 && !loading) {
     return (
-      <EmptyState
+      <AdminEmptyState
         title="No such speaker"
         description="That speaker record does not exist. It may have been deleted."
       />
@@ -206,24 +236,23 @@ export default function AdminSpeakerEditor({ mode }) {
   }
 
   return (
-    <form className="flex flex-col gap-6" onSubmit={submit}>
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-brand-ink">
-          {mode === 'create' ? 'New speaker' : form.firstName || form.lastName
+    <form className="flex flex-col gap-md" onSubmit={submit}>
+      <AdminPageHeader
+        title={
+          mode === 'create' ? 'New speaker' : form.firstName || form.lastName
             ? `${form.firstName} ${form.lastName}`.trim()
-            : speakerId}
-        </h1>
-        <p className="text-sm text-brand-ink-muted">
-          This is the one record for this person. Sessions point at it by id,
-          and the public directory shows a published copy of the safe fields.
-        </p>
-      </div>
+            : speakerId
+        }
+        state={mode === 'edit' ? <RecordState state={speakerRecordState(speaker)} /> : null}
+        identifiers={mode === 'edit' ? speakerId : null}
+        description="This is the one record for this person. Sessions point at it by id, and the public directory shows a published copy of the safe fields."
+      />
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
       <Panel title="Name">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="First name"
             value={form.firstName}
@@ -239,7 +268,7 @@ export default function AdminSpeakerEditor({ mode }) {
             required
           />
         </div>
-        <div className="mt-3">
+        <div className="mt-sm">
           <TextField
             label="URL slug"
             hint="Leave blank to derive it from the name. Lowercase letters, digits, and hyphens."
@@ -251,7 +280,7 @@ export default function AdminSpeakerEditor({ mode }) {
       </Panel>
 
       <Panel title="Profile" description="Everything here appears on the public speaker directory.">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="Job title"
             value={form.jobTitle}
@@ -265,7 +294,7 @@ export default function AdminSpeakerEditor({ mode }) {
             error={errorFor('organization')}
           />
         </div>
-        <div className="mt-3 flex flex-col gap-3">
+        <div className="mt-sm flex flex-col gap-sm">
           <TextAreaField
             label="Bio"
             rows={5}
@@ -287,7 +316,7 @@ export default function AdminSpeakerEditor({ mode }) {
         title="Contact and status"
         description="The email address is used for invitations and is never published."
       >
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="Email"
             type="email"
@@ -312,26 +341,26 @@ export default function AdminSpeakerEditor({ mode }) {
             // without the token it issues — so the editor reports where
             // this speaker stands and leaves the state alone. Editing any
             // other field on this page no longer disturbs it.
-            <div className="flex flex-col gap-1">
-              <span className="text-sm font-semibold text-brand-ink">Status</span>
-              <p className="text-brand-ink-muted">
+            <div className="flex flex-col gap-3xs">
+              <span className="text-caption font-semibold text-admin-ink">Status</span>
+              <p className="text-caption text-admin-ink-secondary">
                 {PIPELINE_STATUS_LABELS[form.status] ?? form.status}
               </p>
-              <p className="text-sm text-brand-ink-muted">
+              <p className="text-caption text-admin-ink-secondary">
                 Managed by the invitation flow. Saving this form leaves it unchanged.
               </p>
             </div>
           )}
         </div>
         {speaker?.uid ? (
-          <p className="mt-3 text-sm text-brand-ink-muted">
+          <p className="mt-sm text-caption text-admin-ink-secondary">
             This speaker is linked to an attendee account. The link is managed
             by the invitation flow and cannot be edited here.
           </p>
         ) : null}
       </Panel>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-xs">
         <button type="submit" className={primaryButtonClass} disabled={saving}>
           {saving ? 'Saving…' : mode === 'create' ? 'Create speaker' : 'Save speaker'}
         </button>

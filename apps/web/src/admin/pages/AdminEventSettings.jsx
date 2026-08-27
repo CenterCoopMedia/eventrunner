@@ -25,6 +25,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AdminPageHeader from '../components/adminChrome.jsx';
 
 const blankDay = () => ({ id: '', label: '', date: '', startTime: '', endTime: '' });
 
@@ -203,19 +204,17 @@ export default function AdminEventSettings() {
   const verified = eventConfig?.sender?.domainVerified === true;
 
   return (
-    <form className="flex flex-col gap-6" onSubmit={submit}>
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-brand-ink">Event</h1>
-        <p className="text-sm text-brand-ink-muted">
-          Name, dates, venue, and the addresses the site and its email use.
-        </p>
-      </div>
+    <form className="flex flex-col gap-md" onSubmit={submit}>
+      <AdminPageHeader
+        title="Event"
+        description="Name, dates, venue, and the addresses the site and its email use."
+      />
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
       <Panel title="Identity">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="Event name"
             value={form.name}
@@ -261,15 +260,15 @@ export default function AdminEventSettings() {
         }
       >
         {form.days.length === 0 ? (
-          <p className="text-sm text-brand-ink-muted">No days configured yet.</p>
+          <p className="text-caption text-admin-ink-secondary">No days configured yet.</p>
         ) : (
-          <ol className="flex flex-col gap-4">
+          <ol className="flex flex-col">
             {form.days.map((day, index) => (
               <li
                 key={index}
-                className="rounded-brand border border-brand-ink/10 bg-brand-surface-alt p-4"
+                className="border-admin-rule-hairline border-t-admin-hairline pt-sm mt-sm first:border-t-0 first:pt-0 first:mt-0"
               >
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-sm sm:grid-cols-2">
                   <TextField
                     label={`Day ${index + 1} id`}
                     value={day.id}
@@ -289,7 +288,7 @@ export default function AdminEventSettings() {
                     onChange={(value) => setDay(index, { date: value })}
                     error={errorFor(`days[${index}].date`) ?? errorFor(`days[${index}]`)}
                   />
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-sm">
                     <TextField
                       label={`Day ${index + 1} start`}
                       type="time"
@@ -308,7 +307,7 @@ export default function AdminEventSettings() {
                 </div>
                 <button
                   type="button"
-                  className={`${dangerButtonClass} mt-3`}
+                  className={`${dangerButtonClass} mt-sm`}
                   onClick={() =>
                     setForm((c) => ({ ...c, days: c.days.filter((_, i) => i !== index) }))
                   }
@@ -322,7 +321,7 @@ export default function AdminEventSettings() {
       </Panel>
 
       <Panel title="Venue">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="Venue name"
             value={form.venue.name}
@@ -371,7 +370,7 @@ export default function AdminEventSettings() {
         title="Registration"
         description="Naive local datetimes (YYYY-MM-DDTHH:MM) in the event's timezone."
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="Registration opens"
             type="datetime-local"
@@ -400,7 +399,7 @@ export default function AdminEventSettings() {
         title="Sender"
         description="The From address every transactional email uses."
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="Sender email"
             type="email"
@@ -421,9 +420,13 @@ export default function AdminEventSettings() {
             onChange={(value) => setGroup('sender', { replyTo: value })}
             error={errorFor('sender.replyTo')}
           />
-          <p className="self-center text-sm text-brand-ink-muted">
+          <p className="self-center text-caption text-admin-ink-secondary">
             Sender domain:{' '}
-            <strong className="font-semibold text-brand-ink">
+            <strong
+              className={`font-admin-data font-semibold ${
+                verified ? 'text-admin-state-ok' : 'text-admin-state-caution'
+              }`}
+            >
               {verified ? 'verified' : 'not verified'}
             </strong>
             . Verification is set by the sender-domain job, not from here.
@@ -432,7 +435,7 @@ export default function AdminEventSettings() {
       </Panel>
 
       <Panel title="Operator and search">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="Operator name"
             value={form.legal.operatorName}

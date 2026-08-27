@@ -22,11 +22,19 @@
 // this page showing "No unresolved errors" once the last VISIBLE row is
 // resolved, even though more unresolved rows exist past this page's limit
 // — reloading from the server is the only way to know that is not true.
+//
+// Restyled onto the fixed admin identity (docs/plans/2026-08-27-admin-
+// identity-story.md): the job line via AdminPageHeader, the galley for the
+// row list (hairline rows, mono data, no zebra, no row cards), and every
+// rejection — the row-level "not resolved" notices — rendered verbatim on
+// the alarm ground via `Notice tone="error"`, the same query pattern
+// `ServerErrorSummary` uses. The soft list-load failure stays a caution
+// notice, not an alarm: it is not a rejection, it is a stale, non-blocking
+// read (same contract AdminPagesList's listener failure follows).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import EmptyState from '../../components/EmptyState.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminApi } from '../adminApi.js';
-import { Panel, secondaryButtonClass } from '../components/formControls.jsx';
+import { Notice, Panel, secondaryButtonClass } from '../components/formControls.jsx';
+import AdminPageHeader, { AdminEmptyState, AdminLoadingState } from '../components/adminChrome.jsx';
 
 const PAGE_SIZE = 100;
 // Long enough to show real signal (a stack's first line, a validation
@@ -41,7 +49,7 @@ function formatWhen(ms) {
 
 function KindLabel({ kind }) {
   return (
-    <code className="rounded-brand border border-brand-ink/20 bg-brand-surface-alt px-2 py-1 text-xs">
+    <code className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-input px-2xs py-3xs font-admin-data text-folio text-admin-ink-data">
       {kind}
     </code>
   );
@@ -53,21 +61,25 @@ function KindLabel({ kind }) {
  * used rather than a custom toggle button: it is natively focusable and
  * Enter/Space-activatable with no extra ARIA wiring, unlike a plain `<p>`
  * with a "show more" link.
+ *
+ * The message is set in the data face: it is exactly the kind of text an
+ * operator copies, pastes, and compares character by character to dedupe a
+ * fault against a known one.
  */
 function MessageText({ text }) {
   if (!text) {
-    return <p className="mt-1 text-sm text-brand-ink">(no message)</p>;
+    return <p className="mt-3xs font-admin-data text-caption text-admin-ink-data">(no message)</p>;
   }
   if (text.length <= MESSAGE_PREVIEW_LEN) {
-    return <p className="mt-1 text-sm text-brand-ink">{text}</p>;
+    return <p className="mt-3xs font-admin-data text-caption text-admin-ink-data">{text}</p>;
   }
   return (
-    <details className="mt-1 text-sm text-brand-ink">
-      <summary className="touch-target inline cursor-pointer underline underline-offset-4">
+    <details className="mt-3xs font-admin-data text-caption text-admin-ink-data">
+      <summary className="admin-target inline cursor-pointer underline underline-offset-4">
         {text.slice(0, MESSAGE_PREVIEW_LEN)}…{' '}
-        <span className="text-brand-ink-muted">(show full message)</span>
+        <span className="text-admin-ink-secondary">(show full message)</span>
       </summary>
-      <p className="mt-2 whitespace-pre-wrap break-words">{text}</p>
+      <p className="mt-2xs whitespace-pre-wrap break-words">{text}</p>
     </details>
   );
 }
@@ -160,85 +172,87 @@ export default function AdminSystemErrors() {
   const visibleRows = (rows ?? []).filter((row) => !row.resolved);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-brand-ink">System errors</h1>
-          <p className="text-sm text-brand-ink-muted">
-            Unresolved server-side faults (telemetry/systemErrors.cjs). Resolving
-            a row here is not permanent — the server reopens it automatically if
-            the same fault happens again.
-          </p>
-        </div>
-        <button
-          type="button"
-          className={secondaryButtonClass}
-          onClick={load}
-          disabled={loading || refreshing}
-        >
-          {refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </div>
+    <div className="flex flex-col gap-md">
+      <AdminPageHeader
+        title="System errors"
+        description="Unresolved server-side faults (telemetry/systemErrors.cjs). Resolving a row here is not permanent — the server reopens it automatically if the same fault happens again."
+        actions={
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={load}
+            disabled={loading || refreshing}
+          >
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        }
+      />
 
       {error ? (
-        <p role="status" className="rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
-          We could not refresh the error list; showing the last values we
-          received.
-        </p>
+        <Notice
+          tone="caution"
+          message="We could not refresh the error list; showing the last values we received."
+        />
       ) : null}
 
       {loading ? (
-        <LoadingState label="Loading system errors…" />
+        <AdminLoadingState label="Loading system errors…" />
       ) : visibleRows.length === 0 && !nextCursor ? (
-        <EmptyState
+        <AdminEmptyState
           title="No unresolved errors"
           description="Nothing is currently flagged. New system errors appear here as soon as they are logged."
         />
       ) : (
         <>
-          <Panel>
-            <ul className="divide-y divide-brand-ink/10">
+          <Panel flush>
+            {/* The galley: hairline rows, no zebra striping and no row cards
+                — the hairline already does that work, and striping is the
+                tell of a default table. */}
+            <ul>
               {visibleRows.map((row) => (
-                <li key={row.id} className="flex flex-col gap-2 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <KindLabel kind={row.kind} />
-                        {/* alertedAt is stamped when a notify attempt is
-                            CLAIMED (systemErrors.cjs's claimAlert), before the
-                            notifier runs — a 'none' sink, a failed send, or a
-                            deduped delivery all still stamp it. "attempted" is
-                            the honest word; the row does not record whether
-                            the notification was actually delivered. */}
-                        {row.alertedAt ? (
-                          <span className="rounded-brand border border-brand-ink/20 px-2 py-1 text-xs text-brand-ink-muted">
-                            Alert attempted
-                          </span>
-                        ) : (
-                          <span className="rounded-brand border border-brand-ink/20 px-2 py-1 text-xs text-brand-ink-muted">
-                            No alert attempted
-                          </span>
-                        )}
+                <li
+                  key={row.id}
+                  className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
+                >
+                  <div className="flex flex-col gap-2xs px-md py-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-sm">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-sm gap-y-3xs">
+                          <KindLabel kind={row.kind} />
+                          {/* alertedAt is stamped when a notify attempt is
+                              CLAIMED (systemErrors.cjs's claimAlert), before the
+                              notifier runs — a 'none' sink, a failed send, or a
+                              deduped delivery all still stamp it. "attempted" is
+                              the honest word; the row does not record whether
+                              the notification was actually delivered. */}
+                          {row.alertedAt ? (
+                            <span className="font-admin-data text-folio text-admin-ink-secondary">
+                              Alert attempted
+                            </span>
+                          ) : (
+                            <span className="font-admin-data text-folio text-admin-ink-secondary">
+                              No alert attempted
+                            </span>
+                          )}
+                        </div>
+                        <MessageText text={row.message || (row.errors ?? []).join('; ') || null} />
+                        <p className="mt-3xs font-admin-data text-folio text-admin-ink-secondary">
+                          Last seen {formatWhen(row.lastSeenAt ?? row.createdAt)}
+                        </p>
                       </div>
-                      <MessageText text={row.message || (row.errors ?? []).join('; ') || null} />
-                      <p className="mt-1 text-sm text-brand-ink-muted">
-                        Last seen {formatWhen(row.lastSeenAt ?? row.createdAt)}
-                      </p>
+                      <button
+                        type="button"
+                        className={secondaryButtonClass}
+                        onClick={() => resolveRow(row)}
+                        disabled={resolvingId === row.id}
+                      >
+                        {resolvingId === row.id ? 'Resolving…' : 'Resolve'}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className={secondaryButtonClass}
-                      onClick={() => resolveRow(row)}
-                      disabled={resolvingId === row.id}
-                    >
-                      {resolvingId === row.id ? 'Resolving…' : 'Resolve'}
-                    </button>
+                    {rowNotices[row.id] ? (
+                      <Notice tone="error" message={rowNotices[row.id]} />
+                    ) : null}
                   </div>
-                  {rowNotices[row.id] ? (
-                    <p role="alert" className="text-sm text-danger">
-                      {rowNotices[row.id]}
-                    </p>
-                  ) : null}
                 </li>
               ))}
             </ul>

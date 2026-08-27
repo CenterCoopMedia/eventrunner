@@ -6,11 +6,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
-import EmptyState from '../../components/EmptyState.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
 import {
+  Notice,
   Panel,
   CheckboxField,
   ServerErrorSummary,
@@ -19,6 +18,10 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+} from '../components/adminChrome.jsx';
 
 function toDate(value) {
   if (!value) return null;
@@ -103,23 +106,22 @@ export default function AdminLiveUpdates() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-brand-ink">Live updates</h1>
-        <p className="text-sm text-brand-ink-muted">
-          Short posts shown on the live updates card. No approval step — posting here is
-          live immediately.
-        </p>
-        {features?.liveUpdates ? null : (
-          <p role="status" className="mt-2 rounded-brand border border-brand-ink/20 bg-brand-surface-alt px-3 py-2 text-sm text-brand-ink-muted">
-            The live updates feature is currently off, so this feed is not shown to visitors.
-            Turn it on under Features.
-          </p>
-        )}
-      </div>
+    <div className="flex flex-col gap-md">
+      <AdminPageHeader
+        title="Live updates"
+        description="Short posts shown on the live updates card. No approval step — posting here is live immediately."
+        identifiers={rows ? `${ordered.length} update${ordered.length === 1 ? '' : 's'}` : null}
+      />
+
+      {features?.liveUpdates ? null : (
+        <Notice
+          tone="caution"
+          message="The live updates feature is currently off, so this feed is not shown to visitors. Turn it on under Features."
+        />
+      )}
 
       <Panel title={editingId ? 'Edit update' : 'Post an update'}>
-        <form className="flex flex-col gap-4" onSubmit={submit}>
+        <form className="flex flex-col gap-sm" onSubmit={submit}>
           <ServerErrorSummary error={error} />
           <TextAreaField
             label="Message"
@@ -133,7 +135,7 @@ export default function AdminLiveUpdates() {
             checked={form.pinned}
             onChange={(checked) => setForm((f) => ({ ...f, pinned: checked }))}
           />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-xs">
             <button type="submit" className={primaryButtonClass} disabled={saving}>
               {saving ? 'Saving…' : editingId ? 'Save changes' : 'Post update'}
             </button>
@@ -147,49 +149,55 @@ export default function AdminLiveUpdates() {
       </Panel>
 
       {listError ? (
-        <p role="status" className="rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
-          We lost the connection to the live updates list; showing the last values we received
-          and retrying.
-        </p>
+        <Notice
+          tone="caution"
+          message="We lost the connection to the live updates list; showing the last values we received and retrying."
+        />
       ) : null}
 
       {rows === null ? (
-        <LoadingState label="Loading live updates…" />
+        <AdminLoadingState label="Loading live updates…" />
       ) : ordered.length === 0 ? (
-        <EmptyState title="No live updates yet" description="Post one using the form above." />
+        <AdminEmptyState title="No live updates yet" description="Post one using the form above." />
       ) : (
-        <Panel title="Posted updates">
-          <ul className="divide-y divide-brand-ink/10">
+        <Panel flush>
+          {/* The galley: hairline rows, no zebra striping, no row cards. */}
+          <ul>
             {ordered.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {row.pinned ? (
-                      <span className="rounded-brand border border-brand-accent/40 bg-brand-accent/10 px-2 py-0.5 text-xs font-semibold text-brand-accent">
-                        Pinned
+              <li
+                key={row.id}
+                className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-sm px-md py-xs">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-x-sm gap-y-3xs">
+                      {row.pinned ? (
+                        <span className="font-admin-data text-folio text-admin-ink-data">
+                          Pinned
+                        </span>
+                      ) : null}
+                      <span className="font-admin-data text-folio text-admin-ink-secondary">
+                        {toDate(row.postedAt)?.toLocaleString() ?? ''}
                       </span>
-                    ) : null}
-                    <span className="text-xs text-brand-ink-muted">
-                      {toDate(row.postedAt)?.toLocaleString() ?? ''}
-                    </span>
+                    </div>
+                    <p className="mt-3xs text-caption text-admin-ink">{row.message}</p>
                   </div>
-                  <p className="mt-1 text-sm text-brand-ink">{row.message}</p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <button type="button" className={secondaryButtonClass} onClick={() => startEdit(row)}>
-                    Edit
-                  </button>
-                  <DestructiveConfirm
-                    trigger="Remove"
-                    title="Remove this update"
-                    confirmLabel="Remove this update"
-                    busyLabel="Removing…"
-                    busy={deletingId === row.id}
-                    disabled={deletingId === row.id}
-                    consequence="The update disappears from the public updates feed and from its own page."
-                    permanence="This cannot be undone."
-                    onConfirm={() => remove(row.id)}
-                  />
+                  <div className="flex shrink-0 gap-xs">
+                    <button type="button" className={secondaryButtonClass} onClick={() => startEdit(row)}>
+                      Edit
+                    </button>
+                    <DestructiveConfirm
+                      trigger="Remove"
+                      title="Remove this update"
+                      confirmLabel="Remove this update"
+                      busyLabel="Removing…"
+                      busy={deletingId === row.id}
+                      disabled={deletingId === row.id}
+                      consequence="The update disappears from the public updates feed and from its own page."
+                      permanence="This cannot be undone."
+                      onConfirm={() => remove(row.id)}
+                    />
+                  </div>
                 </div>
               </li>
             ))}

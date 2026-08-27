@@ -29,8 +29,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
 import { useToast } from '../../contexts/ToastContext.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
-import EmptyState from '../../components/EmptyState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import {
@@ -54,6 +52,26 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  RecordState,
+} from '../components/adminChrome.jsx';
+
+/** A field-level error, spelled like formControls.jsx's own FieldError: a
+ * mark, a word, in the data-adjacent alarm ink. Used for the group-level
+ * errors (allowed block types) that have no single input of their own. */
+function InlineFieldError({ message }) {
+  if (!message) return null;
+  return (
+    <p className="text-folio text-admin-state-error">
+      <span aria-hidden="true" className="font-semibold">
+        !{' '}
+      </span>
+      {message}
+    </p>
+  );
+}
 
 /** Move item `from` → `to` in a copy of `list`. */
 function moved(list, from, to) {
@@ -110,11 +128,11 @@ export default function AdminPageEditor({ mode }) {
   const errorFor = (field) => fieldErrors.get(field);
 
   if (mode === 'edit' && loading && !row) {
-    return <LoadingState label="Loading page…" />;
+    return <AdminLoadingState label="Loading page…" />;
   }
   if (mode === 'edit' && !loading && !row) {
     return (
-      <EmptyState
+      <AdminEmptyState
         title="No such page"
         description="That page id has neither a published nor a draft revision."
         action={
@@ -231,32 +249,29 @@ export default function AdminPageEditor({ mode }) {
 
   return (
     <form
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-md"
       onSubmit={(event) => {
         event.preventDefault();
         save({ publish: false });
       }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-brand-ink">
-            {mode === 'create' ? 'New page' : page.label || page.id}
-          </h1>
-          <p className="text-sm text-brand-ink-muted">
-            Saving writes a draft. Publishing copies that draft to the live
-            revision the public site reads.
-          </p>
-        </div>
-        <Link to=".." relative="path" className={secondaryButtonClass}>
-          Back to pages
-        </Link>
-      </div>
+      <AdminPageHeader
+        title={mode === 'create' ? 'New page' : page.label || page.id}
+        state={row ? <RecordState state={row.state} /> : null}
+        identifiers={isExisting ? page.id : null}
+        description="Saving writes a draft. Publishing copies that draft to the live revision the public site reads."
+        actions={
+          <Link to=".." relative="path" className={secondaryButtonClass}>
+            Back to pages
+          </Link>
+        }
+      />
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
       <Panel title="Page" description="How the page is identified, ordered, and linked.">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="Page id"
             value={page.id}
@@ -298,7 +313,7 @@ export default function AdminPageEditor({ mode }) {
             error={errorFor('order')}
             hint="Lower numbers sort first."
           />
-          <div className="flex flex-col justify-center gap-3">
+          <div className="flex flex-col justify-center gap-xs">
             <CheckboxField
               label="Visible"
               checked={page.visible}
@@ -306,7 +321,7 @@ export default function AdminPageEditor({ mode }) {
               hint="Hidden pages stay out of the public site even once published."
             />
             {isSystemPage ? (
-              <p className="text-sm text-brand-ink-muted">
+              <p className="text-caption text-admin-ink-secondary">
                 This is a system page: it has a dedicated route in the app, so
                 it cannot be deleted or turned into a regular page.
               </p>
@@ -329,23 +344,23 @@ export default function AdminPageEditor({ mode }) {
         }
       >
         {page.sections.length === 0 ? (
-          <p className="text-sm text-brand-ink-muted">
+          <p className="text-caption text-admin-ink-secondary">
             No sections yet. A page with no sections renders nothing.
           </p>
         ) : (
-          <ol className="flex flex-col gap-6">
+          <ol className="flex flex-col gap-md">
             {page.sections.map((section, sectionIndex) => {
               const at = `sections[${sectionIndex}]`;
               return (
                 <li
                   key={sectionIndex}
-                  className="rounded-brand border border-brand-ink/10 bg-brand-surface-alt p-4"
+                  className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground p-sm"
                 >
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-heading text-lg font-semibold text-brand-ink">
+                  <div className="mb-xs flex flex-wrap items-center justify-between gap-2xs border-admin-rule-hairline border-b-admin-hairline pb-2xs">
+                    <h3 className="font-admin-ui text-lead font-semibold text-admin-ink">
                       {section.label || section.id || `Section ${sectionIndex + 1}`}
                     </h3>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2xs">
                       <button
                         type="button"
                         className={secondaryButtonClass}
@@ -383,7 +398,7 @@ export default function AdminPageEditor({ mode }) {
                     </div>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-sm sm:grid-cols-2">
                     <TextField
                       label={`Section ${sectionIndex + 1} id`}
                       value={section.id}
@@ -431,17 +446,15 @@ export default function AdminPageEditor({ mode }) {
                     </div>
                   </div>
 
-                  <fieldset className="mt-4">
-                    <legend className="text-sm font-semibold text-brand-ink">
+                  <fieldset className="mt-sm">
+                    <legend className="text-caption font-semibold text-admin-ink">
                       Allowed block types
                     </legend>
-                    <p className="text-sm text-brand-ink-muted">
+                    <p className="text-caption text-admin-ink-secondary">
                       Which of the registry’s block types this section accepts.
                     </p>
-                    {errorFor(`${at}.allowedBlocks`) ? (
-                      <p className="text-sm text-danger">{errorFor(`${at}.allowedBlocks`)}</p>
-                    ) : null}
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <InlineFieldError message={errorFor(`${at}.allowedBlocks`)} />
+                    <div className="mt-2xs grid gap-2xs sm:grid-cols-2">
                       {BLOCK_TYPE_IDS.map((blockTypeId) => (
                         <CheckboxField
                           key={blockTypeId}
@@ -460,9 +473,9 @@ export default function AdminPageEditor({ mode }) {
                     </div>
                   </fieldset>
 
-                  <div className="mt-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h4 className="text-sm font-semibold text-brand-ink">Blocks</h4>
+                  <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2xs">
+                      <h4 className="text-caption font-semibold text-admin-ink">Blocks</h4>
                       <button
                         type="button"
                         className={secondaryButtonClass}
@@ -483,11 +496,11 @@ export default function AdminPageEditor({ mode }) {
                       </button>
                     </div>
                     {section.defaultBlocks.length === 0 ? (
-                      <p className="mt-2 text-sm text-brand-ink-muted">
+                      <p className="mt-2xs text-caption text-admin-ink-secondary">
                         No blocks yet.
                       </p>
                     ) : (
-                      <ol className="mt-2 flex flex-col gap-4">
+                      <ol className="mt-2xs flex flex-col gap-sm">
                         {section.defaultBlocks.map((block, blockIndex) => {
                           const bat = `${at}.defaultBlocks[${blockIndex}]`;
                           const allowed = section.allowedBlocks.length
@@ -501,9 +514,9 @@ export default function AdminPageEditor({ mode }) {
                           return (
                             <li
                               key={blockIndex}
-                              className="rounded-brand border border-brand-ink/10 bg-brand-surface p-3"
+                              className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-input p-xs"
                             >
-                              <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="grid gap-xs sm:grid-cols-2">
                                 <TextField
                                   label={`Block ${blockIndex + 1} field — section ${sectionIndex + 1}`}
                                   value={block.field}
@@ -533,7 +546,7 @@ export default function AdminPageEditor({ mode }) {
                                   />
                                 </div>
                               </div>
-                              <div className="mt-3 flex flex-wrap gap-2">
+                              <div className="mt-xs flex flex-wrap gap-2xs">
                                 <button
                                   type="button"
                                   className={secondaryButtonClass}
@@ -596,7 +609,7 @@ export default function AdminPageEditor({ mode }) {
         )}
       </Panel>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-xs">
         <button type="submit" className={secondaryButtonClass} disabled={busy !== null}>
           {busy === 'draft' ? 'Saving…' : 'Save draft'}
         </button>

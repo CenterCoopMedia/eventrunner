@@ -152,7 +152,7 @@ export default function AdminPagesList() {
           }
         />
       ) : (
-        <Panel className="p-0">
+        <Panel flush>
           {/* The galley: hairline rows, fixed column order, no zebra
               striping and no row cards — the hairline already does that
               work, and striping is the tell of a default table. */}

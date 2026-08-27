@@ -205,7 +205,7 @@ export default function AdminSpeakersList() {
           }
         />
       ) : (
-        <Panel className="p-0">
+        <Panel flush>
           <ul>
             {speakers.map((speaker) => {
               const note = inviteNote(speaker);

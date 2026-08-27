@@ -157,7 +157,7 @@ export default function AdminContentSection() {
           action={addBlockButton}
         />
       ) : (
-        <Panel className="p-0">
+        <Panel flush>
           <ul>
             {blocks.map((row) => (
               <li

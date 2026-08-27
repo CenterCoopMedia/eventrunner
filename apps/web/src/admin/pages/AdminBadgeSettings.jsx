@@ -12,6 +12,7 @@ import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import {
+  Notice,
   Panel,
   SaveStatus,
   ServerErrorSummary,
@@ -20,6 +21,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AdminPageHeader from '../components/adminChrome.jsx';
 
 function toForm(badges) {
   const categories = Array.isArray(badges?.categories) ? badges.categories : [];
@@ -103,20 +105,18 @@ export default function AdminBadgeSettings() {
   }
 
   return (
-    <form className="flex flex-col gap-6" onSubmit={submit}>
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-brand-ink">Badges</h1>
-        <p className="text-sm text-brand-ink-muted">
-          The badge set attendees pick from, grouped into categories with a cap
-          on how many each attendee may choose.
-        </p>
-      </div>
+    <form className="flex flex-col gap-md" onSubmit={submit}>
+      <AdminPageHeader
+        title="Badges"
+        description="The badge set attendees pick from, grouped into categories with a cap on how many each attendee may choose."
+        identifiers={`${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`}
+      />
 
       {features?.badges ? null : (
-        <p role="status" className="rounded-brand border border-brand-ink/20 bg-brand-surface-alt px-3 py-2 text-sm text-brand-ink-muted">
-          The badges feature is currently off, so this set is not shown to
-          attendees. Turn it on under Features.
-        </p>
+        <Notice
+          tone="caution"
+          message="The badges feature is currently off, so this set is not shown to attendees. Turn it on under Features."
+        />
       )}
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
@@ -140,17 +140,17 @@ export default function AdminBadgeSettings() {
         }
       >
         {categories.length === 0 ? (
-          <p className="text-sm text-brand-ink-muted">No badge categories configured.</p>
+          <p className="text-caption text-admin-ink-secondary">No badge categories configured.</p>
         ) : (
-          <ol className="flex flex-col gap-6">
+          <ol className="flex flex-col">
             {categories.map((category, index) => {
               const at = `badges.categories[${index}]`;
               return (
                 <li
                   key={index}
-                  className="rounded-brand border border-brand-ink/10 bg-brand-surface-alt p-4"
+                  className="border-admin-rule-hairline border-t-admin-hairline pt-sm mt-sm first:border-t-0 first:pt-0 first:mt-0"
                 >
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid gap-sm sm:grid-cols-3">
                     <TextField
                       label={`Category ${index + 1} id`}
                       value={category.id}
@@ -175,8 +175,10 @@ export default function AdminBadgeSettings() {
                     />
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-brand-ink">Badges</h3>
+                  <div className="mt-sm flex flex-wrap items-center justify-between gap-xs">
+                    <h3 className="font-admin-ui text-caption font-semibold text-admin-ink">
+                      Badges
+                    </h3>
                     <button
                       type="button"
                       className={secondaryButtonClass}
@@ -190,11 +192,11 @@ export default function AdminBadgeSettings() {
                     </button>
                   </div>
                   {category.badges.length === 0 ? (
-                    <p className="mt-2 text-sm text-brand-ink-muted">No badges yet.</p>
+                    <p className="mt-xs text-caption text-admin-ink-secondary">No badges yet.</p>
                   ) : (
-                    <ol className="mt-2 flex flex-col gap-3">
+                    <ol className="mt-xs flex flex-col gap-sm">
                       {category.badges.map((badge, badgeIndex) => (
-                        <li key={badgeIndex} className="grid gap-3 sm:grid-cols-[1fr,1fr,auto]">
+                        <li key={badgeIndex} className="grid gap-sm sm:grid-cols-[1fr,1fr,auto]">
                           <TextField
                             label={`Badge ${badgeIndex + 1} id — category ${index + 1}`}
                             value={badge.id}
@@ -236,7 +238,7 @@ export default function AdminBadgeSettings() {
 
                   <button
                     type="button"
-                    className={`${dangerButtonClass} mt-4`}
+                    className={`${dangerButtonClass} mt-sm`}
                     onClick={() =>
                       setCategories((current) => current.filter((_, i) => i !== index))
                     }

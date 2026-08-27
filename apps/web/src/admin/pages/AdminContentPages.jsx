@@ -40,7 +40,7 @@ export default function AdminContentPages() {
           description="Create a page first, in Pages, before editing its content."
         />
       ) : (
-        <Panel className="p-0">
+        <Panel flush>
           <ul>
             {rows.map((row) => {
               const sectionCount = (row.current?.sections ?? []).length;

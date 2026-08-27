@@ -39,8 +39,8 @@ describe('AdminAttendees', () => {
 
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(items[0]).toContain('Ada Lovelace');
-    expect(items[0]).toContain('pending');
-    expect(items[1]).toContain('approved');
+    expect(items[0]).toContain('Pending');
+    expect(items[1]).toContain('Approved');
   });
 
   it('approves a pending account through approveUser', async () => {
