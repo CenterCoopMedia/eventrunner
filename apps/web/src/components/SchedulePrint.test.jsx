@@ -116,6 +116,25 @@ describe('the printed programme', () => {
     );
     expect(screen.getAllByText(/no sessions are announced for this day/i)).toHaveLength(2);
   });
+
+  it('sets that line in the column the titles are in, not in the time column', () => {
+    // A row is `--schedule-time-width 1fr`, and the time column is 7rem, so
+    // a bare sentence in a row wraps over three ragged lines under the day
+    // head with the rest of the sheet empty beside it. The line takes the
+    // second cell, where every session title sits.
+    const { container } = render(
+      <SchedulePrint
+        days={[EVENT.days[0]]}
+        sessionsByDay={new Map()}
+        columns={COLUMNS}
+        eventConfig={EVENT}
+      />,
+    );
+    const row = container.querySelector('.schedule-print__row');
+    expect(row.children).toHaveLength(2);
+    expect(row.children[0].textContent).toBe('');
+    expect(row.children[1].textContent).toMatch(/no sessions are announced for this day/i);
+  });
 });
 
 describe('the print stylesheet', () => {
