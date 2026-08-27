@@ -58,42 +58,53 @@ export default function CallingPoints({ parent, points, eventConfig, className =
         <span aria-hidden="true" className="calling-points__marker" />
         {points.length === 1 ? '1 calling point' : `${points.length} calling points`}
       </button>
-      {open ? (
-        <ul id={listId} aria-label={`Calling points of ${parent.title}`} className="mt-2xs">
-          {points.map((child) => {
-            const range = formatSessionStart(eventConfig, child);
-            // The move from the parent's place to this child's, if anyone
-            // recorded it. Null when either states no place, when both are
-            // in the same one, and when the pair has no record — which is
-            // most calling points, and renders as nothing at all.
-            const movement = sessionMovement(eventConfig, parent, child);
-            return (
-              <li key={child.id} className="calling-points__item">
-                <p className="font-mono text-caption text-text-secondary">
-                  {range ? (
-                    <time dateTime={range.startIso}>{range.startLabel}</time>
-                  ) : (
-                    <span>Time to be announced</span>
-                  )}
-                </p>
-                <p className="text-body text-text-primary">
-                  <Link
-                    to={{ pathname: `/schedule/${child.id}`, search }}
-                    className="hover:underline"
-                  >
-                    {child.title}
-                  </Link>
-                  {/* The relationship, in words. The indent says it to a
-                      reader who can see it; this says it to everyone
-                      else. */}
-                  <span className="sr-only">{` — part of ${parent.title}`}</span>
-                </p>
-                <TransferLine movement={movement} />
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+      {/* The list stays in the document and is hidden, rather than being
+          removed and put back. `aria-controls` on the button above has to
+          name an element that exists, or it is a reference to nothing — and
+          a disclosure that only points at its panel while the panel is
+          already open is pointing where nobody needs to be sent. `hidden`
+          takes it out of the layout, out of the accessibility tree, and out
+          of the tab order, which is what closed means here. Same shape the
+          page editor's Advanced disclosure uses (AdminPageEditor.jsx). */}
+      <ul
+        id={listId}
+        hidden={!open}
+        aria-label={`Calling points of ${parent.title}`}
+        className="mt-2xs"
+      >
+        {points.map((child) => {
+          const range = formatSessionStart(eventConfig, child);
+          // The move from the parent's place to this child's, if anyone
+          // recorded it. Null when either states no place, when both are
+          // in the same one, and when the pair has no record — which is
+          // most calling points, and renders as nothing at all.
+          const movement = sessionMovement(eventConfig, parent, child);
+          return (
+            <li key={child.id} className="calling-points__item">
+              <p className="font-mono text-caption text-text-secondary">
+                {range ? (
+                  <time dateTime={range.startIso}>{range.startLabel}</time>
+                ) : (
+                  <span>Time to be announced</span>
+                )}
+              </p>
+              <p className="text-body text-text-primary">
+                <Link
+                  to={{ pathname: `/schedule/${child.id}`, search }}
+                  className="hover:underline"
+                >
+                  {child.title}
+                </Link>
+                {/* The relationship, in words. The indent says it to a
+                    reader who can see it; this says it to everyone
+                    else. */}
+                <span className="sr-only">{` — part of ${parent.title}`}</span>
+              </p>
+              <TransferLine movement={movement} />
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

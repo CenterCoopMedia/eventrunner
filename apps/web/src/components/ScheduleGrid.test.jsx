@@ -134,6 +134,22 @@ describe('the schedule grid', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('link', { name: /survey clinic/i })).not.toBeInTheDocument();
   });
+
+  it('keeps pointing at a list that exists, open or closed', () => {
+    // `aria-controls` has to name an element in the document. Removing the
+    // list on close would leave the control pointing at nothing exactly
+    // when a reader is most likely to follow it — which is to say, when
+    // they are about to open it.
+    const { container } = renderGrid();
+    const toggle = screen.getByRole('button', { name: '1 calling point' });
+    const listId = toggle.getAttribute('aria-controls');
+    expect(container.querySelector(`#${listId}`)).not.toBeNull();
+
+    fireEvent.click(toggle);
+    const closed = container.querySelector(`#${listId}`);
+    expect(closed, 'the list is hidden, not removed').not.toBeNull();
+    expect(closed).toHaveAttribute('hidden');
+  });
 });
 
 describe('the column that comes forward', () => {

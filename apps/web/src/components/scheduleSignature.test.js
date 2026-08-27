@@ -72,6 +72,20 @@ describe('the column that comes forward', () => {
     expect(Number(declared[1])).toBeLessThan(600);
   });
 
+  it('stays under 600ms in every preset, because the rule is not per theme', () => {
+    // The generated stylesheet declares one value; a preset may retune any
+    // token it likes, and retuning this one past the ceiling would move the
+    // whole site's one expressive moment outside §2.2 with nothing to say
+    // so. The budget belongs to the brief, not to a theme.
+    for (const id of THEME_PRESET_IDS) {
+      const override = getPreset(id).tokens?.['--er-duration-signature'];
+      if (override === undefined) continue;
+      const ms = /^(\d+)ms$/.exec(String(override).trim());
+      expect(ms, `${id} states its signature duration in whole ms`).not.toBeNull();
+      expect(Number(ms[1]), `${id} finishes under 600ms`).toBeLessThan(600);
+    }
+  });
+
   it('animates transform and opacity, and nothing else', () => {
     const transitions = signature.match(/transition:[\s\S]*?;/g) ?? [];
     expect(transitions.length).toBeGreaterThan(0);
