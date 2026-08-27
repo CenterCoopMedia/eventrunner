@@ -13,6 +13,13 @@
 // So the check is made against the BUILT stylesheet, which is committed as
 // part of the demo (docs/demo). If a device class is missing there, it was
 // purged, and this test says which one.
+//
+// THIS FILE MUST NOT BE SCANNED BY TAILWIND, OR IT CANNOT FAIL. The list
+// below is a list of class names as literal strings, which is exactly what
+// Tailwind looks for. While `content` included `src/**/*.test.jsx`, naming a
+// class here was enough to keep its rule in the build — so every assertion
+// passed because the assertion itself was the reason. tailwind.config.js now
+// excludes the test files, and the build reflects the app alone.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,7 +65,6 @@ const DEVICE_CLASSES = [
   '.nameplate__coordinate',
   // The hybrid page shell and its density variant (brief §6.1, §6.2).
   '.page-section',
-  '.directory-row',
   // FOUR DIRECTORIES, FOUR COMPOSITIONS (brief §5.1). Each one is built
   // from the shared tokens and each one carries its own device classes;
   // a purged rule here does not paint a solid rectangle, it collapses the
@@ -116,5 +122,17 @@ describe('the built stylesheet', () => {
       const rule = bundled.slice(bundled.indexOf(selector));
       expect(rule.slice(0, 400), `${selector} still carries a mask`).toContain('mask-image');
     }
+  });
+
+  it('is measuring the app, not this file', () => {
+    // The check above is only worth anything while Tailwind cannot see the
+    // list it checks. Put the test files back in `content` and every name
+    // here keeps its own rule alive, and both assertions pass for a class
+    // no component renders. So the exclusion is asserted, not assumed.
+    const config = fs.readFileSync(path.join(REPO_ROOT, 'apps', 'web', 'tailwind.config.js'), 'utf8');
+    const globs = config.match(/content:\s*\[([^\]]*)\]/);
+    expect(globs, 'tailwind.config.js states its content globs').not.toBeNull();
+    expect(globs[1], 'the test files are excluded from what Tailwind scans')
+      .toContain("'!./src/**/*.test.{js,jsx}'");
   });
 });

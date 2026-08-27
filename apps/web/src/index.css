@@ -181,16 +181,10 @@
     margin-block-start: var(--page-section-gap);
   }
 
-  /* One ruled row of a directory: speakers, sponsors, attendees, updates.
-     A hairline opens it and the padding is the density's to set. */
-  .directory-row {
-    padding-block: var(--page-row-pad-block);
-  }
-
   /* FOUR DIRECTORIES, FOUR COMPOSITIONS (design brief §5.1, §6.1).
      ------------------------------------------------------------------
      Speakers, attendees, sponsors and updates were one composition wearing
-     four headings: `.directory-row` under a hairline, optionally in two
+     four headings: one ruled row under a hairline, optionally in two
      columns. That is a schema browser. They are not the same kind of list,
      and reading each of them is a different job:
 
@@ -202,8 +196,9 @@
      So each gets the shape its job needs. Every one is still built from the
      shared tokens — the same spacing scale, the same rules, the same ink,
      the same radius, the same density remaps — and none of them becomes a
-     card. `.directory-row` stays for the plain case and for anything that
-     is genuinely a ruled list.
+     card. Nothing general is left behind for a fifth directory to reuse,
+     because there is no general answer here: the next one gets read for a
+     reason too, and that reason is what shapes it.
 
      ------------------------------------------------------------------
      SPEAKERS — a shelf of portraits. The headshot was a 40px thumbnail
@@ -308,7 +303,7 @@
     background-color: rgb(var(--rule-hairline-rgb));
   }
 
-  /* The `density` layout variant (brief §6.1): tight, comfortable, loose.  /* The `density` layout variant (brief §6.1): tight, comfortable, loose.
+  /* The `density` layout variant (brief §6.1): tight, comfortable, loose.
      Each step REMAPS tier-3 tokens onto the spacing scale — it never mints
      a value and never adds a property name, which is the same rule a preset
      option follows (§3.4).

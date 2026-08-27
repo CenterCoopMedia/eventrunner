@@ -19,7 +19,20 @@ const fontStep = (step) => [
 ];
 
 export default {
-  content: ['./index.html', './src/**/*.{js,jsx}'],
+  // TESTS ARE NOT CONTENT, AND ONE OF THEM DEPENDS ON THAT.
+  //
+  // Tailwind tree-shakes anything in `@layer components` whose class name it
+  // cannot find in the files it scans, and `src/**/*.{js,jsx}` scanned the
+  // test files too. src/components/editorial/purge.test.js exists to catch
+  // exactly that tree-shaking — and it works by listing every device class
+  // as a literal string. Scanning it made every class on that list survive
+  // BECAUSE the test named it, so the test could not fail for anything it
+  // checked. A class no component used still shipped, and a class a
+  // component stopped using went on shipping.
+  //
+  // Excluding the tests makes the build reflect the app alone, which is
+  // what the test was written to measure.
+  content: ['./index.html', './src/**/*.{js,jsx}', '!./src/**/*.test.{js,jsx}'],
   theme: {
     extend: {
       colors: {
