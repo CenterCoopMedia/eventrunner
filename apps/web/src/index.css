@@ -78,6 +78,58 @@
     content: none;
   }
 
+  /* Editorial devices (design brief §2.1). Each class is the rendered form
+     of one tier-3 component contract, so a preset can retune the device by
+     remapping its tokens and no component has to change. The React
+     primitives in components/editorial/ compose these with Tailwind for
+     layout only.
+
+     Rules are drawn with `border-block-*`, not a height, so the width token
+     (1px / 2px / 3px) is the property it was written for and the device
+     stays a hairline on a fractional-pixel display. */
+
+  /* Masthead nameplate: the rule-bounded title block that carries the event
+     name, the dates, and the edition line. Type and rules only — never a
+     hero banner, never a photo behind the name. */
+  .nameplate {
+    border-block-start: var(--nameplate-rule-width) solid rgb(var(--nameplate-rule-rgb));
+    border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    padding-block: var(--nameplate-gap);
+  }
+  .nameplate__name {
+    font-size: var(--nameplate-size);
+    line-height: var(--nameplate-leading);
+    letter-spacing: var(--nameplate-tracking);
+    color: rgb(var(--nameplate-text-rgb));
+    text-wrap: balance;
+  }
+  /* The compact treatment is the same device at running-header size: it
+     keeps both rules and the edition line, and only the name steps down. */
+  .nameplate--compact .nameplate__name {
+    font-size: var(--text-h3);
+    line-height: var(--text-h3-leading);
+    letter-spacing: var(--text-h3-tracking);
+  }
+
+  /* Folio: a small-caps plain-text label that sits ON a rule at a section
+     boundary. Never a chip, never a pill, never a colored badge — and never
+     directly above a heading (brief §2.4, the absolute eyebrow ban). */
+  .folio {
+    font-size: var(--folio-size);
+    line-height: var(--text-folio-leading);
+    letter-spacing: var(--folio-tracking);
+    text-transform: uppercase;
+    color: rgb(var(--folio-text-rgb));
+  }
+  .folio__rule {
+    border-block-start: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
+  }
+
+  /* Section rule: the one strong rule that opens a section (brief §2.1). */
+  .section-rule {
+    border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
+  }
+
   /* Typography for the sanitized richtext subset (RichTextBlock,
      FaqItemBlock). Only the tags sanitizeHtml allows are styled here. */
   .rich-text {
