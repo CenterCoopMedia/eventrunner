@@ -63,9 +63,10 @@ export default {
         body: 'var(--font-body)',
         data: 'var(--font-data)',
         mono: 'var(--font-mono)',
-        // Retired role, kept for one release as an alias of --font-heading
-        // (brief §3.2). PR2 removes it.
-        accent: 'var(--font-accent)',
+        // There is no `accent` face. PR2 removed the retired --font-accent
+        // alias (brief §3.2, §7). Zine's handwritten callout runs on the
+        // --callout-font component token, which the callout component reads
+        // directly rather than through a utility.
       },
       // The fluid editorial scale (brief §3.7). Eight steps, each carrying
       // its own line height and tracking: text-nameplate, text-h1, text-h2,

@@ -365,7 +365,12 @@ export default function AdminBranding() {
         <p className="font-body text-brand-ink">
           Body typeface — the face most of the site is set in.
         </p>
-        <p className="font-accent text-xl text-brand-ink">Accent typeface</p>
+        <p className="font-data text-brand-ink">
+          Data typeface — captions, labels, and the lines beside the text.
+        </p>
+        <p className="font-mono tabular-nums text-brand-ink">
+          Mono typeface — 09:30 · Room B2 · 148 seats
+        </p>
       </Panel>
 
       <Panel
