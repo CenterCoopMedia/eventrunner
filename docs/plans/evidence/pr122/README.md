@@ -2,7 +2,7 @@
 
 Rendered proof for the review of #122. Everything here was captured from the committed output in this branch: `docs/` served at `/eventrunner/` for the Pages surface, and `docs/demo/` for the print previews. Nothing is a mockup.
 
-24 PNGs, 0.9 MB. They are quantized to a 256-colour palette, which is lossless enough for a flat, ruled design and keeps the set inside its budget. Measured values are in `measurements.txt` and quoted below.
+24 PNGs, 0.9 MB. They are quantized to a 256-colour palette, which is lossless enough for a flat, ruled design and keeps the set inside its budget. The print measurements are in `measurements.txt` and quoted below; the sideways-scroll numbers are quoted in the section that reports them.
 
 ## The Pages surface
 
@@ -18,12 +18,12 @@ Three pages — the landing page, the longest documentation page, and the page w
 
 ## 200% zoom
 
-| File | |
+| File | What to look at |
 |---|---|
-| `zoom-200--landing--{light,dark}.png` | |
-| `zoom-200--wide-table-interface-guidelines--{light,dark}.png` | |
+| `zoom-200--landing--{light,dark}.png` | The masthead keeps the mark, the name, and the whole nav on one line, and the hero has dropped to a single column. |
+| `zoom-200--wide-table-interface-guidelines--{light,dark}.png` | The breadcrumbs, the h1, and the contents list, which is one column at this width rather than two. |
 
-200% browser zoom on a 1440px screen means a 720px CSS viewport at double device pixels, which is what these are. The layout is single-column, the documentation navigation has moved below the article, the contents list is one column, and nothing is clipped or overlapped.
+200% browser zoom on a 1440px screen means a 720px CSS viewport at double device pixels, which is what these are. Unlike the captures above, these four are the viewport rather than the full page: at 200% the top of the page is what a reader has, and it is where the layout either holds or does not. It holds — single column, nothing clipped, nothing overlapped, and no sideways scroll (see below).
 
 ## No page scrolls sideways
 

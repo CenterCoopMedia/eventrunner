@@ -119,8 +119,14 @@
 
 /* ---------- Prose ---------- */
 
+/* `overflow-wrap` inherits, so this is the whole of "every text container
+   breaks a long word" for the article: a bare URL or an unbroken identifier
+   in a paragraph, a list item, or a cell breaks instead of widening the page
+   (interface guidelines, "The project site"). It cannot reach a code block,
+   which is `white-space: pre` and scrolls in its own container. */
 .prose {
   max-width: var(--measure);
+  overflow-wrap: break-word;
 }
 
 .prose h1 {
@@ -158,7 +164,6 @@
 .prose h5,
 .prose h6 {
   margin: var(--space-md) 0 var(--space-xs);
-  overflow-wrap: break-word;
   font-family: var(--font-heading);
   font-size: var(--text-body);
   font-weight: var(--weight-bold);
@@ -255,7 +260,6 @@ h6:hover > .heading-anchor {
 .prose code {
   font-family: var(--font-mono);
   font-size: 0.88em;
-  overflow-wrap: break-word;
 }
 
 .prose :not(pre) > code {

@@ -314,9 +314,11 @@ a {
   font-size: var(--text-caption);
   font-weight: var(--weight-semibold);
   text-decoration: none;
-  /* The padding, not the word, is the hit area: this clears 44px on the
-     block axis, which is the touch minimum (interface guidelines,
-     Accessibility). */
+  /* The padding, not the word, is the hit area: 12px each side of a caption
+     line box clears 44px on the block axis, which is the touch bar
+     (interface guidelines, Accessibility). The floor is the 24px absolute
+     minimum from the same line, so a caption that shrinks cannot take the
+     target below it. */
   padding-block: var(--space-sm);
   min-height: 24px;
 }
