@@ -26,6 +26,65 @@ replace it. It does not change the deploy model, the data model, or the provider
 
 ---
 
+## 0. Owner review and calibration (2026-08-27)
+
+The owner reviewed the PR2 work and then calibrated that review. Both bind. Where this section and
+the rest of this brief disagree, this section wins; where the calibration and the review disagree,
+the calibration wins. Everything the brief says that is not named here still stands.
+
+**All six site styles ship first-class.** Each one is complete, coherent, accessible, responsive,
+and visibly distinct. There is no stability tier, no experimental group, and no warning label.
+`packages/shared/src/presetCatalog.cjs` carries them in picker order, and order is the only ranking
+the system has. Institutional leads it because a fresh deployment starts there — an onboarding
+decision, not a verdict on the other five. §4 stands otherwise.
+
+**Every style ships one recommended configuration.** The option defaults in a style's file are that
+configuration, and picking the style hands an operator a document that is publishable as it stands.
+`recommendedConfiguration` builds it and `theme.test.cjs` measures all six against the §8.1 bar in
+both modes.
+
+**Progressive disclosure replaces breadth at first contact.** The normal workflow is six decisions
+in order: site style, logo and icon, main brand colour, header style, schedule style, and light or
+dark. Typography, Illustrations, density, texture, corners, the remaining component variants, and
+the expert colour controls live behind one Advanced disclosure. Nothing is removed to get there.
+This supersedes the "two depths" wording in §5.2 — the second depth is now the whole of Advanced,
+not raw tokens alone.
+
+**Do not homogenize the styles.** Zine is still handmade, Field Guide is still observational, Atlas
+is still cartographic, Broadsheet is still authoritative. A default may be refined. A style's
+expressive treatments stay fully developed and selectable, and a retune that costs a style its
+conviction is a regression. `theme.test.cjs` pins one signature per style.
+
+**Supporting colours are derived from one brand colour.** `config/theme.brandColor` is the client's
+main colour; `primary`, `primaryDark`, and `primaryLight` are derived from it per mode and are
+contrast-safe by construction (§8.1 still applies, and the derivation cannot produce a failing
+pair). The accent and the five semantic roles stay the style's own. The expert per-token overrides
+of §5.2 are retained under Advanced with live contrast checks, warnings, and a reset path back to
+the derived values.
+
+**There is no separate admin marker colour.** `config/theme.adminAccent` is removed. The admin's two
+client-owned slots take the resolved brand colour, and the §5.2 legibility floor is unchanged.
+
+**The preview stays a real-route preview, and it grows.** It renders the app's own routes and
+components, never swatches (§5.2). It adds desktop and phone widths at true CSS width, zoom to fit,
+long-title and dense-schedule stress fixtures, a light-and-dark comparison state, and warnings for
+any colour or font that will not render as asked.
+
+**The catalog is split by reader.** The runtime catalog carries rendering values only; the words
+staff read live beside the editor that shows them; the design prose is generated documentation. The
+staleness gate covers all three.
+
+**The full 23-family font library stays**, with licensing, loading, fallback, and performance
+verified in `scripts/lib/tokens.test.cjs`, and the curated recommended pairings surfaced in the
+editor and in `design/tokens/presets/README.md`.
+
+**UI names.** Preset is **Site style**. Motifs are **Illustrations**. The proof frame is the **Page
+preview**. Raw token editing is **Advanced colour settings**. Nameplate treatment is **Header
+style**. The per-style component variant — Schedule presentation, Session card, Session block,
+Session presentation — is **Schedule style** everywhere.
+
+---
+
 ## 1. Goal
 
 Rebuild the Event Runner visual system from the foundation up.

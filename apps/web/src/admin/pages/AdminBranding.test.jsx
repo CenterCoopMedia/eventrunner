@@ -329,6 +329,18 @@ describe('the staff workflow', () => {
     expect(screen.getByLabelText('Heading face')).toHaveValue('karrik');
   });
 
+  it('states the style’s recommended type pairing in the faces’ own names', async () => {
+    // The library is 23 families. These are the four a reader of THIS site
+    // gets, so the editor says them rather than leaving an operator to read
+    // them off four select boxes.
+    await renderBranding(PRESET_THEME);
+    openAdvanced();
+    const pairing = document.querySelector('#admin-theme-advanced dl');
+    expect(pairing.textContent).toContain('Libre Baskerville');
+    expect(pairing.textContent).toContain('Libre Caslon Text');
+    expect(pairing.textContent).toContain('Source Serif 4');
+  });
+
   it('keeps typography, illustrations, shape, and raw colours behind Advanced', async () => {
     await renderBranding(PRESET_THEME);
     expect(screen.getByRole('button', { name: 'Show the advanced settings' })).toHaveAttribute(

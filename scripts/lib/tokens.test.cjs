@@ -276,6 +276,56 @@ test('every option a preset offers remaps a token the contracts already declare'
   }
 });
 
+test('the bundled library is 23 families, every one of them recorded', () => {
+  // Owner calibration, 2026-08-27: "Keep the full 23-family font library
+  // (licensing/loading/fallback/performance verified)". The library is the
+  // repo's, not the reader's — a deployed site loads two to four families —
+  // so the thing to hold is that every family is accounted for in writing.
+  const readme = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'apps', 'web', 'public', 'fonts', 'README.md'),
+    'utf8',
+  );
+  assert.equal(THEME_FONT_SET_IDS.length, 23, 'the library is 23 set ids');
+
+  // LICENSING. Every set has a row in the README table, and every row states
+  // a licence. Four faces are not on Google Fonts and carry their licence
+  // text beside the binary.
+  for (const setId of THEME_FONT_SET_IDS) {
+    const row = readme.split('\n').find((line) => line.includes(`\`${setId}\``));
+    assert.ok(row, `${setId} has a row in apps/web/public/fonts/README.md`);
+    assert.match(row, /SIL OFL 1\.1/, `${setId} states its licence`);
+  }
+  for (const file of ['karrik', 'bagnard', 'avara', 'fragment-mono']) {
+    assert.ok(
+      fs.existsSync(path.join(
+        __dirname, '..', '..', 'apps', 'web', 'public', 'fonts', 'licenses', `${file}-OFL.txt`,
+      )),
+      `${file} travels with its licence text`,
+    );
+  }
+
+  // LOADING. Every file in the directory is a family the system can reach,
+  // and every file is recorded. A file nobody names is dead weight in the
+  // repo; a set naming a file that is not there renders a fallback.
+  const dir = path.join(__dirname, '..', '..', 'apps', 'web', 'public', 'fonts');
+  const bundled = fs.readdirSync(dir).filter((name) => name.endsWith('.woff2'));
+  const named = new Set(
+    THEME_FONT_SET_IDS.flatMap((setId) => FONT_SETS[setId].faces.map((face) => `${face.file}.woff2`)),
+  );
+  for (const file of bundled) {
+    assert.ok(named.has(file), `${file} is named by a bundled set`);
+    assert.ok(readme.includes(file), `${file} has a README row`);
+  }
+  assert.equal(named.size, bundled.length, 'every named face has a file');
+
+  // FALLBACK. Every stack names more than one family, so a face that has not
+  // arrived degrades to something rather than to nothing.
+  for (const setId of THEME_FONT_SET_IDS) {
+    const families = FONT_SETS[setId].stack.split(',');
+    assert.ok(families.length > 1, `${setId} declares a fallback after its own family`);
+  }
+});
+
 test('every face a preset or an option names is a bundled set with a real file', () => {
   for (const id of THEME_PRESET_IDS) {
     const preset = getPreset(id);

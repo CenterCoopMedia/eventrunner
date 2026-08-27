@@ -51,7 +51,12 @@
 // Storage bucket, and each slot is an ImagePicker over the `branding/`
 // namespace. Whatever is in `logos` is carried through every save verbatim.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getPreset, findThemeContrastFailures, resolveOptionPicks } from 'shared/theme';
+import {
+  getPreset,
+  findThemeContrastFailures,
+  resolveFontRoles,
+  resolveOptionPicks,
+} from 'shared/theme';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -68,6 +73,7 @@ import {
   THEME_FONT_ROLES,
   TEXTURE_IDS,
   adminAccentVerdict,
+  fontSetFaces,
   rgbTripleToHex,
 } from '../../lib/themeRuntime.js';
 import { clearThemePreview } from '../themePreview.js';
@@ -381,6 +387,9 @@ export default function AdminBranding() {
     );
   };
 
+  // The four faces this document actually resolves to, after the style, the
+  // picked heading option, and any role named outright.
+  const resolvedRoles = resolveFontRoles(candidate);
   const groupIds = Object.keys(preset?.options ?? {});
   const workflowGroups = WORKFLOW_OPTION_GROUPS.filter((group) => groupIds.includes(group));
   const advancedGroups = groupIds.filter(
@@ -627,6 +636,18 @@ export default function AdminBranding() {
                   curated alternates that stay inside the style; naming a role
                   outright leaves the curated set behind.
                 </p>
+                {/* The recommended pairing, in the faces' own names. The
+                    library is 23 families; this is the four a reader of THIS
+                    site actually gets, so it is worth stating rather than
+                    leaving an operator to read it off four select boxes. */}
+                <dl className="mb-sm grid grid-cols-[auto,1fr] gap-x-sm gap-y-3xs font-admin-data text-folio text-admin-ink-data">
+                  {THEME_FONT_ROLES.map((role) => (
+                    <div key={role} className="contents">
+                      <dt>{FONT_ROLE_LABELS[role] ?? role}</dt>
+                      <dd>{fontSetFaces(resolvedRoles[role])?.family ?? '—'}</dd>
+                    </div>
+                  ))}
+                </dl>
                 <div className="grid gap-sm sm:grid-cols-2">
                   {preset?.options?.headingFace
                     ? optionField('headingFace', preset.options.headingFace)
