@@ -165,6 +165,7 @@
 .prose h5,
 .prose h6 {
   margin: var(--space-md) 0 var(--space-xs);
+  overflow-wrap: break-word;
   font-family: var(--font-heading);
   font-size: var(--text-body);
   font-weight: var(--weight-bold);

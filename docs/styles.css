@@ -140,6 +140,11 @@ h2,
 h3 {
   font-family: var(--font-heading);
   text-wrap: balance;
+  /* A heading can carry an identifier nothing will break for it —
+     AUTO_DEPLOY_ENVIRONMENTS in the deploy runbook is 24 characters with no
+     opportunity in them. Without this the whole page scrolls sideways on a
+     phone (interface guidelines, Typography). */
+  overflow-wrap: break-word;
 }
 
 a {

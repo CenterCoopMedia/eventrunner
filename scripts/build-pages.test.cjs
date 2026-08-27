@@ -632,6 +632,21 @@ test('the generated stylesheet declares every token it promises, and no more', (
   assert.deepEqual([...declared].sort(), [...new Set(promised)].sort());
 });
 
+test('every text container that can hold an identifier breaks it', () => {
+  // A heading like "4. AUTO_DEPLOY_ENVIRONMENTS (push auto-deploy)" has no
+  // break opportunity in it, and without this the whole page scrolls
+  // sideways at 320px — the one place a documentation site cannot afford it.
+  const css = ['styles.css', 'docs.css']
+    .map((name) => fs.readFileSync(path.join(ROOT, 'docs', name), 'utf8'))
+    .join('\n');
+  for (const selector of ['h1,\nh2,\nh3 {', '.prose h4,\n.prose h5,\n.prose h6 {']) {
+    const start = css.indexOf(selector);
+    assert.ok(start > -1, `no rule found for ${selector}`);
+    const block = css.slice(start, css.indexOf('}', start));
+    assert.match(block, /overflow-wrap:\s*break-word/, `${selector} lets a long word overflow`);
+  }
+});
+
 test('the handwritten stylesheets declare no token the generated one owns', () => {
   // Two declarations of one name is how a generated value gets quietly
   // overridden by a stale hand copy — the thing generating it removed.
