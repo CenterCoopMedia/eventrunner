@@ -2,8 +2,10 @@
   "$schema-note": "One theme preset (design brief 2026-08-27, §4.2). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
   "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 2.",
   "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin.",
+  "$tier-note": "Stability tier (owner review, 2026-08-27). See design/tokens/presets/civic.json for what the two tiers mean.",
   "id": "newsroom",
-  "label": "Newsroom modern",
+  "label": "Newsroom",
+  "tier": "stable",
   "summary": "A well-made news site on a good day. Named sections, one strong rule each, numbers that never borrow the headline face.",
 
   "$palette-words-light": "cool newsprint white, desk black, one saturated editorial accent, muted data slate, hairline silver, section-rule graphite, caption grey, archive fog",

@@ -15,6 +15,11 @@ const {
   DARK_MIN_CONTRAST_UI,
   THEME_CONTRAST_PAIRS,
   THEME_PRESET_IDS,
+  THEME_PRESET_TIERS,
+  STABLE_PRESET_IDS,
+  EXPERIMENTAL_PRESET_IDS,
+  DEFAULT_PRESET_ID,
+  presetTier,
   findThemeContrastFailures,
   getPreset,
   rgbToHex,
@@ -261,6 +266,35 @@ test('resolveMode reads the policy, and an unknown policy falls back to the defa
 test('the font roles are heading, body, data, and mono — accent is not one of them', () => {
   assert.deepEqual([...THEME_FONT_ROLES], ['heading', 'body', 'data', 'mono']);
   assert.ok(!THEME_FONT_ROLES.includes('accent'));
+});
+
+test('the launch surface is the three stable styles, and the default is one of them', () => {
+  // Owner review 2026-08-27. A tier is a launch decision: every preset
+  // renders in full, and the tier says how much of it has been run against
+  // real client content.
+  assert.deepEqual([...STABLE_PRESET_IDS], ['newsroom', 'zine', 'civic']);
+  assert.deepEqual([...EXPERIMENTAL_PRESET_IDS], ['broadsheet', 'field-guide', 'atlas']);
+  assert.ok(STABLE_PRESET_IDS.includes(DEFAULT_PRESET_ID));
+  assert.equal(DEFAULT_PRESET_ID, 'civic');
+
+  // Every preset carries a tier, and the two lists together are the catalog.
+  for (const id of THEME_PRESET_IDS) {
+    assert.ok(THEME_PRESET_TIERS.includes(getPreset(id).tier), `${id} names a tier`);
+    assert.equal(presetTier(id), getPreset(id).tier);
+  }
+  assert.equal(
+    STABLE_PRESET_IDS.length + EXPERIMENTAL_PRESET_IDS.length,
+    THEME_PRESET_IDS.length,
+  );
+
+  // A preset added without a tier never reaches the launch surface.
+  assert.equal(presetTier('not-a-preset'), 'experimental');
+});
+
+test('the client-facing style names are the plain ones the picker shows', () => {
+  assert.equal(getPreset('civic').label, 'Institutional');
+  assert.equal(getPreset('newsroom').label, 'Newsroom');
+  assert.equal(getPreset('zine').label, 'Zine');
 });
 
 test('both spellings of a palette key normalize to the same role', () => {

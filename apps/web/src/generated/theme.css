@@ -103,7 +103,7 @@
   --rule-strong-width: var(--er-width-strong);
   --rule-nameplate-width: var(--er-width-nameplate);
 
-  /* Tier 2 — font roles (brief §3.2). The active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright — all resolved to a bundled set id (spec §7.4). Preset: Newsroom modern. */
+  /* Tier 2 — font roles (brief §3.2). The active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright — all resolved to a bundled set id (spec §7.4). Preset: Newsroom. */
   --font-heading: 'Fraunces', 'Source Serif 4', Georgia, serif;
   --font-body: 'Newsreader', 'Source Serif 4', Georgia, serif;
   --font-data: 'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
@@ -203,7 +203,7 @@
   /* Tier 3 — marginalia contract (brief §3.1). */
   --marginalia-display: none;
 
-  /* Preset remaps — Newsroom modern and its picked options. An option remaps existing tier 2 and tier 3 tokens and never adds a property name (brief §3.4), so every name here is declared above. */
+  /* Preset remaps — Newsroom and its picked options. An option remaps existing tier 2 and tier 3 tokens and never adds a property name (brief §3.4), so every name here is declared above. */
   --folio-font: var(--font-data);
   --section-rule-width: var(--rule-strong-width);
   --nameplate-align: start;
@@ -467,7 +467,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Newsroom modern — light, the active preset, with this deployment's overrides. */
+/* Newsroom — light, the active preset, with this deployment's overrides. */
 :root[data-theme='newsroom'][data-mode='light'],
 [data-theme='newsroom'][data-mode='light'] {
   --brand-primary-rgb: 178 30 50;
@@ -515,7 +515,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Newsroom modern — dark, the active preset, with this deployment's overrides. */
+/* Newsroom — dark, the active preset, with this deployment's overrides. */
 :root[data-theme='newsroom'][data-mode='dark'],
 [data-theme='newsroom'][data-mode='dark'] {
   --brand-primary-rgb: 240 122 134;
@@ -563,7 +563,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Zine / indie — light. */
+/* Zine — light. */
 :root[data-theme='zine'][data-mode='light'],
 [data-theme='zine'][data-mode='light'] {
   --brand-primary-rgb: 198 26 84;
@@ -611,7 +611,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Zine / indie — dark. */
+/* Zine — dark. */
 :root[data-theme='zine'][data-mode='dark'],
 [data-theme='zine'][data-mode='dark'] {
   --brand-primary-rgb: 244 124 166;
@@ -659,7 +659,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Civic / institutional — light. */
+/* Institutional — light. */
 :root[data-theme='civic'][data-mode='light'],
 [data-theme='civic'][data-mode='light'] {
   --brand-primary-rgb: 26 82 150;
@@ -707,7 +707,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Civic / institutional — dark. */
+/* Institutional — dark. */
 :root[data-theme='civic'][data-mode='dark'],
 [data-theme='civic'][data-mode='dark'] {
   --brand-primary-rgb: 128 178 238;

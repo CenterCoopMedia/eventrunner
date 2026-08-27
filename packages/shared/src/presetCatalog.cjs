@@ -17,6 +17,7 @@ const PRESETS = Object.freeze({
   broadsheet: {
     id: 'broadsheet',
     label: 'Broadsheet',
+    tier: 'experimental',
     summary: 'The paper of record. The nameplate is the loudest thing on the page and rules do the dividing.',
     palette: {
       light: {
@@ -166,7 +167,8 @@ const PRESETS = Object.freeze({
   },
   newsroom: {
     id: 'newsroom',
-    label: 'Newsroom modern',
+    label: 'Newsroom',
+    tier: 'stable',
     summary: 'A well-made news site on a good day. Named sections, one strong rule each, numbers that never borrow the headline face.',
     palette: {
       light: {
@@ -316,7 +318,8 @@ const PRESETS = Object.freeze({
   },
   zine: {
     id: 'zine',
-    label: 'Zine / indie',
+    label: 'Zine',
+    tier: 'stable',
     summary: 'Made by hand, at a copier, the week before. One loud display face, an even mono rhythm under it, and an accent spent twice a page.',
     palette: {
       light: {
@@ -503,7 +506,8 @@ const PRESETS = Object.freeze({
   },
   civic: {
     id: 'civic',
-    label: 'Civic / institutional',
+    label: 'Institutional',
+    tier: 'stable',
     summary: 'The public record of a public event. Plain, patient, unambiguous, with nothing between the reader and the information.',
     palette: {
       light: {
@@ -652,6 +656,7 @@ const PRESETS = Object.freeze({
   'field-guide': {
     id: 'field-guide',
     label: 'Field Guide',
+    tier: 'experimental',
     summary: 'A naturalist\'s expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.',
     palette: {
       light: {
@@ -832,6 +837,7 @@ const PRESETS = Object.freeze({
   atlas: {
     id: 'atlas',
     label: 'Atlas',
+    tier: 'experimental',
     summary: 'A mapped city on its transit network. A survey sheet and a departure board at once: lines, stations, transfers.',
     palette: {
       light: {

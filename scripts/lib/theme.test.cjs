@@ -5,7 +5,12 @@ const assert = require('node:assert/strict');
 
 const { defaultTheme, rgbToHex, hexToRgb, PLACEHOLDER_LOGOS } = require('./theme.cjs');
 const { validateTheme } = require('shared/config');
-const { DEFAULT_PRESET_ID, getPreset, resolveLegacyColors } = require('shared/theme');
+const {
+  DEFAULT_PRESET_ID,
+  getPreset,
+  presetTier,
+  resolveLegacyColors,
+} = require('shared/theme');
 
 test('the default theme passes the real config/theme validator', () => {
   const verdict = validateTheme(defaultTheme());
@@ -31,8 +36,12 @@ test('every logo slot starts as a placeholder the readiness branding row can see
 
 test('the seed starts on the default preset, with its palette materialized', () => {
   const theme = defaultTheme();
-  // Brief §4.2: Newsroom modern is the preset a new deployment gets.
+  // Owner review 2026-08-27: Institutional is the preset a new deployment
+  // gets, and it is on the stable tier by construction — the launch surface
+  // is what onboarding starts from.
   assert.equal(theme.preset, DEFAULT_PRESET_ID);
+  assert.equal(DEFAULT_PRESET_ID, 'civic');
+  assert.equal(presetTier(DEFAULT_PRESET_ID), 'stable');
   assert.equal(theme.motifSet, getPreset(DEFAULT_PRESET_ID).motifSet);
 
   // `colors` is an OUTPUT for a preset document: the one shared resolver

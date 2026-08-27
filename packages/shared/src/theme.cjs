@@ -415,10 +415,50 @@ const { PRESETS, ADMIN_TOKENS, MOTIF_SET_IDS } = require('./presetCatalog.cjs');
 const THEME_PRESET_IDS = Object.freeze(Object.keys(PRESETS));
 
 /**
- * The preset a new deployment gets. Brief §4.2: "Use it as the default
- * preset for new deployments."
+ * The two stability tiers (owner review, 2026-08-27).
+ *
+ * A tier is a LAUNCH decision, not a quality decision. Every preset renders
+ * in full and every preset holds the same gates. What the tier says is how
+ * much of the product has been run against real client content:
+ *
+ *   - `stable` — the launch surface. These lead the style picker, and one of
+ *     them is what a fresh deployment starts on.
+ *   - `experimental` — still fully functional. The picker groups them behind
+ *     a disclosure that tells staff to test them on their own content first.
  */
-const DEFAULT_PRESET_ID = 'newsroom';
+const THEME_PRESET_TIERS = Object.freeze(['stable', 'experimental']);
+
+/**
+ * @param {string} id a preset id
+ * @returns {string} the preset's tier; `experimental` when it names none, so
+ *   a preset added without a tier never lands on the launch surface by
+ *   accident.
+ */
+function presetTier(id) {
+  const tier = PRESETS[id]?.tier;
+  return THEME_PRESET_TIERS.includes(tier) ? tier : 'experimental';
+}
+
+/** The preset ids on the launch surface, in catalog order. */
+const STABLE_PRESET_IDS = Object.freeze(
+  THEME_PRESET_IDS.filter((id) => presetTier(id) === 'stable'),
+);
+
+/** The preset ids behind the "Experimental styles" disclosure. */
+const EXPERIMENTAL_PRESET_IDS = Object.freeze(
+  THEME_PRESET_IDS.filter((id) => presetTier(id) === 'experimental'),
+);
+
+/**
+ * The preset a new deployment gets (owner review, 2026-08-27).
+ *
+ * The brief §4.2 named Newsroom. The review moved the default to
+ * Institutional: it is the plainest of the six, it targets the highest
+ * accessibility bar, and it is the look a client is least likely to have to
+ * undo. The demo fixture stays on Newsroom, which is the story written for
+ * exactly that event.
+ */
+const DEFAULT_PRESET_ID = 'civic';
 
 /** The motif sets `config/theme.motifSet` may name (brief §3.8). */
 const THEME_MOTIF_SET_IDS = Object.freeze([...MOTIF_SET_IDS]);
@@ -846,6 +886,10 @@ module.exports = {
   canonicalColorKey,
   overrideTokenKey,
   THEME_PRESET_IDS,
+  THEME_PRESET_TIERS,
+  STABLE_PRESET_IDS,
+  EXPERIMENTAL_PRESET_IDS,
+  presetTier,
   DEFAULT_PRESET_ID,
   THEME_MOTIF_SET_IDS,
   PRESETS,

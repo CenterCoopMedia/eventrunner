@@ -37,10 +37,13 @@ const { resolveLegacyColors } = require('shared/theme');
  *
  * The demo used to carry a hand-written blue-teal palette of its own. A
  * preset replaces it: the fixture is a media summit for cooperative
- * newsrooms, Newsroom modern is the story written for exactly that, and it
- * brings a designed dark palette the hand-written one never had. Running
- * the default preset also means the public demo shows what a client gets on
- * a fresh deployment rather than a look only the demo has.
+ * newsrooms, Newsroom is the story written for exactly that, and it brings
+ * a designed dark palette the hand-written one never had.
+ *
+ * The demo does NOT follow `DEFAULT_PRESET_ID`. A fresh deployment starts on
+ * Institutional (owner review, 2026-08-27); the demo stays on Newsroom
+ * because the demo's job is to show a real event dressed in the style that
+ * fits it, not to show the onboarding default twice.
  */
 const DEMO_PRESET_ID = 'newsroom';
 
@@ -104,10 +107,10 @@ const DEMO_ANSWERS = Object.freeze({
     },
   },
   // Overlaid on `defaultTheme()` (spec §2.2, §7.2). The demo runs a named
-  // preset rather than a bespoke palette: Newsroom modern is the story
-  // written for a publication that publishes every day, which is what the
-  // fixture is. Its cool newsprint ground is not the warm tan canvas the
-  // anti-pattern checklist (#105) rejects.
+  // preset rather than a bespoke palette: Newsroom is the story written for
+  // a publication that publishes every day, which is what the fixture is.
+  // Its cool newsprint ground is not the warm tan canvas the anti-pattern
+  // checklist (#105) rejects.
   theme: {
     preset: DEMO_PRESET_ID,
     // `colors` is an OUTPUT for a preset document (design brief §5.2): the

@@ -20,6 +20,8 @@ import {
   MODE_POLICY_IDS,
   MOTIF_SET_IDS,
   PRESET_IDS,
+  STABLE_PRESET_IDS,
+  EXPERIMENTAL_PRESET_IDS,
   RADIUS_IDS,
   THEME_COLOR_KEYS,
   THEME_COLOR_PROPERTIES,
@@ -63,6 +65,18 @@ describe('theme vocabulary parity: browser against the shared schema', () => {
     expect(PRESET_IDS).toContain(DEFAULT_PRESET_ID);
     expect(DEFAULT_PRESET_ID).toBe(sharedTheme.DEFAULT_PRESET_ID);
     expect([...MOTIF_SET_IDS]).toEqual([...sharedTheme.THEME_MOTIF_SET_IDS]);
+  });
+
+  it('splits the same launch surface the server does', () => {
+    // The picker leads with the stable styles and keeps the experimental
+    // ones behind a disclosure. Both lists come from the preset data, so the
+    // editor can never present a tier the catalog does not state.
+    expect([...STABLE_PRESET_IDS]).toEqual([...sharedTheme.STABLE_PRESET_IDS]);
+    expect([...EXPERIMENTAL_PRESET_IDS]).toEqual([...sharedTheme.EXPERIMENTAL_PRESET_IDS]);
+    expect([...STABLE_PRESET_IDS, ...EXPERIMENTAL_PRESET_IDS].sort()).toEqual(
+      [...PRESET_IDS].sort(),
+    );
+    expect(STABLE_PRESET_IDS).toContain(DEFAULT_PRESET_ID);
   });
 });
 

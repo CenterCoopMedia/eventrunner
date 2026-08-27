@@ -2,8 +2,10 @@
   "$schema-note": "One theme preset (design brief 2026-08-27, §4.4). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
   "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 4.",
   "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin. Civic targets the highest contrast bar of the six presets and never trades contrast for mood.",
+  "$tier-note": "Stability tier (owner review, 2026-08-27). `stable` styles are the launch surface: they lead the picker and one of them is the default a fresh deployment gets. `experimental` styles still work in full; the picker groups them behind a disclosure that tells staff to test them first.",
   "id": "civic",
-  "label": "Civic / institutional",
+  "label": "Institutional",
+  "tier": "stable",
   "summary": "The public record of a public event. Plain, patient, unambiguous, with nothing between the reader and the information.",
 
   "$palette-words-light": "document off-white, statute near-black, restrained civic blue, form-grey rule, hearing-room slate, plain caution amber, plain confirm green, record grey",

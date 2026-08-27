@@ -42,6 +42,8 @@ import {
   THEME_FONT_ROLES,
   THEME_TEXTURES,
   THEME_PRESET_IDS,
+  STABLE_PRESET_IDS as SHARED_STABLE_PRESET_IDS,
+  EXPERIMENTAL_PRESET_IDS as SHARED_EXPERIMENTAL_PRESET_IDS,
   THEME_MOTIF_SET_IDS,
   DEFAULT_MODE_POLICY,
   DEFAULT_PRESET_ID,
@@ -160,6 +162,10 @@ export const MODE_POLICY_IDS = Object.freeze([...THEME_MODE_POLICIES]);
 export { DEFAULT_MODE_POLICY };
 /** The six preset ids (brief §4). data-theme carries one of these. */
 export const PRESET_IDS = Object.freeze([...THEME_PRESET_IDS]);
+/** The style ids the picker leads with (owner review, 2026-08-27). */
+export const STABLE_PRESET_IDS = Object.freeze([...SHARED_STABLE_PRESET_IDS]);
+/** The style ids the picker keeps behind the "Experimental styles" disclosure. */
+export const EXPERIMENTAL_PRESET_IDS = Object.freeze([...SHARED_EXPERIMENTAL_PRESET_IDS]);
 /** The preset a new deployment starts on. */
 export { DEFAULT_PRESET_ID };
 /** The motif sets data-motif-set switches between (brief §3.8). */

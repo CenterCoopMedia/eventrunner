@@ -4,11 +4,14 @@
  * The default `config/theme` document (spec §2.2, §7.2) and the font/radius
  * vocabularies the CSS generator resolves it against.
  *
- * A fresh deployment starts on the **Newsroom modern** preset. Brief §4.2
- * names it: "Use it as the default preset for new deployments." That
- * replaces the hand-written teal-on-warm-paper palette this file used to
- * carry — a preset IS the designed neutral starting point, and it brings a
- * designed dark palette with it, which a single light palette never could.
+ * A fresh deployment starts on the **Institutional** preset (owner review,
+ * 2026-08-27). The brief §4.2 named Newsroom; the review moved the default
+ * to Institutional because it is the plainest of the six, targets the
+ * highest accessibility bar, and is the look a client is least likely to
+ * have to undo. That replaces the hand-written teal-on-warm-paper palette
+ * this file used to carry — a preset IS the designed neutral starting
+ * point, and it brings a designed dark palette with it, which a single
+ * light palette never could.
  *
  * The seeded `colors` map is materialized from that preset by the one shared
  * resolver, exactly as `updateTheme` materializes it on every publish
