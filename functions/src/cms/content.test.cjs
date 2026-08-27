@@ -882,6 +882,35 @@ test('an update is judged on the MERGED session, not the payload alone', async (
   assert.equal(db.read('cmsSchedule_drafts', 'session-child').dayId, 'day-2');
 });
 
+test('moving a parent session strands nothing: the edit is rejected, naming the children', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop', visible: true, revision: 1 },
+    'cmsSchedule/session-clinic': { dayId: 'day-2', title: 'Clinic', parentId: 'session-parent', visible: true, revision: 1 },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-parent', fields: { dayId: 'day-3' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /carries 1 child session \(session-clinic\)/);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-parent'), undefined);
+});
+
+test('a parent may still be edited in every way that does not strand a child', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop', visible: true, revision: 1 },
+    'cmsSchedule/session-clinic': { dayId: 'day-2', title: 'Clinic', parentId: 'session-parent', visible: true, revision: 1 },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-parent', fields: { title: 'Workshop, renamed' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-parent').title, 'Workshop, renamed');
+});
+
 test('the session seam leaves every other collection alone', async () => {
   const db = makeFakeDb();
   const res = fakeRes();

@@ -7,6 +7,7 @@ const {
   validateSessionShape,
   checkSessionTrack,
   checkSessionParent,
+  checkSessionChildren,
   validateSessionStructure,
   resolveSessionTrack,
 } = require('./sessions.cjs');
@@ -300,6 +301,109 @@ test('a session with no parent never reads anything', async () => {
   const db = makeFakeDb();
   const verdict = await checkSessionParent({ db, docId: 'session-1', fields: session() });
   assert.deepEqual(verdict, { ok: true, errors: [] });
+});
+
+// --- editing the PARENT (design brief §4.6) ---------------------------------
+
+test('a session with no children is judged on itself alone', async () => {
+  const db = makeFakeDb({ 'cmsSchedule/session-parent': { dayId: 'day-2' } });
+  assert.deepEqual(
+    await checkSessionChildren({ db, docId: 'session-parent', fields: session({ dayId: 'day-3' }) }),
+    { ok: true, errors: [] },
+  );
+});
+
+test('moving a parent to another day is rejected, with the child count and the rule', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { dayId: 'day-2' },
+    'cmsSchedule/clinic-a': { dayId: 'day-2', parentId: 'session-parent' },
+    'cmsSchedule/clinic-b': { dayId: 'day-2', parentId: 'session-parent' },
+  });
+  const verdict = await checkSessionChildren({
+    db,
+    docId: 'session-parent',
+    fields: session({ dayId: 'day-3' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.errors[0], /^dayId: this session carries 2 child sessions \(clinic-a, clinic-b\)/);
+  assert.match(verdict.errors[0], /running on "day-2"/);
+  assert.match(verdict.errors[0], /cannot run on day "day-3"/);
+  assert.match(verdict.errors[0], /a child session runs on its parent's day/);
+});
+
+test('one child reads as one child, not "1 child sessions"', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { dayId: 'day-2' },
+    'cmsSchedule/clinic-a': { dayId: 'day-2', parentId: 'session-parent' },
+  });
+  const verdict = await checkSessionChildren({
+    db,
+    docId: 'session-parent',
+    fields: session({ dayId: 'day-3' }),
+  });
+  assert.match(verdict.errors[0], /carries 1 child session \(clinic-a\)/);
+});
+
+test('an unpublished child counts, and its draft revision is what it is judged by', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/clinic-a': { dayId: 'day-2', parentId: 'session-parent' },
+    // The draft has already moved with its parent; the live doc has not.
+    'cmsSchedule_drafts/clinic-a': { dayId: 'day-3', parentId: 'session-parent' },
+    'cmsSchedule_drafts/clinic-b': { dayId: 'day-2', parentId: 'session-parent' },
+  });
+  const verdict = await checkSessionChildren({
+    db,
+    docId: 'session-parent',
+    fields: session({ dayId: 'day-3' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.errors[0], /carries 1 child session \(clinic-b\)/);
+});
+
+test('moving a parent to another line is rejected by the children that state one', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/inherits': { dayId: 'day-2', parentId: 'session-parent' },
+    'cmsSchedule/states-b': { dayId: 'day-2', track: 'B', parentId: 'session-parent' },
+  });
+  const verdict = await checkSessionChildren({
+    db,
+    docId: 'session-parent',
+    fields: session({ dayId: 'day-2', track: 'A' }),
+  });
+  assert.equal(verdict.ok, false);
+  // The child that states nothing inherits the new line; only the one that
+  // states B is stranded by the move.
+  assert.match(verdict.errors[0], /^track: this session carries 1 child session \(states-b\) on "B"/);
+  assert.match(verdict.errors[0], /cannot run on "A"/);
+  assert.equal(verdict.errors.length, 1);
+});
+
+test('clearing a parent’s track strands the children that named it', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/states-b': { dayId: 'day-2', track: 'B', parentId: 'session-parent' },
+  });
+  const verdict = await checkSessionChildren({
+    db,
+    docId: 'session-parent',
+    fields: session({ dayId: 'day-2' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.errors[0], /cannot run on no track/);
+});
+
+test('a parent that changes neither day nor line keeps its children', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/inherits': { dayId: 'day-2', parentId: 'session-parent' },
+    'cmsSchedule/states-b': { dayId: 'day-2', track: 'B', parentId: 'session-parent' },
+  });
+  assert.deepEqual(
+    await checkSessionChildren({
+      db,
+      docId: 'session-parent',
+      fields: session({ dayId: 'day-2', track: 'B', title: 'Renamed' }),
+    }),
+    { ok: true, errors: [] },
+  );
 });
 
 test('validateSessionStructure joins the halves, shape first', async () => {

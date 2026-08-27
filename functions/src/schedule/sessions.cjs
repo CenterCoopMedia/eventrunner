@@ -179,17 +179,28 @@ async function readSession({ db, tx, docId }) {
   return null;
 }
 
-/** Ids of the sessions naming `docId` as their parent, across both revisions. */
-async function findChildIds({ db, tx, docId }) {
+/**
+ * The sessions naming `docId` as their parent, across both revisions, each
+ * as the editor sees it: the draft revision when there is one, the live
+ * document otherwise (same rule as readSession). A child that exists only
+ * as an unpublished draft is a child.
+ *
+ * @returns {Promise<Array<{ id: string, data: object }>>}
+ */
+async function findChildren({ db, tx, docId }) {
   const queries = [
-    db.collection(SESSIONS_DRAFTS).where('parentId', '==', docId),
     db.collection(SESSIONS).where('parentId', '==', docId),
+    db.collection(SESSIONS_DRAFTS).where('parentId', '==', docId),
   ];
+  // Live first, drafts second: a draft revision overwrites the live one.
   const snaps = await Promise.all(queries.map((q) => (tx ? tx.get(q) : q.get())));
-  const ids = new Set();
-  for (const snap of snaps) for (const doc of snap.docs) ids.add(doc.id);
-  return [...ids];
+  const byId = new Map();
+  for (const snap of snaps) for (const doc of snap.docs) byId.set(doc.id, doc.data());
+  return [...byId.entries()]
+    .filter(([id]) => id !== docId)
+    .map(([id, data]) => ({ id, data }));
 }
+
 
 /**
  * The line a child may state (brief §4.6).
@@ -261,10 +272,14 @@ function resolveSessionTrack(session, byId) {
  *     refusing it is what makes "one level deep" hold across two writes
  *     rather than only within one.
  *
- * @param {{ db: object, tx?: object, docId: string, fields: object }} args
+ * @param {{ db: object, tx?: object, docId: string, fields: object,
+ *           children?: Array<{ id: string, data: object }>|null }} args
+ *   `children` is the already-read child set when the caller has one
+ *   (validateSessionStructure reads it once for both child checks); left
+ *   out, this reads it itself.
  * @returns {Promise<{ ok: boolean, errors: string[] }>}
  */
-async function checkSessionParent({ db, tx = null, docId, fields }) {
+async function checkSessionParent({ db, tx = null, docId, fields, children = null }) {
   const parentId = fields?.parentId;
   if (typeof parentId !== 'string' || parentId.trim().length === 0) return { ok: true, errors: [] };
   if (parentId === docId) {
@@ -292,11 +307,70 @@ async function checkSessionParent({ db, tx = null, docId, fields }) {
   }
   errors.push(...checkChildTrack({ childTrack: fields.track, parent, parentId }));
 
-  const children = (await findChildIds({ db, tx, docId })).filter((id) => id !== docId);
-  if (children.length > 0) {
+  const own = children ?? (await findChildren({ db, tx, docId }));
+  if (own.length > 0) {
     errors.push(
-      `parentId: "${docId}" already has child sessions (${children.join(', ')}), ` +
+      `parentId: "${docId}" already has child sessions (${own.map((c) => c.id).join(', ')}), ` +
       'so it cannot become a child itself',
+    );
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+/**
+ * THE SAME INVARIANTS, READ FROM THE PARENT'S END (design brief §4.6).
+ *
+ * checkSessionParent judges a child against its parent, which covers every
+ * write made from the child's side. The other side was unguarded: editing a
+ * PARENT — moving it to another day, putting it on another line — silently
+ * broke the same rules for every child attached to it, because nothing
+ * re-checked the children the parent was carrying. A workshop block moved
+ * to day 3 left its clinics on day 2, still pointing at it: each child
+ * document then failed the rule its parent had just changed under it, and
+ * nothing in the system would say so until someone next edited a child.
+ *
+ * So a save that has children validates the children too, and names the
+ * count. The operator is told what is attached and what to do about it —
+ * move the children or delete them — rather than being handed a schedule
+ * that quietly stopped making sense.
+ *
+ * A child that states no track is not a mismatch: it inherits, so it
+ * follows the parent onto its new line by construction.
+ *
+ * @param {{ db: object, tx?: object, docId: string, fields: object,
+ *           children?: Array<{ id: string, data: object }>|null }} args
+ * @returns {Promise<{ ok: boolean, errors: string[] }>}
+ */
+async function checkSessionChildren({ db, tx = null, docId, fields, children = null }) {
+  const own = children ?? (await findChildren({ db, tx, docId }));
+  if (own.length === 0) return { ok: true, errors: [] };
+
+  const errors = [];
+  const named = (list) => `${list.length} child session${list.length === 1 ? '' : 's'} ` +
+    `(${list.map((c) => c.id).join(', ')})`;
+
+  const offDay = own.filter((child) => child.data?.dayId !== fields?.dayId);
+  if (offDay.length > 0) {
+    errors.push(
+      `dayId: this session carries ${named(offDay)} running on ` +
+      `${[...new Set(offDay.map((c) => JSON.stringify(c.data?.dayId)))].join(', ')}, ` +
+      `so it cannot run on day ${JSON.stringify(fields?.dayId)} — a child session runs on ` +
+      'its parent\'s day, so move those children to this day, re-parent them, or delete them first',
+    );
+  }
+
+  const track = statedTrack(fields?.track);
+  const offTrack = own.filter((child) => {
+    const childTrack = statedTrack(child.data?.track);
+    return childTrack !== null && childTrack !== track;
+  });
+  if (offTrack.length > 0) {
+    errors.push(
+      `track: this session carries ${named(offTrack)} on ` +
+      `${[...new Set(offTrack.map((c) => JSON.stringify(statedTrack(c.data?.track))))].join(', ')}, ` +
+      `so it cannot run on ${track === null ? 'no track' : JSON.stringify(track)} — a child ` +
+      'session runs on its parent\'s line, so clear those children\'s tracks to let them ' +
+      'inherit, set them to this one, or re-parent them first',
     );
   }
   return { ok: errors.length === 0, errors };
@@ -314,10 +388,16 @@ async function validateSessionStructure({ db, tx = null, docId, fields }) {
   const shape = validateSessionShape(fields, docId);
   if (!shape.ok) return { ok: false, message: shape.errors.join('; ') };
 
+  // Read once, judge from both ends: the child set answers both "can this
+  // session become a child" (no, if it is already a parent) and "do the
+  // children it carries still hold after this edit".
+  const children = await findChildren({ db, tx, docId });
+
   const errors = [];
   for (const check of [
     () => checkSessionTrack({ db, tx, fields }),
-    () => checkSessionParent({ db, tx, docId, fields }),
+    () => checkSessionParent({ db, tx, docId, fields, children }),
+    () => checkSessionChildren({ db, tx, docId, fields, children }),
   ]) {
     const verdict = await check();
     errors.push(...verdict.errors);
@@ -330,12 +410,13 @@ module.exports = {
   validateSessionShape,
   checkSessionTrack,
   checkSessionParent,
+  checkSessionChildren,
   validateSessionStructure,
   resolveSessionTrack,
   internals: {
     SESSIONS,
     SESSIONS_DRAFTS,
-    findChildIds,
+    findChildren,
     readSession,
     readTrackLetters,
     statedTrack,
