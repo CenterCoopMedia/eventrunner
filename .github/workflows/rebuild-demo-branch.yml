@@ -1,0 +1,40 @@
+name: Rebuild demo branch
+
+on:
+  push:
+    branches:
+      - agent/demo-site-style-switcher
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/demo-site-style-switcher
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Pack shared package for Functions
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Build the static demo
+        run: node scripts/build-demo.cjs
+      - name: Commit generated demo files
+        run: |
+          if git diff --quiet -- docs/demo; then
+            echo 'The committed demo is current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/demo
+          git commit -s -m 'chore(demo): rebuild static demo'
+          git push origin HEAD:agent/demo-site-style-switcher
