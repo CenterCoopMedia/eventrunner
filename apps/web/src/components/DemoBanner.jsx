@@ -14,7 +14,7 @@ export default function DemoBanner() {
     <div
       role="note"
       aria-label="Demonstration site"
-      className="border-b border-brand-ink/10 bg-brand-ink text-brand-surface"
+      className="no-print border-b border-brand-ink/10 bg-brand-ink text-brand-surface"
     >
       <p className="mx-auto max-w-5xl px-4 py-2 text-sm" style={{ textWrap: 'pretty' }}>
         <span className="font-semibold">Demo</span>
