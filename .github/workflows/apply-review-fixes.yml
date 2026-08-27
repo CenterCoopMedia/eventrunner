@@ -21,15 +21,12 @@ jobs:
           node-version: '22'
       - name: Apply exact replacements
         run: node scripts/dev/apply-review-fixes.cjs
-      - name: Remove temporary helpers
-        run: |
-          rm -f .github/workflows/apply-review-fixes.yml
-          rm -f scripts/dev/apply-review-fixes.cjs
-          rm -f scripts/dev/apply-copy-edits.cjs
-      - name: Commit the review fixes
+      - name: Commit the documentation fixes
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add docs/ADMIN_GUIDE.md docs/CLIENT_ONBOARDING.md \
+            docs/EVENTBRITE_VERIFICATION.md docs/DEPLOY_RUNBOOK.md \
+            docs/POSTMARK_PROVISIONING.md
           git commit -s -m 'fix(copy): address connector review findings'
           git push origin HEAD:agent/plain-language-copy
