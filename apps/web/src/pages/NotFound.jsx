@@ -10,7 +10,7 @@ export default function NotFound() {
       action={
         <Link
           to="/"
-          className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-6 py-3 font-semibold text-brand-surface hover:bg-brand-primary-dark"
+          className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
         >
           Go to the home page
         </Link>

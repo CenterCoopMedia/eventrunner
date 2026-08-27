@@ -2,6 +2,15 @@
 // renders the admin-authored `live_updates` feed. Feature-gated by the
 // caller (config/features.liveUpdates) — this component only knows how to
 // render whatever rows it is handed.
+//
+// A ruled feed, not a card (design brief §2.1, §5.1): SectionHead opens the
+// boundary the way it does everywhere else on the site, each entry is a
+// hairline-separated row, and the posted-at timestamp sits in the mono
+// face. "Pinned" is the small ruled rectangle DirectoryTag/TypeBadge
+// established (issue #113) — never a pill, never a colored badge — and it
+// sits beside the timestamp, never above it.
+import SectionHead from './editorial/SectionHead.jsx';
+import Tag from './editorial/Tag.jsx';
 import { useLiveUpdates } from '../hooks/useLiveUpdates.js';
 
 /** Firestore Timestamp, Date, or epoch millis — whatever the doc carries. */
@@ -36,31 +45,29 @@ export default function LiveUpdatesCard() {
   const ordered = [...pinned, ...rest];
 
   return (
-    <section
-      aria-labelledby="live-updates-title"
-      className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
-    >
-      <h2 id="live-updates-title" className="font-heading text-lg font-semibold text-brand-ink">
-        Live updates
-      </h2>
-      <ul className="mt-3 flex flex-col gap-3">
+    <section aria-labelledby="live-updates-title">
+      <SectionHead level={2} id="live-updates-title" title="Live updates" />
+      <ul className="mt-sm">
         {ordered.map((update) => {
           const posted = formatPostedAt(update.postedAt);
           return (
-            <li key={update.id} className="border-b border-brand-ink/10 pb-3 last:border-0 last:pb-0">
-              <div className="flex flex-wrap items-center gap-2">
+            <li key={update.id} className="border-t-hairline border-t-rule-hairline py-sm">
+              <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
                 {update.pinned ? (
-                  <span className="rounded-brand border border-brand-accent/40 bg-brand-accent/10 px-2 py-0.5 text-xs font-semibold text-brand-accent">
-                    Pinned
-                  </span>
+                  <Tag>Pinned</Tag>
                 ) : null}
                 {posted ? (
-                  <time dateTime={toDate(update.postedAt)?.toISOString()} className="text-xs text-brand-ink-muted">
+                  <time
+                    dateTime={toDate(update.postedAt)?.toISOString()}
+                    className="font-mono text-caption text-text-secondary"
+                  >
                     {posted}
                   </time>
                 ) : null}
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-brand-ink">{update.message}</p>
+              <p className="mt-2xs whitespace-pre-wrap text-body text-text-secondary">
+                {update.message}
+              </p>
             </li>
           );
         })}

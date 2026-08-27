@@ -5,6 +5,10 @@
 // refuse and a profile that does not exist render the SAME "not available"
 // state on purpose: distinguishing them would turn this page into an oracle
 // for "this person is here but has a private profile".
+//
+// Editorial base restyle (design brief §2.1, §2.4): earned badges render as
+// the small ruled-rectangle tag Attendees.jsx and SessionCard.jsx already
+// use — never a pill, never a colored chip.
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -15,6 +19,8 @@ import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
 import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
+import SectionHead from '../components/editorial/SectionHead.jsx';
+import Tag from '../components/editorial/Tag.jsx';
 
 /**
  * Render only strings — the projection coerces these fields and the rules
@@ -52,10 +58,7 @@ export default function AttendeeProfile() {
         title="This event doesn’t have an attendee directory"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
             Go to the home page
           </Link>
         }
@@ -71,10 +74,7 @@ export default function AttendeeProfile() {
         title="This profile isn’t available"
         description="It may be private, or the attendee may not have set one up."
         action={
-          <Link
-            to="/attendees"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/attendees" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
             Back to the directory
           </Link>
         }
@@ -93,53 +93,54 @@ export default function AttendeeProfile() {
   const badges = visibleBadgeIds(profile.badges, badgesConfig);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+    <div className="grid gap-xl lg:grid-cols-[2fr_1fr]">
       <article>
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-sm">
           <ProfilePhoto
             size="lg"
             photoPath={profile.photoPath}
             displayName={text(profile.displayName)}
           />
           <div>
-            <h1 className="font-heading text-3xl font-semibold text-brand-ink">
+            <h1 className="font-heading text-h1 font-semibold text-text-primary">
               {text(profile.displayName)}
             </h1>
             {text(profile.pronouns) ? (
-              <p className="mt-1 text-brand-ink-muted">{text(profile.pronouns)}</p>
+              <p className="mt-2xs font-data text-caption text-text-secondary">
+                {text(profile.pronouns)}
+              </p>
             ) : null}
             {text(profile.jobTitle) || text(profile.organization) ? (
-              <p className="mt-2 text-brand-ink-muted">
+              <p className="mt-2xs font-data text-caption text-text-secondary">
                 {[text(profile.jobTitle), text(profile.organization)].filter(Boolean).join(' · ')}
               </p>
             ) : null}
             {profile.speakerId ? (
-              <p className="mt-2 font-semibold text-brand-primary-dark">Speaker at this event</p>
+              <p className="mt-xs font-data text-caption font-semibold text-text-primary">
+                Speaker at this event
+              </p>
             ) : null}
           </div>
         </div>
         {text(profile.bio) ? (
-          <p className="mt-6 max-w-prose whitespace-pre-line text-brand-ink">
+          <p className="mt-lg max-w-prose whitespace-pre-line text-body text-text-secondary">
             {text(profile.bio)}
           </p>
         ) : null}
         {features.badges && badges.length > 0 ? (
-          <>
-            <h2 className="mt-8 font-heading text-xl text-brand-ink">Badges</h2>
-            <ul className="mt-2 flex flex-wrap gap-2">
+          <section className="mt-xl">
+            <SectionHead level={2} title="Badges" />
+            <ul className="mt-sm flex flex-wrap gap-2xs">
               {badges.map((badgeId) => (
-                <li
-                  key={badgeId}
-                  className="rounded-brand border border-brand-ink/10 bg-brand-surface-alt px-3 py-1 text-sm text-brand-ink"
-                >
-                  {badgeLabel(badgesConfig, badgeId)}
+                <li key={badgeId}>
+                  <Tag>{badgeLabel(badgesConfig, badgeId)}</Tag>
                 </li>
               ))}
             </ul>
-          </>
+          </section>
         ) : null}
-        <p className="mt-8">
-          <Link to="/attendees" className="rounded-brand underline underline-offset-4">
+        <p className="mt-xl">
+          <Link to="/attendees" className="font-data text-caption text-text-secondary underline underline-offset-2 hover:text-text-primary">
             Back to the directory
           </Link>
         </p>

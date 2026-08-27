@@ -20,6 +20,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
 import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
+import Tag from '../components/editorial/Tag.jsx';
 
 /**
  * Render only strings. The rules type-check these fields and the projection
@@ -33,7 +34,7 @@ function text(value) {
 const homeLink = (
   <Link
     to="/"
-    className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
+    className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
   >
     Go to the home page
   </Link>
@@ -97,7 +98,7 @@ export default function Attendees() {
         action={
           <Link
             to="/signin"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
+            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
           >
             Go to sign in
           </Link>
@@ -107,83 +108,86 @@ export default function Attendees() {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+    <div className="grid gap-xl lg:grid-cols-[2fr_1fr]">
       <article>
-        <h1 className="font-heading text-3xl font-semibold text-brand-ink">Attendees</h1>
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Attendees</h1>
         {status === 'ready' && !attendeeAccess ? (
-          <p className="mt-2 text-brand-ink-muted">
+          <p className="mt-xs max-w-prose text-body text-text-secondary">
             You can see attendees with public profiles. The full directory opens up once your
             registration is approved.
           </p>
         ) : null}
 
         {loading ? (
-          <LoadingState label="Loading the attendee directory" />
+          <div className="mt-lg">
+            <LoadingState label="Loading the attendee directory" />
+          </div>
         ) : failed ? (
-          <div className="mt-6">
+          <div className="mt-lg">
             <EmptyState
               title="The directory is unavailable right now"
               description="This is usually temporary. The page keeps trying in the background."
             />
           </div>
         ) : sorted.length === 0 ? (
-          <div className="mt-6">
+          <div className="mt-lg">
             <EmptyState
               title="No attendee profiles yet"
               description="Profiles appear here as attendees complete them."
             />
           </div>
         ) : (
-          <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+          // A ruled directory, not a card grid (design brief §2.1, §5.1): the
+          // same device Speakers.jsx and Sponsors.jsx use — a hairline opens
+          // each row, name and photo on the left in the heading face, role
+          // and organization on the right in the data face.
+          <ul className="mt-lg">
             {sorted.map((profile) => {
               const badges = features.badges ? visibleBadgeIds(profile.badges, badgesConfig) : [];
+              const affiliation = [text(profile.jobTitle), text(profile.organization)]
+                .filter(Boolean)
+                .join(' · ');
               return (
                 <li
                   key={profile.id}
-                  className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
+                  className="border-t-hairline border-t-rule-hairline py-md sm:grid sm:grid-cols-[1fr,2fr] sm:gap-md"
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-xs">
                     <ProfilePhoto
                       photoPath={profile.photoPath}
                       displayName={profile.displayName}
                     />
                     <div className="min-w-0">
-                      <h2 className="font-heading text-lg text-brand-ink">
-                        <Link
-                          to={`/attendees/${profile.id}`}
-                          className="rounded-brand underline-offset-4 hover:underline"
-                        >
+                      <h2 className="font-heading text-h3 font-semibold text-text-primary">
+                        <Link to={`/attendees/${profile.id}`} className="hover:underline">
                           {profile.displayName}
                         </Link>
                       </h2>
                       {text(profile.pronouns) ? (
-                        <p className="text-sm text-brand-ink-muted">{text(profile.pronouns)}</p>
-                      ) : null}
-                      {text(profile.jobTitle) || text(profile.organization) ? (
-                        <p className="mt-1 text-sm text-brand-ink-muted">
-                          {[text(profile.jobTitle), text(profile.organization)]
-                            .filter(Boolean)
-                            .join(' · ')}
+                        <p className="mt-2xs font-data text-caption text-text-secondary">
+                          {text(profile.pronouns)}
                         </p>
-                      ) : null}
-                      {profile.speakerId ? (
-                        <p className="mt-2 text-sm font-semibold text-brand-primary-dark">
-                          Speaker
-                        </p>
-                      ) : null}
-                      {badges.length > 0 ? (
-                        <ul className="mt-2 flex flex-wrap gap-1.5">
-                          {badges.map((badgeId) => (
-                            <li
-                              key={badgeId}
-                              className="rounded-brand border border-brand-ink/10 bg-brand-surface px-2 py-0.5 text-xs text-brand-ink"
-                            >
-                              {badgeLabel(badgesConfig, badgeId)}
-                            </li>
-                          ))}
-                        </ul>
                       ) : null}
                     </div>
+                  </div>
+                  <div className="mt-xs sm:mt-0">
+                    {affiliation ? (
+                      <p className="font-data text-caption text-text-secondary">{affiliation}</p>
+                    ) : null}
+                    {profile.speakerId || badges.length > 0 ? (
+                      <ul className="mt-xs flex flex-wrap gap-2xs">
+                        {profile.speakerId ? (
+                          <li>
+                            <Tag>Speaker</Tag>
+                          </li>
+                        ) : null}
+                        {badges.map((badgeId) => (
+                          <li key={badgeId}>
+                            <Tag>{badgeLabel(badgesConfig, badgeId)}</Tag>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
                 </li>
               );

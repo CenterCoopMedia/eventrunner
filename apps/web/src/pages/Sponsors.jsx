@@ -1,6 +1,8 @@
-// Sponsors page — placeholder the sponsors tranche replaces.
+// Sponsors page — the public directory of supporting organizations.
 // TODO(m2-sponsors): tier grouping/order from cmsOrganizations, logo
-// rendering from Storage paths with the neutral placeholder fallback.
+// rendering from Storage paths with the neutral placeholder fallback. This
+// restyle (design brief §2.1, §5.1) only changes presentation: the ruled
+// list below renders the same fields the placeholder card grid did.
 // Feature-gated by config/features.sponsors — the nav link already hides
 // when the feature is off, but the route itself must gate too, since direct
 // navigation bypasses the nav (matches the Schedule.jsx pattern).
@@ -23,7 +25,7 @@ export default function Sponsors() {
         action={
           <Link
             to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
+            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
           >
             Go to the home page
           </Link>
@@ -34,39 +36,52 @@ export default function Sponsors() {
 
   return (
     <article>
-      <h1 className="font-heading text-3xl font-semibold text-brand-ink">Sponsors</h1>
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Sponsors</h1>
       {visible.length === 0 ? (
-        <div className="mt-6">
+        <div className="mt-lg">
           <EmptyState
             title="Sponsors have not been announced yet"
             description="Supporting organizations appear here once they are published."
           />
         </div>
       ) : (
-        <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+        // A ruled directory, not a card grid (design brief §2.1, §5.1): a
+        // hairline opens each row, the same device Speakers.jsx and
+        // SessionCard use in place of a card border. The tier sits below the
+        // organization's name in the data face — metadata beside a heading,
+        // never furniture above one (brief §2.4).
+        <ul className="mt-lg">
           {visible.map((org) => (
             <li
               key={org.id}
-              className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
+              className="border-t-hairline border-t-rule-hairline py-md sm:grid sm:grid-cols-[1fr,2fr] sm:gap-md"
             >
-              <h2 className="font-heading text-lg text-brand-ink">
-                {isSafeHref(org.url) ? (
-                  <a
-                    href={org.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline underline-offset-2 hover:text-brand-primary-dark"
-                  >
-                    {org.name}
-                  </a>
-                ) : (
-                  org.name
-                )}
-              </h2>
-              <p className="mt-1 text-sm uppercase tracking-wide text-brand-ink-muted">
-                {org.tier}
-              </p>
-              <p className="mt-2 text-brand-ink-muted">{org.description}</p>
+              <div>
+                <h2 className="font-heading text-h3 font-semibold text-text-primary">
+                  {isSafeHref(org.url) ? (
+                    <a href={org.url} target="_blank" rel="noreferrer" className="hover:underline">
+                      {org.name}
+                    </a>
+                  ) : (
+                    org.name
+                  )}
+                </h2>
+                {/* The scale step owns the tracking (tailwind.config.js
+                    fontStep), so no raw tracking utility fights it. */}
+                {org.tier ? (
+                  <p className="mt-2xs font-data text-caption uppercase text-text-secondary">
+                    {org.tier}
+                  </p>
+                ) : null}
+              </div>
+              {org.description ? (
+                <p
+                  className="mt-xs max-w-prose text-body text-text-secondary sm:mt-0"
+                  style={{ textWrap: 'pretty' }}
+                >
+                  {org.description}
+                </p>
+              ) : null}
             </li>
           ))}
         </ul>

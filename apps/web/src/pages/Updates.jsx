@@ -4,10 +4,19 @@
 // direct-navigation-bypasses-nav gate as every other optional route
 // (Sponsors.jsx, SessionDetail.jsx). This is also the page updatesMeta's
 // self-fetched SSR meta describes when no specific post id is requested.
+//
+// A dated column, not a card feed (design brief §2.1, §5.1): a hairline
+// opens each row, the publish date sits in the mono face as a true
+// left-hand column with tabular figures — the same shape SessionCard.jsx
+// gives the schedule — and the title carries the heading face. A rule
+// replaces the card border, so nothing here is boxed. "Pinned" is the small
+// ruled rectangle DirectoryTag/TypeBadge established (issue #113): never a
+// pill, never a colored badge, and it sits beside the title, never above it.
 import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import Tag from '../components/editorial/Tag.jsx';
 import { publishDateLabel, sortUpdates, toPublishDate } from '../lib/updateDates.js';
 
 /** First ~200 chars of the body, word-boundary trimmed, for the list card. */
@@ -32,7 +41,7 @@ export default function Updates() {
         action={
           <Link
             to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
+            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
           >
             Go to the home page
           </Link>
@@ -48,38 +57,51 @@ export default function Updates() {
 
   return (
     <article>
-      <h1 className="font-heading text-3xl font-semibold text-brand-ink">Updates</h1>
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Updates</h1>
       {visible.length === 0 ? (
-        <div className="mt-6">
+        <div className="mt-lg">
           <EmptyState
             title="No updates yet"
             description="Announcements appear here once they are published."
           />
         </div>
       ) : (
-        <ul className="mt-6 space-y-4">
+        <ul className="mt-lg">
           {visible.map((update) => {
             const dateLabel = publishDateLabel(update.publishAt);
+            const publishDate = toPublishDate(update.publishAt);
+            const body = excerpt(update.body);
             return (
-              <li
-                key={update.id}
-                className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
-              >
-                <Link
-                  to={`/updates/${update.id}`}
-                  className="font-heading text-lg text-brand-ink underline-offset-2 hover:text-brand-primary-dark hover:underline"
-                >
-                  {update.pinned ? <span aria-hidden="true">📌 </span> : null}
-                  {update.title}
-                </Link>
-                {dateLabel ? (
-                  <p className="mt-1 text-sm text-brand-ink-muted">
-                    <time dateTime={toPublishDate(update.publishAt).toISOString()}>{dateLabel}</time>
+              <li key={update.id} className="border-t-hairline border-t-rule-hairline">
+                <div className="grid gap-2xs py-md sm:grid-cols-[9.5rem,1fr] sm:gap-md">
+                  <p className="font-mono text-caption text-text-secondary">
+                    {dateLabel ? (
+                      <time dateTime={publishDate.toISOString()}>{dateLabel}</time>
+                    ) : (
+                      <span>Undated</span>
+                    )}
                   </p>
-                ) : null}
-                {excerpt(update.body) ? (
-                  <p className="mt-2 text-brand-ink-muted">{excerpt(update.body)}</p>
-                ) : null}
+                  <div>
+                    <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
+                      <h2 className="font-heading text-h3 font-semibold text-text-primary">
+                        <Link to={`/updates/${update.id}`} className="hover:underline">
+                          {update.title}
+                        </Link>
+                      </h2>
+                      {update.pinned ? (
+                        <Tag>Pinned</Tag>
+                      ) : null}
+                    </div>
+                    {body ? (
+                      <p
+                        className="mt-xs max-w-prose text-body text-text-secondary"
+                        style={{ textWrap: 'pretty' }}
+                      >
+                        {body}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
               </li>
             );
           })}

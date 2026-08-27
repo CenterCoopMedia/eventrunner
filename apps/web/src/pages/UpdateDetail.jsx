@@ -6,6 +6,9 @@
 // SessionDetail.jsx. An id that does not resolve to a visible cmsUpdates doc
 // 404s here (never a leaked draft), matching the SSR side's own
 // visible === true requirement (functions/src/public/og.cjs).
+//
+// Editorial base restyle (design brief §2.1): the same back-link, header,
+// and body treatment SessionDetail.jsx gives its own detail page.
 import { Link, useParams } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -20,7 +23,7 @@ function NotFoundState() {
       action={
         <Link
           to="/updates"
-          className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-6 py-3 font-semibold text-brand-surface hover:bg-brand-primary-dark"
+          className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
         >
           Back to updates
         </Link>
@@ -42,7 +45,7 @@ export default function UpdateDetail() {
         action={
           <Link
             to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
+            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
           >
             Go to the home page
           </Link>
@@ -59,21 +62,21 @@ export default function UpdateDetail() {
 
   return (
     <article>
-      <p className="mb-4">
-        <Link to="/updates" className="text-sm font-semibold text-brand-primary-dark hover:underline">
+      <p className="mb-md">
+        <Link to="/updates" className="font-data text-caption font-semibold text-text-secondary hover:text-text-primary hover:underline">
           ← Back to updates
         </Link>
       </p>
       <header>
-        <h1 className="font-heading text-3xl font-semibold text-brand-ink">{update.title}</h1>
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">{update.title}</h1>
         {dateLabel ? (
-          <p className="mt-2 text-brand-ink-muted">
+          <p className="mt-2xs font-data text-caption text-text-secondary">
             <time dateTime={dateInstant.toISOString()}>{dateLabel}</time>
           </p>
         ) : null}
       </header>
       {update.body ? (
-        <p className="mt-6 max-w-prose whitespace-pre-wrap text-brand-ink" style={{ textWrap: 'pretty' }}>
+        <p className="mt-lg max-w-prose whitespace-pre-wrap text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
           {update.body}
         </p>
       ) : null}

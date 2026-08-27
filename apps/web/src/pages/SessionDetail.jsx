@@ -21,7 +21,7 @@ function NotFoundState({ search }) {
       action={
         <Link
           to={{ pathname: '/schedule', search }}
-          className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-6 py-3 font-semibold text-brand-surface hover:bg-brand-primary-dark"
+          className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
         >
           Back to the schedule
         </Link>
@@ -55,7 +55,7 @@ export default function SessionDetail() {
         action={
           <Link
             to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
+            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
           >
             Go to the home page
           </Link>
@@ -66,7 +66,7 @@ export default function SessionDetail() {
 
   if (loading) {
     return (
-      <div className="mt-6">
+      <div className="mt-lg">
         <LoadingState label="Loading the session" />
       </div>
     );
@@ -81,24 +81,24 @@ export default function SessionDetail() {
 
   return (
     <article>
-      <p className="mb-4">
+      <p className="mb-md">
         <Link
           to={{ pathname: '/schedule', search }}
-          className="text-sm font-semibold text-brand-primary-dark hover:underline"
+          className="font-data text-caption font-semibold text-text-secondary hover:text-text-primary hover:underline"
         >
           ← Back to the schedule
         </Link>
       </p>
       <header>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="font-heading text-3xl font-semibold text-brand-ink">{session.title}</h1>
+        <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">{session.title}</h1>
           <TypeBadge type={session.type} />
         </div>
-        <p className="mt-2 text-brand-ink-muted">
+        <p className="mt-2xs font-data text-caption text-text-secondary">
           {day ? <span>{day.label}</span> : null}
           {day && range ? ' · ' : null}
           {range ? (
-            <>
+            <span className="font-mono">
               <time dateTime={range.startIso}>{range.startLabel}</time>
               {range.endLabel ? (
                 <>
@@ -106,22 +106,24 @@ export default function SessionDetail() {
                 </>
               ) : null}
               {range.zone ? <span className="ms-1">{range.zone}</span> : null}
-            </>
+            </span>
           ) : !day ? (
             'Time to be announced'
           ) : null}
         </p>
-        {session.location ? <p className="mt-1 text-brand-ink-muted">{session.location}</p> : null}
-        <SpeakerNames speakers={speakerNames} features={features} className="mt-2 text-brand-ink-muted" />
+        {session.location ? (
+          <p className="mt-2xs font-data text-caption text-text-secondary">{session.location}</p>
+        ) : null}
+        <SpeakerNames speakers={speakerNames} features={features} />
       </header>
 
       {session.description ? (
-        <p className="mt-6 max-w-prose text-brand-ink" style={{ textWrap: 'pretty' }}>
+        <p className="mt-md max-w-prose text-lead text-text-secondary" style={{ textWrap: 'pretty' }}>
           {session.description}
         </p>
       ) : null}
 
-      <div className="mt-6">
+      <div className="mt-lg">
         <SessionPills
           session={session}
           eventConfig={eventConfig}

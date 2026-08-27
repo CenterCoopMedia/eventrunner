@@ -117,6 +117,18 @@ describe('SessionDetail', () => {
     expect(screen.getByText('Day one')).toBeInTheDocument();
   });
 
+  it('sets the title in the heading face on the type-scale step, and the time in the mono face', () => {
+    // Design brief §2.1/§3.2: real typographic hierarchy carries the
+    // structure, and a changing value (the time) reads in the mono face
+    // with tabular figures — never a card, never a colored edge.
+    const { container } = renderDetail('fx-early');
+    expect(
+      screen.getByRole('heading', { level: 1, name: '[Fixture] Morning kickoff' }),
+    ).toHaveClass('font-heading', 'text-h1');
+    const time = container.querySelector('header time');
+    expect(time.closest('.font-mono')).not.toBeNull();
+  });
+
   it('404s (designed empty state) for an unknown session id', () => {
     renderDetail('no-such-session');
     expect(

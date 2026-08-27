@@ -6,6 +6,10 @@
 // gated to approved attendees (BookmarkPill in SessionCard.jsx), but a
 // signed-out visitor sees a sign-in prompt here rather than an empty list
 // that looks like "you have no bookmarks".
+//
+// Editorial base restyle (design brief §2.1, §5.1): the day head is the same
+// folio-on-a-rule SectionHead device Schedule.jsx uses, and the page actions
+// are ruled rectangles rather than filled pill buttons.
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -15,9 +19,16 @@ import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
+import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
+
+// Page actions in the editorial register: a ruled rectangle on the theme
+// radius, never a filled pill (design brief §2.4) — the same class
+// Schedule.jsx's own page actions use.
+const ACTION_CLASS =
+  'touch-target inline-flex items-center rounded-brand border-hairline border-rule-hairline px-md py-2xs font-data text-caption font-medium text-text-primary hover:bg-brand-surface-alt';
 
 export default function MySchedule() {
   const { eventConfig, features } = useEventConfig();
@@ -68,10 +79,7 @@ export default function MySchedule() {
         title="This event doesn’t have a personal schedule"
         description="Everything else about the event is on the schedule page."
         action={
-          <Link
-            to="/schedule"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/schedule" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
             Go to the schedule
           </Link>
         }
@@ -81,7 +89,7 @@ export default function MySchedule() {
 
   if (authLoading) {
     return (
-      <div className="mt-6">
+      <div className="mt-lg">
         <LoadingState label="Loading your schedule" />
       </div>
     );
@@ -93,10 +101,7 @@ export default function MySchedule() {
         title="Sign in to see your schedule"
         description="Bookmark sessions from the schedule page and they’ll show up here."
         action={
-          <Link
-            to="/signin"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/signin" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
             Sign in
           </Link>
         }
@@ -106,25 +111,22 @@ export default function MySchedule() {
 
   return (
     <article>
-      <header className="flex flex-wrap items-start justify-between gap-4">
+      <header className="flex flex-wrap items-baseline justify-between gap-md">
         <div>
-          <h1 className="font-heading text-3xl font-semibold text-brand-ink">My schedule</h1>
-          <p className="mt-1 text-sm text-brand-ink-muted">
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">My schedule</h1>
+          <p className="mt-2xs font-data text-caption text-text-secondary">
             Sessions you’ve bookmarked, across every day.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to="/schedule"
-            className="touch-target inline-flex items-center rounded-brand border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"
-          >
+        <div className="flex flex-wrap items-center gap-xs">
+          <Link to="/schedule" className={ACTION_CLASS}>
             Full schedule
           </Link>
           {features.icsExport && mySessions.length > 0 ? (
             <button
               type="button"
               onClick={() => downloadIcs(icsFileName('my-schedule'), buildIcsCalendar(eventConfig, mySessions))}
-              className="touch-target inline-flex items-center rounded-brand border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"
+              className={ACTION_CLASS}
             >
               Download my schedule (.ics)
             </button>
@@ -133,19 +135,16 @@ export default function MySchedule() {
       </header>
 
       {loading || bookmarksLoading ? (
-        <div className="mt-6">
+        <div className="mt-lg">
           <LoadingState label="Loading your schedule" />
         </div>
       ) : mySessions.length === 0 ? (
-        <div className="mt-6">
+        <div className="mt-lg">
           <EmptyState
             title="No bookmarked sessions yet"
             description="Browse the schedule and bookmark the sessions you don’t want to miss."
             action={
-              <Link
-                to="/schedule"
-                className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-              >
+              <Link to="/schedule" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
                 Browse the schedule
               </Link>
             }
@@ -155,18 +154,21 @@ export default function MySchedule() {
         days
           .filter((day) => (myByDay.get(day.id) ?? []).length > 0)
           .map((day) => (
-            <section key={day.id} aria-labelledby={`my-day-${day.id}`} className="mt-8">
-              <h2 id={`my-day-${day.id}`} className="font-heading text-xl text-brand-ink">
-                {day.label}
-                {formatDayDate(day, eventConfig.timezone) ? (
-                  <>
-                    {' · '}
-                    <time dateTime={day.date} className="font-normal text-brand-ink-muted">
-                      {formatDayDate(day, eventConfig.timezone)}
-                    </time>
-                  </>
-                ) : null}
-              </h2>
+            <section key={day.id} aria-labelledby={`my-day-${day.id}`} className="mt-xl">
+              {/* The same folio-on-a-rule day head Schedule.jsx uses (brief
+                  §2.1): the standing head of the day, with the date sitting
+                  on the same rule rather than stacked above it. */}
+              <SectionHead
+                variant="folio"
+                level={2}
+                id={`my-day-${day.id}`}
+                title={day.label}
+                folio={
+                  formatDayDate(day, eventConfig.timezone) ? (
+                    <time dateTime={day.date}>{formatDayDate(day, eventConfig.timezone)}</time>
+                  ) : null
+                }
+              />
               {/* No gap between rows: each SessionCard opens with its own
                   hairline, so the rules ARE the separation (brief §2.1). */}
               <ul className="mt-sm">

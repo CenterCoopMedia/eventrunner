@@ -84,4 +84,13 @@ describe('Updates', () => {
     renderUpdates({ updates: [] });
     expect(screen.getByRole('heading', { name: 'No updates yet' })).toBeInTheDocument();
   });
+
+  it('labels a post with no resolvable publish date rather than leaving the date column blank', () => {
+    // The list is a dated column (design brief §2.1), so every row states
+    // its date. A post whose publishAt never resolved still gets a word —
+    // an empty cell would read as a rendering fault, not as missing data.
+    renderUpdates({ updates: [{ ...NEWER, id: 'update-undated', publishAt: null }] });
+    expect(screen.getByText('Undated')).toBeInTheDocument();
+    expect(screen.getByText(NEWER.title)).toBeInTheDocument();
+  });
 });
