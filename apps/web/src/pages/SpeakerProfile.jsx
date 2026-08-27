@@ -192,7 +192,7 @@ export default function SpeakerProfile() {
   if (accountStatus === 'pending-account') {
     return (
       <div className="mt-lg">
-        <LoadingState label="Setting up your account" />
+        <LoadingState label="Setting up your account…" />
       </div>
     );
   }
@@ -228,7 +228,7 @@ export default function SpeakerProfile() {
   if (load.status === 'loading' || form == null) {
     return (
       <div className="mt-lg">
-        <LoadingState label="Loading your speaker profile" />
+        <LoadingState label="Loading your speaker profile…" />
       </div>
     );
   }

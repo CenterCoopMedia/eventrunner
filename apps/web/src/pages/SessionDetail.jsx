@@ -65,7 +65,7 @@ export default function SessionDetail() {
   if (loading) {
     return (
       <div className="mt-lg">
-        <LoadingState label="Loading the session" />
+        <LoadingState label="Loading the session…" />
       </div>
     );
   }

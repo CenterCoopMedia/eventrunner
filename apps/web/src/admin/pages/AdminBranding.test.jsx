@@ -90,7 +90,7 @@ async function renderBranding() {
     await Promise.resolve();
   });
   await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
   });
   await act(async () => {
     configSubscriptions.get('theme')(LIVE_THEME);
@@ -206,7 +206,7 @@ describe('color picker input', () => {
       await Promise.resolve();
     });
     await waitFor(() => {
-      expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
     });
     await act(async () => {
       configSubscriptions.get('theme')({ ...LIVE_THEME, colors: { primary: hex('fff') } });

@@ -115,7 +115,7 @@ export default function Attendees() {
 
         {loading ? (
           <div className="mt-lg">
-            <LoadingState label="Loading the attendee directory" />
+            <LoadingState label="Loading the attendee directory…" />
           </div>
         ) : failed ? (
           <div className="mt-lg">
