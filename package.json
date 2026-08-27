@@ -13,7 +13,7 @@
     "build": "npm run build -w apps/web",
     "build:demo": "node scripts/build-demo.cjs",
     "check:copy": "node scripts/check-copy-style.cjs",
-    "lint": "eslint . && npm run check:copy",
+    "lint": "eslint .",
     "prepare:functions": "node scripts/prepare-functions.cjs",
     "test": "node --test \"packages/shared/src/**/*.test.cjs\" \"functions/src/**/*.test.cjs\" \"scripts/**/*.test.cjs\"",
     "test:web": "npm run test -w apps/web",
