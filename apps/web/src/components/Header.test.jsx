@@ -63,14 +63,17 @@ describe('Header treatments', () => {
     const { container } = renderHeader({ variant: 'masthead' });
     const plate = container.querySelector('.nameplate');
     expect(plate).not.toBeNull();
+    expect(plate.classList.contains('nameplate--compact')).toBe(false);
     expect(plate.textContent).toContain('October 14–16, 2026');
     expect(plate.textContent).toContain('Fixtureville, FX');
   });
 
-  it('compact keeps the dates beside the name on one bar', () => {
+  it('compact draws the nameplate device at running-header size', () => {
     const { container } = renderHeader({ variant: 'compact' });
-    expect(container.querySelector('.nameplate')).toBeNull();
-    expect(container.textContent).toContain('October 14–16, 2026');
+    const plate = container.querySelector('.nameplate');
+    expect(plate).not.toBeNull();
+    expect(plate.classList.contains('nameplate--compact')).toBe(true);
+    expect(plate.textContent).toContain('October 14–16, 2026');
   });
 
   it('minimal shows the mark and the navigation, and nothing else', () => {

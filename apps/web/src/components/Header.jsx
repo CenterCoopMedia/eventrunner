@@ -92,13 +92,18 @@ export default function Header({
   }
 
   if (treatment === 'compact') {
-    // The event bar: name and dates on one baseline, at running-header size.
+    // The event bar: the nameplate device at running-header size, so the
+    // name and the dates share one baseline between the same two rules.
     return (
       <div className="border-b-hairline border-b-rule-hairline">
-        <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs pt-sm">
-          <p className="font-heading text-body text-text-primary">{identityLink(wordmark)}</p>
-          <Dateline dates={dates} place={place} />
-        </div>
+        <Nameplate
+          variant="compact"
+          name={name}
+          dates={dates}
+          edition={place}
+          to={to}
+          mark={mark}
+        />
         {children}
       </div>
     );
