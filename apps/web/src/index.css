@@ -101,7 +101,7 @@
     position: relative;
     border-block-start: var(--nameplate-rule-width) solid rgb(var(--nameplate-rule-rgb));
     border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
-    padding-block: var(--nameplate-gap);
+    padding-block: calc(var(--nameplate-gap) * var(--density-step, 1));
     text-align: var(--nameplate-align);
   }
   /* The frame of a title page (Field Guide) or a title block (Atlas). It is
@@ -165,11 +165,25 @@
      boundary. Never a chip, never a pill, never a colored badge — and never
      directly above a heading (brief §2.4, the absolute eyebrow ban). */
   .folio {
+    font-family: var(--folio-font);
     font-size: var(--folio-size);
     line-height: var(--text-folio-leading);
     letter-spacing: var(--folio-tracking);
+    /* A folio names a day, a plate, or a page, so it carries figures that
+       change: they set in tabular figures like every other value on the
+       page (brief §3.2). The `font-data` utility used to bring this, and
+       the face with it; the face is now the --folio-font contract's job,
+       so the figures are stated here rather than lost with it. */
+    font-variant-numeric: tabular-nums;
     text-transform: uppercase;
     color: rgb(var(--folio-text-rgb));
+    /* The struck folio (Zine): a rule above the word as well as the one
+       running out beside it — the typewriter section break of a
+       photocopied programme. Every other style holds a zero width, and a
+       zero width draws no rule and takes no space, so the padding is
+       computed from the width rather than switched on beside it. */
+    border-block-start: var(--folio-rule-top-width) solid rgb(var(--folio-rule-rgb));
+    padding-block-start: calc(var(--folio-rule-top-width) * 3);
   }
   .folio__rule {
     border-block-start: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
@@ -178,6 +192,14 @@
   /* Section rule: the one strong rule that opens a section (brief §2.1). */
   .section-rule {
     border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
+  }
+  /* The head that follows it, at the distance the style sets. This is one of
+     the three surfaces `config/theme.density` has to reach — a section
+     boundary is where a reader feels a page as tight or as open — so the gap
+     takes the density step the same way the nameplate and the schedule row
+     do. */
+  .section-head {
+    margin-block-start: calc(var(--section-rule-gap) * var(--density-step, 1));
   }
 
   /* The Zine stamp: a session block printed twice, the way a two-pass job
@@ -208,6 +230,19 @@
         adds nothing to what tells a reader the block is interactive. */
   .session-block {
     position: relative;
+    /* The rule that opens the row. It is the tier-3 contract, not a utility,
+       because a style moves it: Zine sets the strong rule where the other
+       five hold the hairline, and a cut-and-pasted programme is what that
+       width says. */
+    border-block-start: var(--session-card-rule-width) solid rgb(var(--session-card-rule-rgb));
+    /* Each stamp is its own misregistration. Without this the rows abut,
+       every offset layer is covered by the next row's face, and the twenty
+       separate artefacts merge into ONE continuous coloured edge down the
+       trailing side of the programme — which is the coloured card edge
+       §2.4 rejects, not the second print pass §2.4 allows. The gap is the
+       offset itself, so it is zero in every style but Zine's stamped
+       block and nothing else moves. */
+    margin-block-end: var(--session-card-stamp-offset);
   }
   .session-block::before {
     content: '';
@@ -226,6 +261,13 @@
      shows only where it is misregistered. */
   .session-block__face {
     position: relative;
+    /* The row's own measure. Every value here is a tier-3 contract a
+       Schedule style moves, so picking "Agate block" or "Field notes
+       column" changes the page without a component edit — which is what
+       makes an option a data change (brief §3.4, §4). */
+    padding-block: calc(var(--session-card-pad-block) * var(--density-step, 1));
+    padding-inline: var(--session-card-pad-inline);
+    column-gap: var(--session-card-gap);
     background-image: linear-gradient(
       rgb(var(--session-card-surface-rgb)),
       rgb(var(--session-card-surface-rgb))
@@ -254,6 +296,50 @@
         calc(var(--session-card-stamp-offset) * -0.25)
       );
     }
+  }
+
+  /* The parts of a schedule row a Schedule style retunes. They read the
+     tier-3 contract in CSS rather than through a Tailwind utility on
+     purpose: a utility sits in a later cascade layer and would win over
+     the token every time, so an option a client picked would never reach
+     the page.
+
+     The three the six styles move: the leading of the row's running text,
+     the size of its listings column, and whether the programme is
+     numbered. */
+  .session-block__data {
+    font-size: var(--schedule-data-size);
+    line-height: var(--schedule-row-leading);
+    letter-spacing: var(--text-caption-tracking);
+  }
+  .session-block__text {
+    font-size: var(--text-body);
+    line-height: var(--schedule-row-leading);
+    letter-spacing: var(--text-body-tracking);
+  }
+  /* The agenda number is the session's real position in the day, the same
+     rule the plate number follows: real sequence data, never a decorative
+     zero-padded one (brief §2.4). `none` keeps it out of the document, and
+     out of the accessibility tree, in the five styles whose programme is
+     not numbered. */
+  .session-block__number {
+    display: var(--schedule-number-display);
+    /* A number and a time on one line have to read as two things. The gap
+       and the weight are what keep "1" from being mistaken for the first
+       digit of "19:30". */
+    padding-inline-end: var(--space-xs);
+    font-weight: var(--weight-semibold);
+  }
+  .session-block__title {
+    font-size: var(--text-h3);
+    line-height: var(--text-h3-leading);
+    letter-spacing: var(--text-h3-tracking);
+  }
+  /* Lead and rest: the first session of a day sets larger and the rest of
+     the day holds its step. Every other style holds a scale of 1, where the
+     lead row and an ordinary row are the same row. */
+  .session-block--lead .session-block__title {
+    font-size: calc(var(--text-h3) * var(--session-card-lead-scale));
   }
 
   /* The handwritten callout (brief §4.3): real copy, one per page, at one
@@ -384,7 +470,7 @@
     border: var(--plate-frame-width) solid rgb(var(--plate-frame-rgb));
     outline: var(--plate-frame-width) solid rgb(var(--plate-frame-rgb));
     outline-offset: var(--space-3xs);
-    padding: var(--plate-pad);
+    padding: calc(var(--plate-pad) * var(--density-step, 1));
   }
 
   /* The plate number in a folio (visual story, Field Guide, moment 1):

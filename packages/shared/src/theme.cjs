@@ -77,6 +77,33 @@ const THEME_RADIUS_IDS = Object.freeze(['sharp', 'small', 'soft', 'round']);
 /** What a preset's `shape.density` may say (brief §4, §6.1). */
 const THEME_DENSITIES = Object.freeze(['tight', 'comfortable', 'loose']);
 
+/**
+ * What each density step is worth, as a multiplier the stylesheet can do
+ * arithmetic with.
+ *
+ * `--density` is the word, and a word is not something CSS can measure: a
+ * custom property holding `tight` cannot set a padding. So the generator
+ * emits this beside it, and the public devices multiply their own spacing
+ * contract by it — one step for the whole page, rather than a per-component
+ * table nobody can keep in step.
+ *
+ * The spread is deliberately small. A style already states its own spacing
+ * in its tier-3 tokens (Broadsheet sets a smaller session-card padding than
+ * Institutional does), so this is the reader's adjustment ON TOP of the
+ * style's, not a second design. A wider spread would either crush a tight
+ * style or let a loose one drift off the page.
+ *
+ * The ADMIN never reads this. The room has one fixed identity and a client
+ * does not get to set its measure (brief §5.2), which is why the step is
+ * applied at the public device rules in index.css rather than to the shared
+ * `--space-*` scale both surfaces draw on.
+ */
+const THEME_DENSITY_STEPS = Object.freeze({
+  tight: '0.85',
+  comfortable: '1',
+  loose: '1.15',
+});
+
 /** The branding slots `config/theme.logos` may fill (spec §7.2). */
 const THEME_LOGO_SLOTS = Object.freeze(['primary', 'mark', 'footer', 'ogDefault', 'favicon']);
 
@@ -1035,6 +1062,7 @@ module.exports = {
   THEME_TEXTURES,
   THEME_RADIUS_IDS,
   THEME_DENSITIES,
+  THEME_DENSITY_STEPS,
   THEME_LOGO_SLOTS,
   THEME_DOC_KEYS,
   THEME_COLOR_KEYS,

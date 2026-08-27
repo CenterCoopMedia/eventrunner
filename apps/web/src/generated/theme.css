@@ -116,8 +116,9 @@
   /* Tier 2 — texture treatment: 'paper' | 'flat'. Components read this through the bg-paper utility layer in index.css. */
   --texture: flat;
 
-  /* Tier 2 — density: 'tight' | 'comfortable' | 'loose' (brief §4). The preset states its own; a page may still set its own layout density in PR3. */
+  /* Tier 2 — density: 'tight' | 'comfortable' | 'loose' (brief §4). The preset states its own; a page may still set its own layout density in PR3. --density is the word, for anything that has to name the step; --density-step is what it is worth, so the public devices in index.css can multiply their own spacing by it. The admin never reads either. */
   --density: comfortable;
+  --density-step: 1;
 
   /* Tier 2 — motion (brief §2.2). Functional 120–200ms; one signature under 600ms. */
   --motion-fast: var(--er-duration-fast);
@@ -143,7 +144,7 @@
   --session-card-rule-width: var(--rule-hairline-width);
   --session-card-stamp-offset: 0;
   --session-card-lead-scale: 1;
-  --session-card-gap: var(--space-xs);
+  --session-card-gap: var(--space-md);
   --session-card-pad-block: var(--space-md);
   --session-card-pad-inline: 0;
 
@@ -161,7 +162,7 @@
 
   /* Tier 3 — section-rule contract (brief §3.1). */
   --section-rule-width: var(--rule-strong-width);
-  --section-rule-gap: var(--space-lg);
+  --section-rule-gap: var(--space-sm);
 
   /* Tier 3 — folio-rule contract (brief §3.1). */
   --folio-rule-width: var(--rule-hairline-width);

@@ -35,7 +35,7 @@ export default function Folio({
       id={id}
       className={['flex items-center gap-xs', className].filter(Boolean).join(' ')}
     >
-      <span className="folio whitespace-nowrap font-data font-medium">{children}</span>
+      <span className="folio whitespace-nowrap font-medium">{children}</span>
       {rule ? <span aria-hidden="true" className="folio__rule flex-1 self-center" /> : null}
     </Tag>
   );

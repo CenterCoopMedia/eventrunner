@@ -45,6 +45,7 @@ import {
   THEME_FONT_ROLES,
   THEME_TEXTURES,
   THEME_DENSITIES,
+  THEME_DENSITY_STEPS,
   THEME_PRESET_IDS,
   recommendedConfiguration,
   THEME_MOTIF_SET_IDS,
@@ -309,7 +310,13 @@ export function buildRuntimeThemeCss(themeDoc) {
   if (THEME_TEXTURES.includes(shape.texture)) {
     rootLines.push(`  --texture: ${shape.texture};`);
   }
-  if (presetId && shape.density) rootLines.push(`  --density: ${shape.density};`);
+  if (presetId && shape.density) {
+    rootLines.push(`  --density: ${shape.density};`);
+    // The same step the generator emits (scripts/lib/tokens.cjs). --density
+    // names the choice; --density-step is what the public devices multiply
+    // their spacing by, because CSS cannot measure a word.
+    rootLines.push(`  --density-step: ${THEME_DENSITY_STEPS[shape.density]};`);
+  }
 
   // The preset's own token remaps, then the picked options'. Every name is
   // a tier 2 or tier 3 token the generated stylesheet already declares: an

@@ -67,6 +67,8 @@ function cardTree({
   bookmarked = false,
   initialEntries = ['/schedule'],
   content = { speakers: [] },
+  position = null,
+  lead = false,
 } = {}) {
   return (
     <MemoryRouter
@@ -78,7 +80,14 @@ function cardTree({
           <ProfileContext.Provider value={profile}>
             <ToastProvider>
               <ul>
-                <SessionCard session={fixtureSession} eventConfig={fixtureConfig} features={features} bookmarked={bookmarked} />
+                <SessionCard
+                  session={fixtureSession}
+                  eventConfig={fixtureConfig}
+                  features={features}
+                  bookmarked={bookmarked}
+                  position={position}
+                  lead={lead}
+                />
               </ul>
             </ToastProvider>
           </ProfileContext.Provider>
@@ -545,11 +554,46 @@ describe('SessionCard shape rules, issue 113', () => {
     expect(screen.getByText('keynote')).toBeInTheDocument();
   });
 
-  it('opens the row with a hairline instead of boxing it in a card', () => {
+  it('opens the row with a rule instead of boxing it in a card', () => {
+    // The rule is the --session-card-rule-* contract now, drawn in
+    // index.css rather than by a border utility: a style moves the width
+    // (Zine sets the strong rule), and a utility in a later cascade layer
+    // would beat the token every time.
     const { container } = renderCard();
     const row = container.querySelector('li');
-    expect(row).toHaveClass('border-t-hairline', 'border-t-rule-hairline');
+    expect(row).toHaveClass('session-block');
+    expect(row.className).not.toContain('border-t-hairline');
     expect(row.querySelector('article').className).not.toContain('rounded-brand');
+  });
+
+  it('reads its measure and its steps from the tier-3 contract, not utilities', () => {
+    // A Schedule style is a data change (brief §3.4): picking one remaps
+    // these tokens and the row has to follow. A `py-md`/`text-h3` utility
+    // on the markup would silently outrank every one of them.
+    const { container } = renderCard();
+    const face = container.querySelector('.session-block__face');
+    expect(face.className).not.toContain('py-md');
+    expect(container.querySelector('.session-block__data')).not.toBeNull();
+    expect(container.querySelector('.session-block__title').className).not.toContain('text-h3');
+  });
+
+  it('numbers the row only from a real position, never a decorative one', () => {
+    // §2.4 rejects zero-padded decorative numbers. This is the session's
+    // real place in its day, and the five styles that do not number their
+    // programme hide it with --schedule-number-display.
+    const { container } = renderCard();
+    expect(container.querySelector('.session-block__number')).toBeNull();
+    const numbered = renderCard({ position: 3 });
+    expect(numbered.container.querySelector('.session-block__number').textContent).toBe('3');
+  });
+
+  it('marks the first row of a day so lead-and-rest can set it larger', () => {
+    expect(renderCard().container.querySelector('li').className).not.toContain(
+      'session-block--lead',
+    );
+    expect(renderCard({ lead: true }).container.querySelector('li')).toHaveClass(
+      'session-block--lead',
+    );
   });
 
   it('renders the type badge as a small rectangle, never a pill', () => {

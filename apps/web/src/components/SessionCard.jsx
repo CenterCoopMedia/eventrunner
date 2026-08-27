@@ -408,7 +408,14 @@ function TransferLine({ to }) {
 /**
  * @param {{ session: object, eventConfig: object, features?: object,
  *           bookmarked?: boolean, linkToDetail?: boolean,
- *           transferTo?: string | null }} props
+ *           transferTo?: string | null, position?: number | null,
+ *           lead?: boolean }} props
+ *
+ * `position` is the session's real place in its day, counted from one. It
+ * renders only where the Schedule style numbers the programme, and it is
+ * sequence data rather than decoration — the same rule the plate number
+ * follows (brief §2.4). `lead` marks the first session of a day, which the
+ * lead-and-rest Schedule style sets larger than the rest.
  */
 export default function SessionCard({
   session,
@@ -417,6 +424,8 @@ export default function SessionCard({
   bookmarked = false,
   linkToDetail = true,
   transferTo = null,
+  position = null,
+  lead = false,
 }) {
   const speakerNames = useSessionSpeakerNames(session.speakerIds);
   const range = formatSessionTimeRange(eventConfig, session);
@@ -432,14 +441,18 @@ export default function SessionCard({
     // left-hand column with tabular figures, and the type is a word beside
     // the title. Issue #113: the colored left edge is gone, and nothing
     // replaces it — a rule does the dividing a card border used to.
-    <li className="session-block border-t-hairline border-t-rule-hairline">
+    // The literal modifier matters: Tailwind scans for class names as
+    // whole strings, so `session-block--lead` is written out rather than
+    // assembled (components/editorial/purge.test.js).
+    <li className={lead ? 'session-block session-block--lead' : 'session-block'}>
       {/* The face is the first ink pass; the stamp behind it is the second,
           printed off register (brief §2.4, "Exception two", Zine only). At
           the zero offset every other preset holds, the face covers the
           stamp exactly and this is the plain ruled row it has always
           been. */}
-      <article className="session-block__face grid gap-2xs py-md sm:grid-cols-[9.5rem,1fr] sm:gap-md">
-        <p className="font-mono text-caption text-text-secondary">
+      <article className="session-block__face grid gap-y-2xs sm:grid-cols-[9.5rem,1fr]">
+        <p className="session-block__data font-mono text-text-secondary">
+          {position ? <span className="session-block__number">{position}</span> : null}
           {range ? (
             <>
               <time dateTime={range.startIso}>{range.startLabel}</time>
@@ -456,7 +469,7 @@ export default function SessionCard({
         </p>
         <div>
           <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
-            <h3 className="font-heading text-h3 font-semibold text-text-primary">
+            <h3 className="session-block__title font-heading font-semibold text-text-primary">
               {linkToDetail ? (
                 <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
                   {session.title}
@@ -478,7 +491,7 @@ export default function SessionCard({
           <TransferLine to={transferTo} />
           {session.description ? (
             <p
-              className="mt-xs max-w-prose text-body text-text-secondary"
+              className="session-block__text mt-xs max-w-prose text-text-secondary"
               style={{ textWrap: 'pretty' }}
             >
               {session.description}

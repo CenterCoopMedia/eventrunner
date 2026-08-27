@@ -75,6 +75,7 @@ const {
   THEME_MODES,
   THEME_MODE_POLICIES,
   THEME_PRESET_IDS,
+  THEME_DENSITY_STEPS,
   DEFAULT_MODE_POLICY,
   deriveRuleColors,
   getPreset,
@@ -462,9 +463,13 @@ function rootBlock(theme, tokens) {
 
   group(
     "Tier 2 — density: 'tight' | 'comfortable' | 'loose' (brief §4). The preset " +
-    'states its own; a page may still set its own layout density in PR3.',
+    'states its own; a page may still set its own layout density in PR3. ' +
+    '--density is the word, for anything that has to name the step; ' +
+    '--density-step is what it is worth, so the public devices in index.css ' +
+    'can multiply their own spacing by it. The admin never reads either.',
   );
   push('--density', shape.density);
+  push('--density-step', THEME_DENSITY_STEPS[shape.density] || THEME_DENSITY_STEPS.comfortable);
 
   group('Tier 2 — motion (brief §2.2). Functional 120–200ms; one signature under 600ms.');
   for (const [step, value] of tokenEntries(tokens.semantic.motion)) push(`--motion-${step}`, value);

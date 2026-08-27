@@ -275,6 +275,11 @@ export default function Schedule() {
                     features={features}
                     bookmarked={bookmarkedIds.has(session.id)}
                     transferTo={transferTarget(activeSessions, index)}
+                    // The session's real place in the day, counted from one:
+                    // the numbered-agenda Schedule style prints it, and the
+                    // lead-and-rest style sets the first row larger.
+                    position={index + 1}
+                    lead={index === 0}
                   />
                 ))}
               </ul>
