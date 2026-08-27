@@ -1,0 +1,20 @@
+{
+  "$schema-note": "The motif layer of the design brief (2026-08-27) §3.8. A fourth, optional layer beside the three token tiers. A motif set is a named group of small SVG drawings.",
+  "$asset-note": "Each set stores its drawings under apps/web/public/motifs/<set>/. SVG only, never a raster. Every path uses currentColor or a theme custom property, so a motif inherits ink from --color-ink-motif-rgb and carries no color of its own. A reviewer checks that by hand: the hex sweep does not lint SVG.",
+  "$scope-note": "PR1 declares the layer and ships the `none` set only. PR2 draws botanical, fauna, and cartographic in the style §2.3 assigns to the preset that uses them.",
+  "slots": ["section-mark", "divider", "nameplate-mark", "empty-state"],
+  "default": "none",
+  "sets": {
+    "none": {
+      "label": "None",
+      "style": "none",
+      "assetDir": null,
+      "slots": {
+        "section-mark": null,
+        "divider": null,
+        "nameplate-mark": null,
+        "empty-state": null
+      }
+    }
+  }
+}

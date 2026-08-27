@@ -129,16 +129,18 @@ const DEMO_ANSWERS = Object.freeze({
   // Overlaid on `defaultTheme()` (spec §2.2, §7.2) — the demo event's own
   // theme, distinct from the neutral product default every fresh
   // deployment starts from. An editorial, single-family look: one
-  // workhorse sans (Source Sans 3) carries heading, body, and accent
+  // workhorse sans (Source Sans 3) carries the heading, body, and data
   // roles alike, a flat/sharp surface (no paper texture, no rounded-card
   // treatment), and a palette built around an ink-blue brand color on a
   // cool neutral surface — not the warm tan canvas the anti-pattern
-  // checklist (#105) rejects.
+  // checklist (#105) rejects. `mode` is light, so the demo renders the
+  // same way it always has; the dark palette is still generated beside it.
   theme: {
     colors: demoThemeColors(),
-    fonts: { heading: 'sans-humanist', body: 'sans-humanist', accent: 'sans-humanist' },
+    fonts: { heading: 'sans-humanist', body: 'sans-humanist', data: 'sans-humanist' },
     texture: 'flat',
     radius: 'sharp',
+    mode: 'light',
   },
 });
 

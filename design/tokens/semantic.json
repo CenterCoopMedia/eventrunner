@@ -1,0 +1,120 @@
+{
+  "$schema-note": "Tier 2 of the design brief (2026-08-27) §3.1. Theme meaning. Tier 3, Tailwind, and components read these.",
+  "$color-note": "Every color token is mode-scoped (brief §3.3) and every name ends in -rgb, because the value is a space-separated RGB triple. Four ops resolve a color: themeKey takes the light value from config/theme.colors and derives the dark value with deriveDarkColors (packages/shared/src/theme.cjs); alias points at another token and emits var(); rule computes a rule weight from the mode's ink and surface; primitive takes fixed channels from primitives.json.",
+  "color": {
+    "--brand-primary-rgb": { "themeKey": "primary" },
+    "--brand-primary-dark-rgb": { "themeKey": "primaryDark" },
+    "--brand-primary-light-rgb": { "themeKey": "primaryLight" },
+    "--brand-accent-rgb": { "themeKey": "accent" },
+    "--brand-surface-rgb": { "themeKey": "surface" },
+    "--brand-surface-alt-rgb": { "themeKey": "surfaceAlt" },
+    "--brand-ink-rgb": { "themeKey": "ink" },
+    "--brand-ink-muted-rgb": { "themeKey": "inkMuted" },
+    "--semantic-success-rgb": { "themeKey": "success" },
+    "--semantic-warning-rgb": { "themeKey": "warning" },
+    "--semantic-danger-rgb": { "themeKey": "danger" },
+    "--semantic-highlight-rgb": { "themeKey": "highlight" },
+    "--semantic-keynote-rgb": { "themeKey": "keynote" },
+
+    "--color-surface-rgb": { "alias": "--brand-surface-rgb" },
+    "--color-surface-alt-rgb": { "alias": "--brand-surface-alt-rgb" },
+    "--color-text-primary-rgb": { "alias": "--brand-ink-rgb" },
+    "--color-text-secondary-rgb": { "alias": "--brand-ink-muted-rgb" },
+    "--color-accent-rgb": { "alias": "--brand-primary-rgb" },
+    "--color-accent-strong-rgb": { "alias": "--brand-primary-dark-rgb" },
+    "--color-accent-soft-rgb": { "alias": "--brand-primary-light-rgb" },
+    "--color-accent-secondary-rgb": { "alias": "--brand-accent-rgb" },
+    "--color-ink-motif-rgb": { "alias": "--color-text-secondary-rgb" },
+
+    "--rule-hairline-rgb": { "rule": "hairline" },
+    "--rule-strong-rgb": { "rule": "strong" },
+    "--rule-nameplate-rgb": { "rule": "nameplate" }
+  },
+
+  "$text-note": "The fluid editorial scale, brief §3.7. Eight steps, no more: a preset may retune a step, a preset never adds one. The middle term of each clamp() carries the step from its small anchor to its large anchor between a 375px and a 1440px viewport.",
+  "text": {
+    "folio": {
+      "size": "clamp(var(--er-size-folio-min), 0.666rem + 0.09vw, var(--er-size-folio-max))",
+      "leading": "1.2",
+      "tracking": "0.08em"
+    },
+    "caption": {
+      "size": "clamp(var(--er-size-caption-min), 0.791rem + 0.09vw, var(--er-size-caption-max))",
+      "leading": "1.45",
+      "tracking": "0.01em"
+    },
+    "body": {
+      "size": "clamp(var(--er-size-body-min), 0.978rem + 0.09vw, var(--er-size-body-max))",
+      "leading": "1.6",
+      "tracking": "0em"
+    },
+    "lead": {
+      "size": "clamp(var(--er-size-lead-min), 1.059rem + 0.28vw, var(--er-size-lead-max))",
+      "leading": "1.5",
+      "tracking": "-0.005em"
+    },
+    "h3": {
+      "size": "clamp(var(--er-size-h3-min), 1.162rem + 0.38vw, var(--er-size-h3-max))",
+      "leading": "1.25",
+      "tracking": "-0.01em"
+    },
+    "h2": {
+      "size": "clamp(var(--er-size-h2-min), 1.405rem + 0.94vw, var(--er-size-h2-max))",
+      "leading": "1.18",
+      "tracking": "-0.015em"
+    },
+    "h1": {
+      "size": "clamp(var(--er-size-h1-min), 1.81rem + 1.88vw, var(--er-size-h1-max))",
+      "leading": "1.08",
+      "tracking": "-0.02em"
+    },
+    "nameplate": {
+      "size": "clamp(var(--er-size-nameplate-min), 1.606rem + 4.88vw, var(--er-size-nameplate-max))",
+      "leading": "0.94",
+      "tracking": "-0.03em"
+    }
+  },
+
+  "$space-note": "Brief §3.7. The gap between groups is at least twice the gap inside one (interface guidelines, Layout): xs pairs with md, sm with lg, md with xl.",
+  "space": {
+    "3xs": "var(--er-space-3xs)",
+    "2xs": "var(--er-space-2xs)",
+    "xs": "var(--er-space-xs)",
+    "sm": "var(--er-space-sm)",
+    "md": "var(--er-space-md)",
+    "lg": "var(--er-space-lg)",
+    "xl": "var(--er-space-xl)",
+    "2xl": "var(--er-space-2xl)",
+    "3xl": "var(--er-space-3xl)"
+  },
+
+  "$rule-note": "Brief §3.7. Rules are structure, so each weight ships as a color plus a width. The colors are mode-scoped above; the widths do not change with the mode.",
+  "rule": {
+    "hairline": { "width": "var(--er-width-hairline)" },
+    "strong": { "width": "var(--er-width-strong)" },
+    "nameplate": { "width": "var(--er-width-nameplate)" }
+  },
+
+  "$font-note": "Roles, never family names (brief §3.2). The three live roles — heading, body, data — plus mono for figures, timestamps, and code, all resolve from config/theme.fonts through the bundled-set allowlist (spec §7.4). The aliases below are the compatibility layer: --font-accent is the retired role, kept for one release, and --font-mono falls back to the data face until a mono ships in PR2.",
+  "font": {
+    "--font-accent": "var(--font-heading)",
+    "--font-mono": "var(--font-data)"
+  },
+
+  "$motion-note": "Brief §2.2. Functional motion runs 120ms to 200ms. One expressive signature per surface finishes under 600ms.",
+  "motion": {
+    "fast": "var(--er-duration-fast)",
+    "base": "var(--er-duration-base)",
+    "slow": "var(--er-duration-slow)",
+    "signature": "var(--er-duration-signature)",
+    "ease": "var(--er-easing-out)"
+  },
+
+  "$weight-note": "Named weights so a component never writes a raw number.",
+  "weight": {
+    "regular": "var(--er-weight-regular)",
+    "medium": "var(--er-weight-medium)",
+    "semibold": "var(--er-weight-semibold)",
+    "bold": "var(--er-weight-bold)"
+  }
+}

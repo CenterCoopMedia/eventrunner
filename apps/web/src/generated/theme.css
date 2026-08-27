@@ -10,12 +10,159 @@
  * triples so Tailwind rgb(var(--…-rgb) / <alpha-value>) utilities keep opacity
  * modifiers working (spec §7.2).
  *
+ * The tokens come from design/tokens/*.json through scripts/lib/tokens.cjs
+ * (design brief §3.5). Edit the JSON, never this file.
+ *
  * EventConfigProvider overrides these same properties at runtime via
  * <style id="event-theme-runtime">.
  */
 
 :root {
-  /* Brand palette from config/theme.colors, hex converted to RGB triples. */
+  /* Tier 1 — primitives (brief §3.1). Raw values. Tier 2 reads these. */
+  --er-ground-800: 35 39 45;
+  --er-ground-900: 24 27 32;
+  --er-bone-100: 238 236 231;
+  --er-bone-300: 170 176 184;
+  --er-size-folio-min: 0.6875rem;
+  --er-size-folio-max: 0.75rem;
+  --er-size-caption-min: 0.8125rem;
+  --er-size-caption-max: 0.875rem;
+  --er-size-body-min: 1rem;
+  --er-size-body-max: 1.0625rem;
+  --er-size-lead-min: 1.125rem;
+  --er-size-lead-max: 1.3125rem;
+  --er-size-h3-min: 1.25rem;
+  --er-size-h3-max: 1.5rem;
+  --er-size-h2-min: 1.625rem;
+  --er-size-h2-max: 2.25rem;
+  --er-size-h1-min: 2.25rem;
+  --er-size-h1-max: 3.5rem;
+  --er-size-nameplate-min: 2.75rem;
+  --er-size-nameplate-max: 6rem;
+  --er-space-3xs: 0.125rem;
+  --er-space-2xs: 0.25rem;
+  --er-space-xs: 0.5rem;
+  --er-space-sm: 0.75rem;
+  --er-space-md: 1rem;
+  --er-space-lg: 1.5rem;
+  --er-space-xl: 2.5rem;
+  --er-space-2xl: 4rem;
+  --er-space-3xl: 6rem;
+  --er-width-hairline: 1px;
+  --er-width-strong: 2px;
+  --er-width-nameplate: 3px;
+  --er-weight-regular: 400;
+  --er-weight-medium: 500;
+  --er-weight-semibold: 600;
+  --er-weight-bold: 700;
+  --er-duration-fast: 120ms;
+  --er-duration-base: 160ms;
+  --er-duration-slow: 200ms;
+  --er-duration-signature: 560ms;
+  --er-easing-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* Tier 2 — fluid type scale (brief §3.7). Eight steps, size + line height + tracking. */
+  --text-folio: clamp(var(--er-size-folio-min), 0.666rem + 0.09vw, var(--er-size-folio-max));
+  --text-folio-leading: 1.2;
+  --text-folio-tracking: 0.08em;
+  --text-caption: clamp(var(--er-size-caption-min), 0.791rem + 0.09vw, var(--er-size-caption-max));
+  --text-caption-leading: 1.45;
+  --text-caption-tracking: 0.01em;
+  --text-body: clamp(var(--er-size-body-min), 0.978rem + 0.09vw, var(--er-size-body-max));
+  --text-body-leading: 1.6;
+  --text-body-tracking: 0em;
+  --text-lead: clamp(var(--er-size-lead-min), 1.059rem + 0.28vw, var(--er-size-lead-max));
+  --text-lead-leading: 1.5;
+  --text-lead-tracking: -0.005em;
+  --text-h3: clamp(var(--er-size-h3-min), 1.162rem + 0.38vw, var(--er-size-h3-max));
+  --text-h3-leading: 1.25;
+  --text-h3-tracking: -0.01em;
+  --text-h2: clamp(var(--er-size-h2-min), 1.405rem + 0.94vw, var(--er-size-h2-max));
+  --text-h2-leading: 1.18;
+  --text-h2-tracking: -0.015em;
+  --text-h1: clamp(var(--er-size-h1-min), 1.81rem + 1.88vw, var(--er-size-h1-max));
+  --text-h1-leading: 1.08;
+  --text-h1-tracking: -0.02em;
+  --text-nameplate: clamp(var(--er-size-nameplate-min), 1.606rem + 4.88vw, var(--er-size-nameplate-max));
+  --text-nameplate-leading: 0.94;
+  --text-nameplate-tracking: -0.03em;
+
+  /* Tier 2 — spacing scale (brief §3.7). */
+  --space-3xs: var(--er-space-3xs);
+  --space-2xs: var(--er-space-2xs);
+  --space-xs: var(--er-space-xs);
+  --space-sm: var(--er-space-sm);
+  --space-md: var(--er-space-md);
+  --space-lg: var(--er-space-lg);
+  --space-xl: var(--er-space-xl);
+  --space-2xl: var(--er-space-2xl);
+  --space-3xl: var(--er-space-3xl);
+
+  /* Tier 2 — rule widths (brief §3.7). The matching colors are mode-scoped below. */
+  --rule-hairline-width: var(--er-width-hairline);
+  --rule-strong-width: var(--er-width-strong);
+  --rule-nameplate-width: var(--er-width-nameplate);
+
+  /* Tier 2 — font roles (brief §3.2). config/theme.fonts names a bundled set id (spec §7.4); the generator wrote the matching stacks. */
+  --font-heading: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-data: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-accent: var(--font-heading);
+
+  /* Tier 2 — radius scale: config/theme.radius = 'sharp'. ('sharp' → 0 / 2px, 'soft' → 8px / 16px, 'round' → 16px / 28px.) */
+  --radius-base: 0;
+  --radius-large: 2px;
+
+  /* Tier 2 — texture treatment: config/theme.texture = 'paper' | 'flat'. Components read this through the bg-paper utility layer in index.css. */
+  --texture: flat;
+
+  /* Tier 2 — motion (brief §2.2). Functional 120–200ms; one signature under 600ms. */
+  --motion-fast: var(--er-duration-fast);
+  --motion-base: var(--er-duration-base);
+  --motion-slow: var(--er-duration-slow);
+  --motion-signature: var(--er-duration-signature);
+  --motion-ease: var(--er-easing-out);
+
+  /* Tier 2 — named weights, so a component never writes a raw number. */
+  --weight-regular: var(--er-weight-regular);
+  --weight-medium: var(--er-weight-medium);
+  --weight-semibold: var(--er-weight-semibold);
+  --weight-bold: var(--er-weight-bold);
+
+  /* Motif layer (brief §3.8). PR1 ships the `none` set only. */
+  --motif-set: none;
+  --motif-section-mark: none;
+  --motif-divider: none;
+  --motif-nameplate-mark: none;
+  --motif-empty-state: none;
+
+  /* Tier 3 — session-card contract (brief §3.1). */
+  --session-card-rule-width: var(--rule-hairline-width);
+  --session-card-gap: var(--space-xs);
+  --session-card-pad-block: var(--space-md);
+  --session-card-pad-inline: 0;
+
+  /* Tier 3 — nameplate contract (brief §3.1). */
+  --nameplate-rule-width: var(--rule-nameplate-width);
+  --nameplate-size: var(--text-nameplate);
+  --nameplate-leading: var(--text-nameplate-leading);
+  --nameplate-tracking: var(--text-nameplate-tracking);
+  --nameplate-gap: var(--space-sm);
+
+  /* Tier 3 — section-rule contract (brief §3.1). */
+  --section-rule-width: var(--rule-strong-width);
+  --section-rule-gap: var(--space-lg);
+
+  /* Tier 3 — folio-rule contract (brief §3.1). */
+  --folio-rule-width: var(--rule-hairline-width);
+  --folio-size: var(--text-folio);
+  --folio-tracking: var(--text-folio-tracking);
+  --folio-gap: var(--space-xs);
+}
+
+/* Light palette, attribute-free baseline — what first paint renders before the runtime writes data-mode. */
+:root {
   --brand-primary-rgb: 21 94 117;
   --brand-primary-dark-rgb: 12 66 82;
   --brand-primary-light-rgb: 79 147 166;
@@ -24,29 +171,102 @@
   --brand-surface-alt-rgb: 236 236 234;
   --brand-ink-rgb: 22 33 44;
   --brand-ink-muted-rgb: 71 82 94;
-
-  /* Semantic tokens — role-named (interface guidelines: Colors). */
   --semantic-success-rgb: 22 101 52;
   --semantic-warning-rgb: 180 83 9;
   --semantic-danger-rgb: 185 28 28;
   --semantic-highlight-rgb: 161 98 7;
   --semantic-keynote-rgb: 109 40 217;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 216 217 217;
+  --rule-strong-rgb: 146 151 155;
+  --rule-nameplate-rgb: 22 33 44;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+}
 
-  /* Font sets (spec §7.4): config/theme.fonts names a set id; the generator
-     emitted the matching stacks. heading=sans-humanist, body=sans-humanist,
-     accent=sans-humanist. */
-  --font-heading: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
-  --font-body: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
-  --font-accent: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+/* Light palette (brief §3.3). Every color token is defined in both mode blocks. */
+:root[data-mode='light'] {
+  --brand-primary-rgb: 21 94 117;
+  --brand-primary-dark-rgb: 12 66 82;
+  --brand-primary-light-rgb: 79 147 166;
+  --brand-accent-rgb: 154 52 18;
+  --brand-surface-rgb: 247 247 245;
+  --brand-surface-alt-rgb: 236 236 234;
+  --brand-ink-rgb: 22 33 44;
+  --brand-ink-muted-rgb: 71 82 94;
+  --semantic-success-rgb: 22 101 52;
+  --semantic-warning-rgb: 180 83 9;
+  --semantic-danger-rgb: 185 28 28;
+  --semantic-highlight-rgb: 161 98 7;
+  --semantic-keynote-rgb: 109 40 217;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 216 217 217;
+  --rule-strong-rgb: 146 151 155;
+  --rule-nameplate-rgb: 22 33 44;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+}
 
-  /* Radius scale: config/theme.radius = 'sharp'.
-     ('sharp' → 0 / 2px, 'soft' → 8px / 16px, 'round' → 16px / 28px.) */
-  --radius-base: 0;
-  --radius-large: 2px;
-
-  /* Texture treatment: config/theme.texture = 'paper' | 'flat'. Components
-     read this via the bg-paper utility layer in index.css. */
-  --texture: flat;
+/* Dark palette (brief §3.3). Its own palette, never light mode reversed: a designed neutral ground with the brand colors lifted until they clear the contrast bar on it. */
+:root[data-mode='dark'] {
+  --brand-primary-rgb: 85 138 155;
+  --brand-primary-dark-rgb: 122 164 177;
+  --brand-primary-light-rgb: 74 107 119;
+  --brand-accent-rgb: 184 112 88;
+  --brand-surface-rgb: 24 27 32;
+  --brand-surface-alt-rgb: 35 39 45;
+  --brand-ink-rgb: 238 236 231;
+  --brand-ink-muted-rgb: 170 176 184;
+  --semantic-success-rgb: 85 143 107;
+  --semantic-warning-rgb: 192 110 47;
+  --semantic-danger-rgb: 206 97 97;
+  --semantic-highlight-rgb: 174 120 42;
+  --semantic-keynote-rgb: 153 105 228;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 54 56 60;
+  --rule-strong-rgb: 120 121 122;
+  --rule-nameplate-rgb: 238 236 231;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
 }
 
 /* Self-hosted font faces (spec §7.4): woff2 only, no font CDN at runtime.

@@ -10,6 +10,18 @@
  */
 
 const { MAX_TOTAL_BADGES } = require('../badges.cjs');
+const {
+  THEME_DOC_KEYS,
+  THEME_COLOR_KEYS,
+  THEME_FONT_ROLES,
+  THEME_FONT_SET_IDS,
+  THEME_LOGO_SLOTS,
+  THEME_MODE_POLICIES,
+  THEME_RADIUS_IDS,
+  THEME_TEXTURES,
+  LEGACY_FONT_ROLE,
+  canonicalColorKey,
+} = require('../theme.cjs');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HHMM_RE = /^\d{2}:\d{2}$/;
@@ -175,27 +187,113 @@ function validateEventConfig(event) {
 }
 
 /**
- * Validate a config/theme document. Every value under theme.colors must be
- * a hex color (#RGB or #RRGGBB) — hex-only because the values are injected
- * into generated CSS custom properties.
+ * Validate a config/theme document.
+ *
+ * `config/theme` is a whole-document replace: the admin editor always
+ * sends the complete document, and the write path stores exactly what it
+ * validates. So the validator names every field it will accept and rejects
+ * anything else BY NAME, the way `validatePageDoc` does. An authenticated
+ * caller must not be able to persist a field nothing reads, or an enum
+ * value the generator would silently ignore.
+ *
+ * Every value under theme.colors must be a hex color (#RGB or #RRGGBB) —
+ * hex-only because the values are injected into generated CSS custom
+ * properties.
  *
  * @param {object} theme
  * @returns {{ ok: boolean, errors: string[] }}
  */
 function validateTheme(theme) {
   const errors = [];
-  if (!theme || typeof theme !== 'object') {
+  if (!theme || typeof theme !== 'object' || Array.isArray(theme)) {
     return { ok: false, errors: ['theme: must be an object'] };
   }
+
+  for (const key of Object.keys(theme)) {
+    if (!THEME_DOC_KEYS.includes(key)) {
+      errors.push(`theme.${key}: unknown config/theme field`);
+    }
+  }
+
   if (theme.colors == null || typeof theme.colors !== 'object' || Array.isArray(theme.colors)) {
     errors.push('theme.colors: must be an object');
   } else {
     for (const [key, value] of Object.entries(theme.colors)) {
+      if (!THEME_COLOR_KEYS.includes(canonicalColorKey(key))) {
+        errors.push(`theme.colors.${key}: unknown color role`);
+        continue;
+      }
       if (typeof value !== 'string' || !HEX_COLOR_RE.test(value)) {
         errors.push(`theme.colors.${key}: must be a hex color (#RGB or #RRGGBB), got ${JSON.stringify(value)}`);
       }
     }
   }
+
+  // Font ROLES, and only bundled set ids (spec §7.4). A client names a set;
+  // a client never supplies a font URL. `accent` is the retired role and
+  // stays accepted for one release so an older stored document still saves.
+  if (theme.fonts != null) {
+    if (typeof theme.fonts !== 'object' || Array.isArray(theme.fonts)) {
+      errors.push('theme.fonts: must be an object');
+    } else {
+      const roles = [...THEME_FONT_ROLES, LEGACY_FONT_ROLE];
+      for (const [role, setId] of Object.entries(theme.fonts)) {
+        if (!roles.includes(role)) {
+          errors.push(`theme.fonts.${role}: unknown font role (expected ${roles.join(', ')})`);
+          continue;
+        }
+        if (!THEME_FONT_SET_IDS.includes(setId)) {
+          errors.push(
+            `theme.fonts.${role}: must be a bundled font set id ` +
+            `(${THEME_FONT_SET_IDS.join(', ')}), got ${JSON.stringify(setId)}`,
+          );
+        }
+      }
+    }
+  }
+
+  const enums = [
+    ['texture', THEME_TEXTURES],
+    ['radius', THEME_RADIUS_IDS],
+    ['mode', THEME_MODE_POLICIES],
+  ];
+  for (const [field, allowed] of enums) {
+    if (theme[field] == null) continue;
+    if (!allowed.includes(theme[field])) {
+      errors.push(
+        `theme.${field}: must be one of ${allowed.join(', ')}, got ${JSON.stringify(theme[field])}`,
+      );
+    }
+  }
+
+  if (theme.logos != null) {
+    if (typeof theme.logos !== 'object' || Array.isArray(theme.logos)) {
+      errors.push('theme.logos: must be an object');
+    } else {
+      for (const [slot, value] of Object.entries(theme.logos)) {
+        if (!THEME_LOGO_SLOTS.includes(slot)) {
+          errors.push(`theme.logos.${slot}: unknown logo slot`);
+          continue;
+        }
+        if (!isNonEmptyString(value)) {
+          errors.push(`theme.logos.${slot}: must be a nonempty storage path`);
+        }
+      }
+    }
+  }
+
+  if (theme.placeholderLogos != null) {
+    if (!Array.isArray(theme.placeholderLogos)) {
+      errors.push('theme.placeholderLogos: must be an array');
+    } else {
+      for (const [i, slot] of theme.placeholderLogos.entries()) {
+        if (!THEME_LOGO_SLOTS.includes(slot)) {
+          errors.push(`theme.placeholderLogos[${i}]: unknown logo slot ${JSON.stringify(slot)}`);
+        }
+      }
+    }
+  }
+
   return { ok: errors.length === 0, errors };
 }
 

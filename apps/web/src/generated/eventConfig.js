@@ -106,10 +106,11 @@ export const theme = {
   fonts: {
     heading: 'sans-humanist',
     body: 'sans-humanist',
-    accent: 'sans-humanist',
+    data: 'sans-humanist',
   },
   texture: 'flat',
   radius: 'sharp',
+  mode: 'light',
   logos: {
     primary: 'branding/logo.svg',
     mark: 'branding/mark.svg',

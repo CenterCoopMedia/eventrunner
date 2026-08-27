@@ -21,7 +21,7 @@
  * `config/bootstrap` is never emitted into the bundle (§2.4).
  */
 
-const { CSS_VARIABLE_STEM, FONT_SETS, RADIUS_SCALES, hexToRgb } = require('./theme.cjs');
+const { buildTokenCss } = require('./tokens.cjs');
 
 /** Publish-model and seed bookkeeping stripped from every emitted doc. */
 const STRIPPED_FIELDS = Object.freeze([
@@ -111,6 +111,10 @@ function emitEventConfig({ event, features, theme }) {
     fonts: theme.fonts,
     texture: theme.texture,
     radius: theme.radius,
+    // The mode policy (design brief §3.3). EventConfigProvider reads it to
+    // write data-mode on <html>; a document from before the field existed
+    // has no `mode` and the runtime defaults it to light.
+    mode: theme.mode,
     logos: theme.logos,
   };
   return [
@@ -264,7 +268,11 @@ function emitOrganizationsData(organizations) {
 }
 
 /**
- * theme.css — `config/theme` as custom properties.
+ * theme.css — the design tokens, resolved against `config/theme`.
+ *
+ * The token graph itself lives in `design/tokens/*.json` and resolves in
+ * `scripts/lib/tokens.cjs` (design brief §3.5, §3.6). This function adds
+ * only the file header.
  *
  * Colors are stored hex (that is what `validateTheme` accepts) and emitted
  * as space-separated RGB triples so Tailwind's
@@ -289,62 +297,14 @@ function emitThemeCss(theme) {
   lines.push(' * triples so Tailwind rgb(var(--…-rgb) / <alpha-value>) utilities keep opacity');
   lines.push(' * modifiers working (spec §7.2).');
   lines.push(' *');
+  lines.push(' * The tokens come from design/tokens/*.json through scripts/lib/tokens.cjs');
+  lines.push(' * (design brief §3.5). Edit the JSON, never this file.');
+  lines.push(' *');
   lines.push(' * EventConfigProvider overrides these same properties at runtime via');
   lines.push(' * <style id="event-theme-runtime">.');
   lines.push(' */');
   lines.push('');
-  lines.push(':root {');
-  lines.push('  /* Brand palette from config/theme.colors, hex converted to RGB triples. */');
-  let semanticHeaderWritten = false;
-  for (const [key, hex] of Object.entries(theme.colors || {})) {
-    const stem = CSS_VARIABLE_STEM[key];
-    const rgb = hexToRgb(hex);
-    if (!stem || !rgb) continue;
-    // Role-named semantic tokens get their own labelled group; a wall of
-    // thirteen undifferentiated custom properties is hard to scan.
-    if (!semanticHeaderWritten && stem.startsWith('semantic-')) {
-      semanticHeaderWritten = true;
-      lines.push('');
-      lines.push('  /* Semantic tokens — role-named (interface guidelines: Colors). */');
-    }
-    lines.push(`  --${stem}-rgb: ${rgb.join(' ')};`);
-  }
-  lines.push('');
-  const fonts = theme.fonts || {};
-  lines.push('  /* Font sets (spec §7.4): config/theme.fonts names a set id; the generator');
-  lines.push(`     emitted the matching stacks. heading=${fonts.heading}, body=${fonts.body},`);
-  lines.push(`     accent=${fonts.accent}. */`);
-  for (const [role, setId] of [['heading', fonts.heading], ['body', fonts.body], ['accent', fonts.accent]]) {
-    const set = FONT_SETS[setId];
-    if (set) lines.push(`  --font-${role}: ${set.stack};`);
-  }
-  lines.push('');
-  const radius = RADIUS_SCALES[theme.radius] || RADIUS_SCALES.soft;
-  lines.push(`  /* Radius scale: config/theme.radius = '${theme.radius}'.`);
-  lines.push("     ('sharp' → 0 / 2px, 'soft' → 8px / 16px, 'round' → 16px / 28px.) */");
-  lines.push(`  --radius-base: ${radius.base};`);
-  lines.push(`  --radius-large: ${radius.large};`);
-  lines.push('');
-  lines.push("  /* Texture treatment: config/theme.texture = 'paper' | 'flat'. Components");
-  lines.push('     read this via the bg-paper utility layer in index.css. */');
-  lines.push(`  --texture: ${theme.texture};`);
-  lines.push('}');
-  lines.push('');
-  lines.push('/* Self-hosted font faces (spec §7.4): woff2 only, no font CDN at runtime.');
-  lines.push('   Files live in apps/web/public/fonts/. */');
-  const seen = new Set();
-  for (const setId of [fonts.heading, fonts.body, fonts.accent]) {
-    const set = FONT_SETS[setId];
-    if (!set || !set.fileBase || seen.has(set.family)) continue;
-    seen.add(set.family);
-    lines.push('@font-face {');
-    lines.push(`  font-family: '${set.family}';`);
-    lines.push('  font-style: normal;');
-    lines.push('  font-weight: 400 700;');
-    lines.push('  font-display: swap;');
-    lines.push(`  src: url('/fonts/${set.fileBase}.woff2') format('woff2');`);
-    lines.push('}');
-  }
+  lines.push(buildTokenCss(theme));
   return `${lines.join('\n')}\n`;
 }
 
