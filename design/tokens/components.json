@@ -1,11 +1,15 @@
 {
   "$schema-note": "Tier 3 of the design brief (2026-08-27) §3.1. One component contract each. A component token exists when a component needs a value the theme may change on its own, and it defaults to a tier 2 token.",
   "$shape-note": "A token whose name ends in -rgb names the tier 2 color token it defaults to; the generator emits it in both mode blocks so it follows the mode. Every other token holds a literal CSS value, normally a var() pointing at tier 2.",
-  "$scope-note": "PR1 ships the minimum the editorial base needs: the session card, the masthead nameplate, and the two rule contracts (section rule and folio rule). PR2 and PR3 add the rest as their components land.",
+  "$scope-note": "PR1 shipped the session card, the masthead nameplate, and the two rule contracts. PR2 adds the contracts the six presets and their curated options remap: an option remaps existing tokens and NEVER adds a property name (brief §3.4), so every name a preset file mentions is declared here first. The components that read the PR2 additions land with the schedule and the preset devices in PR3; declaring the contract now is what lets the option data exist as data.",
   "session-card": {
     "--session-card-rule-rgb": "--rule-hairline-rgb",
     "--session-card-surface-rgb": "--color-surface-rgb",
+    "$stamp-note": "The Zine stamp (brief §2.4, 'Exception two'): a flat, unblurred, ink-tinted offset layer at a fixed small distance. Zero offset is the flat-block variant, which every other preset holds.",
+    "--session-card-stamp-rgb": "--color-accent-rgb",
     "--session-card-rule-width": "var(--rule-hairline-width)",
+    "--session-card-stamp-offset": "0",
+    "--session-card-lead-scale": "1",
     "--session-card-gap": "var(--space-xs)",
     "--session-card-pad-block": "var(--space-md)",
     "--session-card-pad-inline": "0"
@@ -13,7 +17,13 @@
   "nameplate": {
     "--nameplate-rule-rgb": "--rule-nameplate-rgb",
     "--nameplate-text-rgb": "--color-text-primary-rgb",
+    "--nameplate-frame-rgb": "--rule-hairline-rgb",
     "--nameplate-rule-width": "var(--rule-nameplate-width)",
+    "$treatment-note": "The three nameplate treatments each preset ships (brief §4) move these four. The rule above the name is the double-rule treatment; the frame is the boxed and framed treatments; the alignment and the metadata placement are the layout. Metadata inside the rule-bounded nameplate block is part of the nameplate device, never an eyebrow (brief §2.4).",
+    "--nameplate-rule-top-width": "0",
+    "--nameplate-frame-width": "0",
+    "--nameplate-align": "start",
+    "--nameplate-meta-placement": "block",
     "--nameplate-size": "var(--text-nameplate)",
     "--nameplate-leading": "var(--text-nameplate-leading)",
     "--nameplate-tracking": "var(--text-nameplate-tracking)",
@@ -28,8 +38,47 @@
     "--folio-rule-rgb": "--rule-hairline-rgb",
     "--folio-text-rgb": "--color-text-secondary-rgb",
     "--folio-rule-width": "var(--rule-hairline-width)",
+    "$struck-note": "A rule above the folio as well as below it is Zine's struck folio: the typewriter section break of a photocopied programme. Plain text plus rules, never a chip.",
+    "--folio-rule-top-width": "0",
+    "--folio-font": "var(--font-data)",
     "--folio-size": "var(--text-folio)",
     "--folio-tracking": "var(--text-folio-tracking)",
     "--folio-gap": "var(--space-xs)"
+  },
+  "$schedule-note": "The schedule presentation variants (brief §4, visual stories part 6c). The grid itself lands in PR3; these are the values a preset's variant sets. The agenda number is real sequence data, never zero-padded (brief §2.4).",
+  "schedule": {
+    "--schedule-grid-rgb": "--rule-hairline-rgb",
+    "--schedule-row-leading": "var(--text-body-leading)",
+    "--schedule-data-size": "var(--text-caption)",
+    "--schedule-number-display": "none"
+  },
+  "$plate-note": "The Field Guide botanical plate (brief §4.5): a framed drawing with a hairline border and a plate number in the folio style. A plate is drawn linework and never a hero image.",
+  "plate": {
+    "--plate-frame-rgb": "--rule-hairline-rgb",
+    "--plate-frame-width": "0",
+    "--plate-pad": "var(--space-md)"
+  },
+  "$map-grid-note": "The Atlas map grid (brief §4.6): a faint coordinate grid behind a section, held below the hairline contrast level, with pointer-events: none. Zero size turns it off.",
+  "map-grid": {
+    "--map-grid-rgb": "--rule-hairline-rgb",
+    "--map-grid-size": "0"
+  },
+  "$route-mark-note": "The Atlas route mark (brief §4.6): the line letter in the heading face inside a survey-drawn shape, always with the line's name beside it. A route mark is never a coloured pill, and colour is never the only signal.",
+  "route-mark": {
+    "--route-mark-rgb": "--color-accent-rgb",
+    "--route-mark-ink-rgb": "--color-surface-rgb",
+    "--route-mark-radius": "0"
+  },
+  "$callout-note": "Zine's handwritten callout (brief §4.3). --callout-font is a component token, not a fifth semantic role (§3.1, §3.2): one callout per page, real copy, at one fixed angle. A client may point it at var(--font-heading) and drop the script face. Every other preset holds the heading face and a zero angle.",
+  "callout": {
+    "--callout-rgb": "--color-text-primary-rgb",
+    "--callout-font": "var(--font-heading)",
+    "--callout-angle": "0deg",
+    "--callout-size": "var(--text-lead)"
+  },
+  "$marginalia-note": "The drawn pen marks (Zine) and the pencil line (Field Guide). Its own on/off control, independent of the block variant, and off by default in both presets. A mark never lands on a single word inside a headline, which keeps the system clear of the banned headline-underline trick (brief §2.4).",
+  "marginalia": {
+    "--marginalia-rgb": "--color-ink-motif-rgb",
+    "--marginalia-display": "none"
   }
 }

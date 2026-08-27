@@ -19,8 +19,12 @@ const {
   THEME_MODE_POLICIES,
   THEME_RADIUS_IDS,
   THEME_TEXTURES,
-  LEGACY_FONT_ROLE,
+  THEME_PRESET_IDS,
+  THEME_MOTIF_SET_IDS,
+  THEME_MODES,
+  getPreset,
   canonicalColorKey,
+  overrideTokenKey,
 } = require('../theme.cjs');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -230,16 +234,18 @@ function validateTheme(theme) {
   }
 
   // Font ROLES, and only bundled set ids (spec §7.4). A client names a set;
-  // a client never supplies a font URL. `accent` is the retired role and
-  // stays accepted for one release so an older stored document still saves.
+  // a client never supplies a font URL. The retired `accent` role is gone:
+  // PR2 removed the `--font-accent` alias (brief §3.2, §7), and Zine's
+  // handwritten callout runs on the `--callout-font` component token.
   if (theme.fonts != null) {
     if (typeof theme.fonts !== 'object' || Array.isArray(theme.fonts)) {
       errors.push('theme.fonts: must be an object');
     } else {
-      const roles = [...THEME_FONT_ROLES, LEGACY_FONT_ROLE];
       for (const [role, setId] of Object.entries(theme.fonts)) {
-        if (!roles.includes(role)) {
-          errors.push(`theme.fonts.${role}: unknown font role (expected ${roles.join(', ')})`);
+        if (!THEME_FONT_ROLES.includes(role)) {
+          errors.push(
+            `theme.fonts.${role}: unknown font role (expected ${THEME_FONT_ROLES.join(', ')})`,
+          );
           continue;
         }
         if (!THEME_FONT_SET_IDS.includes(setId)) {
@@ -250,6 +256,104 @@ function validateTheme(theme) {
         }
       }
     }
+  }
+
+  // The preset (brief §4). `data-theme` carries this id, and it is the base
+  // every other theme field refines.
+  if (theme.preset != null && !THEME_PRESET_IDS.includes(theme.preset)) {
+    errors.push(
+      `theme.preset: must be one of ${THEME_PRESET_IDS.join(', ')}, ` +
+      `got ${JSON.stringify(theme.preset)}`,
+    );
+  }
+
+  // The curated option picks (brief §4, §5.2). A group and a choice id are
+  // both rejected by name, so a stale pick fails loudly at the editor rather
+  // than degrading silently in the generator.
+  if (theme.optionPicks != null) {
+    if (typeof theme.optionPicks !== 'object' || Array.isArray(theme.optionPicks)) {
+      errors.push('theme.optionPicks: must be an object');
+    } else {
+      const preset = THEME_PRESET_IDS.includes(theme.preset) ? getPreset(theme.preset) : null;
+      for (const [group, choiceId] of Object.entries(theme.optionPicks)) {
+        if (!preset) {
+          errors.push(`theme.optionPicks.${group}: theme.preset must name a preset first`);
+          continue;
+        }
+        const spec = preset.options?.[group];
+        if (!spec) {
+          errors.push(
+            `theme.optionPicks.${group}: the ${preset.label} preset has no option group ` +
+            `by that name (expected ${Object.keys(preset.options || {}).join(', ')})`,
+          );
+          continue;
+        }
+        const offered = (spec.choices || []).map((choice) => choice.id);
+        if (!offered.includes(choiceId)) {
+          errors.push(
+            `theme.optionPicks.${group}: must be one of ${offered.join(', ')}, ` +
+            `got ${JSON.stringify(choiceId)}`,
+          );
+        }
+      }
+    }
+  }
+
+  // Per-mode raw token overrides — the advanced path (brief §5.2). Only the
+  // two modes, and only tokens the system actually resolves: an operator
+  // may name the role (`ink`) or the custom property (`--brand-ink-rgb`),
+  // and anything else is rejected by name so a typo never persists as a
+  // field nothing reads.
+  if (theme.tokens != null) {
+    if (typeof theme.tokens !== 'object' || Array.isArray(theme.tokens)) {
+      errors.push('theme.tokens: must be an object');
+    } else {
+      for (const [mode, overrides] of Object.entries(theme.tokens)) {
+        if (!THEME_MODES.includes(mode)) {
+          errors.push(
+            `theme.tokens.${mode}: unknown mode (expected ${THEME_MODES.join(', ')})`,
+          );
+          continue;
+        }
+        if (overrides == null) continue;
+        if (typeof overrides !== 'object' || Array.isArray(overrides)) {
+          errors.push(`theme.tokens.${mode}: must be an object`);
+          continue;
+        }
+        for (const [name, value] of Object.entries(overrides)) {
+          if (!overrideTokenKey(name)) {
+            errors.push(`theme.tokens.${mode}.${name}: not an overridable color token`);
+            continue;
+          }
+          if (typeof value !== 'string' || !HEX_COLOR_RE.test(value)) {
+            errors.push(
+              `theme.tokens.${mode}.${name}: must be a hex color (#RGB or #RRGGBB), ` +
+              `got ${JSON.stringify(value)}`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // The motif set the root element switches to (brief §3.8).
+  if (theme.motifSet != null && !THEME_MOTIF_SET_IDS.includes(theme.motifSet)) {
+    errors.push(
+      `theme.motifSet: must be one of ${THEME_MOTIF_SET_IDS.join(', ')}, ` +
+      `got ${JSON.stringify(theme.motifSet)}`,
+    );
+  }
+
+  // The one client-owned colour in the admin identity (admin story part 6f).
+  // Its legibility floor is applied at render time, not here: the value is
+  // never clamped, so a failing accent saves and the editor states what it
+  // fell back to.
+  if (theme.adminAccent != null
+    && (typeof theme.adminAccent !== 'string' || !HEX_COLOR_RE.test(theme.adminAccent))) {
+    errors.push(
+      'theme.adminAccent: must be a hex color (#RGB or #RRGGBB), ' +
+      `got ${JSON.stringify(theme.adminAccent)}`,
+    );
   }
 
   const enums = [

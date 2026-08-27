@@ -39,34 +39,58 @@ const DEFAULT_MODE_POLICY = 'light';
  * say both. Until PR2 bundles a mono face, `mono` falls back to the data
  * face.
  *
- * `accent` is NOT a role any more. `--font-accent` stays for one release as
- * an alias of `--font-heading` so ported components keep rendering; PR2
- * removes the alias.
+ * `accent` is NOT a role. PR2 removed the `--font-accent` alias and the
+ * grandfathered `accent` key with it (brief §3.2, §7). Zine's handwritten
+ * callout runs on the component token `--callout-font` instead, which is a
+ * component contract, not a fifth role.
  */
 const THEME_FONT_ROLES = Object.freeze(['heading', 'body', 'data', 'mono']);
-
-/** The retired role name `--font-accent` still aliases (removed in PR2). */
-const LEGACY_FONT_ROLE = 'accent';
 
 /**
  * The bundled font-set ids (spec §7.4). A client names a set id. A client
  * never supplies a font URL, so anything outside this list is rejected at
  * the validator rather than ignored downstream.
+ *
+ * `apps/web/public/fonts/README.md` records the file, the weights, the
+ * designer, and the licence behind each id. `scripts/lib/theme.cjs` holds
+ * the stacks and the faces; `themeRuntime.parity.test.js` fails if the
+ * three lists drift.
  */
-const THEME_FONT_SET_IDS = Object.freeze(['serif-editorial', 'sans-humanist', 'script-casual']);
+const THEME_FONT_SET_IDS = Object.freeze([
+  'serif-editorial', 'sans-humanist', 'script-casual',
+  'caslon-display', 'caslon-text', 'baskerville', 'spectral',
+  'fraunces', 'newsreader', 'plex-sans', 'plex-mono', 'archivo-condensed',
+  'merriweather', 'public-sans',
+  'karrik', 'bagnard', 'avara', 'fragment-mono',
+  'besley', 'vollkorn', 'overpass', 'overpass-mono', 'libre-franklin',
+]);
 
 /** What `config/theme.texture` may say (spec §7.2). */
 const THEME_TEXTURES = Object.freeze(['paper', 'flat']);
 
-/** What `config/theme.radius` may say (spec §7.2). */
-const THEME_RADIUS_IDS = Object.freeze(['sharp', 'soft', 'round']);
+/**
+ * What `config/theme.radius` may say (spec §7.2). `small` is the 2px-to-4px
+ * step Newsroom modern and Civic ask for (brief §4.2, §4.4).
+ */
+const THEME_RADIUS_IDS = Object.freeze(['sharp', 'small', 'soft', 'round']);
+
+/** What a preset's `shape.density` may say (brief §4, §6.1). */
+const THEME_DENSITIES = Object.freeze(['tight', 'comfortable', 'loose']);
 
 /** The branding slots `config/theme.logos` may fill (spec §7.2). */
 const THEME_LOGO_SLOTS = Object.freeze(['primary', 'mark', 'footer', 'ogDefault', 'favicon']);
 
-/** Every top-level field a `config/theme` document may carry. */
+/**
+ * Every top-level field a `config/theme` document may carry.
+ *
+ * PR2 adds four (brief §4, §5.2): `preset` names the base look, `optionPicks`
+ * records which curated option the operator chose in each group, `tokens`
+ * carries the advanced per-mode token overrides, and `motifSet` names the
+ * motif set the root element switches to.
+ */
 const THEME_DOC_KEYS = Object.freeze([
   'colors', 'fonts', 'texture', 'radius', 'mode', 'logos', 'placeholderLogos',
+  'preset', 'optionPicks', 'tokens', 'motifSet', 'adminAccent',
 ]);
 
 /**
@@ -113,6 +137,50 @@ function canonicalColorKey(key) {
   return Object.prototype.hasOwnProperty.call(THEME_COLOR_KEY_ALIASES, key)
     ? THEME_COLOR_KEY_ALIASES[key]
     : key;
+}
+
+/**
+ * Canonical color role → the tier 2 custom property it writes.
+ *
+ * This is the map the advanced per-mode override path edits: an operator
+ * naming a raw token in `config/theme.tokens` names one of these property
+ * names, and the validator resolves it back to the role. Naming the role
+ * directly works too, so both spellings reach the same token.
+ */
+const THEME_COLOR_PROPERTIES = Object.freeze({
+  primary: '--brand-primary-rgb',
+  primaryDark: '--brand-primary-dark-rgb',
+  primaryLight: '--brand-primary-light-rgb',
+  accent: '--brand-accent-rgb',
+  surface: '--brand-surface-rgb',
+  surfaceAlt: '--brand-surface-alt-rgb',
+  ink: '--brand-ink-rgb',
+  inkMuted: '--brand-ink-muted-rgb',
+  success: '--semantic-success-rgb',
+  warning: '--semantic-warning-rgb',
+  danger: '--semantic-danger-rgb',
+  highlight: '--semantic-highlight-rgb',
+  keynote: '--semantic-keynote-rgb',
+});
+
+/** The reverse map: custom property name → canonical color role. */
+const THEME_PROPERTY_COLOR_KEYS = Object.freeze(
+  Object.fromEntries(Object.entries(THEME_COLOR_PROPERTIES).map(([role, prop]) => [prop, role])),
+);
+
+/**
+ * Resolve either spelling of an overridable color token to its role.
+ *
+ * @param {string} name a canonical role, a stored alias, or a `--…-rgb` name
+ * @returns {string|null} the canonical role, or null when it names nothing
+ */
+function overrideTokenKey(name) {
+  if (typeof name !== 'string') return null;
+  if (Object.prototype.hasOwnProperty.call(THEME_PROPERTY_COLOR_KEYS, name)) {
+    return THEME_PROPERTY_COLOR_KEYS[name];
+  }
+  const role = canonicalColorKey(name);
+  return Object.prototype.hasOwnProperty.call(THEME_COLOR_PROPERTIES, role) ? role : null;
 }
 
 /**
@@ -337,20 +405,453 @@ function resolveMode(policy, prefersDark) {
   return chosen;
 }
 
+/* -------------------------------------------------------------------------
+ * Presets (brief §4) and the one publish-time resolver (brief §5.2).
+ * ---------------------------------------------------------------------- */
+
+const { PRESETS, ADMIN_TOKENS, MOTIF_SET_IDS } = require('./presetCatalog.cjs');
+
+/** The six preset ids (brief §4). `data-theme` carries one of these. */
+const THEME_PRESET_IDS = Object.freeze(Object.keys(PRESETS));
+
+/**
+ * The preset a new deployment gets. Brief §4.2: "Use it as the default
+ * preset for new deployments."
+ */
+const DEFAULT_PRESET_ID = 'newsroom';
+
+/** The motif sets `config/theme.motifSet` may name (brief §3.8). */
+const THEME_MOTIF_SET_IDS = Object.freeze([...MOTIF_SET_IDS]);
+
+/** Hex digits, so a hex string is computed and never written (spec §7.6). */
+const HEX_DIGITS = '0123456789abcdef';
+
+/** @param {unknown} hex `#rgb`, `#rrggbb`, or the same without the hash @returns {number[]|null} */
+function hexToRgb(hex) {
+  if (typeof hex !== 'string') return null;
+  let body = hex.trim().toLowerCase().replace(/^#/, '');
+  if (body.length === 3) body = body.split('').map((c) => c + c).join('');
+  if (body.length === 8) body = body.slice(0, 6);
+  if (body.length !== 6) return null;
+  const channels = [];
+  for (let i = 0; i < 6; i += 2) {
+    const hi = HEX_DIGITS.indexOf(body[i]);
+    const lo = HEX_DIGITS.indexOf(body[i + 1]);
+    if (hi === -1 || lo === -1) return null;
+    channels.push(hi * 16 + lo);
+  }
+  return channels;
+}
+
+/** @param {readonly number[]} rgb @returns {string} `#rrggbb`, computed digit by digit */
+function rgbToHex(rgb) {
+  const digits = rgb.map(clampChannel).map((c) => HEX_DIGITS[Math.floor(c / 16)] + HEX_DIGITS[c % 16]);
+  return `#${digits.join('')}`;
+}
+
+/** @param {unknown} v @returns {boolean} */
+function isPlainObject(v) {
+  return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+}
+
+/**
+ * The preset a `config/theme` document runs.
+ *
+ * A document that names no preset is a deployment made before presets
+ * existed. It keeps the pre-preset behavior: its stored `colors` map is the
+ * whole light palette and the dark palette is derived from it. Naming a
+ * preset switches the base to that preset's two authored palettes.
+ *
+ * @param {object} theme
+ * @returns {string|null} preset id, or null for a pre-preset document
+ */
+function themePresetId(theme) {
+  const id = theme?.preset;
+  return THEME_PRESET_IDS.includes(id) ? id : null;
+}
+
+/**
+ * @param {string} id
+ * @returns {object|null} the preset design data, frozen
+ */
+function getPreset(id) {
+  return Object.prototype.hasOwnProperty.call(PRESETS, id) ? PRESETS[id] : null;
+}
+
+/**
+ * Which curated option is picked in each of a preset's option groups
+ * (brief §4). A group the document does not name, or names with an id the
+ * preset does not offer, resolves to that group's default — so a stale pick
+ * degrades to the designed look rather than to nothing.
+ *
+ * @param {object} theme
+ * @returns {Record<string, string>} group id → choice id
+ */
+function resolveOptionPicks(theme) {
+  const preset = getPreset(themePresetId(theme));
+  if (!preset) return {};
+  const stored = isPlainObject(theme?.optionPicks) ? theme.optionPicks : {};
+  const picks = {};
+  for (const [group, spec] of Object.entries(preset.options || {})) {
+    const offered = (spec.choices || []).map((choice) => choice.id);
+    picks[group] = offered.includes(stored[group]) ? stored[group] : spec.default;
+  }
+  return picks;
+}
+
+/** The picked choice objects, in the preset's group order. */
+function pickedChoices(theme) {
+  const preset = getPreset(themePresetId(theme));
+  if (!preset) return [];
+  const picks = resolveOptionPicks(theme);
+  const chosen = [];
+  for (const [group, spec] of Object.entries(preset.options || {})) {
+    const choice = (spec.choices || []).find((c) => c.id === picks[group]);
+    if (choice) chosen.push(choice);
+  }
+  return chosen;
+}
+
+/**
+ * The bundled font-set id each role resolves to.
+ *
+ * Three layers, each winning over the one before it: the preset's type map,
+ * then the picked options (a heading-face option remaps the heading role),
+ * then any role `config/theme.fonts` names outright — the advanced path,
+ * and the only path a pre-preset document has.
+ *
+ * @param {object} theme
+ * @returns {Record<string, string>} role → font-set id
+ */
+function resolveFontRoles(theme) {
+  const preset = getPreset(themePresetId(theme));
+  const roles = {};
+  if (preset) {
+    for (const role of THEME_FONT_ROLES) {
+      if (THEME_FONT_SET_IDS.includes(preset.fonts?.[role])) roles[role] = preset.fonts[role];
+    }
+    for (const choice of pickedChoices(theme)) {
+      for (const [role, setId] of Object.entries(choice.fonts || {})) {
+        if (THEME_FONT_ROLES.includes(role) && THEME_FONT_SET_IDS.includes(setId)) {
+          roles[role] = setId;
+        }
+      }
+    }
+  }
+  for (const role of THEME_FONT_ROLES) {
+    const setId = theme?.fonts?.[role];
+    if (THEME_FONT_SET_IDS.includes(setId)) roles[role] = setId;
+  }
+  return roles;
+}
+
+/**
+ * Component-token font faces the preset asks for, beyond the four roles.
+ * Zine's `--callout-font` is the only one at launch (brief §4.3).
+ *
+ * @param {object} theme
+ * @returns {Record<string, string>} custom property → font-set id
+ */
+function resolveComponentFonts(theme) {
+  const preset = getPreset(themePresetId(theme));
+  const fonts = {};
+  for (const [name, setId] of Object.entries(preset?.componentFonts || {})) {
+    if (THEME_FONT_SET_IDS.includes(setId)) fonts[name] = setId;
+  }
+  return fonts;
+}
+
+/**
+ * Non-color token remaps: the preset's own, then the picked options'. Every
+ * name here already exists in `design/tokens/components.json`, because an
+ * option remaps tokens and never adds a property name (brief §3.4).
+ *
+ * @param {object} theme
+ * @returns {Record<string, string>} custom property → CSS value
+ */
+function resolvePresetTokens(theme) {
+  const preset = getPreset(themePresetId(theme));
+  if (!preset) return {};
+  const tokens = { ...(preset.tokens || {}) };
+  for (const choice of pickedChoices(theme)) Object.assign(tokens, choice.tokens || {});
+  return tokens;
+}
+
+/**
+ * The shape settings that render: the preset's, with anything
+ * `config/theme` names outright winning.
+ *
+ * @param {object} theme
+ * @returns {{ radius: string|null, texture: string|null, density: string|null }}
+ */
+function resolveShape(theme) {
+  const shape = getPreset(themePresetId(theme))?.shape || {};
+  const pick = (value, fallback, allowed) => {
+    if (allowed.includes(value)) return value;
+    if (allowed.includes(fallback)) return fallback;
+    return null;
+  };
+  return {
+    radius: pick(theme?.radius, shape.radius, THEME_RADIUS_IDS),
+    texture: pick(theme?.texture, shape.texture, THEME_TEXTURES),
+    // A document with no preset predates the setting, so it takes the
+    // middle step — which is what the pre-preset surfaces already render.
+    density: pick(null, shape.density, THEME_DENSITIES) || 'comfortable',
+  };
+}
+
+/**
+ * The motif set the root element switches to (brief §3.8). The client's
+ * choice wins; otherwise the preset's default; otherwise `none`.
+ *
+ * @param {object} theme
+ * @returns {string}
+ */
+function resolveMotifSet(theme) {
+  if (THEME_MOTIF_SET_IDS.includes(theme?.motifSet)) return theme.motifSet;
+  const preset = getPreset(themePresetId(theme));
+  if (preset && THEME_MOTIF_SET_IDS.includes(preset.motifSet)) return preset.motifSet;
+  return 'none';
+}
+
+/**
+ * Read a stored palette map (either spelling of the keys, hex values) into
+ * canonical roles.
+ *
+ * @param {unknown} colors
+ * @returns {Record<string, number[]>}
+ */
+function readPaletteMap(colors) {
+  const palette = {};
+  if (!isPlainObject(colors)) return palette;
+  for (const [key, hex] of Object.entries(colors)) {
+    const role = overrideTokenKey(key);
+    const rgb = hexToRgb(hex);
+    if (role && rgb) palette[role] = rgb;
+  }
+  return palette;
+}
+
+/**
+ * THE resolver (brief §5.2: "One resolver serves the browser runtime, the
+ * generator, and the publish path. Never add a second.").
+ *
+ * Resolve one `config/theme` document down to the palette that renders in
+ * each mode.
+ *
+ * WHICH FIELD IS THE PALETTE depends on one thing: whether the document
+ * names a preset.
+ *
+ *   - **A document that names a preset.** The preset's two authored
+ *     palettes are the base, and `tokens.light` / `tokens.dark` — the
+ *     advanced per-mode override path from the theme editor (brief §5.2) —
+ *     are the only overrides. `colors` is IGNORED on the way in: for a
+ *     preset document it is an OUTPUT, the materialized legacy map that
+ *     `resolveLegacyColors` writes back on publish so email and PDF keep
+ *     rendering. Reading it back in would pin a client to whatever palette
+ *     their previous preset happened to leave behind, and switching presets
+ *     would do nothing. Nothing is derived here: both palettes are designed.
+ *
+ *   - **A document that names no preset.** This is a deployment made before
+ *     presets existed, and it keeps exactly the behavior it has: `colors`
+ *     is the light palette, `colors.dark` writes the dark mode where the
+ *     document uses the per-mode shape, and anything the dark mode does not
+ *     name is DERIVED from the resolved light palette. `tokens` still
+ *     overrides last, so the advanced path works there too.
+ *
+ * @param {object} theme config/theme
+ * @returns {{ light: Record<string, number[]>, dark: Record<string, number[]> }}
+ */
+function resolveThemePalettes(theme) {
+  const preset = getPreset(themePresetId(theme));
+  const overrides = isPlainObject(theme?.tokens) ? theme.tokens : {};
+
+  if (preset) {
+    return {
+      light: { ...preset.palette.light, ...readPaletteMap(overrides.light) },
+      dark: { ...preset.palette.dark, ...readPaletteMap(overrides.dark) },
+    };
+  }
+
+  const stored = isPlainObject(theme?.colors) ? theme.colors : {};
+  const perMode = isPlainObject(stored.light) || isPlainObject(stored.dark);
+  const light = {
+    ...readPaletteMap(perMode ? stored.light : stored),
+    ...readPaletteMap(overrides.light),
+  };
+  const dark = {
+    ...deriveDarkColors(light),
+    ...readPaletteMap(perMode ? stored.dark : null),
+    ...readPaletteMap(overrides.dark),
+  };
+  return { light, dark };
+}
+
+/**
+ * The foreground/background pairs a published theme must clear (brief §5.2,
+ * §8.1).
+ *
+ * "Where a defined token pair names a foreground and a background, the pair
+ * must clear the §8.1 bar in both modes." These are those pairs. Text holds
+ * 4.5:1. A form control's boundary is non-text user interface under WCAG
+ * 1.4.11, so it holds 3:1 — against every ground an input actually renders
+ * on, which is why it appears twice.
+ *
+ * Contrast is measured against the actual rendered background, not the page
+ * background (interface guidelines, Colors), so each text role is measured
+ * on both surfaces it can sit on.
+ */
+const THEME_CONTRAST_PAIRS = Object.freeze([
+  Object.freeze({ foreground: 'ink', background: 'surface', min: 4.5 }),
+  Object.freeze({ foreground: 'ink', background: 'surfaceAlt', min: 4.5 }),
+  Object.freeze({ foreground: 'inkMuted', background: 'surface', min: 4.5 }),
+  Object.freeze({ foreground: 'inkMuted', background: 'surfaceAlt', min: 4.5 }),
+  Object.freeze({ foreground: 'primary', background: 'surface', min: 4.5 }),
+  Object.freeze({ foreground: 'control', background: 'surface', min: 3 }),
+  Object.freeze({ foreground: 'control', background: 'surfaceAlt', min: 3 }),
+]);
+
+/**
+ * Every contrast failure in a `config/theme` document, in both modes.
+ *
+ * A contrast failure is an ERROR at publish, not a warning (brief §5.2). The
+ * message names the pair, the mode, and the measured ratio, because those
+ * three facts are what an operator needs to fix it. `updateTheme` rejects
+ * the write; the theme editor shows the same failure inline in the control
+ * that caused it, and keeps rendering the preview.
+ *
+ * A draft may hold a failing value. A published document may not.
+ *
+ * @param {object} theme config/theme
+ * @returns {Array<{ foreground: string, background: string, mode: string,
+ *                   min: number, ratio: number, message: string }>}
+ */
+function findThemeContrastFailures(theme) {
+  const palettes = resolveThemePalettes(theme);
+  const failures = [];
+  for (const mode of THEME_MODES) {
+    const palette = palettes[mode];
+    if (!isRgb(palette.ink) || !isRgb(palette.surface)) continue;
+    const rules = deriveRuleColors({ ink: palette.ink, surface: palette.surface });
+    const read = (role) => (role === 'control' ? rules.control : palette[role]);
+    for (const pair of THEME_CONTRAST_PAIRS) {
+      const fg = read(pair.foreground);
+      const bg = read(pair.background);
+      if (!isRgb(fg) || !isRgb(bg)) continue;
+      const ratio = contrastRatio(fg, bg);
+      if (ratio >= pair.min) continue;
+      failures.push({
+        foreground: pair.foreground,
+        background: pair.background,
+        mode,
+        min: pair.min,
+        ratio,
+        message:
+          `theme contrast: ${pair.foreground} on ${pair.background} in ${mode} mode is ` +
+          `${ratio.toFixed(2)}:1, below the ${pair.min}:1 bar`,
+      });
+    }
+  }
+  return failures;
+}
+
+/**
+ * The legacy `config/theme.colors` map, materialized (brief §5.2).
+ *
+ * `functions/src/email/render.cjs` and `functions/src/schedule/pdf.cjs`
+ * render outside a browser and read `config/theme.colors` directly. A
+ * client running a preset with no overrides stores no colors, so those two
+ * consumers would render from nothing. `updateTheme` calls this on publish
+ * and writes the result into the stored document.
+ *
+ * The map is the LIGHT palette: email and PDF are light-mode surfaces, and
+ * that is the mode `colors` has always meant.
+ *
+ * @param {object} theme config/theme
+ * @returns {Record<string, string>} canonical role → `#rrggbb`
+ */
+function resolveLegacyColors(theme) {
+  const { light } = resolveThemePalettes(theme);
+  const colors = {};
+  for (const key of THEME_COLOR_KEYS) {
+    if (isRgb(light[key])) colors[key] = rgbToHex(light[key]);
+  }
+  return colors;
+}
+
+/**
+ * The fixed admin token set (admin story part 6). Emitted once per mode,
+ * never once per (theme, mode) pair.
+ */
+const ADMIN_TOKEN_SET = ADMIN_TOKENS;
+
+/** The contrast the admin position marker must clear: it is non-text UI. */
+const ADMIN_ACCENT_MIN_CONTRAST = DARK_MIN_CONTRAST_UI;
+
+/**
+ * The client accent's legibility floor (admin story part 6f).
+ *
+ * A client picks `config/theme.adminAccent`, so it may be unreadable on an
+ * admin ground. Measure it against `--admin-ground` in the mode. When it
+ * fails, both accent slots fall back to `--admin-ink` and the editor says
+ * so, naming what it fell back to. The value is never clamped: clamping
+ * silently changes what the client chose.
+ *
+ * @param {object} theme config/theme
+ * @param {'light'|'dark'} mode
+ * @returns {{ rgb: number[]|null, ratio: number|null, fellBack: boolean }}
+ *   `rgb` null means the document names no accent, so the token keeps its
+ *   declared default of `--admin-ink-rgb`.
+ */
+function resolveAdminAccent(theme, mode) {
+  const accent = hexToRgb(theme?.adminAccent);
+  if (!accent) return { rgb: null, ratio: null, fellBack: false };
+  const ground = ADMIN_TOKENS.colors['--admin-ground-rgb'][mode];
+  const ink = ADMIN_TOKENS.colors['--admin-ink-rgb'][mode];
+  const ratio = contrastRatio(accent, ground);
+  if (ratio < ADMIN_ACCENT_MIN_CONTRAST) return { rgb: [...ink], ratio, fellBack: true };
+  return { rgb: accent, ratio, fellBack: false };
+}
+
 module.exports = {
   THEME_MODES,
   THEME_MODE_POLICIES,
   DEFAULT_MODE_POLICY,
   THEME_FONT_ROLES,
-  LEGACY_FONT_ROLE,
   THEME_FONT_SET_IDS,
   THEME_TEXTURES,
   THEME_RADIUS_IDS,
+  THEME_DENSITIES,
   THEME_LOGO_SLOTS,
   THEME_DOC_KEYS,
   THEME_COLOR_KEYS,
   THEME_COLOR_KEY_ALIASES,
+  THEME_COLOR_PROPERTIES,
+  THEME_PROPERTY_COLOR_KEYS,
   canonicalColorKey,
+  overrideTokenKey,
+  THEME_PRESET_IDS,
+  DEFAULT_PRESET_ID,
+  THEME_MOTIF_SET_IDS,
+  PRESETS,
+  ADMIN_TOKEN_SET,
+  ADMIN_ACCENT_MIN_CONTRAST,
+  getPreset,
+  themePresetId,
+  resolveOptionPicks,
+  pickedChoices,
+  resolveFontRoles,
+  resolveComponentFonts,
+  resolvePresetTokens,
+  resolveShape,
+  resolveMotifSet,
+  resolveThemePalettes,
+  resolveLegacyColors,
+  THEME_CONTRAST_PAIRS,
+  findThemeContrastFailures,
+  resolveAdminAccent,
+  hexToRgb,
+  rgbToHex,
   DARK_GROUND_RGB,
   DARK_MIN_CONTRAST,
   DARK_MIN_CONTRAST_UI,

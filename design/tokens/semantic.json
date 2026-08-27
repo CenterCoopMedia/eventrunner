@@ -98,9 +98,8 @@
     "nameplate": { "width": "var(--er-width-nameplate)" }
   },
 
-  "$font-note": "Roles, never family names (brief §3.2). The three live roles — heading, body, data — plus mono for figures, timestamps, and code, all resolve from config/theme.fonts through the bundled-set allowlist (spec §7.4). A role config/theme.fonts does not name falls through to the alias list below instead: --font-accent is the retired role, kept for one release; --font-data follows the body face; --font-mono follows the data face until a mono ships in PR2.",
+  "$font-note": "Roles, never family names (brief §3.2). Four roles — heading, body, data, mono — resolve from the active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright, all through the bundled-set allowlist (spec §7.4). A role nothing names falls through to the alias list below: --font-data follows the body face, --font-mono follows the data face. PR2 removed --font-accent, the retired role (brief §7): Zine's handwritten callout runs on the component token --callout-font instead.",
   "font": {
-    "--font-accent": "var(--font-heading)",
     "--font-data": "var(--font-body)",
     "--font-mono": "var(--font-data)"
   },

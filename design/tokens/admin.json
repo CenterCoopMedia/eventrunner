@@ -1,0 +1,153 @@
+{
+  "$schema-note": "The fixed Event Runner admin identity (design brief §5.2; full spec docs/plans/2026-08-27-admin-identity-story.md part 6). Not a seventh preset: the admin obeys data-mode and ignores data-theme, so the generator emits this set ONCE PER MODE and never once per (theme, mode) pair. That emission rule is the mechanical statement of 'the admin ignores data-theme', and apps/web/src/lib/themeModes.test.js asserts it.",
+  "$palette-note": "Channels are [r, g, b] numbers, never hex strings. The light ground is a warm-leaning grey pulled toward lead and proof stock, not a cool blue-grey: the distance from the generic dashboard slate is a stated design requirement (admin story part 5).",
+  "$palette-words-light": "proof-stock grey, type-metal near-black, lead-grey rule, bench graphite, galley tint, oiled-steel focus, oxide alarm red, checked green, held caution amber, standing-matter grey",
+  "$palette-words-dark": "night-side charcoal, cast-bone type, banked lead rule, lamp graphite, night galley tint, lit-steel focus, held oxide red, held green, held amber, dead-matter grey",
+
+  "$colors-note": "Every entry resolves under :root[data-mode='light'] and :root[data-mode='dark']. Both values are authored; no dark value is derived from its light twin.",
+  "colors": {
+    "--admin-ground-rgb": {
+      "$role": "(a1) The room itself. The base page ground, tonal, never pure white or pure black.",
+      "light": [234, 232, 227],
+      "dark": [31, 30, 28]
+    },
+    "--admin-ground-raised-rgb": {
+      "$role": "(a2) A region sitting above the room, reached by tint, not by shadow.",
+      "light": [243, 241, 237],
+      "dark": [43, 42, 39]
+    },
+    "--admin-ground-proof-rgb": {
+      "$role": "(a3) The draft / unpublished-changes ground. The rough stock a proof is pulled on.",
+      "light": [234, 223, 194],
+      "dark": [56, 49, 32]
+    },
+    "--admin-ground-input-rgb": {
+      "$role": "(a4) The ground inside a form control, distinct from both above so a field reads as a field without a heavy border.",
+      "light": [251, 250, 247],
+      "dark": [23, 22, 21]
+    },
+    "--admin-ground-alarm-rgb": {
+      "$role": "(a5) The destructive and rejection ground. Low chroma; the words carry the weight.",
+      "light": [246, 231, 228],
+      "dark": [56, 31, 29]
+    },
+
+    "--admin-ink-rgb": {
+      "$role": "(b1) Primary text. Type-metal near-black in light, cast bone in dark. Never pure black, never pure white.",
+      "light": [28, 27, 25],
+      "dark": [236, 231, 222]
+    },
+    "--admin-ink-secondary-rgb": {
+      "$role": "(b2) Hints, metadata, and support text. 'Muted' never means 'below the bar'.",
+      "light": [82, 79, 74],
+      "dark": [173, 168, 158]
+    },
+    "--admin-ink-data-rgb": {
+      "$role": "(b3) The mono role's ink, tuned so a dense mono column does not out-weigh the prose beside it.",
+      "light": [56, 54, 50],
+      "dark": [201, 196, 186]
+    },
+    "--admin-ink-inverse-rgb": {
+      "$role": "(b4) Text on a filled control.",
+      "light": [246, 244, 240],
+      "dark": [24, 23, 22]
+    },
+    "--admin-ink-disabled-rgb": {
+      "$role": "(b5) Dead matter and disabled controls. Still readable.",
+      "light": [98, 95, 89],
+      "dark": [150, 145, 136]
+    },
+    "--admin-ink-link-rgb": {
+      "$role": "(b6) The admin's own link colour, which is never the client accent.",
+      "light": [26, 70, 126],
+      "dark": [142, 182, 234]
+    },
+
+    "--admin-rule-hairline-rgb": {
+      "$role": "(c1) Row, field, and region separators. The workhorse.",
+      "light": [204, 200, 192],
+      "dark": [63, 61, 57]
+    },
+    "--admin-rule-strong-rgb": {
+      "$role": "(c2) Region and table-head boundaries. One per region.",
+      "light": [136, 131, 122],
+      "dark": [114, 110, 102]
+    },
+    "--admin-rule-header-rgb": {
+      "$role": "(c3) The job line's rule, the heaviest rule in the room.",
+      "light": [92, 88, 81],
+      "dark": [158, 153, 144]
+    },
+    "--admin-rule-alarm-rgb": {
+      "$role": "(c4) The rule around a destructive or rejected surface.",
+      "light": [166, 74, 62],
+      "dark": [186, 100, 90]
+    },
+
+    "--admin-state-live-rgb": {
+      "$role": "(d1) Ink for the published state. Always paired with the word 'Live'.",
+      "light": [24, 88, 56],
+      "dark": [122, 198, 148]
+    },
+    "--admin-state-draft-rgb": {
+      "$role": "(d2) Ink for the unpublished state; its ground is --admin-ground-proof-rgb. Always paired with the word 'Draft'.",
+      "light": [112, 74, 8],
+      "dark": [228, 178, 94]
+    },
+    "--admin-state-error-rgb": {
+      "$role": "(d3) Ink for a rejection; its ground is --admin-ground-alarm-rgb.",
+      "light": [150, 28, 32],
+      "dark": [246, 142, 140]
+    },
+    "--admin-state-caution-rgb": {
+      "$role": "(d4) Ink for a warning that is not a failure.",
+      "light": [118, 76, 8],
+      "dark": [232, 182, 96]
+    },
+    "--admin-state-ok-rgb": {
+      "$role": "(d5) Ink for a completed action.",
+      "light": [24, 88, 56],
+      "dark": [122, 198, 148]
+    },
+
+    "--admin-focus-ring-rgb": {
+      "$role": "(e1) One visible focus colour that clears both --admin-ground and --admin-ground-input in both modes. Never the client accent.",
+      "light": [26, 66, 116],
+      "dark": [130, 180, 236]
+    },
+
+    "--admin-client-accent-ink-rgb": {
+      "$role": "(f2) The ink that reads on the accent, for the rare case the marker is filled behind a glyph.",
+      "light": [246, 244, 240],
+      "dark": [24, 23, 22]
+    }
+  },
+
+  "$alias-note": "(f1) The one client-owned colour, written from config/theme through buildRuntimeThemeCss like any other override. It defaults to the admin ink, so an unset accent renders as a plain ink marker rather than as nothing. The legibility floor lives in packages/shared/src/theme.cjs: when the resolved accent fails against --admin-ground in a mode, both slots fall back to --admin-ink and the editor says so.",
+  "aliases": {
+    "--admin-client-accent-rgb": "--admin-ink-rgb"
+  },
+
+  "$component-note": "(f3, f4) Two component tokens, and only two, so the 'accent appears in exactly two places' rule is greppable. Any other reference to --admin-client-accent in apps/web fails review.",
+  "components": {
+    "--admin-nav-active-marker-rgb": "--admin-client-accent-rgb",
+    "--admin-page-header-mark-rgb": "--admin-client-accent-rgb"
+  },
+
+  "$scalar-note": "(c) rules ship as a colour plus a width pair (brief §3.7). (e2) the focus offset keeps the ring off a hairline. (g) type and shape are fixed, never writable from config/theme.",
+  "scalars": {
+    "--admin-rule-hairline-width": "var(--er-width-hairline)",
+    "--admin-rule-strong-width": "var(--er-width-strong)",
+    "--admin-rule-header-width": "var(--er-width-nameplate)",
+    "--admin-rule-alarm-width": "var(--er-width-strong)",
+    "--admin-focus-offset": "2px",
+    "--admin-radius": "2px",
+    "--admin-nav-active-marker-width": "var(--er-width-strong)"
+  },
+
+  "$font-note": "(g1, g2) Source Sans 3 carries everything a person reads as language. IBM Plex Mono carries everything the machine owns. No --admin-font-* token is ever writable from config/theme, so the generator always emits these two faces whatever preset a deployment runs.",
+  "fonts": {
+    "--admin-font-ui": "sans-humanist",
+    "--admin-font-data": "plex-mono"
+  }
+}

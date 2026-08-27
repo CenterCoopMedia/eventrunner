@@ -1,0 +1,150 @@
+{
+  "$schema-note": "One theme preset (design brief 2026-08-27, §4.4). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
+  "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 4.",
+  "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin. Civic targets the highest contrast bar of the six presets and never trades contrast for mood.",
+  "id": "civic",
+  "label": "Civic / institutional",
+  "summary": "The public record of a public event. Plain, patient, unambiguous, with nothing between the reader and the information.",
+
+  "$palette-words-light": "document off-white, statute near-black, restrained civic blue, form-grey rule, hearing-room slate, plain caution amber, plain confirm green, record grey",
+  "$palette-words-dark": "evening-office neutral, high-contrast bone text, retuned civic blue, lamp-grey rule, night slate, caution amber held bright, confirm green held bright, archive grey",
+  "palette": {
+    "light": {
+      "surface": [250, 250, 249],
+      "surfaceAlt": [240, 240, 239],
+      "ink": [23, 24, 26],
+      "inkMuted": [80, 83, 89],
+      "primary": [26, 82, 150],
+      "primaryDark": [16, 56, 106],
+      "primaryLight": [126, 164, 208],
+      "accent": [64, 80, 98],
+      "success": [20, 92, 56],
+      "warning": [124, 74, 6],
+      "danger": [162, 26, 36],
+      "highlight": [116, 84, 10],
+      "keynote": [76, 48, 132]
+    },
+    "dark": {
+      "surface": [25, 26, 28],
+      "surfaceAlt": [37, 39, 42],
+      "ink": [238, 238, 236],
+      "inkMuted": [174, 178, 184],
+      "primary": [128, 178, 238],
+      "primaryDark": [172, 208, 248],
+      "primaryLight": [56, 90, 134],
+      "accent": [152, 168, 184],
+      "success": [126, 204, 152],
+      "warning": [234, 180, 92],
+      "danger": [246, 142, 146],
+      "highlight": [228, 196, 114],
+      "keynote": [190, 168, 244]
+    }
+  },
+
+  "$font-note": "Brief §4.4. This is the USWDS pairing: Merriweather headings, Public Sans body and labels, IBM Plex Mono for times, room codes, and identifiers.",
+  "fonts": {
+    "heading": "merriweather",
+    "body": "public-sans",
+    "data": "public-sans",
+    "mono": "plex-mono"
+  },
+
+  "shape": { "radius": "small", "texture": "flat", "density": "comfortable" },
+  "motifSet": "none",
+
+  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). Civic runs larger hit areas, so the session row keeps a comfortable block pad.",
+  "tokens": {
+    "--session-card-pad-block": "var(--space-md)",
+    "--folio-font": "var(--font-data)"
+  },
+
+  "options": {
+    "headingFace": {
+      "label": "Heading face",
+      "prompt": "The institution's register.",
+      "default": "merriweather",
+      "choices": [
+        {
+          "id": "merriweather",
+          "label": "Merriweather",
+          "why": "Weight without drama. It is the USWDS pairing and it reads as a body that has existed for a while.",
+          "fonts": { "heading": "merriweather" }
+        },
+        {
+          "id": "source-serif-4",
+          "label": "Source Serif 4",
+          "why": "The same document, lighter on its feet: a university or a cultural institution rather than an agency, and the repo already bundles it for Broadsheet.",
+          "fonts": { "heading": "serif-editorial" }
+        },
+        {
+          "id": "public-sans-bold",
+          "label": "Public Sans bold",
+          "why": "The all-sans document. One face for headings, labels, and data is the plainest possible public notice, which is the story taken to its logical end.",
+          "fonts": { "heading": "public-sans" }
+        }
+      ]
+    },
+    "nameplate": {
+      "label": "Nameplate treatment",
+      "prompt": "The letterhead.",
+      "default": "institutional-letterhead",
+      "choices": [
+        {
+          "id": "institutional-letterhead",
+          "label": "Institutional letterhead",
+          "why": "The top of an official document. The organisation line sits below the name, never above it.",
+          "tokens": {
+            "--nameplate-align": "start",
+            "--nameplate-meta-placement": "block",
+            "--nameplate-rule-width": "var(--rule-hairline-width)"
+          }
+        },
+        {
+          "id": "two-part-lockup",
+          "label": "Two-part lockup",
+          "why": "The co-signed notice of a partnership, which is the common Civic case: logo slot left, event name and dates right, divided by a vertical hairline.",
+          "tokens": {
+            "--nameplate-align": "start",
+            "--nameplate-meta-placement": "inline",
+            "--nameplate-frame-width": "var(--rule-hairline-width)"
+          }
+        },
+        {
+          "id": "compact-standing-head",
+          "label": "Compact standing head",
+          "why": "For inner pages, where the reader wants the content and not the letterhead again.",
+          "tokens": {
+            "--nameplate-align": "start",
+            "--nameplate-size": "var(--text-h1)",
+            "--nameplate-meta-placement": "inline"
+          }
+        }
+      ]
+    },
+    "component": {
+      "label": "Schedule presentation",
+      "prompt": "How the agenda is posted.",
+      "default": "posted-agenda",
+      "choices": [
+        {
+          "id": "posted-agenda",
+          "label": "Posted agenda",
+          "why": "Hairline rows, fixed column order, tabular figures. The list is first-class at every width.",
+          "tokens": {
+            "--schedule-number-display": "none",
+            "--schedule-row-leading": "var(--text-body-leading)"
+          }
+        },
+        {
+          "id": "numbered-agenda",
+          "label": "Numbered agenda",
+          "why": "The numbers are content, not decoration, and they are never zero-padded, so this matches how a formal programme is published.",
+          "tokens": {
+            "--schedule-number-display": "inline",
+            "--schedule-row-leading": "var(--text-body-leading)"
+          }
+        }
+      ]
+    }
+  }
+}
