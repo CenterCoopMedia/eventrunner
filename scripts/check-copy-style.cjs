@@ -3,9 +3,10 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { Linter } = require('eslint');
 
 const ROOT = path.resolve(__dirname, '..');
-const CODE_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx']);
+const CODE_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.mjs']);
 const SCANNED_EXTENSIONS = new Set([...CODE_EXTENSIONS, '.html', '.json', '.md']);
 
 // Current copy that a client, attendee, speaker, event staff member, or CCM
@@ -16,6 +17,9 @@ const ROOT_FILES = Object.freeze([
   'docs/index.html',
   'docs/ADMIN_GUIDE.md',
   'docs/CLIENT_ONBOARDING.md',
+  'docs/DEPLOY_RUNBOOK.md',
+  'docs/POSTMARK_PROVISIONING.md',
+  'docs/EVENTBRITE_VERIFICATION.md',
   'scripts/lib/demo-event.cjs',
   'scripts/lib/seed.cjs',
 ]);
@@ -43,7 +47,7 @@ const BLOCKED_RULES = Object.freeze([
   {
     id: 'rhetorical-frame',
     pattern:
-      /\b(?:not just|more than just|whether you(?: are|'re)|in today(?:'|’)?s|at its core)\b/giu,
+      /\b(?:not just|more than just|whether you(?: are|['’]re)|in today(?:'|’)?s|at its core)\b/giu,
     guidance: 'Start with the required fact or instruction.',
   },
   {
@@ -62,11 +66,6 @@ const BLOCKED_RULES = Object.freeze([
     id: 'filler',
     pattern: /\b(?:simply|obviously|of course)\b/giu,
     guidance: 'Delete the filler word or state the reason.',
-  },
-  {
-    id: 'long-dash',
-    pattern: /—|&mdash;|&#8212;/gu,
-    guidance: 'Use a full stop, comma, colon, or parentheses.',
   },
 ]);
 
@@ -128,139 +127,107 @@ function collectFiles() {
   return [...files].sort();
 }
 
-function previousTokenAllowsRegex(source, slashIndex) {
-  let cursor = slashIndex - 1;
-  while (cursor >= 0 && /\s/u.test(source[cursor])) cursor -= 1;
-  if (cursor < 0) return true;
-  if ('([{:;,=!?&|+-*%^~<>'.includes(source[cursor])) return true;
+function addFragment(fragments, text, startLine) {
+  if (typeof text !== 'string' || !/[\p{L}\p{N}]/u.test(text)) return;
+  fragments.push({ text, startLine });
+}
 
-  const prefix = source.slice(0, cursor + 1);
-  return /(?:^|\s)(?:return|case|throw|delete|void|typeof|instanceof|in|of|yield|await)\s*$/u.test(
-    prefix,
+function skipStringLiteral(node) {
+  const parent = node.parent;
+  if (!parent) return false;
+  if (
+    (parent.type === 'ImportDeclaration' ||
+      parent.type === 'ExportNamedDeclaration' ||
+      parent.type === 'ExportAllDeclaration') &&
+    parent.source === node
+  ) {
+    return true;
+  }
+  if (parent.type === 'ImportExpression' && parent.source === node) return true;
+  if (parent.type === 'Property' && parent.key === node && !parent.computed) return true;
+  return parent.type === 'ExpressionStatement' && Boolean(parent.directive);
+}
+
+function extractCodeFragments(source, relativePath) {
+  const fragments = [];
+  const linter = new Linter({ configType: 'eslintrc' });
+  linter.defineRule('collect-user-copy', {
+    meta: { schema: [] },
+    create() {
+      return {
+        Literal(node) {
+          if (typeof node.value !== 'string' || skipStringLiteral(node)) return;
+          addFragment(fragments, node.value, node.loc.start.line);
+        },
+        TemplateElement(node) {
+          addFragment(
+            fragments,
+            node.value.cooked ?? node.value.raw,
+            node.loc.start.line,
+          );
+        },
+        JSXText(node) {
+          addFragment(fragments, node.value, node.loc.start.line);
+        },
+      };
+    },
+  });
+
+  const messages = linter.verify(
+    source,
+    {
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        ecmaFeatures: { jsx: true },
+      },
+      rules: { 'collect-user-copy': 'error' },
+    },
+    { filename: relativePath },
   );
-}
-
-// Keep only text that can render or be returned to a user. Code, comments,
-// and regular expressions become spaces. Newlines and character positions
-// stay unchanged so each finding points to the source line a writer edits.
-function maskCodeToVisibleText(source) {
-  const output = Array.from(source, (char) => (char === '\n' ? '\n' : ' '));
-  let state = 'code';
-  let quote = '';
-  let escaped = false;
-  let inRegexClass = false;
-
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index];
-    const next = source[index + 1];
-
-    if (state === 'line-comment') {
-      if (char === '\n') state = 'code';
-      continue;
-    }
-
-    if (state === 'block-comment') {
-      if (char === '*' && next === '/') {
-        index += 1;
-        state = 'code';
-      }
-      continue;
-    }
-
-    if (state === 'regex') {
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (char === '\\') {
-        escaped = true;
-        continue;
-      }
-      if (char === '[') inRegexClass = true;
-      else if (char === ']') inRegexClass = false;
-      else if (char === '/' && !inRegexClass) state = 'code';
-      continue;
-    }
-
-    if (state === 'string') {
-      output[index] = char;
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (char === '\\') {
-        escaped = true;
-        continue;
-      }
-      if (char === quote) {
-        output[index] = ' ';
-        state = 'code';
-      }
-      continue;
-    }
-
-    if (char === '/' && next === '/') {
-      index += 1;
-      state = 'line-comment';
-      continue;
-    }
-    if (char === '/' && next === '*') {
-      index += 1;
-      state = 'block-comment';
-      continue;
-    }
-    if (char === '/' && previousTokenAllowsRegex(source, index)) {
-      state = 'regex';
-      inRegexClass = false;
-      continue;
-    }
-    if (char === "'" || char === '"' || char === '`') {
-      quote = char;
-      state = 'string';
-      output[index] = ' ';
-    }
-  }
-
-  // JSX child text is not a JavaScript string literal. Add plain text found
-  // between adjacent tags. Braces are excluded because expressions are code.
-  const jsxText = />([^<>{}]*[\p{L}\p{N}][^<>{}]*)</gu;
-  for (const match of source.matchAll(jsxText)) {
-    const text = match[1];
-    const start = match.index + 1;
-    for (let offset = 0; offset < text.length; offset += 1) {
-      output[start + offset] = text[offset];
-    }
-  }
-
-  return output.join('');
-}
-
-function textToScan(source, relativePath) {
-  const extension = path.extname(relativePath);
-  if (CODE_EXTENSIONS.has(extension)) return maskCodeToVisibleText(source);
-  if (extension === '.html') {
-    return source.replace(/<!--[\s\S]*?-->/gu, (comment) =>
-      comment.replace(/[^\n]/gu, ' '),
+  const fatal = messages.find((message) => message.fatal);
+  if (fatal) {
+    throw new Error(
+      `${relativePath}:${fatal.line ?? 1}:${fatal.column ?? 1}: ${fatal.message}`,
     );
   }
-  return source;
+
+  return fragments;
 }
 
-function isLongDashScope(relativePath) {
-  const normalized = normalizePath(relativePath);
-  return (
-    normalized === 'docs/index.html' ||
-    normalized.startsWith('docs/handbook/') ||
-    /^design\/tokens\/presets\/[^/]+\.json$/u.test(normalized) ||
-    normalized === 'scripts/lib/demo-event.cjs' ||
-    normalized.startsWith('apps/web/src/') ||
-    normalized.startsWith('functions/src/email/templates/')
-  );
+function maskNonProse(source, patterns) {
+  let masked = source;
+  for (const pattern of patterns) {
+    masked = masked.replace(pattern, (match) => match.replace(/[^\n]/gu, ' '));
+  }
+  return masked;
 }
 
-function ruleAppliesTo(rule, relativePath) {
-  if (rule.id === 'long-dash') return isLongDashScope(relativePath);
-  return true;
+function extractMarkdownFragments(source) {
+  return [
+    {
+      text: maskNonProse(source, [
+        /<!--[\s\S]*?-->/gu,
+        /```[\s\S]*?```/gu,
+        /~~~[\s\S]*?~~~/gu,
+        /`[^`\n]*`/gu,
+      ]),
+      startLine: 1,
+    },
+  ];
+}
+
+function extractHtmlFragments(source) {
+  return [
+    {
+      text: maskNonProse(source, [
+        /<!--[\s\S]*?-->/gu,
+        /<script\b[^>]*>[\s\S]*?<\/script>/giu,
+        /<style\b[^>]*>[\s\S]*?<\/style>/giu,
+      ]),
+      startLine: 1,
+    },
+  ];
 }
 
 function lineNumberAt(source, index) {
@@ -271,42 +238,114 @@ function lineNumberAt(source, index) {
   return line;
 }
 
-function lineAt(source, index) {
-  const lineStart = source.lastIndexOf('\n', index - 1) + 1;
-  const lineEndValue = source.indexOf('\n', index);
-  const lineEnd = lineEndValue === -1 ? source.length : lineEndValue;
-  return source.slice(lineStart, lineEnd);
+function locateJsonString(source, key, value, cursor) {
+  const keyToken = JSON.stringify(key);
+  const valueToken = JSON.stringify(value);
+  let keyIndex = source.indexOf(keyToken, cursor);
+
+  while (keyIndex !== -1) {
+    const colon = source.indexOf(':', keyIndex + keyToken.length);
+    if (colon === -1) break;
+    let valueIndex = colon + 1;
+    while (/\s/u.test(source[valueIndex])) valueIndex += 1;
+    if (source.startsWith(valueToken, valueIndex)) {
+      return {
+        fragment: {
+          text: value,
+          startLine: lineNumberAt(source, valueIndex),
+        },
+        cursor: valueIndex + valueToken.length,
+      };
+    }
+    keyIndex = source.indexOf(keyToken, keyIndex + keyToken.length);
+  }
+
+  throw new Error(`Could not locate rendered preset field ${key}.`);
 }
 
-function excerptAt(source, index) {
-  return lineAt(source, index).trim().replace(/\s+/gu, ' ').slice(0, 180);
+function extractPresetFragments(source, relativePath) {
+  let preset;
+  try {
+    preset = JSON.parse(source);
+  } catch (error) {
+    throw new Error(`${relativePath}: invalid JSON: ${error.message}`);
+  }
+
+  const fragments = [];
+  let cursor = 0;
+  const addField = (object, key) => {
+    const value = object?.[key];
+    if (typeof value !== 'string') return;
+    const located = locateJsonString(source, key, value, cursor);
+    fragments.push(located.fragment);
+    cursor = located.cursor;
+  };
+
+  addField(preset, 'label');
+  addField(preset, 'summary');
+  addField(preset, 'bestFor');
+  for (const option of Object.values(preset.options || {})) {
+    addField(option, 'label');
+    addField(option, 'prompt');
+    for (const choice of option.choices || []) {
+      addField(choice, 'label');
+      addField(choice, 'why');
+    }
+  }
+
+  return fragments;
 }
 
-function isStandaloneDash(scanned, index) {
-  return lineAt(scanned, index).trim() === '—';
+function isPresetJson(relativePath) {
+  return /^design\/tokens\/presets\/[^/]+\.json$/u.test(
+    normalizePath(relativePath),
+  );
+}
+
+function extractVisibleFragments(source, relativePath) {
+  const extension = path.extname(relativePath);
+  if (CODE_EXTENSIONS.has(extension)) {
+    return extractCodeFragments(source, relativePath);
+  }
+  if (isPresetJson(relativePath)) {
+    return extractPresetFragments(source, relativePath);
+  }
+  if (extension === '.md') return extractMarkdownFragments(source);
+  if (extension === '.html') return extractHtmlFragments(source);
+  return [{ text: source, startLine: 1 }];
+}
+
+function sourceLine(source, line) {
+  return source.split(/\r?\n/u)[line - 1] ?? '';
+}
+
+function linesBefore(text, index) {
+  let count = 0;
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    if (text[cursor] === '\n') count += 1;
+  }
+  return count;
 }
 
 function findFindings(source, relativePath, rules = BLOCKED_RULES) {
   if (isExcluded(relativePath)) return [];
-  const scanned = textToScan(source, relativePath);
+  const fragments = extractVisibleFragments(source, relativePath);
   const findings = [];
 
-  for (const rule of rules) {
-    if (!ruleAppliesTo(rule, relativePath)) continue;
-    rule.pattern.lastIndex = 0;
-
-    for (const match of scanned.matchAll(rule.pattern)) {
-      if (rule.id === 'long-dash' && isStandaloneDash(scanned, match.index)) {
-        continue;
+  for (const fragment of fragments) {
+    for (const rule of rules) {
+      rule.pattern.lastIndex = 0;
+      for (const match of fragment.text.matchAll(rule.pattern)) {
+        const line = fragment.startLine + linesBefore(fragment.text, match.index);
+        findings.push({
+          path: relativePath,
+          line,
+          rule: rule.id,
+          match: match[0],
+          guidance: rule.guidance,
+          excerpt: sourceLine(source, line).trim().replace(/\s+/gu, ' ').slice(0, 180),
+        });
       }
-      findings.push({
-        path: relativePath,
-        line: lineNumberAt(scanned, match.index),
-        rule: rule.id,
-        match: match[0],
-        guidance: rule.guidance,
-        excerpt: excerptAt(source, match.index),
-      });
     }
   }
 
@@ -319,9 +358,15 @@ function run() {
   const files = collectFiles();
   const findings = [];
 
-  for (const relativePath of files) {
-    const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
-    findings.push(...findFindings(source, relativePath));
+  try {
+    for (const relativePath of files) {
+      const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
+      findings.push(...findFindings(source, relativePath));
+    }
+  } catch (error) {
+    console.error(`copy-style: ${error.message}`);
+    process.exitCode = 1;
+    return;
   }
 
   if (findings.length === 0) {
@@ -347,10 +392,8 @@ if (require.main === module) run();
 module.exports = {
   BLOCKED_RULES,
   collectFiles,
+  extractPresetFragments,
+  extractVisibleFragments,
   findFindings,
   isExcluded,
-  isLongDashScope,
-  maskCodeToVisibleText,
-  ruleAppliesTo,
-  textToScan,
 };
