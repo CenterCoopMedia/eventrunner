@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+<path d="M32.00,48.00 A32,32 0 0 0 0.00,16.00"/>
+<path d="M16.00,48.00 A16,16 0 0 0 0.00,32.00"/>
+</g>
+<g stroke="currentColor" stroke-width="1" stroke-linecap="round">
+<line x1="28.01" y1="40.49" x2="33.81" y2="38.94"/>
+<line x1="25.11" y1="33.50" x2="30.31" y2="30.50"/>
+<line x1="20.51" y1="27.49" x2="24.75" y2="23.25"/>
+<line x1="14.50" y1="22.89" x2="17.50" y2="17.69"/>
+<line x1="7.51" y1="19.99" x2="9.06" y2="14.19"/>
+</g>
+<g stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+<line x1="32.00" y1="48.00" x2="44.00" y2="48.00"/>
+<line x1="0.00" y1="16.00" x2="0.00" y2="4.00"/>
+</g>
+<g stroke="currentColor" stroke-width="1" stroke-linecap="round">
+<line x1="36.00" y1="45.00" x2="36.00" y2="48.00"/>
+<line x1="40.00" y1="45.00" x2="40.00" y2="48.00"/>
+<line x1="0.00" y1="12.00" x2="3.00" y2="12.00"/>
+<line x1="0.00" y1="8.00" x2="3.00" y2="8.00"/>
+</g>
+<path d="M0.00,48.00 L4.00,48.00 A4,4 0 0 0 0.00,44.00 Z" fill="currentColor" stroke="none"/>
+</svg>

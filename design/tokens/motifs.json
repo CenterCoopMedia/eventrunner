@@ -1,7 +1,9 @@
 {
   "$schema-note": "The motif layer of the design brief (2026-08-27) §3.8. A fourth, optional layer beside the three token tiers. A motif set is a named group of small SVG drawings.",
   "$asset-note": "Each set stores its drawings under apps/web/public/motifs/<set>/. SVG only, never a raster. Every path uses currentColor or a theme custom property, so a motif inherits ink from --color-ink-motif-rgb and carries no color of its own. A reviewer checks that by hand: the hex sweep does not lint SVG.",
-  "$scope-note": "PR1 declares the layer and ships the `none` set only. PR2 draws botanical, fauna, and cartographic in the style §2.3 assigns to the preset that uses them.",
+  "$render-note": "Render a motif one of two ways only (brief §3.8). Either apply the slot token as a CSS mask-image and paint it with background-color: var(--color-ink-motif-rgb), or inline the file as an SVG symbol that reads currentColor. Never an <img>, never a CSS url() fill: neither form can inherit theme ink. Every motif is aria-hidden=\"true\" and pointer-events: none, and a page carries at most three.",
+  "$switch-note": "A custom property cannot rewrite the asset a second custom property points at, so --motif-set alone can never remap the slot URLs. The root element carries data-motif-set instead, and the generator emits one [data-motif-set] block per set, each resolving every slot token to that set's asset. Same mechanism as data-theme and data-mode.",
+  "$icon-note": "The line between a motif and an icon is meaning, not shape. A mark that names a specific line, venue, or room carries meaning: that mark is a labelled icon, it lives under apps/web/public/icons/wayfinding/, and it never renders through this layer.",
   "slots": ["section-mark", "divider", "nameplate-mark", "empty-state"],
   "default": "none",
   "sets": {
@@ -14,6 +16,42 @@
         "divider": null,
         "nameplate-mark": null,
         "empty-state": null
+      }
+    },
+    "botanical": {
+      "label": "Botanical",
+      "style": "Engraving and botanical-plate linework (brief §2.3).",
+      "$default-for": "field-guide",
+      "assetDir": "botanical",
+      "slots": {
+        "section-mark": "section-mark.svg",
+        "divider": "divider.svg",
+        "nameplate-mark": "nameplate-mark.svg",
+        "empty-state": "empty-state.svg"
+      }
+    },
+    "fauna": {
+      "label": "Fauna",
+      "style": "Engraving and plate linework (brief §2.3). The supported alternate for Field Guide, and the second engraved set a Broadsheet client may enable.",
+      "assetDir": "fauna",
+      "slots": {
+        "section-mark": "section-mark.svg",
+        "divider": "divider.svg",
+        "nameplate-mark": "nameplate-mark.svg",
+        "empty-state": "empty-state.svg"
+      }
+    },
+    "cartographic": {
+      "label": "Cartographic",
+      "style": "Precise survey linework (brief §2.3). The set carries the transit register too: the divider is a Beck-style schematic line diagram of straight segments and 45 degree turns, and the section mark is a contour and benchmark mark.",
+      "$default-for": "atlas",
+      "$transit-note": "Route marks and station symbols name a specific line, venue, or room, so they are labelled icons under apps/web/public/icons/wayfinding/, never motifs (brief §3.8).",
+      "assetDir": "cartographic",
+      "slots": {
+        "section-mark": "section-mark.svg",
+        "divider": "divider.svg",
+        "nameplate-mark": "nameplate-mark.svg",
+        "empty-state": "empty-state.svg"
       }
     }
   }
