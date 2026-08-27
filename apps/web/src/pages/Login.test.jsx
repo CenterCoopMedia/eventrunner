@@ -113,7 +113,11 @@ describe('emailed-code sign-in', () => {
     // home page renders (the login page's own "Sign in" h1 would otherwise
     // satisfy a generic `heading level 1` check even with no navigation at
     // all), and confirm the sign-in form itself is gone.
-    await screen.findByRole('region', { name: 'Event days' });
+    //
+    // The dates section is now titled by its own section head ("Dates")
+    // rather than carrying an aria-label, which is what the editorial
+    // restyle gave every section boundary (design brief §2.1).
+    await screen.findByRole('region', { name: 'Dates' });
     expect(
       screen.queryByRole('button', { name: 'Sign in' }),
     ).not.toBeInTheDocument();
