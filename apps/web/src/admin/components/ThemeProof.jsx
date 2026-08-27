@@ -51,8 +51,18 @@ export default function ThemeProof({ themeDoc, path, mode, identification }) {
 
   return (
     <div className="flex min-w-0 flex-col">
+      {/* What the frame is, for a reader who cannot see it. The frame itself
+          is inert: it holds a whole rendered page, landmarks and links
+          included, and letting that into the tab order or the landmark tree
+          would put a second copy of the site inside the admin's own. The
+          identification line below carries the same three facts visually. */}
+      <p className="sr-only">
+        A proof of the {identification}. It is a picture of the page, not a
+        working copy: nothing inside the frame can be reached by keyboard.
+      </p>
       <div
         ref={frameRef}
+        inert=""
         // The forme locked in a chase: a hairline frame on the room's
         // ground, held at true scale. No shadow, no rounded card, no
         // browser-window chrome pretending to be a device.
@@ -60,10 +70,10 @@ export default function ThemeProof({ themeDoc, path, mode, identification }) {
       >
         {/* React Router refuses a Router inside a Router, and rightly: two
             histories fighting over one URL is a bug everywhere else. Here it
-            is the point — the proof has its OWN history, so following a link
-            inside the frame moves the preview and never the admin. Clearing
-            the two contexts is what lets the frame start a router of its
-            own; nothing outside this element sees it. */}
+            is the point — the proof has its OWN history, so nothing it
+            renders can move the admin's location. Clearing the two contexts
+            is what lets the frame start a router of its own; nothing outside
+            this element sees it. */}
         <UNSAFE_RouteContext.Provider value={{ outlet: null, matches: [], isDataRoute: false }}>
           <UNSAFE_LocationContext.Provider value={null}>
             <MemoryRouter
