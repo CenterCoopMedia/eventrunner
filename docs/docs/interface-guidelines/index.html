@@ -103,12 +103,14 @@
             <p class="contents-title" id="contents-title">On this page</p>
             <ul>
               <li><a href="#how-this-connects-to-the-rest-of-the-repo">How this connects to the rest of the repo</a></li>
+              <li><a href="#editorial-devices">Editorial devices</a></li>
               <li><a href="#user-interface">User interface</a></li>
               <li><a href="#animation">Animation</a></li>
               <li><a href="#typography">Typography</a></li>
               <li><a href="#colors">Colors</a></li>
               <li><a href="#accessibility">Accessibility</a></li>
               <li><a href="#layout">Layout</a></li>
+              <li><a href="#rejected-patterns">Rejected patterns</a></li>
               <li><a href="#writing">Writing</a></li>
             </ul>
           </nav>
@@ -119,7 +121,30 @@
           <li><strong>Tokens come from <code>design/tokens/</code>.</strong> The design system&#39;s three tiers, the motif layer, and every scale live in JSON there (design brief §3.5). <code>scripts/lib/tokens.cjs</code> turns that JSON into the custom properties <code>apps/web/src/generated/theme.css</code> carries, and <code>tailwind.config.js</code> maps the utilities onto them. Change a token by editing the JSON and regenerating. Never hand-edit the generated stylesheet.</li>
           <li><strong>Accessibility is a merge requirement, not a nicety.</strong> CONTRIBUTING already requires a keyboard path and visible focus for UI changes; the Accessibility section below is the working checklist behind that line.</li>
           <li><strong>Event-neutrality applies to design too.</strong> No hardcoded brand color, font stack &quot;for this event,&quot; or copy that assumes one venue or city. If a design decision varies per client, it belongs in <code>config/theme</code> or CMS content.</li>
+          <li><strong>The design brief binds.</strong> <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-27-design-system-overhaul.md"><code>plans/2026-08-27-design-system-overhaul.md</code></a> is the design contract; this document is the standing rulebook that carries it into review. Where the two disagree, the brief wins and this document gets fixed in the same pull request.</li>
           </ul>
+          <h2 id="editorial-devices">Editorial devices<a class="heading-anchor" href="#editorial-devices" aria-label="Link to this section">#</a></h2>
+          <p>Typography and rules do the visual work. Color decorates very little, and shadow decorates nothing (design brief §2.1). Each device below has one job: use it where its job applies, and never as decoration. The shared implementations live in <code>apps/web/src/components/editorial/</code>, and each one resolves through its tier-3 token contract, so a preset retunes a device by remapping tokens rather than by changing a component.</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Device</th><th>Component</th><th>What it is</th><th>The rule</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Masthead nameplate</td><td><code>Nameplate</code></td><td>The rule-bounded title block: event name, dates, edition line.</td><td>Every public page carries one. Type and rules only — never a hero banner, never a photo behind the name. <code>full</code> opens the home page; <code>compact</code> runs as a header everywhere else.</td></tr>
+          <tr><td>Folio</td><td><code>Folio</code></td><td>A small-caps plain-text label sitting on a hairline rule.</td><td>Text plus rule. Never a chip, never a pill, never a colored badge. <strong>Never directly above a heading</strong> — see the eyebrow ban below.</td></tr>
+          <tr><td>Rule</td><td><code>Rule</code></td><td>A standalone hairline, strong, or nameplate rule.</td><td>A rule replaces a card border. A rule never carries brand color and reads only the <code>--rule-*</code> tokens. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node.</td></tr>
+          <tr><td>Section boundary</td><td><code>SectionHead</code></td><td>One strong rule, then the section heading with the folio beside it on a hairline.</td><td>Reach for this instead of composing a folio and a heading by hand. Its <code>folio</code> variant makes the folio itself the heading, which is what a schedule day head needs.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p><strong>The eyebrow ban is absolute.</strong> No text sits directly above a heading. Not an eyebrow label, not a chip, not a small line of description copy, and not a plain small-caps folio — a folio stacked above a headline is still an eyebrow, and a reviewer rejects it. The rule holds at every size, on every surface, in every preset. A folio lives beside a rule at a section boundary, in a margin, or in a running header. Where a label must sit near a title, put it below the title or beside it.</p>
+          <p>Two things are <strong>not</strong> eyebrows and must never be &quot;fixed&quot; to satisfy this rule:</p>
+          <ul>
+          <li>Metadata inside the rule-bounded nameplate block. The dates and the edition line are the nameplate device, wherever they sit inside it.</li>
+          <li>A form <code>&lt;label&gt;</code> above its own input. That is a control label.</li>
+          </ul>
+          <p>Cards, boxes, and chrome: a rule replaces a card border wherever a rule can do the job. Elevation is tint, not shadow — where a surface must sit above another, shift its tone with a low-opacity overlay of the theme&#39;s ink or accent.</p>
           <h2 id="user-interface">User interface<a class="heading-anchor" href="#user-interface" aria-label="Link to this section">#</a></h2>
           <ul>
           <li>Apply concentric border radius across nested elements (inner radius = outer radius − padding).</li>
@@ -127,6 +152,12 @@
           <li>Add a <code>1px</code> outline to images, offset by <code>-1px</code>: black at 8% opacity in light mode, white at 8% in dark mode.</li>
           </ul>
           <h2 id="animation">Animation<a class="heading-anchor" href="#animation" aria-label="Link to this section">#</a></h2>
+          <p>The system has two motion classes and there is no third (design brief §2.2).</p>
+          <ul>
+          <li><strong>Functional motion</strong> shows a state change: menus, filters, tabs, disclosure, toasts. Keep it between 120ms and 200ms, animate <code>transform</code> and <code>opacity</code> only, and use <code>ease-out</code>. The <code>duration-fast</code> / <code>duration-base</code> / <code>duration-slow</code> and <code>ease-motion</code> utilities map to the motion tokens.</li>
+          <li><strong>Expressive motion</strong> is one designed signature interaction per surface. The schedule grid holds that slot on the public site. It starts from a user action, finishes under 600ms, and stays readable at every frame.</li>
+          </ul>
+          <p>Both classes: never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support <code>prefers-reduced-motion</code> in full; the reduced state is truly static, and a shortened animation is not a fallback.</p>
           <ul>
           <li>Never <code>transition: all</code>; list the exact properties that change.</li>
           <li>Scale pressed buttons to 0.95–0.98 with <code>transition: scale 200ms ease-out</code>.</li>
@@ -189,6 +220,33 @@
           <li>Logical properties (<code>margin-inline-start</code>, <code>padding-inline-end</code>), not directional values.</li>
           <li>No fixed widths or heights on text containers.</li>
           </ul>
+          <h2 id="rejected-patterns">Rejected patterns<a class="heading-anchor" href="#rejected-patterns" aria-label="Link to this section">#</a></h2>
+          <p>The list the design brief settles in §2.4, recorded here so a review has one place to look. This is holistic guidance, not a checklist to game: a reviewer may reject a pattern this list does not name, and may accept a listed pattern only where the brief grants an exception.</p>
+          <ul>
+          <li><strong>Eyebrow furniture.</strong> Nothing sits directly above a heading. See Editorial devices above for the full rule and its two non-exceptions.</li>
+          <li><strong>Decorative gradients.</strong> No gradient blobs, no purple-heavy gradients, no gradient as a background event.</li>
+          <li><strong>Glassmorphism.</strong> No frosted panels, no blurred translucent overlays used as style.</li>
+          <li><strong>Zero-padded decorative numbers.</strong> No <code>01</code> / <code>02</code> / <code>03</code> motifs.</li>
+          <li><strong>Headline tricks.</strong> No italicized or underlined single word in a headline.</li>
+          <li><strong>Carousels.</strong> No sliding text carousels, no auto-advancing content.</li>
+          <li><strong>The tan-canvas look.</strong> No warm-tan canvas paired with an oversized primary action.</li>
+          <li><strong>Colored card edges.</strong> No arbitrary colored left edge on a card, button, or block. No decorative colored rule across the top of a card.</li>
+          <li><strong>Tiny low-contrast subtext.</strong> Body-adjacent text meets the contrast bar in both modes.</li>
+          <li><strong>Pulse dots.</strong> No glowing dots, no pulsing status dots.</li>
+          <li><strong>Fake 3D stacking.</strong> No box-behind-box layering, no pointless depth.</li>
+          <li><strong>Generic SaaS framing.</strong> No startup marketing voice, no self-justifying subheads, no insider-facing copy a visitor does not need.</li>
+          <li><strong>Pill-shaped everything.</strong> No fully rounded decoration across the interface.</li>
+          <li><strong>Default-typeface tells.</strong> Never ship Inter alone, Space Grotesk, or Geist Mono as the design default. Never use the stereotypical AI-site serif treatment.</li>
+          <li><strong>Dead calls to action.</strong> Every action has a stated workflow behind it.</li>
+          <li><strong>Sectionless scroll.</strong> Every page has named, meaningful sections.</li>
+          <li><strong>Pointless forms.</strong> No newsletter slot without a real purpose and a real backend.</li>
+          <li><strong>Inconsistent dark mode.</strong> A half-applied mode is a bug, not a polish item.</li>
+          <li><strong>Semantic color conflicts.</strong> Never use a color against its familiar meaning, and never use color alone for status.</li>
+          <li><strong>Corner errors.</strong> Never let a rounded-box stroke shrink at the corner — apply the concentric radius rule.</li>
+          <li><strong>Cursor and reveal effects.</strong> No oversized cursor animations, no reveal-on-scroll.</li>
+          <li><strong>Repetition.</strong> No verbose sections, no repeated promotional copy.</li>
+          </ul>
+          <p>The brief names exactly two exceptions, both narrow: a bento grid that passes all five tests in §2.4, and the Zine preset&#39;s off-register stamp. Nothing else gets one, and a preset may not grant itself one.</p>
           <h2 id="writing">Writing<a class="heading-anchor" href="#writing" aria-label="Link to this section">#</a></h2>
           <ul>
           <li>Button labels start with verbs: &quot;Save draft&quot;, &quot;Delete project&quot;.</li>
