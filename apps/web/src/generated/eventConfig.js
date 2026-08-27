@@ -103,13 +103,9 @@ export const features = {
 };
 
 export const theme = {
-  fonts: {
-    heading: 'sans-humanist',
-    body: 'sans-humanist',
-    data: 'sans-humanist',
-  },
+  fonts: {},
   texture: 'flat',
-  radius: 'sharp',
+  radius: 'small',
   mode: 'light',
   logos: {
     primary: 'branding/logo.svg',

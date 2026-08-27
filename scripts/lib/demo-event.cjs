@@ -29,43 +29,20 @@
 
 const { buildConfigDocs } = require('./answers.cjs');
 const { defaultPages, buildSeedContent } = require('./seed.cjs');
-const { rgbToHex } = require('./theme.cjs');
 const { buildPublicSpeaker } = require('shared/speaker');
+const { resolveLegacyColors } = require('shared/theme');
 
 /**
- * The demo event's own brand palette, overlaid on `defaultTheme()` (spec
- * §2.2, §7.2). RGB triples, converted to hex below — the same reason
- * `theme.cjs` does it (this comment mirrors that one): `scripts/**` is not
- * on the spec §7.6 hex-literal allowlist (eslint.config.mjs), so a color
- * value here has to arrive as numbers, not a `#rrggbb` string literal.
+ * The preset the demo event runs (design brief §4.2).
  *
- * An editorial, ink-on-neutral look: a deep blue-teal brand color, a cool
- * off-white surface (not the warm tan canvas the anti-pattern checklist in
- * #105 rejects), and semantic status colors unchanged in meaning from the
- * product default.
+ * The demo used to carry a hand-written blue-teal palette of its own. A
+ * preset replaces it: the fixture is a media summit for cooperative
+ * newsrooms, Newsroom modern is the story written for exactly that, and it
+ * brings a designed dark palette the hand-written one never had. Running
+ * the default preset also means the public demo shows what a client gets on
+ * a fresh deployment rather than a look only the demo has.
  */
-const DEMO_THEME_COLORS_RGB = Object.freeze({
-  brandPrimary: Object.freeze([21, 94, 117]),
-  brandPrimaryDark: Object.freeze([12, 66, 82]),
-  brandPrimaryLight: Object.freeze([79, 147, 166]),
-  brandAccent: Object.freeze([154, 52, 18]),
-  brandSurface: Object.freeze([247, 247, 245]),
-  brandSurfaceAlt: Object.freeze([236, 236, 234]),
-  brandInk: Object.freeze([22, 33, 44]),
-  brandInkMuted: Object.freeze([71, 82, 94]),
-  semanticSuccess: Object.freeze([22, 101, 52]),
-  semanticWarning: Object.freeze([180, 83, 9]),
-  semanticDanger: Object.freeze([185, 28, 28]),
-  semanticHighlight: Object.freeze([161, 98, 7]),
-  semanticKeynote: Object.freeze([109, 40, 217]),
-});
-
-/** @returns {object} `config/theme.colors` for the demo event, as hex strings */
-function demoThemeColors() {
-  const colors = {};
-  for (const [key, rgb] of Object.entries(DEMO_THEME_COLORS_RGB)) colors[key] = rgbToHex(rgb);
-  return colors;
-}
+const DEMO_PRESET_ID = 'newsroom';
 
 /** Fixed instant for every demo `seededAt`, so regeneration is stable. */
 const DEMO_SEEDED_AT = '2026-01-01T00:00:00.000Z';
@@ -126,20 +103,21 @@ const DEMO_ANSWERS = Object.freeze({
       organizerName: '[Demo] Harborlight Cooperative',
     },
   },
-  // Overlaid on `defaultTheme()` (spec §2.2, §7.2) — the demo event's own
-  // theme, distinct from the neutral product default every fresh
-  // deployment starts from. An editorial, single-family look: one
-  // workhorse sans (Source Sans 3) carries the heading, body, and data
-  // roles alike, a flat/sharp surface (no paper texture, no rounded-card
-  // treatment), and a palette built around an ink-blue brand color on a
-  // cool neutral surface — not the warm tan canvas the anti-pattern
-  // checklist (#105) rejects. `mode` is light, so the demo renders the
-  // same way it always has; the dark palette is still generated beside it.
+  // Overlaid on `defaultTheme()` (spec §2.2, §7.2). The demo runs a named
+  // preset rather than a bespoke palette: Newsroom modern is the story
+  // written for a publication that publishes every day, which is what the
+  // fixture is. Its cool newsprint ground is not the warm tan canvas the
+  // anti-pattern checklist (#105) rejects.
   theme: {
-    colors: demoThemeColors(),
-    fonts: { heading: 'sans-humanist', body: 'sans-humanist', data: 'sans-humanist' },
-    texture: 'flat',
-    radius: 'sharp',
+    preset: DEMO_PRESET_ID,
+    // `colors` is an OUTPUT for a preset document (design brief §5.2): the
+    // one shared resolver materializes it, exactly as updateTheme does on
+    // publish, so email and PDF have a palette to read. Writing a palette
+    // here by hand would be ignored on the way in and would only drift.
+    colors: resolveLegacyColors({ preset: DEMO_PRESET_ID }),
+    // The preset names the type map, the shape, and the motif default, so
+    // the fixture states none of them. `mode` is light, so the demo renders
+    // the same way it always has; the dark palette is generated beside it.
     mode: 'light',
   },
 });
