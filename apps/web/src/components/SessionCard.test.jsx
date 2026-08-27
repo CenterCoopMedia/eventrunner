@@ -520,3 +520,63 @@ describe('SessionCard', () => {
     });
   });
 });
+
+// Issue #113, closed by the editorial restyle (design brief §2.4, §5.1).
+//
+// Two rejected patterns leave the schedule here: the arbitrary colored left
+// edge on a keynote card, and the fully rounded pill. Both assertions are
+// written against the rendered class list on purpose — these are shape
+// rules, and a shape rule that no test can see is a shape rule that comes
+// back on the next restyle.
+describe('SessionCard shape rules, issue 113', () => {
+  const classesOf = (container) =>
+    [...container.querySelectorAll('*')].flatMap((node) => [...node.classList]);
+
+  it('gives a keynote no colored left edge', () => {
+    const { container } = renderCard();
+    const classes = classesOf(container);
+    expect(classes).not.toContain('border-s-4');
+    expect(classes).not.toContain('border-s-keynote');
+  });
+
+  it('names the keynote in words, so nothing depends on color alone', () => {
+    // §8.1: never signal status with color alone. The type is the word.
+    renderCard();
+    expect(screen.getByText('keynote')).toBeInTheDocument();
+  });
+
+  it('opens the row with a hairline instead of boxing it in a card', () => {
+    const { container } = renderCard();
+    const row = container.querySelector('li');
+    expect(row).toHaveClass('border-t-hairline', 'border-t-rule-hairline');
+    expect(row.querySelector('article').className).not.toContain('rounded-brand');
+  });
+
+  it('renders the type badge as a small rectangle, never a pill', () => {
+    const { container } = renderCard();
+    const badge = screen.getByText('keynote');
+    expect(badge.className).toContain('rounded-brand');
+    expect(badge.className).not.toContain('rounded-full');
+    expect(classesOf(container)).not.toContain('rounded-full');
+  });
+
+  it('keeps every session control off the pill shape too', () => {
+    const { container } = renderCard({
+      features: { sessionBookmarks: true, icsExport: true },
+      auth: { user: { uid: 'u1' } },
+      profile: { attendeeAccess: true },
+    });
+    expect(classesOf(container)).not.toContain('rounded-full');
+    expect(screen.getByRole('button', { name: /bookmark/i }).className).toContain(
+      'rounded-brand',
+    );
+  });
+
+  it('sets the time in the mono face, which carries tabular figures', () => {
+    // Interface guidelines, Typography: schedule columns read in tabular
+    // figures, and .font-mono is where index.css sets them.
+    const { container } = renderCard();
+    const time = container.querySelector('time');
+    expect(time.closest('p').className).toContain('font-mono');
+  });
+});

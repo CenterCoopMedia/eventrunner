@@ -167,7 +167,9 @@ export default function MySchedule() {
                   </>
                 ) : null}
               </h2>
-              <ul className="mt-4 grid gap-3">
+              {/* No gap between rows: each SessionCard opens with its own
+                  hairline, so the rules ARE the separation (brief §2.1). */}
+              <ul className="mt-sm">
                 {(myByDay.get(day.id) ?? []).map((session) => (
                   <SessionCard
                     key={session.id}

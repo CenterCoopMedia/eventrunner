@@ -69,7 +69,11 @@ export function useSessionSpeakerNames(speakerIds) {
  * speaker's name loses the preview the moment they land on the speaker
  * page.
  */
-export function SpeakerNames({ speakers, features = {}, className = 'mt-2 text-sm text-brand-ink-muted' }) {
+export function SpeakerNames({
+  speakers,
+  features = {},
+  className = 'mt-2xs font-data text-caption text-text-secondary',
+}) {
   const { search } = useLocation();
   if (!speakers || speakers.length === 0) return null;
   return (
@@ -90,6 +94,15 @@ export function SpeakerNames({ speakers, features = {}, className = 'mt-2 text-s
   );
 }
 
+/**
+ * The session type as a small ruled rectangle beside the title (issue #113).
+ *
+ * It is not a pill: the fully rounded shape is a rejected pattern (design
+ * brief §2.4), and the radius is now `--radius-base`, which the concentric
+ * radius rule keeps in step with everything else the theme draws (interface
+ * guidelines, User interface). Keynote emphasis is a flat tint plus the word
+ * itself — never a colored edge, and never color alone (§8.1).
+ */
 export function TypeBadge({ type }) {
   if (typeof type !== 'string' || !type) return null;
   // Session types are CMS vocabulary — presented, never interpreted, except
@@ -98,17 +111,20 @@ export function TypeBadge({ type }) {
   return (
     <span
       className={[
-        'inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize text-brand-ink',
-        isKeynote ? 'border-keynote/40 bg-keynote/15' : 'border-brand-ink/15 bg-brand-ink/5',
+        'inline-flex items-center whitespace-nowrap rounded-brand border-hairline px-2xs py-3xs font-data text-folio font-medium uppercase text-text-primary',
+        isKeynote ? 'border-keynote/40 bg-keynote/10' : 'border-rule-hairline bg-surface-alt',
       ].join(' ')}
+      style={{ letterSpacing: 'var(--text-folio-tracking)' }}
     >
       {type}
     </span>
   );
 }
 
-const pillClass =
-  'touch-target inline-flex items-center gap-1 rounded-full border border-brand-ink/15 px-3 py-1 text-sm text-brand-ink transition-colors hover:bg-brand-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
+// The feature-flag controls under a session. Rectangles on the theme radius,
+// not pills (brief §2.4): the same shape rule TypeBadge now follows.
+const actionClass =
+  'touch-target inline-flex items-center gap-1 rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-brand-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
 
 /**
  * Bookmark toggle pill (spec §9 "Bookmarks"). Feature-gated by
@@ -160,7 +176,7 @@ function BookmarkPill({ session, bookmarked }) {
 
   if (!user) {
     return (
-      <Link to="/signin" className={pillClass}>
+      <Link to="/signin" className={actionClass}>
         <span aria-hidden="true">☆</span> Sign in to bookmark
       </Link>
     );
@@ -169,7 +185,7 @@ function BookmarkPill({ session, bookmarked }) {
   if (!attendeeAccess) {
     return (
       <span
-        className={pillClass}
+        className={actionClass}
         aria-disabled="true"
         title="Bookmarking is available to approved attendees."
       >
@@ -181,7 +197,7 @@ function BookmarkPill({ session, bookmarked }) {
   return (
     <button
       type="button"
-      className={pillClass}
+      className={actionClass}
       onClick={onClick}
       disabled={pending}
       aria-pressed={isBookmarked}
@@ -209,16 +225,16 @@ function CalendarPill({ eventConfig, session }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1 text-sm text-brand-ink-muted">
       <span aria-hidden="true">Add to calendar:</span>
-      <button type="button" className={pillClass} onClick={onDownload}>
+      <button type="button" className={actionClass} onClick={onDownload}>
         .ics
       </button>
       {googleUrl ? (
-        <a href={googleUrl} target="_blank" rel="noreferrer" className={pillClass}>
+        <a href={googleUrl} target="_blank" rel="noreferrer" className={actionClass}>
           Google
         </a>
       ) : null}
       {outlookUrl ? (
-        <a href={outlookUrl} target="_blank" rel="noreferrer" className={pillClass}>
+        <a href={outlookUrl} target="_blank" rel="noreferrer" className={actionClass}>
           Outlook
         </a>
       ) : null}
@@ -230,7 +246,7 @@ function MaterialsPill({ session }) {
   const count = useSessionMaterialsCount(session);
   if (!count) return null;
   return (
-    <span className={pillClass}>
+    <span className={actionClass}>
       <span aria-hidden="true">📎</span> {count} {count === 1 ? 'material' : 'materials'}
     </span>
   );
@@ -318,7 +334,7 @@ function ReactionsPill({ session }) {
           // counts, nothing worth rendering when a reaction has zero.
           if (count === 0) return null;
           return (
-            <span key={emoji} className={pillClass} aria-hidden="false">
+            <span key={emoji} className={actionClass} aria-hidden="false">
               <span aria-hidden="true">{emoji}</span> {count}
             </span>
           );
@@ -327,7 +343,7 @@ function ReactionsPill({ session }) {
           <button
             key={emoji}
             type="button"
-            className={pillClass}
+            className={actionClass}
             onClick={() => onPick(emoji)}
             disabled={pending}
             aria-pressed={mine}
@@ -385,14 +401,14 @@ export default function SessionCard({
   const { search } = useLocation();
 
   return (
-    <li>
-      <article
-        className={[
-          'grid gap-2 rounded-brand border border-brand-ink/10 bg-brand-surface-alt p-4 sm:grid-cols-[9.5rem,1fr] sm:gap-4',
-          session.type === 'keynote' ? 'border-s-4 border-s-keynote' : '',
-        ].join(' ')}
-      >
-        <p className="text-sm text-brand-ink-muted">
+    // A ruled entry in a printed programme, not a card (design brief §2.1):
+    // a hairline opens the row, the time sits in the mono face as a true
+    // left-hand column with tabular figures, and the type is a word beside
+    // the title. Issue #113: the colored left edge is gone, and nothing
+    // replaces it — a rule does the dividing a card border used to.
+    <li className="border-t-hairline border-t-rule-hairline">
+      <article className="grid gap-2xs py-md sm:grid-cols-[9.5rem,1fr] sm:gap-md">
+        <p className="font-mono text-caption text-text-secondary">
           {range ? (
             <>
               <time dateTime={range.startIso}>{range.startLabel}</time>
@@ -408,8 +424,8 @@ export default function SessionCard({
           )}
         </p>
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold text-brand-ink">
+          <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
+            <h3 className="font-heading text-h3 font-semibold text-text-primary">
               {linkToDetail ? (
                 <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
                   {session.title}
@@ -421,15 +437,18 @@ export default function SessionCard({
             <TypeBadge type={session.type} />
           </div>
           {session.location ? (
-            <p className="mt-1 text-sm text-brand-ink-muted">{session.location}</p>
+            <p className="mt-2xs font-data text-caption text-text-secondary">{session.location}</p>
           ) : null}
           {session.description ? (
-            <p className="mt-2 max-w-prose text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+            <p
+              className="mt-xs max-w-prose text-body text-text-secondary"
+              style={{ textWrap: 'pretty' }}
+            >
               {session.description}
             </p>
           ) : null}
           <SpeakerNames speakers={speakerNames} features={features} />
-          <div className="mt-3">
+          <div className="mt-sm">
             <SessionPills
               session={session}
               eventConfig={eventConfig}
