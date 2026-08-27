@@ -1,14 +1,18 @@
-// The dialog shell the three media modals share.
+// The dialog shell the three media modals share (admin-only: MediaLibrary,
+// AssetModal, UploadModal, and ImagePicker all live here — design brief
+// §5.2, admin story part 2 "the cut file"). A public-facing photo field
+// (ProfilePhotoField, SpeakerPhotoField) never opens one of these; they stay
+// on ../../../components/media/AssetImage.jsx instead.
 //
 // Interface guidelines applied: the dialog is labelled by its own heading,
 // focus moves into it on open and returns to whatever opened it on close,
 // Escape closes, and the page behind it stops scrolling. No dependency: the
 // app has no dialog library and one modal shell does not justify adding one.
 //
-// Elevation (design brief §2.1, §2.4): the ink-tinted overlay (no blur) is
-// the scrim, and a strong-rule frame carries the panel — never a shadow.
-// "Shadow decorates nothing" is absolute; a modal is lifted by tint, not by
-// depth.
+// Elevation (admin story part 6, brief §5.2 open question 4): the scrim is a
+// tinted-ink overlay, never a blur, and a strong-rule frame carries the
+// panel — never a shadow. No `--admin-shadow-*` family exists; a modal is
+// lifted by tint and rule, not by depth.
 //
 // Escape closes ONE dialog — the topmost. These modals nest: ImagePicker
 // opens a library, and a tile inside it opens the asset detail dialog. With
@@ -17,6 +21,7 @@
 // only stepping out of. A module-level stack of open shells decides which
 // handler acts; the rest ignore the key.
 import { useEffect, useId, useRef } from 'react';
+import { secondaryButtonClass } from '../formControls.jsx';
 
 /** Open shells, oldest first. The last entry is the topmost dialog. */
 const openShells = [];
@@ -67,33 +72,29 @@ export default function ModalShell({ title, description = null, onClose, childre
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-brand-ink/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-admin-ink/40 p-md">
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
         tabIndex={-1}
-        className="my-8 w-full max-w-3xl rounded-brand-lg border-strong border-rule-strong bg-brand-surface p-6"
+        className="my-lg w-full max-w-3xl rounded-admin border-admin-strong border-admin-rule-strong bg-admin-ground-raised p-md font-admin-ui text-admin-ink"
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-sm">
           <div>
-            <h2 id={headingId} className="font-heading text-xl font-semibold text-brand-ink">
+            <h2 id={headingId} className="text-lead font-semibold text-admin-ink">
               {title}
             </h2>
             {description ? (
-              <p className="mt-1 text-sm text-brand-ink-muted">{description}</p>
+              <p className="mt-3xs text-caption text-admin-ink-secondary">{description}</p>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="touch-target rounded-brand px-3 py-2 text-brand-ink hover:bg-brand-surface-alt"
-          >
+          <button type="button" onClick={onClose} className={secondaryButtonClass}>
             Close
           </button>
         </div>
-        <div className="mt-4">{children}</div>
+        <div className="mt-sm">{children}</div>
       </div>
     </div>
   );

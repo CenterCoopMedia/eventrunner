@@ -1,4 +1,5 @@
 // Upload modal: pick a file, describe it, send it to `mediaUpload`.
+// Admin-only (design brief §5.2, admin story part 2 "the cut file").
 //
 // Alt text is asked for HERE, at the only moment the uploader is actually
 // looking at the image. It is not required — an asset with no description is
@@ -15,13 +16,13 @@ import {
   checkFile,
   formatBytes,
   typeLabel,
-} from '../../lib/mediaSource.js';
+} from '../../../lib/mediaSource.js';
 import {
   TextAreaField,
   TextField,
   primaryButtonClass,
   secondaryButtonClass,
-} from '../../admin/components/formControls.jsx';
+} from '../formControls.jsx';
 import ModalShell from './ModalShell.jsx';
 
 export default function UploadModal({ folder, onClose, onUploaded, upload }) {
@@ -63,9 +64,9 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
       description={`${accepted.map(typeLabel).join(', ')} · up to ${formatBytes(MEDIA_MAX_BYTES)} · stored in ${folder}/`}
       onClose={onClose}
     >
-      <form className="flex flex-col gap-4" onSubmit={submit}>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="media-upload-file" className="text-sm font-semibold text-brand-ink">
+      <form className="flex flex-col gap-sm" onSubmit={submit}>
+        <div className="flex flex-col gap-3xs">
+          <label htmlFor="media-upload-file" className="text-caption font-semibold text-admin-ink">
             File
           </label>
           <input
@@ -75,10 +76,10 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
             onChange={chooseFile}
             aria-invalid={error ? 'true' : undefined}
             aria-describedby={error ? 'media-upload-error' : undefined}
-            className="touch-target w-full rounded-brand border border-brand-ink/20 bg-brand-surface px-3 py-2 text-brand-ink"
+            className="admin-target w-full rounded-admin border-admin-hairline border-admin-rule-strong bg-admin-ground-input px-sm py-2xs font-admin-ui text-caption text-admin-ink"
           />
           {file ? (
-            <p className="text-sm text-brand-ink-muted">
+            <p className="font-admin-data text-folio text-admin-ink-data">
               {file.name} · {formatBytes(file.size)}
             </p>
           ) : null}
@@ -99,12 +100,12 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
         />
 
         {error ? (
-          <p id="media-upload-error" role="alert" className="text-sm text-danger">
+          <p id="media-upload-error" role="alert" className="text-caption text-admin-state-error">
             {error}
           </p>
         ) : null}
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-xs">
           <button type="submit" className={primaryButtonClass} disabled={busy}>
             {busy ? 'Uploading…' : 'Upload'}
           </button>

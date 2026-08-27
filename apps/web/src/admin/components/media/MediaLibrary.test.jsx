@@ -11,18 +11,18 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 const call = vi.fn();
 let assets;
 
-vi.mock('../../admin/adminApi.js', async () => {
-  const actual = await vi.importActual('../../admin/adminApi.js');
+vi.mock('../../adminApi.js', async () => {
+  const actual = await vi.importActual('../../adminApi.js');
   return { ...actual, useAdminApi: () => call };
 });
-vi.mock('../../admin/adminSource.js', () => ({
+vi.mock('../../adminSource.js', () => ({
   subscribeAdminCollection: (_name, onNext) => {
     onNext(assets);
     return () => {};
   },
 }));
-vi.mock('../../lib/mediaSource.js', async () => {
-  const actual = await vi.importActual('../../lib/mediaSource.js');
+vi.mock('../../../lib/mediaSource.js', async () => {
+  const actual = await vi.importActual('../../../lib/mediaSource.js');
   return {
     ...actual,
     // Only the file read is faked; assetUrl is a pure builder and runs for
@@ -33,7 +33,7 @@ vi.mock('../../lib/mediaSource.js', async () => {
 
 const { default: MediaLibrary } = await import('./MediaLibrary.jsx');
 const { default: ImagePicker } = await import('./ImagePicker.jsx');
-const { AdminApiError } = await import('../../admin/adminApi.js');
+const { AdminApiError } = await import('../../adminApi.js');
 
 const HERO = {
   id: 'asset-1',

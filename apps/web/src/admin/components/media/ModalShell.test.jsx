@@ -1,11 +1,11 @@
 // ModalShell — the dialog shell the three media modals share.
 //
-// Elevation (design brief §2.1, §2.4): a modal is lifted by an ink-tinted
-// scrim and a strong-rule frame, never a shadow. These assertions guard the
-// look (no shadow-lg, the strong-rule frame is on the panel) alongside the
-// behavior the shell is actually for (focus moves in on open, Escape
-// closes, focus returns to the opener on close) so a future restyle cannot
-// silently drop either.
+// Elevation (admin story part 6, brief §5.2 open question 4): a modal is
+// lifted by an ink-tinted scrim and a strong-rule frame, never a shadow.
+// These assertions guard the look (no shadow class, the strong-rule frame is
+// on the panel) alongside the behavior the shell is actually for (focus
+// moves in on open, Escape closes, focus returns to the opener on close) so
+// a future restyle cannot silently drop either.
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ModalShell from './ModalShell.jsx';
@@ -18,18 +18,18 @@ describe('ModalShell', () => {
       </ModalShell>,
     );
     const panel = screen.getByRole('dialog');
-    expect(panel).toHaveClass('border-strong', 'border-rule-strong');
+    expect(panel).toHaveClass('border-admin-strong', 'border-admin-rule-strong');
     expect(panel.className).not.toContain('shadow');
   });
 
-  it('tints the overlay with ink, with no blur', () => {
+  it('tints the overlay with the admin ink, with no blur', () => {
     const { container } = render(
       <ModalShell title="Upload a file" onClose={() => {}}>
         <p>Body</p>
       </ModalShell>,
     );
     const overlay = container.firstChild;
-    expect(overlay).toHaveClass('bg-brand-ink/40');
+    expect(overlay).toHaveClass('bg-admin-ink/40');
     expect(overlay.className).not.toMatch(/blur/);
   });
 

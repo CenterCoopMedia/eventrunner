@@ -64,7 +64,7 @@ import {
 import AdminPageHeader, { RecordState } from '../components/adminChrome.jsx';
 import { state } from '../recordState.js';
 import ThemeProof, { PROOF_PAGES } from '../components/ThemeProof.jsx';
-import ImagePicker from '../../components/media/ImagePicker.jsx';
+import ImagePicker from '../components/media/ImagePicker.jsx';
 
 const LOGO_SLOTS = ['primary', 'mark', 'footer', 'ogDefault', 'favicon'];
 
