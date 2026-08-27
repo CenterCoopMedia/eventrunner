@@ -149,9 +149,11 @@ describe('page list', () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages');
 
-    expect(screen.getByText('Live')).toBeInTheDocument();
-    expect(screen.getByText('Draft')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Live')).toBeInTheDocument();
+      expect(screen.getByText('Draft')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+    });
   });
 
   it('fails soft when a listener errors: rows stay, with a non-blocking notice', async () => {
@@ -159,15 +161,17 @@ describe('page list', () => {
     listenerError = new Error('permission denied');
     await renderAt('/admin/pages');
 
-    expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/lost the connection/i);
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent(/lost the connection/i);
+    });
   });
 
   it('marks a live page with a dirty draft as having unpublished changes', async () => {
     liveDocs = [{ ...SCHOLARSHIPS_DRAFT, status: undefined, revision: 2 }];
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages');
-    expect(screen.getByText('Live with unpublished changes')).toBeInTheDocument();
+    expect(await screen.findByText('Live with unpublished changes')).toBeInTheDocument();
   });
 
   it('publishes only the pages that have something to publish', async () => {
@@ -179,7 +183,7 @@ describe('page list', () => {
     fetch.mockResolvedValueOnce(okResponse({ queueId: 'q1', status: 'done' }));
     await renderAt('/admin/pages');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish all (1)' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsPublish$/);
@@ -243,7 +247,7 @@ describe('page editor', () => {
       .mockResolvedValueOnce(okResponse({ queueId: 'q1', status: 'done' }));
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(urlOf(0)).toMatch(/\/cmsSavePage$/);
@@ -256,7 +260,7 @@ describe('page editor', () => {
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
 
     const { page } = bodyOf(0);
@@ -290,7 +294,7 @@ describe('page editor', () => {
     );
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.change(screen.getByLabelText('Path'), { target: { value: 'scholarships' } });
+    fireEvent.change(await screen.findByLabelText('Path'), { target: { value: 'scholarships' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
@@ -312,7 +316,7 @@ describe('page editor', () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
 
-    const hint = screen.getByLabelText('Path').getAttribute('aria-describedby');
+    const hint = (await screen.findByLabelText('Path')).getAttribute('aria-describedby');
     const hintText = document.getElementById(hint.split(' ')[0]).textContent;
     for (const segment of RESERVED_PATH_SEGMENTS) {
       expect(hintText).toContain(segment);
@@ -331,7 +335,7 @@ describe('page editor', () => {
     );
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/schedule' } });
+    fireEvent.change(await screen.findByLabelText('Path'), { target: { value: '/schedule' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -346,8 +350,8 @@ describe('page editor', () => {
 
     // The server refuses this delete, so the room states the refusal in
     // words instead of offering a control that will be rejected.
+    expect(await screen.findByText(/cannot be deleted/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete this page' })).toBeNull();
-    expect(screen.getByText(/cannot be deleted/i)).toBeInTheDocument();
   });
 
   it('deletes a regular page through cmsDeletePage, after stating what is lost', async () => {
@@ -358,7 +362,7 @@ describe('page editor', () => {
     // Moment 3: the first press opens a still surface that names the cost;
     // the confirm button repeats the consequence rather than saying
     // "Confirm", and nothing is sent until it is pressed.
-    fireEvent.click(screen.getByRole('button', { name: 'Delete this page' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete this page' }));
     expect(screen.getByText(/The live page and its draft both go/)).toBeInTheDocument();
     expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
@@ -374,7 +378,7 @@ describe('page editor', () => {
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add block to section 1' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add block to section 1' }));
     fireEvent.change(screen.getByLabelText('Block 2 field — section 1'), {
       target: { value: 'closing' },
     });
@@ -394,15 +398,15 @@ describe('page editor', () => {
   // Layout variants and section slots (design brief §6.1, §6.2).
   // THE OPERATOR PICKS A TASK. The individual variants are still reachable,
   // behind a disclosure, for the page that genuinely needs to differ.
-  function openIndividualSettings() {
-    fireEvent.click(screen.getByRole('button', { name: 'Change the individual settings' }));
+  async function openIndividualSettings() {
+    fireEvent.click(await screen.findByRole('button', { name: 'Change the individual settings' }));
   }
 
   it('names six tasks and no design-system parts in the main editor', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
 
-    const template = screen.getByLabelText('Template');
+    const template = await screen.findByLabelText('Template');
     expect(within(template).getAllByRole('option').map((o) => o.textContent)).toEqual([
       'Standard page',
       'Feature first',
@@ -424,7 +428,7 @@ describe('page editor', () => {
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.change(screen.getByLabelText('Template'), { target: { value: 'long-read' } });
+    fireEvent.change(await screen.findByLabelText('Template'), { target: { value: 'long-read' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -441,9 +445,9 @@ describe('page editor', () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, template: 'standard', layout: { density: 'comfortable' } }];
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
-    expect(screen.getByLabelText('Template')).toHaveValue('standard');
+    expect(await screen.findByLabelText('Template')).toHaveValue('standard');
 
-    openIndividualSettings();
+    await openIndividualSettings();
     fireEvent.change(screen.getByLabelText('Arrangement'), { target: { value: 'grid' } });
     expect(screen.getByLabelText('Template')).toHaveValue('custom');
 
@@ -459,14 +463,14 @@ describe('page editor', () => {
     // values happen to match a template has not chosen that template.
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, layout: { density: 'loose', arrangement: 'list' } }];
     await renderAt('/admin/pages/scholarships');
-    expect(screen.getByLabelText('Template')).toHaveValue('custom');
+    expect(await screen.findByLabelText('Template')).toHaveValue('custom');
   });
 
   it('sends the individual settings the operator picked, and offers no headerless option', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
-    openIndividualSettings();
+    await openIndividualSettings();
 
     // Every public page keeps a nameplate: compact is the smallest header.
     const header = screen.getByLabelText('Header');
@@ -491,7 +495,7 @@ describe('page editor', () => {
   it('offers the site setting by name, and a page-level exception beside it', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
-    openIndividualSettings();
+    await openIndividualSettings();
 
     const nav = screen.getByLabelText('Navigation on this page');
     // A page that states nothing follows the site, and the option says what
@@ -508,7 +512,7 @@ describe('page editor', () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, template: 'long-read', layout: { density: 'loose' } }];
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
-    openIndividualSettings();
+    await openIndividualSettings();
 
     fireEvent.change(screen.getByLabelText('Navigation on this page'), {
       target: { value: 'side' },
@@ -528,7 +532,7 @@ describe('page editor', () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, layout: { navPlacement: 'side' } }];
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
-    openIndividualSettings();
+    await openIndividualSettings();
     expect(screen.getByLabelText('Navigation on this page')).toHaveValue('side');
 
     fireEvent.change(screen.getByLabelText('Navigation on this page'), { target: { value: '' } });
@@ -544,7 +548,7 @@ describe('page editor', () => {
   it('opens a stored layout on what the page says, not on the defaults', async () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, layout: { density: 'tight' } }];
     await renderAt('/admin/pages/scholarships');
-    openIndividualSettings();
+    await openIndividualSettings();
     expect(screen.getByLabelText('Density')).toHaveValue('tight');
     expect(screen.getByLabelText('Arrangement')).toHaveValue('list');
   });
@@ -557,7 +561,7 @@ describe('page editor', () => {
     // A section stored before this schema landed carries no slot; it reads
     // as main, which is where it has always rendered — and "after the main
     // feature" is what that position IS, in the operator's words.
-    const position = screen.getByLabelText('Section 1 position');
+    const position = await screen.findByLabelText('Section 1 position');
     expect(within(position).getAllByRole('option').map((o) => o.textContent)).toEqual([
       'Before the main feature',
       'After the main feature',
@@ -588,7 +592,7 @@ describe('page editor', () => {
     fetch.mockResolvedValueOnce(okResponse({ id: 'home', status: 'dirty' }));
     await renderAt('/admin/pages/home');
 
-    expect(screen.getByLabelText('Section 1 position')).toHaveValue('main');
+    expect(await screen.findByLabelText('Section 1 position')).toHaveValue('main');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).page.sections[0].slot).toBe('below');
@@ -597,6 +601,7 @@ describe('page editor', () => {
   it('hides the section position on a custom page, which has no core content', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
+    await screen.findByLabelText('Template');
     expect(screen.queryByLabelText('Section 1 position')).toBeNull();
   });
 
@@ -604,7 +609,7 @@ describe('page editor', () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
 
-    const picker = screen.getByLabelText('Block 1 type — section 1');
+    const picker = await screen.findByLabelText('Block 1 type — section 1');
     expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual(['Rich text']);
 
     // Widening the palette widens the picker — the registry drives both.
@@ -638,8 +643,10 @@ describe('publish results and recovery', () => {
     listenerError = new Error('permission denied');
     await renderAt('/admin/pages');
 
-    expect(screen.queryByRole('status', { name: 'Loading pages…' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('status', { name: 'Loading pages…' })).toBeNull();
+      expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+    });
   });
 
   it('does not claim success when cmsPublish skipped the page', async () => {
@@ -660,7 +667,7 @@ describe('publish results and recovery', () => {
       );
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
     // Both the inline status and the toast carry the verdict.
     expect(
@@ -690,7 +697,7 @@ describe('publish results and recovery', () => {
       );
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
     const resume = await screen.findByRole('button', { name: 'Resume publish' });
 
     fireEvent.click(resume);
@@ -740,7 +747,7 @@ describe('publish results and recovery', () => {
     );
     await renderAt('/admin/pages');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish all (1)' }));
     const alerts = await screen.findAllByRole('alert');
     expect(
       alerts.some((el) => /scholarships has no draft to publish/i.test(el.textContent)),
