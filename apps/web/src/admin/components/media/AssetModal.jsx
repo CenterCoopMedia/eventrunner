@@ -14,6 +14,8 @@ import { useEffect, useState } from 'react';
 import { formatBytes } from '../../../lib/mediaSource.js';
 import {
   DestructiveConfirm,
+  Notice,
+  SaveStatus,
   TextAreaField,
   TextField,
   primaryButtonClass,
@@ -140,12 +142,8 @@ export default function AssetModal({ asset, onClose, onChanged, scanUsage, updat
       <form className="mt-md flex flex-col gap-sm" onSubmit={save}>
         <TextAreaField label="Alt text" value={alt} onChange={setAlt} rows={2} />
         <TextField label="Title" value={title} onChange={setTitle} />
-        {status ? <p className="text-caption text-admin-state-ok">{status}</p> : null}
-        {error ? (
-          <p role="alert" className="text-caption text-admin-state-error">
-            {error}
-          </p>
-        ) : null}
+        {status ? <SaveStatus message={status} /> : null}
+        {error ? <Notice tone="error" message={error} /> : null}
         <div className="flex flex-wrap gap-xs">
           <button type="submit" className={primaryButtonClass} disabled={busy}>
             {busy ? 'Saving…' : 'Save description'}

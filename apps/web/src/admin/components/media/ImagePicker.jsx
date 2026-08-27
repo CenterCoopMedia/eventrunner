@@ -17,7 +17,7 @@
 // to click, and a picker that could not express them would be a downgrade
 // from the plain field it replaces.
 import { useId, useState } from 'react';
-import { fieldLabelClass, secondaryButtonClass } from '../formControls.jsx';
+import { FieldError, fieldHintClass, fieldLabelClass, secondaryButtonClass } from '../formControls.jsx';
 import AssetImage from '../../../components/media/AssetImage.jsx';
 import ModalShell from './ModalShell.jsx';
 import MediaLibrary from './MediaLibrary.jsx';
@@ -39,7 +39,7 @@ export default function ImagePicker({
         {label}
       </label>
       {hint ? (
-        <p id={`${id}-hint`} className="text-caption text-admin-ink-secondary">
+        <p id={`${id}-hint`} className={fieldHintClass}>
           {hint}
         </p>
       ) : null}
@@ -85,11 +85,7 @@ export default function ImagePicker({
         </div>
       </div>
 
-      {error ? (
-        <p id={`${id}-error`} className="text-caption text-admin-state-error">
-          {error}
-        </p>
-      ) : null}
+      <FieldError id={`${id}-error`} message={error} />
 
       {browsing ? (
         <ModalShell

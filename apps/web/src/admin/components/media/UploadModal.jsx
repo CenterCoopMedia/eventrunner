@@ -18,9 +18,11 @@ import {
   typeLabel,
 } from '../../../lib/mediaSource.js';
 import {
+  FieldError,
   TextAreaField,
   TextField,
   fieldLabelClass,
+  inputClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../formControls.jsx';
@@ -77,7 +79,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
             onChange={chooseFile}
             aria-invalid={error ? 'true' : undefined}
             aria-describedby={error ? 'media-upload-error' : undefined}
-            className="admin-target w-full rounded-admin border-admin-hairline border-admin-rule-strong bg-admin-ground-input px-sm py-2xs font-admin-ui text-caption text-admin-ink"
+            className={inputClass}
           />
           {file ? (
             <p className="font-admin-data text-folio text-admin-ink-data">
@@ -100,11 +102,10 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
           hint="A name for this file in the library."
         />
 
-        {error ? (
-          <p id="media-upload-error" role="alert" className="text-caption text-admin-state-error">
-            {error}
-          </p>
-        ) : null}
+        {/* The one thing on this surface that can be rejected, so it carries
+            the announcement a ServerErrorSummary would carry on a page with
+            several fields. */}
+        <FieldError id="media-upload-error" role="alert" message={error} />
 
         <div className="flex flex-wrap gap-xs">
           <button type="submit" className={primaryButtonClass} disabled={busy}>

@@ -22,7 +22,14 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '..', '..', '..', '..', '..');
 const ASSETS = path.join(REPO_ROOT, 'docs', 'demo', 'assets');
 
-/** Every class the preset devices draw with, including every modifier. */
+/**
+ * Every class the preset devices draw with, including every modifier.
+ *
+ * Every modifier, because a family that is only half listed is a family the
+ * next person can break in the half nobody checks: the session block was
+ * pinned down to `__title` while the masthead beside it was pinned at one
+ * class out of six.
+ */
 const DEVICE_CLASSES = [
   '.motif',
   '.motif--section-mark',
@@ -55,9 +62,17 @@ const DEVICE_CLASSES = [
   '.session-block__number',
   '.session-block__title',
   '.section-head',
+  '.section-rule',
   '.transfer-line',
   '.callout',
+  '.folio',
+  '.folio__rule',
+  '.nameplate',
+  '.nameplate--compact',
+  '.nameplate__name',
   '.nameplate__coordinate',
+  '.nameplate__coordinate--start',
+  '.nameplate__coordinate--end',
 ];
 
 describe('the built stylesheet', () => {

@@ -123,6 +123,15 @@ export const PREVIEW_VIEWPORTS = Object.freeze([
 /** How tall a frame is drawn, per width. A phone is drawn phone-shaped. */
 const VIEWPORT_HEIGHT = Object.freeze({ desktop: 576, mobile: 844 });
 
+/**
+ * The gutter between the two frames of the light-and-dark comparison, in
+ * pixels. It is `gap-xs` on the grid below, which is one --space-xs, and
+ * zoom-to-fit has to subtract the same measure it draws — a number here that
+ * does not match the class there scales the picture to a column that is not
+ * the column.
+ */
+const COMPARE_GUTTER = 8;
+
 /** How many sessions the dense-schedule fixture puts on one day. */
 const STRESS_SESSION_COUNT = 28;
 
@@ -314,7 +323,8 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
   }, []);
 
   const frameCount = compare ? 2 : 1;
-  const available = columnWidth > 0 ? (columnWidth - (compare ? 16 : 0)) / frameCount : 0;
+  const available =
+    columnWidth > 0 ? (columnWidth - (compare ? COMPARE_GUTTER : 0)) / frameCount : 0;
   const scale = fit && available > 0 ? Math.min(1, available / viewport.width) : 1;
 
   // The candidate lands on every frame on every change, and the overlay is

@@ -212,11 +212,18 @@ export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
  * own — and a second spelling of this markup is a second answer to "what
  * does a rejected field look like". Renders nothing without a message, so a
  * caller can pass one through unconditionally.
+ *
+ * `role` is normally left off: a form with several fields that fires several
+ * alerts at once is noise, which is why a rejected save is announced once,
+ * by ServerErrorSummary. A surface with ONE thing that can be rejected — the
+ * upload modal's file — has no summary to carry the announcement, so it asks
+ * for role="alert" here. The markup and the appearance stay the same either
+ * way, which is the whole point of this component.
  */
-export function FieldError({ id, message }) {
+export function FieldError({ id, message, role }) {
   if (!message) return null;
   return (
-    <p id={id} className="text-folio text-admin-state-error">
+    <p id={id} role={role} className="text-folio text-admin-state-error">
       <span aria-hidden="true" className="font-semibold">
         !{' '}
       </span>
