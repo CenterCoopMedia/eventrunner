@@ -141,6 +141,53 @@ describe('event settings', () => {
     expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
   });
 
+  // The event's concurrent tracks (design brief §4.6): a letter and a name,
+  // set here once, so a session names a line by its letter alone.
+  it('edits the track list and sends it with the event', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, tracks: [{ letter: 'A', name: 'Practice' }] });
+
+    expect(screen.getByLabelText('Track 1 letter')).toHaveValue('A');
+    expect(screen.getByLabelText('Track 1 name')).toHaveValue('Practice');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add track' }));
+    // A letter is sent as a capital, whatever case it was typed in.
+    fireEvent.change(screen.getByLabelText('Track 2 letter'), { target: { value: 'b' } });
+    fireEvent.change(screen.getByLabelText('Track 2 name'), {
+      target: { value: 'Sustainability' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.tracks).toEqual([
+      { letter: 'A', name: 'Practice' },
+      { letter: 'B', name: 'Sustainability' },
+    ]);
+  });
+
+  it('says plainly that an event with one room needs no tracks', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, tracks: [] });
+    expect(screen.getByText('No tracks configured yet.')).toBeInTheDocument();
+  });
+
+  it('marks the offending track when the server rejects a letter', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, tracks: [{ letter: 'A', name: 'Practice' }] });
+    fetch.mockResolvedValueOnce(
+      errorResponse(
+        400,
+        'bad-request',
+        'tracks[0].letter: must be a single capital letter A-Z, got "AA"',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Track 1 letter')).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('reflects a saved change from the config listener without a reload', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);

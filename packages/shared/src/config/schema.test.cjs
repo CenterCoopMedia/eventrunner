@@ -110,6 +110,44 @@ test('validateEventConfig rejects calendar dates Date.UTC would silently normali
   assert.equal(nonLeapDay.ok, false);
 });
 
+// Tracks: the event's concurrent lines (design brief §4.6).
+
+test('validateEventConfig accepts an event with no tracks, and one with tracks', () => {
+  assert.equal(validateEventConfig(VALID_EVENT).ok, true);
+  const withTracks = validateEventConfig({
+    ...VALID_EVENT,
+    tracks: [{ letter: 'A', name: 'Practice' }, { letter: 'B', name: 'Sustainability' }],
+  });
+  assert.deepEqual(withTracks, { ok: true, errors: [] });
+});
+
+test('validateEventConfig names every problem with a track', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    tracks: [
+      { letter: 'AB', name: 'Two letters' },
+      { letter: 'a', name: 'Lowercase' },
+      { letter: 'B', name: '   ' },
+      { letter: 'C', name: 'Fine', colour: 'red' },
+      { letter: 'C', name: 'Duplicate letter' },
+      'not an object',
+    ],
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.startsWith('tracks[0].letter:')));
+  assert.ok(result.errors.some((e) => e.startsWith('tracks[1].letter:')));
+  assert.ok(result.errors.some((e) => e === 'tracks[2].name: must be a nonempty string'));
+  assert.ok(result.errors.some((e) => e === 'tracks[3].colour: unknown track field'));
+  assert.ok(result.errors.some((e) => e.includes('duplicate track letter "C"')));
+  assert.ok(result.errors.some((e) => e === 'tracks[5]: must be an object'));
+});
+
+test('validateEventConfig rejects a tracks value that is not an array', () => {
+  const result = validateEventConfig({ ...VALID_EVENT, tracks: { A: 'Practice' } });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.includes('tracks: must be an array'));
+});
+
 test('validateEventConfig: tagline must be a string when present, but is optional', () => {
   assert.equal(validateEventConfig({ ...VALID_EVENT, tagline: 'A gathering' }).ok, true);
   assert.equal(validateEventConfig({ ...VALID_EVENT, tagline: undefined }).ok, true);

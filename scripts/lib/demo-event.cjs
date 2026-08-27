@@ -74,6 +74,13 @@ const DEMO_ANSWERS = Object.freeze({
       { id: 'day-2', label: 'Day two', date: '2026-10-15', startTime: '09:00', endTime: '17:00' },
       { id: 'day-3', label: 'Day three', date: '2026-10-16', startTime: '09:00', endTime: '16:00' },
     ],
+    // Two concurrent lines (design brief §4.6). The demo runs them so the
+    // schedule has a real second axis to draw, and so an operator can see
+    // what a track list is before configuring their own.
+    tracks: [
+      { letter: 'A', name: 'Practice' },
+      { letter: 'B', name: 'Sustainability' },
+    ],
     registration: {
       opensAt: '2026-06-01T09:00:00',
       closesAt: '2026-10-09T23:59:00',
@@ -255,6 +262,7 @@ const DEMO_SESSIONS = Object.freeze([
       'bylines.',
     location: 'Room A',
     type: 'workshop',
+    track: 'A',
     speakerIds: ['speaker-placeholder-2'],
     visible: true,
     order: 1,
@@ -287,9 +295,49 @@ const DEMO_SESSIONS = Object.freeze([
       'research team.',
     location: 'Room B',
     type: 'workshop',
+    track: 'B',
     speakerIds: ['speaker-placeholder-2'],
     visible: true,
     order: 1,
+    seeded: true,
+  },
+  {
+    // Concurrent with the workshop above, on the other line — the demo
+    // schedule has a real second axis for the grid to draw.
+    id: 'session-workshop-money',
+    dayId: 'day-2',
+    startTime: '13:30',
+    endTime: '15:00',
+    title: 'Workshop: budgets that survive a thin year',
+    description:
+      'Building a newsroom budget that bends instead of breaking when one grant does not ' +
+      'renew.',
+    location: 'Room A',
+    type: 'workshop',
+    track: 'A',
+    speakerIds: ['speaker-placeholder-1'],
+    visible: true,
+    order: 1,
+    seeded: true,
+  },
+  {
+    // A child session: one calling point inside the workshop above. It
+    // inherits its parent's day, and it runs on its parent's line.
+    id: 'session-workshop-b-clinic',
+    dayId: 'day-2',
+    startTime: '14:00',
+    endTime: '15:00',
+    title: 'Clinic: bring your survey questions',
+    description:
+      'The second half of the audience workshop splits into small groups — bring a draft ' +
+      'survey and leave with it rewritten.',
+    location: 'Room B',
+    type: 'workshop',
+    track: 'B',
+    parentId: 'session-workshop-b',
+    speakerIds: ['speaker-placeholder-2'],
+    visible: true,
+    order: 2,
     seeded: true,
   },
   {

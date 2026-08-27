@@ -34,6 +34,7 @@ const {
   internals: storeInternals,
 } = require('./store.cjs');
 const { validateSpeakerReferences } = require('../speakers/references.cjs');
+const { validateSessionStructure } = require('../schedule/sessions.cjs');
 const { deleteMaterialsForSession } = require('../materials/store.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -183,6 +184,24 @@ async function checkSpeakerReferences({ db, tx = null, collection, fields }) {
 }
 
 /**
+ * The session structure seam (design brief §4.6): `track` and `parentId`.
+ *
+ * Same shape as the speaker seam beside it, and for the same reasons — the
+ * check runs over the RESULT of the merge (a session whose stored draft
+ * already names a missing parent must not be quietly re-saved with the
+ * dangling reference intact), and it reads inside the write transaction, so
+ * a parent deleted or re-parented mid-save aborts this write rather than
+ * slipping past a check that has already run.
+ *
+ * @param {{ db: object, tx?: object, collection: string, docId: string, fields: object }} args
+ * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
+ */
+async function checkSessionStructure({ db, tx = null, collection, docId, fields }) {
+  if (collection !== 'cmsSchedule') return { ok: true };
+  return validateSessionStructure({ db, tx, docId, fields });
+}
+
+/**
  * Block-shape contracts at the content-write seam (design brief §2.1.1).
  *
  * These generic endpoints deliberately validate no block shape — the
@@ -281,6 +300,15 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
         const contract = checkBlockContract({ collection, fields: references.fields });
         if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
 
+        const structure = await checkSessionStructure({
+          db,
+          tx,
+          collection,
+          docId,
+          fields: references.fields,
+        });
+        if (!structure.ok) throw new RequestError(400, 'bad-request', structure.message);
+
         const written = await writeDraft({
           db,
           tx,
@@ -358,6 +386,15 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
 
         const contract = checkBlockContract({ collection, fields: references.fields });
         if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
+
+        const structure = await checkSessionStructure({
+          db,
+          tx,
+          collection,
+          docId,
+          fields: references.fields,
+        });
+        if (!structure.ok) throw new RequestError(400, 'bad-request', structure.message);
 
         const written = await writeDraft({
           db,
@@ -504,6 +541,8 @@ module.exports = {
     resolveTarget,
     validateFields,
     checkSpeakerReferences,
+    checkSessionStructure,
+    checkBlockContract,
     isValidDocId,
     SECTION_FIELD_RE,
     GENERIC_COLLECTIONS,

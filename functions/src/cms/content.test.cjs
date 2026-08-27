@@ -762,3 +762,74 @@ test('the contract binds stat blocks only, and cmsContent only', async () => {
   );
   assert.equal(session.statusCode, 200);
 });
+
+// --- the session structure seam (design brief §4.6) -------------------------
+
+test('a session save validates its track letter, naming the field', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-1', fields: { dayId: 'day-1', track: 'Line A' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^track: /);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-1'), undefined);
+});
+
+test('a session save rejects a parent that does not exist, naming the id', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-1', fields: { dayId: 'day-1', parentId: 'session-ghost' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /no session exists with id "session-ghost"/);
+});
+
+test('a session save accepts a track and a parent on the same day', async () => {
+  const db = makeFakeDb({ 'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop' } });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        collection: 'cmsSchedule',
+        docId: 'session-child',
+        fields: { dayId: 'day-2', title: 'Clinic', track: 'B', parentId: 'session-parent' },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  const draft = db.read('cmsSchedule_drafts', 'session-child');
+  assert.equal(draft.track, 'B');
+  assert.equal(draft.parentId, 'session-parent');
+});
+
+test('an update is judged on the MERGED session, not the payload alone', async () => {
+  // The stored draft already names the parent; this edit only moves the day.
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { dayId: 'day-2' },
+    'cmsSchedule_drafts/session-child': { dayId: 'day-2', parentId: 'session-parent' },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-child', fields: { dayId: 'day-3' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /a child session\s+runs on its parent's day|child session/);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-child').dayId, 'day-2');
+});
+
+test('the session seam leaves every other collection alone', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  // `track` and `parentId` are ordinary content anywhere but a session.
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'blurb', fields: { blockType: 'text', value: 'x', track: 'Line A', parentId: 'nope' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+});

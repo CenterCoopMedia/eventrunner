@@ -544,6 +544,27 @@ test('unknown top-level config/event keys are rejected by name', async () => {
   assert.equal(deps.db.writes.length, 0);
 });
 
+// The event's concurrent tracks (design brief §4.6) are an operator's to
+// set, and the shared validator is what judges them.
+test('tracks are editable on config/event, and a bad letter is rejected by name', async () => {
+  const deps = makeDeps({ 'config/event': validEvent() });
+  const ok = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { tracks: [{ letter: 'A', name: 'Practice' }] } }),
+    ok,
+  );
+  assert.equal(ok.statusCode, 200);
+  assert.deepEqual(deps.db.docs.get('config/event').tracks, [{ letter: 'A', name: 'Practice' }]);
+
+  const bad = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { tracks: [{ letter: 'AA', name: 'Two letters' }] } }),
+    bad,
+  );
+  assert.equal(bad.statusCode, 400);
+  assert.match(bad.body.error.message, /tracks\[0\]\.letter: must be a single capital letter/);
+});
+
 test('a first event write defaults the verification pair, never omits it', async () => {
   const deps = makeDeps();
   const res = makeRes();

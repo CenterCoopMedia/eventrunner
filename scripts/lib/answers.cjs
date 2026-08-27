@@ -266,6 +266,9 @@ function buildEvent({ answers, tierA }) {
     tagline: orDefault(src.tagline, ''),
     timezone: orDefault(src.timezone, 'UTC'),
     days: Array.isArray(src.days) ? src.days : [],
+    // The event's concurrent tracks (design brief §4.6). Empty on a fresh
+    // deployment: an event runs no lines until an operator says it does.
+    tracks: Array.isArray(src.tracks) ? src.tracks : [],
     registration: {
       opensAt: orDefault(registration.opensAt, null),
       closesAt: orDefault(registration.closesAt, null),

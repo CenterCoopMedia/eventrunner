@@ -28,6 +28,7 @@ import {
 import AdminPageHeader from '../components/adminChrome.jsx';
 
 const blankDay = () => ({ id: '', label: '', date: '', startTime: '', endTime: '' });
+const blankTrack = () => ({ letter: '', name: '' });
 
 /** Editable slice of config/event, normalized for controlled inputs. */
 function toForm(eventConfig) {
@@ -51,6 +52,9 @@ function toForm(eventConfig) {
           startTime: day?.startTime ?? '',
           endTime: day?.endTime ?? '',
         }))
+      : [],
+    tracks: Array.isArray(c.tracks)
+      ? c.tracks.map((track) => ({ letter: track?.letter ?? '', name: track?.name ?? '' }))
       : [],
     venue: {
       name: venue.name ?? '',
@@ -104,6 +108,13 @@ function toPayload(form) {
       date: day.date,
       startTime: day.startTime,
       endTime: day.endTime,
+    })),
+    // A letter is a wayfinding mark, so it is always sent as a capital —
+    // the server accepts A-Z only, and an operator should not have to know
+    // that to type one.
+    tracks: form.tracks.map((track) => ({
+      letter: String(track.letter ?? '').trim().toUpperCase(),
+      name: track.name,
     })),
     venue: {
       name: orNull(form.venue.name),
@@ -183,6 +194,11 @@ export default function AdminEventSettings() {
     setForm((current) => ({
       ...current,
       days: current.days.map((day, i) => (i === index ? { ...day, ...patch } : day)),
+    }));
+  const setTrack = (index, patch) =>
+    setForm((current) => ({
+      ...current,
+      tracks: current.tracks.map((track, i) => (i === index ? { ...track, ...patch } : track)),
     }));
 
   async function submit(event) {
@@ -313,6 +329,60 @@ export default function AdminEventSettings() {
                   }
                 >
                   Remove day {index + 1}
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Panel>
+
+      <Panel
+        title="Tracks"
+        description="Sessions that run at the same time, on separate lines. Each line has a letter and a name, and the schedule shows both. Leave this empty if everything happens in one room."
+        actions={
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={() => setForm((c) => ({ ...c, tracks: [...c.tracks, blankTrack()] }))}
+          >
+            Add track
+          </button>
+        }
+      >
+        {form.tracks.length === 0 ? (
+          <p className="text-caption text-admin-ink-secondary">No tracks configured yet.</p>
+        ) : (
+          <ol className="flex flex-col">
+            {form.tracks.map((track, index) => (
+              <li
+                key={index}
+                className="border-admin-rule-hairline border-t-admin-hairline pt-sm mt-sm first:border-t-0 first:pt-0 first:mt-0"
+              >
+                <div className="grid gap-sm sm:grid-cols-2">
+                  <TextField
+                    label={`Track ${index + 1} letter`}
+                    value={track.letter}
+                    onChange={(value) => setTrack(index, { letter: value })}
+                    error={errorFor(`tracks[${index}].letter`)}
+                    maxLength={1}
+                    hint="One letter, A to Z. It is how a reader tells the lines apart."
+                  />
+                  <TextField
+                    label={`Track ${index + 1} name`}
+                    value={track.name}
+                    onChange={(value) => setTrack(index, { name: value })}
+                    error={errorFor(`tracks[${index}].name`)}
+                    hint="Shown beside the letter, e.g. Practice."
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={`${dangerButtonClass} mt-sm`}
+                  onClick={() =>
+                    setForm((c) => ({ ...c, tracks: c.tracks.filter((_, i) => i !== index) }))
+                  }
+                >
+                  Remove track {index + 1}
                 </button>
               </li>
             ))}

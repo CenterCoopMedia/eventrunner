@@ -28,6 +28,15 @@ const {
 } = require('../theme.cjs');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/**
+ * A track letter: one capital, A to Z (design brief §4.6, "lines, lettered
+ * A, B, C"). One character because the letter is a wayfinding mark that has
+ * to read at a glance inside a route shape, and 26 is more concurrent tracks
+ * than any event this platform serves will run.
+ */
+const TRACK_LETTER_RE = /^[A-Z]$/;
+/** Keys a `config/event.tracks[]` entry may carry. */
+const TRACK_KEYS = Object.freeze(['letter', 'name']);
 const HHMM_RE = /^\d{2}:\d{2}$/;
 const NAIVE_ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -147,6 +156,43 @@ function validateEventConfig(event) {
       if (prevDateOk && curDateOk && prev.date >= cur.date) {
         errors.push(`days[${i}].date: dates must be strictly ascending ("${cur.date}" is not after "${prev.date}")`);
       }
+    }
+  }
+
+  // The event's concurrent tracks (design brief §4.6). Optional: an event
+  // with one room runs no tracks, and every deployment made before this
+  // field existed carries none. A session names a track by its LETTER
+  // (cmsSchedule.track); the name lives here once, so renaming a track is
+  // one edit rather than a sweep of every session.
+  //
+  // Array order is the order the schedule grid puts the columns in.
+  if (event.tracks != null) {
+    if (!Array.isArray(event.tracks)) {
+      errors.push('tracks: must be an array');
+    } else {
+      const seenLetters = new Set();
+      event.tracks.forEach((track, i) => {
+        const at = `tracks[${i}]`;
+        if (!track || typeof track !== 'object' || Array.isArray(track)) {
+          errors.push(`${at}: must be an object`);
+          return;
+        }
+        for (const key of Object.keys(track)) {
+          if (!TRACK_KEYS.includes(key)) errors.push(`${at}.${key}: unknown track field`);
+        }
+        if (typeof track.letter !== 'string' || !TRACK_LETTER_RE.test(track.letter)) {
+          errors.push(`${at}.letter: must be a single capital letter A-Z, got ${JSON.stringify(track.letter)}`);
+        } else if (seenLetters.has(track.letter)) {
+          errors.push(`${at}.letter: duplicate track letter "${track.letter}"`);
+        } else {
+          seenLetters.add(track.letter);
+        }
+        // A line is told apart by its letter AND its name (brief §4.6), so
+        // an unnamed track is not a track.
+        if (!isNonEmptyString(track.name)) {
+          errors.push(`${at}.name: must be a nonempty string`);
+        }
+      });
     }
   }
 
@@ -507,4 +553,5 @@ module.exports = {
   validateBadgesConfig,
   validateFeatures,
   KNOWN_FEATURE_KEYS,
+  TRACK_LETTER_RE,
 };

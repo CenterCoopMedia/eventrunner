@@ -35,6 +35,16 @@ export const eventConfig = {
       endTime: '16:00',
     },
   ],
+  tracks: [
+    {
+      letter: 'A',
+      name: 'Practice',
+    },
+    {
+      letter: 'B',
+      name: 'Sustainability',
+    },
+  ],
   registration: {
     opensAt: '2026-06-01T09:00:00',
     closesAt: '2026-10-09T23:59:00',

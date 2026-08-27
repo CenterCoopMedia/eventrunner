@@ -88,6 +88,7 @@ const EVENT_EDITABLE_KEYS = Object.freeze([
   'tagline',
   'timezone',
   'days',
+  'tracks',
   'registration',
   'venue',
   'sender',
