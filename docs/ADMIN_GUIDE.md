@@ -15,12 +15,28 @@ Every `cmsPages` document (About, Travel, Conduct, and anything else seeded or a
 publish state visible in the list: **Never published** (draft only), **Unpublished changes** (a
 published page with a dirty draft), or fully published. Create, edit, and publish from here.
 
+Each page also sets its own **layout**: the header (full or compact nameplate — a page always has
+one), whether it arranges its items as a grid or a list, how much space sits between things, and
+whether navigation runs across the top or down the side. A page that has never been given a layout
+renders the defaults, so nothing changes until you change it.
+
+A **system page** — home, schedule, speakers, sponsors — keeps its built-in content and lets you
+put sections around it. Each section on one of those pages picks a position: above the main
+content, with it, or below it. Custom pages have no built-in content, so they have no position to
+pick.
+
 ## Content (Pages → Content editor)
 
 Filling in what a page's blocks actually say is a separate step from shaping the page: pick a
 page, then a section, then the block inside it. A page's *structure* — its sections, which block
 types each allows, default blocks — is set in the page editor above; this tree of screens is for
 the block *content* itself. Every one of the eight CMS block types is editable here.
+
+**A statistic needs four things**, and the editor will not save one without them: the finding in
+words ("Two thirds of sessions are workshops", not "Session types"), what the number counts and
+over what period, where the number came from and the date you read it, and a line describing the
+finding for a screen reader. A stat block saved before this rule existed keeps working; the next
+time you edit one, you will be asked to fill the four parts in.
 
 ## Media
 
@@ -128,6 +144,12 @@ The `config/event` fields an admin owns: name, dates, timezone, venue, sender ad
 of the event's identity fields. This is a merge-then-validate write — the form only needs to send
 the keys it's actually changing; fields it doesn't touch (like the legal postal address or SEO
 metadata) are left alone.
+
+**Tracks** live here too: the lines your event runs when sessions happen at the same time in
+different rooms. Each track has a letter (A to Z) and a name, and the schedule shows both — a
+reader tells two lines apart by the letter and the name, never by colour alone. Sessions point at a
+track by its letter, so renaming a track is one edit here rather than a change to every session.
+Leave the list empty if everything happens in one room.
 
 ### Features
 

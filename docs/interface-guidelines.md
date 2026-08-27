@@ -20,6 +20,9 @@ Typography and rules do the visual work. Color decorates very little, and shadow
 | Folio | `Folio` | A small-caps plain-text label sitting on a hairline rule. | Text plus rule. Never a chip, never a pill, never a colored badge. **Never directly above a heading** — see the eyebrow ban below. |
 | Rule | `Rule` | A standalone hairline, strong, or nameplate rule. | A rule replaces a card border. A rule never carries brand color and reads only the `--rule-*` tokens. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node. |
 | Section boundary | `SectionHead` | One strong rule, then the section heading with the folio beside it on a hairline. | Reach for this instead of composing a folio and a heading by hand. Its `folio` variant makes the folio itself the heading, which is what a schedule day head needs. |
+| Stat and chart anatomy | `StatBlock` | A number the site presents as evidence. | Four parts, and all four are required (design brief §2.1.1). A large number with a small caption under it is not a stat block. |
+
+**Every stat carries four parts, and the write path enforces it.** A stat block states the finding in words (`takeaway`), says what the number counts and over what period (`description`), names where the number came from and the date it was read (`source`), and describes the finding for a screen reader (`alt`). The block editor asks for all four and refuses to save without them, and `cmsCreateContent` / `cmsUpdateContent` reject a stat block that misses one, naming the part. A block already stored in the older `{ value, label }` shape keeps rendering and keeps publishing — what stops is writing one that way.
 
 **The eyebrow ban is absolute.** No text sits directly above a heading. Not an eyebrow label, not a chip, not a small line of description copy, and not a plain small-caps folio — a folio stacked above a headline is still an eyebrow, and a reviewer rejects it. The rule holds at every size, on every surface, in every preset. A folio lives beside a rule at a section boundary, in a margin, or in a running header. Where a label must sit near a title, put it below the title or beside it.
 
@@ -123,6 +126,8 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 - The gap between groups is at least twice the gap inside one: 8px within, 16px+ between. Use the named spacing steps (`--space-3xs` through `--space-3xl`), which are built to that rule: `xs` pairs with `md`, `sm` with `lg`, `md` with `xl`.
 - Logical properties (`margin-inline-start`, `padding-inline-end`), not directional values.
 - No fixed widths or heights on text containers.
+- A system page states its own shape in `cmsPages.layout`: `header` (`nameplate` or `nameplate-compact` — there is no headerless page), `arrangement`, `density`, and `navPlacement`. A page that states none renders the defaults, and nothing migrates.
+- Sections carry a `slot`. The order down a system page is nameplate, `above` sections, the page's own core content, `main` sections, `below` sections. A section with no slot is `main`, which is where it has always rendered. A custom page has no core content, so it ignores the slot.
 
 ## Rejected patterns
 
