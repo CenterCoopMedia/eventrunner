@@ -169,7 +169,9 @@ test('every preset gets a block per mode, and none introduces a property name', 
   );
   for (const id of THEME_PRESET_IDS) {
     for (const mode of ['light', 'dark']) {
-      const block = new RegExp(`:root\\[data-theme='${id}'\\]\\[data-mode='${mode}'\\] \\{([^}]*)\\}`);
+      const block = new RegExp(
+        `\\[data-theme='${id}'\\]\\[data-mode='${mode}'\\] \\{([^}]*)\\}`,
+      );
       const found = css.match(block);
       assert.ok(found, `${id} has a ${mode} block`);
       const names = [...found[1].matchAll(/(--[\w-]+):/g)].map((m) => m[1]);
@@ -181,15 +183,37 @@ test('every preset gets a block per mode, and none introduces a property name', 
   }
 });
 
+test('every palette block matches a scoped element as well as :root', () => {
+  // The admin's live-preview frame renders the client's real pages inside a
+  // hairline chase on the admin ground (brief §5.2). It carries data-theme,
+  // data-mode, and data-motif-set itself, so each palette block has to match
+  // an element that is not the root — otherwise the frame would inherit the
+  // room's values and the preview would be a lie. The admin blocks stay
+  // root-only, which is what keeps "emitted once per mode" narrow.
+  const css = buildTokenCss(THEME);
+  for (const attributes of [
+    "[data-mode='light']",
+    "[data-mode='dark']",
+    "[data-theme='zine'][data-mode='dark']",
+    "[data-motif-set='botanical']",
+  ]) {
+    const escaped = attributes.replace(/[[\]]/g, '\\$&');
+    assert.match(css, new RegExp(`:root${escaped},\n${escaped} \\{`), `${attributes} is scoped`);
+  }
+  const adminBlock = css.match(/Admin identity — dark[^{]*\{/);
+  assert.ok(adminBlock, 'the admin dark block exists');
+  assert.match(adminBlock[0], /:root\[data-mode='dark'\] \{/);
+});
+
 test("the active preset's block carries this deployment's overrides", () => {
   // A [data-theme][data-mode] block outranks the attribute-free baselines,
   // so the active pair has to carry the same resolved palette they do.
   const override = `#${'123456'}`;
   const css = buildTokenCss({ preset: 'civic', tokens: { light: { surface: override } } });
-  const active = css.match(/:root\[data-theme='civic'\]\[data-mode='light'\] \{([^}]*)\}/);
+  const active = css.match(/\[data-theme='civic'\]\[data-mode='light'\] \{([^}]*)\}/);
   assert.match(active[1], /--brand-surface-rgb: 18 52 86;/);
   // A preset that is not active keeps its own designed palette.
-  const other = css.match(/:root\[data-theme='atlas'\]\[data-mode='light'\] \{([^}]*)\}/);
+  const other = css.match(/\[data-theme='atlas'\]\[data-mode='light'\] \{([^}]*)\}/);
   assert.match(
     other[1],
     new RegExp(`--brand-surface-rgb: ${getPreset('atlas').palette.light.surface.join(' ')};`),
@@ -301,7 +325,7 @@ test('every motif set gets a slot-resolution block, and its assets exist', () =>
   const { motifs } = loadTokens();
   assert.deepEqual(Object.keys(motifs.sets).sort(), [...THEME_MOTIF_SET_IDS].sort());
   for (const [setId, set] of Object.entries(motifs.sets)) {
-    const block = css.match(new RegExp(`:root\\[data-motif-set='${setId}'\\] \\{([^}]*)\\}`));
+    const block = css.match(new RegExp(`\\[data-motif-set='${setId}'\\] \\{([^}]*)\\}`));
     assert.ok(block, `${setId} has a slot-resolution block`);
     assert.match(block[1], new RegExp(`--motif-set: ${setId};`));
     for (const slot of motifs.slots) {

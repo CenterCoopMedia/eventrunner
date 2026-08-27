@@ -465,6 +465,29 @@ function rootBlock(theme, tokens) {
 }
 
 /**
+ * A block's selector list.
+ *
+ * Every palette block matches TWO ways: on `:root`, which is what a whole
+ * page renders from, and on any element carrying the same attributes, which
+ * is what the admin's live-preview frame renders from (brief §5.2 — the
+ * client's design is contained inside the frame, and the room around it
+ * never adopts it). A scoped element's own declarations beat the values it
+ * inherits from `:root`, so the frame gets the whole set — the tier-2
+ * aliases and the tier-3 contracts included — with no second resolver and
+ * no duplicated token list.
+ *
+ * The `admin-*` blocks deliberately do NOT get this treatment: the admin
+ * never renders inside the frame, and keeping them root-only keeps "emitted
+ * once per mode" exactly as narrow as it reads.
+ *
+ * @param {string} attributes e.g. "[data-mode='dark']"
+ * @returns {string}
+ */
+function scopedSelector(attributes) {
+  return `:root${attributes},\n${attributes}`;
+}
+
+/**
  * One block of custom properties.
  *
  * @param {string} selector
@@ -529,7 +552,7 @@ function buildTokenCss(theme, { tokensDir } = {}) {
     lines.push('');
     lines.push(
       ...colorBlock(
-        ":root[data-mode='light']",
+        scopedSelector("[data-mode='light']"),
         names,
         values.light,
         'Light palette (brief §3.3). Every color token is defined in both mode blocks.',
@@ -538,7 +561,7 @@ function buildTokenCss(theme, { tokensDir } = {}) {
     lines.push('');
     lines.push(
       ...colorBlock(
-        ":root[data-mode='dark']",
+        scopedSelector("[data-mode='dark']"),
         names,
         values.dark,
         'Dark palette (brief §3.3). Its own palette, never light mode reversed.',
@@ -583,7 +606,7 @@ function buildTokenCss(theme, { tokensDir } = {}) {
         lines.push('');
         lines.push(
           ...colorBlock(
-            `:root[data-theme='${id}'][data-mode='${mode}']`,
+            scopedSelector(`[data-theme='${id}'][data-mode='${mode}']`),
             preset.names,
             preset.values[mode],
             `${getPreset(id).label} — ${mode}` +
@@ -633,7 +656,7 @@ function buildTokenCss(theme, { tokensDir } = {}) {
     for (const setId of setIds) {
       const slots = motifSlotValues(tokens.motifs, setId);
       lines.push('');
-      lines.push(`:root[data-motif-set='${setId}'] {`);
+      lines.push(`${scopedSelector(`[data-motif-set='${setId}']`)} {`);
       for (const [name, value] of slots) lines.push(`  ${name}: ${value};`);
       lines.push('}');
     }

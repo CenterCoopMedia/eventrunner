@@ -1,13 +1,19 @@
-// Branding tab (issue #15 done-when: "changing colors/logo in the Branding
-// tab restyles the public site with no deploy").
+// The theme editor — the proof (design brief §5.2; admin story moment 2).
 //
-// Two things are pinned here: the LIVE PREVIEW — candidate values run through
-// lib/themeRuntime.js and land on the page before any save, in a style
-// element that does not fight EventConfigProvider for its own — and the
-// updateTheme payload, which is a whole-doc replace and therefore always
-// carries colors, fonts, texture, radius, and the logo slots together.
+// What is pinned here:
+//
+//   • The preview is FRAMED. The candidate lands on the frame element, the
+//     frame carries data-theme/data-mode/data-motif-set for the draft, and
+//     the room around it never adopts any of them.
+//   • The frame renders the client's REAL page, not swatches.
+//   • Two depths: the curated pickers first, raw tokens behind a disclosure.
+//   • The whole-document replace really is whole — a save carries preset,
+//     optionPicks, tokens, motifSet, adminAccent, mode, fonts, and logos
+//     together. Dropping one would silently delete it.
+//   • A contrast failure is stated inline with the pair, the mode, and the
+//     ratio, and the frame keeps rendering.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const configSubscriptions = new Map();
@@ -46,7 +52,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
-import { PREVIEW_STYLE_ID } from '../themePreview.js';
+import { PREVIEW_SCOPE_ID, PREVIEW_STYLE_ID } from '../themePreview.js';
 
 // Hex values are DATA here, never literals in source (spec §7.6 forbids hex
 // literals outside the allowlist — including in tests).
@@ -54,7 +60,16 @@ const hex = (digits) => `#${digits}`;
 const TEAL = hex('2a9d8f');
 const RUST = hex('c84b31');
 
-const LIVE_THEME = {
+/**
+ * A deployment made before presets existed: its stored palette IS the theme.
+ *
+ * `preset: null` is load-bearing. EventConfigProvider overlays config/theme
+ * onto the committed snapshot shallowly (spec §2.4), and the snapshot runs a
+ * preset, so a document that simply omits the field would inherit that one.
+ * Saying null is how a stored document says "no preset".
+ */
+const LEGACY_THEME = {
+  preset: null,
   colors: { primary: TEAL, ink: hex('2c3e50') },
   fonts: {
     heading: 'serif-editorial',
@@ -68,6 +83,21 @@ const LIVE_THEME = {
   logos: { primary: 'branding/logo.svg', mark: 'branding/mark.svg' },
 };
 
+/** A deployment on the preset pipeline — what PR2-A ships. */
+const PRESET_THEME = {
+  preset: 'broadsheet',
+  optionPicks: { headingFace: 'libre-baskerville', nameplate: 'full-measure' },
+  tokens: { light: { surface: hex('f7f4ee') } },
+  motifSet: 'none',
+  adminAccent: hex('1a3a6e'),
+  colors: {},
+  fonts: {},
+  texture: 'flat',
+  radius: 'sharp',
+  mode: 'light',
+  logos: { primary: 'branding/logo.svg' },
+};
+
 function okResponse(body = {}) {
   return { ok: true, status: 200, json: async () => body };
 }
@@ -75,8 +105,9 @@ function errorResponse(status, code, message) {
   return { ok: false, status, json: async () => ({ error: { code, message } }) };
 }
 const previewCss = () => document.getElementById(PREVIEW_STYLE_ID)?.textContent ?? '';
+const frame = () => document.getElementById(PREVIEW_SCOPE_ID);
 
-async function renderBranding() {
+async function renderBranding(themeDoc = LEGACY_THEME) {
   const result = render(
     <MemoryRouter
       initialEntries={['/admin/branding']}
@@ -93,56 +124,79 @@ async function renderBranding() {
   // gate holds on (AdminGate renders "Checking your access…" until it
   // answers). Waiting only for the chunk lets an assertion run while the
   // gate is still checking, which is a flake under load, not a bug.
-  await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
-  });
+  await waitFor(
+    () => {
+      expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    },
+    // The frame renders the whole public app, so the first mount in this
+    // file is slower than the default budget allows for.
+    { timeout: 5000 },
+  );
   await act(async () => {
-    configSubscriptions.get('theme')(LIVE_THEME);
+    configSubscriptions.get('theme')(themeDoc);
     await Promise.resolve();
   });
   return result;
 }
 
+/** Open the second depth. Raw token editing is never the first thing seen. */
+function openAdvanced() {
+  fireEvent.click(screen.getByRole('button', { name: 'Edit the raw tokens' }));
+}
+
 beforeEach(() => {
   configSubscriptions.clear();
   document.getElementById(PREVIEW_STYLE_ID)?.remove();
+  for (const attribute of ['theme', 'mode', 'motifSet', 'texture']) {
+    delete document.documentElement.dataset[attribute];
+  }
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-describe('branding live preview', () => {
-  it('applies a candidate color to the page before anything is saved', async () => {
+describe('the proof', () => {
+  it('renders the client’s real page inside the frame, not swatches', async () => {
     await renderBranding();
-    expect(previewCss()).toContain('--brand-primary-rgb: 42 157 143;');
-
-    fireEvent.change(screen.getByLabelText('Primary'), { target: { value: RUST } });
-
-    // 0xC8 0x4B 0x31 → 200 75 49, applied through the same builder the
-    // runtime override uses.
-    await waitFor(() => expect(previewCss()).toContain('--brand-primary-rgb: 200 75 49;'));
-    expect(fetch).not.toHaveBeenCalled();
+    // The public shell, rendered by the app's own routes and components.
+    expect(within(frame()).getByRole('banner')).toBeInTheDocument();
+    expect(within(frame()).getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
   });
 
-  it('previews font, texture, and radius changes too, and owns its own style element', async () => {
+  it('applies the candidate to the FRAME, and the room never adopts it', async () => {
     await renderBranding();
+    expect(previewCss()).toContain(`#${PREVIEW_SCOPE_ID}`);
+    expect(previewCss()).not.toContain(':root');
+    expect(previewCss()).toContain('--brand-primary-rgb: 42 157 143;');
 
-    fireEvent.change(screen.getByLabelText('Heading font'), {
-      target: { value: 'script-casual' },
-    });
-    fireEvent.change(screen.getByLabelText('Texture'), { target: { value: 'flat' } });
-    fireEvent.change(screen.getByLabelText('Corner radius'), { target: { value: 'round' } });
+    // The frame states its own mode and motif set…
+    expect(frame().dataset.mode).toBe('light');
+    expect(frame().dataset.motifSet).toBe('none');
+    // …and the room keeps the attributes the SAVED theme gave it. (The
+    // provider writes those; the draft must not move them.)
+    const room = { ...document.documentElement.dataset };
+    fireEvent.change(screen.getByLabelText('Preset'), { target: { value: 'zine' } });
+    await waitFor(() => expect(frame().dataset.theme).toBe('zine'));
+    expect({ ...document.documentElement.dataset }).toEqual(room);
+  });
 
-    await waitFor(() => expect(previewCss()).toContain('Caveat'));
-    expect(previewCss()).toContain('--texture: flat;');
-    expect(previewCss()).toContain('--radius-base: 16px;');
-    // The texture treatment is gated on this attribute (index.css).
-    expect(document.documentElement.dataset.texture).toBe('flat');
-    // EventConfigProvider's own runtime element is left alone.
-    expect(document.getElementById('event-theme-runtime')).not.toBeNull();
-    expect(document.getElementById(PREVIEW_STYLE_ID)).not.toBe(
-      document.getElementById('event-theme-runtime'),
-    );
+  it('states the page, the mode, and the draft below the frame', async () => {
+    await renderBranding();
+    expect(screen.getByText('Home · light · published theme')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule' }));
+    expect(screen.getByText('Schedule · light · published theme')).toBeInTheDocument();
+  });
+
+  it('switches light and dark instantly, as two proofs of one forme', async () => {
+    await renderBranding();
+    fireEvent.click(screen.getByRole('button', { name: 'Dark' }));
+
+    expect(frame().dataset.mode).toBe('dark');
+    expect(screen.getByText('Home · dark · published theme')).toBeInTheDocument();
+    // The room is not dragged into dark mode with it: the admin obeys the
+    // mode the OPERATOR is working in, never the one being previewed.
+    expect(document.documentElement.dataset.mode).not.toBe('dark');
   });
 
   it('discards the preview when the tab is left', async () => {
@@ -151,110 +205,150 @@ describe('branding live preview', () => {
     unmount();
     expect(document.getElementById(PREVIEW_STYLE_ID)).toBeNull();
   });
-
-  it('reverts to the saved theme on request', async () => {
-    await renderBranding();
-    fireEvent.change(screen.getByLabelText('Primary'), { target: { value: RUST } });
-    await waitFor(() => expect(previewCss()).toContain('200 75 49'));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Revert to saved' }));
-    await waitFor(() => expect(previewCss()).toContain('42 157 143'));
-    expect(screen.getByLabelText('Primary')).toHaveValue(TEAL);
-  });
-
-  it('reverting a color the saved theme does not set does not resurrect the candidate', async () => {
-    // Colors absent from config/theme are seeded by reading them back off
-    // :root — so reverting while the preview stylesheet is still applied
-    // would read the UNSAVED candidate as if it were the saved value.
-    // jsdom does not resolve custom properties, so getComputedStyle is stood
-    // in for with a reader over whatever stylesheet is currently applied,
-    // which is exactly the behaviour being guarded against.
-    await renderBranding();
-    // `accent` is not in LIVE_THEME.colors.
-    fireEvent.change(screen.getByLabelText('Accent'), { target: { value: RUST } });
-    await waitFor(() => expect(previewCss()).toContain('--brand-accent-rgb: 200 75 49;'));
-
-    const readFromAppliedCss = vi.spyOn(window, 'getComputedStyle').mockImplementation(() => ({
-      getPropertyValue: (prop) => {
-        const css = document.getElementById(PREVIEW_STYLE_ID)?.textContent ?? '';
-        const match = css.match(new RegExp(`${prop}:\\s*([^;]+);`));
-        return match ? match[1] : '';
-      },
-    }));
-    try {
-      fireEvent.click(screen.getByRole('button', { name: 'Revert to saved' }));
-    } finally {
-      readFromAppliedCss.mockRestore();
-    }
-
-    expect(screen.getByLabelText('Accent')).toHaveValue('');
-    await waitFor(() => expect(previewCss()).not.toContain('--brand-accent-rgb'));
-  });
 });
 
-describe('color picker input', () => {
-  it('expands #RGB shorthand for the native picker, keeping the typed value', async () => {
-    // <input type="color"> only understands #rrggbb: handed #fff it
-    // sanitizes the value to black, and the next interaction would write
-    // that black over a perfectly valid stored color.
-    configSubscriptions.clear();
-    render(
-      <MemoryRouter
-        initialEntries={['/admin/branding']}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      >
-        <App />
-      </MemoryRouter>,
+describe('the curated depth', () => {
+  it('offers the preset first, and says plainly what picking one replaces', async () => {
+    await renderBranding(PRESET_THEME);
+    expect(screen.getByLabelText('Preset')).toHaveValue('broadsheet');
+    expect(
+      screen.getByText(/Picking a preset replaces every value you have not overridden yourself/),
+    ).toBeInTheDocument();
+  });
+
+  it('offers that preset’s own option groups, with the reason for each choice', async () => {
+    await renderBranding(PRESET_THEME);
+    expect(screen.getByLabelText('Heading face')).toHaveValue('libre-baskerville');
+    expect(screen.getByLabelText('Nameplate treatment')).toHaveValue('full-measure');
+    // The catalog's `why` is the hint, so a choice is never a bare name.
+    expect(screen.getByText(/The same paper, founded sixty years later/)).toBeInTheDocument();
+  });
+
+  it('re-renders the frame on the picked preset', async () => {
+    await renderBranding(PRESET_THEME);
+    expect(frame().dataset.theme).toBe('broadsheet');
+
+    fireEvent.change(screen.getByLabelText('Preset'), { target: { value: 'zine' } });
+    await waitFor(() => expect(frame().dataset.theme).toBe('zine'));
+    // The picks follow the preset that offers them, rather than carrying a
+    // stale group id the server would reject by name.
+    expect(screen.getByLabelText('Heading face')).toHaveValue('karrik');
+  });
+
+  it('keeps raw token editing behind its own disclosure', async () => {
+    await renderBranding(PRESET_THEME);
+    expect(screen.getByRole('button', { name: 'Edit the raw tokens' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
     );
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    await waitFor(() => {
-      expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
-    });
-    await act(async () => {
-      configSubscriptions.get('theme')({ ...LIVE_THEME, colors: { primary: hex('fff') } });
-      await Promise.resolve();
-    });
+    expect(screen.getByLabelText('Surface — light').closest('[hidden]')).not.toBeNull();
 
-    expect(screen.getByLabelText('Primary')).toHaveValue(hex('fff'));
-    expect(screen.getByLabelText('Primary color picker')).toHaveValue(hex('ffffff'));
+    openAdvanced();
+    expect(screen.getByRole('button', { name: 'Hide the raw tokens' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByLabelText('Surface — light').closest('[hidden]')).toBeNull();
   });
 
-  it('hides the picker for a value it cannot represent, rather than showing black', async () => {
-    await renderBranding();
-    fireEvent.change(screen.getByLabelText('Ink'), { target: { value: 'not-a-color' } });
-    await waitFor(() => expect(screen.queryByLabelText('Ink color picker')).toBeNull());
-    expect(screen.getByLabelText('Ink')).toHaveValue('not-a-color');
+  it('states the accent’s legibility floor plainly when it falls back', async () => {
+    // A client picks this value, so it may be unreadable on an admin ground.
+    // The system never clamps it: it says what it fell back to.
+    await renderBranding({ ...PRESET_THEME, adminAccent: hex('eae8e3') });
+    expect(screen.getByText(/below the 3:1 floor a position marker needs/)).toBeInTheDocument();
+    expect(screen.getByText(/falls back to its own ink/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Admin marker colour')).toHaveValue(hex('eae8e3'));
   });
 });
 
-describe('branding save', () => {
-  it('posts the whole theme document, carrying the logo slots through', async () => {
-    await renderBranding();
+describe('the advanced depth', () => {
+  it('edits per-mode overrides on a light tab and a dark tab', async () => {
+    await renderBranding(PRESET_THEME);
+    openAdvanced();
+    expect(screen.getByLabelText('Surface — light')).toHaveValue(hex('f7f4ee'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dark mode' }));
+    expect(screen.getByLabelText('Surface — dark')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('Surface — dark'), { target: { value: RUST } });
+    await waitFor(() => expect(previewCss()).toContain('--brand-surface-rgb: 200 75 49;'));
+  });
+
+  it('names the pair, the mode, and the ratio inline, and keeps rendering', async () => {
+    await renderBranding(PRESET_THEME);
+    openAdvanced();
+    // Ink at the surface's own value: nothing can read on it.
+    fireEvent.change(screen.getByLabelText('Ink — light'), { target: { value: hex('f7f4ee') } });
+
+    await waitFor(() =>
+      // Twice, and on purpose: under the control that caused it, and in the
+      // stated line at the top of the bench.
+      expect(
+        screen.getAllByText(/ink on surface in light mode is 1\.\d+:1, below the 4.5:1 bar/),
+      ).toHaveLength(2),
+    );
+    // A draft may hold a failing value, and the frame keeps rendering it.
+    expect(frame()).not.toBeNull();
+    expect(previewCss()).toContain('--brand-ink-rgb: 247 244 238;');
+  });
+
+  it('clears a mode’s overrides only after stating what goes', async () => {
+    await renderBranding(PRESET_THEME);
+    openAdvanced();
+    expect(screen.getByLabelText('Surface — light')).toHaveValue(hex('f7f4ee'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear the overrides for this mode' }));
+    expect(screen.getByText(/falls back to the preset's own palette/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear these overrides' }));
+
+    expect(screen.getByLabelText('Surface — light')).toHaveValue('');
+  });
+});
+
+describe('publishing the theme', () => {
+  it('posts the WHOLE document: preset, picks, tokens, motif set, accent, mode', async () => {
+    // config/theme is a whole-doc replace, so a field this form forgets to
+    // send is a field the save deletes. That is how the preset pipeline
+    // would quietly disappear on the first logo edit.
+    await renderBranding(PRESET_THEME);
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
 
-    fireEvent.change(screen.getByLabelText('Primary'), { target: { value: RUST } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save branding' }));
+    fireEvent.change(screen.getByLabelText('Primary logo'), {
+      target: { value: 'branding/new.svg' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/updateTheme$/);
     const { theme } = JSON.parse(fetch.mock.calls[0][1].body);
-    expect(theme.colors.primary).toBe(RUST);
-    expect(theme.fonts).toEqual(LIVE_THEME.fonts);
-    expect(theme.texture).toBe('paper');
-    expect(theme.radius).toBe('soft');
-    // The mode policy rides along too — a whole-doc replace that dropped it
-    // would silently move a dark deployment back to light.
-    expect(theme.mode).toBe('system');
-    // Untouched slots ride along rather than being dropped by the whole-doc
-    // replace.
-    expect(theme.logos).toEqual(LIVE_THEME.logos);
+    expect(theme.preset).toBe('broadsheet');
+    expect(theme.optionPicks).toMatchObject({ headingFace: 'libre-baskerville' });
+    expect(theme.tokens).toEqual({ light: { surface: hex('f7f4ee') } });
+    expect(theme.motifSet).toBe('none');
+    expect(theme.adminAccent).toBe(hex('1a3a6e'));
+    expect(theme.mode).toBe('light');
+    expect(theme.texture).toBe('flat');
+    expect(theme.radius).toBe('sharp');
+    expect(theme.logos).toEqual({ primary: 'branding/new.svg' });
     expect(await screen.findByText(/no deploy needed/i)).toBeInTheDocument();
   });
 
-  it('surfaces the server’s hex-color rejection against the offending swatch', async () => {
+  it('carries a pre-preset deployment’s stored palette through untouched', async () => {
+    await renderBranding();
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
+    openAdvanced();
+    fireEvent.change(screen.getByLabelText('Primary'), { target: { value: RUST } });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const { theme } = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(theme.colors.primary).toBe(RUST);
+    expect(theme.colors.ink).toBe(hex('2c3e50'));
+    expect(theme.fonts).toEqual(LEGACY_THEME.fonts);
+    expect(theme.preset).toBeUndefined();
+    expect(theme.logos).toEqual(LEGACY_THEME.logos);
+  });
+
+  it('surfaces the server’s rejection verbatim, against the offending control', async () => {
     await renderBranding();
     fetch.mockResolvedValueOnce(
       errorResponse(
@@ -263,24 +357,60 @@ describe('branding save', () => {
         'theme.colors.primary: must be a hex color (#RGB or #RRGGBB), got "teal"',
       ),
     );
-
+    openAdvanced();
     fireEvent.change(screen.getByLabelText('Primary'), { target: { value: 'teal' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save branding' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('theme.colors.primary: must be a hex color');
     expect(screen.getByLabelText('Primary')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  // Issue #24 closed the "no upload backend" TODO: each slot is now an
-  // ImagePicker over the branding/ namespace. The path stays editable by
-  // hand, because the four placeholders init seeds have no library row.
-  it('edits each logo slot through the media picker, path still typeable', async () => {
+  it('reverts to the saved theme on request', async () => {
     await renderBranding();
-    expect(screen.queryByText(/asset upload has no backend yet/i)).toBeNull();
+    openAdvanced();
+    fireEvent.change(screen.getByLabelText('Primary'), { target: { value: RUST } });
+    await waitFor(() => expect(previewCss()).toContain('200 75 49'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revert to the saved theme' }));
+    await waitFor(() => expect(previewCss()).toContain('42 157 143'));
+    expect(screen.getByLabelText('Primary')).toHaveValue(TEAL);
+  });
+
+  it('says whether the draft is published or not, in the job line', async () => {
+    await renderBranding(PRESET_THEME);
+    expect(screen.getByText('Live')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Preset'), { target: { value: 'zine' } });
+    expect(await screen.findByText('Live with unpublished changes')).toBeInTheDocument();
+  });
+
+  // Issue #24: each slot is an ImagePicker over the branding/ namespace. The
+  // path stays editable by hand, because the four placeholders init seeds
+  // have no library row.
+  it('keeps the logo slots and the media picker', async () => {
+    await renderBranding();
     expect(screen.getByLabelText('Primary logo')).toHaveValue('branding/logo.svg');
-    expect(
-      screen.getAllByRole('button', { name: 'Choose or upload…' }).length,
-    ).toBe(5);
+    expect(screen.getAllByRole('button', { name: 'Choose or upload…' }).length).toBe(5);
+  });
+});
+
+describe('color picker input', () => {
+  it('expands #RGB shorthand for the native picker, keeping the typed value', async () => {
+    // <input type="color"> only understands #rrggbb: handed #fff it
+    // sanitizes the value to black, and the next interaction would write
+    // that black over a perfectly valid stored color.
+    await renderBranding({ ...LEGACY_THEME, colors: { primary: hex('fff') } });
+    openAdvanced();
+    expect(screen.getByLabelText('Primary')).toHaveValue(hex('fff'));
+    expect(screen.getByLabelText('Primary color picker')).toHaveValue(hex('ffffff'));
+  });
+
+  it('hides the picker for a value it cannot represent, rather than showing black', async () => {
+    await renderBranding();
+    openAdvanced();
+    fireEvent.change(screen.getByLabelText('Ink'), { target: { value: 'not-a-color' } });
+    await waitFor(() => expect(screen.queryByLabelText('Ink color picker')).toBeNull());
+    expect(screen.getByLabelText('Ink')).toHaveValue('not-a-color');
   });
 });

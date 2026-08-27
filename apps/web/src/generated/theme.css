@@ -261,7 +261,8 @@
 }
 
 /* Light palette (brief §3.3). Every color token is defined in both mode blocks. */
-:root[data-mode='light'] {
+:root[data-mode='light'],
+[data-mode='light'] {
   --brand-primary-rgb: 178 30 50;
   --brand-primary-dark-rgb: 140 20 38;
   --brand-primary-light-rgb: 224 148 158;
@@ -307,7 +308,8 @@
 }
 
 /* Dark palette (brief §3.3). Its own palette, never light mode reversed. */
-:root[data-mode='dark'] {
+:root[data-mode='dark'],
+[data-mode='dark'] {
   --brand-primary-rgb: 240 122 134;
   --brand-primary-dark-rgb: 248 168 176;
   --brand-primary-light-rgb: 118 56 66;
@@ -357,7 +359,8 @@
    above do not already carry. data-theme picks which one wins. */
 
 /* Broadsheet — light. */
-:root[data-theme='broadsheet'][data-mode='light'] {
+:root[data-theme='broadsheet'][data-mode='light'],
+[data-theme='broadsheet'][data-mode='light'] {
   --brand-primary-rgb: 26 58 110;
   --brand-primary-dark-rgb: 17 40 80;
   --brand-primary-light-rgb: 126 150 192;
@@ -403,7 +406,8 @@
 }
 
 /* Broadsheet — dark. */
-:root[data-theme='broadsheet'][data-mode='dark'] {
+:root[data-theme='broadsheet'][data-mode='dark'],
+[data-theme='broadsheet'][data-mode='dark'] {
   --brand-primary-rgb: 130 170 226;
   --brand-primary-dark-rgb: 172 200 240;
   --brand-primary-light-rgb: 70 96 138;
@@ -449,7 +453,8 @@
 }
 
 /* Newsroom modern — light, the active preset, with this deployment's overrides. */
-:root[data-theme='newsroom'][data-mode='light'] {
+:root[data-theme='newsroom'][data-mode='light'],
+[data-theme='newsroom'][data-mode='light'] {
   --brand-primary-rgb: 178 30 50;
   --brand-primary-dark-rgb: 140 20 38;
   --brand-primary-light-rgb: 224 148 158;
@@ -495,7 +500,8 @@
 }
 
 /* Newsroom modern — dark, the active preset, with this deployment's overrides. */
-:root[data-theme='newsroom'][data-mode='dark'] {
+:root[data-theme='newsroom'][data-mode='dark'],
+[data-theme='newsroom'][data-mode='dark'] {
   --brand-primary-rgb: 240 122 134;
   --brand-primary-dark-rgb: 248 168 176;
   --brand-primary-light-rgb: 118 56 66;
@@ -541,7 +547,8 @@
 }
 
 /* Zine / indie — light. */
-:root[data-theme='zine'][data-mode='light'] {
+:root[data-theme='zine'][data-mode='light'],
+[data-theme='zine'][data-mode='light'] {
   --brand-primary-rgb: 198 26 84;
   --brand-primary-dark-rgb: 156 16 64;
   --brand-primary-light-rgb: 240 148 182;
@@ -587,7 +594,8 @@
 }
 
 /* Zine / indie — dark. */
-:root[data-theme='zine'][data-mode='dark'] {
+:root[data-theme='zine'][data-mode='dark'],
+[data-theme='zine'][data-mode='dark'] {
   --brand-primary-rgb: 244 124 166;
   --brand-primary-dark-rgb: 250 170 198;
   --brand-primary-light-rgb: 118 42 74;
@@ -633,7 +641,8 @@
 }
 
 /* Civic / institutional — light. */
-:root[data-theme='civic'][data-mode='light'] {
+:root[data-theme='civic'][data-mode='light'],
+[data-theme='civic'][data-mode='light'] {
   --brand-primary-rgb: 26 82 150;
   --brand-primary-dark-rgb: 16 56 106;
   --brand-primary-light-rgb: 126 164 208;
@@ -679,7 +688,8 @@
 }
 
 /* Civic / institutional — dark. */
-:root[data-theme='civic'][data-mode='dark'] {
+:root[data-theme='civic'][data-mode='dark'],
+[data-theme='civic'][data-mode='dark'] {
   --brand-primary-rgb: 128 178 238;
   --brand-primary-dark-rgb: 172 208 248;
   --brand-primary-light-rgb: 56 90 134;
@@ -725,7 +735,8 @@
 }
 
 /* Field Guide — light. */
-:root[data-theme='field-guide'][data-mode='light'] {
+:root[data-theme='field-guide'][data-mode='light'],
+[data-theme='field-guide'][data-mode='light'] {
   --brand-primary-rgb: 43 86 54;
   --brand-primary-dark-rgb: 27 60 37;
   --brand-primary-light-rgb: 140 172 136;
@@ -771,7 +782,8 @@
 }
 
 /* Field Guide — dark. */
-:root[data-theme='field-guide'][data-mode='dark'] {
+:root[data-theme='field-guide'][data-mode='dark'],
+[data-theme='field-guide'][data-mode='dark'] {
   --brand-primary-rgb: 142 192 142;
   --brand-primary-dark-rgb: 180 216 176;
   --brand-primary-light-rgb: 64 94 64;
@@ -817,7 +829,8 @@
 }
 
 /* Atlas — light. */
-:root[data-theme='atlas'][data-mode='light'] {
+:root[data-theme='atlas'][data-mode='light'],
+[data-theme='atlas'][data-mode='light'] {
   --brand-primary-rgb: 180 38 34;
   --brand-primary-dark-rgb: 142 26 24;
   --brand-primary-light-rgb: 226 148 144;
@@ -863,7 +876,8 @@
 }
 
 /* Atlas — dark. */
-:root[data-theme='atlas'][data-mode='dark'] {
+:root[data-theme='atlas'][data-mode='dark'],
+[data-theme='atlas'][data-mode='dark'] {
   --brand-primary-rgb: 244 122 112;
   --brand-primary-dark-rgb: 250 166 158;
   --brand-primary-light-rgb: 118 46 42;
@@ -972,7 +986,8 @@
    background-color: rgb(var(--color-ink-motif-rgb)), or inline the SVG as a
    symbol reading currentColor. Never an <img>, never a url() fill. */
 
-:root[data-motif-set='none'] {
+:root[data-motif-set='none'],
+[data-motif-set='none'] {
   --motif-set: none;
   --motif-section-mark: none;
   --motif-divider: none;
@@ -980,7 +995,8 @@
   --motif-empty-state: none;
 }
 
-:root[data-motif-set='botanical'] {
+:root[data-motif-set='botanical'],
+[data-motif-set='botanical'] {
   --motif-set: botanical;
   --motif-section-mark: url('/motifs/botanical/section-mark.svg');
   --motif-divider: url('/motifs/botanical/divider.svg');
@@ -988,7 +1004,8 @@
   --motif-empty-state: url('/motifs/botanical/empty-state.svg');
 }
 
-:root[data-motif-set='fauna'] {
+:root[data-motif-set='fauna'],
+[data-motif-set='fauna'] {
   --motif-set: fauna;
   --motif-section-mark: url('/motifs/fauna/section-mark.svg');
   --motif-divider: url('/motifs/fauna/divider.svg');
@@ -996,7 +1013,8 @@
   --motif-empty-state: url('/motifs/fauna/empty-state.svg');
 }
 
-:root[data-motif-set='cartographic'] {
+:root[data-motif-set='cartographic'],
+[data-motif-set='cartographic'] {
   --motif-set: cartographic;
   --motif-section-mark: url('/motifs/cartographic/section-mark.svg');
   --motif-divider: url('/motifs/cartographic/divider.svg');
