@@ -10,7 +10,7 @@
 export const eventConfig = {
   name: '[Demo] Harborlight Media Summit',
   shortName: 'DEMO-SUMMIT',
-  tagline: '[Replace] A three-day gathering for people who make community media work.',
+  tagline: 'A three-day gathering for the people who keep community media working.',
   timezone: 'America/New_York',
   days: [
     {
@@ -42,11 +42,11 @@ export const eventConfig = {
   },
   venue: {
     name: '[Demo] Harborlight Hall',
-    addressLine1: '1 Placeholder Plaza',
+    addressLine1: '1 Harborlight Way',
     addressLine2: null,
-    city: 'Demoville',
-    region: 'ST',
-    postalCode: '00000',
+    city: 'Millhaven',
+    region: 'MH',
+    postalCode: '58211',
     country: 'US',
     mapUrl: null,
   },
@@ -59,7 +59,7 @@ export const eventConfig = {
   },
   legal: {
     operatorName: '[Demo] Harborlight Cooperative',
-    postalAddressHtml: '[Replace] Operator postal address for the email footer.',
+    postalAddressHtml: '<p>[Demo] Harborlight Cooperative<br>1 Harborlight Way<br>Millhaven, MH 58211</p>',
     supportEmail: 'support@example.org',
     conductEmail: 'conduct@example.org',
     reviewRequired: true,
@@ -71,7 +71,7 @@ export const eventConfig = {
   announcedAt: '2026-05-01T12:00:00',
   archivedAt: null,
   seo: {
-    description: '[Replace] One-sentence description of the event for search and social cards.',
+    description: 'Three days of sessions, workshops, and hallway conversation for people who run local and cooperative newsrooms — schedule, speakers, and travel details for the [Demo] Harborlight Media Summit.',
     defaultOgImagePath: 'branding/og-default.svg',
     organizerName: '[Demo] Harborlight Cooperative',
     organizerUrl: 'https://example.org',
@@ -104,12 +104,12 @@ export const features = {
 
 export const theme = {
   fonts: {
-    heading: 'serif-editorial',
+    heading: 'sans-humanist',
     body: 'sans-humanist',
-    accent: 'script-casual',
+    accent: 'sans-humanist',
   },
-  texture: 'paper',
-  radius: 'soft',
+  texture: 'flat',
+  radius: 'sharp',
   logos: {
     primary: 'branding/logo.svg',
     mark: 'branding/mark.svg',

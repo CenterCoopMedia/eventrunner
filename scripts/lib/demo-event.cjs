@@ -29,7 +29,43 @@
 
 const { buildConfigDocs } = require('./answers.cjs');
 const { defaultPages, buildSeedContent } = require('./seed.cjs');
+const { rgbToHex } = require('./theme.cjs');
 const { buildPublicSpeaker } = require('shared/speaker');
+
+/**
+ * The demo event's own brand palette, overlaid on `defaultTheme()` (spec
+ * §2.2, §7.2). RGB triples, converted to hex below — the same reason
+ * `theme.cjs` does it (this comment mirrors that one): `scripts/**` is not
+ * on the spec §7.6 hex-literal allowlist (eslint.config.mjs), so a color
+ * value here has to arrive as numbers, not a `#rrggbb` string literal.
+ *
+ * An editorial, ink-on-neutral look: a deep blue-teal brand color, a cool
+ * off-white surface (not the warm tan canvas the anti-pattern checklist in
+ * #105 rejects), and semantic status colors unchanged in meaning from the
+ * product default.
+ */
+const DEMO_THEME_COLORS_RGB = Object.freeze({
+  brandPrimary: Object.freeze([21, 94, 117]),
+  brandPrimaryDark: Object.freeze([12, 66, 82]),
+  brandPrimaryLight: Object.freeze([79, 147, 166]),
+  brandAccent: Object.freeze([154, 52, 18]),
+  brandSurface: Object.freeze([247, 247, 245]),
+  brandSurfaceAlt: Object.freeze([236, 236, 234]),
+  brandInk: Object.freeze([22, 33, 44]),
+  brandInkMuted: Object.freeze([71, 82, 94]),
+  semanticSuccess: Object.freeze([22, 101, 52]),
+  semanticWarning: Object.freeze([180, 83, 9]),
+  semanticDanger: Object.freeze([185, 28, 28]),
+  semanticHighlight: Object.freeze([161, 98, 7]),
+  semanticKeynote: Object.freeze([109, 40, 217]),
+});
+
+/** @returns {object} `config/theme.colors` for the demo event, as hex strings */
+function demoThemeColors() {
+  const colors = {};
+  for (const [key, rgb] of Object.entries(DEMO_THEME_COLORS_RGB)) colors[key] = rgbToHex(rgb);
+  return colors;
+}
 
 /** Fixed instant for every demo `seededAt`, so regeneration is stable. */
 const DEMO_SEEDED_AT = '2026-01-01T00:00:00.000Z';
@@ -54,7 +90,7 @@ const DEMO_ANSWERS = Object.freeze({
   event: {
     name: '[Demo] Harborlight Media Summit',
     shortName: 'DEMO-SUMMIT',
-    tagline: '[Replace] A three-day gathering for people who make community media work.',
+    tagline: 'A three-day gathering for the people who keep community media working.',
     timezone: 'America/New_York',
     days: [
       { id: 'day-1', label: 'Day one', date: '2026-10-14', startTime: '09:00', endTime: '17:00' },
@@ -68,25 +104,41 @@ const DEMO_ANSWERS = Object.freeze({
     },
     venue: {
       name: '[Demo] Harborlight Hall',
-      addressLine1: '1 Placeholder Plaza',
+      addressLine1: '1 Harborlight Way',
       addressLine2: null,
-      city: 'Demoville',
-      region: 'ST',
-      postalCode: '00000',
+      city: 'Millhaven',
+      region: 'MH',
+      postalCode: '58211',
       country: 'US',
       mapUrl: null,
     },
     sender: { email: 'summit@example.org', name: '[Demo] Harborlight Media Summit', replyTo: null },
     legal: {
       operatorName: '[Demo] Harborlight Cooperative',
-      postalAddressHtml: '[Replace] Operator postal address for the email footer.',
+      postalAddressHtml: '<p>[Demo] Harborlight Cooperative<br>1 Harborlight Way<br>Millhaven, MH 58211</p>',
       supportEmail: 'support@example.org',
       conductEmail: 'conduct@example.org',
     },
     seo: {
-      description: '[Replace] One-sentence description of the event for search and social cards.',
+      description:
+        'Three days of sessions, workshops, and hallway conversation for people who run local ' +
+        'and cooperative newsrooms — schedule, speakers, and travel details for the [Demo] Harborlight Media Summit.',
       organizerName: '[Demo] Harborlight Cooperative',
     },
+  },
+  // Overlaid on `defaultTheme()` (spec §2.2, §7.2) — the demo event's own
+  // theme, distinct from the neutral product default every fresh
+  // deployment starts from. An editorial, single-family look: one
+  // workhorse sans (Source Sans 3) carries heading, body, and accent
+  // roles alike, a flat/sharp surface (no paper texture, no rounded-card
+  // treatment), and a palette built around an ink-blue brand color on a
+  // cool neutral surface — not the warm tan canvas the anti-pattern
+  // checklist (#105) rejects.
+  theme: {
+    colors: demoThemeColors(),
+    fonts: { heading: 'sans-humanist', body: 'sans-humanist', accent: 'sans-humanist' },
+    texture: 'flat',
+    radius: 'sharp',
   },
 });
 
@@ -99,29 +151,77 @@ const DEMO_ANSWERS = Object.freeze({
 const DEMO_EVENT_OVERRIDES = Object.freeze({ announcedAt: '2026-05-01T12:00:00' });
 
 /**
- * Demo copy overlaid on the seeded blocks, keyed by content doc id. Only
- * fields listed here are replaced; everything else stays the placeholder an
- * operator would see, which is the honest thing for a demo of a CMS whose
- * point is that a client fills it in.
+ * Demo copy overlaid on the seeded blocks, keyed by content doc id.
+ *
+ * Every field a visitor would actually see on the demo is listed here, with
+ * specific, credible copy for the fictional event — not the `[Replace] …`
+ * instruction an operator sees on a fresh deployment (issue #109: a demo
+ * whose point is to look like a real, well-run event should not read like
+ * an unfilled template). Fields with no visible placeholder text today
+ * (config-derived values, or sections seeded with zero items) are left
+ * alone; only the entries below are overlaid onto what `buildSeedContent`
+ * produces from `DEMO_ANSWERS`.
  */
 const DEMO_CONTENT = Object.freeze({
   hero__subtitle: {
-    value: '[Replace] One warm sentence about who this event is for and why it matters.',
+    value:
+      'Sessions, workshops, and time to compare notes with people running newsrooms and ' +
+      'stations like yours.',
   },
   hero__register_cta: { label: 'Register for the summit' },
   details__intro: {
     value:
-      '<p>[Replace] A short paragraph describing what happens across the three days: sessions, ' +
-      'workshops, and time to meet collaborators.</p>',
+      '<p>Three days, one track of shared sessions and two of workshops. Day one is welcome and ' +
+      'orientation. Day two is panels and small-group workshops. Day three is unconference ' +
+      'blocks — participants propose the sessions — and a closing conversation about what to ' +
+      'carry home.</p>',
   },
-  highlights__first: { text: '[Replace] One thing attendees can expect, in a short line.' },
-  stats__attendees: { value: '0', label: 'Attendees expected' },
-  stats__sessions: { value: '0', label: 'Sessions planned' },
+  highlights__first: {
+    text: 'Small workshop rooms, capped at thirty seats, so there is time for real questions.',
+  },
+  stats__attendees: { value: '420', label: 'Attendees expected' },
+  stats__sessions: { value: '38', label: 'Sessions planned' },
   faq_items__what_is_this: {
-    question: '[Replace] What is this event?',
-    answer: '<p>[Replace] Answer describing the event in one or two sentences.</p>',
+    question: 'What is the Harborlight Media Summit?',
+    answer:
+      '<p>A three-day gathering for people who report, edit, and run local and cooperative ' +
+      'newsrooms. It mixes shared sessions with hands-on workshops, and leaves room for the ' +
+      'hallway conversations that usually matter as much as the agenda.</p>',
   },
-  travel_header__page_title: { value: '[Replace] Getting to the venue' },
+  travel_header__page_title: { value: 'Getting to Harborlight Hall' },
+  travel_header__page_subtitle: {
+    value: 'Directions, transit options, and what to expect when you arrive.',
+  },
+  travel_venue__venue_notes: {
+    value:
+      '<p>Doors open thirty minutes before the first session each day. The main entrance is ' +
+      'step-free, and accessible parking is available in the north lot.</p>',
+  },
+  travel_help__help_title: { value: 'Travel questions' },
+  travel_help__help_description: {
+    value:
+      '<p>Email <a href="mailto:support@example.org">support@example.org</a> and a member of ' +
+      'the Harborlight team will get back to you within one business day.</p>',
+  },
+  faq_intro__summary: {
+    value: '<p>Answers to the questions we hear most before the summit.</p>',
+  },
+  conduct_intro__summary: {
+    value:
+      '<p>This code of conduct applies to everyone at the Harborlight Media Summit — attendees, ' +
+      'speakers, volunteers, and staff, in every session, workshop, and social space.</p>',
+  },
+  conduct_expectations__first: {
+    text: 'Treat other attendees, speakers, and staff with respect, on the record and off it.',
+  },
+  conduct_reporting__how_to_report: {
+    value:
+      '<p>Report a concern to conduct@example.org or to any staff member wearing a Harborlight ' +
+      'badge. Reports are reviewed by the organizing committee within one business day.</p>',
+  },
+  contact_intro__summary: {
+    value: '<p>Questions before the summit? Here is how to reach the organizing team.</p>',
+  },
 });
 
 /** Fictional sessions across the three demo days. */
@@ -131,8 +231,10 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-1',
     startTime: '09:30',
     endTime: '10:00',
-    title: '[Demo] Welcome and orientation',
-    description: '[Replace] Short description of the opening session.',
+    title: 'Welcome and orientation',
+    description:
+      'Coffee, badge pickup, and a short welcome from the organizing committee before the ' +
+      'first sessions begin.',
     location: 'Main hall',
     type: 'keynote',
     speakerIds: ['speaker-placeholder-1'],
@@ -145,8 +247,10 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-1',
     startTime: '10:30',
     endTime: '12:00',
-    title: '[Demo] Workshop: collaborative reporting basics',
-    description: '[Replace] What attendees will practice in this workshop.',
+    title: 'Workshop: collaborative reporting basics',
+    description:
+      'Setting up a cross-newsroom reporting partnership, from shared documents to shared ' +
+      'bylines.',
     location: 'Room A',
     type: 'workshop',
     speakerIds: ['speaker-placeholder-2'],
@@ -159,8 +263,10 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-2',
     startTime: '09:30',
     endTime: '10:45',
-    title: '[Demo] Panel: sustaining local partnerships',
-    description: '[Replace] The question this panel will dig into.',
+    title: 'Panel: sustaining local partnerships',
+    description:
+      'Three newsroom leaders on what it actually takes to keep a shared-coverage partnership ' +
+      'funded past year one.',
     location: 'Main hall',
     type: 'panel',
     speakerIds: ['speaker-placeholder-1', 'speaker-placeholder-3'],
@@ -173,8 +279,10 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-2',
     startTime: '13:30',
     endTime: '15:00',
-    title: '[Demo] Workshop: audience research on a small budget',
-    description: '[Replace] What attendees will practice in this workshop.',
+    title: 'Workshop: audience research on a small budget',
+    description:
+      'Simple survey and interview methods for newsrooms with no research budget and no ' +
+      'research team.',
     location: 'Room B',
     type: 'workshop',
     speakerIds: ['speaker-placeholder-2'],
@@ -187,8 +295,10 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-3',
     startTime: '09:30',
     endTime: '11:30',
-    title: '[Demo] Unconference blocks',
-    description: '[Replace] How the participant-proposed sessions work.',
+    title: 'Unconference blocks',
+    description:
+      'Participant-proposed sessions, posted on the board each morning — bring a topic or ' +
+      'just show up.',
     location: 'Rooms A and B',
     type: 'workshop',
     speakerIds: [],
@@ -201,8 +311,10 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-3',
     startTime: '15:00',
     endTime: '16:00',
-    title: '[Demo] Closing conversation',
-    description: '[Replace] How the event wraps up and what happens next.',
+    title: 'Closing conversation',
+    description:
+      'A short conversation on what came out of the three days and where the network goes ' +
+      'from here.',
     location: 'Main hall',
     type: 'plenary',
     speakerIds: ['speaker-placeholder-3'],
@@ -230,14 +342,16 @@ const DEMO_SESSIONS = Object.freeze([
 const DEMO_SPEAKERS = Object.freeze([
   {
     id: 'speaker-placeholder-1',
-    firstName: '[Demo] Alex',
-    lastName: 'Placeholder',
-    slug: 'demo-alex-placeholder',
+    firstName: '[Demo] Marisol',
+    lastName: 'Reyes',
+    slug: 'demo-marisol-reyes',
     email: null,
-    bio: '[Replace] Two-sentence speaker bio.',
+    bio:
+      'Managing editor at a bilingual community newsroom, focused on collaborative ' +
+      'investigations with rural partner outlets.',
     headshotPath: 'branding/mark.svg',
-    organization: '[Replace] Organization',
-    jobTitle: '[Replace] Role',
+    organization: 'Coastal Public Media',
+    jobTitle: 'Managing Editor',
     socialHandles: {},
     status: 'approved',
     uid: null,
@@ -247,14 +361,16 @@ const DEMO_SPEAKERS = Object.freeze([
   },
   {
     id: 'speaker-placeholder-2',
-    firstName: '[Demo] Sam',
-    lastName: 'Example',
-    slug: 'demo-sam-example',
+    firstName: '[Demo] Devon',
+    lastName: 'Achebe',
+    slug: 'demo-devon-achebe',
     email: null,
-    bio: '[Replace] Two-sentence speaker bio.',
+    bio:
+      'Runs audience engagement for a three-station public radio network and teaches ' +
+      'newsroom data-literacy workshops.',
     headshotPath: 'branding/mark.svg',
-    organization: '[Replace] Organization',
-    jobTitle: '[Replace] Role',
+    organization: 'Three Rivers Public Radio',
+    jobTitle: 'Audience Engagement Director',
     socialHandles: {},
     status: 'approved',
     uid: null,
@@ -264,14 +380,16 @@ const DEMO_SPEAKERS = Object.freeze([
   },
   {
     id: 'speaker-placeholder-3',
-    firstName: '[Demo] Riley',
-    lastName: 'Specimen',
-    slug: 'demo-riley-specimen',
+    firstName: '[Demo] Priya',
+    lastName: 'Natarajan',
+    slug: 'demo-priya-natarajan',
     email: null,
-    bio: '[Replace] Two-sentence speaker bio.',
+    bio:
+      'Co-founded a reader-funded local news cooperative and advises other outlets on ' +
+      'member-supported revenue models.',
     headshotPath: 'branding/mark.svg',
-    organization: '[Replace] Organization',
-    jobTitle: '[Replace] Role',
+    organization: 'Harborlight Neighborhood News',
+    jobTitle: 'Co-founder and Publisher',
     socialHandles: {},
     status: 'approved',
     uid: null,
@@ -285,33 +403,33 @@ const DEMO_SPEAKERS = Object.freeze([
 const DEMO_ORGANIZATIONS = Object.freeze([
   {
     id: 'org-placeholder-1',
-    name: '[Demo] Beacon Placeholder Fund',
+    name: '[Demo] Beacon Community Fund',
     tier: 'presenting',
     url: 'https://example.org',
     logoPath: 'branding/mark.svg',
-    description: '[Replace] One sentence about this sponsor.',
+    description: 'A regional foundation funding local news sustainability projects along the coast.',
     visible: true,
     order: 0,
     seeded: true,
   },
   {
     id: 'org-placeholder-2',
-    name: '[Demo] Sample Community Trust',
+    name: '[Demo] Lighthouse Press Trust',
     tier: 'supporting',
     url: 'https://example.org',
     logoPath: 'branding/mark.svg',
-    description: '[Replace] One sentence about this sponsor.',
+    description: 'A nonprofit press trust supporting newsroom operations and staff training.',
     visible: true,
     order: 1,
     seeded: true,
   },
   {
     id: 'org-placeholder-3',
-    name: '[Demo] Fictional Media Collective',
+    name: '[Demo] Tidewater Media Collective',
     tier: 'partner',
     url: 'https://example.org',
     logoPath: 'branding/mark.svg',
-    description: '[Replace] One sentence about this partner.',
+    description: 'A cooperative of six independent local outlets sharing investigative resources.',
     visible: true,
     order: 2,
     seeded: true,
