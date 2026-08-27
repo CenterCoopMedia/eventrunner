@@ -5,6 +5,11 @@
 // Escape closes, and the page behind it stops scrolling. No dependency: the
 // app has no dialog library and one modal shell does not justify adding one.
 //
+// Elevation (design brief §2.1, §2.4): the ink-tinted overlay (no blur) is
+// the scrim, and a strong-rule frame carries the panel — never a shadow.
+// "Shadow decorates nothing" is absolute; a modal is lifted by tint, not by
+// depth.
+//
 // Escape closes ONE dialog — the topmost. These modals nest: ImagePicker
 // opens a library, and a tile inside it opens the asset detail dialog. With
 // every mounted shell handling the same document-level keydown, one Escape
@@ -69,7 +74,7 @@ export default function ModalShell({ title, description = null, onClose, childre
         aria-modal="true"
         aria-labelledby={headingId}
         tabIndex={-1}
-        className="my-8 w-full max-w-3xl rounded-brand-lg border border-brand-ink/10 bg-brand-surface p-6 shadow-lg"
+        className="my-8 w-full max-w-3xl rounded-brand-lg border-strong border-rule-strong bg-brand-surface p-6"
       >
         <div className="flex items-start justify-between gap-4">
           <div>

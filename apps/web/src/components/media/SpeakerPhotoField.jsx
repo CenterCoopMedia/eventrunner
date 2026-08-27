@@ -62,17 +62,18 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
   return (
     <div className="flex flex-col gap-2">
       <span className="block font-semibold text-brand-ink">Photo</span>
+      {/* Square portrait, brand radius (design brief §2.4) — not a circle. */}
       <div className="flex items-center gap-4">
         {value ? (
           <AssetImage
             path={value}
             alt="Your current speaker photo"
-            className="h-20 w-20 rounded-full bg-brand-surface-alt object-cover"
+            className="h-20 w-20 rounded-brand bg-brand-surface-alt object-cover"
           />
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-20 w-20 items-center justify-center rounded-full border border-dashed border-brand-ink/20 text-xs text-brand-ink-muted"
+            className="flex h-20 w-20 items-center justify-center rounded-brand border border-dashed border-brand-ink/20 text-xs text-brand-ink-muted"
           >
             None
           </span>

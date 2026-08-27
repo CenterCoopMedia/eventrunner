@@ -150,6 +150,7 @@
           <li>Apply concentric border radius across nested elements (inner radius = outer radius − padding).</li>
           <li>Prioritize optical alignment over geometric alignment.</li>
           <li>Add a <code>1px</code> outline to images, offset by <code>-1px</code>: black at 8% opacity in light mode, white at 8% in dark mode.</li>
+          <li>Portraits and avatars are square on the brand radius (<code>rounded-brand</code>), never a circle (<code>rounded-full</code>) — a circular crop is a generic-template tell.</li>
           </ul>
           <h2 id="animation">Animation<a class="heading-anchor" href="#animation" aria-label="Link to this section">#</a></h2>
           <p>The system has two motion classes and there is no third (design brief §2.2).</p>
@@ -193,6 +194,7 @@
           <li>Dark mode is its own palette, not light mode reversed. Every color token is defined under both <code>:root[data-mode=&#39;light&#39;]</code> and <code>:root[data-mode=&#39;dark&#39;]</code>, and a token missing from either block is a bug (design brief §8.2).</li>
           <li>The mode comes from <code>data-mode</code> on the root element. <code>config/theme.mode</code> sets the policy — <code>light</code>, <code>dark</code>, or <code>system</code> — and <code>lib/modeRuntime.js</code> writes the attribute. Never add a <code>.dark</code> class of your own.</li>
           <li>Use the rule tokens for rules: <code>--rule-hairline-*</code>, <code>--rule-strong-*</code>, <code>--rule-nameplate-*</code> (design brief §3.7). A rule never borrows an ink step and never carries brand color.</li>
+          <li>A form control&#39;s boundary (<code>input</code>, <code>select</code>, <code>textarea</code>) uses <code>--color-border-control</code>, never <code>--rule-hairline</code>. WCAG 1.4.11 needs 3:1 against the ground it renders on; a rule is tuned for low-contrast structure and falls well short of that bar.</li>
           <li>One theme mechanism, used consistently. This repo&#39;s choice: the <code>config/theme</code>-driven custom-property chain (spec §7.2) — not ad-hoc <code>.dark</code> classes per component.</li>
           <li>Define gradient interpolation: <code>in oklab</code> for even brightness, <code>in oklch</code> for vivid midtones.</li>
           </ul>

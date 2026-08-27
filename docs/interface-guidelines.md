@@ -35,6 +35,7 @@ Cards, boxes, and chrome: a rule replaces a card border wherever a rule can do t
 - Apply concentric border radius across nested elements (inner radius = outer radius − padding).
 - Prioritize optical alignment over geometric alignment.
 - Add a `1px` outline to images, offset by `-1px`: black at 8% opacity in light mode, white at 8% in dark mode.
+- Portraits and avatars are square on the brand radius (`rounded-brand`), never a circle (`rounded-full`) — a circular crop is a generic-template tell.
 
 ## Animation
 

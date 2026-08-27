@@ -31,6 +31,27 @@ function pick(file) {
 }
 
 describe('SpeakerPhotoField', () => {
+  it('renders the placeholder as a square portrait on the brand radius, never a circle', () => {
+    render(<SpeakerPhotoField user={user} speakerId="rae" value="" onChange={vi.fn()} />);
+    const stub = screen.getByText('None');
+    expect(stub).toHaveClass('rounded-brand');
+    expect(stub).not.toHaveClass('rounded-full');
+  });
+
+  it('renders an uploaded photo as a square portrait on the brand radius', () => {
+    render(
+      <SpeakerPhotoField
+        user={user}
+        speakerId="rae"
+        value="speaker-photos/rae/photo.png"
+        onChange={vi.fn()}
+      />,
+    );
+    const image = screen.getByAltText('Your current speaker photo');
+    expect(image).toHaveClass('rounded-brand');
+    expect(image).not.toHaveClass('rounded-full');
+  });
+
   it('uploads to the speaker’s own folder through speakerPhotoUpload and reports the path', async () => {
     const onChange = vi.fn();
     render(<SpeakerPhotoField user={user} speakerId="rae" value="" onChange={onChange} />);

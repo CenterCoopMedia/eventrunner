@@ -1,5 +1,9 @@
 // An attendee's photo, or a lettered stand-in.
 //
+// Square portrait, brand radius (design brief §2.4): a circular crop is a
+// generic-template tell here, so the frame is `rounded-brand` — the same
+// radius every other shape in the system uses — not `rounded-full`.
+//
 // The value comes from `users_public/{uid}.photoPath` — a projection of an
 // unvalidated client-written field. Two guards, both deliberate:
 //
@@ -39,7 +43,7 @@ export default function ProfilePhoto({ photoPath, displayName, size = 'md', clas
   }, [url]);
 
   const dimensions = size === 'lg' ? 'h-24 w-24 text-2xl' : 'h-12 w-12 text-base';
-  const shared = `shrink-0 rounded-full object-cover ${dimensions} ${className}`;
+  const shared = `shrink-0 rounded-brand object-cover ${dimensions} ${className}`;
 
   if (!url || failed) {
     return (
