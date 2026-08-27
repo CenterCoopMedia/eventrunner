@@ -44,6 +44,7 @@ import {
   THEME_MODE_POLICIES,
   THEME_FONT_ROLES,
   THEME_TEXTURES,
+  THEME_DENSITIES,
   THEME_PRESET_IDS,
   recommendedConfiguration,
   THEME_MOTIF_SET_IDS,
@@ -158,6 +159,8 @@ export { THEME_FONT_ROLES };
 export const RADIUS_IDS = Object.freeze(Object.keys(RADIUS_SCALES));
 /** config/theme.texture values. */
 export const TEXTURE_IDS = Object.freeze([...THEME_TEXTURES]);
+/** config/theme.density values (brief §4, §6.1). */
+export const DENSITY_IDS = Object.freeze([...THEME_DENSITIES]);
 /** config/theme.mode values (brief §3.3). */
 export const MODE_POLICY_IDS = Object.freeze([...THEME_MODE_POLICIES]);
 /** The mode policy a document without a `mode` field renders as. */

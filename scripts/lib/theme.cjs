@@ -29,7 +29,6 @@
 const {
   DEFAULT_MODE_POLICY,
   DEFAULT_PRESET_ID,
-  getPreset,
   hexToRgb,
   resolveLegacyColors,
   rgbToHex,
@@ -230,7 +229,6 @@ const PLACEHOLDER_LOGOS = Object.freeze({
  * @returns {object} config/theme
  */
 function defaultTheme() {
-  const preset = getPreset(DEFAULT_PRESET_ID);
   return {
     // The base look (design brief §4). Every other field below either comes
     // from it or refines it.
@@ -249,11 +247,14 @@ function defaultTheme() {
     optionPicks: {},
     // Per-mode raw token overrides, the advanced path (brief §5.2).
     tokens: {},
-    texture: preset.shape.texture,
-    radius: preset.shape.radius,
-    // The motif set the root element switches to (brief §3.8). Newsroom
-    // ships with none; Field Guide and Atlas turn one on.
-    motifSet: preset.motifSet,
+    // Texture, corners, spacing, and the illustration set are DELIBERATELY
+    // absent (owner review, 2026-08-27). The style states all four, and a
+    // seed that copied them into the document would pin the FIRST style's
+    // shape onto every later one: switch from Institutional to Zine and the
+    // copier grain would be suppressed by a `texture: 'flat'` nobody chose.
+    // A field the document does not name is a field the style decides, and
+    // the theme editor writes one only when an operator picks it under
+    // Advanced.
     // Mode policy (design brief §3.3): 'light' | 'dark' | 'system'. A fresh
     // deployment starts light, which is what every deployment made before
     // the field existed also renders.

@@ -92,7 +92,7 @@
       ]
     },
     "nameplate": {
-      "label": "Nameplate treatment",
+      "label": "Header style",
       "prompt": "The title block.",
       "default": "corner-title-block",
       "choices": [
@@ -132,7 +132,7 @@
       ]
     },
     "component": {
-      "label": "Schedule presentation",
+      "label": "Schedule style",
       "prompt": "How the board is drawn.",
       "default": "departure-board",
       "choices": [

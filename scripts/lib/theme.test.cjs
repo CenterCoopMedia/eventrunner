@@ -43,7 +43,13 @@ test('the seed starts on the default preset, with its palette materialized', () 
   assert.equal(theme.preset, DEFAULT_PRESET_ID);
   assert.equal(DEFAULT_PRESET_ID, 'civic');
   assert.equal(THEME_PRESET_IDS[0], DEFAULT_PRESET_ID);
-  assert.equal(theme.motifSet, getPreset(DEFAULT_PRESET_ID).motifSet);
+
+  // Texture, corners, spacing, and illustrations are the STYLE's to state.
+  // A seed that copied them in would pin the first style's shape onto every
+  // later one (owner review, 2026-08-27).
+  for (const field of ['texture', 'radius', 'density', 'motifSet']) {
+    assert.equal(theme[field], undefined, `${field} is the style's to decide`);
+  }
 
   // `colors` is an OUTPUT for a preset document: the one shared resolver
   // materializes it here exactly as updateTheme does on every publish, so

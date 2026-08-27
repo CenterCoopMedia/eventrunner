@@ -93,7 +93,7 @@
       ]
     },
     "nameplate": {
-      "label": "Nameplate treatment",
+      "label": "Header style",
       "prompt": "The flyer headline.",
       "default": "full-sheet",
       "choices": [
@@ -130,7 +130,7 @@
       ]
     },
     "component": {
-      "label": "Session block",
+      "label": "Schedule style",
       "prompt": "How a session block is printed.",
       "$default-note": "Flat is the default (owner review, 2026-08-27). The stamp is the theme's signature and it still ships under the brief §2.4 exception, but a printing artefact is a thing a client turns ON, not a thing they discover on their own schedule page.",
       "default": "flat-block",
@@ -166,7 +166,7 @@
       ]
     },
     "marginalia": {
-      "label": "Marginalia",
+      "label": "Pen marks",
       "prompt": "The pen that went over the page afterwards. Its own control, because a client may want the stamp without the pen.",
       "default": "off",
       "choices": [

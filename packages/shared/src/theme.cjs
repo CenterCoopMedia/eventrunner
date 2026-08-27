@@ -96,8 +96,9 @@ const THEME_LOGO_SLOTS = Object.freeze(['primary', 'mark', 'footer', 'ogDefault'
  * way to pick one that renders as nothing.
  */
 const THEME_DOC_KEYS = Object.freeze([
-  'colors', 'fonts', 'texture', 'radius', 'mode', 'logos', 'placeholderLogos',
-  'preset', 'optionPicks', 'tokens', 'motifSet', 'brandColor',
+  'colors', 'fonts', 'texture', 'radius', 'density', 'mode', 'logos',
+  'placeholderLogos', 'preset', 'optionPicks', 'tokens', 'motifSet',
+  'brandColor',
 ]);
 
 /**
@@ -774,9 +775,11 @@ function resolveShape(theme) {
   return {
     radius: pick(theme?.radius, shape.radius, THEME_RADIUS_IDS),
     texture: pick(theme?.texture, shape.texture, THEME_TEXTURES),
-    // A document with no preset predates the setting, so it takes the
-    // middle step — which is what the pre-preset surfaces already render.
-    density: pick(null, shape.density, THEME_DENSITIES) || 'comfortable',
+    // Density is an Advanced setting like the other two (owner review,
+    // 2026-08-27): the style states one, and a client may name another. A
+    // document that names neither — one made before presets existed — takes
+    // the middle step, which is what those surfaces already render.
+    density: pick(theme?.density, shape.density, THEME_DENSITIES) || 'comfortable',
   };
 }
 

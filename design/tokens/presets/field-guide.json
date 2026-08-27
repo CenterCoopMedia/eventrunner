@@ -96,7 +96,7 @@
       ]
     },
     "nameplate": {
-      "label": "Nameplate treatment",
+      "label": "Header style",
       "prompt": "The title page.",
       "$default-note": "The framed title page is the default, as it was before. An earlier pass moved it to the alternate on the grounds that a frame belongs only on \"content that supports it\" — but the framed treatment renders on the HOME page alone (Layout.jsx builds the compact nameplate on every inner page), and the opening page of a handbook is exactly the content a frontispiece supports. The plain ruled head stays one pick away for a text-heavy event.",
       "default": "framed-title-page",
@@ -136,7 +136,7 @@
       ]
     },
     "component": {
-      "label": "Session presentation",
+      "label": "Schedule style",
       "prompt": "How a session is labelled.",
       "default": "specimen-label",
       "choices": [

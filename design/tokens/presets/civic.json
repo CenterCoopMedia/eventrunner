@@ -88,7 +88,7 @@
       ]
     },
     "nameplate": {
-      "label": "Nameplate treatment",
+      "label": "Header style",
       "prompt": "The letterhead.",
       "default": "institutional-letterhead",
       "choices": [
@@ -125,7 +125,7 @@
       ]
     },
     "component": {
-      "label": "Schedule presentation",
+      "label": "Schedule style",
       "prompt": "How the agenda is posted.",
       "default": "posted-agenda",
       "choices": [

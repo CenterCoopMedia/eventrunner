@@ -106,10 +106,7 @@ export const theme = {
   preset: 'newsroom',
   optionPicks: {},
   fonts: {},
-  texture: 'flat',
-  radius: 'small',
   mode: 'light',
-  motifSet: 'none',
   logos: {
     primary: 'branding/logo.svg',
     mark: 'branding/mark.svg',

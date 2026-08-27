@@ -6,7 +6,9 @@
 //     frame carries data-theme/data-mode/data-motif-set for the draft, and
 //     the room around it never adopts any of them.
 //   • The frame renders the client's REAL page, not swatches.
-//   • Two depths: the curated pickers first, raw tokens behind a disclosure.
+//   • The workflow is six decisions in order: site style, logo and icon,
+//     main brand colour, header style, schedule style, light or dark. Every
+//     other control is behind the Advanced disclosure.
 //   • The whole-document replace really is whole — a save carries preset,
 //     optionPicks, brandColor, tokens, motifSet, mode, fonts, and logos
 //     together. Dropping one would silently delete it.
@@ -140,9 +142,20 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
   return result;
 }
 
-/** Open the second depth. Raw token editing is never the first thing seen. */
+/** Open Advanced. Nothing behind it is needed for a finished site. */
 function openAdvanced() {
-  fireEvent.click(screen.getByRole('button', { name: 'Edit the raw tokens' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Show the advanced settings' }));
+}
+
+/** The panel titles the bench shows, in the order a staff member meets them. */
+function panelTitles() {
+  // The frame renders a whole public page, headings and all, so the bench's
+  // own panels are the level-2 headings OUTSIDE it.
+  const preview = document.getElementById(PREVIEW_SCOPE_ID);
+  return screen
+    .getAllByRole('heading', { level: 2 })
+    .filter((heading) => !preview?.contains(heading))
+    .map((heading) => heading.textContent);
 }
 
 beforeEach(() => {
@@ -175,7 +188,7 @@ describe('the proof', () => {
     // …and the room keeps the attributes the SAVED theme gave it. (The
     // provider writes those; the draft must not move them.)
     const room = { ...document.documentElement.dataset };
-    fireEvent.change(screen.getByLabelText('Preset'), { target: { value: 'zine' } });
+    fireEvent.change(screen.getByLabelText('Site style'), { target: { value: 'zine' } });
     await waitFor(() => expect(frame().dataset.theme).toBe('zine'));
     expect({ ...document.documentElement.dataset }).toEqual(room);
   });
@@ -207,48 +220,112 @@ describe('the proof', () => {
   });
 });
 
-describe('the curated depth', () => {
-  it('offers the preset first, and says plainly what picking one replaces', async () => {
+describe('the staff workflow', () => {
+  it('asks six questions, in order, and shows the page preview beside them', async () => {
+    // Owner calibration, 2026-08-27: "staff complete the normal workflow
+    // with a small set of clear decisions". This is that list, and the order
+    // is the workflow.
     await renderBranding(PRESET_THEME);
-    expect(screen.getByLabelText('Preset')).toHaveValue('broadsheet');
-    expect(
-      screen.getByText(/Picking a preset replaces every value you have not overridden yourself/),
-    ).toBeInTheDocument();
+    expect(panelTitles()).toEqual([
+      'Site style',
+      'Logo and icon',
+      'Main brand colour',
+      'Header and schedule',
+      'Light or dark',
+      'Advanced',
+      'Page preview',
+    ]);
   });
 
-  it('offers that preset’s own option groups, with the reason for each choice', async () => {
+  it('offers all six styles with no second tier, and says who each suits', async () => {
     await renderBranding(PRESET_THEME);
-    expect(screen.getByLabelText('Heading face')).toHaveValue('libre-baskerville');
-    expect(screen.getByLabelText('Nameplate treatment')).toHaveValue('full-measure');
+    const picker = screen.getByLabelText('Site style');
+    expect(picker).toHaveValue('broadsheet');
+    const offered = [...picker.options].map((option) => option.textContent);
+    expect(offered).toEqual([
+      'None — this deployment’s stored palette',
+      'Institutional',
+      'Newsroom',
+      'Broadsheet',
+      'Atlas',
+      'Field Guide',
+      'Zine',
+    ]);
+    // Nothing carries a warning label.
+    expect(offered.join(' ')).not.toMatch(/experimental|beta|unstable/i);
+    expect(screen.getByText(/Best for: Formal programmes/)).toBeInTheDocument();
+  });
+
+  it('asks for the header and the schedule, with the reason for each choice', async () => {
+    await renderBranding(PRESET_THEME);
+    expect(screen.getByLabelText('Header style')).toHaveValue('full-measure');
+    expect(screen.getByLabelText('Schedule style')).toHaveValue('ruled-programme');
     // The catalog's `why` is the hint, so a choice is never a bare name.
-    expect(screen.getByText(/The same paper, founded sixty years later/)).toBeInTheDocument();
+    expect(screen.getByText(/Hairline rows, times in the agate column/)).toBeInTheDocument();
   });
 
-  it('re-renders the frame on the picked preset', async () => {
+  it('re-renders the frame on the picked style, with that style’s own choices', async () => {
     await renderBranding(PRESET_THEME);
     expect(frame().dataset.theme).toBe('broadsheet');
 
-    fireEvent.change(screen.getByLabelText('Preset'), { target: { value: 'zine' } });
+    fireEvent.change(screen.getByLabelText('Site style'), { target: { value: 'zine' } });
     await waitFor(() => expect(frame().dataset.theme).toBe('zine'));
-    // The picks follow the preset that offers them, rather than carrying a
+    // The picks follow the style that offers them, rather than carrying a
     // stale group id the server would reject by name.
+    expect(screen.getByLabelText('Schedule style')).toHaveValue('flat-block');
+    openAdvanced();
     expect(screen.getByLabelText('Heading face')).toHaveValue('karrik');
   });
 
-  it('keeps raw token editing behind its own disclosure', async () => {
+  it('keeps typography, illustrations, shape, and raw colours behind Advanced', async () => {
     await renderBranding(PRESET_THEME);
-    expect(screen.getByRole('button', { name: 'Edit the raw tokens' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Show the advanced settings' })).toHaveAttribute(
       'aria-expanded',
       'false',
     );
+    for (const label of ['Heading face', 'Illustration set', 'Surface', 'Corners', 'Spacing']) {
+      expect(screen.getByLabelText(label).closest('[hidden]'), label).not.toBeNull();
+    }
     expect(screen.getByLabelText('Surface — light').closest('[hidden]')).not.toBeNull();
 
     openAdvanced();
-    expect(screen.getByRole('button', { name: 'Hide the raw tokens' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Hide the advanced settings' })).toHaveAttribute(
       'aria-expanded',
       'true',
     );
+    for (const label of ['Heading face', 'Illustration set', 'Surface', 'Corners', 'Spacing']) {
+      expect(screen.getByLabelText(label).closest('[hidden]'), label).toBeNull();
+    }
     expect(screen.getByLabelText('Surface — light').closest('[hidden]')).toBeNull();
+  });
+
+  it('leaves a shape field blank so a save cannot pin a style to a shape', async () => {
+    // Zine names the copier grain; the stored document names no texture. A
+    // form that seeded a concrete value here would write it on the next
+    // publish and quietly flatten the style.
+    await renderBranding({
+      preset: 'zine',
+      optionPicks: {},
+      colors: {},
+      mode: 'light',
+      // Explicit nulls: the provider overlays config/theme onto the
+      // committed snapshot shallowly, and the snapshot predates this rule.
+      texture: null,
+      radius: null,
+      density: null,
+    });
+    openAdvanced();
+    expect(screen.getByLabelText('Surface')).toHaveValue('');
+    expect(screen.getByLabelText('Corners')).toHaveValue('');
+    expect(screen.getByLabelText('Spacing')).toHaveValue('');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const { theme } = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(theme.texture).toBeUndefined();
+    expect(theme.radius).toBeUndefined();
+    expect(theme.density).toBeUndefined();
   });
 
   it('asks for one brand colour and derives the supporting shades from it', async () => {
@@ -275,7 +352,7 @@ describe('the curated depth', () => {
   });
 });
 
-describe('the advanced depth', () => {
+describe('advanced colour settings', () => {
   it('edits per-mode overrides on a light tab and a dark tab', async () => {
     await renderBranding(PRESET_THEME);
     openAdvanced();
@@ -310,9 +387,10 @@ describe('the advanced depth', () => {
     openAdvanced();
     expect(screen.getByLabelText('Surface — light')).toHaveValue(hex('f7f4ee'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear the overrides for this mode' }));
-    expect(screen.getByText(/falls back to the preset's own palette/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear these overrides' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset the light colours' }));
+    expect(screen.getByText(/falls back to the shades worked out from the main brand colour/))
+      .toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset these colours' }));
 
     expect(screen.getByLabelText('Surface — light')).toHaveValue('');
   });
@@ -395,16 +473,21 @@ describe('publishing the theme', () => {
     await renderBranding(PRESET_THEME);
     expect(screen.getByText('Live')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Preset'), { target: { value: 'zine' } });
+    fireEvent.change(screen.getByLabelText('Site style'), { target: { value: 'zine' } });
     expect(await screen.findByText('Live with unpublished changes')).toBeInTheDocument();
   });
 
   // Issue #24: each slot is an ImagePicker over the branding/ namespace. The
   // path stays editable by hand, because the four placeholders init seeds
   // have no library row.
-  it('keeps the logo slots and the media picker', async () => {
+  it('keeps every logo slot and the media picker, two of them in the workflow', async () => {
     await renderBranding();
     expect(screen.getByLabelText('Primary logo')).toHaveValue('branding/logo.svg');
+    expect(screen.getByLabelText('Square icon')).toHaveValue('branding/mark.svg');
+    // The other three are still here, one disclosure away.
+    expect(screen.getByLabelText('Favicon').closest('[hidden]')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More image slots' }));
+    expect(screen.getByLabelText('Favicon').closest('[hidden]')).toBeNull();
     expect(screen.getAllByRole('button', { name: 'Choose or upload…' }).length).toBe(5);
   });
 });

@@ -87,7 +87,7 @@
       ]
     },
     "nameplate": {
-      "label": "Nameplate treatment",
+      "label": "Header style",
       "prompt": "The masthead layout.",
       "default": "full-measure",
       "choices": [
@@ -125,7 +125,7 @@
       ]
     },
     "component": {
-      "label": "Schedule presentation",
+      "label": "Schedule style",
       "prompt": "How the programme is set.",
       "default": "ruled-programme",
       "choices": [

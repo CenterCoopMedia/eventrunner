@@ -87,7 +87,7 @@
       ]
     },
     "nameplate": {
-      "label": "Nameplate treatment",
+      "label": "Header style",
       "prompt": "The masthead bar.",
       "default": "rule-bounded-bar",
       "choices": [
@@ -126,7 +126,7 @@
       ]
     },
     "component": {
-      "label": "Session card",
+      "label": "Schedule style",
       "prompt": "How a session listing is set.",
       "default": "hairline-row",
       "choices": [

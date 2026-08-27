@@ -64,7 +64,7 @@ The institution's register.
 - **Source Serif 4** — The same document, lighter on its feet: a university or a cultural institution rather than an agency, and the repo already bundles it for Broadsheet.
 - **Public Sans bold** — The all-sans document. One face for headings, labels, and data is the plainest possible public notice, which is the story taken to its logical end.
 
-### Nameplate treatment — `nameplate`
+### Header style — `nameplate`
 
 The letterhead.
 
@@ -72,7 +72,7 @@ The letterhead.
 - **Two-part lockup** — The co-signed notice of a partnership, which is the common Civic case: logo slot left, event name and dates right, divided by a vertical hairline.
 - **Compact standing head** — For inner pages, where the reader wants the content and not the letterhead again.
 
-### Schedule presentation — `component`
+### Schedule style — `component`
 
 How the agenda is posted.
 
@@ -122,7 +122,7 @@ The desk's headline voice.
 - **Newsreader at display weights** — The wire-service desk. Running the body face up to headline size gives a quieter, more traditional publication that still belongs to the same newsroom.
 - **Archivo bold condensed** — Grotesque headlines are a real newsroom tradition, and they keep the story while letting a client trade warmth for punch.
 
-### Nameplate treatment — `nameplate`
+### Header style — `nameplate`
 
 The masthead bar.
 
@@ -130,7 +130,7 @@ The masthead bar.
 - **Stacked with a deck** — The deck is a newsroom device, not marketing copy, so it must state a fact about the event.
 - **Section-aware bar** — The running head of a news site; it reinforces the table-of-contents idea the section rules set up.
 
-### Session card — `component`
+### Schedule style — `component`
 
 How a session listing is set.
 
@@ -180,7 +180,7 @@ The paper's era.
 - **Libre Baskerville** — The same paper, founded sixty years later. Its more even colour and open counters keep the authority while reading a shade less antique.
 - **Spectral semibold** — The paper of record that redesigned in this century. It holds the serious register while giving a modern client a masthead that does not look inherited.
 
-### Nameplate treatment — `nameplate`
+### Header style — `nameplate`
 
 The masthead layout.
 
@@ -188,7 +188,7 @@ The masthead layout.
 - **Centred with a double rule** — The ceremonial masthead a paper uses on an anniversary edition, so it stays inside the story while reading more formal.
 - **Compact left with a standing edition line** — The running head on an inside page, which is why it fits inner pages and the nameplate-compact header variant.
 
-### Schedule presentation — `component`
+### Schedule style — `component`
 
 How the programme is set.
 
@@ -240,7 +240,7 @@ The sign face. Body stays Libre Franklin and data stays Overpass Mono under ever
 - **Libre Franklin extrabold** — Franklin Gothic set American transit and news signage for a century, so running the body face up to heading size keeps the system whole and costs nothing extra.
 - **Archivo Condensed** — Sheet space is scarce on a real map, and condensed headings pull the page toward the drawn sheet, which suits a dense multi-venue programme.
 
-### Nameplate treatment — `nameplate`
+### Header style — `nameplate`
 
 The title block.
 
@@ -248,7 +248,7 @@ The title block.
 - **Sheet header with a scale line** — A scale bar states an extent, which is what a date span is, so the device stays honest.
 - **Departure board header** — The concourse board rather than the sheet, for events whose story is movement more than geography. The line updates on load and on user action only.
 
-### Schedule presentation — `component`
+### Schedule style — `component`
 
 How the board is drawn.
 
@@ -305,7 +305,7 @@ The plate caption. Body stays Vollkorn and data stays IBM Plex Mono under every 
 - **Vollkorn bold at display size** — The one-face volume: a pocket handbook rather than a plate book, quieter and closer to the reading, and it adds nothing to the font budget.
 - **Spectral semibold** — The collector's volume. Its finer, sharper serifs read as the frontispiece of a formal edition, so the story gains a more scholarly opening.
 
-### Nameplate treatment — `nameplate`
+### Header style — `nameplate`
 
 The title page.
 
@@ -315,7 +315,7 @@ The title page.
 - **Ruled title, no frame** — The title page of a cheaper printing of the same book; quieter, and better for text-heavy events.
 - **Plate and label** — It states the book's subject the way a frontispiece plate does, and the plate stays drawn linework, never a photo.
 
-### Session presentation — `component`
+### Schedule style — `component`
 
 How a session is labelled.
 
@@ -376,7 +376,7 @@ The hand-cut poster lettering.
 - **Bagnard** — The same hand-cut origin with more weight and menace, for a louder, rougher event.
 - **Avara** — A transitional serif with the curves replaced by straight segments, so every bowl reads as a cut facet: a poster cut from flat stock rather than drawn.
 
-### Nameplate treatment — `nameplate`
+### Header style — `nameplate`
 
 The flyer headline.
 
@@ -384,7 +384,7 @@ The flyer headline.
 - **Stacked block** — This is how hand-lettering fills a sheet, so it stays hand-made without any rotation or collage.
 - **Boxed bill** — The show bill pinned to a noticeboard; a box drawn in strong rules is a printing device here, not a card.
 
-### Session block — `component`
+### Schedule style — `component`
 
 How a session block is printed.
 
@@ -394,7 +394,7 @@ How a session block is printed.
 - **Stamped block** — Misregistration is what a two-pass print looks like, which is the story's whole production method. It ships under the brief §2.4 exception, Zine only.
 - **Struck folio** — The typewriter section break of a photocopied programme; plain text plus rules, no chip or badge.
 
-### Marginalia — `marginalia`
+### Pen marks — `marginalia`
 
 The pen that went over the page afterwards. Its own control, because a client may want the stamp without the pen.
 

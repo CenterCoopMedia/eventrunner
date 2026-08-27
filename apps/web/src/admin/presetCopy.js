@@ -36,7 +36,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       nameplate: {
-        label: 'Nameplate treatment',
+        label: 'Header style',
         prompt: 'The letterhead.',
         choices: {
           'institutional-letterhead': {
@@ -54,7 +54,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       component: {
-        label: 'Schedule presentation',
+        label: 'Schedule style',
         prompt: 'How the agenda is posted.',
         choices: {
           'posted-agenda': {
@@ -93,7 +93,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       nameplate: {
-        label: 'Nameplate treatment',
+        label: 'Header style',
         prompt: 'The masthead bar.',
         choices: {
           'rule-bounded-bar': {
@@ -111,7 +111,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       component: {
-        label: 'Session card',
+        label: 'Schedule style',
         prompt: 'How a session listing is set.',
         choices: {
           'hairline-row': {
@@ -150,7 +150,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       nameplate: {
-        label: 'Nameplate treatment',
+        label: 'Header style',
         prompt: 'The masthead layout.',
         choices: {
           'full-measure': {
@@ -168,7 +168,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       component: {
-        label: 'Schedule presentation',
+        label: 'Schedule style',
         prompt: 'How the programme is set.',
         choices: {
           'ruled-programme': {
@@ -207,7 +207,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       nameplate: {
-        label: 'Nameplate treatment',
+        label: 'Header style',
         prompt: 'The title block.',
         choices: {
           'corner-title-block': {
@@ -225,7 +225,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       component: {
-        label: 'Schedule presentation',
+        label: 'Schedule style',
         prompt: 'How the board is drawn.',
         choices: {
           'departure-board': {
@@ -268,7 +268,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       nameplate: {
-        label: 'Nameplate treatment',
+        label: 'Header style',
         prompt: 'The title page.',
         choices: {
           'framed-title-page': {
@@ -286,7 +286,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       component: {
-        label: 'Session presentation',
+        label: 'Schedule style',
         prompt: 'How a session is labelled.',
         choices: {
           'specimen-label': {
@@ -339,7 +339,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       nameplate: {
-        label: 'Nameplate treatment',
+        label: 'Header style',
         prompt: 'The flyer headline.',
         choices: {
           'full-sheet': {
@@ -357,7 +357,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       component: {
-        label: 'Session block',
+        label: 'Schedule style',
         prompt: 'How a session block is printed.',
         choices: {
           'flat-block': {
@@ -375,7 +375,7 @@ export const PRESET_COPY = Object.freeze({
         },
       },
       marginalia: {
-        label: 'Marginalia',
+        label: 'Pen marks',
         prompt: 'The pen that went over the page afterwards. Its own control, because a client may want the stamp without the pen.',
         choices: {
           off: {
