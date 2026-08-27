@@ -460,6 +460,11 @@ export default function SessionCard({
     // better order to hear. At `sm` and up the grid places the time back in
     // its own left-hand column beside the title, which is where the eye
     // wants it once there is room for a column.
+    //
+    // The time column carries row-span-2 so its own two rows of height
+    // (a time range that wraps, e.g. "10:30 AM–12:00 PM EDT") cannot inflate
+    // row 1 — the row the title/badge cell alone should size — and push the
+    // location/description cell in row 2 down with it.
     <li className={lead ? 'session-block session-block--lead' : 'session-block'}>
       {/* The face is the first ink pass; the stamp behind it is the second,
           printed off register (brief §2.4, "Exception two", Zine only). At
@@ -479,7 +484,7 @@ export default function SessionCard({
           </h3>
           <TypeBadge type={session.type} />
         </div>
-        <p className="session-block__data mt-2xs font-mono text-text-secondary sm:col-start-1 sm:row-start-1 sm:mt-0">
+        <p className="session-block__data mt-2xs font-mono text-text-secondary sm:col-start-1 sm:row-start-1 sm:row-span-2 sm:mt-0">
           {position ? <span className="session-block__number">{position}</span> : null}
           {range ? (
             <>
@@ -506,10 +511,7 @@ export default function SessionCard({
           />
           <TransferLine to={transferTo} />
           {session.description ? (
-            <p
-              className="session-block__text mt-xs max-w-prose text-text-secondary"
-              style={{ textWrap: 'pretty' }}
-            >
+            <p className="session-block__text mt-xs max-w-prose text-text-secondary text-pretty">
               {session.description}
             </p>
           ) : null}

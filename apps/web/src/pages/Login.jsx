@@ -56,7 +56,7 @@ export default function Login() {
           "disabled in this demo" notice instead of the form — promising a
           Google button and an emailed code above it would contradict it. */}
       {IS_DEMO ? null : (
-        <p className="mt-xs max-w-prose text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+        <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
           Use your Google account, or get a one-time code by email. No password
           needed.
         </p>

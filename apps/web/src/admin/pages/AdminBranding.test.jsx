@@ -133,7 +133,7 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
   // gate is still checking, which is a flake under load, not a bug.
   await waitFor(
     () => {
-      expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
     },
     // The frame renders the whole public app, so the first mount in this

@@ -175,7 +175,7 @@ export default function Schedule() {
 
       {loading ? (
         <div className="mt-lg">
-          <LoadingState label="Loading the schedule" />
+          <LoadingState label="Loading the schedule…" />
         </div>
       ) : !hasAnySession || !activeDay ? (
         <div className="mt-lg">

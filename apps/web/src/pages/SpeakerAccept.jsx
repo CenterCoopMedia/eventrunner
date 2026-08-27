@@ -58,7 +58,7 @@ function DemoInviteNotice() {
         <p className="font-heading text-h3 font-semibold text-text-primary">
           Invitations are disabled in this demo
         </p>
-        <p className="text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+        <p className="text-body text-text-secondary text-pretty">
           On a real deployment this page checks the invitation link an
           organizer emailed you, then links it to the account you sign in
           with. This is a read-only tour of a fictional event, so no
@@ -233,7 +233,7 @@ export default function SpeakerAccept() {
               (the attendee users/{uid} record) — same route
               speaker.accepted's email CTA now points at
               (functions/src/speakers/invites.cjs). */}
-          <p className="text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+          <p className="text-body text-text-secondary text-pretty">
             Next, write your speaker profile — your biography, photograph, and
             organization — for the public programme. It appears publicly once
             an organizer has reviewed it.
@@ -251,7 +251,7 @@ export default function SpeakerAccept() {
   return (
     <article className="mx-auto max-w-md">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">Your invitation</h1>
-      <p className="mt-xs max-w-prose text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+      <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
         {invite.speakerName ? `${invite.speakerName}, you` : 'You'} are invited to
         take part as a {invite.inviteType || 'speaker'}.
         {invite.invitedEmailMasked
@@ -288,7 +288,7 @@ export default function SpeakerAccept() {
               does without a password. */}
           {error?.code === 'email-mismatch' ? (
             <div className="space-y-sm">
-              <p className="text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+              <p className="text-body text-text-secondary text-pretty">
                 Sign in with{' '}
                 {error.invitedEmailMasked ? (
                   <strong>{error.invitedEmailMasked}</strong>
@@ -325,7 +325,7 @@ export default function SpeakerAccept() {
         </Panel>
       ) : (
         <>
-          <p className="mt-md text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+          <p className="mt-md text-body text-text-secondary text-pretty">
             Sign in with the address this invitation was sent to
             {invite.invitedEmailMasked ? ` (${invite.invitedEmailMasked})` : ''} to
             accept it. The quickest way is a one-time code emailed to that

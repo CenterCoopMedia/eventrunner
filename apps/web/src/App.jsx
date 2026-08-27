@@ -61,7 +61,7 @@ export function AppRoutes() {
           // surfaces as a thrown error at the lazy boundary, not as a
           // fallback, so a boundary inside Suspense would never see it.
           <ChunkErrorBoundary>
-            <Suspense fallback={<LoadingState label="Loading admin" />}>
+            <Suspense fallback={<LoadingState label="Loading admin…" />}>
               <AdminApp />
             </Suspense>
           </ChunkErrorBoundary>

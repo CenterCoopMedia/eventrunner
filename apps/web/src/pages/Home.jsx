@@ -96,21 +96,17 @@ export default function Home() {
             {tagline ? (
               <p
                 className={[
-                  'max-w-prose text-lead text-text-secondary',
+                  'max-w-prose text-lead text-text-secondary text-pretty',
                   leadTitle && !titleRepeatsMasthead ? 'mt-sm' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
-                style={{ textWrap: 'pretty' }}
               >
                 {tagline}
               </p>
             ) : null}
             {subtitle ? (
-              <p
-                className="mt-sm max-w-prose text-body text-text-secondary"
-                style={{ textWrap: 'pretty' }}
-              >
+              <p className="mt-sm max-w-prose text-body text-text-secondary text-pretty">
                 {subtitle.value}
               </p>
             ) : null}

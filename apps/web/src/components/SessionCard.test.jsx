@@ -634,4 +634,14 @@ describe('SessionCard shape rules, issue 113', () => {
     const time = container.querySelector('time');
     expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('spans the time cell across both rows, so a wrapped time cannot push row 2 down', () => {
+    // Row 1 holds the title/badge cell and row 2 holds the location and
+    // description. Without row-span-2 the time cell sizes row 1 on its own,
+    // and a time range long enough to wrap (e.g. "10:30 AM–12:00 PM EDT")
+    // grows row 1 taller than the title needs and pushes row 2 with it.
+    const { container } = renderCard();
+    const time = container.querySelector('time');
+    expect(time.closest('p').className).toContain('sm:row-span-2');
+  });
 });

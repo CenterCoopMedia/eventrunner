@@ -105,4 +105,14 @@ describe('Updates', () => {
     const time = container.querySelector('time');
     expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('spans the date cell across both rows, so a wrapped date cannot push row 2 down', () => {
+    // Row 1 holds the title cell and row 2 holds the excerpt. Without
+    // row-span-2 the date cell sizes row 1 on its own, and a date long
+    // enough to wrap grows row 1 taller than the title needs and pushes
+    // row 2 with it. SessionCard.jsx carries the same fix for the schedule.
+    const { container } = renderUpdates({ updates: [NEWER] });
+    const time = container.querySelector('time');
+    expect(time.closest('p').className).toContain('sm:row-span-2');
+  });
 });

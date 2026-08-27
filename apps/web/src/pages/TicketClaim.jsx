@@ -118,7 +118,7 @@ export default function TicketClaim() {
   return (
     <article className="mx-auto max-w-md">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1>
-      <p className="mt-xs max-w-prose text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+      <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
         You are signed in{user.email ? ` as ${user.email}` : ''}. Enter the order number from
         your confirmation email to link your ticket to this account.
       </p>

@@ -85,7 +85,7 @@ export default function MySchedule() {
   if (authLoading) {
     return (
       <div className="mt-lg">
-        <LoadingState label="Loading your schedule" />
+        <LoadingState label="Loading your schedule…" />
       </div>
     );
   }
@@ -131,7 +131,7 @@ export default function MySchedule() {
 
       {loading || bookmarksLoading ? (
         <div className="mt-lg">
-          <LoadingState label="Loading your schedule" />
+          <LoadingState label="Loading your schedule…" />
         </div>
       ) : mySessions.length === 0 ? (
         <div className="mt-lg">

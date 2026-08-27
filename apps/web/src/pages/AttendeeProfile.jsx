@@ -67,7 +67,7 @@ export default function AttendeeProfile() {
     );
   }
 
-  if (state.status === 'loading') return <LoadingState label="Loading profile" />;
+  if (state.status === 'loading') return <LoadingState label="Loading profile…" />;
 
   if (state.status === 'unavailable') {
     return (

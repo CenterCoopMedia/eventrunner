@@ -115,7 +115,7 @@ async function renderAt(path) {
   // gate is still checking, which is a flake under load, not a bug.
   await waitFor(
     () => {
-      expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
     },
     // The admin chunk now pulls the whole public app in with it (the theme
