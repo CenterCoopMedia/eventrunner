@@ -14,6 +14,7 @@ import { resolveHeader } from 'shared/theme';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
 import Header from './Header.jsx';
+import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
 import FeedbackModal from './FeedbackModal.jsx';
 import DemoBanner from './DemoBanner.jsx';
@@ -150,7 +151,7 @@ export default function Layout() {
             {features.feedbackInbox ? (
               <button
                 type="button"
-                className="touch-target mt-md inline-flex items-center rounded-brand border-hairline border-rule-hairline px-sm py-2xs text-text-primary hover:bg-surface-alt"
+                className={`${quietActionClass} mt-md`}
                 onClick={() => setFeedbackOpen(true)}
               >
                 Share feedback

@@ -132,7 +132,7 @@ Two rules from §2.4 bind this section directly:
 - **The eyebrow ban is absolute.** No text sits directly above a heading. This holds for a folio in
   plain small-caps text. It holds at every size, on every surface, in every preset. A folio lives
   beside a rule at a section boundary, in a margin, or in a running header. Where a label must sit
-  near a title, put it below the title or beside it. Two things are not eyebrows: metadata inside
+  near a title, put it below the title or beside it. Two things are not eyebrows: Metadata inside
   the rule-bounded nameplate block, which is part of the nameplate device wherever it sits inside
   it; and a form `<label>` above its own input, which is a control label and must never be
   "corrected".
@@ -143,11 +143,11 @@ Never use a device as decoration.
 
 | Device | What it is | Where to use it | The rule |
 |---|---|---|---|
-| **Masthead nameplate** | A rule-bounded title block. It holds the event name, the dates, and the edition line. | The header of a deployment whose theme names the `masthead` or `compact` treatment (§2.5.1). | Never a hero banner with a background image. Never a photo behind the name. The nameplate is type and rules only. Never mandatory: a theme chooses it. |
+| **Masthead nameplate** | A rule-bounded title block. It holds the event name, the dates, and the edition line. | The header of a deployment whose theme names the `masthead` or `compact` treatment (§2.5.1). | Never a hero banner with a background image. Never a photo behind the name. The nameplate is type and rules only. Never mandatory: A theme chooses it. |
 | **Lead image** | One picture beside the opening copy, or below it at narrow viewports. | The opening section of a page whose subject has a face, a place, or a room. | See §2.5.2. Text never sits over it. Alt text, a token-fixed crop, and a stated focal point are all required. One per page. |
 | **Hairline rules** | Low-contrast 1px rules that separate content. | Section boundaries, table rows, folios, column gutters. | A rule replaces a card border. A rule never carries brand color. Rules use the `--rule-*` tokens only. |
 | **Folios** | A small-caps plain-text label beside a rule. It states the section, the day, or the page role. | A section boundary, a schedule day head, an archive label, a margin, or a running header. | Never a chip. Never a pill. Never a colored badge. Text plus rule only. A folio never sits directly above a heading. See §2.4. |
-| **Multi-column long form** | Two or three text columns at wide viewports. | Long prose pages: about, travel, code of conduct, policy pages. | Apply columns only above the `lg` breakpoint. Keep 60–75 characters per line (interface guidelines, Typography). Never column-split a list of controls. |
+| **Multi-column long form** | Two or three text columns at wide viewports. | Long prose pages: About, travel, code of conduct, policy pages. | Apply columns only above the `lg` breakpoint. Keep 60–75 characters per line (interface guidelines, Typography). Never column-split a list of controls. |
 | **Drop cap** | A large first letter that spans two or three lines. | The first paragraph of a long-form page. | One drop cap per page at most. Never on a short intro. Never on a card. |
 | **Stat and chart anatomy** | A fixed four-part contract for every data block. | Every stat block, every chart, every number the site presents as evidence. | See §2.1.1. The anatomy is enforced, not advisory, from PR3 on. |
 | **Grid schedule** | A two-axis schedule. Time runs down the left. Tracks run across the top. | The schedule page at wide viewports. | The grid must degrade to a single time-ordered list at narrow viewports. The list is the accessible baseline, not a fallback of lower quality. |
@@ -168,7 +168,7 @@ A large number with a small caption under it is not a stat block. It fails this 
 **When the contract lands.** The contract arrives in two phases. Do not read it as one gate.
 
 - **PR1 restyles stat presentation.** PR1 gives stat blocks their editorial treatment and renders
-  both shapes: a block that carries all four parts, and a legacy block that does not. A legacy stat
+  both shapes: A block that carries all four parts, and a legacy block that does not. A legacy stat
   block keeps rendering. PR1 never drops content because a part is missing.
 - **PR3 enforces the contract.** The four-part schema, the editor fields, the seed migration, and
   the write-time enforcement land in PR3 beside the block-schema work. From PR3 on, a block that
@@ -229,7 +229,7 @@ These rules bind every motif:
 
 - A motif supports content. A motif never replaces content.
 - A motif inherits theme ink color. A motif never carries its own color. Render it one of two ways
-  only: as a CSS `mask-image` with `background-color: var(--color-ink-motif)`, or as an inline SVG
+  only: As a CSS `mask-image` with `background-color: var(--color-ink-motif)`, or as an inline SVG
   symbol that reads `currentColor`. Never render a motif as an external `<img>` and never as a CSS
   `url()` fill. Those two forms cannot inherit theme ink, so they break this rule by construction.
   See §3.8.
@@ -248,12 +248,12 @@ Reject these patterns:
 
 - **Eyebrow furniture.** The ban is absolute. Nothing sits directly above a heading. No eyebrow
   labels. No chips. No pills. No dash-style eyebrows. No genre-claim pills. No small description
-  copy above a headline. A folio does not escape this rule: a plain small-caps folio stacked above
+  copy above a headline. A folio does not escape this rule: A plain small-caps folio stacked above
   a heading is still an eyebrow, and a reviewer rejects it. The rule holds at every size, on every
   surface, and in every preset. A folio lives beside a rule at a section boundary, in a margin, or
   in a running header. Where a label must sit near a title, put it below the title or beside it.
   Two things are not eyebrows. Metadata inside the rule-bounded nameplate block is part of the
-  nameplate device, wherever it sits inside that block: the dates and the edition line above the
+  nameplate device, wherever it sits inside that block: The dates and the edition line above the
   event name are the nameplate, not an eyebrow. A form `<label>` above its own input is a control
   label. Never "fix" a form label to satisfy this rule.
 - **Decorative gradients.** No gradient blobs. No purple-heavy gradients. No gradient as a
@@ -292,7 +292,7 @@ Reject these patterns:
 This list has exactly two exceptions. Both are named below. A pattern this list rejects gets no
 other exception, and a preset may not grant itself one.
 
-**Exception one: bento grids.** #105 rejected bento grids. This brief allows one narrow form.
+**Exception one: Bento grids.** #105 rejected bento grids. This brief allows one narrow form.
 A bento grid is allowed only when it passes all five tests:
 
 1. Cell size follows content rank. A bigger cell holds more important content.
@@ -303,7 +303,7 @@ A bento grid is allowed only when it passes all five tests:
 
 A bento grid that fails any test is a basic template bento. Reject it.
 
-**Exception two: the Zine stamp.** Zine may print a session block twice, the way a two-pass job
+**Exception two: The Zine stamp.** Zine may print a session block twice, the way a two-pass job
 prints off register. This is the only box-behind-box layering the system allows, and it is a
 printing artefact, not depth.
 
@@ -321,7 +321,7 @@ The stamp is allowed only when it passes all six tests:
 6. The stamp is never the only signal that a block is interactive. The link is the affordance.
 
 "Shadow decorates nothing" (§2.1) and "no box-behind-box layering" stay intact everywhere else.
-The stamp buys Zine nothing else: no drop shadow, no depth stack, no second offset layer. Zine also
+The stamp buys Zine nothing else: No drop shadow, no depth stack, no second offset layer. Zine also
 ships the flat-block variant, which is the same block with the stamp off. That variant needs no
 exception, and a client may pick it.
 
@@ -330,20 +330,20 @@ exception, and a client may pick it.
 The base system is what a deployment renders before a theme states anything. It must be neutral. A
 theme is where the character lives, and a theme may be very expressive indeed.
 
-This section binds both halves. Read it with §2.1: the devices in §2.1 are the vocabulary, and this
+This section binds both halves. Read it with §2.1: The devices in §2.1 are the vocabulary, and this
 section says who chooses which of them a deployment uses.
 
 #### 2.5.1 The four public headers
 
 A public page renders one of four headers. The active theme names the default for its deployment,
-and a page may state its own. `standard` is the base: a theme that names no header renders it, and
+and a page may state its own. `standard` is the base: A theme that names no header renders it, and
 so does a stored value outside this list.
 
 | Header | What it draws | Where it fits |
 |---|---|---|
 | **`standard`** | The event name at heading size, the dates and place beside it, the navigation under a hairline. | The base. A conference, a university event, a nonprofit convening — any event whose own identity should lead. |
 | **`masthead`** | The masthead nameplate device in full (§2.1), with the navigation under it. | An event that wants the authority of a publication. Broadsheet and Newsroom default to it. |
-| **`compact`** | The nameplate device at running-header size: the short name and the dates on one baseline, between the same two rules. | A long site where the header must not push the page's subject down. |
+| **`compact`** | The nameplate device at running-header size: The short name and the dates on one baseline, between the same two rules. | A long site where the header must not push the page's subject down. |
 | **`minimal`** | The client's mark and the navigation. Nothing else. | A deployment whose own logo is the identity and needs no second voice. |
 
 Bind these:
@@ -410,7 +410,7 @@ permission to remove one.
   atmosphere. Never flatten a surface toward generic institutional UI.
 - Control complexity with defaults and contracts. Never control it by deleting a capability.
 
-The target is one sentence: an ambitious system, with clear defaults, and room for a client to
+The target is one sentence: An ambitious system, with clear defaults, and room for a client to
 express itself. A reviewer who is choosing between "make this smaller" and "make this clearer"
 picks clearer.
 
@@ -574,7 +574,7 @@ The system leans on Tailwind defaults today. Replace that with real scales.
 preset may retune the steps. A preset never adds a step.
 
 **Spacing scale.** Ship a spacing scale as tokens: `--space-3xs` through `--space-3xl`. Keep the
-grouping rule: the gap between groups is at least twice the gap inside one (interface guidelines,
+grouping rule: The gap between groups is at least twice the gap inside one (interface guidelines,
 Layout).
 
 **Rule scale.** Ship `--rule-hairline`, `--rule-strong`, and `--rule-nameplate` as color plus width
@@ -585,7 +585,7 @@ sizes.
 
 ### 3.8 Motif token layer
 
-The system has a fourth, optional layer beside the three tiers: the motif layer. A motif set is a
+The system has a fourth, optional layer beside the three tiers: The motif layer. A motif set is a
 named group of small SVG drawings. `design/tokens/motifs.json` declares the sets. The launch sets
 are `botanical`, `fauna`, `cartographic`, and `none`.
 
@@ -627,7 +627,7 @@ once (§4.6), so `cartographic` adds transit slots beside its map marks:
 - **Schematic line diagrams.** Beck-style runs of straight segments and 45° turns, used as section
   dividers.
 
-These are drawings, so they follow every §2.3 rule: ink only, `aria-hidden="true"`,
+These are drawings, so they follow every §2.3 rule: Ink only, `aria-hidden="true"`,
 `pointer-events: none`. The line between a motif and an icon is meaning, not shape. A mark that
 names a specific line, venue, or room carries meaning. That mark is a labelled icon (§4.6), never a
 motif, and it never renders through the motif layer.
@@ -642,7 +642,7 @@ shape and texture and density settings, a motif default, and a personality state
 Each preset must tell one visual story. The type pairing, the palette, the shape, the density, and
 the motifs must all serve that one story, and a preset whose parts pull in different directions
 fails review. The six visual-story specs are written and settled. They live in
-`docs/plans/2026-08-27-preset-visual-stories.md`: the narrative, the visual vocabulary, the
+`docs/plans/2026-08-27-preset-visual-stories.md`: The narrative, the visual vocabulary, the
 signature moments, the palette words, what each story refuses, and the curated options. Read that
 document before any preset work starts in PR2. Where it and this brief disagree, this brief wins.
 
@@ -671,7 +671,7 @@ SIL Open Font Licence or an equivalent libre licence. No face may load from a CD
 **The font budget is about 20 to 22 Latin-subset `woff2` families repo-wide.** That count covers
 the six preset defaults, every curated heading option, the Zine callout face, and the fixed admin
 pairing. It supersedes the earlier 8-to-12 count, which was written before the option sets existed.
-Reuse across presets is deliberate: hold the count by picking a face the repo already bundles
+Reuse across presets is deliberate: Hold the count by picking a face the repo already bundles
 wherever a story allows it.
 
 **A deployed site loads only the faces its active preset and its picked options use.** The bundle
@@ -685,8 +685,8 @@ face for captions and metadata. Mono: Source Serif 4 with tabular figures, so ti
 and counts stay in the agate column the story asks for. Broadsheet is the one preset that runs a
 serif in the mono role, and it costs the font budget nothing.
 
-**Shape and texture.** Radius: sharp. Rules: hairline, high count. Texture: flat paper tone in
-light, flat ink tone in dark. Density: tight.
+**Shape and texture.** Radius: Sharp. Rules: Hairline, high count. Texture: Flat paper tone in
+light, flat ink tone in dark. Density: Tight.
 
 **Motifs.** Default `none`. A client may enable `botanical` or `fauna` in the engraving style.
 
@@ -705,8 +705,8 @@ than as a feed. Use Broadsheet for an event that wants authority and a long reco
 **Type.** Heading: Fraunces. Body: Newsreader. Data: IBM Plex Sans for captions, labels, and desk
 furniture. Mono: IBM Plex Mono for figures, timestamps, and counts, with tabular figures.
 
-**Shape and texture.** Radius: small, 2px to 4px. Rules: hairline with one strong rule per section.
-Texture: flat. Density: comfortable.
+**Shape and texture.** Radius: Small, 2px to 4px. Rules: Hairline with one strong rule per section.
+Texture: Flat. Density: Comfortable.
 
 **Motifs.** Default `none`. An enabled set renders in the restrained flat style.
 
@@ -726,16 +726,16 @@ deployments.
 
 **Type.** Settled. Heading: Karrik, the default. Bagnard and Avara ship bundled as
 client-selectable heading alternates. Body: Fragment Mono. Data: Fragment Mono. Mono: Fragment
-Mono with tabular figures. Zine runs one mono across body, data, and values on purpose: the even
+Mono with tabular figures. Zine runs one mono across body, data, and values on purpose: The even
 typewriter rhythm is the story.
 
 **Callout.** Zine adds one component token, `--callout-font`. It defaults to Caveat, a bundled
-script face, and it carries the handwritten callout only: one callout per page, real copy, at one
+script face, and it carries the handwritten callout only: One callout per page, real copy, at one
 fixed angle. A component token is not a semantic role (§3.1), so this adds no fifth font role. A
 client may point `--callout-font` at `--font-heading` instead and drop the script face.
 
-**Shape and texture.** Radius: sharp. Rules: strong, low count. Texture: paper grain allowed at low
-opacity, applied with `pointer-events: none` (interface guidelines, Accessibility). Density: loose.
+**Shape and texture.** Radius: Sharp. Rules: Strong, low count. Texture: Paper grain allowed at low
+opacity, applied with `pointer-events: none` (interface guidelines, Accessibility). Density: Loose.
 
 **Stamp.** Zine is the one preset that may print a session block twice, off register. The stamp is
 a flat, unblurred, ink-tinted offset layer behind the block. It is a printing artefact, not depth.
@@ -761,7 +761,7 @@ community events, and student work.
 table headings. Mono: IBM Plex Mono for times, room codes, identifiers, and code, with tabular
 figures. This is the USWDS pairing.
 
-**Shape and texture.** Radius: small. Rules: hairline, even. Texture: flat. Density: comfortable,
+**Shape and texture.** Radius: Small. Rules: Hairline, even. Texture: Flat. Density: Comfortable,
 with larger hit areas.
 
 **Motifs.** Default `none`. An enabled set renders in the restrained flat style.
@@ -784,7 +784,7 @@ plate and the specimen label.
 **Type.** Settled. Heading: Besley, a Clarendon revival whose blunt bracketed serifs are the
 lettering of a printed plate. Body: Vollkorn, a warm text serif that reads long and never competes
 with linework. Data and mono: IBM Plex Mono with tabular figures, the specimen-label hand. Field
-Guide points both value roles at one face on purpose: a label in this world is a tag, and a tag is
+Guide points both value roles at one face on purpose: A label in this world is a tag, and a tag is
 set in the exact hand.
 
 **Devices.** Field Guide adds two devices to the §2.1 set:
@@ -797,8 +797,8 @@ set in the exact hand.
 Both devices follow the §2.1 rules. A plate never becomes a hero image. A specimen label never
 becomes a chip.
 
-**Shape and texture.** Radius: sharp. Rules: hairline, even, with a double rule at the plate frame.
-Texture: flat with an optional light paper tone. Density: comfortable.
+**Shape and texture.** Radius: Sharp. Rules: Hairline, even, with a double rule at the plate frame.
+Texture: Flat with an optional light paper tone. Density: Comfortable.
 
 **Light palette.** Warm off-white ground. Dark bark-brown ink. One deep leaf-green accent. One
 muted clay second accent for data. Earth-tone rules.
@@ -826,14 +826,14 @@ theme's whole idea:
 - The schedule is a **departure board**. Time runs down the left as departures. Lines run across
   the head. A cell is a service. A parent session and its children read as a service and its
   calling points.
-- Concurrent tracks are **lines**, lettered A, B, C. Each line carries a route mark: the letter in
+- Concurrent tracks are **lines**, lettered A, B, C. Each line carries a route mark: The letter in
   the heading face inside a survey-drawn shape, always with the line's name beside it.
 - Rooms and venues are **stations**. A station has a name, a symbol, and a place on the sheet.
 - Moving between sessions is a **transfer**, and the site states it plainly in signage voice:
   "Transfer to Line B · Hall 2 · 6 min walk." State where you are, where it is, and how long it
   takes.
 
-Bind the safety rule: a line is told apart by its letter and its name first. A line colour, where a
+Bind the safety rule: A line is told apart by its letter and its name first. A line colour, where a
 client sets one, is a second signal and never the only one (§8.1). Read the Atlas visual story in
 `docs/plans/2026-08-27-preset-visual-stories.md` before building either register.
 
@@ -841,7 +841,7 @@ client sets one, is a second signal and never the only one (§8.1). Read the Atl
 network uses to tell you where to go. Body: Libre Franklin, the Franklin Gothic lineage that has
 set public signage and timetables for a century. Data and mono: Overpass Mono with tabular figures,
 for departure times, room codes, walking minutes, and distances. Atlas points both value roles at
-one face on purpose: a timetable and a coordinate are the same kind of value.
+one face on purpose: A timetable and a coordinate are the same kind of value.
 
 **Devices.** Atlas adds three devices to the §2.1 set:
 
@@ -852,8 +852,8 @@ one face on purpose: a timetable and a coordinate are the same kind of value.
 - **Wayfinding icons.** A small, consistent icon set for venue, room, track, and transit. An icon
   that carries meaning needs a label (interface guidelines, Accessibility).
 
-**Shape and texture.** Radius: sharp. Rules: hairline grid with one strong rule per section.
-Texture: flat. Density: tight.
+**Shape and texture.** Radius: Sharp. Rules: Hairline grid with one strong rule per section.
+Texture: Flat. Density: Tight.
 
 **Light palette.** Cool paper ground. Near-black ink. One route-marker accent. One second accent
 for the grid and the contour lines, held at low contrast.
@@ -862,7 +862,7 @@ for the grid and the contour lines, held at low contrast.
 stays felt rather than seen.
 
 **Motifs.** Default `cartographic`, on by default. Draw it in precise survey linework. The set
-carries the transit slots too: route marks, station symbols, and Beck-style schematic line-diagram
+carries the transit slots too: Route marks, station symbols, and Beck-style schematic line-diagram
 dividers (§3.8). A mark that names a specific line, venue, or room is a labelled icon, not a motif.
 
 **Personality.** Atlas reads like a well-made map. The grid and the coordinate marks give the page
@@ -898,8 +898,8 @@ client theme it is a support liability. Bind:
 
 - Ship a complete `admin-*` token set with light and dark values. The admin obeys `data-mode`. It
   ignores `data-theme`.
-- The admin carries exactly two client-owned elements: the client logo in the top-left slot, and
-  one client accent token (`--admin-client-accent`). Use the accent in two named places: the
+- The admin carries exactly two client-owned elements: The client logo in the top-left slot, and
+  one client accent token (`--admin-client-accent`). Use the accent in two named places: The
   active-navigation marker and the page-header mark. Use it nowhere else.
 - The admin identity uses one type pairing for all deployments. Do not make it configurable. The
   UI face is Source Sans 3, which the repo already bundles. The data face is IBM Plex Mono with
@@ -911,10 +911,10 @@ words, what the identity refuses, and the whole `admin-*` token contract. Four o
 settled here, because they bind:
 
 - **The docket replaces the tab row.** Navigation is a standing list of words down the leading
-  edge, grouped by what the operator came to do: content, people, operations, system. Group heads
+  edge, grouped by what the operator came to do: Content, people, operations, system. Group heads
   are folios on a hairline. No icon rail. No collapse to glyphs. No counts in bubbles.
 - **Three state words, everywhere.** A record is `Draft`, `Live`, or `Live with unpublished
-  changes`. Use these exact words in every editor: pages, content, speakers, sessions, badges, and
+  changes`. Use these exact words in every editor: Pages, content, speakers, sessions, badges, and
   branding. One term per flow (§8.5). The state is always a word, never a coloured pill and never
   colour alone.
 - **The client accent has a legibility floor.** A client picks the value, so it may be unreadable
@@ -935,7 +935,7 @@ settled here, because they bind:
   `config/theme` whole, as it does today.
 - A preset picker sets the base. The picker states plainly that a preset overwrites unmodified
   tokens.
-- **The editor has two depths.** The first depth is the curated option pickers from §4: the preset,
+- **The editor has two depths.** The first depth is the curated option pickers from §4: The preset,
   then its heading face, its nameplate treatment, and its component variants. Most operators never
   leave this depth. The second depth is raw per-mode token override, and it is the advanced path.
   Put it behind its own disclosure. Never make raw token editing the first thing an operator meets.
@@ -1021,7 +1021,7 @@ header at all.
 
 **`main` is the default, and it has stated semantics.** On a system page, sections in the `main`
 slot render immediately after the core feature component and before every `below` section. The
-order down the page is: header, `above` sections, core component, `main` sections, `below`
+order down the page is: Header, `above` sections, core component, `main` sections, `below`
 sections.
 
 That default is what keeps existing data working. A section stored before this schema landed
@@ -1073,7 +1073,7 @@ it. Never rebase a phase onto `main` while the phase below it is still open.
 - Ship the four headers from §2.5.1, the nameplate device behind two of them, and the theme field
   that names the default.
 - Ship the lead image from §2.5.2.
-- Apply §2.1 devices: nameplate, rules, folios.
+- Apply §2.1 devices: Nameplate, rules, folios.
 - Restyle stat presentation and render both stat shapes. Legacy stat blocks keep rendering. The
   §2.1.1 contract is not enforced in this phase.
 - Ship the §8.2 dark-mode completeness test against the base tokens.
@@ -1107,7 +1107,7 @@ it. Never rebase a phase onto `main` while the phase below it is still open.
 - Extend the `cmsPages` schema with `layout` and `slot`.
 - Render variants on the system pages.
 - Render `above`, `main`, and `below` sections on the system pages in the §6.2 order.
-- Land the §2.1.1 stat contract in full: the four-part schema, the editor fields, the seed
+- Land the §2.1.1 stat contract in full: The four-part schema, the editor fields, the seed
   migration, and write-time enforcement.
 - Add the schedule grid and its signature interaction.
 - Add the back-issue treatment.
@@ -1156,7 +1156,7 @@ The test lands in two phases, because the presets do not exist in PR1:
 - **PR1 ships the test against the base tokens.** It covers the whole semantic set in light and
   dark, plus the first-paint blocks from §3.3.
 - **PR2 extends the same test to every preset in every mode**, and to the `admin-*` set. The admin
-  blocks are emitted once per mode, never once per theme-and-mode pair. Assert that too: it is the
+  blocks are emitted once per mode, never once per theme-and-mode pair. Assert that too: It is the
   mechanical statement of "the admin ignores `data-theme`".
 
 ### 8.3 Documentation stays true

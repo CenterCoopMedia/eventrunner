@@ -127,7 +127,7 @@
           <li><strong>The design brief binds.</strong> <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-27-design-system-overhaul.md"><code>plans/2026-08-27-design-system-overhaul.md</code></a> is the design contract; this document is the standing rulebook that carries it into review. Where the two disagree, the brief wins and this document gets fixed in the same pull request.</li>
           </ul>
           <h2 id="editorial-devices">Editorial devices<a class="heading-anchor" href="#editorial-devices" aria-label="Link to this section">#</a></h2>
-          <p>Typography and rules do the visual work. Color decorates very little, and shadow decorates nothing (design brief §2.1). Each device below has one job: use it where its job applies, and never as decoration. The shared implementations live in <code>apps/web/src/components/editorial/</code>, and each one resolves through its tier-3 token contract, so a preset retunes a device by remapping tokens rather than by changing a component.</p>
+          <p>Typography and rules do the visual work. Color decorates very little, and shadow decorates nothing (design brief §2.1). Each device below has one job: Use it where its job applies, and never as decoration. The shared implementations live in <code>apps/web/src/components/editorial/</code>, and each one resolves through its tier-3 token contract, so a preset retunes a device by remapping tokens rather than by changing a component.</p>
           <div class="table-scroll">
           <table>
           <thead>
@@ -135,7 +135,7 @@
           </thead>
           <tbody>
           <tr><td>Public header</td><td><code>Header</code></td><td>The site identity plus the navigation, in one of four treatments.</td><td>See Headers below. The active theme names the treatment; <code>standard</code> is the base. Every treatment carries both halves, and none of them is a heading.</td></tr>
-          <tr><td>Masthead nameplate</td><td><code>Nameplate</code></td><td>The rule-bounded title block: event name, dates, edition line.</td><td>Type and rules only — never a hero banner, never a photo behind the name. <code>full</code> is the <code>masthead</code> header; <code>compact</code> is the <code>compact</code> one. A theme chooses it; it is never mandatory.</td></tr>
+          <tr><td>Masthead nameplate</td><td><code>Nameplate</code></td><td>The rule-bounded title block: Event name, dates, edition line.</td><td>Type and rules only — never a hero banner, never a photo behind the name. <code>full</code> is the <code>masthead</code> header; <code>compact</code> is the <code>compact</code> one. A theme chooses it; it is never mandatory.</td></tr>
           <tr><td>Lead image</td><td><code>LeadImage</code></td><td>One optional picture beside the opening copy, or below it at narrow viewports.</td><td>Alt text is required or the image does not render. The crop is fixed by token and the editor states the focal point. Text never sits over it. One per page.</td></tr>
           <tr><td>Folio</td><td><code>Folio</code></td><td>A small-caps plain-text label sitting on a hairline rule.</td><td>Text plus rule. Never a chip, never a pill, never a colored badge. <strong>Never directly above a heading</strong> — see the eyebrow ban below.</td></tr>
           <tr><td>Rule</td><td><code>Rule</code></td><td>A standalone hairline, strong, or nameplate rule.</td><td>A rule replaces a card border. A rule never carries brand color and reads only the <code>--rule-*</code> tokens. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node.</td></tr>
@@ -149,7 +149,7 @@
           <li>Metadata inside the rule-bounded nameplate block. The dates and the edition line are the nameplate device, wherever they sit inside it.</li>
           <li>A form <code>&lt;label&gt;</code> above its own input. That is a control label.</li>
           </ul>
-          <p>Cards, boxes, and chrome: a rule replaces a card border wherever a rule can do the job. Elevation is tint, not shadow — where a surface must sit above another, shift its tone with a low-opacity overlay of the theme&#39;s ink or accent.</p>
+          <p>Cards, boxes, and chrome: A rule replaces a card border wherever a rule can do the job. Elevation is tint, not shadow — where a surface must sit above another, shift its tone with a low-opacity overlay of the theme&#39;s ink or accent.</p>
           <h2 id="headers">Headers<a class="heading-anchor" href="#headers" aria-label="Link to this section">#</a></h2>
           <p>A public page renders one of four headers (design brief §2.5.1). <code>config/theme.header</code> names the deployment&#39;s default and a page may state its own; <code>standard</code> is the base, and a value outside the four resolves to it rather than to no header at all.</p>
           <div class="table-scroll">
@@ -160,7 +160,7 @@
           <tbody>
           <tr><td><code>standard</code></td><td>The event name at heading size, the dates and place beside it, the navigation under a hairline. The base.</td></tr>
           <tr><td><code>masthead</code></td><td>The nameplate device at full size, with the navigation under it.</td></tr>
-          <tr><td><code>compact</code></td><td>The nameplate device at running-header size: short name and dates on one baseline.</td></tr>
+          <tr><td><code>compact</code></td><td>The nameplate device at running-header size: Short name and dates on one baseline.</td></tr>
           <tr><td><code>minimal</code></td><td>The client&#39;s mark and the navigation, and nothing else.</td></tr>
           </tbody>
           </table>
@@ -185,20 +185,20 @@
           <ul>
           <li>Apply concentric border radius across nested elements (inner radius = outer radius − padding).</li>
           <li>Prioritize optical alignment over geometric alignment.</li>
-          <li>Add a <code>1px</code> outline to images, offset by <code>-1px</code>: black at 8% opacity in light mode, white at 8% in dark mode.</li>
+          <li>Add a <code>1px</code> outline to images, offset by <code>-1px</code>: Black at 8% opacity in light mode, white at 8% in dark mode.</li>
           <li>Portraits and avatars are square on the brand radius (<code>rounded-brand</code>), never a circle (<code>rounded-full</code>) — a circular crop is a generic-template tell.</li>
           </ul>
           <h2 id="animation">Animation<a class="heading-anchor" href="#animation" aria-label="Link to this section">#</a></h2>
           <p>The system has two motion classes and there is no third (design brief §2.2).</p>
           <ul>
-          <li><strong>Functional motion</strong> shows a state change: menus, filters, tabs, disclosure, toasts. Keep it between 120ms and 200ms, animate <code>transform</code> and <code>opacity</code> only, and use <code>ease-out</code>. The <code>duration-fast</code> / <code>duration-base</code> / <code>duration-slow</code> and <code>ease-motion</code> utilities map to the motion tokens.</li>
+          <li><strong>Functional motion</strong> shows a state change: Menus, filters, tabs, disclosure, toasts. Keep it between 120ms and 200ms, animate <code>transform</code> and <code>opacity</code> only, and use <code>ease-out</code>. The <code>duration-fast</code> / <code>duration-base</code> / <code>duration-slow</code> and <code>ease-motion</code> utilities map to the motion tokens.</li>
           <li><strong>Expressive motion</strong> is one designed signature interaction per surface. The schedule grid holds that slot on the public site. It starts from a user action, finishes under 600ms, and stays readable at every frame.</li>
           </ul>
-          <p>Both classes: never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support <code>prefers-reduced-motion</code> in full; the reduced state is truly static, and a shortened animation is not a fallback.</p>
+          <p>Both classes: Never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support <code>prefers-reduced-motion</code> in full; the reduced state is truly static, and a shortened animation is not a fallback.</p>
           <ul>
           <li>Never <code>transition: all</code>; list the exact properties that change.</li>
           <li>Scale pressed buttons to 0.95–0.98 with <code>transition: scale 200ms ease-out</code>.</li>
-          <li>Cross-fade swapped icons: entering scales 0.25→1 with opacity 0→1 and blur 4px→0; exiting reverses.</li>
+          <li>Cross-fade swapped icons: Entering scales 0.25→1 with opacity 0→1 and blur 4px→0; exiting reverses.</li>
           <li>CSS transitions for interruptible interactions; keyframes for one-time sequences.</li>
           <li>Disable transitions while switching between light and dark themes.</li>
           <li><code>will-change</code> only on properties that actually change: <code>transform</code>, <code>opacity</code>, <code>filter</code>. Add <code>will-change: transform</code> to elements that jitter 1–2px mid-animation (iOS Safari especially).</li>
@@ -210,20 +210,20 @@
           <li>Ship only <code>.woff2</code> — never TTF or OTF on the web. Fonts are self-hosted in <code>apps/web/public/fonts/</code> (spec §7.4).</li>
           <li>Set type from the eight-step fluid scale: <code>text-nameplate</code>, <code>text-h1</code>, <code>text-h2</code>, <code>text-h3</code>, <code>text-lead</code>, <code>text-body</code>, <code>text-caption</code>, <code>text-folio</code> (design brief §3.7). Each step carries its own line height and tracking. Never pick a default Tailwind size instead.</li>
           <li>Name a font by its role, never by its family: <code>font-heading</code>, <code>font-body</code>, <code>font-data</code>, <code>font-mono</code> (design brief §3.2). There is no <code>font-accent</code>: PR2 removed the retired role. Zine&#39;s handwritten callout runs on the <code>--callout-font</code> component token, which is a component contract and not a fifth role.</li>
-          <li><code>font-variant-numeric: tabular-nums</code> on all dynamic values: timers, counters, prices, schedule columns.</li>
+          <li><code>font-variant-numeric: tabular-nums</code> on all dynamic values: Timers, counters, prices, schedule columns.</li>
           <li>Long-form text: 60–75 characters per line.</li>
           <li><code>text-wrap: balance</code> on headings, <code>text-wrap: pretty</code> on descriptions, neither on long-form.</li>
           <li><code>overflow-wrap: break-word</code> wherever long words, links, or IDs might overflow; <code>white-space: nowrap</code> for labels and badges.</li>
           <li>Set <code>-webkit-font-smoothing: antialiased</code> and <code>-moz-osx-font-smoothing: grayscale</code> once, on the root.</li>
           <li>Store copy in natural case; control presentation with <code>text-transform</code>. (This matches the email rule in spec §6 — content and presentation stay separate.)</li>
-          <li>Smart punctuation: curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.</li>
+          <li>Smart punctuation: Curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.</li>
           <li><code>text-underline-position: from-font</code> with <code>text-decoration-skip-ink: auto</code>.</li>
           <li>Truncated text stays fully accessible via tooltip or an expanded view.</li>
           </ul>
           <h2 id="colors">Colors<a class="heading-anchor" href="#colors" aria-label="Link to this section">#</a></h2>
           <ul>
           <li>Every palette step must earn its place — no unused steps.</li>
-          <li>Use semantic tokens (<code>--color-text-secondary</code>), never primitives (<code>blue-500</code>). This is the same rule the hex sweep enforces in code: colors resolve through <code>config/theme</code> custom properties (spec §7.2).</li>
+          <li>Use semantic tokens (<code>--color-text-secondary</code>), never primitives (<code>blue-500</code>). This is the same rule the hex sweep enforces in code: Colors resolve through <code>config/theme</code> custom properties (spec §7.2).</li>
           <li>Name tokens by role, never by appearance or first use. Reserve <code>accent</code> for the brand color so <code>primary</code> doesn&#39;t mean both brand and body text.</li>
           <li>Don&#39;t borrow a token from another role; when a role changes color, mint a new token.</li>
           <li>Measure contrast against the actual rendered background, not the page background.</li>
@@ -235,7 +235,7 @@
           <li>Every palette block matches a scoped element as well as <code>:root</code> (<code>scripts/lib/tokens.cjs</code>). That is what lets the theme editor&#39;s frame render the client&#39;s pages inside the admin: the frame carries <code>data-theme</code>, <code>data-mode</code>, and <code>data-motif-set</code> for the draft and resolves the whole set from its own declarations. The <code>admin-*</code> blocks stay root-only, because the admin never renders inside that frame.</li>
           <li>Use the rule tokens for rules: <code>--rule-hairline-*</code>, <code>--rule-strong-*</code>, <code>--rule-nameplate-*</code> (design brief §3.7). A rule never borrows an ink step and never carries brand color.</li>
           <li>A form control&#39;s boundary (<code>input</code>, <code>select</code>, <code>textarea</code>) uses <code>--color-border-control</code>, never <code>--rule-hairline</code>. WCAG 1.4.11 needs 3:1 against the ground it renders on; a rule is tuned for low-contrast structure and falls well short of that bar.</li>
-          <li>One theme mechanism, used consistently. This repo&#39;s choice: the <code>config/theme</code>-driven custom-property chain (spec §7.2) — not ad-hoc <code>.dark</code> classes per component.</li>
+          <li>One theme mechanism, used consistently. This repo&#39;s choice: The <code>config/theme</code>-driven custom-property chain (spec §7.2) — not ad-hoc <code>.dark</code> classes per component.</li>
           <li>Define gradient interpolation: <code>in oklab</code> for even brightness, <code>in oklch</code> for vivid midtones.</li>
           </ul>
           <h2 id="the-admin-surface">The admin surface<a class="heading-anchor" href="#the-admin-surface" aria-label="Link to this section">#</a></h2>
@@ -274,7 +274,7 @@
           <li>No fixed widths or heights on text containers.</li>
           </ul>
           <h2 id="rejected-patterns">Rejected patterns<a class="heading-anchor" href="#rejected-patterns" aria-label="Link to this section">#</a></h2>
-          <p>The list the design brief settles in §2.4, recorded here so a review has one place to look. This is holistic guidance, not a checklist to game: a reviewer may reject a pattern this list does not name, and may accept a listed pattern only where the brief grants an exception.</p>
+          <p>The list the design brief settles in §2.4, recorded here so a review has one place to look. This is holistic guidance, not a checklist to game: A reviewer may reject a pattern this list does not name, and may accept a listed pattern only where the brief grants an exception.</p>
           <ul>
           <li><strong>Eyebrow furniture.</strong> Nothing sits directly above a heading. See Editorial devices above for the full rule and its two non-exceptions.</li>
           <li><strong>Decorative gradients.</strong> No gradient blobs, no purple-heavy gradients, no gradient as a background event.</li>
@@ -299,7 +299,7 @@
           <li><strong>Cursor and reveal effects.</strong> No oversized cursor animations, no reveal-on-scroll.</li>
           <li><strong>Repetition.</strong> No verbose sections, no repeated promotional copy.</li>
           </ul>
-          <p>The brief names exactly two exceptions, both narrow: a bento grid that passes all five tests in §2.4, and the Zine preset&#39;s off-register stamp. Nothing else gets one, and a preset may not grant itself one.</p>
+          <p>The brief names exactly two exceptions, both narrow: A bento grid that passes all five tests in §2.4, and the Zine preset&#39;s off-register stamp. Nothing else gets one, and a preset may not grant itself one.</p>
           <h2 id="writing">Writing<a class="heading-anchor" href="#writing" aria-label="Link to this section">#</a></h2>
           <ul>
           <li>Button labels start with verbs: &quot;Save draft&quot;, &quot;Delete project&quot;.</li>

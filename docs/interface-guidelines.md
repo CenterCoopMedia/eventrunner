@@ -12,12 +12,12 @@ Foundational rules for every `apps/web` surface — attendee pages, admin panel,
 
 ## Editorial devices
 
-Typography and rules do the visual work. Color decorates very little, and shadow decorates nothing (design brief §2.1). Each device below has one job: use it where its job applies, and never as decoration. The shared implementations live in `apps/web/src/components/editorial/`, and each one resolves through its tier-3 token contract, so a preset retunes a device by remapping tokens rather than by changing a component.
+Typography and rules do the visual work. Color decorates very little, and shadow decorates nothing (design brief §2.1). Each device below has one job: Use it where its job applies, and never as decoration. The shared implementations live in `apps/web/src/components/editorial/`, and each one resolves through its tier-3 token contract, so a preset retunes a device by remapping tokens rather than by changing a component.
 
 | Device | Component | What it is | The rule |
 |---|---|---|---|
 | Public header | `Header` | The site identity plus the navigation, in one of four treatments. | See Headers below. The active theme names the treatment; `standard` is the base. Every treatment carries both halves, and none of them is a heading. |
-| Masthead nameplate | `Nameplate` | The rule-bounded title block: event name, dates, edition line. | Type and rules only — never a hero banner, never a photo behind the name. `full` is the `masthead` header; `compact` is the `compact` one. A theme chooses it; it is never mandatory. |
+| Masthead nameplate | `Nameplate` | The rule-bounded title block: Event name, dates, edition line. | Type and rules only — never a hero banner, never a photo behind the name. `full` is the `masthead` header; `compact` is the `compact` one. A theme chooses it; it is never mandatory. |
 | Lead image | `LeadImage` | One optional picture beside the opening copy, or below it at narrow viewports. | Alt text is required or the image does not render. The crop is fixed by token and the editor states the focal point. Text never sits over it. One per page. |
 | Folio | `Folio` | A small-caps plain-text label sitting on a hairline rule. | Text plus rule. Never a chip, never a pill, never a colored badge. **Never directly above a heading** — see the eyebrow ban below. |
 | Rule | `Rule` | A standalone hairline, strong, or nameplate rule. | A rule replaces a card border. A rule never carries brand color and reads only the `--rule-*` tokens. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node. |
@@ -30,7 +30,7 @@ Two things are **not** eyebrows and must never be "fixed" to satisfy this rule:
 - Metadata inside the rule-bounded nameplate block. The dates and the edition line are the nameplate device, wherever they sit inside it.
 - A form `<label>` above its own input. That is a control label.
 
-Cards, boxes, and chrome: a rule replaces a card border wherever a rule can do the job. Elevation is tint, not shadow — where a surface must sit above another, shift its tone with a low-opacity overlay of the theme's ink or accent.
+Cards, boxes, and chrome: A rule replaces a card border wherever a rule can do the job. Elevation is tint, not shadow — where a surface must sit above another, shift its tone with a low-opacity overlay of the theme's ink or accent.
 
 ## Headers
 
@@ -40,7 +40,7 @@ A public page renders one of four headers (design brief §2.5.1). `config/theme.
 |---|---|
 | `standard` | The event name at heading size, the dates and place beside it, the navigation under a hairline. The base. |
 | `masthead` | The nameplate device at full size, with the navigation under it. |
-| `compact` | The nameplate device at running-header size: short name and dates on one baseline. |
+| `compact` | The nameplate device at running-header size: Short name and dates on one baseline. |
 | `minimal` | The client's mark and the navigation, and nothing else. |
 
 - Every treatment carries the site identity **and** the navigation. Dropping either fails review.
@@ -63,21 +63,21 @@ The base is what a deployment renders before its theme states anything, and it i
 
 - Apply concentric border radius across nested elements (inner radius = outer radius − padding).
 - Prioritize optical alignment over geometric alignment.
-- Add a `1px` outline to images, offset by `-1px`: black at 8% opacity in light mode, white at 8% in dark mode.
+- Add a `1px` outline to images, offset by `-1px`: Black at 8% opacity in light mode, white at 8% in dark mode.
 - Portraits and avatars are square on the brand radius (`rounded-brand`), never a circle (`rounded-full`) — a circular crop is a generic-template tell.
 
 ## Animation
 
 The system has two motion classes and there is no third (design brief §2.2).
 
-- **Functional motion** shows a state change: menus, filters, tabs, disclosure, toasts. Keep it between 120ms and 200ms, animate `transform` and `opacity` only, and use `ease-out`. The `duration-fast` / `duration-base` / `duration-slow` and `ease-motion` utilities map to the motion tokens.
+- **Functional motion** shows a state change: Menus, filters, tabs, disclosure, toasts. Keep it between 120ms and 200ms, animate `transform` and `opacity` only, and use `ease-out`. The `duration-fast` / `duration-base` / `duration-slow` and `ease-motion` utilities map to the motion tokens.
 - **Expressive motion** is one designed signature interaction per surface. The schedule grid holds that slot on the public site. It starts from a user action, finishes under 600ms, and stays readable at every frame.
 
-Both classes: never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support `prefers-reduced-motion` in full; the reduced state is truly static, and a shortened animation is not a fallback.
+Both classes: Never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support `prefers-reduced-motion` in full; the reduced state is truly static, and a shortened animation is not a fallback.
 
 - Never `transition: all`; list the exact properties that change.
 - Scale pressed buttons to 0.95–0.98 with `transition: scale 200ms ease-out`.
-- Cross-fade swapped icons: entering scales 0.25→1 with opacity 0→1 and blur 4px→0; exiting reverses.
+- Cross-fade swapped icons: Entering scales 0.25→1 with opacity 0→1 and blur 4px→0; exiting reverses.
 - CSS transitions for interruptible interactions; keyframes for one-time sequences.
 - Disable transitions while switching between light and dark themes.
 - `will-change` only on properties that actually change: `transform`, `opacity`, `filter`. Add `will-change: transform` to elements that jitter 1–2px mid-animation (iOS Safari especially).
@@ -89,20 +89,20 @@ Both classes: never trigger motion from scroll position, never run ambient anima
 - Ship only `.woff2` — never TTF or OTF on the web. Fonts are self-hosted in `apps/web/public/fonts/` (spec §7.4).
 - Set type from the eight-step fluid scale: `text-nameplate`, `text-h1`, `text-h2`, `text-h3`, `text-lead`, `text-body`, `text-caption`, `text-folio` (design brief §3.7). Each step carries its own line height and tracking. Never pick a default Tailwind size instead.
 - Name a font by its role, never by its family: `font-heading`, `font-body`, `font-data`, `font-mono` (design brief §3.2). There is no `font-accent`: PR2 removed the retired role. Zine's handwritten callout runs on the `--callout-font` component token, which is a component contract and not a fifth role.
-- `font-variant-numeric: tabular-nums` on all dynamic values: timers, counters, prices, schedule columns.
+- `font-variant-numeric: tabular-nums` on all dynamic values: Timers, counters, prices, schedule columns.
 - Long-form text: 60–75 characters per line.
 - `text-wrap: balance` on headings, `text-wrap: pretty` on descriptions, neither on long-form.
 - `overflow-wrap: break-word` wherever long words, links, or IDs might overflow; `white-space: nowrap` for labels and badges.
 - Set `-webkit-font-smoothing: antialiased` and `-moz-osx-font-smoothing: grayscale` once, on the root.
 - Store copy in natural case; control presentation with `text-transform`. (This matches the email rule in spec §6 — content and presentation stay separate.)
-- Smart punctuation: curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.
+- Smart punctuation: Curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.
 - `text-underline-position: from-font` with `text-decoration-skip-ink: auto`.
 - Truncated text stays fully accessible via tooltip or an expanded view.
 
 ## Colors
 
 - Every palette step must earn its place — no unused steps.
-- Use semantic tokens (`--color-text-secondary`), never primitives (`blue-500`). This is the same rule the hex sweep enforces in code: colors resolve through `config/theme` custom properties (spec §7.2).
+- Use semantic tokens (`--color-text-secondary`), never primitives (`blue-500`). This is the same rule the hex sweep enforces in code: Colors resolve through `config/theme` custom properties (spec §7.2).
 - Name tokens by role, never by appearance or first use. Reserve `accent` for the brand color so `primary` doesn't mean both brand and body text.
 - Don't borrow a token from another role; when a role changes color, mint a new token.
 - Measure contrast against the actual rendered background, not the page background.
@@ -114,7 +114,7 @@ Both classes: never trigger motion from scroll position, never run ambient anima
 - Every palette block matches a scoped element as well as `:root` (`scripts/lib/tokens.cjs`). That is what lets the theme editor's frame render the client's pages inside the admin: the frame carries `data-theme`, `data-mode`, and `data-motif-set` for the draft and resolves the whole set from its own declarations. The `admin-*` blocks stay root-only, because the admin never renders inside that frame.
 - Use the rule tokens for rules: `--rule-hairline-*`, `--rule-strong-*`, `--rule-nameplate-*` (design brief §3.7). A rule never borrows an ink step and never carries brand color.
 - A form control's boundary (`input`, `select`, `textarea`) uses `--color-border-control`, never `--rule-hairline`. WCAG 1.4.11 needs 3:1 against the ground it renders on; a rule is tuned for low-contrast structure and falls well short of that bar.
-- One theme mechanism, used consistently. This repo's choice: the `config/theme`-driven custom-property chain (spec §7.2) — not ad-hoc `.dark` classes per component.
+- One theme mechanism, used consistently. This repo's choice: The `config/theme`-driven custom-property chain (spec §7.2) — not ad-hoc `.dark` classes per component.
 - Define gradient interpolation: `in oklab` for even brightness, `in oklch` for vivid midtones.
 
 ## The admin surface
@@ -155,7 +155,7 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 
 ## Rejected patterns
 
-The list the design brief settles in §2.4, recorded here so a review has one place to look. This is holistic guidance, not a checklist to game: a reviewer may reject a pattern this list does not name, and may accept a listed pattern only where the brief grants an exception.
+The list the design brief settles in §2.4, recorded here so a review has one place to look. This is holistic guidance, not a checklist to game: A reviewer may reject a pattern this list does not name, and may accept a listed pattern only where the brief grants an exception.
 
 - **Eyebrow furniture.** Nothing sits directly above a heading. See Editorial devices above for the full rule and its two non-exceptions.
 - **Decorative gradients.** No gradient blobs, no purple-heavy gradients, no gradient as a background event.
@@ -180,7 +180,7 @@ The list the design brief settles in §2.4, recorded here so a review has one pl
 - **Cursor and reveal effects.** No oversized cursor animations, no reveal-on-scroll.
 - **Repetition.** No verbose sections, no repeated promotional copy.
 
-The brief names exactly two exceptions, both narrow: a bento grid that passes all five tests in §2.4, and the Zine preset's off-register stamp. Nothing else gets one, and a preset may not grant itself one.
+The brief names exactly two exceptions, both narrow: A bento grid that passes all five tests in §2.4, and the Zine preset's off-register stamp. Nothing else gets one, and a preset may not grant itself one.
 
 ## Writing
 

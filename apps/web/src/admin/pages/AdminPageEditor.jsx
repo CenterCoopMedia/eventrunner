@@ -309,7 +309,7 @@ export default function AdminPageEditor({ mode }) {
             />
             {isSystemPage ? (
               <p className="text-caption text-admin-ink-secondary">
-                This is a system page: it has a dedicated route in the app, so
+                This is a system page: It has a dedicated route in the app, so
                 it cannot be deleted or turned into a regular page.
               </p>
             ) : null}
