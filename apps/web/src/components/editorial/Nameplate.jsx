@@ -15,7 +15,11 @@
 //
 // The dates and the edition line sit INSIDE the rule-bounded block, so they
 // are the nameplate device rather than an eyebrow — brief §2.4 names this
-// exception explicitly. Nothing else may sit above a title anywhere.
+// exception explicitly. Nothing else may sit above a title anywhere. WHERE
+// inside the block they sit is the Header style's own decision, stated as
+// --nameplate-meta-placement and drawn by the `.nameplate__lockup` rule in
+// index.css: on their own line under the name, or on the name's baseline at
+// the far end of the measure.
 //
 // The name is a heading on exactly one page. A running masthead repeats
 // everywhere, so on an inner page it is a <p> and the page's own <h1> is that
@@ -96,16 +100,12 @@ export default function Nameplate({
       {name}
     </span>
   );
+  // The literal class matters: Tailwind scans for whole strings, and
+  // `nameplate__meta` carries the rule that reads the Header style's
+  // --nameplate-meta-placement (components/editorial/purge.test.js).
   const dateline =
     dates || edition ? (
-      <p
-        className={[
-          'font-data text-caption text-text-secondary',
-          compact ? '' : 'mt-2xs',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
+      <p className="nameplate__meta font-data text-caption text-text-secondary">
         {dates ? <span className="font-mono">{dates}</span> : null}
         {dates && edition ? ' · ' : null}
         {edition}
@@ -118,11 +118,7 @@ export default function Nameplate({
         .filter(Boolean)
         .join(' ')}
     >
-      <div
-        className={
-          compact ? 'flex flex-wrap items-baseline justify-between gap-x-md gap-y-3xs' : ''
-        }
-      >
+      <div className="nameplate__lockup">
         <NameTag id={nameId} className="nameplate__name font-heading font-semibold">
           {to ? (
             <Link to={to} className="hover:underline">

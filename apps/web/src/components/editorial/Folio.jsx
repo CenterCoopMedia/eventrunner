@@ -31,10 +31,10 @@ export default function Folio({
   className = '',
 }) {
   return (
-    <Tag
-      id={id}
-      className={['flex items-center gap-xs', className].filter(Boolean).join(' ')}
-    >
+    // The literal class matters: Tailwind scans for whole strings, and
+    // `folio-line` carries the --folio-gap contract that used to be a
+    // `gap-xs` utility (components/editorial/purge.test.js).
+    <Tag id={id} className={['folio-line', className].filter(Boolean).join(' ')}>
       <span className="folio whitespace-nowrap font-medium">{children}</span>
       {rule ? <span aria-hidden="true" className="folio__rule flex-1 self-center" /> : null}
     </Tag>

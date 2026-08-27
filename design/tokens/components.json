@@ -51,9 +51,8 @@
     "--folio-tracking": "var(--text-folio-tracking)",
     "--folio-gap": "var(--space-xs)"
   },
-  "$schedule-note": "The schedule presentation variants (brief §4, visual stories part 6c). The two-axis grid lands in PR3; these are the values a style's Schedule style sets on the row today, and index.css reads all three. The agenda number is real sequence data, never zero-padded (brief §2.4).",
+  "$schedule-note": "The schedule presentation variants (brief §4, visual stories part 6c). These are the values a style's Schedule style sets on the row today, and index.css reads all three. The agenda number is real sequence data, never zero-padded (brief §2.4). The two-axis grid lands in PR3 and brings its own rule colour with it: a contract lands with the rule that draws it, so there is nothing here waiting for one.",
   "schedule": {
-    "--schedule-grid-rgb": "--rule-hairline-rgb",
     "--schedule-row-leading": "var(--text-body-leading)",
     "--schedule-data-size": "var(--text-caption)",
     "--schedule-number-display": "none"

@@ -483,3 +483,37 @@ test('a preset that ships a motif set on gets it as the baseline too', () => {
   // A client may switch a set or turn motifs off (brief §3.8).
   assert.match(buildTokenCss({ preset: 'field-guide', motifSet: 'none' }), /--motif-set: none;/);
 });
+
+test('every component token has a rule that draws it', () => {
+  // design/tokens/components.json states the rule itself, in its scope note:
+  // "Every token here is read by a render path in apps/web/src/index.css — a
+  // token an option offers but nothing renders is a promise the interface
+  // does not keep, so a new contract lands with the rule that draws it."
+  //
+  // That sentence held for the schedule row and stopped holding for the
+  // masthead: eighteen Header styles were each setting a metadata placement
+  // and a double-rule width, and nothing read either one. An operator picked
+  // an option and the page did not move. This test is why that cannot come
+  // back — a name added to the contract file without a rule fails the build,
+  // by name, here.
+  const { components } = loadTokens();
+  // Comments are stripped first. A token named in a note explaining why it
+  // is not drawn yet would otherwise pass this test by being talked about.
+  const stylesheet = fs
+    .readFileSync(path.join(__dirname, '..', '..', 'apps', 'web', 'src', 'index.css'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const names = [];
+  const walk = (node) => {
+    for (const [key, value] of Object.entries(node)) {
+      if (key.startsWith('--')) names.push(key);
+      else if (value && typeof value === 'object') walk(value);
+    }
+  };
+  walk(components);
+  assert.ok(names.length > 40, 'the contract file was read');
+  for (const name of names) {
+    // A rule reads a token with var(), and a style query reads one by name.
+    const read = stylesheet.includes(`var(${name}`) || stylesheet.includes(`style(${name}`);
+    assert.ok(read, `${name} is declared in components.json but no rule draws it`);
+  }
+});

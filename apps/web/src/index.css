@@ -103,6 +103,18 @@
     border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
     padding-block: calc(var(--nameplate-gap) * var(--density-step, 1));
     text-align: var(--nameplate-align);
+    /* The second rule of the double-rule treatment: a line drawn just under
+       the first, the way a masthead is ruled twice. It is the nameplate's
+       twin of the struck folio below, and it is drawn as a background sized
+       from its own width, so the zero width every other treatment holds
+       paints nothing and takes no space — the same way the coordinate marks
+       turn themselves off. The distance below the first rule comes from the
+       width too, so the pair reads as one device at any weight. */
+    background-image:
+      linear-gradient(rgb(var(--nameplate-rule-rgb)), rgb(var(--nameplate-rule-rgb)));
+    background-repeat: no-repeat;
+    background-position: 0 calc(var(--nameplate-rule-top-width) * 3);
+    background-size: 100% var(--nameplate-rule-top-width);
   }
   /* The frame of a title page (Field Guide) or a title block (Atlas). It is
      drawn OUTSIDE the flow, so a preset that leaves --nameplate-frame-width
@@ -160,6 +172,49 @@
     line-height: var(--text-h3-leading);
     letter-spacing: var(--text-h3-tracking);
   }
+  /* Where the dates and the edition line sit INSIDE the rule-bounded block.
+     Both places are the nameplate device, never an eyebrow (brief §2.4).
+
+     A Header style states the choice as --nameplate-meta-placement, and the
+     value is the design word for it: `block` puts the line on its own line
+     under the name, `inline` puts it on the name's baseline at the far end
+     of the measure. All eighteen header styles set it, and until now nothing
+     read it — a token an option offers that nothing renders is a promise the
+     interface does not keep (design/tokens/components.json, scope note).
+
+     The lockup is one flex row either way, and the switch is one
+     declaration: metadata told to fill the line takes the whole of it and
+     wraps under the name. The switch is a style query, which is how CSS
+     branches a layout on a custom property's value — the property is
+     inherited from :root and the nearest style container is the .nameplate
+     around this lockup. Everything outside the query is what shipped
+     before, so a browser too old to read one gets the masthead it got
+     before rather than nothing.
+
+     It reaches the FULL treatment only. A Header style is the masthead's
+     treatment, and the running header is the same device at running-header
+     size: turning every inner page's header into two lines is a bigger
+     change than picking a masthead is asking for, and five of the six
+     styles ask for `block`. The compact line stays beside the name. */
+  .nameplate__lockup {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: var(--space-md);
+    row-gap: var(--space-2xs);
+  }
+  .nameplate__meta {
+    flex-basis: 100%;
+  }
+  .nameplate--compact .nameplate__meta {
+    flex-basis: auto;
+  }
+  @container style(--nameplate-meta-placement: inline) {
+    .nameplate:not(.nameplate--compact) .nameplate__meta {
+      flex-basis: auto;
+    }
+  }
 
   /* Folio: a small-caps plain-text label that sits ON a rule at a section
      boundary. Never a chip, never a pill, never a colored badge — and never
@@ -187,6 +242,15 @@
   }
   .folio__rule {
     border-block-start: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
+  }
+  /* The row the word and its rule share. The distance between them is the
+     --folio-gap contract rather than a utility: a utility sits in a later
+     cascade layer and would outrank the token, so a style that retuned the
+     gap would never reach the page. */
+  .folio-line {
+    display: flex;
+    align-items: center;
+    column-gap: var(--folio-gap);
   }
 
   /* Section rule: the one strong rule that opens a section (brief §2.1). */
