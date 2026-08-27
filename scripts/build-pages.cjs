@@ -69,6 +69,19 @@ const PRELOADED_FONTS = ['source-sans-3-latin.woff2', 'bricolage-grotesque-latin
 
 const EXTERNAL_SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
 
+// The Event Runner mark, inline so it takes the masthead's own ink. Four
+// strokes: a stem, then the three rule weights the system ships. The link
+// already says the name, so the drawing is decorative. Same markup as
+// docs/index.html, and the same geometry as docs/favicon.svg.
+const MARK = Object.freeze([
+  '        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
+  '          <rect x="2.5" y="2" width="3" height="20"/>',
+  '          <rect x="5.5" y="2" width="16" height="3"/>',
+  '          <rect x="5.5" y="11" width="9.5" height="2"/>',
+  '          <rect x="5.5" y="19.5" width="13" height="2.5"/>',
+  '        </svg>',
+]);
+
 /* -------------------------------------------------------------- palette ---
 
    The site mints no palette. It renders the product's own default look, so
@@ -379,8 +392,11 @@ function head({ title, description, canonical, themeTags, ogType }) {
     // the site the reader is on.
     '    <header class="site-header">',
     `      <a class="brand" href="${SITE_BASE}">`,
-    `        <strong>${PRODUCT}</strong>`,
-    '        <span>Documentation</span>',
+    ...MARK,
+    '        <span class="brand-words">',
+    `          <strong>${PRODUCT}</strong>`,
+    '          <span class="brand-line">Documentation</span>',
+    '        </span>',
     '      </a>',
     '      <nav aria-label="Site">',
     `        <a href="${SITE_BASE}">Home</a>`,

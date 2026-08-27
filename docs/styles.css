@@ -256,9 +256,25 @@ a {
 }
 
 .brand {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
   color: rgb(var(--nameplate-text-rgb));
   text-decoration: none;
+}
+
+/* The mark: a stem and the three rule weights the system ships, at mark size.
+   It takes the masthead's ink and carries no color of its own. It sits BESIDE
+   the name, never behind it. */
+.brand-mark {
+  flex: none;
+  width: calc(var(--text-h3) * 1.3);
+  height: calc(var(--text-h3) * 1.3);
+  fill: currentColor;
+}
+
+.brand-words {
+  display: block;
 }
 
 .brand strong {
@@ -270,7 +286,7 @@ a {
   letter-spacing: var(--text-h3-tracking);
 }
 
-.brand span {
+.brand-line {
   display: block;
   font-family: var(--font-data);
   font-size: var(--text-caption);
