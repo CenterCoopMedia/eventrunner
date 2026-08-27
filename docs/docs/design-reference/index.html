@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Site design reference — Event Runner documentation</title>
+  <meta name="description" content="Every site style, option, layout axis, and token, in full. The deep end.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/design-reference/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Site design reference — Event Runner documentation">
+  <meta property="og:description" content="Every site style, option, layout axis, and token, in full. The deep end.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/design-reference/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Site design reference — Event Runner documentation">
+  <meta name="twitter:description" content="Every site style, option, layout axis, and token, in full. The deep end.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#17191e" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/tokens.css">
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2.5" y="2" width="3" height="20"/>
+          <rect x="5.5" y="2" width="16" height="3"/>
+          <rect x="5.5" y="11" width="9.5" height="2"/>
+          <rect x="5.5" y="19.5" width="13" height="2.5"/>
+        </svg>
+        <span class="brand-words">
+          <strong>Event Runner</strong>
+          <span class="brand-line">Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Site design reference</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/design-reference/" aria-current="page" class="is-current">Site design reference</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Site design reference</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#how-a-look-is-decided">How a look is decided</a></li>
+              <li><a href="#the-six-site-styles">The six site styles</a></li>
+              <li><a href="#headers">Headers</a></li>
+              <li><a href="#typography">Typography</a></li>
+              <li><a href="#illustrations">Illustrations</a></li>
+              <li><a href="#layout">Layout</a></li>
+              <li><a href="#colour">Colour</a></li>
+              <li><a href="#tokens">Tokens</a></li>
+              <li><a href="#composition-rules">Composition rules</a></li>
+              <li><a href="#print">Print</a></li>
+              <li><a href="#the-admin-panel-is-not-a-site-style">The admin panel is not a site style</a></li>
+              <li><a href="#extension-points">Extension points</a></li>
+            </ul>
+          </nav>
+          <p>Everything the look of a client site is made of: the six site styles, the type, the illustrations, the headers, the page templates, the colour, the tokens under all of it, what prints, and where a developer extends it.</p>
+          <p><strong>This is the deep end, and you do not need it to run a site.</strong> <a href="/eventrunner/docs/admin-guide/"><code>ADMIN_GUIDE.md</code></a> is the operator&#39;s path — pick a style, add your logo, set your colour, preview, publish — and it is a complete answer for almost every event. Come here when you want to know what a control is doing underneath, when a recommended configuration is not quite right, or when you are adding to the system rather than using it.</p>
+          <p>Two audiences, one document. Where a section says <strong>Staff</strong> it is about a control somebody clicks; where it says <strong>Engine</strong> it is about the mechanism, and the names in it are internal ones (<a href="/eventrunner/docs/interface-guidelines/"><code>interface-guidelines.md</code></a>, Vocabulary).</p>
+          <h2 id="how-a-look-is-decided">How a look is decided<a class="heading-anchor" href="#how-a-look-is-decided" aria-label="Link to this section">#</a></h2>
+          <p>One chain, four links, and each one only overrides what it names:</p>
+          <ol>
+          <li><strong>The design tokens</strong> (<code>design/tokens/*.json</code>) define every scale, contract, and primitive the system has. Nothing outside them is a value.</li>
+          <li><strong>The site style</strong> picks a base: two authored palettes, a type pairing, a shape, a header, a set of illustrations, and its own remaps of the tokens above.</li>
+          <li><strong>The options</strong> inside that style retune it — the heading face, the header treatment, the session presentation. An option remaps tokens the style already declares. It never invents a name.</li>
+          <li><strong>The overrides</strong> are the exceptional path: one colour, one font role, one radius, named outright.</li>
+          </ol>
+          <p>Whatever comes out of that is resolved once, in one place, and everything reads the result: the public site, the admin&#39;s page preview, the emails, and the PDF handout.</p>
+          <p><strong>Engine.</strong> The stored document is <code>config/theme</code>. <code>packages/shared/src/theme.cjs</code> is the single resolver — the browser, the build-time generator, and the publish gate all call it, so none of them can disagree about what a document means. <code>scripts/lib/tokens.cjs</code> turns the resolved answer into <code>apps/web/src/generated/theme.css</code> at build time; <code>apps/web/src/lib/themeRuntime.js</code> turns the same answer into a <code>&lt;style&gt;</code> element at run time, so a publish restyles an open page with no deploy. <code>data-theme</code>, <code>data-mode</code>, and <code>data-motif-set</code> on the root element pick which blocks win.</p>
+          <p><strong>Nothing here is per-client code.</strong> A client&#39;s whole visual identity is one Firestore document. There is no branch, no fork, and no build flag per event.</p>
+          <h2 id="the-six-site-styles">The six site styles<a class="heading-anchor" href="#the-six-site-styles" aria-label="Link to this section">#</a></h2>
+          <p>Every style is finished work: two authored palettes, a type pairing that has been set against real event content, its own devices, and its own answers in every option group. None of them is a skin over another, and none of them is a lesser version of the default. What they differ in is what an event is <em>for</em>.</p>
+          <p>Three of them are the <strong>launch surface</strong> — run against real client content, and the ones the picker offers first. The other three are <strong>still being proved</strong>: fully functional, holding every gate, and grouped behind their own disclosure so staff try them on their own content before an event depends on them.</p>
+          <h3 id="institutional-launch-surface-and-the-default">Institutional — launch surface, and the default<a class="heading-anchor" href="#institutional-launch-surface-and-the-default" aria-label="Link to this section">#</a></h3>
+          <p><em>The public record of a public event.</em> Plain, patient, unambiguous, with nothing between the reader and the information.</p>
+          <ul>
+          <li><strong>Suits</strong>: a government body, a university, a professional association, a public meeting, anything where the reader is checking a fact rather than being persuaded.</li>
+          <li><strong>Type</strong>: Merriweather over Public Sans. A serif that stays legible at small sizes over a face designed for public documents.</li>
+          <li><strong>Shape</strong>: near-square corners, flat surfaces, comfortable spacing.</li>
+          <li><strong>Devices</strong>: the institutional letterhead header; the posted agenda for the schedule.</li>
+          <li><strong>Illustrations</strong>: none.</li>
+          <li><strong>Why it is the default</strong>: it is the plainest of the six, it targets the highest accessibility bar, and it is the look a client is least likely to have to undo. A fresh deployment starts here.</li>
+          <li><strong>Deeper controls</strong>: the heading face can move to Source Serif 4 (warmer) or to Public Sans bold (drops the serif entirely, for an event that is not a document). The header can become a two-part lockup, for an event run by two organizations, or a compact standing head. The schedule can number its agenda items, which a formal proceeding often wants.</li>
+          </ul>
+          <h3 id="newsroom-launch-surface">Newsroom — launch surface<a class="heading-anchor" href="#newsroom-launch-surface" aria-label="Link to this section">#</a></h3>
+          <p><em>A well-made news site on a good day.</em> Named sections, one strong rule each, numbers that never borrow the headline face.</p>
+          <ul>
+          <li><strong>Suits</strong>: a conference with a programme worth reading, a summit, a festival — anything with editorial ambition and a lot of sessions.</li>
+          <li><strong>Type</strong>: Fraunces over Newsreader, with IBM Plex Sans carrying data and IBM Plex Mono carrying values. Four roles, four jobs.</li>
+          <li><strong>Shape</strong>: the small radius, flat surfaces, comfortable spacing.</li>
+          <li><strong>Devices</strong>: the rule-bounded bar header; the hairline row for a session.</li>
+          <li><strong>Illustrations</strong>: none.</li>
+          <li><strong>Deeper controls</strong>: the heading face can move to Newsreader at display weights (one family throughout, quieter) or to Archivo bold condensed (more sessions per screen in a headline). The header can stack with a deck, which suits an event whose name needs a sentence after it, or become section-aware so the running header names where the reader is. Sessions can run as &quot;lead and rest&quot;, which gives the first session of a day the room a keynote deserves.</li>
+          </ul>
+          <h3 id="zine-launch-surface">Zine — launch surface<a class="heading-anchor" href="#zine-launch-surface" aria-label="Link to this section">#</a></h3>
+          <p><em>Made by hand, at a copier, the week before.</em> One loud display face, an even rhythm under it, and an accent spent twice a page.</p>
+          <ul>
+          <li><strong>Suits</strong>: an unconference, a community gathering, a student event, a workshop series — anything whose character is that it is not corporate.</li>
+          <li><strong>Type</strong>: Karrik for headings over Source Sans 3 for reading, with Fragment Mono carrying times, room codes, and identifiers. The mono is the value face, not the page face: a long session description set in a typewriter face is slow to read at any length.</li>
+          <li><strong>Shape</strong>: sharp corners, loose spacing.</li>
+          <li><strong>Devices</strong>: the full-sheet header; the flat block for a session.</li>
+          <li><strong>Illustrations</strong>: none.</li>
+          <li><strong>The one exception in the whole system</strong>: Zine may print a session block off-register, like a stamp that missed. It is the only place the design brief grants a deliberate imperfection, and it is <strong>off by default</strong> — a printing artefact is something a client turns on, not something they discover on their own schedule page.</li>
+          <li><strong>Deeper controls</strong>: the heading face can move to Bagnard or Avara. The header can become a stacked block or a boxed bill. The session block can take the off-register stamp or the struck folio. Marginalia — hand-drawn margin marks — can be turned on.</li>
+          </ul>
+          <h3 id="broadsheet-being-proved">Broadsheet — being proved<a class="heading-anchor" href="#broadsheet-being-proved" aria-label="Link to this section">#</a></h3>
+          <p><em>The paper of record.</em> The nameplate is the loudest thing on the page, and rules do the dividing.</p>
+          <ul>
+          <li><strong>Suits</strong>: an annual convening with weight behind it, an anniversary edition, an event that wants to look like it has happened many times before.</li>
+          <li><strong>Type</strong>: Libre Caslon Display over Libre Caslon Text, with a serif carrying data too. One voice, all the way down.</li>
+          <li><strong>Shape</strong>: sharp corners, flat surfaces, tight spacing — a broadsheet fits a lot on a page.</li>
+          <li><strong>Devices</strong>: the full-measure nameplate; the ruled programme for the schedule.</li>
+          <li><strong>Illustrations</strong>: none.</li>
+          <li><strong>Deeper controls</strong>: the heading face can move to Libre Baskerville or Spectral semibold. The nameplate can centre itself under a double rule, or compact to the left with a standing edition line. The schedule can drop to an agate block — the dense small-type listing a printed programme uses when the day is long.</li>
+          </ul>
+          <h3 id="field-guide-being-proved">Field Guide — being proved<a class="heading-anchor" href="#field-guide-being-proved" aria-label="Link to this section">#</a></h3>
+          <p><em>A naturalist&#39;s expedition handbook.</em> Plates, specimen labels, and observation notes, with the linework carrying the character.</p>
+          <ul>
+          <li><strong>Suits</strong>: a field school, an environmental convening, a residency, a science festival — an event about looking closely at things.</li>
+          <li><strong>Type</strong>: Besley over Vollkorn, with IBM Plex Mono for data.</li>
+          <li><strong>Shape</strong>: sharp corners, comfortable spacing, and the paper tone available as an advanced setting.</li>
+          <li><strong>Devices</strong>: a plain ruled title head; the specimen label for a session.</li>
+          <li><strong>Illustrations</strong>: the botanical set exists for this style and ships <strong>off</strong>. Drawings on every page of a real programme read as decoration rather than as observation. Turn them on for an event where they mean something.</li>
+          <li><strong>Deeper controls</strong>: the heading face can move to Vollkorn at display size or to Spectral semibold. The header can become a framed title page or a plate-and-label lockup. Sessions can run as a field-notes column. A pencil line can be turned on in the margins. The empty-state plate stays framed whatever you pick, because a blank sheet really is one.</li>
+          </ul>
+          <h3 id="atlas-being-proved">Atlas — being proved<a class="heading-anchor" href="#atlas-being-proved" aria-label="Link to this section">#</a></h3>
+          <p><em>A mapped city on its transit network.</em> A survey sheet and a departure board at once: lines, stations, transfers.</p>
+          <ul>
+          <li><strong>Suits</strong>: a multi-venue event, a city-wide festival, anything where getting from one thing to the next is part of the problem.</li>
+          <li><strong>Type</strong>: Overpass over Libre Franklin, with Overpass Mono carrying times and codes.</li>
+          <li><strong>Shape</strong>: sharp corners, flat surfaces, tight spacing.</li>
+          <li><strong>Devices</strong>: the corner title block; the departure board for the schedule.</li>
+          <li><strong>Illustrations</strong>: the cartographic set, on by default for this style.</li>
+          <li><strong>Where the grid is drawn</strong>: the coordinate grid and the route marks sit on the schedule surface only. A grid behind the about page, the speaker bios, and the code of conduct is texture; a grid behind a timetable is a reading device.</li>
+          <li><strong>Deeper controls</strong>: the heading face can move to Libre Franklin extrabold or Archivo Condensed. The header can take a scale line or become a departure-board header. The schedule can run as a line diagram or a gazetteer list.</li>
+          </ul>
+          <h2 id="headers">Headers<a class="heading-anchor" href="#headers" aria-label="Link to this section">#</a></h2>
+          <p>Four treatments, and a site picks one. The header is the site&#39;s identity, and it repeats on every page — which is exactly why it is <strong>not</strong> a heading: every page owns its own <code>h1</code>, and the header sits outside it.</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Treatment</th><th>What it draws</th><th>Reach for it when</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><strong>Standard</strong></td><td>The event name at normal weight, the dates and place under it, the navigation.</td><td>The default. The identity is present and the page&#39;s own headline leads.</td></tr>
+          <tr><td><strong>Masthead</strong></td><td>The full nameplate device: a rule-bounded title block at display size.</td><td>The event&#39;s name is the point — a front page, a single-day event, an anniversary.</td></tr>
+          <tr><td><strong>Compact</strong></td><td>The event bar: name and navigation on one line.</td><td>A long document site where every pixel above the text is spent.</td></tr>
+          <tr><td><strong>Minimal</strong></td><td>The mark and the navigation. No name.</td><td>The event&#39;s mark is well known, or the page is a utility.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p><strong>A page may override the site&#39;s choice</strong>, and one usually should not. The site-wide value is what makes the header furniture a reader stops noticing; a page that differs is asking to be noticed, which is right for a front page and wrong for a policy page.</p>
+          <p><strong>Engine.</strong> <code>config/theme.header</code> names one of <code>standard</code>, <code>masthead</code>, <code>compact</code>, <code>minimal</code>; a <code>cmsPages</code> document may state its own <code>layout.header</code>. <code>resolveHeader(themeHeader, pageHeader)</code> returns the one to draw — page first, then theme, then the base. A stored value the validator should never have accepted renders the base rather than no header at all. <code>Nameplate</code> is unchanged in shape; it is now the device the masthead treatment draws rather than the shell&#39;s only header.</p>
+          <h2 id="typography">Typography<a class="heading-anchor" href="#typography" aria-label="Link to this section">#</a></h2>
+          <p><strong>Four roles, never family names.</strong> A component asks for a role and gets whatever the resolved style says that role is.</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Role</th><th>What it carries</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>heading</code></td><td>Every heading, and the masthead.</td></tr>
+          <tr><td><code>body</code></td><td>Everything a person reads as language.</td></tr>
+          <tr><td><code>data</code></td><td>The voice beside the text: labels, folios, captions.</td></tr>
+          <tr><td><code>mono</code></td><td>Anything a person would copy, paste, or compare character by character.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>There is no fifth role. Zine&#39;s handwritten callout runs on a component token, which is a contract for one device rather than a role.</p>
+          <p><strong>The scale is fluid and has eight steps</strong> — nameplate, h1, h2, h3, lead, body, caption, folio — and each step carries its own size, line height, and tracking together. Never pick a size without its leading.</p>
+          <p><strong>The bundled sets</strong> are the only faces a site can use, and they are self-hosted. No page on a client site asks an external font service for anything, ever: Source Serif 4, Source Sans 3, Caveat, Libre Caslon Display, Libre Caslon Text, Libre Baskerville, Spectral, Fraunces, Newsreader, IBM Plex Sans, IBM Plex Mono, Archivo Condensed, Merriweather, Public Sans, Karrik, Bagnard, Avara, Fragment Mono, Besley, Vollkorn, Overpass, Overpass Mono, Libre Franklin.</p>
+          <p><strong>Heading-face options</strong> are the sanctioned way to change type: each style offers three, and they are chosen to still work with that style&#39;s body face. Naming a role outright is the override path, and it is where a pairing can go wrong.</p>
+          <p><strong>Engine.</strong> Every bundled family is declared in the generated stylesheet, and only the ones a rendered element resolves to are downloaded — see <a href="/eventrunner/docs/interface-guidelines/"><code>interface-guidelines.md</code></a>, Typography, for why that has to be every set.</p>
+          <h2 id="illustrations">Illustrations<a class="heading-anchor" href="#illustrations" aria-label="Link to this section">#</a></h2>
+          <p>A set of small drawings that carry a style&#39;s vocabulary, in four slots: a section mark, a divider, a mark inside the header, and an empty state.</p>
+          <ul>
+          <li><strong>None</strong> — no drawings. What Institutional, Newsroom, Zine, and Broadsheet ship.</li>
+          <li><strong>Botanical</strong> — leaves, seed heads, specimen sprigs. Built for Field Guide, off by default.</li>
+          <li><strong>Fauna</strong> — the same idea in animals.</li>
+          <li><strong>Cartographic</strong> — compass points, contour fragments, route marks. On for Atlas.</li>
+          </ul>
+          <p>They take the site&#39;s own ink and never carry a colour of their own, so a set cannot fight a client&#39;s palette.</p>
+          <p><strong>Engine.</strong> <code>config/theme.motifSet</code> names the set; <code>data-motif-set</code> on the root element does the switching, because a custom property cannot rewrite the asset another custom property points at. A motif renders as a <code>mask-image</code> painted with the ink token, or as an inline SVG symbol reading <code>currentColor</code> — never as an <code>&lt;img&gt;</code>, never as a <code>url()</code> fill.</p>
+          <h2 id="layout">Layout<a class="heading-anchor" href="#layout" aria-label="Link to this section">#</a></h2>
+          <h3 id="pages-are-chosen-by-task">Pages are chosen by task<a class="heading-anchor" href="#pages-are-chosen-by-task" aria-label="Link to this section">#</a></h3>
+          <p>An operator knows &quot;this is a long read&quot; and &quot;this is a directory with an introduction&quot;. They do not know, and should not have to work out, what <code>arrangement</code> should be. So the page editor asks the question they can answer:</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Template</th><th>What it is for</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><strong>Standard page</strong></td><td>The ordinary page: a running header, one column, normal spacing. Start here.</td></tr>
+          <tr><td><strong>Feature first</strong></td><td>Opens on its main content under the full masthead, for a page whose subject is the first thing to see.</td></tr>
+          <tr><td><strong>Directory with introduction</strong></td><td>A few words, then entries in columns. Speakers, sponsors, anything that is a list of people or organizations.</td></tr>
+          <tr><td><strong>Long read</strong></td><td>One column with air between things, for a page that is mostly text.</td></tr>
+          <tr><td><strong>Schedule</strong></td><td>Dense and time-led, so a long day fits on one screen.</td></tr>
+          <tr><td><strong>Landing page</strong></td><td>The full masthead over items in columns. A front page or a section opener.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Picking one sets every underlying value at once. The individual axes stay reachable behind a disclosure, for the page that genuinely needs to differ — and moving one clears the template, because a page that no longer matches its template should not go on claiming it.</p>
+          <p><strong>A template is never inferred.</strong> A page whose values happen to match Long read has not chosen Long read; it has values that coincide. The editor reports absence as absence rather than reporting a decision nobody made.</p>
+          <h3 id="the-axes-underneath-advanced">The axes underneath (Advanced)<a class="heading-anchor" href="#the-axes-underneath-advanced" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li><strong>Header</strong> — the four treatments above.</li>
+          <li><strong>Arrangement</strong> — <code>list</code> or <code>grid</code>. Whether the page&#39;s items run down or across.</li>
+          <li><strong>Density</strong> — <code>tight</code>, <code>comfortable</code>, <code>loose</code>. A set of token remaps, never raw values: each step maps the page and session contracts onto the spacing scale, and the block nearest an element wins, which is how a page overrides the style for its own subtree and nowhere else.</li>
+          </ul>
+          <h3 id="navigation-is-a-site-setting-not-a-page-setting">Navigation is a site setting, not a page setting<a class="heading-anchor" href="#navigation-is-a-site-setting-not-a-page-setting" aria-label="Link to this section">#</a></h3>
+          <p>Where the navigation sits is part of what the site <em>is</em>. A reader who meets a top navigation on the home page and a rail on the schedule has been handed two sites, and the navigation stops being furniture they can stop noticing. It is one choice — <code>top</code> or <code>side</code> — and it covers every page.</p>
+          <p><code>side</code> moves the same navigation to the leading edge at wide viewports. It is one navigation either way: same landmark, same items, same place in the document, and below the wide breakpoint it is the top navigation again.</p>
+          <p><strong>Engine.</strong> The value lives in <code>config/theme</code> beside the style, the texture, the radius, and the mode policy. A page document&#39;s own stored value is still accepted on write and still read as that page&#39;s fallback, because deployments made before the move set it per page and an upgrade may not restyle their pages.</p>
+          <h3 id="sections-are-inserted-not-slotted">Sections are inserted, not slotted<a class="heading-anchor" href="#sections-are-inserted-not-slotted" aria-label="Link to this section">#</a></h3>
+          <p>A system page — home, schedule, speakers, sponsors — keeps its built-in feature and lets you put sections around it. The control asks where relative to that feature: <strong>before the main feature</strong> or <strong>after the main feature</strong>.</p>
+          <p><strong>Engine.</strong> The stored positions are <code>above</code>, <code>main</code>, and <code>below</code>. A section with no position is <code>main</code>. <code>below</code> is a third stored position with no third name in the editor: it renders after every <code>main</code> section, and a section stored that way keeps both its value and its place unless the operator moves the control. A custom page has no built-in feature, so it ignores position entirely.</p>
+          <h2 id="colour">Colour<a class="heading-anchor" href="#colour" aria-label="Link to this section">#</a></h2>
+          <h3 id="what-a-client-actually-sets">What a client actually sets<a class="heading-anchor" href="#what-a-client-actually-sets" aria-label="Link to this section">#</a></h3>
+          <p><strong>One colour.</strong> The main brand colour, and everything else follows from it:</p>
+          <ul>
+          <li>The <strong>darker and lighter</strong> steps of it, for the states and the surfaces that need them.</li>
+          <li>The <strong>rules</strong> — hairline, strong, nameplate — which are the brand ink mixed into the ground at fixed shares, so a restyled site never keeps build-time rules on a new ground.</li>
+          <li>The <strong>form control boundary</strong>, mixed the same way but at a share high enough to clear the non-text contrast bar against either ground.</li>
+          <li>The <strong>dark palette</strong>, authored from the light one rather than inverted from it: a dark site is its own palette, and every colour is lifted to clear its bar on the dark ground rather than reused.</li>
+          </ul>
+          <p>Semantic colours — success, warning, danger, and the rest — come from the style and are not part of the brand decision. They mean what they mean, and a client&#39;s colour does not get to redefine them.</p>
+          <h3 id="expert-overrides">Expert overrides<a class="heading-anchor" href="#expert-overrides" aria-label="Link to this section">#</a></h3>
+          <p>Any single colour can be set by hand, per mode, in Advanced. This is an <strong>exceptional control</strong>: it is there for the client whose brand guide names an exact value that the derivation does not reach, and every use of it takes a token out of the derivation permanently — it will no longer move when the brand colour moves. Most sites should never open it, and a site that has overridden a dozen values has usually picked the wrong style.</p>
+          <h3 id="the-contrast-gate">The contrast gate<a class="heading-anchor" href="#the-contrast-gate" aria-label="Link to this section">#</a></h3>
+          <p>Publishing is refused when any defined foreground/background pair fails its bar, in either mode. Text holds 4.5:1. A form control&#39;s boundary is non-text user interface and holds 3:1, measured against every ground an input actually renders on. Contrast is measured against the real rendered background, not the page background.</p>
+          <p><strong>A failure stops a publish, not a save.</strong> A draft may hold two colours too close together to read; publishing that draft is refused, and the message names the pair, the mode, and the ratio it measured.</p>
+          <h3 id="modes">Modes<a class="heading-anchor" href="#modes" aria-label="Link to this section">#</a></h3>
+          <p><code>light</code>, <code>dark</code>, or <code>system</code>. Every style defines both palettes, so no choice here leaves the site half-dressed. The mode arrives as <code>data-mode</code> on the root element, written by the runtime; a deployment whose policy is not <code>light</code> also gets a first-paint block, so the ground is right before that attribute lands and a reader never sees a flash of the other mode.</p>
+          <h2 id="tokens">Tokens<a class="heading-anchor" href="#tokens" aria-label="Link to this section">#</a></h2>
+          <p>Three tiers, and each one only reads the one below it.</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Tier</th><th>Names look like</th><th>What it is</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>1 — primitives</td><td><code>--er-space-md</code>, <code>--er-size-h2-max</code></td><td>Raw values. Nothing renders against these directly.</td></tr>
+          <tr><td>2 — semantic</td><td><code>--space-md</code>, <code>--text-h2</code>, <code>--color-text-secondary-rgb</code>, <code>--rule-hairline-width</code></td><td>The scales and roles components ask for.</td></tr>
+          <tr><td>3 — contracts</td><td><code>--folio-size</code>, <code>--section-rule-width</code>, <code>--session-card-pad-block</code></td><td>One device&#39;s settings, so a style retunes a device by remapping tokens rather than by changing a component.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p><strong>Rules for using them</strong>, in full in <a href="/eventrunner/docs/interface-guidelines/"><code>interface-guidelines.md</code></a>, Colors:</p>
+          <ul>
+          <li>Name a token by role, never by appearance or first use.</li>
+          <li>Never borrow a token from another role. When a role changes colour, mint a new token.</li>
+          <li>Every colour token is defined under both modes. A token missing from either is a bug, not a polish item.</li>
+          <li>Rules read the rule tokens. A rule never borrows an ink step and never carries brand colour.</li>
+          <li>A form control&#39;s boundary reads the control token, never the hairline: a hairline is tuned for low-contrast structure and falls well short of the 3:1 bar.</li>
+          </ul>
+          <p><strong>Colours are stored as space-separated RGB triples</strong>, so the utility layer&#39;s <code>rgb(var(--…) / &lt;alpha-value&gt;)</code> keeps its opacity modifiers working.</p>
+          <p><strong>Where each is written.</strong> <code>design/tokens/*.json</code> is the source. <code>scripts/lib/tokens.cjs</code> is the only thing in the repo that mints a token. Never hand-edit a generated stylesheet.</p>
+          <h2 id="composition-rules">Composition rules<a class="heading-anchor" href="#composition-rules" aria-label="Link to this section">#</a></h2>
+          <p>The devices, and the one job each has. The implementations live in <code>apps/web/src/components/editorial/</code>, and each resolves through its tier-3 contract.</p>
+          <ul>
+          <li><strong>Header</strong> — the site identity, in one of four treatments. Never a heading, never a photo behind the name.</li>
+          <li><strong>Folio</strong> — a small-caps plain-text label on a hairline. Never a chip, never a pill, never a coloured badge, and <strong>never directly above a heading</strong>.</li>
+          <li><strong>Rule</strong> — hairline, strong, or nameplate. A rule replaces a card border. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node.</li>
+          <li><strong>Section boundary</strong> — one strong rule, then the heading with the folio beside it. Reach for this rather than composing a folio and a heading by hand.</li>
+          <li><strong>Stat block</strong> — four parts, all required: the finding in words, what the number counts and over what period, where it came from and when it was read, and a line describing it for a screen reader. A large number with a small caption under it is not a stat block, and the write path refuses one.</li>
+          <li><strong>Grid schedule</strong> — time down the left, lettered tracks across the head, at wide viewports. A real table, and it degrades to the time-ordered list, which is the accessible baseline and not a lesser view.</li>
+          <li><strong>Back issue</strong> — the archival state of a past day. Reduce the palette to the archive tokens, add the folio, remove the live controls. Never hide the content.</li>
+          <li><strong>Print view</strong> — its own view, not the screen with the controls hidden.</li>
+          </ul>
+          <p><strong>The eyebrow ban is absolute.</strong> Nothing sits directly above a heading — not a label, not a chip, not a small line of description, not a plain folio. It holds at every size, in every style. Two things are not eyebrows and must never be &quot;fixed&quot;: metadata inside the rule-bounded nameplate block, and a form <code>&lt;label&gt;</code> above its own input.</p>
+          <p><strong>Elevation is tint, not shadow.</strong> Where a surface must sit above another, shift its tone.</p>
+          <p><strong>Flat surfaces are the shared default.</strong> The page ground paints no texture on its own; <code>paper</code> is a treatment a style opts into. An opt-in cannot leak.</p>
+          <p>The full list of rejected patterns is in <a href="/eventrunner/docs/interface-guidelines/"><code>interface-guidelines.md</code></a>, Rejected patterns.</p>
+          <h2 id="print">Print<a class="heading-anchor" href="#print" aria-label="Link to this section">#</a></h2>
+          <p><strong>Paper has no dark mode.</strong> Print any schedule page from a dark screen and you get the light edition: the print rules read the ink and rule tokens and nothing else, so re-pointing those at the light palette is the whole switch, and no print rule has to know a mode exists.</p>
+          <p><strong>The handout is its own view.</strong> Every day of the event, every session and every stop under it, tracks named by letter and by name, no buttons, no demo notice. Nothing has to be prepared for it.</p>
+          <p><strong>The live palette prints, not the shipped one.</strong> There are two print blocks and they are not redundant. The generated stylesheet carries one whose values are frozen at build time — that is the fallback, for a reader with no JavaScript or one printing before <code>config/theme</code> arrives. The runtime element writes its own from the live resolved palette, naming the same selectors so it wins on document order. Without it, a site restyled after deployment printed the palette it shipped with, and only from a dark screen, which is exactly the kind of bug nobody finds until a client hands out a hundred programmes.</p>
+          <h2 id="the-admin-panel-is-not-a-site-style">The admin panel is not a site style<a class="heading-anchor" href="#the-admin-panel-is-not-a-site-style" aria-label="Link to this section">#</a></h2>
+          <p>The admin CMS is its own design surface and it does not restyle. It reads its own fixed token set, obeys the mode, and ignores the site style entirely — so the room a staff member works in does not change shape every time a client changes their palette.</p>
+          <ul>
+          <li><strong>Two faces, fixed.</strong> Source Sans 3 for everything a person reads as language, IBM Plex Mono with tabular figures for everything the machine owns.</li>
+          <li><strong>Navigation is the docket</strong>: a grouped standing list of words down the leading edge. No icon rail, no collapse to glyphs, no counts in bubbles.</li>
+          <li><strong>The active item carries four signals</strong>, never colour alone: the marker, the weight, a ground shift, and the assistive-technology current-page state.</li>
+          <li><strong>The position marker is derived</strong>, from the admin&#39;s own ink against the admin ground. It is not a client setting: there is no marker colour to choose, nothing to get wrong, and no failure state to explain.</li>
+          <li><strong>Three state words, everywhere</strong>: Draft, Live, and Live with unpublished changes.</li>
+          <li><strong>A destructive action stands still and states what it costs.</strong> Nothing animates in a destructive moment.</li>
+          </ul>
+          <p><strong>Engine.</strong> The <code>admin-*</code> blocks are emitted once per mode and never once per (style, mode), which is the mechanical form of &quot;the admin ignores the site style&quot;. They stay root-only, because the admin never renders inside the page-preview frame.</p>
+          <h2 id="extension-points">Extension points<a class="heading-anchor" href="#extension-points" aria-label="Link to this section">#</a></h2>
+          <p>What a developer can add, and what the system will refuse.</p>
+          <p><strong>A new site style.</strong> Add its JSON under <code>design/tokens/presets/</code>, with both palettes, its type map, its shape, its option groups, and its tier. A style that names no tier reads as still-being-proved, so a new one cannot reach the launch surface by accident. It must clear the contrast gate in both modes before it ships.</p>
+          <p><strong>A new option inside a style.</strong> An option remaps tokens the style already declares. It may not introduce a property name and it may not introduce a class. If it needs a name that does not exist, the thing you are adding is a token, not an option.</p>
+          <p><strong>A new font set.</strong> Add the woff2 to the bundle, declare the family, and register the set. It becomes selectable everywhere at once, because the type map is live.</p>
+          <p><strong>A new illustration set.</strong> Add it to the motif JSON with all four slots filled. A set with a hole in it renders nothing in that slot, which reads as a bug.</p>
+          <p><strong>A new page template.</strong> A template is a named, validated bundle of layout values plus the record of which task the operator meant. Add both, and state every axis: a template that left one unanswered would leave the page following the style for that one value while stating the others, which is the half-configured state templates exist to prevent.</p>
+          <p><strong>What a style may never do</strong>: grant itself an exception to a rejected pattern, introduce a property name, ship a remote font, or define a colour in one mode only.</p>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/design-reference.md"><code>docs/design-reference.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/admin-guide/"><span>Previous</span>Admin guide</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/client-onboarding/"><span>Next</span>Client onboarding</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

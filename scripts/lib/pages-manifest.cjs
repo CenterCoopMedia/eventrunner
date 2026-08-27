@@ -84,7 +84,13 @@ const SECTIONS = Object.freeze([
         source: 'docs/ADMIN_GUIDE.md',
         route: 'admin-guide/',
         title: 'Admin guide',
-        summary: 'Every admin screen, in the order staff meet them.',
+        summary: 'Running a client site from the admin panel, in the order the work happens.',
+      },
+      {
+        source: 'docs/design-reference.md',
+        route: 'design-reference/',
+        title: 'Site design reference',
+        summary: 'Every site style, option, layout axis, and token, in full. The deep end.',
       },
       {
         source: 'docs/CLIENT_ONBOARDING.md',
