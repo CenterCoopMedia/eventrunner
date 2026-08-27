@@ -55,6 +55,16 @@ const DEVICE_CLASSES = [
   // The hybrid page shell and its density variant (brief §6.1, §6.2).
   '.page-section',
   '.directory-row',
+  // The schedule grid, its signature interaction, and the calling points
+  // under a parent session (brief §2.1, §2.2, §4.6).
+  '.schedule-grid',
+  '.schedule-grid__head',
+  '.schedule-grid__time',
+  '.schedule-grid__cell',
+  '.schedule-grid__corner',
+  '.schedule-grid__entry',
+  '.calling-points__item',
+  '.calling-points__marker',
 ];
 
 describe('the built stylesheet', () => {

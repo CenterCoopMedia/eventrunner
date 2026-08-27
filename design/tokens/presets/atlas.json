@@ -53,9 +53,10 @@
   "shape": { "radius": "sharp", "texture": "flat", "density": "tight" },
   "motifSet": "cartographic",
 
-  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The map grid is held below hairline contrast and never becomes an image.",
+  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The map grid is held below hairline contrast and never becomes an image. --schedule-trace-width is the traced line (visual story, moment 3): the departure board's forward column connects down the sheet. It is zero in every other preset, and a zero-width bar paints nothing at all.",
   "tokens": {
     "--map-grid-size": "var(--space-xl)",
+    "--schedule-trace-width": "var(--rule-strong-width)",
     "--transfer-line-display": "block",
     "--route-mark-radius": "var(--radius-base)",
     "--session-card-pad-block": "var(--space-xs)",

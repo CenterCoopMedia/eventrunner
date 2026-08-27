@@ -52,13 +52,20 @@
     "--folio-tracking": "var(--text-folio-tracking)",
     "--folio-gap": "var(--space-xs)"
   },
-  "$schedule-note": "The schedule presentation variants (brief §4, visual stories part 6c). The grid itself lands in PR3; these are the values a preset's variant sets. The agenda number is real sequence data, never zero-padded (brief §2.4).",
+  "$schedule-note": "The schedule presentation variants (brief §4, visual stories part 6c) and the grid itself (§2.1 'Grid schedule'). The agenda number is real sequence data, never zero-padded (brief §2.4).",
+  "$schedule-forward-note": "The one expressive moment on the public site (brief §2.2): a track column comes forward on a user action. The state is a TINT of the column's ground, which lands in both motion settings; the lift is the motion, and index.css draws it only under a no-preference query. The other columns are never dimmed, so the page is readable at every frame. --schedule-trace-width is Atlas's traced line — the forward column's cells connect down the sheet — and it is zero everywhere else, which paints nothing at all.",
   "schedule": {
     "--schedule-grid-rgb": "--rule-hairline-rgb",
+    "--schedule-forward-rgb": "--color-surface-alt-rgb",
+    "--schedule-trace-rgb": "--color-accent-rgb",
     "--schedule-row-leading": "var(--text-body-leading)",
     "--schedule-data-size": "var(--text-caption)",
     "--schedule-number-display": "none",
-    "--schedule-cell-pad-block": "var(--space-xs)"
+    "--schedule-cell-pad-block": "var(--space-xs)",
+    "--schedule-cell-pad-inline": "var(--space-sm)",
+    "--schedule-time-width": "7rem",
+    "--schedule-forward-lift": "var(--space-3xs)",
+    "--schedule-trace-width": "0"
   },
   "$plate-note": "The Field Guide botanical plate (brief §4.5): a framed drawing with a hairline border and a plate number in the folio style. A plate is drawn linework and never a hero image. The frame is a DOUBLE hairline, drawn as a border plus an outline at the same width. Zero frame and zero pad is the device off: the wrapper then adds no rule, no space, and no reflow, which is what every preset but Field Guide holds.",
   "plate": {

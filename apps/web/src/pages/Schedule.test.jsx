@@ -323,3 +323,97 @@ describe('transferTarget', () => {
     expect(transferTarget(day, 4)).toBeNull();
   });
 });
+
+describe('the two views of a day', () => {
+  // The list is what a viewport that cannot be measured gets, so jsdom —
+  // which ships no matchMedia — renders it in every test above. These two
+  // stub the query the way a wide browser would answer it.
+  function withViewport(matches, run) {
+    const original = window.matchMedia;
+    window.matchMedia = () => ({
+      matches,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    try {
+      run();
+    } finally {
+      if (original) window.matchMedia = original;
+      else delete window.matchMedia;
+    }
+  }
+
+  const tracked = [
+    { ...fixtureSessions[1], track: 'A' },
+    {
+      id: 'fx-parallel',
+      dayId: 'fx-day-1',
+      startTime: '09:05',
+      endTime: '09:45',
+      title: '[Fixture] Parallel session',
+      location: 'Room B',
+      track: 'B',
+      speakerIds: [],
+      visible: true,
+      order: 1,
+    },
+  ];
+  const eventWithTracks = {
+    ...fixtureConfig,
+    tracks: [
+      { letter: 'A', name: 'Practice' },
+      { letter: 'B', name: 'Sustainability' },
+    ],
+  };
+
+  it('draws the grid at a wide viewport, when the event runs lines', () => {
+    withViewport(true, () => {
+      renderSchedule({ eventConfig: eventWithTracks, scheduleData: tracked });
+      expect(screen.getByRole('table', { name: /day one, sessions by track/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /practice/i })).toBeInTheDocument();
+    });
+  });
+
+  it('keeps the list at a narrow viewport, with every session in it', () => {
+    withViewport(false, () => {
+      renderSchedule({ eventConfig: eventWithTracks, scheduleData: tracked });
+      expect(screen.queryByRole('table')).toBeNull();
+      expect(screen.getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+      expect(screen.getByText('[Fixture] Parallel session')).toBeInTheDocument();
+    });
+  });
+
+  it('keeps the list at a wide viewport when the event runs no lines', () => {
+    // No second axis, so there is nothing for a grid to be.
+    withViewport(true, () => {
+      renderSchedule();
+      expect(screen.queryByRole('table')).toBeNull();
+      expect(screen.getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+    });
+  });
+
+  it('lists a child under its parent in the list too, never as its own row', () => {
+    const parent = { ...fixtureSessions[1] };
+    const child = {
+      id: 'fx-clinic',
+      dayId: 'fx-day-1',
+      startTime: '09:20',
+      endTime: '09:45',
+      title: '[Fixture] Breakout clinic',
+      location: 'Main hall',
+      parentId: 'fx-early',
+      speakerIds: [],
+      visible: true,
+      order: 1,
+    };
+    withViewport(false, () => {
+      const { container } = renderSchedule({ scheduleData: [parent, child] });
+      expect(container.querySelectorAll('li.session-block')).toHaveLength(1);
+      const points = screen.getByRole('list', {
+        name: /calling points of \[fixture\] morning kickoff/i,
+      });
+      expect(points).toBeInTheDocument();
+      expect(screen.getByText('[Fixture] Breakout clinic')).toBeInTheDocument();
+    });
+  });
+});

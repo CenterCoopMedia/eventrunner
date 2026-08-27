@@ -22,6 +22,9 @@ import SessionCard from '../components/SessionCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { PlateNumber } from '../components/editorial/Plate.jsx';
 import Marginalia from '../components/editorial/Marginalia.jsx';
+import ScheduleGrid from '../components/ScheduleGrid.jsx';
+import { resolveTracks, withCallingPoints } from '../lib/scheduleGrid.js';
+import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 
@@ -90,6 +93,11 @@ export default function Schedule() {
   const { user } = useAuth();
   const { attendeeAccess } = useProfile();
   const { bookmarkedIds } = useMyBookmarks();
+  // Which of the two views is in the document at all (lib/viewport.js). The
+  // list is the answer until the viewport is measured and found wide, so a
+  // browser that cannot be asked gets the accessible baseline rather than a
+  // grid it has no room for.
+  const wide = useMediaQuery(WIDE_VIEWPORT);
 
   // Days are runtime config — a live config/event write could deliver a
   // malformed entry; drop anything without a usable string id rather than
@@ -142,6 +150,14 @@ export default function Schedule() {
 
   const activeDay = days.find((d) => d.id === activeDayId) ?? null;
   const activeSessions = activeDayId ? (sessionsByDay.get(activeDayId) ?? []) : [];
+  // The day as top-level entries, each carrying its calling points. Both
+  // views render from this, so a child session appears under its parent in
+  // the grid and in the list, and never as a row of its own.
+  const entries = withCallingPoints(activeSessions);
+  // The event's lines, in the client's own order (config/event.tracks). No
+  // lines means no second axis, so there is nothing for a grid to be.
+  const columns = resolveTracks(eventConfig);
+  const showGrid = wide && columns.length > 0 && entries.length > 0;
   const hasAnySession = sessionsByDay.size > 0;
   const eventZoneLabel = activeDay
     ? zoneLabel(
@@ -253,18 +269,37 @@ export default function Schedule() {
               <p className="mt-md max-w-prose text-body text-text-secondary">
                 No sessions are announced for {activeDay.label} yet.
               </p>
+            ) : showGrid ? (
+              // The programme page: time down, lettered lines across (brief
+              // §2.1). It scrolls inside its own box rather than pushing
+              // the page sideways.
+              <div className="mt-sm overflow-x-auto">
+                <ScheduleGrid
+                  day={activeDay}
+                  entries={entries}
+                  columns={columns}
+                  eventConfig={eventConfig}
+                />
+              </div>
             ) : (
+              // The time-ordered list. It is the other first-class view,
+              // not a lesser one (visual story, Civic, moment 1): fixed
+              // column order, tabular figures, every relationship stated.
               // No gap: every row opens with its own hairline, so the rules
               // are the separation a card border used to be.
               <ul className="mt-sm">
-                {activeSessions.map((session, index) => (
+                {entries.map((entry, index) => (
                   <SessionCard
-                    key={session.id}
-                    session={session}
+                    key={entry.session.id}
+                    session={entry.session}
                     eventConfig={eventConfig}
                     features={features}
-                    bookmarked={bookmarkedIds.has(session.id)}
-                    transferTo={transferTarget(activeSessions, index)}
+                    bookmarked={bookmarkedIds.has(entry.session.id)}
+                    transferTo={transferTarget(
+                      entries.map((one) => one.session),
+                      index,
+                    )}
+                    callingPoints={entry.children}
                   />
                 ))}
               </ul>

@@ -23,6 +23,7 @@ import {
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';
 import WayfindingIcon from './editorial/WayfindingIcon.jsx';
 import Tag from './editorial/Tag.jsx';
+import CallingPoints from './CallingPoints.jsx';
 
 /**
  * Resolve a session's `speakerIds` against the live `speakers_public`
@@ -408,7 +409,7 @@ function TransferLine({ to }) {
 /**
  * @param {{ session: object, eventConfig: object, features?: object,
  *           bookmarked?: boolean, linkToDetail?: boolean,
- *           transferTo?: string | null }} props
+ *           transferTo?: string | null, callingPoints?: object[] }} props
  */
 export default function SessionCard({
   session,
@@ -417,6 +418,7 @@ export default function SessionCard({
   bookmarked = false,
   linkToDetail = true,
   transferTo = null,
+  callingPoints = [],
 }) {
   const speakerNames = useSessionSpeakerNames(session.speakerIds);
   const range = formatSessionTimeRange(eventConfig, session);
@@ -485,6 +487,14 @@ export default function SessionCard({
             </p>
           ) : null}
           <SpeakerNames speakers={speakerNames} features={features} />
+          {/* A parent session's children are calling points on the way
+              through it (brief §4.6), never rows of their own. */}
+          <CallingPoints
+            className="mt-sm"
+            parent={session}
+            points={callingPoints}
+            eventConfig={eventConfig}
+          />
           <div className="mt-sm">
             <SessionPills
               session={session}

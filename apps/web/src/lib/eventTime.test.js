@@ -7,6 +7,7 @@ import {
   zonedDateTime,
   formatDayDate,
   formatEventDateRange,
+  formatSessionStart,
   formatSessionTimeRange,
 } from './eventTime.js';
 
@@ -102,5 +103,28 @@ describe('formatEventDateRange', () => {
     expect(formatEventDateRange([], ZONE)).toBeNull();
     expect(formatEventDateRange('not an array', ZONE)).toBeNull();
     expect(formatEventDateRange([{ date: '2026-02-30' }], ZONE)).toBeNull();
+  });
+});
+
+describe('formatSessionStart', () => {
+  const config = {
+    timezone: 'America/New_York',
+    days: [{ id: 'd1', date: '2026-10-14' }],
+  };
+
+  it('carries the period a range would have dropped', () => {
+    // "9:00-9:45 AM" reads right as a range and wrong as a row header: a
+    // time standing on its own has to say which half of the day it is in.
+    const session = { dayId: 'd1', startTime: '09:00', endTime: '09:45' };
+    expect(formatSessionTimeRange(config, session).startLabel).toBe('9:00');
+    expect(formatSessionStart(config, session)).toEqual({
+      startIso: '2026-10-14T09:00',
+      startLabel: '9:00 AM',
+    });
+  });
+
+  it('fails soft the same way the range does', () => {
+    expect(formatSessionStart(config, { dayId: 'nope', startTime: '09:00' })).toBeNull();
+    expect(formatSessionStart(config, { dayId: 'd1', startTime: 'noon' })).toBeNull();
   });
 });

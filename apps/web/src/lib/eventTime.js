@@ -179,6 +179,27 @@ export function formatSessionTimeRange(eventConfig, session) {
   };
 }
 
+/**
+ * A session's START on its own: `{ startIso, startLabel }`, with the AM/PM
+ * always carried. Null where the session's day or start time cannot be
+ * resolved.
+ *
+ * formatSessionTimeRange drops the period from the start of a range that
+ * does not cross noon ("9:30–10:00 AM"), which is right for a range and
+ * wrong for a time standing alone — a schedule-grid row header reading
+ * "9:00" states half a time. Asking the same formatter for a range with no
+ * end is what makes the period come back, so there is still one formatter
+ * and one set of rules about how a time reads.
+ *
+ * @param {object} eventConfig
+ * @param {object} session
+ * @returns {{ startIso: string, startLabel: string }|null}
+ */
+export function formatSessionStart(eventConfig, session) {
+  const range = formatSessionTimeRange(eventConfig, { ...session, endTime: null });
+  return range ? { startIso: range.startIso, startLabel: range.startLabel } : null;
+}
+
 /** "YYYY-MM-DD" one calendar day later, UTC-safe (no local-timezone DST). */
 function rollDateForward(dateStr) {
   const [y, mo, d] = dateStr.split('-').map(Number);

@@ -295,6 +295,156 @@
     }
   }
 
+  /* The schedule grid (brief §2.1 "Grid schedule", §4.6): time down the
+     left in the data face, lettered tracks across the head. It is drawn as
+     a table because it IS one — a session sits at the intersection of a
+     time and a line — so the structure a screen reader reads and the
+     structure a reader sees are the same structure.
+
+     Rules, never boxes: a hairline opens every row and runs between the
+     columns, which is the column rule of a printed programme page. */
+  .schedule-grid {
+    inline-size: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    line-height: var(--schedule-row-leading);
+  }
+  .schedule-grid__corner,
+  .schedule-grid__time {
+    inline-size: var(--schedule-time-width);
+    padding-block: var(--schedule-cell-pad-block);
+    padding-inline-end: var(--schedule-cell-pad-inline);
+    text-align: start;
+    vertical-align: baseline;
+    color: rgb(var(--color-text-secondary-rgb));
+    font-weight: var(--weight-regular);
+  }
+  .schedule-grid__head {
+    padding-block: var(--schedule-cell-pad-block);
+    padding-inline: var(--schedule-cell-pad-inline);
+    text-align: start;
+    vertical-align: bottom;
+    border-block-end: var(--rule-strong-width) solid rgb(var(--rule-strong-rgb));
+  }
+  .schedule-grid__cell {
+    padding-block: var(--schedule-cell-pad-block);
+    padding-inline: var(--schedule-cell-pad-inline);
+    vertical-align: top;
+    border-block-start: var(--rule-hairline-width) solid rgb(var(--schedule-grid-rgb));
+    border-inline-start: var(--rule-hairline-width) solid rgb(var(--schedule-grid-rgb));
+  }
+  .schedule-grid__time {
+    border-block-start: var(--rule-hairline-width) solid rgb(var(--schedule-grid-rgb));
+  }
+  .schedule-grid__entry + .schedule-grid__entry {
+    margin-block-start: var(--space-md);
+  }
+
+  /* THE ONE EXPRESSIVE MOMENT ON THE PUBLIC SITE (brief §2.2). A column
+     comes forward when the reader clicks or focuses its head. Read these
+     rules against the four requirements:
+
+     1. FROM A USER ACTION. `data-track-forward` is written by
+        ScheduleGrid.jsx from a click or a focus. Nothing here reads scroll
+        position, nothing loops, and this stylesheet declares no
+        animation anywhere — only transitions on a state a person caused.
+     2. UNDER 600ms. The transition runs at --motion-signature.
+     3. transform AND opacity ONLY. The forward state is an overlay whose
+        OPACITY changes and a lift that is a TRANSFORM. No colour animates,
+        no size animates, and `transition: all` appears nowhere.
+     4. READABLE AT EVERY FRAME. The other columns are untouched — nothing
+        is dimmed — so no text ever drops below its contrast bar. The
+        forward column is marked by a tint of --schedule-forward-rgb, which
+        is the same surface pair the palette already tests at 4.5:1.
+
+     STATIC UNDER prefers-reduced-motion: the tint sits OUTSIDE the
+     no-preference query and the lift sits inside it. A reader who asked
+     for less motion still gets the column brought forward — as a tint that
+     does not move. That is a truly static state, not a shortened one. */
+  .schedule-grid__head,
+  .schedule-grid__cell {
+    position: relative;
+  }
+  .schedule-grid__head::before,
+  .schedule-grid__cell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-color: rgb(var(--schedule-forward-rgb));
+    opacity: 0;
+  }
+  /* The tint is a ground, so the cell's own content sits above it. Same
+     device the map grid uses to stay behind the page it is drawn on. */
+  .schedule-grid__head > *,
+  .schedule-grid__cell > * {
+    position: relative;
+  }
+  .schedule-grid [data-track-forward]::before {
+    opacity: 1;
+  }
+  /* Atlas's traced line (visual story, Atlas, moment 3): the forward
+     column's cells connect down the sheet, from the route mark in the head
+     to the last service of the day. It is drawn at
+     --schedule-trace-width, which is zero in every preset that is not a
+     network — and a zero-width bar paints nothing, so the device turns
+     itself off with no second rule and no theme test. */
+  .schedule-grid__head::after,
+  .schedule-grid__cell::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: calc(var(--schedule-cell-pad-inline) * 0.5);
+    inline-size: var(--schedule-trace-width);
+    pointer-events: none;
+    background-color: rgb(var(--schedule-trace-rgb));
+    opacity: 0;
+  }
+  .schedule-grid [data-track-forward]::after {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .schedule-grid__head,
+    .schedule-grid__cell,
+    .schedule-grid__head::before,
+    .schedule-grid__cell::before,
+    .schedule-grid__head::after,
+    .schedule-grid__cell::after {
+      transition:
+        transform var(--motion-signature) var(--motion-ease),
+        opacity var(--motion-signature) var(--motion-ease);
+    }
+    .schedule-grid [data-track-forward] {
+      transform: translateY(calc(-1 * var(--schedule-forward-lift)));
+    }
+  }
+
+  /* Calling points: a parent session's children, under it and inside its
+     time (brief §4.6). The marker is the disclosure's functional motion —
+     transform only, at --motion-base, from a user action, and static for a
+     reader who asked for less motion. The list opens by default, because a
+     programme that hides half of itself is not a programme. */
+  .calling-points__item {
+    border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    padding-block: var(--space-2xs);
+    padding-inline-start: var(--space-md);
+  }
+  .calling-points__marker {
+    inline-size: 0.5em;
+    block-size: 0.5em;
+    border-inline-end: var(--rule-strong-width) solid currentColor;
+    border-block-end: var(--rule-strong-width) solid currentColor;
+    transform: rotate(45deg);
+  }
+  .calling-points [aria-expanded='false'] .calling-points__marker {
+    transform: rotate(-45deg);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .calling-points__marker {
+      transition: transform var(--motion-base) var(--motion-ease);
+    }
+  }
+
   /* The handwritten callout (brief §4.3): real copy, one per page, at one
      fixed angle. Every preset but Zine holds a zero angle and the heading
      face, so the same element is simply a lead line there. */
