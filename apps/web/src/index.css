@@ -14,7 +14,7 @@
   }
 
   body {
-    @apply bg-brand-surface font-body text-brand-ink;
+    @apply bg-surface font-body text-text-primary;
   }
 
   h1,
@@ -31,7 +31,7 @@
 
   /* Never remove outlines without replacing them (interface guidelines). */
   :focus-visible {
-    @apply outline outline-2 outline-offset-2 outline-brand-primary;
+    @apply outline outline-2 outline-offset-2 outline-accent;
   }
 
   [id] {
@@ -48,40 +48,1012 @@
 @layer components {
   /* Skip link: first focusable element on every page (Layout.jsx). */
   .skip-link {
-    @apply sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-50
-      focus:rounded-brand focus:bg-brand-primary focus:px-4 focus:py-3 focus:text-brand-surface;
+    @apply sr-only focus:not-sr-only focus:absolute focus:start-md focus:top-md focus:z-50
+      focus:rounded-brand focus:bg-accent focus:px-md focus:py-sm focus:text-surface;
   }
 
-  /* Texture treatment driven by config/theme.texture (spec §7.2). CSS custom
-     properties can't be tested for equality in a selector, so
-     EventConfigProvider mirrors the resolved texture onto
-     documentElement.dataset.texture (snapshot value at first paint, runtime
-     value once config/theme lands) and this rule gates the overlay on that
-     attribute: 'paper' (the default — matches generated/theme.css) paints
-     the dot pattern, 'flat' suppresses it. The overlay is decorative, so it
-     must never intercept the pointer. */
-  .bg-paper {
-    @apply relative bg-brand-surface;
+  /* The page ground. Flat is the base; a texture arrives only when
+     config/theme.texture opts into one.
+
+     The selector reads documentElement.dataset.texture, which
+     EventConfigProvider mirrors the resolved value onto, because a custom
+     property cannot be compared for equality in a selector.
+
+     The gate is an OPT-IN, and it has to be. The overlay used to paint by
+     default and be suppressed under [data-texture='flat'], so any surface
+     that reached a reader before the attribute was written — or with no
+     attribute at all, which is what a document naming no texture resolves
+     to — got the dot pattern nobody asked for. An opt-in cannot leak; an
+     opt-out always can.
+
+     The overlay is decorative, so it never intercepts the pointer. */
+  .page-surface {
+    @apply relative bg-surface;
   }
-  .bg-paper::before {
+  :root[data-texture='paper'] .page-surface::before {
     content: '';
     position: absolute;
     inset: 0;
     pointer-events: none;
     background-image: radial-gradient(
-      rgb(var(--brand-ink-rgb) / 0.04) 1px,
+      rgb(var(--color-text-primary-rgb) / 0.04) 1px,
       transparent 1px
     );
     background-size: 24px 24px;
   }
-  :root[data-texture='flat'] .bg-paper::before {
-    content: none;
+
+  /* Editorial devices. Each class is the rendered form of one tier-3
+     component contract, so a preset retunes a device by remapping its
+     tokens and no component changes. What each device is for, and the rules
+     a review applies to it: docs/interface-guidelines.md, Editorial devices.
+
+     Rules are drawn with `border-block-*`, not a height, so the width token
+     (1px / 2px / 3px) is the property it was written for and the device
+     stays a hairline on a fractional-pixel display. */
+
+  /* Masthead nameplate: the rule-bounded title block. */
+  .nameplate {
+    position: relative;
+    border-block-start: var(--nameplate-rule-width) solid rgb(var(--nameplate-rule-rgb));
+    border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    padding-block: calc(var(--nameplate-gap) * var(--density-step, 1));
+    text-align: var(--nameplate-align);
+    /* The second rule of the double-rule treatment: a line drawn just under
+       the first, the way a masthead is ruled twice. It is the nameplate's
+       twin of the struck folio below, and it is drawn as a background sized
+       from its own width, so the zero width every other treatment holds
+       paints nothing and takes no space — the same way the coordinate marks
+       turn themselves off. The distance below the first rule comes from the
+       width too, so the pair reads as one device at any weight. */
+    background-image:
+      linear-gradient(rgb(var(--nameplate-rule-rgb)), rgb(var(--nameplate-rule-rgb)));
+    background-repeat: no-repeat;
+    background-position: 0 calc(var(--nameplate-rule-top-width) * 3);
+    background-size: 100% var(--nameplate-rule-top-width);
+  }
+  /* The frame of a title page (Field Guide) or a title block (Atlas). It is
+     drawn OUTSIDE the flow, so a preset that leaves --nameplate-frame-width
+     at zero renders the same block it always did — no border, no reflow. */
+  .nameplate::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--space-xs)) calc(-1 * var(--space-sm));
+    pointer-events: none;
+    border: var(--nameplate-frame-width) solid rgb(var(--nameplate-frame-rgb));
+  }
+  /* Coordinate marks at two corners: a survey registration cross centred on
+     the corner of the title block (brief §4.6). A cross rather than an L,
+     because an L drawn at a corner the frame already turns is a corner
+     nobody can see.
+
+     The two bars are one background each, sized from the mark width, so a
+     zero width gives each bar a zero dimension and nothing is painted at
+     all. That is what keeps the mark out of every preset that is not
+     locating a sheet — a mark states a position, and it appears nowhere
+     else. */
+  .nameplate__coordinate {
+    position: absolute;
+    inline-size: var(--space-md);
+    block-size: var(--space-md);
+    pointer-events: none;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-image:
+      linear-gradient(rgb(var(--nameplate-frame-rgb)), rgb(var(--nameplate-frame-rgb))),
+      linear-gradient(rgb(var(--nameplate-frame-rgb)), rgb(var(--nameplate-frame-rgb)));
+    background-size:
+      100% var(--nameplate-corner-mark-width),
+      var(--nameplate-corner-mark-width) 100%;
+  }
+  .nameplate__coordinate--start {
+    inset-block-start: calc(-1 * (var(--space-xs) + var(--space-xs)));
+    inset-inline-start: calc(-1 * (var(--space-sm) + var(--space-xs)));
+  }
+  .nameplate__coordinate--end {
+    inset-block-end: calc(-1 * (var(--space-xs) + var(--space-xs)));
+    inset-inline-end: calc(-1 * (var(--space-sm) + var(--space-xs)));
+  }
+  .nameplate__name {
+    font-size: var(--nameplate-size);
+    line-height: var(--nameplate-leading);
+    letter-spacing: var(--nameplate-tracking);
+    color: rgb(var(--nameplate-text-rgb));
+    text-wrap: balance;
+  }
+  /* The same device at running-header size: both rules and the edition line
+     stay, and only the name steps down. */
+  .nameplate--compact .nameplate__name {
+    font-size: var(--text-h3);
+    line-height: var(--text-h3-leading);
+    letter-spacing: var(--text-h3-tracking);
+  }
+  /* Where the dates and the edition line sit INSIDE the rule-bounded block.
+     Both places are the nameplate device, never an eyebrow (brief §2.4).
+
+     A Header style states the choice as --nameplate-meta-placement, and the
+     value is the design word for it: `block` puts the line on its own line
+     under the name, `inline` puts it on the name's baseline at the far end
+     of the measure. All eighteen header styles set it, and until now nothing
+     read it — a token an option offers that nothing renders is a promise the
+     interface does not keep (design/tokens/components.json, scope note).
+
+     The lockup is one flex row either way, and the switch is one
+     declaration: metadata told to fill the line takes the whole of it and
+     wraps under the name. The switch is a style query, which is how CSS
+     branches a layout on a custom property's value — the property is
+     inherited from :root and the nearest style container is the .nameplate
+     around this lockup. Everything outside the query is what shipped
+     before, so a browser too old to read one gets the masthead it got
+     before rather than nothing.
+
+     It reaches the FULL treatment only. A Header style is the masthead's
+     treatment, and the running header is the same device at running-header
+     size: turning every inner page's header into two lines is a bigger
+     change than picking a masthead is asking for, and five of the six
+     styles ask for `block`. The compact line stays beside the name. */
+  .nameplate__lockup {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: var(--space-md);
+    row-gap: var(--space-2xs);
+  }
+  .nameplate__meta {
+    flex-basis: 100%;
+  }
+  .nameplate--compact .nameplate__meta {
+    flex-basis: auto;
+  }
+  @container style(--nameplate-meta-placement: inline) {
+    .nameplate:not(.nameplate--compact) .nameplate__meta {
+      flex-basis: auto;
+    }
+  }
+  /* The lockup is laid out the way the block is set. `space-between` is what
+     a masthead set to the start wants: the name at one end of the measure and
+     the dateline at the other. A CENTRED masthead wants neither end — it
+     wants one centred lockup, and a dateline that wraps under a long name
+     wants to centre under it.
+
+     Without this, `space-between` sent the wrapped line to the start of a
+     row the centred name above it does not use, which read as a stray line
+     rather than as part of the block. `text-align` could not fix it: it sets
+     the text inside a flex item, and the item itself was the thing in the
+     wrong place. */
+  @container style(--nameplate-align: center) {
+    .nameplate__lockup {
+      justify-content: center;
+    }
+  }
+
+  /* Lead image: beside the opening copy at wide viewports, below it at
+     narrow ones. The crop is fixed by token so swapping the picture never
+     reflows the page. */
+  .lead-image {
+    display: block;
+    inline-size: 100%;
+    aspect-ratio: var(--lead-image-aspect);
+    object-fit: cover;
+  }
+  .lead-image-slot {
+    inline-size: 100%;
+  }
+  @media (min-width: 64rem) {
+    .lead-image-slot {
+      flex: 0 0 var(--lead-image-width);
+      max-inline-size: var(--lead-image-width);
+    }
+  }
+
+  /* Folio: a small-caps plain-text label that sits ON a rule. Never above a
+     heading — the eyebrow ban is absolute. */
+  .folio {
+    font-family: var(--folio-font);
+    font-size: var(--folio-size);
+    line-height: var(--text-folio-leading);
+    letter-spacing: var(--folio-tracking);
+    /* A folio names a day, a plate, or a page, so it carries figures that
+       change: they set in tabular figures like every other value on the
+       page (brief §3.2). The `font-data` utility used to bring this, and
+       the face with it; the face is now the --folio-font contract's job,
+       so the figures are stated here rather than lost with it. */
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+    color: rgb(var(--folio-text-rgb));
+    /* The struck folio (Zine): a rule above the word as well as the one
+       running out beside it — the typewriter section break of a
+       photocopied programme. Every other style holds a zero width, and a
+       zero width draws no rule and takes no space, so the padding is
+       computed from the width rather than switched on beside it. */
+    border-block-start: var(--folio-rule-top-width) solid rgb(var(--folio-rule-rgb));
+    padding-block-start: calc(var(--folio-rule-top-width) * 3);
+  }
+  .folio__rule {
+    border-block-start: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
+  }
+  /* The row the word and its rule share. The distance between them is the
+     --folio-gap contract rather than a utility: a utility sits in a later
+     cascade layer and would outrank the token, so a style that retuned the
+     gap would never reach the page. */
+  .folio-line {
+    display: flex;
+    align-items: center;
+    column-gap: var(--folio-gap);
+  }
+
+  /* Section rule: the one strong rule that opens a section. */
+  .section-rule {
+    border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
+  }
+  /* The head that follows it, at the distance the style sets. This is one of
+     the three surfaces `config/theme.density` has to reach — a section
+     boundary is where a reader feels a page as tight or as open — so the gap
+     takes the density step the same way the nameplate and the schedule row
+     do. */
+  .section-head {
+    margin-block-start: calc(var(--section-rule-gap) * var(--density-step, 1));
+  }
+
+  /* A composable section on a system page (brief §6.2). The gap above it is
+     a token rather than a utility, because the `density` layout variant is
+     what moves it — see the [data-density] blocks below. */
+  .page-section {
+    margin-block-start: var(--page-section-gap);
+  }
+
+  /* FOUR DIRECTORIES, FOUR COMPOSITIONS (design brief §5.1, §6.1).
+     ------------------------------------------------------------------
+     Speakers, attendees, sponsors and updates were one composition wearing
+     four headings: one ruled row under a hairline, optionally in two
+     columns. That is a schema browser. They are not the same kind of list,
+     and reading each of them is a different job:
+
+       speakers    you are looking for a FACE you half remember
+       attendees   you are looking for a NAME you already know
+       sponsors    you are being shown WHO PAID FOR THIS, by weight
+       updates     you are catching up on WHAT CHANGED, newest first
+
+     So each gets the shape its job needs. Every one is still built from the
+     shared tokens — the same spacing scale, the same rules, the same ink,
+     the same radius, the same density remaps — and none of them becomes a
+     card. Nothing general is left behind for a fifth directory to reuse,
+     because there is no general answer here: the next one gets read for a
+     reason too, and that reason is what shapes it.
+
+     ------------------------------------------------------------------
+     SPEAKERS — a shelf of portraits. The headshot was a 40px thumbnail
+     beside a name, which is not a picture of anyone; at that size it is a
+     bullet. Here the portrait leads at a size a face survives, framed on
+     the alternate ground so a missing headshot is an empty frame rather
+     than a hole in the shelf. */
+  .portrait-shelf__plate {
+    padding-block: var(--page-row-pad-block);
+  }
+  .portrait-shelf__frame {
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    border-radius: var(--radius-base);
+    background-color: rgb(var(--color-surface-alt-rgb));
+  }
+  .portrait-shelf__frame > img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+
+  /* ------------------------------------------------------------------
+     ATTENDEES — an index, not a directory of profiles. Hundreds of names
+     you already know one of: the job is to find YOUR name, or the person
+     you met at lunch. So the entries are one compact line each and they sit
+     under letter heads, which is what makes a long list scannable at all.
+     The letter is a folio on a rule — the same standing head a schedule day
+     uses — and it STICKS to the top of the viewport while its group is on
+     screen, so the reader always knows which letter they are in. */
+  .attendee-index__letter {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    background-color: rgb(var(--color-surface-rgb));
+    padding-block-end: var(--space-3xs);
+  }
+  .attendee-index__entry {
+    padding-block: var(--space-2xs);
+  }
+
+  /* ------------------------------------------------------------------
+     SPONSORS — a logo wall, weighted by tier. A supporter's standing is
+     the one thing this page is actually for, and a list where every row is
+     the same size states the opposite of what the operator agreed to. So
+     the tier sets the mark's size, through one token per tier group rather
+     than a rule per tier: --logo-wall-mark-size is set inline from the
+     tier's rank, and the wall is built from it.
+
+     The mark is drawn on the alternate ground with the house radius, which
+     is what keeps a wall of wildly different logo files reading as one
+     wall. It is contained, never cropped: a sponsor's mark is their
+     property and `cover` would cut it. */
+  .logo-wall {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+  }
+  /* A cell is as wide as its mark, with a little room for a long name to
+     breathe rather than run into the next cell. Both bounds come from the
+     tier's own token, so the whole wall rescales together and no name can
+     widen one cell out of the wall. */
+  .logo-wall > li {
+    min-inline-size: var(--logo-wall-mark-size);
+    max-inline-size: min(100%, calc(var(--logo-wall-mark-size) * 1.5));
+  }
+  .logo-wall__mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--logo-wall-mark-size);
+    block-size: calc(var(--logo-wall-mark-size) * 0.6);
+    padding: var(--space-xs);
+    border-radius: var(--radius-base);
+    background-color: rgb(var(--color-surface-alt-rgb));
+  }
+  .logo-wall__mark > img {
+    max-inline-size: 100%;
+    max-block-size: 100%;
+    object-fit: contain;
+  }
+
+  /* ------------------------------------------------------------------
+     UPDATES — a feed with a spine. The dated column was right; what it was
+     missing was continuity. A hairline runs down the leading edge of the
+     whole run and each entry hangs a short tick off it, so the column reads
+     as one thread of time rather than as unrelated rows that happen to have
+     dates. Newest first, and the month is a standing head on the thread. */
+  .update-feed__entry {
+    position: relative;
+    padding-block: var(--page-row-pad-block);
+    padding-inline-start: var(--space-md);
+    border-inline-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+  }
+  .update-feed__entry::before {
+    content: '';
+    position: absolute;
+    inset-block-start: calc(var(--page-row-pad-block) + 0.6em);
+    inset-inline-start: 0;
+    inline-size: var(--space-sm);
+    block-size: var(--rule-hairline-width);
+    background-color: rgb(var(--rule-hairline-rgb));
+  }
+
+  /* The `density` layout variant (brief §6.1): tight, comfortable, loose.
+     Each step REMAPS tier-3 tokens onto the spacing scale — it never mints
+     a value and never adds a property name, which is the same rule a preset
+     option follows (§3.4).
+
+     The attribute is written in two places, and that is the whole design:
+     the shell mirrors the PRESET's density onto <html>
+     (contexts/EventConfigContext.jsx), and a page that states one of its
+     own writes it on its own <article> (components/SystemPage.jsx). Custom
+     properties inherit, so the nearer block wins for the page's subtree and
+     the preset keeps the rest of the site. A page that states nothing sets
+     no attribute at all, so it cannot silently override the preset. */
+  [data-density='tight'] {
+    --page-section-gap: var(--space-xl);
+    --page-row-pad-block: var(--space-sm);
+    --session-card-pad-block: var(--space-sm);
+    --schedule-cell-pad-block: var(--space-2xs);
+  }
+  [data-density='comfortable'] {
+    --page-section-gap: var(--space-2xl);
+    --page-row-pad-block: var(--space-md);
+    --session-card-pad-block: var(--space-md);
+    --schedule-cell-pad-block: var(--space-xs);
+  }
+  [data-density='loose'] {
+    --page-section-gap: var(--space-3xl);
+    --page-row-pad-block: var(--space-lg);
+    --session-card-pad-block: var(--space-lg);
+    --schedule-cell-pad-block: var(--space-sm);
+  }
+
+  /* The Zine stamp: a session block printed twice, the way a two-pass job
+     prints off register (brief §2.4, "Exception two" — the ONE piece of
+     box-behind-box layering this system allows, and it is a printing
+     artefact, not depth). The six tests it ships against:
+
+     1. FLAT. The layer is the block's own shape in one token colour at one
+        token strength. No blur, no gradient, no grey — none of those three
+        words appears in these rules, and a reviewer can check that by
+        reading them. The strength is what keeps the layer a TINT of the
+        accent rather than the accent: Zine spends the accent at full
+        strength twice a page, and a stamp prints on every row, so full
+        strength here would both spend the rare accent twenty times and
+        turn the misregistration into the coloured card edge §2.4 rejects.
+     2. A FIXED SMALL DISTANCE. The offset is --session-card-stamp-offset.
+        It never scales with the pointer and never follows it: nothing here
+        reads a pointer position at all.
+     3. ZINE ONLY. The offset is zero in every other preset, and a zero
+        offset puts the layer exactly under the block's own face, which
+        paints over it completely. That is also the flat-block variant, so
+        turning the stamp off needs no second rule.
+     4. 150ms ON transform AND opacity, ease-out, FROM A USER ACTION. The
+        peek runs on transform alone at --motion-base, the token step
+        nearest the story's 150ms and inside §2.2's 120-200ms functional
+        band; the scale has no 150ms step and a device may not mint a raw
+        duration. Hover and :focus-visible get the same treatment.
+     5. TRULY STATIC UNDER prefers-reduced-motion. Both the transition AND
+        the hover/focus rules sit inside the no-preference query, so a
+        reader who asked for less motion gets a stamp that renders and does
+        not move — not a shortened animation.
+     6. NEVER THE ONLY AFFORDANCE. The block's title is a link. The stamp
+        adds nothing to what tells a reader the block is interactive. */
+  .session-block {
+    position: relative;
+    /* The rule that opens the row. It is the tier-3 contract, not a utility,
+       because a style moves it: Zine sets the strong rule where the other
+       five hold the hairline, and a cut-and-pasted programme is what that
+       width says. */
+    border-block-start: var(--session-card-rule-width) solid rgb(var(--session-card-rule-rgb));
+    /* Each stamp is its own misregistration. Without this the rows abut,
+       every offset layer is covered by the next row's face, and the twenty
+       separate artefacts merge into ONE continuous coloured edge down the
+       trailing side of the programme — which is the coloured card edge
+       §2.4 rejects, not the second print pass §2.4 allows. The gap is the
+       offset itself, so it is zero in every style but Zine's stamped
+       block and nothing else moves. */
+    margin-block-end: var(--session-card-stamp-offset);
+  }
+  .session-block::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-color: rgb(var(--session-card-stamp-rgb) / var(--session-card-stamp-alpha));
+    transform: translate(var(--session-card-stamp-offset), var(--session-card-stamp-offset));
+  }
+  /* The face is the first pass, and it prints its own ground ONLY where
+     there is a second pass behind it to cover. The ground is a background
+     image sized from the offset, so a zero offset gives it a zero size and
+     the face stays transparent — which is what keeps every other preset
+     exactly as it was, paper texture and map grid still showing through the
+     row. Where the offset is real the ground is opaque and the second pass
+     shows only where it is misregistered. */
+  .session-block__face {
+    position: relative;
+    /* The row's own measure. Every value here is a tier-3 contract a
+       Schedule style moves, so picking "Agate block" or "Field notes
+       column" changes the page without a component edit — which is what
+       makes an option a data change (brief §3.4, §4). */
+    padding-block: calc(var(--session-card-pad-block) * var(--density-step, 1));
+    padding-inline: var(--session-card-pad-inline);
+    column-gap: var(--session-card-gap);
+    background-image: linear-gradient(
+      rgb(var(--session-card-surface-rgb)),
+      rgb(var(--session-card-surface-rgb))
+    );
+    background-repeat: no-repeat;
+    background-size:
+      calc(var(--session-card-stamp-offset) * 1000)
+      calc(var(--session-card-stamp-offset) * 1000);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .session-block::before,
+    .session-block__face {
+      transition: transform var(--motion-base) var(--motion-ease);
+    }
+    .session-block:hover::before,
+    .session-block:has(:focus-visible)::before {
+      transform: translate(
+        calc(var(--session-card-stamp-offset) * 2.25),
+        calc(var(--session-card-stamp-offset) * 2.25)
+      );
+    }
+    .session-block:hover .session-block__face,
+    .session-block:has(:focus-visible) .session-block__face {
+      transform: translate(
+        calc(var(--session-card-stamp-offset) * -0.25),
+        calc(var(--session-card-stamp-offset) * -0.25)
+      );
+    }
+  }
+
+  /* The parts of a schedule row a Schedule style retunes. They read the
+     tier-3 contract in CSS rather than through a Tailwind utility on
+     purpose: a utility sits in a later cascade layer and would win over
+     the token every time, so an option a client picked would never reach
+     the page.
+
+     The three the six styles move: the leading of the row's running text,
+     the size of its listings column, and whether the programme is
+     numbered. */
+  .session-block__data {
+    font-size: var(--schedule-data-size);
+    line-height: var(--schedule-row-leading);
+    letter-spacing: var(--text-caption-tracking);
+  }
+  .session-block__text {
+    font-size: var(--text-body);
+    line-height: var(--schedule-row-leading);
+    letter-spacing: var(--text-body-tracking);
+  }
+  /* The agenda number is the session's real position in the day, the same
+     rule the plate number follows: real sequence data, never a decorative
+     zero-padded one (brief §2.4). `none` keeps it out of the document, and
+     out of the accessibility tree, in the five styles whose programme is
+     not numbered. */
+  .session-block__number {
+    display: var(--schedule-number-display);
+    /* A number and a time on one line have to read as two things. The gap
+       and the weight are what keep "1" from being mistaken for the first
+       digit of "19:30". */
+    padding-inline-end: var(--space-xs);
+    font-weight: var(--weight-semibold);
+  }
+  .session-block__title {
+    font-size: var(--text-h3);
+    line-height: var(--text-h3-leading);
+    letter-spacing: var(--text-h3-tracking);
+  }
+  /* Lead and rest: the first session of a day sets larger and the rest of
+     the day holds its step. Every other style holds a scale of 1, where the
+     lead row and an ordinary row are the same row. */
+  .session-block--lead .session-block__title {
+    font-size: calc(var(--text-h3) * var(--session-card-lead-scale));
+
+  }
+
+  /* The schedule grid (brief §2.1 "Grid schedule", §4.6): time down the
+     left in the data face, lettered tracks across the head. It is drawn as
+     a table because it IS one — a session sits at the intersection of a
+     time and a line — so the structure a screen reader reads and the
+     structure a reader sees are the same structure.
+
+     Rules, never boxes: a hairline opens every row and runs between the
+     columns, which is the column rule of a printed programme page. */
+  .schedule-grid {
+    inline-size: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    line-height: var(--schedule-row-leading);
+  }
+  .schedule-grid__corner,
+  .schedule-grid__time {
+    inline-size: var(--schedule-time-width);
+    padding-block: var(--schedule-cell-pad-block);
+    padding-inline-end: var(--schedule-cell-pad-inline);
+    text-align: start;
+    vertical-align: baseline;
+    color: rgb(var(--color-text-secondary-rgb));
+    font-weight: var(--weight-regular);
+  }
+  .schedule-grid__head {
+    padding-block: var(--schedule-cell-pad-block);
+    padding-inline: var(--schedule-cell-pad-inline);
+    text-align: start;
+    vertical-align: bottom;
+    border-block-end: var(--rule-strong-width) solid rgb(var(--rule-strong-rgb));
+  }
+  .schedule-grid__cell {
+    padding-block: var(--schedule-cell-pad-block);
+    padding-inline: var(--schedule-cell-pad-inline);
+    vertical-align: top;
+    border-block-start: var(--rule-hairline-width) solid rgb(var(--schedule-grid-rgb));
+    border-inline-start: var(--rule-hairline-width) solid rgb(var(--schedule-grid-rgb));
+  }
+  .schedule-grid__time {
+    border-block-start: var(--rule-hairline-width) solid rgb(var(--schedule-grid-rgb));
+  }
+  .schedule-grid__entry + .schedule-grid__entry {
+    margin-block-start: var(--space-md);
+  }
+
+  /* THE ONE EXPRESSIVE MOMENT ON THE PUBLIC SITE (brief §2.2). A column
+     comes forward when the reader clicks or focuses its head. Read these
+     rules against the four requirements:
+
+     1. FROM A USER ACTION. `data-track-forward` is written by
+        ScheduleGrid.jsx from a click or a focus. Nothing here reads scroll
+        position, nothing loops, and this stylesheet declares no
+        animation anywhere — only transitions on a state a person caused.
+     2. UNDER 600ms. The transition runs at --motion-signature.
+     3. transform AND opacity ONLY. The forward state is an overlay whose
+        OPACITY changes and a lift that is a TRANSFORM. No colour animates,
+        no size animates, and `transition: all` appears nowhere.
+     4. READABLE AT EVERY FRAME. The other columns are untouched — nothing
+        is dimmed — so no text ever drops below its contrast bar. The
+        forward column is marked by a tint of --schedule-forward-rgb, which
+        is the same surface pair the palette already tests at 4.5:1.
+
+     STATIC UNDER prefers-reduced-motion: the tint sits OUTSIDE the
+     no-preference query and the lift sits inside it. A reader who asked
+     for less motion still gets the column brought forward — as a tint that
+     does not move. That is a truly static state, not a shortened one. */
+  .schedule-grid__head,
+  .schedule-grid__cell {
+    position: relative;
+  }
+  .schedule-grid__head::before,
+  .schedule-grid__cell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-color: rgb(var(--schedule-forward-rgb));
+    opacity: 0;
+  }
+  /* The tint is a ground, so the cell's own content sits above it. Same
+     device the map grid uses to stay behind the page it is drawn on. */
+  .schedule-grid__head > *,
+  .schedule-grid__cell > * {
+    position: relative;
+  }
+  .schedule-grid [data-track-forward]::before {
+    opacity: 1;
+  }
+  /* Atlas's traced line (visual story, Atlas, moment 3): the forward
+     column's cells connect down the sheet, from the route mark in the head
+     to the last service of the day. It is drawn at
+     --schedule-trace-width, which is zero in every preset that is not a
+     network — and a zero-width bar paints nothing, so the device turns
+     itself off with no second rule and no theme test. */
+  .schedule-grid__head::after,
+  .schedule-grid__cell::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: calc(var(--schedule-cell-pad-inline) * 0.5);
+    inline-size: var(--schedule-trace-width);
+    pointer-events: none;
+    background-color: rgb(var(--schedule-trace-rgb));
+    opacity: 0;
+  }
+  .schedule-grid [data-track-forward]::after {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .schedule-grid__head,
+    .schedule-grid__cell,
+    .schedule-grid__head::before,
+    .schedule-grid__cell::before,
+    .schedule-grid__head::after,
+    .schedule-grid__cell::after {
+      transition:
+        transform var(--motion-signature) var(--motion-ease),
+        opacity var(--motion-signature) var(--motion-ease);
+    }
+    .schedule-grid [data-track-forward] {
+      transform: translateY(calc(-1 * var(--schedule-forward-lift)));
+    }
+  }
+
+  /* Calling points: a parent session's children, under it and inside its
+     time (brief §4.6). The marker is the disclosure's functional motion —
+     transform only, at --motion-base, from a user action, and static for a
+     reader who asked for less motion. The list opens by default, because a
+     programme that hides half of itself is not a programme. */
+  .calling-points__item {
+    border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    padding-block: var(--space-2xs);
+    padding-inline-start: var(--space-md);
+  }
+  .calling-points__marker {
+    inline-size: 0.5em;
+    block-size: 0.5em;
+    border-inline-end: var(--rule-strong-width) solid currentColor;
+    border-block-end: var(--rule-strong-width) solid currentColor;
+    transform: rotate(45deg);
+  }
+  .calling-points [aria-expanded='false'] .calling-points__marker {
+    transform: rotate(-45deg);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .calling-points__marker {
+      transition: transform var(--motion-base) var(--motion-ease);
+    }
+  }
+
+  /* The back issue (brief §2.1): yesterday's edition, still on the shelf.
+     A past day — or a past event — keeps every word and drops to the
+     archive tokens.
+
+     It REDUCES the palette rather than repainting it. Inside a back issue
+     the accents resolve to the archive ink, so the colour that means
+     "act on this" is simply not there any more; the ink, the rules, and
+     the grounds are untouched, which is what keeps every word at the
+     contrast it had. The archive ink is --color-text-secondary, a pair the
+     dark-mode completeness test already measures on both surfaces in both
+     modes, so this treatment cannot invent a failing pair.
+
+     The live controls are removed in the markup, not hidden here: a
+     control that a reader can reach but not use is worse than no control
+     (Schedule.jsx, SessionCard.jsx). */
+  .back-issue {
+    --color-accent-rgb: var(--back-issue-ink-rgb);
+    --color-accent-strong-rgb: var(--back-issue-ink-rgb);
+    --color-accent-soft-rgb: var(--back-issue-rule-rgb);
+    --color-accent-secondary-rgb: var(--back-issue-ink-rgb);
+    --semantic-keynote-rgb: var(--back-issue-ink-rgb);
+    --semantic-highlight-rgb: var(--back-issue-ink-rgb);
+    --route-mark-rgb: var(--back-issue-ink-rgb);
+    --schedule-trace-rgb: var(--back-issue-ink-rgb);
+    --session-card-stamp-rgb: var(--back-issue-rule-rgb);
+  }
+
+  /* The handwritten callout (brief §4.3): real copy, one per page, at one
+     fixed angle. Every preset but Zine holds a zero angle and the heading
+     face, so the same element is simply a lead line there. */
+  .callout {
+    display: inline-block;
+    max-inline-size: 34ch;
+    font-family: var(--callout-font);
+    font-size: var(--callout-size);
+    color: rgb(var(--callout-rgb));
+    transform: rotate(var(--callout-angle));
+    transform-origin: left center;
+  }
+
+  /* Map grid: the faint coordinate grid a section is drawn on (brief §4.6).
+     Held BELOW hairline contrast — it is felt rather than seen — and inert
+     to the pointer. The grid is the sheet, so it never moves and never
+     animates, including under the departure board's traced-line moment.
+
+     --map-grid-size is zero in every preset but Atlas, and a background
+     with a zero size is not painted at all, so the device turns itself off
+     with no second token and no theme test. The children are positioned so
+     they paint above the grid rather than under it. */
+  .map-grid {
+    position: relative;
+  }
+  .map-grid::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(
+        to right,
+        rgb(var(--map-grid-rgb) / 0.45) var(--rule-hairline-width),
+        transparent var(--rule-hairline-width)
+      ),
+      linear-gradient(
+        to bottom,
+        rgb(var(--map-grid-rgb) / 0.45) var(--rule-hairline-width),
+        transparent var(--rule-hairline-width)
+      );
+    background-size: var(--map-grid-size) var(--map-grid-size);
+  }
+  .map-grid > * {
+    position: relative;
+  }
+
+  /* Route mark: the line letter in the sign face inside a survey-drawn
+     shape (brief §4.6). Never a coloured pill — the radius follows the
+     theme's own scale, which is sharp in Atlas, and §2.4 rejects the fully
+     rounded shape with no exception. The letter is the signal; a colour is
+     only ever the second one. */
+  .route-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 1.75em;
+    min-block-size: 1.75em;
+    padding-inline: 0.3em;
+    border-radius: var(--route-mark-radius);
+    background-color: rgb(var(--route-mark-rgb));
+    color: rgb(var(--route-mark-ink-rgb));
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  /* Wayfinding icons: the sign set, masked over currentColor so one file
+     serves both modes and every icon inherits the ink of the line it sits
+     in. Each one always has its word beside it. */
+  .wayfinding-icon {
+    display: inline-block;
+    inline-size: 1em;
+    block-size: 1em;
+    vertical-align: -0.125em;
+    pointer-events: none;
+    background-color: currentColor;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
+  .wayfinding-icon--venue {
+    -webkit-mask-image: url('/icons/wayfinding/venue.svg');
+    mask-image: url('/icons/wayfinding/venue.svg');
+  }
+  .wayfinding-icon--room {
+    -webkit-mask-image: url('/icons/wayfinding/room.svg');
+    mask-image: url('/icons/wayfinding/room.svg');
+  }
+  .wayfinding-icon--line {
+    -webkit-mask-image: url('/icons/wayfinding/line.svg');
+    mask-image: url('/icons/wayfinding/line.svg');
+  }
+  .wayfinding-icon--transit {
+    -webkit-mask-image: url('/icons/wayfinding/transit.svg');
+    mask-image: url('/icons/wayfinding/transit.svg');
+  }
+  .wayfinding-icon--walk {
+    -webkit-mask-image: url('/icons/wayfinding/walk.svg');
+    mask-image: url('/icons/wayfinding/walk.svg');
+  }
+  .wayfinding-icon--step-free {
+    -webkit-mask-image: url('/icons/wayfinding/step-free.svg');
+    mask-image: url('/icons/wayfinding/step-free.svg');
+  }
+
+  /* Transfer line: a recorded move between two of the venue's places
+     (brief §4.6; shared/venue.cjs). It is set in from the leading edge and
+     opens on a hairline, so it reads as a note about the gap between two
+     entries rather than as a property of either one.
+
+     IT IS NOT PRESET-GATED. The old line was switched on by an Atlas token
+     and hidden in the other five, which was defensible when it was a
+     flourish in a story about a transport network. What renders here is a
+     walking time somebody surveyed, and a fact five presets hide is a fact
+     withheld from the reader who needed it most. A preset may restyle this
+     block. None may set it to `display: none`. */
+  .transfer-line {
+    border-inline-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    padding-inline-start: var(--space-sm);
+    margin-block: var(--space-xs);
+  }
+
+  /* Botanical plate: a framed opener, drawn as a DOUBLE hairline (brief
+     §4.5). The border is the inner rule and the outline is the outer one,
+     both at --plate-frame-width, so the doubling needs no second element.
+     An outline is drawn outside the box and takes no space, which is what
+     keeps a preset that leaves the width at zero completely unchanged —
+     and --plate-pad is zero there too, so the wrapper adds nothing at all.
+     A plate holds linework and words. It never holds a photograph. */
+  .plate {
+    border: var(--plate-frame-width) solid rgb(var(--plate-frame-rgb));
+    outline: var(--plate-frame-width) solid rgb(var(--plate-frame-rgb));
+    outline-offset: var(--space-3xs);
+    padding: calc(var(--plate-pad) * var(--density-step, 1));
+  }
+
+  /* The plate number in a folio (visual story, Field Guide, moment 1):
+     "PLATE III · SATURDAY 14 MARCH". Real sequence data, so it is real text
+     in the document — and `display: none` in the five presets that are not
+     plate books keeps it out of the accessibility tree there rather than
+     leaving a screen reader to read a number the page never sets. */
+  .plate-number {
+    display: var(--plate-number-display);
+  }
+
+  /* Specimen label: the collection tag (brief §4.5). A ruled block, never a
+     chip and never a pill — the radius stays out of this device entirely.
+     At zero rule width and zero padding it IS the caption line it replaced,
+     which is how five presets keep the page they already had. */
+  .specimen-label {
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    border-block: var(--specimen-label-rule-width) solid rgb(var(--specimen-label-rule-rgb));
+    padding-block: var(--specimen-label-pad);
+  }
+  .specimen-label__key {
+    display: var(--specimen-label-key-display);
+    padding-inline-end: var(--space-2xs);
+    font-size: var(--text-folio);
+    letter-spacing: var(--text-folio-tracking);
+    text-transform: uppercase;
+  }
+
+  /* Marginalia: the pen that went over the page afterwards. Off until a
+     client turns it on (--marginalia-display), decorative, inert to the
+     pointer, and STATIC — no draw-on animation in any preset. */
+  .marginalia {
+    display: var(--marginalia-display);
+    pointer-events: none;
+    color: rgb(var(--marginalia-rgb));
+  }
+  .marginalia svg {
+    display: block;
+    inline-size: 100%;
+  }
+  .marginalia--pencil svg {
+    block-size: 0.375rem;
+  }
+  .marginalia--squiggle svg {
+    block-size: 0.5rem;
+  }
+  /* The ring goes AROUND a label, so it is laid over its own wrapper rather
+     than stacked under it. It never lands on a word inside a headline —
+     that is the banned headline-underline trick (brief §2.4) — which is
+     held by where it is wired: a whole label, never part of one. */
+  .marginalia-ring {
+    position: relative;
+    display: inline-flex;
+  }
+  .marginalia--circle {
+    position: absolute;
+    inset: -0.3em -0.55em;
+  }
+  .marginalia--circle svg {
+    block-size: 100%;
+  }
+
+  /* Motif slot (brief §2.3, §3.8; components/editorial/Motif.jsx).
+     ONE of the two render forms the brief allows: the slot token is a
+     mask-image and the paint is --color-ink-motif, so a drawing inherits
+     theme ink in both modes. Never an <img>, never a url() fill — neither
+     can inherit ink, so neither can meet the rule at all.
+
+     Which asset a slot resolves to is `data-motif-set`'s job, not this
+     file's: theme.css emits one block per set. Under the `none` set every
+     slot token is `none`, and an unmasked box would paint as a solid
+     rectangle of ink — so the `none` set takes the element out of the
+     layout. The selector is attribute-scoped rather than :root-only,
+     because the admin's live-preview frame carries its own set. */
+  .motif {
+    display: inline-block;
+    pointer-events: none;
+    background-color: rgb(var(--color-ink-motif-rgb));
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
+  [data-motif-set='none'] .motif {
+    display: none;
+  }
+  .motif--section-mark {
+    block-size: 1.25em;
+    inline-size: 1.25em;
+    -webkit-mask-image: var(--motif-section-mark);
+    mask-image: var(--motif-section-mark);
+  }
+  .motif--nameplate-mark {
+    -webkit-mask-image: var(--motif-nameplate-mark);
+    mask-image: var(--motif-nameplate-mark);
+  }
+  /* A divider closes the block it sits in and runs its full measure, so the
+     drawing is centred on the rule the way a printer would set an ornament —
+     and, in Atlas, the way a schematic line diagram closes a title block. */
+  .motif--divider {
+    display: block;
+    block-size: 2rem;
+    inline-size: 100%;
+    -webkit-mask-image: var(--motif-divider);
+    mask-image: var(--motif-divider);
+  }
+  /* The empty-state drawing sits above the sentence and aligns with it, so
+     it reads as part of the same block rather than as a centred illustration.
+
+     8rem, not 5rem. This slot is the one place the site renders a whole
+     drawing rather than a mark, and the portrait sets — the botanical
+     frond is 320 by 420 — were being fitted into 80px of height, which
+     put the WHOLE drawing under a pixel a stroke and greyed it into a
+     smudge. A plate drawn at thumbnail size is not a plate. */
+  .motif--empty-state {
+    display: block;
+    block-size: 8rem;
+    inline-size: 100%;
+    -webkit-mask-position: left center;
+    mask-position: left center;
+    -webkit-mask-image: var(--motif-empty-state);
+    mask-image: var(--motif-empty-state);
   }
 
   /* Typography for the sanitized richtext subset (RichTextBlock,
-     FaqItemBlock). Only the tags sanitizeHtml allows are styled here. */
+     FaqItemBlock). Only the tags sanitizeHtml allows are styled here — one
+     rule per tag in lib/sanitizeHtml.js's ALLOWED_TAGS, so a selector below
+     exists if and only if the sanitizer still permits that tag.
+
+     Sizes read the type-scale steps (tailwind.config.js fontStep), not
+     Tailwind's default text-* scale, so a client's preset retunes prose the
+     same way it retunes headings. There is no --text-h4 step (brief §3.7
+     names eight steps and h4 is not one of them); --text-lead sits between
+     h3 and body, which is exactly where an h4 belongs, so h4 borrows it. */
   .rich-text {
-    @apply text-brand-ink;
+    @apply text-body text-text-primary;
     text-wrap: pretty;
   }
   .rich-text p,
@@ -89,7 +1061,7 @@
   .rich-text ol,
   .rich-text blockquote,
   .rich-text pre {
-    @apply mt-3 first:mt-0;
+    @apply mt-sm first:mt-0;
   }
   .rich-text ul {
     @apply list-disc ps-5;
@@ -98,41 +1070,103 @@
     @apply list-decimal ps-5;
   }
   .rich-text li {
-    @apply mt-1;
+    @apply mt-2xs;
   }
   .rich-text h2,
   .rich-text h3,
   .rich-text h4 {
-    @apply mt-6 font-semibold text-brand-ink first:mt-0;
+    @apply mt-lg font-semibold text-text-primary first:mt-0;
   }
   .rich-text h2 {
-    @apply text-2xl;
+    @apply text-h2;
   }
   .rich-text h3 {
-    @apply text-xl;
+    @apply text-h3;
   }
   .rich-text h4 {
-    @apply text-lg;
+    @apply text-lead;
   }
   .rich-text a {
-    @apply text-brand-primary underline decoration-brand-primary/40 underline-offset-2;
+    @apply text-accent underline decoration-accent/40 underline-offset-2;
     text-underline-position: from-font;
     text-decoration-skip-ink: auto;
   }
   .rich-text a:hover {
-    @apply text-brand-primary-dark;
+    @apply text-accent-strong;
   }
+  /* The quote rule draws in rule-token ink at the strong rule width, never
+     in brand or accent color, so it is a typographic rule and not the
+     rejected colored card edge. */
   .rich-text blockquote {
-    @apply border-s-4 border-brand-primary/30 ps-4 text-brand-ink-muted;
+    @apply border-s-strong border-rule-strong ps-md text-text-secondary;
   }
   .rich-text code {
-    @apply rounded-brand bg-brand-ink/5 px-1 py-0.5 text-sm;
+    @apply rounded-brand bg-text-primary/5 px-2xs py-3xs font-mono text-caption;
   }
   .rich-text pre {
-    @apply overflow-x-auto rounded-brand bg-brand-ink/5 p-4 text-sm;
+    @apply overflow-x-auto rounded-brand bg-text-primary/5 p-md font-mono text-caption;
   }
   .rich-text hr {
-    @apply my-6 border-brand-ink/10;
+    @apply my-lg border-t-hairline border-t-rule-hairline;
+  }
+}
+
+@layer components {
+  /* The composing room (docs/plans/2026-08-27-admin-identity-story.md).
+     The admin is the seventh surface and it is not a preset: it reads the
+     admin-* tokens only, obeys data-mode, and ignores data-theme. These
+     rules carry the two things a utility class cannot: the one focus ring,
+     and moment 1's publish resolve. */
+
+  /* The room's own skip link. Same behaviour as .skip-link, in admin ink on
+     an admin ground: the shell must not paint a client's brand colour. */
+  .skip-link--admin {
+    @apply focus:border-admin-hairline focus:border-admin-rule-strong focus:bg-admin-ground-raised
+      focus:font-admin-ui focus:text-admin-ink;
+  }
+
+  /* A folio in the room: a small-caps plain-text label on a hairline at a
+     group boundary. Same device as the public .folio, in admin ink — never
+     a chip, never a pill, and never directly above a heading. */
+  .admin-folio {
+    @apply text-folio uppercase text-admin-ink-secondary;
+  }
+
+  /* Part 6e: ONE ring, clearing both --admin-ground and
+     --admin-ground-input in both modes, offset so it never collides with a
+     hairline. It replaces the public ring inside the room rather than
+     removing it. */
+  .admin-room :focus-visible {
+    outline: var(--er-width-strong) solid rgb(var(--admin-focus-ring-rgb));
+    outline-offset: var(--admin-focus-offset);
+  }
+
+  /* Moment 1: a record with unpublished changes sits on the proof ground —
+     the rough stock a proof is pulled on. The tint is a LAYER, so a
+     successful publish resolves it to the base ground on `opacity` alone,
+     over --motion-base (160ms). The word is always present beside it; the
+     tint is the second signal, never the first. */
+  .admin-proof-row {
+    position: relative;
+  }
+  .admin-proof-row::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-color: rgb(var(--admin-ground-proof-rgb));
+  }
+  .admin-proof-row > * {
+    position: relative;
+  }
+  /* Published in this session: the same row, its proof tint resolved away. */
+  .admin-proof-row--resolved::before {
+    opacity: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .admin-proof-row::before {
+      transition: opacity var(--motion-base) var(--motion-ease);
+    }
   }
 }
 
@@ -140,6 +1174,31 @@
   /* 44px minimum touch targets (interface guidelines: Accessibility). */
   .touch-target {
     @apply min-h-11 min-w-11;
+  }
+
+  /* Dense is not cramped (admin story part 5): a control may drop to the
+     24×24px minimum on a pointer surface, and holds 44×44px on touch. */
+  .admin-target {
+    @apply min-h-6 min-w-6;
+  }
+  @media (pointer: coarse) {
+    .admin-target {
+      @apply min-h-11 min-w-11;
+    }
+  }
+
+  /* The data face carries everything the machine owns, and every value it
+     carries can change, so it sets tabular figures (admin story part 6g). */
+  .font-admin-data {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The data and mono roles carry changing values — figures, timestamps,
+     schedule columns — so they set tabular figures wherever they are used
+     (design brief §3.2; interface guidelines, Typography). */
+  .font-data,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -151,5 +1210,98 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* THE PRINTED PROGRAMME (design brief §2.1; every visual story, part 2,
+   "Print view"). A registration desk hands this out.
+
+   Print is not the screen with the controls hidden. The page carries a
+   second view written for paper — components/SchedulePrint.jsx — and this
+   block is what swaps them: the screen view leaves the layout, the printed
+   one enters it. Outside print media `.schedule-print` is `display: none`,
+   which keeps it out of the accessibility tree as well as out of the page,
+   so a screen reader never meets a session twice.
+
+   ONE PRINT VIEW, SIX REGISTERS. The rules below name the four type roles
+   and the rule tokens and nothing else, so the handout prints in whichever
+   register the active preset is: Broadsheet's programme page, Civic's
+   posted agenda, Field Guide's dated observation sheet, Atlas's pocket
+   timetable. No rule here asks which theme is on.
+
+   FULL CONTRAST. Everything prints in the primary ink, including the
+   support lines that sit in the secondary ink on screen. Paper has no
+   backlight, and a handout is read across a room. */
+.schedule-print {
+  display: none;
+}
+
+@media print {
+  /* No controls: a button on paper is a lie. */
+  .no-print,
+  nav,
+  footer,
+  .skip-link {
+    display: none;
+  }
+
+  .schedule-screen {
+    display: none;
+  }
+  .schedule-print {
+    display: block;
+    color: rgb(var(--color-text-primary-rgb));
+  }
+  .schedule-print p,
+  .schedule-print li {
+    color: rgb(var(--color-text-primary-rgb));
+  }
+
+  /* A day opens on a rule, the way a standing head does on screen. */
+  .schedule-print__day {
+    margin-block-start: var(--space-lg);
+    break-inside: auto;
+  }
+  .schedule-print__day-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: baseline;
+    border-block-end: var(--rule-strong-width) solid rgb(var(--rule-strong-rgb));
+    padding-block-end: var(--space-2xs);
+    font-family: var(--font-heading);
+    font-size: var(--text-h2);
+  }
+  .schedule-print__date {
+    font-family: var(--font-data);
+    font-size: var(--text-caption);
+  }
+
+  /* A ruled entry, and it never breaks across two sheets. */
+  .schedule-print__row {
+    display: grid;
+    grid-template-columns: var(--schedule-time-width) 1fr;
+    gap: var(--space-md);
+    border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    padding-block: var(--space-2xs);
+    break-inside: avoid;
+    font-size: var(--text-caption);
+  }
+  .schedule-print__time {
+    font-variant-numeric: tabular-nums;
+  }
+  .schedule-print__title {
+    font-size: var(--text-lead);
+  }
+  /* Calling points are listed, indented under the service they belong to,
+     and each one still says what it is part of. */
+  .schedule-print__calls {
+    margin-block-start: var(--space-3xs);
+    padding-inline-start: var(--space-md);
+  }
+  .schedule-print__calls li {
+    display: grid;
+    grid-template-columns: var(--schedule-time-width) 1fr;
+    gap: var(--space-md);
   }
 }

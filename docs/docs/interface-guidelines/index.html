@@ -23,11 +23,12 @@
   <meta name="twitter:description" content="The interface rules the web app is held to.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta name="twitter:image:alt" content="Event Runner documentation">
-  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
   <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
 </head>
@@ -37,10 +38,15 @@
   <div class="wrap">
     <header class="site-header">
       <a class="brand" href="/eventrunner/">
-        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
-        <span class="brand-text">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2.5" y="2" width="3" height="20"/>
+          <rect x="5.5" y="2" width="16" height="3"/>
+          <rect x="5.5" y="11" width="9.5" height="2"/>
+          <rect x="5.5" y="19.5" width="13" height="2.5"/>
+        </svg>
+        <span class="brand-words">
           <strong>Event Runner</strong>
-          <span>Documentation</span>
+          <span class="brand-line">Documentation</span>
         </span>
       </a>
       <nav aria-label="Site">
@@ -73,6 +79,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
           <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
@@ -103,12 +110,19 @@
             <p class="contents-title" id="contents-title">On this page</p>
             <ul>
               <li><a href="#how-this-connects-to-the-rest-of-the-repo">How this connects to the rest of the repo</a></li>
+              <li><a href="#vocabulary-the-words-staff-see">Vocabulary: The words staff see</a></li>
+              <li><a href="#editorial-devices">Editorial devices</a></li>
+              <li><a href="#headers">Headers</a></li>
+              <li><a href="#the-base-and-the-theme">The base and the theme</a></li>
               <li><a href="#user-interface">User interface</a></li>
               <li><a href="#animation">Animation</a></li>
               <li><a href="#typography">Typography</a></li>
               <li><a href="#colors">Colors</a></li>
+              <li><a href="#the-admin-surface">The admin surface</a></li>
+              <li><a href="#the-project-site">The project site</a></li>
               <li><a href="#accessibility">Accessibility</a></li>
               <li><a href="#layout">Layout</a></li>
+              <li><a href="#rejected-patterns">Rejected patterns</a></li>
               <li><a href="#writing">Writing</a></li>
             </ul>
           </nav>
@@ -116,20 +130,116 @@
           <h2 id="how-this-connects-to-the-rest-of-the-repo">How this connects to the rest of the repo<a class="heading-anchor" href="#how-this-connects-to-the-rest-of-the-repo" aria-label="Link to this section">#</a></h2>
           <ul>
           <li><strong>Colors are theme tokens, never literals.</strong> The ESLint hex sweep (spec §7.6) enforces the mechanical half; this document covers the design half. Every color you use must be a custom property from <code>config/theme</code> (spec §7) with a role-based name.</li>
+          <li><strong>Tokens come from <code>design/tokens/</code>.</strong> The design system&#39;s three tiers, the motif layer, and every scale live in JSON there (design brief §3.5). <code>scripts/lib/tokens.cjs</code> turns that JSON into the custom properties <code>apps/web/src/generated/theme.css</code> carries, and <code>tailwind.config.js</code> maps the utilities onto them. Change a token by editing the JSON and regenerating. Never hand-edit the generated stylesheet.</li>
           <li><strong>Accessibility is a merge requirement, not a nicety.</strong> CONTRIBUTING already requires a keyboard path and visible focus for UI changes; the Accessibility section below is the working checklist behind that line.</li>
           <li><strong>Event-neutrality applies to design too.</strong> No hardcoded brand color, font stack &quot;for this event,&quot; or copy that assumes one venue or city. If a design decision varies per client, it belongs in <code>config/theme</code> or CMS content.</li>
+          <li><strong>The reference is the other half.</strong> <a href="/eventrunner/docs/design-reference/"><code>design-reference.md</code></a> documents what the system contains — every site style, option, illustration set, layout axis, token, and extension point. This document is the rules a review applies; that one is the material those rules apply to.</li>
+          <li><strong>The design brief binds.</strong> <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-27-design-system-overhaul.md"><code>plans/2026-08-27-design-system-overhaul.md</code></a> is the design contract; this document is the standing rulebook that carries it into review. Where the two disagree, the brief wins and this document gets fixed in the same pull request.</li>
+          </ul>
+          <h2 id="vocabulary-the-words-staff-see">Vocabulary: The words staff see<a class="heading-anchor" href="#vocabulary-the-words-staff-see" aria-label="Link to this section">#</a></h2>
+          <p>Staff meet this system through words, not through token names. One term per flow (Writing, below), and the staff term is the one that ships in every operator-facing surface: Admin labels and hints, <code>docs/ADMIN_GUIDE.md</code>, the handbook, and any message a person reads.</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>What staff see</th><th>What the code calls it</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Site style</td><td>preset — <code>config/theme.preset</code>, <code>data-theme</code></td></tr>
+          <tr><td>Main brand colour</td><td><code>config/theme.brandColor</code>, and the steps derived from it</td></tr>
+          <tr><td>Header style</td><td>the nameplate option group — <code>optionPicks.nameplate</code>; <code>config/theme.header</code>; <code>cmsPages.layout.header</code>; <code>resolveHeader</code></td></tr>
+          <tr><td>Schedule style</td><td>the component option group — <code>optionPicks.component</code></td></tr>
+          <tr><td>Page template</td><td><code>cmsPages.template</code>, resolved by <code>pageTemplates.js</code></td></tr>
+          <tr><td>Illustrations</td><td>motif set — <code>config/theme.motifSet</code>, <code>data-motif-set</code></td></tr>
+          <tr><td>Page preview</td><td>the proof — <code>ThemeProof</code>, <code>--admin-ground-proof</code></td></tr>
+          <tr><td>Advanced colour settings</td><td>raw per-mode token override — <code>config/theme.tokens</code></td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p><strong>The left-hand column is spelled the way the control is spelled.</strong> These are the labels the admin renders, so a guide that quotes them matches what a staff member is looking at, down to the spelling of &quot;colour&quot;.</p>
+          <p><strong>The right-hand column is internal.</strong> Those are component names, token names, attribute values, and stored document fields. Use them freely in this document, in <code>docs/adr/0001-event-platform-v1.md</code>, in code, and in commit messages: That is architecture, and renaming it would break the thing it names. Where one appears below beside a staff word, it is marked. What must never happen is one of those words reaching a person using the product.</p>
+          <h2 id="editorial-devices">Editorial devices<a class="heading-anchor" href="#editorial-devices" aria-label="Link to this section">#</a></h2>
+          <p>Typography and rules do the visual work. Color decorates very little, and shadow decorates nothing (design brief §2.1). Each device below has one job: Use it where its job applies, and never as decoration. The shared implementations live in <code>apps/web/src/components/editorial/</code>, and each one resolves through its tier-3 token contract, so a preset retunes a device by remapping tokens rather than by changing a component.</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Device</th><th>Component</th><th>What it is</th><th>The rule</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Site header</td><td><code>Header</code></td><td>The site identity plus the navigation, in one of four treatments: <code>standard</code>, <code>masthead</code>, <code>compact</code>, <code>minimal</code> (internal values; staff pick a <strong>Header style</strong> — Vocabulary above).</td><td>See Headers below. The theme names the default and a page may override it. Type and rules only — never a hero banner, never a photo behind the name. The identity repeats on every page, so it is NEVER a heading: Each page owns its own <code>h1</code>. An unrecognized value renders the base rather than no header at all.</td></tr>
+          <tr><td>Masthead nameplate</td><td><code>Nameplate</code></td><td>The rule-bounded title block: Event name, dates, edition line.</td><td>The device the header treatments draw: <code>full</code> is the <code>masthead</code> header, <code>compact</code> is the <code>compact</code> one. It is no longer the shell&#39;s only header, and its shape is unchanged. A theme chooses it; it is never mandatory.</td></tr>
+          <tr><td>Lead image</td><td><code>LeadImage</code></td><td>One optional picture beside the opening copy, or below it at narrow viewports.</td><td>Alt text is required or the image does not render. The crop is fixed by token and the editor states the focal point. Text never sits over it. One per page.</td></tr>
+          <tr><td>Folio</td><td><code>Folio</code></td><td>A small-caps plain-text label sitting on a hairline rule.</td><td>Text plus rule. Never a chip, never a pill, never a colored badge. <strong>Never directly above a heading</strong> — see the eyebrow ban below.</td></tr>
+          <tr><td>Rule</td><td><code>Rule</code></td><td>A standalone hairline, strong, or nameplate rule.</td><td>A rule replaces a card border. A rule never carries brand color and reads only the <code>--rule-*</code> tokens. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node.</td></tr>
+          <tr><td>Section boundary</td><td><code>SectionHead</code></td><td>One strong rule, then the section heading with the folio beside it on a hairline.</td><td>Reach for this instead of composing a folio and a heading by hand. Its <code>folio</code> variant makes the folio itself the heading, which is what a schedule day head needs.</td></tr>
+          <tr><td>Stat and chart anatomy</td><td><code>StatBlock</code></td><td>A number the site presents as evidence.</td><td>Four parts, and all four are required (design brief §2.1.1). A large number with a small caption under it is not a stat block.</td></tr>
+          <tr><td>Grid schedule</td><td><code>ScheduleGrid</code></td><td>A two-axis schedule: Time down the left, lettered tracks across the head.</td><td>Wide viewports only. It is a real <code>&lt;table&gt;</code> — times are row headers, tracks are column headers — and it degrades to the time-ordered list, which is the accessible baseline and not a lesser view.</td></tr>
+          <tr><td>Back issue</td><td>the <code>.back-issue</code> treatment</td><td>The archival state of a past day or a past event.</td><td>Reduce the palette to the archive tokens, add the &quot;Back issue&quot; folio, remove the live controls. <strong>Never hide the content.</strong></td></tr>
+          <tr><td>Print view</td><td><code>SchedulePrint</code></td><td>The programme a desk hands out.</td><td>Its own view, not the screen with the controls hidden. It is <code>display: none</code> outside print media, so it never reaches the accessibility tree twice.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p><strong>Every stat carries four parts, and the write path enforces it.</strong> A stat block states the finding in words (<code>takeaway</code>), says what the number counts and over what period (<code>description</code>), names where the number came from and the date it was read (<code>source</code>), and describes the finding for a screen reader (<code>alt</code>). The block editor asks for all four and refuses to save without them, and <code>cmsCreateContent</code> / <code>cmsUpdateContent</code> reject a stat block that misses one, naming the part. A block already stored in the older <code>{ value, label }</code> shape keeps rendering and keeps publishing — what stops is writing one that way.</p>
+          <p><strong>The schedule reads twice, and both readings are first-class.</strong> At wide viewports the day is a grid: Time down the left in the data face, the event&#39;s lettered lines across the head in <code>config/event.tracks</code> order. A session on no line spans the width, which is what a plenary is. Everywhere else the day is a time-ordered list with a fixed column order and tabular figures. Exactly one of the two is in the document at a time, so nobody meets a session twice, and the list is what a viewport that cannot be measured gets. A parent session&#39;s children are calling points in both: Under the parent, inside its time, never rows of their own, with the relationship stated in words rather than carried by the indent alone.</p>
+          <p><strong>Four directories, four compositions — on one token system.</strong> Speakers, attendees, sponsors and updates are not the same kind of list, and reading each of them is a different job, so each gets the shape its job needs rather than one ruled row under four different headings. <strong>Speakers</strong> is a shelf of portraits: The headshot leads at a size a face survives, framed on the alternate ground, so a speaker with no photo is an empty frame holding its place rather than a hole in the shelf. <strong>Attendees</strong> is an index, not a list of profiles — one compact line per person under sticky letter heads, because a reader here is searching for a name they already know; a name this alphabet does not cover files under <code>#</code>, never under <code>A</code>. <strong>Sponsors</strong> is a tiered logo wall whose mark size carries the tier&#39;s weight, and standing comes from the operator&#39;s own ordering, never from ranking the words they typed. <strong>Updates</strong> is a chronological feed with a spine: A hairline down the leading edge, a tick per entry, and standing heads for Pinned (which is not a date), each month, and Undated. Every one is built from the same spacing scale, rules, ink, radius and density remaps, and none of them is a card.</p>
+          <p><strong>A movement is stated only from a record, and only where the reader stated the journey.</strong> Walking between two rooms is a fact about a building, so it lives with the building: <code>config/event.venue.places[]</code> names the rooms a session points at by <code>placeId</code>, and <code>config/event.venue.movements[]</code> records one move — <code>from</code>, <code>to</code>, <code>walkingMinutes</code>, and optionally <code>accessibleRoute</code> in the operator&#39;s own words (<code>shared/venue.cjs</code>, validated by <code>validateEventConfig</code>; a session&#39;s <code>placeId</code> is checked against the venue&#39;s places the way its track letter is checked against the event&#39;s tracks). A movement is <strong>one-way</strong> and is never reversed, chained, or estimated; a recorded <code>0</code> means &quot;across the corridor&quot; and reads as &quot;under a minute&quot;; an absent <code>accessibleRoute</code> is silence, never &quot;there isn&#39;t one&quot;. A room label in <code>location</code> is never matched against a place name — that is the string comparison the whole model exists to remove.</p>
+          <p><strong>And the record says what a move costs, never that this reader is making it.</strong> So <code>TransferLine</code> renders in exactly two places, both carrying a stated sequence: Between two sessions the reader bookmarked (my schedule), and from a parent session to a calling point inside it in another place. Never between two consecutive rows of the full programme — that reader skipped a session, or is following one line out of five. The line is not preset-gated: A surveyed walking time is a fact, and a fact five presets hide is a fact withheld from the reader who needed it most.</p>
+          <p><strong>A back issue keeps every word.</strong> A day whose last minute has passed on the event&#39;s clock, and every day of an event the operator archived, drops to the archive tokens. The device reduces a palette rather than introducing one: Inside a back issue the accents resolve to the archive ink, while the ink, the rules, and the grounds are untouched, so nothing reads at less than the contrast it had. The live controls leave the document rather than sitting there disabled — bookmarking a session that has finished is an act on nothing — and the materials it left behind stay, because those are content.</p>
+          <p><strong>The eyebrow ban is absolute.</strong> No text sits directly above a heading. Not an eyebrow label, not a chip, not a small line of description copy, and not a plain small-caps folio — a folio stacked above a headline is still an eyebrow, and a reviewer rejects it. The rule holds at every size, on every surface, in every preset. A folio lives beside a rule at a section boundary, in a margin, or in a running header. Where a label must sit near a title, put it below the title or beside it.</p>
+          <p>Two things are <strong>not</strong> eyebrows and must never be &quot;fixed&quot; to satisfy this rule:</p>
+          <ul>
+          <li>Metadata inside the rule-bounded nameplate block. The dates and the edition line are the nameplate device, wherever they sit inside it.</li>
+          <li>A form <code>&lt;label&gt;</code> above its own input. That is a control label.</li>
+          </ul>
+          <p>Cards, boxes, and chrome: A rule replaces a card border wherever a rule can do the job. Elevation is tint, not shadow — where a surface must sit above another, shift its tone with a low-opacity overlay of the theme&#39;s ink or accent.</p>
+          <h2 id="headers">Headers<a class="heading-anchor" href="#headers" aria-label="Link to this section">#</a></h2>
+          <p>A public page renders one of four headers (design brief §2.5.1). <code>config/theme.header</code> names the deployment&#39;s default and a page may state its own; <code>standard</code> is the base, and a value outside the four resolves to it rather than to no header at all.</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Treatment</th><th>What it draws</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>standard</code></td><td>The event name at heading size, the dates and place beside it, the navigation under a hairline. The base.</td></tr>
+          <tr><td><code>masthead</code></td><td>The nameplate device at full size, with the navigation under it.</td></tr>
+          <tr><td><code>compact</code></td><td>The nameplate device at running-header size: Short name and dates on one baseline.</td></tr>
+          <tr><td><code>minimal</code></td><td>The client&#39;s mark and the navigation, and nothing else.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <ul>
+          <li>Every treatment carries the site identity <strong>and</strong> the navigation. Dropping either fails review.</li>
+          <li>The identity repeats on every page, so it is never a heading. Every page owns its own <code>&lt;h1&gt;</code>.</li>
+          <li><code>masthead</code> sets the event name at display size, so a page headline that is that same name keeps its <code>&lt;h1&gt;</code> for structure and is not printed a second time. The other three set the identity at running-header size, where no repetition is visible.</li>
+          <li>No treatment puts text over an image, and none of them is a hero banner.</li>
+          <li>Never make one treatment mandatory across every deployment.</li>
+          </ul>
+          <h2 id="the-base-and-the-theme">The base and the theme<a class="heading-anchor" href="#the-base-and-the-theme" aria-label="Link to this section">#</a></h2>
+          <p>The base is what a deployment renders before its theme states anything, and it is neutral. The theme is where the character lives (design brief §2.5).</p>
+          <ul>
+          <li><strong>Flat is the base.</strong> The page ground paints no texture on its own. <code>config/theme.texture</code> opts into one, and only then. Keep texture where it builds atmosphere or separates one plane from another; never add it as decoration.</li>
+          <li><strong>The seeded palette is grey.</strong> Every brand slot in a fresh deployment is achromatic, so the first hue a reader sees is the client&#39;s own. Semantic slots keep their hues, because a status color that is grey states nothing.</li>
+          <li><strong>The seeded type is one neutral face for every role.</strong> A theme brings the pairing.</li>
+          <li><strong>Client identity leads.</strong> This system supplies type, spacing, rules, focus, and accessibility. It never makes a deployment read as Event Runner first and the client&#39;s event second.</li>
+          <li><strong>Neutral is a default, not a ceiling.</strong> A theme may be very expressive. The masthead, texture, folios, drop caps, and unusual typography stay fully developed choices, and a neutral fallback always exists beneath them. Control complexity with defaults and contracts, never by deleting a capability.</li>
           </ul>
           <h2 id="user-interface">User interface<a class="heading-anchor" href="#user-interface" aria-label="Link to this section">#</a></h2>
           <ul>
           <li>Apply concentric border radius across nested elements (inner radius = outer radius − padding).</li>
           <li>Prioritize optical alignment over geometric alignment.</li>
-          <li>Add a <code>1px</code> outline to images, offset by <code>-1px</code>: black at 8% opacity in light mode, white at 8% in dark mode.</li>
+          <li>Add a <code>1px</code> outline to images, offset by <code>-1px</code>: Black at 8% opacity in light mode, white at 8% in dark mode.</li>
+          <li>Portraits and avatars are square on the brand radius (<code>rounded-brand</code>), never a circle (<code>rounded-full</code>) — a circular crop is a generic-template tell.</li>
           </ul>
           <h2 id="animation">Animation<a class="heading-anchor" href="#animation" aria-label="Link to this section">#</a></h2>
+          <p>The system has two motion classes and there is no third (design brief §2.2).</p>
+          <ul>
+          <li><strong>Functional motion</strong> shows a state change: Menus, filters, tabs, disclosure, toasts. Keep it between 120ms and 200ms, animate <code>transform</code> and <code>opacity</code> only, and use <code>ease-out</code>. The <code>duration-fast</code> / <code>duration-base</code> / <code>duration-slow</code> and <code>ease-motion</code> utilities map to the motion tokens.</li>
+          <li><strong>Expressive motion</strong> is one designed signature interaction per surface. The schedule grid holds that slot on the public site: A track column comes forward when a reader presses or focuses its head. Focus previews it, the press keeps it, and <code>aria-pressed</code> is the record. The state is a tint of the column&#39;s own ground and the motion is a small lift, so the state lands in both motion settings and only the lift is animated — under <code>prefers-reduced-motion</code> the column still comes forward and nothing moves. No other column is dimmed, so no text drops below its contrast bar at any frame.</li>
+          </ul>
+          <p>Both classes: Never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support <code>prefers-reduced-motion</code> in full; the reduced state is truly static, and a shortened animation is not a fallback.</p>
           <ul>
           <li>Never <code>transition: all</code>; list the exact properties that change.</li>
           <li>Scale pressed buttons to 0.95–0.98 with <code>transition: scale 200ms ease-out</code>.</li>
-          <li>Cross-fade swapped icons: entering scales 0.25→1 with opacity 0→1 and blur 4px→0; exiting reverses.</li>
+          <li>Cross-fade swapped icons: Entering scales 0.25→1 with opacity 0→1 and blur 4px→0; exiting reverses.</li>
           <li>CSS transitions for interruptible interactions; keyframes for one-time sequences.</li>
           <li>Disable transitions while switching between light and dark themes.</li>
           <li><code>will-change</code> only on properties that actually change: <code>transform</code>, <code>opacity</code>, <code>filter</code>. Add <code>will-change: transform</code> to elements that jitter 1–2px mid-animation (iOS Safari especially).</li>
@@ -139,26 +249,60 @@
           <h2 id="typography">Typography<a class="heading-anchor" href="#typography" aria-label="Link to this section">#</a></h2>
           <ul>
           <li>Ship only <code>.woff2</code> — never TTF or OTF on the web. Fonts are self-hosted in <code>apps/web/public/fonts/</code> (spec §7.4).</li>
-          <li><code>font-variant-numeric: tabular-nums</code> on all dynamic values: timers, counters, prices, schedule columns.</li>
+          <li><strong>Declare every bundled set; download only what renders.</strong> The design brief&#39;s &quot;a deployed site loads only the faces its active preset and its picked options use&quot; is a statement about downloads, and a downloaded face is not a declared one. An <code>@font-face</code> block is lazy by specification: The browser fetches the file only once a rendered element resolves to that family, so declaring a family nothing renders costs the CSS bytes of the block and not one request. <code>scripts/lib/tokens.cjs</code> therefore declares the whole of <code>FONT_SETS</code> plus the two fixed admin faces. It has to, because the type map is live: <code>config/theme</code> arrives over <code>onSnapshot</code>, a picked heading-face option remaps <code>--font-heading</code>, <code>config/theme.fonts</code> may name any bundled set outright, and the admin&#39;s page preview renders a candidate document in a frame. All four go through <code>buildRuntimeThemeCss</code>, which writes a <code>--font-*</code> stack — and a stack naming a family with no <code>@font-face</code> block renders the fallback. Declaring only the build-time preset&#39;s faces meant every one of those switches silently degraded to a system serif.</li>
+          <li>Set type from the eight-step fluid scale: <code>text-nameplate</code>, <code>text-h1</code>, <code>text-h2</code>, <code>text-h3</code>, <code>text-lead</code>, <code>text-body</code>, <code>text-caption</code>, <code>text-folio</code> (design brief §3.7). Each step carries its own line height and tracking. Never pick a default Tailwind size instead.</li>
+          <li>Name a font by its role, never by its family: <code>font-heading</code>, <code>font-body</code>, <code>font-data</code>, <code>font-mono</code> (design brief §3.2). There is no <code>font-accent</code>: PR2 removed the retired role. Zine&#39;s handwritten callout runs on the <code>--callout-font</code> component token, which is a component contract and not a fifth role.</li>
+          <li><code>font-variant-numeric: tabular-nums</code> on all dynamic values: Timers, counters, prices, schedule columns.</li>
           <li>Long-form text: 60–75 characters per line.</li>
-          <li><code>text-wrap: balance</code> on headings, <code>text-wrap: pretty</code> on descriptions, neither on long-form.</li>
+          <li><code>text-wrap: balance</code> on headings, <code>text-wrap: pretty</code> on descriptions, neither on long-form. Reach for the <code>text-balance</code> and <code>text-pretty</code> utilities, never an inline <code>style</code> — a class is what the scanner, the reviewer, and a preset can all see.</li>
           <li><code>overflow-wrap: break-word</code> wherever long words, links, or IDs might overflow; <code>white-space: nowrap</code> for labels and badges.</li>
           <li>Set <code>-webkit-font-smoothing: antialiased</code> and <code>-moz-osx-font-smoothing: grayscale</code> once, on the root.</li>
           <li>Store copy in natural case; control presentation with <code>text-transform</code>. (This matches the email rule in spec §6 — content and presentation stay separate.)</li>
-          <li>Smart punctuation: curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.</li>
+          <li>Smart punctuation: Curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.</li>
           <li><code>text-underline-position: from-font</code> with <code>text-decoration-skip-ink: auto</code>.</li>
           <li>Truncated text stays fully accessible via tooltip or an expanded view.</li>
           </ul>
           <h2 id="colors">Colors<a class="heading-anchor" href="#colors" aria-label="Link to this section">#</a></h2>
           <ul>
           <li>Every palette step must earn its place — no unused steps.</li>
-          <li>Use semantic tokens (<code>--color-text-secondary</code>), never primitives (<code>blue-500</code>). This is the same rule the hex sweep enforces in code: colors resolve through <code>config/theme</code> custom properties (spec §7.2).</li>
+          <li>Use semantic tokens (<code>--color-text-secondary</code>), never primitives (<code>blue-500</code>). This is the same rule the hex sweep enforces in code: Colors resolve through <code>config/theme</code> custom properties (spec §7.2).</li>
           <li>Name tokens by role, never by appearance or first use. Reserve <code>accent</code> for the brand color so <code>primary</code> doesn&#39;t mean both brand and body text.</li>
+          <li><strong>A client sets one color, and the supporting colors are derived from it</strong>: The darker and lighter steps, the three rule weights and the control boundary (ink mixed into the ground at fixed shares), and the whole dark palette (authored from the light one, never inverted). Semantic colors come from the site style and are not part of the brand decision — a client&#39;s color does not get to redefine what &quot;warning&quot; means. A raw per-mode override is an EXCEPTIONAL control for a brand guide that names an exact value: Every use takes one token out of the derivation permanently, so it stops moving when the brand color moves. There is no second brand field: <code>adminAccent</code> is gone, and the admin&#39;s marker takes this same resolved colour rather than one of its own.</li>
           <li>Don&#39;t borrow a token from another role; when a role changes color, mint a new token.</li>
           <li>Measure contrast against the actual rendered background, not the page background.</li>
-          <li>Dark mode is its own palette, not light mode reversed.</li>
-          <li>One theme mechanism, used consistently. This repo&#39;s choice: the <code>config/theme</code>-driven custom-property chain (spec §7.2) — not ad-hoc <code>.dark</code> classes per component.</li>
+          <li>Dark mode is its own palette, not light mode reversed. Every color token is defined under both <code>:root[data-mode=&#39;light&#39;]</code> and <code>:root[data-mode=&#39;dark&#39;]</code>, and a token missing from either block is a bug (design brief §8.2).</li>
+          <li>The mode comes from <code>data-mode</code> on the root element. <code>config/theme.mode</code> sets the policy — <code>light</code>, <code>dark</code>, or <code>system</code> — and <code>lib/modeRuntime.js</code> writes the attribute. Never add a <code>.dark</code> class of your own.</li>
+          <li>The preset comes from <code>data-theme</code> on the root element, and its values are the six preset ids (design brief §3.4). A theme remaps the same custom properties. It never introduces a property name and never introduces a class. <code>EventConfigProvider</code> writes the attribute from <code>config/theme.preset</code>.</li>
+          <li>The motif set comes from <code>data-motif-set</code> on the root element (design brief §3.8). A custom property cannot rewrite the asset a second custom property points at, so the set switch is an attribute for the same reason the mode and the theme are. Render a motif as a <code>mask-image</code> painted with <code>--color-ink-motif</code>, or inline it as an SVG symbol reading <code>currentColor</code> — never as an <code>&lt;img&gt;</code>, never as a <code>url()</code> fill.</li>
+          <li>The admin has its own fixed palette: The <code>admin-*</code> tokens (design brief §5.2). The admin obeys <code>data-mode</code> and ignores <code>data-theme</code>, so the <code>admin-*</code> blocks are emitted once per mode and never once per theme. <strong>There is no separate admin marker colour to set.</strong> The <code>config/theme.adminAccent</code> field is gone; <code>--admin-client-accent</code> appears in exactly two places — the marker beside the section you are in and the mark on the page-header rule — and both take the resolved brand colour for the mode, which is the same value the site paints. A marker is non-text user interface, so it holds 3:1 against <code>--admin-ground</code>; below that both slots fall back to <code>--admin-ink</code> and the editor says so in words. Nothing is clamped, and the site keeps painting the client&#39;s colour either way.</li>
+          <li>Every palette block matches a scoped element as well as <code>:root</code> (<code>scripts/lib/tokens.cjs</code>). That is what lets the page preview render the client&#39;s pages inside the admin: Its frame carries <code>data-theme</code>, <code>data-mode</code>, and <code>data-motif-set</code> (internal names — Vocabulary above) for the draft and resolves the whole set from its own declarations. The <code>admin-*</code> blocks stay root-only, because the admin never renders inside that frame.</li>
+          <li>Use the rule tokens for rules: <code>--rule-hairline-*</code>, <code>--rule-strong-*</code>, <code>--rule-nameplate-*</code> (design brief §3.7). A rule never borrows an ink step and never carries brand color.</li>
+          <li>A form control&#39;s boundary (<code>input</code>, <code>select</code>, <code>textarea</code>) uses <code>--color-border-control</code>, never <code>--rule-hairline</code>. WCAG 1.4.11 needs 3:1 against the ground it renders on; a rule is tuned for low-contrast structure and falls well short of that bar.</li>
+          <li>One theme mechanism, used consistently. This repo&#39;s choice: The <code>config/theme</code>-driven custom-property chain (spec §7.2) — not ad-hoc <code>.dark</code> classes per component.</li>
           <li>Define gradient interpolation: <code>in oklab</code> for even brightness, <code>in oklch</code> for vivid midtones.</li>
+          </ul>
+          <h2 id="the-admin-surface">The admin surface<a class="heading-anchor" href="#the-admin-surface" aria-label="Link to this section">#</a></h2>
+          <p>The admin CMS is the seventh design surface and it is not a preset. The full spec is <code>docs/plans/2026-08-27-admin-identity-story.md</code>; these are the rules a review checks.</p>
+          <ul>
+          <li><strong>It reads <code>admin-*</code> tokens only.</strong> A <code>brand-*</code> utility, a <code>font-heading</code>, or a <code>rounded-brand</code> inside the admin shell is a bug: The room would restyle itself every time a client changed their palette. The public site&#39;s own controls live in <code>components/forms/publicForm.jsx</code> and the admin&#39;s in <code>admin/components/formControls.jsx</code>; neither imports the other.</li>
+          <li><strong>Navigation is the docket:</strong> A grouped standing list of words down the leading edge — content, people, operations, system — with group heads as folios on a hairline. No icon rail, no collapse to glyphs, no counts in bubbles. The active item carries four signals, never color alone: The marker, the semibold weight, a ground shift, and <code>aria-current=&quot;page&quot;</code>.</li>
+          <li><strong>A page header is the job line:</strong> The section name on <code>--admin-rule-header</code> with the client mark at the rule&#39;s leading end, and the record&#39;s state and identifiers beside the name or under it — never above it.</li>
+          <li><strong>Three state words, everywhere:</strong> <code>Draft</code>, <code>Live</code>, and <code>Live with unpublished changes</code> (<code>admin/recordState.js</code>). A record with a draft sits on <code>--admin-ground-proof</code> (an internal token name — Vocabulary above), and a successful publish resolves that tint to the base ground over 160ms on <code>opacity</code> — instantly under <code>prefers-reduced-motion</code>. The tint is the second signal; the word is always present.</li>
+          <li><strong>A destructive action stands still and states what it costs</strong> (<code>DestructiveConfirm</code>): The alarm ground inside the alarm rule, a sentence naming what is removed and whether anything survives, and a confirm button that repeats the consequence at normal size. Nothing animates in a destructive moment.</li>
+          <li><strong>Two faces, fixed:</strong> Source Sans 3 carries everything a person reads as language, IBM Plex Mono with tabular figures carries everything the machine owns. If an operator would ever copy it, paste it, or compare it character by character, it is set in the mono.</li>
+          <li><strong>Elevation is tint.</strong> No <code>--admin-shadow-*</code> family ships, there is one small radius and no second one, and a region is a ruled and tinted band rather than a floating card.</li>
+          </ul>
+          <h2 id="the-project-site">The project site<a class="heading-anchor" href="#the-project-site" aria-label="Link to this section">#</a></h2>
+          <p><code>docs/</code> is the GitHub Pages surface — the landing page and every generated documentation page. It is not an <code>apps/web</code> surface, but it is Event Runner&#39;s own front door, so it is held to the same design language and reviewed against this document.</p>
+          <ul>
+          <li><strong>It mints no token.</strong> <code>docs/tokens.css</code> is generated by <code>scripts/build-pages.cjs</code> from <code>design/tokens/</code>, through the same generator that writes <code>apps/web/src/generated/theme.css</code>, narrowed to the tokens the site uses. <code>build-pages --check</code> fails on a stale copy, so the site cannot drift from the product&#39;s palette. <code>docs/styles.css</code> is the handwritten half: The three faces the site serves from <code>docs/fonts/</code>, the device contracts it composes, and its measure. Never hand-declare a name the generated file owns.</li>
+          <li><strong>The mark is four strokes</strong>: A stem, then the three rule weights the system ships. It is inline SVG taking the masthead&#39;s own ink, and it sits beside the wordmark, never behind it. <code>docs/favicon.svg</code> carries the same geometry in ink, because a favicon has no page color to inherit, and <code>scripts/dev/build-social-cards.mjs</code> draws the two social cards from it. No stacked cards, no tinted panels, no drawing behind the name.</li>
+          <li><strong>A boundary states its own weight, and only one device draws it.</strong> A major boundary opens on the strong rule and takes more air above it than anything else on the page. A secondary one is the heading with a hairline running out beside it. A subsection heading takes no rule at all — the heading face, the step, and the space are the signal. Both devices stay in the vocabulary; what is banned is stacking them, because a strong rule with a second rule two lines under it is what turns a page of boundaries into ruling.</li>
+          <li><strong>Where the layout already separates, nothing is drawn.</strong> A row of entries takes one hairline across the row and lets the column gap do the rest; the hairline returns between the items only when the row stacks and the gap is gone.</li>
+          <li><strong>The folio floor is caption size.</strong> <code>--text-folio</code> bottoms out at 11px, which suits a running head a reader glances past. Every folio this site renders is a functional label somebody has to read — the docket&#39;s group heads, a table&#39;s column heads, the status words, the pager&#39;s direction labels — so <code>--folio-size</code> resolves to <code>--text-caption</code> here. The tracking, the leading, and the case stay the folio&#39;s.</li>
+          <li><strong>No page scrolls sideways</strong>, at 320px or at 200% zoom on a 1440px screen. Wide content — tables, code blocks — scrolls inside its own container, and every text container breaks a long word.</li>
+          <li><strong>Paper has no dark mode here either.</strong> Print a documentation page from a dark screen and you get the light edition: <code>docs/tokens.css</code> re-points the ink, the ground, and the rules at the light values under print media, and no print rule asks what mode the screen was in. What prints is the document — the masthead, the breadcrumbs, the contents, the article. The docket, the site nav, and the previous/next pager are ways of reaching another page, and paper cannot follow a link, so they leave. Nothing scrolls on paper, so a table and a code block let their content out of the box instead of clipping it.</li>
+          <li><strong>Comments state the local contract, not the philosophy.</strong> The rules live in this document; a comment in <code>docs/styles.css</code> or a generator says what the code next to it must hold to and why that specific choice, and points here for the rest.</li>
           </ul>
           <h2 id="accessibility">Accessibility<a class="heading-anchor" href="#accessibility" aria-label="Link to this section">#</a></h2>
           <ul>
@@ -180,10 +324,43 @@
           </ul>
           <h2 id="layout">Layout<a class="heading-anchor" href="#layout" aria-label="Link to this section">#</a></h2>
           <ul>
-          <li>The gap between groups is at least twice the gap inside one: 8px within, 16px+ between.</li>
+          <li>The gap between groups is at least twice the gap inside one: 8px within, 16px+ between. Use the named spacing steps (<code>--space-3xs</code> through <code>--space-3xl</code>), which are built to that rule: <code>xs</code> pairs with <code>md</code>, <code>sm</code> with <code>lg</code>, <code>md</code> with <code>xl</code>.</li>
           <li>Logical properties (<code>margin-inline-start</code>, <code>padding-inline-end</code>), not directional values.</li>
           <li>No fixed widths or heights on text containers.</li>
+          <li>A system page states its own shape in <code>cmsPages.layout</code>: <code>header</code> (<code>nameplate</code> or <code>nameplate-compact</code> — there is no headerless page), <code>arrangement</code>, and <code>density</code>. Nothing migrates: A page that states nothing keeps the shape it already had. That is why two variants read what the page STATES rather than what it resolves to — an unstated <code>header</code> keeps the shell&#39;s own rule (the home page opens with the full masthead, every other page takes the running header), and an unstated <code>density</code> keeps the active preset&#39;s, which the shell mirrors onto the document element.</li>
+          <li><strong>The operator does not assemble that shape out of parts.</strong> <code>cmsPages.template</code> names one of six tasks — Standard page, Feature first, Directory with introduction, Long read, Schedule, Landing page — and each resolves to a bundle of the three values above (<code>apps/web/src/lib/pageTemplates.js</code>, mirrored in <code>functions/src/cms/pageTemplates.cjs</code> and pinned by <code>pageDoc.test.js</code>). The layout object stays the storage format; the template records which task was meant. A template is never inferred from the values: A page whose three variants happen to match one has not chosen it. The individual axes stay reachable behind the editor&#39;s disclosure, and moving one clears the template, because a page that no longer matches its template should not go on claiming it.</li>
+          <li><strong>Where the navigation sits is a SITE setting with a page-level exception.</strong> The site&#39;s answer is <code>config/theme.navPlacement</code> (<code>top</code> or <code>side</code>) and it covers every page that says nothing: A reader who meets a top nav on the home page and a rail on the schedule <em>by accident</em> has been handed two sites. A page may overrule it with <code>layout.navPlacement</code>, offered in the page editor&#39;s Advanced disclosure, and the shell reads the page FIRST, then the site, then the default — an exception the site setting could overrule would not be an exception. Reading the page first is also what keeps deployments that set it per page, before the site setting existed, rendering what they rendered. <code>side</code> moves the same navigation to the leading edge at wide viewports: Same landmark, same items, same place in the document, and below <code>lg</code> it is the top nav again.</li>
+          <li><code>density</code> is a set of token remaps, never a set of raw values. Each step maps the page and session contracts onto the spacing scale, and the block nearest an element wins — which is how a page overrides the preset for its own subtree and nowhere else.</li>
+          <li>Sections carry a <code>slot</code>. The order down a system page is nameplate, <code>above</code> sections, the page&#39;s own core content, <code>main</code> sections, <code>below</code> sections. A section with no slot is <code>main</code>, which is where it has always rendered. A custom page has no core content, so it ignores the slot.</li>
+          <li><strong>The slot keys are storage, not words the operator reads.</strong> The editor offers two insertion points — &quot;Before the main feature&quot; (<code>above</code>) and &quot;After the main feature&quot; (<code>main</code>) — because that is the choice being made: Where a section goes relative to the page&#39;s built-in feature. <code>below</code> is a third stored position with no third name; it renders after every <code>main</code>, the control reads it as &quot;After the main feature&quot;, and a section stored that way keeps it unless the operator moves the control.</li>
           </ul>
+          <h2 id="rejected-patterns">Rejected patterns<a class="heading-anchor" href="#rejected-patterns" aria-label="Link to this section">#</a></h2>
+          <p>The list the design brief settles in §2.4, recorded here so a review has one place to look. This is holistic guidance, not a checklist to game: A reviewer may reject a pattern this list does not name, and may accept a listed pattern only where the brief grants an exception.</p>
+          <ul>
+          <li><strong>Eyebrow furniture.</strong> Nothing sits directly above a heading. See Editorial devices above for the full rule and its two non-exceptions.</li>
+          <li><strong>Decorative gradients.</strong> No gradient blobs, no purple-heavy gradients, no gradient as a background event.</li>
+          <li><strong>Glassmorphism.</strong> No frosted panels, no blurred translucent overlays used as style.</li>
+          <li><strong>Zero-padded decorative numbers.</strong> No <code>01</code> / <code>02</code> / <code>03</code> motifs.</li>
+          <li><strong>Headline tricks.</strong> No italicized or underlined single word in a headline.</li>
+          <li><strong>Carousels.</strong> No sliding text carousels, no auto-advancing content.</li>
+          <li><strong>The tan-canvas look.</strong> No warm-tan canvas paired with an oversized primary action.</li>
+          <li><strong>Colored card edges.</strong> No arbitrary colored left edge on a card, button, or block. No decorative colored rule across the top of a card.</li>
+          <li><strong>Tiny low-contrast subtext.</strong> Body-adjacent text meets the contrast bar in both modes.</li>
+          <li><strong>Pulse dots.</strong> No glowing dots, no pulsing status dots.</li>
+          <li><strong>Fake 3D stacking.</strong> No box-behind-box layering, no pointless depth.</li>
+          <li><strong>Generic SaaS framing.</strong> No startup marketing voice, no self-justifying subheads, no insider-facing copy a visitor does not need.</li>
+          <li><strong>Pill-shaped everything.</strong> No fully rounded decoration across the interface.</li>
+          <li><strong>Default-typeface tells.</strong> Never ship Inter alone, Space Grotesk, or Geist Mono as the design default. Never use the stereotypical AI-site serif treatment.</li>
+          <li><strong>Dead calls to action.</strong> Every action has a stated workflow behind it.</li>
+          <li><strong>Sectionless scroll.</strong> Every page has named, meaningful sections.</li>
+          <li><strong>Pointless forms.</strong> No newsletter slot without a real purpose and a real backend.</li>
+          <li><strong>Inconsistent dark mode.</strong> A half-applied mode is a bug, not a polish item.</li>
+          <li><strong>Semantic color conflicts.</strong> Never use a color against its familiar meaning, and never use color alone for status.</li>
+          <li><strong>Corner errors.</strong> Never let a rounded-box stroke shrink at the corner — apply the concentric radius rule.</li>
+          <li><strong>Cursor and reveal effects.</strong> No oversized cursor animations, no reveal-on-scroll.</li>
+          <li><strong>Repetition.</strong> No verbose sections, no repeated promotional copy.</li>
+          </ul>
+          <p>The brief names exactly two exceptions, both narrow: A bento grid that passes all five tests in §2.4, and the Zine preset&#39;s off-register stamp. Nothing else gets one, and a preset may not grant itself one.</p>
           <h2 id="writing">Writing<a class="heading-anchor" href="#writing" aria-label="Link to this section">#</a></h2>
           <ul>
           <li>Button labels start with verbs: &quot;Save draft&quot;, &quot;Delete project&quot;.</li>
@@ -191,6 +368,7 @@
           <li>One term per flow: &quot;Continue&quot; or &quot;Next&quot;, not both.</li>
           <li>Links describe their destination: &quot;Read the schedule&quot;, never &quot;Click here&quot;.</li>
           <li>Consistent capitalization everywhere; sentence case is the default.</li>
+          <li>Capitalize the first word after a colon, wherever the colon falls — after a standing label (&quot;Risk: What could break&quot;, &quot;<strong>Illustrations</strong>: None&quot;) and inside a sentence alike (&quot;the day reads twice: A grid and a list&quot;). Code spans, paths, URLs, and token names keep their own case, so a colon that introduces one leaves it exactly as it is: <code>text-wrap: balance</code> is written the way the property is written.</li>
           <li>Toggles are labeled by their enabled state: &quot;Send read receipts&quot;, not &quot;Disable read receipts&quot;.</li>
           <li>Empty states orient the reader and offer exactly one next action.</li>
           <li>Address readers as &quot;you&quot;, not &quot;the user&quot;.</li>

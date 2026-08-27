@@ -3,10 +3,14 @@
 // set Schedule.jsx renders down to the signed-in user's bookmarks, grouped
 // and sorted the same way. Requires config/features.{schedule,
 // sessionBookmarks} AND a signed-in user — bookmarking itself is further
-// gated to approved attendees (BookmarkPill in SessionCard.jsx), but a
+// gated to approved attendees (session/BookmarkAction.jsx), but a
 // signed-out visitor sees a sign-in prompt here rather than an empty list
 // that looks like "you have no bookmarks".
-import { useMemo } from 'react';
+//
+// Editorial base restyle (design brief §2.1, §5.1): the day head is the same
+// folio-on-a-rule SectionHead device Schedule.jsx uses, and the page actions
+// are ruled rectangles rather than filled pill buttons.
+import { Fragment, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
@@ -15,9 +19,29 @@ import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
+import SectionHead from '../components/editorial/SectionHead.jsx';
+import TransferLine from '../components/TransferLine.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
+import { sessionMovement } from 'shared/venue';
+import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
+
+// THIS IS THE ONE LIST A TRANSFER BELONGS IN (design brief §4.6;
+// shared/venue.cjs).
+//
+// A recorded movement says what it costs to go from one place to another.
+// It does not say that this reader is going. On the full schedule nobody
+// is: a reader scanning the programme skipped that session, or is
+// following one track out of five, and a transfer line between two
+// consecutive rows would be the old inference wearing better data.
+//
+// Here the reader has said it themselves. These are the sessions THEY
+// bookmarked, grouped by day and in programme order, so consecutive
+// entries are an itinerary they wrote. Between two of them the site may
+// state the walk — if, and only if, somebody recorded that exact move.
+// Where nothing was recorded the gap says nothing, which is what an
+// unrecorded route honestly looks like.
 
 export default function MySchedule() {
   const { eventConfig, features } = useEventConfig();
@@ -68,10 +92,7 @@ export default function MySchedule() {
         title="This event doesn’t have a personal schedule"
         description="Everything else about the event is on the schedule page."
         action={
-          <Link
-            to="/schedule"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/schedule" className={primaryActionClass}>
             Go to the schedule
           </Link>
         }
@@ -81,8 +102,8 @@ export default function MySchedule() {
 
   if (authLoading) {
     return (
-      <div className="mt-6">
-        <LoadingState label="Loading your schedule" />
+      <div className="mt-lg">
+        <LoadingState label="Loading your schedule…" />
       </div>
     );
   }
@@ -93,10 +114,7 @@ export default function MySchedule() {
         title="Sign in to see your schedule"
         description="Bookmark sessions from the schedule page and they’ll show up here."
         action={
-          <Link
-            to="/signin"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/signin" className={primaryActionClass}>
             Sign in
           </Link>
         }
@@ -106,25 +124,22 @@ export default function MySchedule() {
 
   return (
     <article>
-      <header className="flex flex-wrap items-start justify-between gap-4">
+      <header className="flex flex-wrap items-baseline justify-between gap-md">
         <div>
-          <h1 className="font-heading text-3xl font-semibold text-brand-ink">My schedule</h1>
-          <p className="mt-1 text-sm text-brand-ink-muted">
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">My schedule</h1>
+          <p className="mt-2xs font-data text-caption text-text-secondary">
             Sessions you’ve bookmarked, across every day.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to="/schedule"
-            className="touch-target inline-flex items-center rounded-brand border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"
-          >
+        <div className="flex flex-wrap items-center gap-xs">
+          <Link to="/schedule" className={quietActionClass}>
             Full schedule
           </Link>
           {features.icsExport && mySessions.length > 0 ? (
             <button
               type="button"
               onClick={() => downloadIcs(icsFileName('my-schedule'), buildIcsCalendar(eventConfig, mySessions))}
-              className="touch-target inline-flex items-center rounded-brand border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"
+              className={quietActionClass}
             >
               Download my schedule (.ics)
             </button>
@@ -133,19 +148,16 @@ export default function MySchedule() {
       </header>
 
       {loading || bookmarksLoading ? (
-        <div className="mt-6">
-          <LoadingState label="Loading your schedule" />
+        <div className="mt-lg">
+          <LoadingState label="Loading your schedule…" />
         </div>
       ) : mySessions.length === 0 ? (
-        <div className="mt-6">
+        <div className="mt-lg">
           <EmptyState
             title="No bookmarked sessions yet"
             description="Browse the schedule and bookmark the sessions you don’t want to miss."
             action={
-              <Link
-                to="/schedule"
-                className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-              >
+              <Link to="/schedule" className={primaryActionClass}>
                 Browse the schedule
               </Link>
             }
@@ -155,28 +167,54 @@ export default function MySchedule() {
         days
           .filter((day) => (myByDay.get(day.id) ?? []).length > 0)
           .map((day) => (
-            <section key={day.id} aria-labelledby={`my-day-${day.id}`} className="mt-8">
-              <h2 id={`my-day-${day.id}`} className="font-heading text-xl text-brand-ink">
-                {day.label}
-                {formatDayDate(day, eventConfig.timezone) ? (
-                  <>
-                    {' · '}
-                    <time dateTime={day.date} className="font-normal text-brand-ink-muted">
-                      {formatDayDate(day, eventConfig.timezone)}
-                    </time>
-                  </>
-                ) : null}
-              </h2>
-              <ul className="mt-4 grid gap-3">
-                {(myByDay.get(day.id) ?? []).map((session) => (
-                  <SessionCard
-                    key={session.id}
-                    session={session}
-                    eventConfig={eventConfig}
-                    features={features}
-                    bookmarked
-                  />
-                ))}
+            // The Atlas sheet, on the one surface that holds a programme
+            // (owner review, 2026-08-27). See Schedule.jsx for the rule.
+            <section key={day.id} aria-labelledby={`my-day-${day.id}`} className="map-grid mt-xl">
+              {/* The same folio-on-a-rule day head Schedule.jsx uses (brief
+                  §2.1): the standing head of the day, with the date sitting
+                  on the same rule rather than stacked above it. */}
+              <SectionHead
+                variant="folio"
+                level={2}
+                id={`my-day-${day.id}`}
+                title={day.label}
+                folio={
+                  formatDayDate(day, eventConfig.timezone) ? (
+                    <time dateTime={day.date}>{formatDayDate(day, eventConfig.timezone)}</time>
+                  ) : null
+                }
+              />
+              {/* No gap between rows: each SessionCard opens with its own
+                  hairline, so the rules ARE the separation (brief §2.1). */}
+              <ul className="mt-sm">
+                {(myByDay.get(day.id) ?? []).map((session, index, list) => {
+                  // The move INTO this session, from the one the reader
+                  // attends before it. `null` for the first of the day —
+                  // arriving is not transferring — and null wherever the
+                  // pair has no recorded route, which is most pairs in most
+                  // venues and renders as nothing at all.
+                  const movement =
+                    index > 0 ? sessionMovement(eventConfig, list[index - 1], session) : null;
+                  return (
+                    <Fragment key={session.id}>
+                      {/* Its own item in the itinerary, because that is
+                          what it is: the step between two sessions, not a
+                          property of either. SessionCard renders the <li>
+                          for the session itself. */}
+                      {movement ? (
+                        <li>
+                          <TransferLine movement={movement} />
+                        </li>
+                      ) : null}
+                      <SessionCard
+                        session={session}
+                        eventConfig={eventConfig}
+                        features={features}
+                        bookmarked
+                      />
+                    </Fragment>
+                  );
+                })}
               </ul>
             </section>
           ))

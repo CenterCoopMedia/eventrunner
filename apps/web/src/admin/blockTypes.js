@@ -12,7 +12,7 @@ export const BLOCK_TYPES = Object.freeze({
   text: {
     id: 'text',
     label: 'Text',
-    description: 'A single plain-text value: headings, labels, short copy.',
+    description: 'A single plain-text value: Headings, labels, short copy.',
     fields: [{ id: 'value', type: 'string', required: true }],
   },
   richtext: {
@@ -24,17 +24,22 @@ export const BLOCK_TYPES = Object.freeze({
   image: {
     id: 'image',
     label: 'Image',
-    description: 'An image by URL. Alt text is required, not optional.',
+    description:
+      'An image by URL. Alt text is required, not optional. focalX and focalY name ' +
+      'the part of the picture a fixed crop must keep, as percentages from the top ' +
+      'left; both default to the centre.',
     fields: [
       { id: 'url', type: 'url', required: true },
       { id: 'alt', type: 'string', required: true },
       { id: 'caption', type: 'string', required: false },
+      { id: 'focalX', type: 'number', required: false },
+      { id: 'focalY', type: 'number', required: false },
     ],
   },
   cta: {
     id: 'cta',
     label: 'Call to action',
-    description: 'A button or prominent link: label plus destination.',
+    description: 'A button or prominent link: Label plus destination.',
     fields: [
       { id: 'label', type: 'string', required: true },
       { id: 'url', type: 'url', required: true },
@@ -44,10 +49,17 @@ export const BLOCK_TYPES = Object.freeze({
   stat: {
     id: 'stat',
     label: 'Statistic',
-    description: 'A headline number with its caption, e.g. "450 / attendees".',
+    description:
+      'A number that carries evidence: The figure and its caption, plus the four parts ' +
+      'every stat must state — the finding in words, what it counts, where it came from, ' +
+      'and what a screen reader hears. All six are required to write one.',
     fields: [
       { id: 'value', type: 'string', required: true },
       { id: 'label', type: 'string', required: true },
+      { id: 'takeaway', type: 'string', required: true },
+      { id: 'description', type: 'string', required: true },
+      { id: 'source', type: 'string', required: true },
+      { id: 'alt', type: 'string', required: true },
       { id: 'order', type: 'number', required: false },
     ],
   },
@@ -81,6 +93,23 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'order', type: 'number', required: false },
     ],
   },
+});
+
+/**
+ * What to write in each part of the stat contract (design brief §2.1.1),
+ * shown under that field in the block editor. The server enforces the same
+ * parts and rejects a write that misses one (blockTypes.cjs
+ * statContractErrors); blockTypes.test.js pins the two field sets together,
+ * so the editor can never prompt for a part the server ignores, or stay
+ * silent about one it demands.
+ */
+export const STAT_CONTRACT_HINTS = Object.freeze({
+  value: 'The figure itself, as it should read. “420”, “2×”, “68%”.',
+  label: 'Caption the figure in a few words. “Attendees expected”.',
+  takeaway: 'State the finding in words. “Two thirds of sessions are workshops”, not “Session types”.',
+  description: 'Say what the number counts, and over what period.',
+  source: 'Name where the number came from, and the date you read it.',
+  alt: 'Describe the finding for a screen reader. Do not describe the shape of the chart.',
 });
 
 /** Registry order — the palette's display order. */

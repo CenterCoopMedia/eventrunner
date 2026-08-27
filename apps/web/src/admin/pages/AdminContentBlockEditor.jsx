@@ -18,12 +18,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
-import EmptyState from '../../components/EmptyState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
-import { BLOCK_TYPE_IDS, blockTypeFor, blockTypeLabel } from '../blockTypes.js';
+import {
+  BLOCK_TYPE_IDS,
+  STAT_CONTRACT_HINTS,
+  blockTypeFor,
+  blockTypeLabel,
+} from '../blockTypes.js';
 import {
   blankContent,
   staleFieldDeletions,
@@ -33,36 +36,52 @@ import {
   valueFieldsOf,
 } from '../contentDoc.js';
 import { summarizePublish } from '../publishResult.js';
-import ImagePicker from '../../components/media/ImagePicker.jsx';
+import ImagePicker from '../components/media/ImagePicker.jsx';
 import {
   CheckboxField,
+  DestructiveConfirm,
   Panel,
   SaveStatus,
   SelectField,
   ServerErrorSummary,
   TextAreaField,
   TextField,
-  dangerButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  RecordState,
+} from '../components/adminChrome.jsx';
+
+/**
+ * What to write in this field, where the system has something to say. Only
+ * the stat contract does today (design brief §2.1.1): its four parts are
+ * required on write, so the editor states what each one is for rather than
+ * leaving an operator to guess from the field name.
+ */
+function hintFor(blockTypeId, fieldId) {
+  return blockTypeId === 'stat' ? STAT_CONTRACT_HINTS[fieldId] : undefined;
+}
 
 /** One control per registry field, chosen by the field's declared type. */
 function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
   const fields = valueFieldsOf(blockTypeId);
   if (!blockTypeFor(blockTypeId)) {
     return (
-      <p className="text-sm text-brand-ink-muted">
+      <p className="text-caption text-admin-ink-secondary">
         Choose a block type above to fill in its value.
       </p>
     );
   }
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-sm sm:grid-cols-2">
       {fields.map((field) => {
         const label = `${field.id}${field.required ? '' : ' (optional)'}`;
         const value = values[field.id];
         const error = errorFor(field.id);
+        const hint = hintFor(blockTypeId, field.id);
         if (field.type === 'boolean') {
           return (
             <div key={field.id} className="flex items-center">
@@ -136,6 +155,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
             value={value}
             onChange={(next) => onChange(field.id, next)}
             error={error}
+            hint={hint}
           />
         );
       })}
@@ -238,11 +258,11 @@ export default function AdminContentBlockEditor({ mode }) {
   // draft is still in flight (see the adoption effect above).
   const adopted = loadedKeyRef.current === `${sectionId}__${fieldParam}`;
   if (mode === 'edit' && (pagesLoading || contentLoading) && !adopted) {
-    return <LoadingState label="Loading block…" />;
+    return <AdminLoadingState label="Loading block…" />;
   }
   if (!pagesLoading && (!page || !section)) {
     return (
-      <EmptyState
+      <AdminEmptyState
         title="No such section"
         description="That section doesn’t exist on this page (any more)."
         action={
@@ -255,7 +275,7 @@ export default function AdminContentBlockEditor({ mode }) {
   }
   if (mode === 'edit' && !pagesLoading && !contentLoading && !existingRow) {
     return (
-      <EmptyState
+      <AdminEmptyState
         title="No such block"
         description="That content block has neither a published nor a draft revision."
         action={
@@ -390,27 +410,32 @@ export default function AdminContentBlockEditor({ mode }) {
 
   return (
     <form
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-md"
       onSubmit={(event) => {
         event.preventDefault();
         save({ publish: false });
       }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-brand-ink">
-            {mode === 'create' ? 'New content block' : currentFieldId || 'Content block'}
-          </h1>
-          <p className="text-sm text-brand-ink-muted">
-            {section?.label || sectionId} · {page?.current?.label}. Saving
-            writes a draft; publishing copies it to the live revision the
-            public site reads.
-          </p>
-        </div>
-        <Link to=".." relative="path" className={secondaryButtonClass}>
-          Back to section
-        </Link>
-      </div>
+      <AdminPageHeader
+        title={mode === 'create' ? 'New content block' : currentFieldId || 'Content block'}
+        state={existingRow ? <RecordState state={existingRow.state} /> : null}
+        identifiers={`${pageId} · ${sectionId}`}
+        description={
+          // JSX children, not a template literal: while the page listener is
+          // still loading, `page` is null and a template literal would print
+          // the literal word "undefined" — JSX quietly renders nothing for
+          // an undefined child instead, same as before the restyle.
+          <>
+            {section?.label || sectionId} · {page?.current?.label}. Saving writes a draft;
+            publishing copies it to the live revision the public site reads.
+          </>
+        }
+        actions={
+          <Link to=".." relative="path" className={secondaryButtonClass}>
+            Back to section
+          </Link>
+        }
+      />
 
       <ServerErrorSummary
         error={error}
@@ -421,9 +446,9 @@ export default function AdminContentBlockEditor({ mode }) {
 
       <Panel
         title="Block"
-        description="The field id ties this block to the public page's block slot."
+        description="The field id ties this block to the public page’s block slot."
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="Field id"
             value={currentFieldId}
@@ -478,7 +503,7 @@ export default function AdminContentBlockEditor({ mode }) {
         />
       </Panel>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-xs">
         <button type="submit" className={secondaryButtonClass} disabled={busy !== null}>
           {busy === 'draft' ? 'Saving…' : 'Save draft'}
         </button>
@@ -501,14 +526,17 @@ export default function AdminContentBlockEditor({ mode }) {
           </button>
         ) : null}
         {isExisting ? (
-          <button
-            type="button"
-            className={dangerButtonClass}
+          <DestructiveConfirm
+            trigger="Delete this block"
+            title={`Delete ${currentFieldId}`}
+            confirmLabel="Delete this block"
+            busyLabel="Deleting…"
+            busy={busy === 'delete'}
             disabled={busy !== null}
-            onClick={remove}
-          >
-            {busy === 'delete' ? 'Deleting…' : 'Delete block'}
-          </button>
+            consequence={`The live revision of ${currentFieldId} and its draft both go, and the section renders without it.`}
+            permanence="This cannot be undone."
+            onConfirm={remove}
+          />
         ) : null}
       </div>
     </form>

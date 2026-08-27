@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { defaultPages, buildSeedContent, placeholderBlock, LEGAL_PAGE_IDS } = require('./seed.cjs');
 const { buildConfigDocs } = require('./answers.cjs');
@@ -36,16 +38,61 @@ function configDocs(overrides = {}) {
   return built.docs;
 }
 
-test('the ten §5.3 pages are seeded, with the four system pages marked', () => {
+test('the twelve §5.3 pages are seeded, with the six system pages marked', () => {
   const pages = defaultPages();
   assert.deepEqual(
     pages.map((p) => p.id),
-    ['home', 'schedule', 'speakers', 'sponsors', 'travel', 'faq', 'conduct', 'contact', 'privacy', 'terms'],
+    [
+      'home', 'schedule', 'speakers', 'sponsors', 'travel', 'faq', 'conduct', 'contact',
+      'privacy', 'terms', 'attendees', 'updates',
+    ],
   );
   assert.deepEqual(
     pages.filter((p) => p.systemPage).map((p) => p.id),
-    ['home', 'schedule', 'speakers', 'sponsors'],
+    ['home', 'schedule', 'speakers', 'sponsors', 'attendees', 'updates'],
   );
+});
+
+test('every page a SystemPage route asks for is actually seeded', () => {
+  // The gap this test exists to close: attendees and updates render through
+  // SystemPage — which reads the page's template, layout, and section slots
+  // — but had no seeded document, so they were the only system pages an
+  // operator could not open in the admin Pages list and shape. A route that
+  // names a page id and finds nothing renders the default layout forever,
+  // silently, with no way to change it.
+  const webPages = path.resolve(__dirname, '..', '..', 'apps', 'web', 'src', 'pages');
+  const asked = new Set();
+  for (const file of fs.readdirSync(webPages)) {
+    if (!file.endsWith('.jsx') || file.includes('.test.')) continue;
+    const source = fs.readFileSync(path.join(webPages, file), 'utf8');
+    for (const match of source.matchAll(/<SystemPage\s+pageId=(?:"([^"]+)"|\{\[([^\]]+)\]\})/g)) {
+      // A page may offer several keys to try in order (Home tries 'home'
+      // then '/'); the FIRST is the document id a seed has to provide.
+      const key = match[1] ?? match[2].split(',')[0].trim().replace(/^['"]|['"]$/g, '');
+      if (key.startsWith('/')) continue;
+      asked.add(key);
+    }
+  }
+  assert.ok(asked.size >= 6, `expected to find the SystemPage routes, found ${[...asked]}`);
+  const seeded = new Set(defaultPages().map((page) => page.id));
+  for (const id of [...asked].sort()) {
+    assert.ok(seeded.has(id), `apps/web renders <SystemPage pageId="${id}"> but no seed creates it`);
+  }
+});
+
+test('a seeded system page sits at the path its React route is mounted at', () => {
+  const routes = fs.readFileSync(
+    path.resolve(__dirname, '..', '..', 'apps', 'web', 'src', 'App.jsx'),
+    'utf8',
+  );
+  for (const page of defaultPages()) {
+    if (!page.systemPage || page.path === '/') continue;
+    assert.match(
+      routes,
+      new RegExp(`path="${page.path.slice(1)}"`),
+      `${page.id} seeds ${page.path} but App.jsx mounts no such route`,
+    );
+  }
 });
 
 test('every seeded page passes the REAL validatePageDoc from the admin endpoint', () => {

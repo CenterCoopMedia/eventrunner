@@ -35,6 +35,16 @@ export const eventConfig = {
       endTime: '16:00',
     },
   ],
+  tracks: [
+    {
+      letter: 'A',
+      name: 'Practice',
+    },
+    {
+      letter: 'B',
+      name: 'Sustainability',
+    },
+  ],
   registration: {
     opensAt: '2026-06-01T09:00:00',
     closesAt: '2026-10-09T23:59:00',
@@ -49,6 +59,59 @@ export const eventConfig = {
     postalCode: '58211',
     country: 'US',
     mapUrl: null,
+    places: [
+      {
+        id: 'main-hall',
+        name: 'Main hall',
+        floor: 'Ground floor',
+      },
+      {
+        id: 'room-a',
+        name: 'Room A',
+        floor: 'First floor',
+      },
+      {
+        id: 'room-b',
+        name: 'Room B',
+        floor: 'First floor',
+      },
+    ],
+    movements: [
+      {
+        from: 'main-hall',
+        to: 'room-a',
+        walkingMinutes: 4,
+        accessibleRoute: 'Lift beside the north stair to the first floor, then left along the gallery. Step-free the whole way.',
+      },
+      {
+        from: 'room-a',
+        to: 'main-hall',
+        walkingMinutes: 3,
+        accessibleRoute: 'The same lift back down, then straight ahead into the hall.',
+      },
+      {
+        from: 'main-hall',
+        to: 'room-b',
+        walkingMinutes: 5,
+        accessibleRoute: 'Lift beside the north stair to the first floor, then right to the end of the gallery.',
+      },
+      {
+        from: 'room-b',
+        to: 'main-hall',
+        walkingMinutes: 4,
+      },
+      {
+        from: 'room-a',
+        to: 'room-b',
+        walkingMinutes: 1,
+        accessibleRoute: 'Along the first-floor gallery. No steps between the two rooms.',
+      },
+      {
+        from: 'room-b',
+        to: 'room-a',
+        walkingMinutes: 1,
+      },
+    ],
   },
   sender: {
     email: 'summit@example.org',
@@ -103,13 +166,11 @@ export const features = {
 };
 
 export const theme = {
-  fonts: {
-    heading: 'sans-humanist',
-    body: 'sans-humanist',
-    accent: 'sans-humanist',
-  },
-  texture: 'flat',
-  radius: 'sharp',
+  preset: 'newsroom',
+  optionPicks: {},
+  fonts: {},
+  mode: 'light',
+  header: 'masthead',
   logos: {
     primary: 'branding/logo.svg',
     mark: 'branding/mark.svg',

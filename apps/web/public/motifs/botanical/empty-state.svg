@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="96 48 128 310">
+  <!--
+    The unlabelled plate (visual story, Field Guide, moment 3): a frond
+    mounted on a herbarium sheet, with the label line left blank.
+
+    DRAWN FOR THE SIZE IT IS SEEN AT. The slot renders this at 8rem tall
+    under `mask-size: contain`, so what the viewBox says is what the scale
+    is. The box is drawn to the ink with one small even margin: an earlier
+    pass left a 320 by 420 sheet around a drawing 100 by 282, which was two
+    thirds empty and shrank the frond to three tenths for nothing. The plate
+    device around it supplies the margin a mounted specimen needs; the file
+    should not supply it twice.
+
+    Every stroke below is chosen so that it lands as a line at the scale
+    that leaves — the thinnest here is 1.2, and nothing thinner ships. An
+    earlier pass carried six vein ticks per pinna at 0.6, a hundred and
+    twenty of them, which no display could resolve and which greyed the
+    frond into a smudge. Detail a reader cannot see is not detail; it is
+    dirt.
+
+    No frame either. EmptyState mounts this inside the plate device, and
+    under Field Guide that device draws the double hairline itself. A second
+    frame inside the first is a doubling a plate does not do.
+  -->
+  <defs>
+    <g id="es-pinna">
+      <path fill="none" stroke="currentColor" stroke-width="2" d="M0,0 C8,-4 20,-5.5 30,-3 C34,-1.8 36,-0.8 36,0 C34,1.5 24,3.3 15,3.6 C7,3.8 1.5,2.2 0,0 Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.2" d="M2,-0.3 C12,-1 24,-1 33,-0.4"/>
+    </g>
+  </defs>
+
+  <g fill="none" stroke="currentColor">
+    <path stroke-width="1.6" d="M160,316 C160,312 159,309 159,306"/>
+    <path stroke-width="2.4" d="M159,306 C158,268 161,224 163,184 C165,152 167,120 168,80"/>
+    <path stroke-width="1.8" d="M168,80 C168,74 169,70 170,62"/>
+  </g>
+
+  <g>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(159,286) rotate(-16) scale(1.3)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(159,286) rotate(16) scale(-1.3,1.3)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(160,262) rotate(-22) scale(1.15)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(160,262) rotate(22) scale(-1.15,1.15)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(161,238) rotate(-28) scale(1.03)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(161,238) rotate(28) scale(-1.03,1.03)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(162,214) rotate(-34) scale(0.92)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(162,214) rotate(34) scale(-0.92,0.92)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(164,190) rotate(-40) scale(0.8)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(164,190) rotate(40) scale(-0.8,0.8)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(165,164) rotate(-46) scale(0.68)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(165,164) rotate(46) scale(-0.68,0.68)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(167,136) rotate(-52) scale(0.56)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(167,136) rotate(52) scale(-0.56,0.56)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(168,110) rotate(-58) scale(0.44)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(168,110) rotate(58) scale(-0.44,0.44)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(169,88) rotate(-64) scale(0.34)"/>
+    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(169,88) rotate(64) scale(-0.34,0.34)"/>
+  </g>
+
+  <!-- The mounting line the label would sit on. It is left blank: this is
+       the empty state, and the sentence beside the drawing is the label. -->
+  <path fill="none" stroke="currentColor" stroke-width="1.4" d="M110,344 L210,344"/>
+</svg>

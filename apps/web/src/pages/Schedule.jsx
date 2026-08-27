@@ -17,9 +17,33 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
+import SystemPage from '../components/SystemPage.jsx';
 import SessionCard from '../components/SessionCard.jsx';
+import SectionHead from '../components/editorial/SectionHead.jsx';
+import { PlateNumber } from '../components/editorial/Plate.jsx';
+import Marginalia from '../components/editorial/Marginalia.jsx';
+import ScheduleGrid from '../components/ScheduleGrid.jsx';
+import SchedulePrint from '../components/SchedulePrint.jsx';
+import { resolveTracks, withCallingPoints } from '../lib/scheduleGrid.js';
+import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
+import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
+import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
+
+// One day of the programme. The active day is marked twice over — heavier
+// weight plus a strong rule under the word — because color alone never
+// signals state (§8.1). The press is functional motion: transform only,
+// inside the 120–200ms band, and the global reduced-motion block in
+// index.css takes it out entirely for a reader who asked for that.
+function dayClass(isActive) {
+  return [
+    'touch-target inline-flex items-center border-b-strong px-2xs py-xs font-data text-caption transition-transform duration-fast ease-motion active:scale-[0.98]',
+    isActive
+      ? 'border-b-rule-strong font-semibold text-text-primary'
+      : 'border-b-transparent text-text-secondary hover:text-text-primary',
+  ].join(' ');
+}
 
 /** Sort sessions the same way everywhere they're grouped by day (Schedule
  * and MySchedule both use this). Start time first, then explicit `order`,
@@ -39,6 +63,11 @@ export default function Schedule() {
   const { user } = useAuth();
   const { attendeeAccess } = useProfile();
   const { bookmarkedIds } = useMyBookmarks();
+  // Which of the two views is in the document at all (lib/viewport.js). The
+  // list is the answer until the viewport is measured and found wide, so a
+  // browser that cannot be asked gets the accessible baseline rather than a
+  // grid it has no room for.
+  const wide = useMediaQuery(WIDE_VIEWPORT);
 
   // Days are runtime config — a live config/event write could deliver a
   // malformed entry; drop anything without a usable string id rather than
@@ -78,10 +107,7 @@ export default function Schedule() {
         title="This event doesn’t have a public schedule"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -91,6 +117,20 @@ export default function Schedule() {
 
   const activeDay = days.find((d) => d.id === activeDayId) ?? null;
   const activeSessions = activeDayId ? (sessionsByDay.get(activeDayId) ?? []) : [];
+  // The day as top-level entries, each carrying its calling points. Both
+  // views render from this, so a child session appears under its parent in
+  // the grid and in the list, and never as a row of its own.
+  const entries = withCallingPoints(activeSessions);
+  // The event's lines, in the client's own order (config/event.tracks). No
+  // lines means no second axis, so there is nothing for a grid to be.
+  const columns = resolveTracks(eventConfig);
+  const showGrid = wide && columns.length > 0 && entries.length > 0;
+  // The back issue (brief §2.1): a day the event has moved past, or a whole
+  // event the operator has archived. Nothing is hidden — the palette drops
+  // to the archive tokens, the day head says so, and the controls that act
+  // on a live event go away because there is nothing left to act on.
+  const archived = eventIsArchived(eventConfig);
+  const backIssue = activeDay ? isBackIssue(activeDay, eventConfig) : false;
   const hasAnySession = sessionsByDay.size > 0;
   const eventZoneLabel = activeDay
     ? zoneLabel(
@@ -100,32 +140,31 @@ export default function Schedule() {
     : null;
 
   return (
-    <article>
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    <SystemPage pageId="schedule">
+      <header className="flex flex-wrap items-baseline justify-between gap-md">
         <div>
-          <h1 className="font-heading text-3xl font-semibold text-brand-ink">Schedule</h1>
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">Schedule</h1>
           {eventZoneLabel ? (
-            <p className="mt-1 text-sm text-brand-ink-muted">
+            <p className="mt-2xs font-data text-caption text-text-secondary">
               All times are shown in {eventZoneLabel}.
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Controls do not print: a button on paper is a lie (index.css,
+            the print block). */}
+        <div className="no-print flex flex-wrap items-center gap-xs">
           {features.sessionBookmarks && user && attendeeAccess ? (
-            <Link
-              to="/schedule/mine"
-              className="touch-target inline-flex items-center rounded-brand border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"
-            >
+            <Link to="/schedule/mine" className={quietActionClass}>
               My schedule
             </Link>
           ) : null}
-          {features.icsExport && visibleSessions.length > 0 ? (
+          {features.icsExport && !archived && visibleSessions.length > 0 ? (
             <button
               type="button"
               onClick={() => {
                 downloadIcs(icsFileName(eventConfig.shortName || eventConfig.name), buildIcsCalendar(eventConfig, visibleSessions));
               }}
-              className="touch-target inline-flex items-center rounded-brand border border-brand-ink/15 px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"
+              className={quietActionClass}
             >
               Download schedule (.ics)
             </button>
@@ -134,11 +173,11 @@ export default function Schedule() {
       </header>
 
       {loading ? (
-        <div className="mt-6">
-          <LoadingState label="Loading the schedule" />
+        <div className="mt-lg">
+          <LoadingState label="Loading the schedule…" />
         </div>
       ) : !hasAnySession || !activeDay ? (
-        <div className="mt-6">
+        <div className="mt-lg">
           <EmptyState
             title="The schedule isn’t published yet"
             description="Sessions appear here as soon as they’re announced — check back closer to the event."
@@ -146,62 +185,142 @@ export default function Schedule() {
         </div>
       ) : (
         <>
-          {days.length > 1 ? (
-            <div role="group" aria-label="Event days" className="mt-6 flex flex-wrap gap-2">
-              {days.map((day) => {
-                const isActive = day.id === activeDayId;
-                return (
-                  <button
-                    key={day.id}
-                    type="button"
-                    aria-pressed={isActive}
-                    onClick={() => setSelectedDayId(day.id)}
-                    className={[
-                      'touch-target inline-flex items-center rounded-brand border px-4 py-2 text-sm transition-transform duration-200 ease-out active:scale-[0.98]',
-                      isActive
-                        ? 'border-brand-primary bg-brand-primary/10 font-semibold text-brand-primary-dark'
-                        : 'border-brand-ink/15 text-brand-ink hover:bg-brand-surface-alt',
-                    ].join(' ')}
-                  >
-                    {day.label}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
+          {/* The screen view and the printed programme are two views of the
+              same day, and exactly one of them is ever in the layout — and
+              in the accessibility tree — at a time. */}
+          <div className="schedule-screen">
+            {days.length > 1 ? (
+              <div
+                role="group"
+                aria-label="Event days"
+                className="mt-lg flex flex-wrap gap-x-md border-b-hairline border-b-rule-hairline"
+              >
+                {days.map((day) => {
+                  const isActive = day.id === activeDayId;
+                  return (
+                    <button
+                      key={day.id}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => setSelectedDayId(day.id)}
+                      className={dayClass(isActive)}
+                    >
+                      {day.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
 
-          <section key={activeDay.id} aria-labelledby={`day-${activeDay.id}`} className="mt-8">
-            <h2 id={`day-${activeDay.id}`} className="font-heading text-xl text-brand-ink">
-              {activeDay.label}
-              {formatDayDate(activeDay, eventConfig.timezone) ? (
-                <>
-                  {' · '}
-                  <time dateTime={activeDay.date} className="font-normal text-brand-ink-muted">
-                    {formatDayDate(activeDay, eventConfig.timezone)}
-                  </time>
-                </>
-              ) : null}
-            </h2>
-            {activeSessions.length === 0 ? (
-              <p className="mt-4 max-w-prose text-brand-ink-muted">
-                No sessions are announced for {activeDay.label} yet.
-              </p>
-            ) : (
-              <ul className="mt-4 grid gap-3">
-                {activeSessions.map((session) => (
-                  <SessionCard
-                    key={session.id}
-                    session={session}
+          {/* The sheet the programme is drawn on (brief §4.6): a faint
+              coordinate grid, below hairline contrast and inert to the
+              pointer. It lives HERE and not on the shell, because a
+              coordinate grid is a device for reading a timetable (owner
+              review, 2026-08-27). --map-grid-size is zero in every preset
+              but Atlas, and a zero-size background paints nothing, so the
+              sheet appears only where the story has one. */}
+            <section
+              key={activeDay.id}
+              aria-labelledby={`day-${activeDay.id}`}
+              className={backIssue ? 'back-issue map-grid mt-xl' : 'map-grid mt-xl'}
+              {...(backIssue ? { 'data-back-issue': 'true' } : null)}
+            >
+              {/* The day head is a folio on a rule (brief §2.1): the standing
+                  head of the day, with the date sitting on the same rule. It is
+                  never stacked above the heading — it IS the heading. */}
+              <SectionHead
+                variant="folio"
+                level={2}
+                id={`day-${activeDay.id}`}
+                title={activeDay.label}
+                folio={
+                  <>
+                    {/* "PLATE III · SATURDAY 14 MARCH" (visual story, Field
+                        Guide, moment 1). The number is the day's real
+                        position in the programme, so it is sequence data and
+                        never a decorative 01/02/03 (brief §2.4). It is set
+                        only where the page is a plate book: the token, not a
+                        theme test in here, decides that. */}
+                    <PlateNumber position={days.indexOf(activeDay) + 1} />
+                    {formatDayDate(activeDay, eventConfig.timezone) ? (
+                      <time dateTime={activeDay.date}>
+                        {formatDayDate(activeDay, eventConfig.timezone)}
+                      </time>
+                    ) : null}
+                    {/* The "Back issue" folio the device asks for, beside the
+                        day it labels — a folio never sits above a heading
+                        (brief §2.4). */}
+                    {backIssue ? (
+                      <>
+                        {formatDayDate(activeDay, eventConfig.timezone) ? ' · ' : null}
+                        Back issue
+                      </>
+                    ) : null}
+                  </>
+                }
+              />
+              {/* The pen mark under the day head (visual story, Zine, moment
+                  3): "a squiggle underline under a folio". It is one of the
+                  two drawn marks a page may carry, it never lands on a word
+                  inside a headline, and it is off until a client turns
+                  marginalia on. */}
+              <Marginalia mark="squiggle" className="mt-3xs" />
+              {activeSessions.length === 0 ? (
+                <p className="mt-md max-w-prose text-body text-text-secondary">
+                  No sessions are announced for {activeDay.label} yet.
+                </p>
+              ) : showGrid ? (
+                // The programme page: time down, lettered lines across (brief
+                // §2.1). It scrolls inside its own box rather than pushing
+                // the page sideways.
+                <div className="mt-sm overflow-x-auto">
+                  <ScheduleGrid
+                    day={activeDay}
+                    entries={entries}
+                    columns={columns}
                     eventConfig={eventConfig}
-                    features={features}
-                    bookmarked={bookmarkedIds.has(session.id)}
                   />
-                ))}
-              </ul>
-            )}
-          </section>
+                </div>
+              ) : (
+                // The time-ordered list. It is the other first-class view,
+                // not a lesser one (visual story, Civic, moment 1): fixed
+                // column order, tabular figures, every relationship stated.
+                // No gap: every row opens with its own hairline, so the rules
+                // are the separation a card border used to be.
+                <ul className="mt-sm">
+                  {entries.map((entry, index) => (
+                    <SessionCard
+                      key={entry.session.id}
+                      session={entry.session}
+                      eventConfig={eventConfig}
+                      features={features}
+                      bookmarked={bookmarkedIds.has(entry.session.id)}
+                      backIssue={backIssue}
+                      callingPoints={entry.children}
+                      // The session's real place in the day, counted from
+                      // one: the numbered-agenda Schedule style prints it,
+                      // and the lead-and-rest style sets the first row
+                      // larger. It counts ENTRIES, so a calling point does
+                      // not take a number of its own — it is a stop inside
+                      // its parent, not a row in the programme.
+                      position={index + 1}
+                      lead={index === 0}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+          {/* The handout: every day, every session, every calling point,
+              no controls (visual stories, part 2, "Print view"). */}
+          <SchedulePrint
+            days={days}
+            sessionsByDay={sessionsByDay}
+            columns={columns}
+            eventConfig={eventConfig}
+          />
         </>
       )}
-    </article>
+    </SystemPage>
   );
 }

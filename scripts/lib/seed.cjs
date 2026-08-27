@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * The ten default pages and their placeholder content (spec §5.3, §5.4).
+ * The twelve default pages and their placeholder content (spec §5.3, §5.4).
  *
  * Pure. `defaultPages()` returns cmsPages documents in exactly the shape
  * `validatePageDoc` (functions/src/cms/pages.cjs) accepts — init runs that
@@ -42,10 +42,28 @@ function block(field, blockType, description) {
 }
 
 /**
- * The ten seeded pages (§5.3): home, schedule, speakers, sponsors (system
- * pages, each owning a dedicated React route), then travel, faq, conduct,
- * contact, privacy, terms as generic content pages at their own root-level
- * paths.
+ * The twelve seeded pages (§5.3): home, schedule, speakers, sponsors,
+ * attendees, updates (system pages, each owning a dedicated React route),
+ * then travel, faq, conduct, contact, privacy, terms as generic content
+ * pages at their own root-level paths.
+ *
+ * EVERY SYSTEM ROUTE GETS A DOCUMENT, INCLUDING THE TWO THAT SEED NO
+ * CONTENT. Attendees and Updates own dedicated routes (shared/routing
+ * reserves both segments) and both render through `SystemPage`, which reads
+ * the page's `template`, `layout`, and section slots. Without a document
+ * there is nothing in the admin Pages list to open, so those two pages were
+ * the only ones an operator could not shape. They seed the same way
+ * schedule, speakers, and sponsors do: a document with no sections, because
+ * the route's own component is the page and the sections are what an
+ * operator adds around it.
+ *
+ * THEY ARE APPENDED, NOT INSERTED. `order` only sorts the admin Pages list,
+ * and re-running init refreshes a seeded page that nobody has edited while
+ * leaving an edited one alone. Renumbering the ten pages that came before
+ * would therefore half-apply on a deployment where an operator had edited
+ * some of them, scrambling their list. New numbers at the end change no
+ * stored page at all, which is the same rule the layout schema follows:
+ * existing documents keep working, and no migration runs.
  *
  * @returns {object[]} cmsPages documents
  */
@@ -250,6 +268,26 @@ function defaultPages() {
         section('terms_contact', 'Contact', 'Where questions about the terms go.', ['richtext'], 4),
       ],
     },
+    {
+      id: 'attendees',
+      label: 'Attendees',
+      path: '/attendees',
+      icon: null,
+      order: 10,
+      visible: true,
+      systemPage: true,
+      sections: [],
+    },
+    {
+      id: 'updates',
+      label: 'Updates',
+      path: '/updates',
+      icon: null,
+      order: 11,
+      visible: true,
+      systemPage: true,
+      sections: [],
+    },
   ];
 }
 
@@ -270,6 +308,23 @@ function venueAddress(venue = {}) {
  * they are correct as soon as init runs"). Keyed `<section>.<field>`;
  * anything absent here falls through to `placeholderBlock`.
  */
+/**
+ * The four parts of the stat contract (design brief §2.1.1) as seeded
+ * placeholder copy. Each one names what the operator has to supply, in the
+ * same `[Replace] ` form every other placeholder uses (§5.4).
+ *
+ * @param {string} subject what this particular number is about
+ * @returns {{ takeaway: string, description: string, source: string, alt: string }}
+ */
+function statContract(subject) {
+  return {
+    takeaway: `[Replace] State what ${subject} shows, in words.`,
+    description: `[Replace] Say what this number counts, and over what period.`,
+    source: '[Replace] Name where the number came from, and the date you read it.',
+    alt: '[Replace] Describe the finding for a screen reader.',
+  };
+}
+
 const CONFIG_SEEDS = Object.freeze({
   'hero.title': ({ event }) => ({ value: event.name }),
   'hero.register_cta': ({ event, tierA }) => ({
@@ -277,8 +332,13 @@ const CONFIG_SEEDS = Object.freeze({
     url: event.registration?.externalUrl || tierA?.publicUrl || 'https://example.org',
     external: true,
   }),
-  'stats.attendees': () => ({ value: '0', label: 'Attendees expected' }),
-  'stats.sessions': () => ({ value: '0', label: 'Sessions planned' }),
+  // A stat carries the four-part contract from PR3 on (design brief
+  // §2.1.1), and a seeded stat is no exception: the figure and its caption
+  // are correct as seeded, and the four parts arrive as the instruction for
+  // what to write, because nobody but the operator knows what this number
+  // will count or where it came from.
+  'stats.attendees': () => ({ value: '0', label: 'attendees expected', ...statContract('attendance') }),
+  'stats.sessions': () => ({ value: '0', label: 'sessions planned', ...statContract('the session count') }),
   'travel_venue.venue_name': ({ event }) => ({
     value: event.venue?.name || '[Replace] Venue name.',
   }),
@@ -323,7 +383,7 @@ function placeholderBlock(blockType, description) {
     case 'cta':
       return { label: '[Replace] Button label', url: 'https://example.org', external: true };
     case 'stat':
-      return { value: '0', label: text };
+      return { value: '0', label: text, ...statContract('this number') };
     case 'list_item':
       return { text };
     case 'faq_item':

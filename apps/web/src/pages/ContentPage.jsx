@@ -23,6 +23,8 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
+import SectionHead from '../components/editorial/SectionHead.jsx';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 /** First path segment ('' for '/'), no leading/trailing slash. */
 function firstSegment(path) {
@@ -68,16 +70,16 @@ export default function ContentPage() {
 
   return (
     <article>
-      <h1 className="py-8 font-heading text-4xl font-semibold text-brand-ink">
+      <h1 className="pb-lg font-heading text-h1 font-semibold text-text-primary">
         {page.label}
       </h1>
       {showLegalNotice ? (
         <p
           role="note"
-          className="mb-8 rounded-brand border border-warning/40 bg-warning/10 p-4 text-sm text-brand-ink"
+          className="mb-xl border-hairline border-warning/40 bg-warning/10 p-md font-data text-caption text-text-primary"
         >
           This page is an unreviewed template. It has not been reviewed by the
-          organizer&rsquo;s legal counsel and does not yet state their policy.
+          organizer’s legal counsel and does not yet state their policy.
         </p>
       ) : null}
       {sections.length === 0 ? (
@@ -85,10 +87,7 @@ export default function ContentPage() {
           title="Nothing here yet"
           description="This page is published but has no visible content. Check back soon."
           action={
-            <Link
-              to="/"
-              className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-6 py-3 font-semibold text-brand-surface hover:bg-brand-primary-dark"
-            >
+            <Link to="/" className={primaryActionClass}>
               Go to the home page
             </Link>
           }
@@ -98,21 +97,19 @@ export default function ContentPage() {
           <section
             key={section.id}
             aria-labelledby={`section-${section.id}`}
-            className={index === 0 ? undefined : 'mt-12'}
+            className={index === 0 ? undefined : 'mt-2xl'}
           >
             {/* The first section's label usually repeats the page title;
-                keep it for screen readers only. */}
-            <h2
-              id={`section-${section.id}`}
-              className={
-                index === 0
-                  ? 'sr-only'
-                  : 'font-heading text-2xl font-semibold text-brand-ink'
-              }
-            >
-              {section.label}
-            </h2>
-            <div className={index === 0 ? undefined : 'mt-4'}>
+                keep it for screen readers only — and with no visible heading
+                there is no section boundary to draw either. */}
+            {index === 0 ? (
+              <h2 id={`section-${section.id}`} className="sr-only">
+                {section.label}
+              </h2>
+            ) : (
+              <SectionHead level={2} id={`section-${section.id}`} title={section.label} />
+            )}
+            <div className={index === 0 ? undefined : 'mt-md'}>
               <SectionBlocks blocks={blocks} />
             </div>
           </section>

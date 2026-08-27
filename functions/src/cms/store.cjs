@@ -166,20 +166,36 @@ function isAlreadyExistsError(err) {
 }
 
 /**
- * Delete the live doc and its draft in ONE batch (spec §8.4 step 4) —
- * never one without the other. cmsVersionHistory rows are deliberately
- * kept (audit trail); a later recreation of the same docId publishes above
- * the historical max revision (see publishDocs), never back at 1.
+ * Delete the live doc and its draft ATOMICALLY (spec §8.4 step 4) — never
+ * one without the other. cmsVersionHistory rows are deliberately kept
+ * (audit trail); a later recreation of the same docId publishes above the
+ * historical max revision (see publishDocs), never back at 1.
  *
- * @param {{ db: FirebaseFirestore.Firestore, collection: string, docId: string }} args
+ * Pass `tx` to make both deletes part of the CALLER'S transaction, and the
+ * pair still lands together. That is what the session delete needs
+ * (schedule/sessions.cjs checkSessionDeletable): a refusal to strand child
+ * sessions has to read the children in the same transaction that removes
+ * the parent, or a child created a heartbeat later is orphaned by a check
+ * that had already passed. Without `tx` this commits its own batch, which
+ * is what every other collection's delete does.
+ *
+ * @param {{ db: FirebaseFirestore.Firestore, tx?: FirebaseFirestore.Transaction,
+ *           collection: string, docId: string }} args
  * @returns {Promise<{ livePath: string, draftPath: string }>}
  */
-async function deleteBoth({ db, collection, docId }) {
+async function deleteBoth({ db, tx = null, collection, docId }) {
   const draftCol = draftCollectionFor(collection);
-  const batch = db.batch();
-  batch.delete(db.collection(collection).doc(docId));
-  batch.delete(db.collection(draftCol).doc(docId));
-  await batch.commit();
+  const liveRef = db.collection(collection).doc(docId);
+  const draftRef = db.collection(draftCol).doc(docId);
+  if (tx) {
+    tx.delete(liveRef);
+    tx.delete(draftRef);
+  } else {
+    const batch = db.batch();
+    batch.delete(liveRef);
+    batch.delete(draftRef);
+    await batch.commit();
+  }
   return { livePath: `${collection}/${docId}`, draftPath: `${draftCol}/${docId}` };
 }
 

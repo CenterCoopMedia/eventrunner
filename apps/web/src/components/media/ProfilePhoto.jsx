@@ -1,5 +1,9 @@
 // An attendee's photo, or a lettered stand-in.
 //
+// Square portrait, brand radius (design brief §2.4): a circular crop is a
+// generic-template tell here, so the frame is `rounded-brand` — the same
+// radius every other shape in the system uses — not `rounded-full`.
+//
 // The value comes from `users_public/{uid}.photoPath` — a projection of an
 // unvalidated client-written field. Two guards, both deliberate:
 //
@@ -30,6 +34,12 @@ export function profilePhotoUrl(photoPath) {
   return assetUrl(path);
 }
 
+/**
+ * Three sizes, and each one belongs to a surface rather than to a taste:
+ * `lg` is a profile page's own portrait, `md` is a card, and `sm` is the
+ * attendee index — a list read one line per person, where a 48px frame
+ * would set the row height and undo the compactness the index is for.
+ */
 export default function ProfilePhoto({ photoPath, displayName, size = 'md', className = '' }) {
   const url = profilePhotoUrl(photoPath);
   const [failed, setFailed] = useState(false);
@@ -38,8 +48,13 @@ export default function ProfilePhoto({ photoPath, displayName, size = 'md', clas
     setFailed(false);
   }, [url]);
 
-  const dimensions = size === 'lg' ? 'h-24 w-24 text-2xl' : 'h-12 w-12 text-base';
-  const shared = `shrink-0 rounded-full object-cover ${dimensions} ${className}`;
+  const dimensions =
+    size === 'lg'
+      ? 'h-24 w-24 text-2xl'
+      : size === 'sm'
+        ? 'h-7 w-7 text-caption'
+        : 'h-12 w-12 text-base';
+  const shared = `shrink-0 rounded-brand object-cover ${dimensions} ${className}`;
 
   if (!url || failed) {
     return (

@@ -1,12 +1,18 @@
-// Designed loading state. Announces via role="status"; the pulse animation
-// is suppressed globally under prefers-reduced-motion (index.css).
-export default function LoadingState({ label = 'Loading' }) {
+// Loading state (design brief §2.2): loading is a stated line, not a loop.
+// Ambient animation — anything that pulses, drifts, or breathes on its own —
+// is banned outright, a skeleton included, so this renders the label as
+// plain text and nothing more. It still announces via role="status".
+//
+// Every label trails off, and it trails off the same way everywhere: One
+// ellipsis CHARACTER, closed up against the last word — never a space before
+// it, never three full stops (interface guidelines, Typography: smart
+// punctuation, the single ellipsis character). Callers pass the whole label,
+// so the convention lives at every call site and this is the note that keeps
+// them in step.
+export default function LoadingState({ label = 'Loading…' }) {
   return (
-    <div role="status" className="flex flex-col gap-3 py-8" aria-label={label}>
-      <span className="sr-only">{label}</span>
-      <div aria-hidden="true" className="h-6 w-1/3 animate-pulse rounded-brand bg-brand-ink/10" />
-      <div aria-hidden="true" className="h-4 w-2/3 animate-pulse rounded-brand bg-brand-ink/10" />
-      <div aria-hidden="true" className="h-4 w-1/2 animate-pulse rounded-brand bg-brand-ink/10" />
-    </div>
+    <p role="status" aria-label={label} className="py-xl font-data text-caption text-text-secondary">
+      {label}
+    </p>
   );
 }

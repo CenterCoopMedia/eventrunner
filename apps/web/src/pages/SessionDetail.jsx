@@ -9,9 +9,12 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
-import { SessionPills, SpeakerNames, TypeBadge, useSessionSpeakerNames } from '../components/SessionCard.jsx';
+import { SpeakerNames, useSessionSpeakerNames } from '../components/SessionCard.jsx';
+import SessionActions from '../components/session/SessionActions.jsx';
+import SessionFormat from '../components/session/SessionFormat.jsx';
 import SessionMaterialsList from '../components/SessionMaterialsList.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 function NotFoundState({ search }) {
   return (
@@ -21,7 +24,7 @@ function NotFoundState({ search }) {
       action={
         <Link
           to={{ pathname: '/schedule', search }}
-          className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-6 py-3 font-semibold text-brand-surface hover:bg-brand-primary-dark"
+          className={primaryActionClass}
         >
           Back to the schedule
         </Link>
@@ -53,10 +56,7 @@ export default function SessionDetail() {
         title="This event doesn’t have a public schedule"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -66,8 +66,8 @@ export default function SessionDetail() {
 
   if (loading) {
     return (
-      <div className="mt-6">
-        <LoadingState label="Loading the session" />
+      <div className="mt-lg">
+        <LoadingState label="Loading the session…" />
       </div>
     );
   }
@@ -81,48 +81,55 @@ export default function SessionDetail() {
 
   return (
     <article>
-      <p className="mb-4">
+      <p className="mb-md">
         <Link
           to={{ pathname: '/schedule', search }}
-          className="text-sm font-semibold text-brand-primary-dark hover:underline"
+          className="font-data text-caption font-semibold text-text-secondary hover:text-text-primary hover:underline"
         >
           ← Back to the schedule
         </Link>
       </p>
       <header>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="font-heading text-3xl font-semibold text-brand-ink">{session.title}</h1>
-          <TypeBadge type={session.type} />
+        <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">{session.title}</h1>
+          <SessionFormat format={session.type} />
         </div>
-        <p className="mt-2 text-brand-ink-muted">
+        <p className="mt-2xs font-data text-caption text-text-secondary">
           {day ? <span>{day.label}</span> : null}
           {day && range ? ' · ' : null}
           {range ? (
-            <>
+            <span className="font-mono">
               <time dateTime={range.startIso}>{range.startLabel}</time>
               {range.endLabel ? (
                 <>
                   –<time dateTime={range.endIso}>{range.endLabel}</time>
                 </>
               ) : null}
-              {range.zone ? <span className="ms-1">{range.zone}</span> : null}
-            </>
+              {range.zone ? <span className="ms-2xs">{range.zone}</span> : null}
+            </span>
           ) : !day ? (
             'Time to be announced'
           ) : null}
         </p>
-        {session.location ? <p className="mt-1 text-brand-ink-muted">{session.location}</p> : null}
-        <SpeakerNames speakers={speakerNames} features={features} className="mt-2 text-brand-ink-muted" />
+        {session.location ? (
+          <p className="mt-2xs font-data text-caption text-text-secondary">{session.location}</p>
+        ) : null}
+        <SpeakerNames speakers={speakerNames} features={features} />
       </header>
 
       {session.description ? (
-        <p className="mt-6 max-w-prose text-brand-ink" style={{ textWrap: 'pretty' }}>
+        <p className="mt-md max-w-prose text-lead text-text-secondary text-pretty">
           {session.description}
         </p>
       ) : null}
 
-      <div className="mt-6">
-        <SessionPills
+      {/* Every control this session has, on the page the session owns —
+          the reactions among them (components/session/SessionActions.jsx).
+          A schedule row carries none of this beyond a bookmark and a way
+          in. */}
+      <div className="mt-lg">
+        <SessionActions
+          surface="detail"
           session={session}
           eventConfig={eventConfig}
           features={features}

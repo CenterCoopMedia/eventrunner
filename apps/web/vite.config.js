@@ -32,7 +32,9 @@ export default defineConfig({
       'shared/profile',
       'shared/badges',
       'shared/speaker',
+      'shared/theme',
       'shared/urlSafety',
+      'shared/venue',
     ],
   },
   resolve: {

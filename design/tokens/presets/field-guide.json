@@ -1,0 +1,184 @@
+{
+  "$schema-note": "One theme preset (design brief 2026-08-27, §4.5). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
+  "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 5.",
+  "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin. The palette stays quiet and earthy so the linework carries the character.",
+  "$first-class-note": "See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.",
+  "id": "field-guide",
+  "label": "Field Guide",
+  "summary": "A naturalist’s expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.",
+  "bestFor": "Environmental events, science communication, and regional gatherings.",
+
+  "$palette-words-light": "near-neutral plate stock with a trace of warmth, soft bark ink, deep leaf green, muted clay, lichen-grey rule, herbarium cream, pressed archive, pencil grey",
+  "$palette-words-dark": "near-neutral night ground with a trace of warmth, bone-white text, lifted moss green, lifted clay, moth-grey rule, lantern warmth, nocturne slate, faded field-note grey",
+  "$ground-note": "Owner review, 2026-08-27: The ground was too warm. A tan canvas paired with earthy ink reads as the look #109 rejected, and it fought every client logo that was not itself brown. Surface, alt surface, and both inks move most of the way to neutral. Warmth is kept as a trace — a few channels of red over blue, no more — so the story is still a paper handbook and not a spreadsheet. The leaf-green primary and the clay accent are untouched: They are the theme's colour, and the ground is what had to get out of their way.",
+  "palette": {
+    "light": {
+      "surface": [248, 247, 244],
+      "surfaceAlt": [241, 240, 236],
+      "ink": [38, 35, 31],
+      "inkMuted": [96, 91, 84],
+      "primary": [43, 86, 54],
+      "primaryDark": [27, 60, 37],
+      "primaryLight": [140, 172, 136],
+      "accent": [136, 72, 40],
+      "success": [34, 88, 52],
+      "warning": [140, 86, 12],
+      "danger": [158, 44, 36],
+      "highlight": [124, 92, 18],
+      "keynote": [86, 60, 124]
+    },
+    "dark": {
+      "surface": [28, 28, 27],
+      "surfaceAlt": [40, 40, 38],
+      "ink": [235, 233, 228],
+      "inkMuted": [172, 170, 164],
+      "primary": [142, 192, 142],
+      "primaryDark": [180, 216, 176],
+      "primaryLight": [64, 94, 64],
+      "accent": [216, 152, 112],
+      "success": [130, 200, 144],
+      "warning": [228, 178, 96],
+      "danger": [238, 142, 128],
+      "highlight": [220, 192, 118],
+      "keynote": [186, 168, 232]
+    }
+  },
+
+  "$font-note": "Brief §9.2. Field Guide points both value roles at IBM Plex Mono on purpose: A label in this world is a tag, and a tag is set in the exact hand.",
+  "fonts": {
+    "heading": "besley",
+    "body": "vollkorn",
+    "data": "plex-mono",
+    "mono": "plex-mono"
+  },
+
+  "$shape-note": "Texture is flat by default (owner review, 2026-08-27). Brief §4.5 already called it \"flat with an optional light paper tone\"; the optional tone was on. Flat surfaces are the shared default everywhere, and the tone is one advanced setting away.",
+  "shape": { "radius": "sharp", "texture": "flat", "density": "comfortable" },
+  "$motif-note": "Botanical illustrations are ON by default, as brief §3.8 binds. An earlier pass turned them off on the grounds that drawings appear \"on every page\"; that was wrong about the wiring. The site renders a motif in three places only — the masthead mark, the masthead's closing divider, and the public empty state — and the masthead mark yields to a client logo whenever one is set. Two small drawings on a page is the observational vocabulary this style is FOR, not decoration on top of it, and brief §2.3 caps the page at three. A client who wants none picks `none` in Illustrations; `fauna` is the supported alternate.",
+  "motifSet": "botanical",
+
+  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The plate frame is a hairline; the double rule is the plate device's own doubling. The specimen label is the one preset that turns its rules and its field names on: A label in this world is a tag, and a tag states what each field is.",
+  "tokens": {
+    "--plate-frame-width": "var(--rule-hairline-width)",
+    "--plate-pad": "var(--space-md)",
+    "--plate-number-display": "inline",
+    "--specimen-label-rule-width": "var(--rule-hairline-width)",
+    "--specimen-label-pad": "var(--space-2xs)",
+    "--specimen-label-key-display": "inline",
+    "--folio-font": "var(--font-data)",
+    "--marginalia-display": "none"
+  },
+
+  "options": {
+    "headingFace": {
+      "label": "Heading face",
+      "prompt": "The plate caption. Body stays Vollkorn and data stays IBM Plex Mono under every option.",
+      "default": "besley",
+      "choices": [
+        {
+          "id": "besley",
+          "label": "Besley",
+          "why": "The printed plate caption. Its Clarendon weight holds a title page and still sits calmly under a drawing, which is the core Field Guide relationship.",
+          "fonts": { "heading": "besley" }
+        },
+        {
+          "id": "vollkorn-display",
+          "label": "Vollkorn bold at display size",
+          "why": "The one-face volume: A pocket handbook rather than a plate book, quieter and closer to the reading, and it adds nothing to the font budget.",
+          "fonts": { "heading": "vollkorn" }
+        },
+        {
+          "id": "spectral",
+          "label": "Spectral semibold",
+          "why": "The collector’s volume. Its finer, sharper serifs read as the frontispiece of a formal edition, so the story gains a more scholarly opening.",
+          "fonts": { "heading": "spectral" }
+        }
+      ]
+    },
+    "nameplate": {
+      "label": "Header style",
+      "prompt": "The title page.",
+      "$default-note": "The framed title page is the default, as it was before. An earlier pass moved it to the alternate on the grounds that a frame belongs only on \"content that supports it\" — but the framed treatment renders on the HOME page alone (Layout.jsx builds the compact nameplate on every inner page), and the opening page of a handbook is exactly the content a frontispiece supports. The plain ruled head stays one pick away for a text-heavy event.",
+      "default": "framed-title-page",
+      "choices": [
+        {
+          "id": "framed-title-page",
+          "label": "Framed title page",
+          "why": "Name and dates inside a hairline frame with the nameplate-mark motif above the name. The opening plate of the handbook.",
+          "tokens": {
+            "--nameplate-align": "center",
+            "--nameplate-frame-width": "var(--rule-hairline-width)",
+            "--nameplate-meta-placement": "block"
+          }
+        },
+        {
+          "id": "ruled-title-no-frame",
+          "label": "Ruled title, no frame",
+          "why": "The title page of a cheaper printing of the same book; quieter, and better for text-heavy events.",
+          "tokens": {
+            "--nameplate-align": "start",
+            "--nameplate-frame-width": "0",
+            "--nameplate-rule-top-width": "var(--rule-hairline-width)",
+            "--nameplate-meta-placement": "block"
+          }
+        },
+        {
+          "id": "plate-and-label",
+          "label": "Plate and label",
+          "why": "It states the book’s subject the way a frontispiece plate does, and the plate stays drawn linework, never a photo.",
+          "tokens": {
+            "--nameplate-align": "start",
+            "--nameplate-frame-width": "0",
+            "--nameplate-meta-placement": "inline",
+            "--plate-frame-width": "var(--rule-strong-width)"
+          }
+        }
+      ]
+    },
+    "component": {
+      "label": "Schedule style",
+      "prompt": "How a session is labelled.",
+      "default": "specimen-label",
+      "choices": [
+        {
+          "id": "specimen-label",
+          "label": "Specimen label",
+          "why": "A small ruled block: Name, date, place. The collection tag.",
+          "tokens": {
+            "--session-card-rule-width": "var(--rule-hairline-width)",
+            "--session-card-pad-block": "var(--space-sm)"
+          }
+        },
+        {
+          "id": "field-notes-column",
+          "label": "Field notes column",
+          "why": "The observation notebook rather than the mounted collection; it suits a single-track event where the day reads as one sitting.",
+          "tokens": {
+            "--session-card-rule-width": "var(--rule-hairline-width)",
+            "--session-card-pad-block": "var(--space-xs)",
+            "--schedule-row-leading": "1.4"
+          }
+        }
+      ]
+    },
+    "marginalia": {
+      "label": "Pencil line",
+      "prompt": "The one piece of marginalia this theme allows. Its own control, so a client can keep the plates clean.",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "Off",
+          "why": "The plates stay clean. This is the default, because a field notebook is written by someone being careful.",
+          "tokens": { "--marginalia-display": "none" }
+        },
+        {
+          "id": "on",
+          "label": "On",
+          "why": "A thin hand-drawn underline under a specimen label or a note line: A pencil mark in a notebook, never a highlighter.",
+          "tokens": { "--marginalia-display": "inline" }
+        }
+      ]
+    }
+  }
+}

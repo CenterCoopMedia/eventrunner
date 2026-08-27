@@ -1,0 +1,31 @@
+BASE THEME, no runtime override (the generated block is the whole answer)
+    on the dark screen: {"surface":"23 25 30","ink":"232 235 240","hairline":"52 54 59"}
+    what printed:      {"surface":"246 247 249","ink":"22 24 29","hairline":"215 216 218"}
+CUSTOMIZED THEME published live (the runtime block must win)
+    on the dark screen: {"surface":"18 22 27","ink":"238 242 246","hairline":"49 53 58"}
+    what printed:      {"surface":"251 247 239","ink":"20 24 31","hairline":"219 216 210"}
+THE SAME CUSTOMIZED THEME with the runtime print block removed (what shipped before)
+    on the dark screen: {"surface":"18 22 27","ink":"238 242 246","hairline":"49 53 58"}
+    what printed:      {"surface":"246 247 249","ink":"22 24 29","hairline":"215 216 218"}
+
+THE DOCUMENTATION SITE, /docs/admin-guide/ (it carried no print rules at all)
+  before, from a dark screen
+    what printed:      {"surface":"23 25 30","ink":"232 235 240","hairline":"52 54 59"}
+  after
+    on the dark screen: {"surface":"23 25 30","ink":"232 235 240","hairline":"52 54 59"}
+    what printed:      {"surface":"246 247 249","ink":"22 24 29","hairline":"215 216 218"}
+    on the light screen: {"surface":"246 247 249","ink":"22 24 29","hairline":"215 216 218"}
+    what printed:      {"surface":"246 247 249","ink":"22 24 29","hairline":"215 216 218"}
+
+THE DOCKET'S TOUCH TARGET, .docs-nav li a on /docs/deploy-runbook/
+  entry height, mouse (pointer: fine) -- unchanged by this branch
+    1440px: 28.22  1024px: 27.69  390px: 26.84  320px: 26.84
+  entry height, finger (pointer: coarse), before
+    1440px: 28.22  1024px: 27.69  390px: 26.84  320px: 26.84
+  entry height, finger (pointer: coarse), after
+    1440px: 44.22  1024px: 44.00  390px: 44.00  320px: 44.00
+  entry width (never the problem)
+    1440px: 239  1024px: 239  390px: 349  320px: 279
+  gap between two entries, every width and both pointers: 0
+  article column at 1440px, both pointers, before and after: x=480, width=784
+  sideways scroll, 27 pages x {320,390,768,1024,1440}: 0 everywhere

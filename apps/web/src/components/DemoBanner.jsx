@@ -5,6 +5,11 @@
 // and the bundler drops it. Deliberately quiet: one line above the header,
 // theme tokens only (no hex, spec §7.6), and a role="note" landmark so it is
 // announced once rather than interrupting.
+//
+// Reversed ink on the page's own ink role, so the bar inverts with the mode
+// rather than pinning one color — bg-text-primary carries text-surface on
+// it, closed by the hairline rule token. The measure and inline padding match
+// the shell's own (Layout.jsx), so the line starts where the header does.
 import { IS_DEMO } from '../lib/demoMode.js';
 
 export default function DemoBanner() {
@@ -14,9 +19,9 @@ export default function DemoBanner() {
     <div
       role="note"
       aria-label="Demonstration site"
-      className="border-b border-brand-ink/10 bg-brand-ink text-brand-surface"
+      className="no-print border-b-hairline border-b-rule-hairline bg-text-primary text-surface"
     >
-      <p className="mx-auto max-w-5xl px-4 py-2 text-sm" style={{ textWrap: 'pretty' }}>
+      <p className="mx-auto max-w-5xl px-md py-xs text-caption text-pretty">
         <span className="font-semibold">Demo</span>
         <span aria-hidden="true"> — </span>
         <span className="sr-only">: </span>

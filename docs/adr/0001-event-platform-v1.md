@@ -1632,6 +1632,12 @@ in the custom properties for that reason.
 
 `config/theme`:
 
+[The shape below is the record of this decision, not the current document. The theme vocabulary
+has moved on since — a client now sets one brand colour and the supporting shades are derived, so
+`adminAccent` no longer exists. See the design brief,
+[`plans/2026-08-27-design-system-overhaul.md`](../plans/2026-08-27-design-system-overhaul.md), for
+the current one.]
+
 ```ts
 {
   colors: {
@@ -1640,9 +1646,14 @@ in the custom properties for that reason.
     ink: '#2C3E50', inkMuted: '#5C6B7A',
     success: '#166534', warning: '#D97706', danger: '#CA3553', highlight: '#D4A017'
   },
-  fonts: { heading: 'serif-editorial', body: 'sans-humanist', accent: 'script-casual' },
+  fonts: { heading: 'serif-editorial', body: 'sans-humanist', data: 'plex-sans', mono: 'plex-mono' },
+  preset: 'broadsheet' | 'newsroom' | 'zine' | 'civic' | 'field-guide' | 'atlas',
+  optionPicks: { headingFace: string, nameplate: string, component: string },
+  tokens: { light: { ink: '#16181D' }, dark: { ink: '#E8EBF0' } },
+  motifSet: 'none' | 'botanical' | 'fauna' | 'cartographic',
+  adminAccent: '#1A5296',              // the one client-owned colour in the admin identity
   texture: 'paper' | 'flat',           // controls the bg-paper / bg-parchment treatments
-  radius: 'sharp' | 'soft' | 'round',
+  radius: 'sharp' | 'small' | 'soft' | 'round',
   logos: {                             // Storage paths under branding/
     primary: string, mark: string, footer: string,
     ogDefault: string, favicon: string
@@ -1659,12 +1670,19 @@ letting a client theme it is a support liability.
 
 ### 7.4 Fonts
 
-Font families are chosen from a **bundled allowlist** of three-to-five self-hosted sets shipped as
-woff2 in `apps/web/public/fonts`, not from arbitrary remote URLs. Reasons: no third-party request on
-every page load (a real objection from institutional clients), no CSP exception, and no dependency on
-a font CDN's availability. `config/theme.fonts` names a set id; `theme.css` emits the matching
-`@font-face` block and `--font-heading` / `--font-body` / `--font-accent` properties. Adding a font
-set is a PR — a deliberate, small, reviewable one.
+Font families are chosen from a **bundled allowlist** of self-hosted sets shipped as woff2 in
+`apps/web/public/fonts`, not from arbitrary remote URLs. Reasons: No third-party request on every
+page load (a real objection from institutional clients), no CSP exception, and no dependency on a
+font CDN's availability. `config/theme.fonts` names a set id, and a preset's type map names one for
+each of the four roles; `theme.css` emits the matching `@font-face` blocks and the
+`--font-heading` / `--font-body` / `--font-data` / `--font-mono` properties. Adding a font set is a
+PR — a deliberate, small, reviewable one.
+
+Design brief §4 grew the allowlist to the twenty-odd families the six presets and their curated
+heading options need. **The stylesheet declares only the faces the active preset and its picked
+options use**, plus the two fixed admin faces, so the repo carries the whole bundle and a reader
+downloads two to four families. `apps/web/public/fonts/README.md` records every file, its weights,
+its designer, its licence, and how it was subset.
 
 ### 7.5 What stays build-time
 

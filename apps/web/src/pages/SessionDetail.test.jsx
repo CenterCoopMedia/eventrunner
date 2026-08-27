@@ -117,6 +117,18 @@ describe('SessionDetail', () => {
     expect(screen.getByText('Day one')).toBeInTheDocument();
   });
 
+  it('sets the title in the heading face on the type-scale step, and the time in the mono face', () => {
+    // Design brief §2.1/§3.2: real typographic hierarchy carries the
+    // structure, and a changing value (the time) reads in the mono face
+    // with tabular figures — never a card, never a colored edge.
+    const { container } = renderDetail('fx-early');
+    expect(
+      screen.getByRole('heading', { level: 1, name: '[Fixture] Morning kickoff' }),
+    ).toHaveClass('font-heading', 'text-h1');
+    const time = container.querySelector('header time');
+    expect(time.closest('.font-mono')).not.toBeNull();
+  });
+
   it('404s (designed empty state) for an unknown session id', () => {
     renderDetail('no-such-session');
     expect(
@@ -159,7 +171,7 @@ describe('SessionDetail', () => {
 
   it('shows the loading state while runtime content is loading', () => {
     renderDetail('fx-early', { loading: true });
-    expect(screen.getByRole('status', { name: 'Loading the session' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading the session…' })).toBeInTheDocument();
   });
 
   it('renders no pill row when every relevant feature flag is off', () => {
@@ -167,9 +179,18 @@ describe('SessionDetail', () => {
     expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
   });
 
-  it('renders the bookmark pill when features.sessionBookmarks is on', () => {
+  it('offers a signed-out visitor the sign-in path when features.sessionBookmarks is on', () => {
     renderDetail('fx-early', { features: { schedule: true, sessionBookmarks: true } });
-    expect(screen.getByRole('link', { name: /sign in to bookmark/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sign in to save sessions' })).toBeInTheDocument();
+  });
+
+  it('puts the reactions on the session\u2019s own page, where a row never had them', () => {
+    renderDetail('fx-early', {
+      features: { schedule: true, sessionReactions: true },
+      auth: { user: { uid: 'u1' } },
+      profile: { attendeeAccess: true },
+    });
+    expect(screen.getByRole('group', { name: /session reactions/i })).toBeInTheDocument();
   });
 
   it('renders no materials section when the session has no approved materials', () => {
@@ -178,7 +199,7 @@ describe('SessionDetail', () => {
   });
 
   it('lists approved materials from session_materials_public when features.sessionMaterials is on', () => {
-    // Two hooks subscribe independently here (MaterialsPill's count and the
+    // Two hooks subscribe independently here (MaterialsLink's count and the
     // list itself), so this stubs every call, not just the first.
     subscribeSessionMaterialsMock.mockImplementation((sessionId, onNext) => {
       onNext([

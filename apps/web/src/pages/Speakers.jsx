@@ -14,7 +14,10 @@ import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import SystemPage from '../components/SystemPage.jsx';
+import SpecimenLabel from '../components/editorial/SpecimenLabel.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function Speakers() {
   const { features } = useEventConfig();
@@ -26,10 +29,7 @@ export default function Speakers() {
         title="This event doesn’t have a public speaker directory"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -38,49 +38,103 @@ export default function Speakers() {
   }
 
   return (
-    <article>
-      <h1 className="font-heading text-3xl font-semibold text-brand-ink">Speakers</h1>
-      {speakers.length === 0 ? (
-        <div className="mt-6">
-          <EmptyState
-            title="Speakers have not been announced yet"
-            description="Speaker profiles appear here once they are published."
-          />
-        </div>
-      ) : (
-        <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {speakers.map((speaker) => {
-            // jobTitle and organization are separate canonical fields, not
-            // the one free-text "Role, Organization" string the old
-            // name-joined store carried. Either may be blank.
-            const affiliation = [speaker.jobTitle, speaker.organization]
-              .filter(Boolean)
-              .join(', ');
-            const href = `/speakers/${typeof speaker.slug === 'string' && speaker.slug ? speaker.slug : speaker.id}`;
-            return (
-              <li
-                key={speaker.id}
-                className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
-              >
-                <Link to={href} className="flex items-start gap-3 hover:underline">
-                  {speaker.headshotPath ? (
-                    <AssetImage
-                      path={speaker.headshotPath}
-                      alt=""
-                      className="h-12 w-12 shrink-0 rounded-full bg-brand-surface object-cover"
-                    />
-                  ) : null}
-                  <h2 className="font-heading text-lg text-brand-ink">{speaker.displayName}</h2>
-                </Link>
-                {affiliation ? (
-                  <p className="mt-1 text-sm text-brand-ink-muted">{affiliation}</p>
-                ) : null}
-                {speaker.bio ? <p className="mt-2 text-brand-ink-muted">{speaker.bio}</p> : null}
-              </li>
-            );
-          })}
-        </ul>
+    <SystemPage pageId="speakers">
+      {({ arrangement }) => (
+        <>
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">Speakers</h1>
+          {speakers.length === 0 ? (
+            <div className="mt-lg">
+              <EmptyState
+                title="Speakers have not been announced yet"
+                description="Speaker profiles appear here once they are published."
+              />
+            </div>
+          ) : (
+            // A SHELF OF PORTRAITS (design brief §5.1; this review).
+            //
+            // The headshot used to be a 40px thumbnail beside the name,
+            // which is not a picture of anyone — at that size a face is a
+            // bullet. This page's job is recognition: a reader is looking
+            // for someone they half remember, or working out who is worth
+            // an hour of their day. So the portrait leads, at a size a face
+            // survives, in a frame on the alternate ground — which also
+            // means a speaker with no headshot is an empty frame holding
+            // its place on the shelf, not a hole in it.
+            //
+            // Still not a card. The frame holds the picture and nothing
+            // else: no border boxes the entry, the name and the credit sit
+            // on the open page under a hairline, and the ink and radius are
+            // the house's.
+            //
+            // `arrangement` (brief §6.1) chooses the shelf's shape and
+            // never what it is: `grid` runs the plates in columns, which is
+            // what a shelf normally looks like, and `list` gives each
+            // portrait its own row with the bio running beside it — the
+            // reading a long-form speaker page wants.
+            <ul
+              className={
+                arrangement === 'grid'
+                  ? 'portrait-shelf mt-lg grid gap-x-lg sm:grid-cols-2 lg:grid-cols-3'
+                  : 'portrait-shelf mt-lg'
+              }
+            >
+              {speakers.map((speaker, index) => {
+                // jobTitle and organization are separate canonical fields, not
+                // the one free-text "Role, Organization" string the old
+                // name-joined store carried. Either may be blank.
+                const affiliation = [speaker.jobTitle, speaker.organization]
+                  .filter(Boolean)
+                  .join(', ');
+                const href = `/speakers/${typeof speaker.slug === 'string' && speaker.slug ? speaker.slug : speaker.id}`;
+                return (
+                  <li
+                    key={speaker.id}
+                    className={
+                      arrangement === 'grid'
+                        ? 'portrait-shelf__plate border-t-hairline border-t-rule-hairline'
+                        : 'portrait-shelf__plate border-t-hairline border-t-rule-hairline sm:grid sm:grid-cols-[14rem,1fr] sm:gap-lg'
+                    }
+                  >
+                    {/* The portrait is decorative here: the name is right
+                        under it and links to the same place, so alt text
+                        would be the name said twice to a screen reader. */}
+                    <div className="portrait-shelf__frame">
+                      {speaker.headshotPath ? (
+                        <AssetImage path={speaker.headshotPath} alt="" className="" />
+                      ) : null}
+                    </div>
+                    <div className={arrangement === 'grid' ? 'mt-xs' : 'mt-xs sm:mt-0'}>
+                      <h2 className="font-heading text-h3 font-semibold text-text-primary">
+                        <Link to={href} className="hover:underline">
+                          {speaker.displayName}
+                        </Link>
+                      </h2>
+                      {/* The credit line as a specimen label (visual story,
+                          Field Guide, moment 2): the shelf reads as the
+                          plates of a collection rather than a grid of
+                          profile cards. The pencil line goes under the
+                          FIRST entry only — "at most one per page" — and it
+                          is off until a client turns marginalia on. */}
+                      <SpecimenLabel
+                        className="mt-2xs"
+                        pencil={index === 0}
+                        fields={[{ key: 'Affiliation', value: affiliation }]}
+                      />
+                      {speaker.bio ? (
+                        <p
+                          className="mt-xs max-w-prose text-body text-text-secondary text-pretty"
+                        >
+                          {speaker.bio}
+                        </p>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
-    </article>
+    </SystemPage>
   );
 }

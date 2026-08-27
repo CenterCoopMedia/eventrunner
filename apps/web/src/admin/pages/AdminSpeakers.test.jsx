@@ -91,9 +91,20 @@ async function renderAt(path) {
     await Promise.resolve();
     await Promise.resolve();
   });
-  await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
-  });
+  // Two waits, not one: the lazy admin chunk, and then the admin probe the
+  // gate holds on (AdminGate renders "Checking your access…" until it
+  // answers). Waiting only for the chunk lets an assertion run while the
+  // gate is still checking, which is a flake under load, not a bug.
+  await waitFor(
+    () => {
+      expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    },
+    // The admin chunk now pulls the whole public app in with it (the theme
+    // editor's frame renders real pages), so the first mount in a file can
+    // outrun the default budget on a loaded machine.
+    { timeout: 5000 },
+  );
   return result;
 }
 
@@ -108,18 +119,23 @@ beforeEach(() => {
 });
 
 describe('speakers list', () => {
-  it('lists every canonical record with its pipeline status', async () => {
+  it('lists every canonical record with its record state and its pipeline status', async () => {
     speakerDocs = [
       RAE,
       { ...RAE, id: 'sam-example', firstName: 'Sam', lastName: 'Example', slug: 'sam-example', status: 'draft', uid: 'u2' },
     ];
     await renderAt('/admin/speakers');
 
-    expect(screen.getByRole('link', { name: 'Rae Okonkwo' })).toBeInTheDocument();
-    expect(screen.getByText('Published')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Rae Okonkwo' })).toBeInTheDocument();
+    // Two axes, two words: the record's state in the admin's three-word
+    // vocabulary (brief §5.2), and where the speaker is in the invitation
+    // pipeline, which is a different question.
+    expect(screen.getByText('Live')).toBeInTheDocument();
+    expect(screen.getByText('Approved')).toBeInTheDocument();
     // The list shows unpublished records too — that is why it reads the
     // canonical store rather than the public projection.
     expect(screen.getByRole('link', { name: 'Sam Example' })).toBeInTheDocument();
+    expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(screen.getByText('Not invited')).toBeInTheDocument();
     expect(screen.getByText('Account linked')).toBeInTheDocument();
   });
@@ -220,8 +236,13 @@ describe('speaker editor', () => {
       okResponse({ speakerId: 'rae-okonkwo', mode: 'hard', unlinkedSessions: ['s1'], unlinkedDrafts: [] }),
     );
     await renderAt('/admin/speakers/rae-okonkwo');
+    // Moment 3: the first press states what is lost — the record and every
+    // session link — and sends nothing.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this speaker' }));
+    expect(screen.getByText(/every session that references them is unlinked/)).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Delete speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete this speaker' }));
     });
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -238,18 +259,20 @@ describe('speaker editor', () => {
 
     // Not offered up front: two delete buttons nobody can tell apart is
     // worse than one plus a named fallback.
-    expect(screen.queryByRole('button', { name: 'Mark removed instead' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Mark this speaker removed' })).toBeNull();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this speaker' }));
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Delete speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete this speaker' }));
     });
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Mark removed instead' })).toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: 'Mark this speaker removed' })).toBeInTheDocument(),
     );
 
     fetch.mockResolvedValueOnce(okResponse({ speakerId: 'rae-okonkwo', mode: 'soft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark this speaker removed' }));
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Mark removed instead' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Mark this speaker removed' }));
     });
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(bodyOf(1)).toEqual({ speakerId: 'rae-okonkwo', soft: true });

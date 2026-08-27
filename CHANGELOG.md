@@ -9,7 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The landing page and the documentation site now use the product's own design language: the same
+  token names the app ships, the editorial type scale, rules and folios instead of cards, and a
+  complete dark palette that follows the reader's system setting. The page content, links, and
+  social-card metadata are unchanged (design brief §5.3).
+- Admin documentation now uses the words staff see rather than the names the code uses: site style,
+  header, illustrations, page preview, and advanced color settings. The interface guidelines
+  keep the internal names and mark them as internal.
+- The product documentation is now two depths. `docs/ADMIN_GUIDE.md` is the operator path — a
+  six-step visual setup, then every admin screen in the order the work happens — and the new
+  `docs/design-reference.md` is the complete engine: all six site styles as first-class
+  capabilities with a recommended configuration each, the four header treatments, the page
+  templates and the axes under them, site-level navigation, the illustration sets, the three token
+  tiers, the composition rules, print behaviour, the fixed admin identity, and the extension points.
+- The Pages site's scale and palette are generated from `design/tokens/` into `docs/tokens.css`
+  rather than hand-copied into `docs/styles.css`; `build-pages --check` fails on a stale copy.
+- The Pages site has a mark again — a stem and the system's three rule weights — carried by the
+  masthead, the favicon, and both regenerated social cards. Section boundaries now vary by weight
+  instead of drawing one identical rule each, and the folio floor is caption size.
 - Updated canonical repository and GitHub Pages paths to `CenterCoopMedia/eventrunner` (#97).
+
+### Fixed
+
+- A site restyled after deployment printed the palette it shipped with, not the one on screen —
+  and only from a dark screen, because the generated print block outranked the runtime one. The
+  runtime theme element now emits its own print block from the live resolved light palette at the
+  same specificity, and the generated block stays as the no-JavaScript fallback.
+- A heading containing a long identifier scrolled a whole documentation page sideways at 320px.
 
 ### Added
 

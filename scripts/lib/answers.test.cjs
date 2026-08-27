@@ -146,13 +146,13 @@ test('a partial theme override keeps the rest of the default palette', () => {
   // every rgb(var(--brand-ink-rgb)) utility resolving to nothing.
   const { docs } = buildConfigDocs({
     // Built, not written: the repo lint bans hex literals here.
-    answers: { ...MINIMAL, theme: { colors: { brandPrimary: `#${'123456'}` } } },
+    answers: { ...MINIMAL, theme: { colors: { primary: `#${'123456'}` } } },
     tierA: TIER_A,
     now: () => 0,
   });
-  assert.equal(docs.theme.colors.brandPrimary, `#${'123456'}`);
+  assert.equal(docs.theme.colors.primary, `#${'123456'}`);
   assert.equal(Object.keys(docs.theme.colors).length, Object.keys(defaultTheme().colors).length);
-  assert.ok(docs.theme.colors.brandInk, 'the untouched slots survive');
+  assert.ok(docs.theme.colors.ink, 'the untouched slots survive');
   assert.equal(validateTheme(docs.theme).ok, true);
 });
 
@@ -163,7 +163,10 @@ test('a partial fonts or logos override merges the same way', () => {
     now: () => 0,
   });
   assert.equal(docs.theme.fonts.heading, 'sans-humanist');
-  assert.equal(docs.theme.fonts.body, defaultTheme().fonts.body);
+  // The seed names no role at all — the preset's type map does — so a
+  // client naming one role leaves the other three to the preset.
+  assert.equal(docs.theme.fonts.body, undefined);
+  assert.equal(docs.theme.preset, defaultTheme().preset, 'the preset survives a partial override');
   assert.equal(docs.theme.logos.primary, 'branding/client.svg');
   assert.equal(docs.theme.logos.mark, defaultTheme().logos.mark);
   // A slot the client supplied is no longer a placeholder, and the

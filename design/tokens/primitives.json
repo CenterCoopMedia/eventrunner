@@ -1,0 +1,68 @@
+{
+  "$schema-note": "Tier 1 of the design brief (2026-08-27) §3.1. Raw values only. Tier 2 reads these; a component that reads a primitive fails review.",
+  "$name-pattern": "--er-<family>-<step>",
+  "$color-note": "Color channels are [r, g, b] numbers, never hex strings. The generator writes them as space-separated RGB triples so Tailwind's rgb(var(--...) / <alpha-value>) keeps working (brief §3.6).",
+  "$palette-note": "PR1 carries only the dark ground here. The light ramps still come from config/theme.colors, which is where every deployment's palette lives today. PR2 adds the preset ramps and moves the light values in beside these. The ground and bone steps mirror DARK_GROUND_RGB in packages/shared/src/theme.cjs, which is the code that derives the dark palette; scripts/lib/tokens.test.cjs fails if the two drift.",
+  "color": {
+    "ground": {
+      "900": [24, 27, 32],
+      "800": [35, 39, 45]
+    },
+    "bone": {
+      "100": [238, 236, 231],
+      "300": [170, 176, 184]
+    }
+  },
+  "$scalar-note": "Sizes are the two anchors of each fluid type step (brief §3.7). semantic.json builds the clamp() between them.",
+  "scalar": {
+    "size": {
+      "folio-min": "0.6875rem",
+      "folio-max": "0.75rem",
+      "caption-min": "0.8125rem",
+      "caption-max": "0.875rem",
+      "body-min": "1rem",
+      "body-max": "1.0625rem",
+      "lead-min": "1.125rem",
+      "lead-max": "1.3125rem",
+      "h3-min": "1.25rem",
+      "h3-max": "1.5rem",
+      "h2-min": "1.625rem",
+      "h2-max": "2.25rem",
+      "h1-min": "2.25rem",
+      "h1-max": "3.5rem",
+      "nameplate-min": "2.75rem",
+      "nameplate-max": "6rem"
+    },
+    "space": {
+      "3xs": "0.125rem",
+      "2xs": "0.25rem",
+      "xs": "0.5rem",
+      "sm": "0.75rem",
+      "md": "1rem",
+      "lg": "1.5rem",
+      "xl": "2.5rem",
+      "2xl": "4rem",
+      "3xl": "6rem"
+    },
+    "width": {
+      "hairline": "1px",
+      "strong": "2px",
+      "nameplate": "3px"
+    },
+    "weight": {
+      "regular": "400",
+      "medium": "500",
+      "semibold": "600",
+      "bold": "700"
+    },
+    "duration": {
+      "fast": "120ms",
+      "base": "160ms",
+      "slow": "200ms",
+      "signature": "560ms"
+    },
+    "easing": {
+      "out": "cubic-bezier(0, 0, 0.2, 1)"
+    }
+  }
+}

@@ -3,9 +3,11 @@
 // Regenerate with:  node scripts/generate-content.cjs --demo
 //
 // Shape mirrors published cmsPages docs. systemPage: true marks pages with a
-// dedicated React route (home, schedule, speakers, sponsors); non-system
-// pages render at their own root-level `path` (e.g. /faq) through the
-// generic catch-all route (issue #52). Section ids are generic vocabulary
+// dedicated React route (home, schedule, speakers, sponsors, attendees,
+// updates); non-system pages render at their own root-level `path` (e.g.
+// /faq) through the generic catch-all route (issue #52). A system page may
+// carry no sections at all — the route IS the page, and the sections are
+// what an operator adds around it. Section ids are generic vocabulary
 // (spec §5.3) and tie to cmsContent docs via each block `section` field;
 // ids are unique across pages because cmsContent is keyed
 // `<section>__<field>` globally, not per page.
@@ -620,6 +622,28 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
+    seeded: true,
+  },
+  {
+    id: 'attendees',
+    label: 'Attendees',
+    path: '/attendees',
+    icon: null,
+    order: 10,
+    visible: true,
+    systemPage: true,
+    sections: [],
+    seeded: true,
+  },
+  {
+    id: 'updates',
+    label: 'Updates',
+    path: '/updates',
+    icon: null,
+    order: 11,
+    visible: true,
+    systemPage: true,
+    sections: [],
     seeded: true,
   },
 ];

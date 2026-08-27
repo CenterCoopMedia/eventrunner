@@ -19,7 +19,15 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { buildSite, compare, linkResolver, themeColorTags, internals } = require('./build-pages.cjs');
+const {
+  buildSite,
+  buildTokensCss,
+  compare,
+  linkResolver,
+  themeColorProblems,
+  themeColorTags,
+  internals,
+} = require('./build-pages.cjs');
 const { renderMarkdown, renderInline, slugify, escapeHtml } = require('./lib/markdown-pages.cjs');
 const { DOCS_BASE, SECTIONS, pagesInOrder, routesBySource } = require('./lib/pages-manifest.cjs');
 
@@ -186,14 +194,35 @@ test('every page carries the required metadata', () => {
   }
 });
 
-test('theme colors are mirrored from the landing page', () => {
-  const landing = fs.readFileSync(path.join(ROOT, 'docs', 'index.html'), 'utf8');
-  const tags = themeColorTags(landing);
+test('the theme colors are the palette grounds, on every page', () => {
+  const tags = themeColorTags();
   assert.equal(tags.length, 2);
   for (const [, html] of site.files) {
     for (const tag of tags) assert.ok(html.includes(tag));
   }
-  assert.throws(() => themeColorTags('<html></html>'), /theme-color/);
+  // The landing page is written by hand, so its two tags are the last colors
+  // on this site a person could get wrong. A stale one fails the build.
+  const landing = fs.readFileSync(path.join(ROOT, 'docs', 'index.html'), 'utf8');
+  assert.deepEqual(themeColorProblems(landing), []);
+  assert.deepEqual(themeColorProblems('<html></html>'), [
+    'docs/index.html declares no theme-color meta tag',
+  ]);
+  // Composed, so no hex color literal appears in source (spec §7.6).
+  const stale = landing.replace(/content="#[0-9a-f]{6}"/i, `content="#${'0'.repeat(6)}"`);
+  assert.ok(themeColorProblems(stale).some((problem) => /stale ground/.test(problem)));
+});
+
+test('every page loads the generated tokens before the handwritten styles', () => {
+  // The palette has to be declared before the rules that read it are parsed
+  // — and a page that linked only styles.css would render unstyled colors.
+  for (const [file, html] of site.files) {
+    const tokens = html.indexOf(`${internals.TOKENS_FILE}"`);
+    const styles = html.indexOf('styles.css"');
+    assert.ok(tokens > 0, `${file} does not load ${internals.TOKENS_FILE}`);
+    assert.ok(tokens < styles, `${file} loads ${internals.TOKENS_FILE} after styles.css`);
+  }
+  const landing = fs.readFileSync(path.join(ROOT, 'docs', 'index.html'), 'utf8');
+  assert.ok(landing.indexOf(`${internals.TOKENS_FILE}"`) < landing.indexOf('styles.css"'));
 });
 
 test('every page has one h1, a skip link, and a main landmark', () => {
@@ -568,65 +597,207 @@ test('no page on this site asks a font CDN for anything', () => {
 // ------------------------------------------------------------ token palette
 
 /**
- * WCAG 2.x relative luminance and contrast ratio, for `#rrggbb` literals.
+ * WCAG 2.x relative luminance and contrast ratio, for `r g b` channel triples.
  *
- * @param {string} first
- * @param {string} second
+ * The site stores colors in the same space-separated RGB-triple form the
+ * product ships (design brief §3.6), so this reads triples rather than hex.
+ *
+ * @param {number[]} first
+ * @param {number[]} second
  * @returns {number}
  */
 function contrastRatio(first, second) {
-  const luminance = (color) => {
-    const channels = color.slice(1).match(/.{2}/g).map((pair) => Number.parseInt(pair, 16) / 255);
-    const linear = channels.map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const luminance = (channels) => {
+    const linear = channels
+      .map((channel) => channel / 255)
+      .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
     return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
   };
   const [lighter, darker] = [luminance(first), luminance(second)].sort((a, b) => b - a);
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+const TOKENS_CSS = fs.readFileSync(path.join(ROOT, 'docs', internals.TOKENS_FILE), 'utf8');
+
+test('the committed token stylesheet matches design/tokens', () => {
+  // The whole point of generating it: a token that moves in design/tokens/
+  // and not here is a site wearing last month's palette. Same gate as the
+  // committed pages above, and `build-pages --check` enforces it in CI.
+  assert.equal(TOKENS_CSS.replace(/\r\n/g, '\n'), buildTokensCss());
+});
+
+test('the generated stylesheet declares every token it promises, and no more', () => {
+  const declared = new Set([...TOKENS_CSS.matchAll(/^\s*(--[\w-]+):/gm)].map((m) => m[1]));
+  const promised = [...internals.SITE_COLOR_TOKENS, ...internals.SITE_SCALE_TOKENS];
+  assert.deepEqual([...declared].sort(), [...new Set(promised)].sort());
+});
+
+test('every text container that can hold an identifier breaks it', () => {
+  // A heading like "4. AUTO_DEPLOY_ENVIRONMENTS (push auto-deploy)" has no
+  // break opportunity in it, and without this the whole page scrolls
+  // sideways at 320px — the one place a documentation site cannot afford it.
+  //
+  // Two rules cover the whole surface, because `overflow-wrap` inherits:
+  // `.prose` carries every container in a generated article (headings at
+  // every level, paragraphs, list items, table cells), and the bare heading
+  // rule carries the landing page, which has no `.prose`.
+  const css = ['styles.css', 'docs.css']
+    .map((name) => fs.readFileSync(path.join(ROOT, 'docs', name), 'utf8'))
+    .join('\n');
+  for (const selector of ['h1,\nh2,\nh3 {', '.prose {']) {
+    const start = css.indexOf(selector);
+    assert.ok(start > -1, `no rule found for ${selector}`);
+    const block = css.slice(start, css.indexOf('}', start));
+    assert.match(block, /overflow-wrap:\s*break-word/, `${selector} lets a long word overflow`);
+  }
+});
+
+test('the handwritten stylesheets declare no token the generated one owns', () => {
+  // Two declarations of one name is how a generated value gets quietly
+  // overridden by a stale hand copy — the thing generating it removed.
+  const owned = new Set([...internals.SITE_COLOR_TOKENS, ...internals.SITE_SCALE_TOKENS]);
+  for (const name of ['styles.css', 'docs.css']) {
+    const css = fs.readFileSync(path.join(ROOT, 'docs', name), 'utf8');
+    for (const [, token] of css.matchAll(/^\s*(--[\w-]+):/gm)) {
+      assert.ok(!owned.has(token), `docs/${name} redeclares the generated ${token}`);
+    }
+  }
+});
+
+/**
+ * The two mode palettes docs/tokens.css declares, each resolved to channels.
+ *
+ * A palette block is any `:root { … }` that declares `--brand-surface-rgb`,
+ * which skips the scale block above them. Values are either a triple or a
+ * `var(--other-rgb)` alias, exactly as apps/web/src/generated/theme.css
+ * writes them, so aliases are followed until they reach channels.
+ *
+ * @param {string} css
+ * @returns {Array<Record<string, number[]>>} light first, then dark
+ */
 function paletteBlocks(css) {
-  // The light palette is the first `:root {…}`; the dark one is the `:root`
-  // nested in the prefers-color-scheme media query.
-  const blocks = [...css.matchAll(/:root\s*\{([^}]*)\}/g)].map((match) => match[1]);
-  return blocks.slice(0, 2).map((block) => Object.fromEntries(
-    [...block.matchAll(/(--color-[\w-]+):\s*(#[\da-f]{6})/gi)].map((match) => [match[1], match[2]]),
-  ));
+  const blocks = [...css.matchAll(/:root\s*\{([^}]*)\}/g)]
+    .map((match) => match[1])
+    .filter((block) => block.includes('--brand-surface-rgb'));
+  return blocks.map((block) => {
+    const declared = Object.fromEntries(
+      [...block.matchAll(/(--[\w-]+-rgb):\s*([^;]+);/g)].map((match) => [match[1], match[2].trim()]),
+    );
+    const resolve = (name, seen = new Set()) => {
+      const value = declared[name];
+      if (value === undefined || seen.has(name)) return null;
+      const alias = value.match(/^var\(\s*(--[\w-]+)\s*\)$/);
+      if (alias) return resolve(alias[1], new Set([...seen, name]));
+      const channels = value.split(/\s+/).map(Number);
+      return channels.length === 3 && channels.every(Number.isInteger) ? channels : null;
+    };
+    return Object.fromEntries(
+      Object.keys(declared).map((name) => [name, resolve(name)]).filter(([, value]) => value),
+    );
+  });
 }
 
-test('the token palette clears the contrast ratios its roles promise', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'docs', 'styles.css'), 'utf8');
-  const [light, dark] = paletteBlocks(css);
+test('the two mode palettes declare exactly the same tokens', () => {
+  // Design brief §8.2: a half-applied dark mode is a bug, not a polish item.
+  // The static site has no runtime to write `data-mode`, so this comparison is
+  // what stands in for the product's dark-mode completeness test.
+  const [light, dark] = paletteBlocks(TOKENS_CSS);
   assert.ok(Object.keys(light).length > 10, 'the light palette did not parse');
+  assert.deepEqual(
+    Object.keys(dark).sort(),
+    Object.keys(light).sort(),
+    'the light and dark palettes are not token-for-token symmetrical',
+  );
+});
 
-  const bodyText = [
-    ['--color-text', '--color-bg'],
-    ['--color-text', '--color-surface'],
-    ['--color-text-secondary', '--color-bg'],
-    ['--color-link', '--color-bg'],
-    ['--color-status-done-text', '--color-status-done-bg'],
-    ['--color-status-progress-text', '--color-status-progress-bg'],
-    ['--color-btn-text', '--color-btn-bg'],
+test('printing a page from a dark screen gets the light edition', () => {
+  // "Paper has no dark mode" (design-reference.md, Print) binds this site too,
+  // and it is the reader on a dark screen who finds out. Every rule here reads
+  // the ink, ground, and rule tokens, so re-pointing them under print media is
+  // the whole switch.
+  const [light, , print] = paletteBlocks(TOKENS_CSS);
+  assert.ok(print, 'docs/tokens.css declares no print palette');
+  assert.match(
+    TOKENS_CSS,
+    /@media print \{\n {2}:root \{\n {4}color-scheme: light;/,
+    'the print block does not open on a light :root',
+  );
+  assert.deepEqual(
+    Object.keys(print).sort(),
+    Object.keys(light).sort(),
+    'the print palette is not token-for-token the light one',
+  );
+  for (const name of Object.keys(light)) {
+    assert.deepEqual(print[name], light[name], `${name} does not print its light value`);
+  }
+
+  // `prefers-color-scheme` still reports dark while printing, so the dark
+  // block still matches and only source order settles it.
+  assert.ok(
+    TOKENS_CSS.indexOf('@media print') > TOKENS_CSS.indexOf('@media (prefers-color-scheme: dark)'),
+    'the print block does not come after the dark block, so dark would win on paper',
+  );
+});
+
+test('the token palette clears the contrast ratios its roles promise', () => {
+  const [light, dark] = paletteBlocks(TOKENS_CSS);
+
+  // Every foreground/background pair this site actually renders. Text pairs
+  // clear 4.5:1; the control boundary and the strong rule are non-text UI and
+  // clear 3:1 (interface guidelines, Colors).
+  const text = [
+    ['--color-text-primary-rgb', '--color-surface-rgb'],
+    ['--color-text-primary-rgb', '--color-surface-alt-rgb'],
+    ['--color-text-secondary-rgb', '--color-surface-rgb'],
+    ['--color-text-secondary-rgb', '--color-surface-alt-rgb'],
+    ['--folio-text-rgb', '--color-surface-rgb'],
+    ['--color-accent-rgb', '--color-surface-rgb'],
+    ['--color-accent-rgb', '--color-surface-alt-rgb'],
+    ['--semantic-success-rgb', '--color-surface-rgb'],
+    ['--semantic-warning-rgb', '--color-surface-rgb'],
+    // The primary button inverts the page: surface ink on the ink ground.
+    ['--color-surface-rgb', '--color-text-primary-rgb'],
+    ['--color-surface-rgb', '--color-accent-rgb'],
   ];
-  // Dark redefines only some tokens; anything it leaves alone still resolves
-  // to the light value, which is what the browser does too.
-  for (const [name, palette] of [['light', light], ['dark', { ...light, ...dark }]]) {
-    for (const [foreground, background] of bodyText) {
+  const nonText = [
+    ['--color-border-control-rgb', '--color-surface-rgb'],
+    ['--color-border-control-rgb', '--color-surface-alt-rgb'],
+    ['--rule-strong-rgb', '--color-surface-rgb'],
+    ['--color-accent-rgb', '--color-surface-rgb'],
+  ];
+
+  for (const [mode, palette] of [['light', light], ['dark', dark]]) {
+    for (const [foreground, background] of text) {
       const ratio = contrastRatio(palette[foreground], palette[background]);
-      assert.ok(ratio >= 4.5, `${name}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
-      assert.ok(ratio <= 21, `${name}: ${foreground} on ${background} exceeds 21:1`);
+      assert.ok(ratio >= 4.5, `${mode}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
+      assert.ok(ratio <= 21, `${mode}: ${foreground} on ${background} exceeds 21:1`);
     }
-    // Borders and accents are non-text UI, held to the 3:1 rule.
-    const accent = contrastRatio(palette['--color-accent'], palette['--color-bg']);
-    assert.ok(accent >= 3, `${name}: --color-accent on --color-bg is ${accent.toFixed(2)}:1`);
+    for (const [foreground, background] of nonText) {
+      const ratio = contrastRatio(palette[foreground], palette[background]);
+      assert.ok(ratio >= 3, `${mode}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
+    }
+  }
+});
+
+test('every color the stylesheets use is declared by both palettes', () => {
+  // The other half of §8.2: a rule that reads a token no palette declares
+  // paints nothing in one mode and something in the other.
+  const css = ['styles.css', 'docs.css']
+    .map((name) => fs.readFileSync(path.join(ROOT, 'docs', name), 'utf8'))
+    .join('\n');
+  const [light, dark] = paletteBlocks(TOKENS_CSS);
+  const used = new Set([...css.matchAll(/rgb\(var\((--[\w-]+-rgb)\)\)/g)].map((match) => match[1]));
+  assert.ok(used.size > 5, 'no color usage parsed');
+  for (const name of used) {
+    assert.ok(name in light, `light palette does not declare ${name}`);
+    assert.ok(name in dark, `dark palette does not declare ${name}`);
   }
 });
 
 test('contrastRatio matches the values WCAG defines', () => {
-  // Built rather than written as literals: the hex-literal ban (spec §7.6)
-  // applies to this file, and these two are the endpoints of the scale, not
-  // colors the design uses.
-  const black = `#${'0'.repeat(6)}`;
-  const white = `#${'f'.repeat(6)}`;
+  // The endpoints of the scale, not colors the design uses.
+  const black = [0, 0, 0];
+  const white = [255, 255, 255];
   assert.equal(contrastRatio(black, white), 21);
   assert.equal(contrastRatio(white, white), 1);
 });

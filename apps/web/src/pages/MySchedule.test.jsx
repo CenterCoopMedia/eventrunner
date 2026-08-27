@@ -23,6 +23,24 @@ const fixtureConfig = {
     { id: 'fx-day-1', label: 'Day one', date: '2026-10-15' },
     { id: 'fx-day-2', label: 'Day two', date: '2026-10-16' },
   ],
+  // A surveyed venue: three places, and ONE recorded move between two of
+  // them. The gaps are the point — hall → lab is recorded, lab → annex is
+  // not, and the difference has to show.
+  venue: {
+    places: [
+      { id: 'fx-hall', name: '[Fixture] Main hall', floor: 'Ground floor' },
+      { id: 'fx-lab', name: '[Fixture] Editing lab', floor: 'Second floor' },
+      { id: 'fx-annex', name: '[Fixture] Annex' },
+    ],
+    movements: [
+      {
+        from: 'fx-hall',
+        to: 'fx-lab',
+        walkingMinutes: 6,
+        accessibleRoute: '[Fixture] Lift by the cloakroom, then right.',
+      },
+    ],
+  },
 };
 
 const fixtureSessions = [
@@ -32,6 +50,7 @@ const fixtureSessions = [
     startTime: '09:05',
     endTime: '09:45',
     title: '[Fixture] Morning kickoff',
+    placeId: 'fx-hall',
     type: 'keynote',
     speakerIds: [],
     visible: true,
@@ -42,7 +61,21 @@ const fixtureSessions = [
     startTime: '13:30',
     endTime: '14:15',
     title: '[Fixture] Afternoon editing lab',
+    placeId: 'fx-lab',
     type: 'workshop',
+    speakerIds: [],
+    visible: true,
+  },
+  // Same day as the two above, in a place the venue defines but to which
+  // nobody recorded a route from the editing lab.
+  {
+    id: 'fx-annex-talk',
+    dayId: 'fx-day-1',
+    startTime: '15:00',
+    endTime: '15:45',
+    title: '[Fixture] Late annex talk',
+    placeId: 'fx-annex',
+    type: 'panel',
     speakerIds: [],
     visible: true,
   },
@@ -171,6 +204,47 @@ describe('MySchedule', () => {
       // Only the orphaned bookmark exists, so mySessions is empty — the
       // download button (gated on mySessions.length > 0) must not render.
       expect(screen.queryByRole('button', { name: /download my schedule/i })).toBeNull();
+    });
+  });
+
+  // THE TRANSFER LINE, AND THE ONE LIST IT BELONGS IN (design brief §4.6;
+  // shared/venue.cjs). A recorded movement says what a move costs. It does
+  // not say the reader is making it — here, the reader said so themselves
+  // by bookmarking both ends.
+  describe('a stated move between two sessions the reader chose', () => {
+    it('states where, where to, and how long, from the recorded move', () => {
+      renderMySchedule({ bookmarkedIds: new Set(['fx-early', 'fx-late']) });
+      expect(
+        screen.getByText(
+          /Transfer from \[Fixture\] Main hall to \[Fixture\] Editing lab, Second floor — 6 min walk/,
+        ),
+      ).toBeInTheDocument();
+      // The step-free way, in the operator's own words.
+      expect(
+        screen.getByText(/Step-free route: \[Fixture\] Lift by the cloakroom, then right\./),
+      ).toBeInTheDocument();
+    });
+
+    it('says nothing where nobody recorded the route', () => {
+      // Both places are defined, both sessions state one, and the reader
+      // attends both — and still the site says nothing, because nobody
+      // walked lab → annex and wrote it down. Silence is what an
+      // unrecorded route looks like; an estimate would be the old
+      // inference wearing better data.
+      renderMySchedule({ bookmarkedIds: new Set(['fx-late', 'fx-annex-talk']) });
+      expect(screen.queryByText(/Transfer from/)).toBeNull();
+    });
+
+    it('never opens a day with a transfer — arriving is not transferring', () => {
+      renderMySchedule({ bookmarkedIds: new Set(['fx-late']) });
+      expect(screen.queryByText(/Transfer from/)).toBeNull();
+    });
+
+    it('states nothing about a session that names no place', () => {
+      // fx-d2 carries no placeId, so it is nowhere the reader can be routed
+      // to and nowhere they can be routed from.
+      renderMySchedule({ bookmarkedIds: new Set(['fx-early', 'fx-late', 'fx-d2']) });
+      expect(screen.getAllByText(/Transfer from/)).toHaveLength(1);
     });
   });
 });

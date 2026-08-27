@@ -68,7 +68,10 @@ describe('AdminLiveUpdates', () => {
     render(<AdminLiveUpdates />);
     pushRows([{ id: 'u1', message: 'Remove me', pinned: false }]);
 
+    // Moment 3: the first press states what goes, the second does it.
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(callMock).not.toHaveBeenCalledWith('deleteLiveUpdate', { id: 'u1' });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove this update' }));
 
     await act(async () => {
       await Promise.resolve();

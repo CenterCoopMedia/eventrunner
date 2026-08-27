@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRuntimeThemeCss,
+  fontSetFaces,
   hexToRgbTriple,
   rgbTripleToHex,
+  themeFallbackWarnings,
 } from './themeRuntime.js';
+import { recommendedConfiguration } from 'shared/theme';
 
 // Hex strings under test are composed at runtime so no hex color literal
 // appears in source (spec §7.6 — the ESLint sweep applies to tests too).
@@ -41,6 +44,16 @@ describe('hexToRgbTriple', () => {
   });
 });
 
+const LIGHT_BLOCK = ":root,\n:root[data-mode='light'],\n:root[data-theme][data-mode='light'] {";
+const DARK_BLOCK = ":root[data-mode='dark'],\n:root[data-theme][data-mode='dark'] {";
+
+/**
+ * The two screen mode blocks, with the print block that follows them cut
+ * away — it carries the light palette a second time, so leaving it attached
+ * would put light values inside what a test reads as "the dark block".
+ */
+const screenModeBlocks = (css) => css.split('@media print')[0].split(DARK_BLOCK);
+
 describe('buildRuntimeThemeCss', () => {
   it('emits brand and semantic RGB-triple overrides from config/theme colors', () => {
     const css = buildRuntimeThemeCss({
@@ -57,7 +70,60 @@ describe('buildRuntimeThemeCss', () => {
     expect(css).toContain('--brand-ink-muted-rgb: 92 107 122;');
     expect(css).toContain('--semantic-success-rgb: 22 101 52;');
     expect(css).toContain('--semantic-keynote-rgb: 94 53 177;');
-    expect(css.startsWith(':root {')).toBe(true);
+    // Colors are mode-scoped now (design brief §3.3), so the light block
+    // carries two selectors: the attribute-free one beats the generated
+    // baseline that first paint uses, and the [data-mode='light'] one beats
+    // the generated light block once the runtime has written the attribute.
+    // The light block names three selectors and the dark block two, because
+    // the generated stylesheet now carries a (preset, mode) block that is
+    // more specific than the plain mode block (design brief §3.4). Attribute
+    // presence ties with attribute equality, so this element wins on
+    // document order.
+    expect(css.startsWith(LIGHT_BLOCK)).toBe(true);
+    expect(css).toContain(DARK_BLOCK);
+  });
+
+  it('derives a dark block from a document that names one palette', () => {
+    const css = buildRuntimeThemeCss({
+      colors: { surface: hex('F7F7F5'), ink: hex('16212C'), primary: hex('155E75') },
+    });
+    const [light, dark] = screenModeBlocks(css);
+    // The designed dark ground replaces the light surface, and the brand
+    // color is lifted rather than reused.
+    expect(light).toContain('--brand-surface-rgb: 247 247 245;');
+    expect(dark).toContain('--brand-surface-rgb: 24 27 32;');
+    expect(dark).not.toContain('--brand-primary-rgb: 21 94 117;');
+    expect(dark).toMatch(/--brand-primary-rgb: \d+ \d+ \d+;/);
+  });
+
+  it('accepts per-mode overrides, and a named dark token wins over the derivation', () => {
+    const css = buildRuntimeThemeCss({
+      colors: {
+        light: { surface: hex('F7F7F5'), ink: hex('16212C') },
+        dark: { surface: hex('101418') },
+      },
+    });
+    const [light, dark] = screenModeBlocks(css);
+    expect(light).toContain('--brand-surface-rgb: 247 247 245;');
+    expect(dark).toContain('--brand-surface-rgb: 16 20 24;');
+    // Ink is not named for dark, so the derivation still supplies it.
+    expect(dark).toContain('--brand-ink-rgb: 238 236 231;');
+  });
+
+  it('moves the rule colors with the ink and surface it derives them from', () => {
+    const css = buildRuntimeThemeCss({
+      colors: { surface: hex('F7F7F5'), ink: hex('16212C') },
+    });
+    expect(css).toContain('--rule-hairline-rgb: 216 217 217;');
+    expect(css).toContain('--rule-nameplate-rgb: 22 33 44;');
+    // The control border rides the same derivation (WCAG 1.4.11 needs it to
+    // move with ink/surface exactly like the named rules do).
+    expect(css).toContain('--color-border-control-rgb: 130 136 140;');
+    // Without both ends of the mix there is nothing to derive from, so the
+    // build-time rules stand.
+    expect(buildRuntimeThemeCss({ colors: { ink: hex('16212C') } })).not.toContain(
+      '--rule-hairline-rgb',
+    );
   });
 
   it('skips malformed colors instead of emitting broken CSS', () => {
@@ -76,6 +142,14 @@ describe('buildRuntimeThemeCss', () => {
     expect(css).not.toContain('--font-body');
   });
 
+  it('resolves the data and mono roles too', () => {
+    const css = buildRuntimeThemeCss({
+      fonts: { data: 'serif-editorial', mono: 'sans-humanist' },
+    });
+    expect(css).toContain("--font-data: 'Source Serif 4'");
+    expect(css).toContain("--font-mono: 'Source Sans 3'");
+  });
+
   it('maps radius and texture ids', () => {
     const css = buildRuntimeThemeCss({ radius: 'round', texture: 'flat' });
     expect(css).toContain('--radius-base: 16px;');
@@ -87,6 +161,83 @@ describe('buildRuntimeThemeCss', () => {
     expect(buildRuntimeThemeCss(null)).toBe('');
     expect(buildRuntimeThemeCss({})).toBe('');
     expect(buildRuntimeThemeCss({ radius: 'unknown', texture: 'velvet' })).toBe('');
+    // The mode policy is an attribute, not CSS, so it alone overrides nothing.
+    expect(buildRuntimeThemeCss({ mode: 'dark' })).toBe('');
+  });
+});
+
+// The generated stylesheet's print block freezes the palette the deployment
+// shipped with. config/theme arrives live, so paper needs the live one too.
+describe('buildRuntimeThemeCss print block', () => {
+  const printBlockOf = (css) => {
+    const match = css.match(/@media print \{\n([\s\S]*?)\n\}\n?$/);
+    return match ? match[1] : null;
+  };
+
+  it('prints the live light palette, whatever mode the screen is in', () => {
+    const css = buildRuntimeThemeCss({
+      colors: { surface: hex('F7F7F5'), ink: hex('16212C'), primary: hex('C84B31') },
+    });
+    const print = printBlockOf(css);
+    expect(print).not.toBeNull();
+    expect(print).toContain('--brand-surface-rgb: 247 247 245;');
+    expect(print).toContain('--brand-ink-rgb: 22 33 44;');
+    expect(print).toContain('--brand-primary-rgb: 200 75 49;');
+    // The rules move with the ink and surface they are mixed from, on paper
+    // exactly as on screen.
+    expect(print).toContain('--rule-hairline-rgb: 216 217 217;');
+    expect(print).toContain('--color-border-control-rgb: 130 136 140;');
+  });
+
+  it('never lets a dark value reach paper', () => {
+    const css = buildRuntimeThemeCss({
+      colors: {
+        light: { surface: hex('F7F7F5'), ink: hex('16212C') },
+        dark: { surface: hex('101418'), ink: hex('E8EBF0') },
+      },
+    });
+    const print = printBlockOf(css);
+    expect(print).toContain('--brand-surface-rgb: 247 247 245;');
+    expect(print).not.toContain('16 20 24');
+    expect(print).not.toContain('232 235 240');
+  });
+
+  it('names every selector the generated print block names, so it wins on order', () => {
+    // Specificity, selector for selector, is a TIE with the generated block
+    // (scripts/lib/tokens.cjs printPaletteBlock). That is the point: this
+    // element is appended after the generated stylesheet, so the tie is
+    // broken by document order and the live values win. Dropping the leading
+    // `html` would lose to the generated block instead.
+    const print = printBlockOf(buildRuntimeThemeCss({ colors: { primary: hex('C84B31') } }));
+    for (const selector of [
+      'html:root,',
+      'html:root:not([data-mode]),',
+      "html:root[data-mode='dark'],",
+      "html:root[data-theme][data-mode='dark']",
+    ]) {
+      expect(print).toContain(selector);
+    }
+  });
+
+  it('leaves the admin token on screen', () => {
+    // The admin is a screen tool; no print rule reads its tokens. Its own
+    // mode blocks still carry the marker colour, which is the site's own
+    // brand colour — there is no separate adminAccent field to set.
+    const css = buildRuntimeThemeCss({
+      colors: { surface: hex('F7F7F5'), ink: hex('16212C') },
+      brandColor: hex('C84B31'),
+    });
+    expect(css).toContain('--admin-client-accent-rgb:');
+    expect(printBlockOf(css)).not.toContain('--admin-');
+  });
+
+  it('emits no print block when the document overrides no color', () => {
+    // Nothing to say about paper, so the generated block — the no-JavaScript
+    // fallback — is left to do the whole job on its own.
+    expect(buildRuntimeThemeCss({ fonts: { heading: 'sans-humanist' } })).not.toContain(
+      '@media print',
+    );
+    expect(buildRuntimeThemeCss({ radius: 'round' })).not.toContain('@media print');
   });
 });
 
@@ -110,5 +261,74 @@ describe('rgbTripleToHex', () => {
     expect(rgbTripleToHex('42 157 256')).toBeNull();
     expect(rgbTripleToHex('42 157 abc')).toBeNull();
     expect(rgbTripleToHex(null)).toBeNull();
+  });
+});
+
+describe('themeFallbackWarnings', () => {
+  // What the candidate asks for that will NOT render as asked. Both kinds
+  // fall back silently otherwise, so the preview would show a page nobody
+  // chose and say nothing about it (owner review, 2026-08-27).
+  const everyFontLoaded = () => true;
+  const noFontLoaded = () => false;
+
+  it('says nothing about a document that renders exactly as asked', () => {
+    expect(
+      themeFallbackWarnings(recommendedConfiguration('civic'), { fontAvailable: everyFontLoaded }),
+    ).toEqual([]);
+    expect(themeFallbackWarnings(null)).toEqual([]);
+  });
+
+  it('names a brand colour it cannot read, and what shows instead', () => {
+    const [warning, ...rest] = themeFallbackWarnings(
+      { ...recommendedConfiguration('zine'), brandColor: 'brand blue' },
+      { fontAvailable: everyFontLoaded },
+    );
+    expect(rest).toEqual([]);
+    expect(warning.kind).toBe('color');
+    expect(warning.message).toContain('Main brand colour is not a colour this system can read');
+    expect(warning.message).toContain('brand blue');
+    expect(warning.message).toMatch(/showing instead/);
+  });
+
+  it('names an unreadable per-mode override, with the mode it is in', () => {
+    const warnings = themeFallbackWarnings(
+      {
+        ...recommendedConfiguration('newsroom'),
+        tokens: { dark: { ink: 'off-white' } },
+      },
+      { fontAvailable: everyFontLoaded },
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].field).toBe('ink (dark)');
+  });
+
+  it('accepts every hex spelling the schema accepts', () => {
+    for (const value of [hex('fff'), hex('FFF'), hex('a1b2c3'), `  ${hex('a1b2c3')}  `]) {
+      expect(
+        themeFallbackWarnings(
+          { ...recommendedConfiguration('civic'), brandColor: value },
+          { fontAvailable: everyFontLoaded },
+        ),
+      ).toEqual([]);
+    }
+  });
+
+  it('names a font that has not loaded, and the face showing in its place', () => {
+    const warnings = themeFallbackWarnings(recommendedConfiguration('atlas'), {
+      fontAvailable: noFontLoaded,
+    });
+    // Atlas runs Overpass for headings and Overpass Mono for both value
+    // roles, so three roles resolve to two families and the warning is per
+    // family, not per role.
+    expect(warnings).toHaveLength(3);
+    expect(warnings.every((warning) => warning.kind === 'font')).toBe(true);
+    expect(warnings[0].message).toContain('Overpass has not loaded');
+    expect(warnings[0].message).toMatch(/showing in .+/);
+  });
+
+  it('reads the bundled face and its fallbacks out of the one stack table', () => {
+    expect(fontSetFaces('plex-mono').family).toBe('IBM Plex Mono');
+    expect(fontSetFaces('plex-mono').fallback).toContain('monospace');
+    expect(fontSetFaces('not-a-set')).toBeNull();
   });
 });

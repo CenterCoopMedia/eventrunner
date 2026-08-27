@@ -81,9 +81,20 @@ async function renderAt(path) {
     await Promise.resolve();
     await Promise.resolve();
   });
-  await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
-  });
+  // Two waits, not one: the lazy admin chunk, and then the admin probe the
+  // gate holds on (AdminGate renders "Checking your access…" until it
+  // answers). Waiting only for the chunk lets an assertion run while the
+  // gate is still checking, which is a flake under load, not a bug.
+  await waitFor(
+    () => {
+      expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    },
+    // The admin chunk now pulls the whole public app in with it (the theme
+    // editor's frame renders real pages), so the first mount in a file can
+    // outrun the default budget on a loaded machine.
+    { timeout: 5000 },
+  );
   return result;
 }
 
@@ -130,13 +141,60 @@ describe('event settings', () => {
     expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
   });
 
+  // The event's concurrent tracks (design brief §4.6): a letter and a name,
+  // set here once, so a session names a line by its letter alone.
+  it('edits the track list and sends it with the event', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, tracks: [{ letter: 'A', name: 'Practice' }] });
+
+    expect(screen.getByLabelText('Track 1 letter')).toHaveValue('A');
+    expect(screen.getByLabelText('Track 1 name')).toHaveValue('Practice');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add track' }));
+    // A letter is sent as a capital, whatever case it was typed in.
+    fireEvent.change(screen.getByLabelText('Track 2 letter'), { target: { value: 'b' } });
+    fireEvent.change(screen.getByLabelText('Track 2 name'), {
+      target: { value: 'Sustainability' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.tracks).toEqual([
+      { letter: 'A', name: 'Practice' },
+      { letter: 'B', name: 'Sustainability' },
+    ]);
+  });
+
+  it('says plainly that an event with one room needs no tracks', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, tracks: [] });
+    expect(screen.getByText('No tracks configured yet.')).toBeInTheDocument();
+  });
+
+  it('marks the offending track when the server rejects a letter', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, tracks: [{ letter: 'A', name: 'Practice' }] });
+    fetch.mockResolvedValueOnce(
+      errorResponse(
+        400,
+        'bad-request',
+        'tracks[0].letter: must be a single capital letter A-Z, got "AA"',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Track 1 letter')).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('reflects a saved change from the config listener without a reload', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);
     // The listener echo of a save landing from another surface updates the
-    // rendered config (here: the shell's short name).
+    // rendered config (here: the job mark's short name in the docket).
     await pushConfig('event', { ...LIVE_EVENT, shortName: 'SUMMIT27' });
-    expect(screen.getByText('Admin · SUMMIT27')).toBeInTheDocument();
+    expect(screen.getByText('SUMMIT27')).toBeInTheDocument();
   });
 
   it('shows the sender-domain verification state without offering to edit it', async () => {

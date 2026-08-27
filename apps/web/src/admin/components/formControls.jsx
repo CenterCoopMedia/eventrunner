@@ -1,30 +1,67 @@
-// Hand-rolled form primitives for the admin area (no form library — the
-// forms here are plain controlled inputs, and a dependency would buy nothing
-// but bundle weight).
+// The copy bench — form primitives for the composing room (no form library;
+// the forms here are plain controlled inputs, and a dependency would buy
+// nothing but bundle weight).
 //
-// Every control follows the interface guidelines the public app already
-// applies: a real <label> tied by id, 44px touch targets, aria-invalid plus
-// an aria-describedby error message on failure, and errors that read as text
-// rather than color alone.
-import { useId } from 'react';
+// Every control reads the `admin-*` tokens and nothing else: the admin has
+// one fixed identity, so a client's preset never reaches a field, a button,
+// or a rule in this room (design brief §5.2, admin story part 2). The public
+// site's own controls live in components/forms/publicForm.jsx and run on the
+// tier-2 tokens — the two tiers stay apart on purpose.
+//
+// The pattern, unchanged from the accessibility work that built it: a real
+// <label> tied by id and sitting ABOVE its own input (a control label is the
+// one thing the eyebrow ban explicitly does not touch — never "fix" it),
+// its hint under the label, the field on the input ground inside a rule
+// that clears 3:1, and the error under the field with a mark and a word.
+// `aria-invalid` plus `aria-describedby` carry the failure to a screen
+// reader; nothing is signalled by colour alone.
+import { useId, useState } from 'react';
+
+// The field boundary is --admin-rule-strong, not the hairline: a form
+// control's boundary is non-text user interface under WCAG 1.4.11 and needs
+// 3:1 against its own ground, which the hairline (tuned for row separators)
+// does not clear.
+/**
+ * The label above a field, and the hint under the label. One source each:
+ * these strings appear on every control in this file and on the hand-built
+ * fields elsewhere in the room, and a copy that drifts is a control that
+ * stops matching its neighbours.
+ */
+export const fieldLabelClass = 'text-caption font-semibold text-admin-ink';
+export const fieldHintClass = 'text-folio text-admin-ink-secondary';
 
 export const inputClass =
-  'touch-target w-full rounded-brand border border-brand-ink/20 bg-brand-surface px-3 py-2 ' +
-  'text-brand-ink placeholder:text-brand-ink-muted aria-[invalid=true]:border-danger';
+  'admin-target w-full rounded-admin border-admin-hairline border-admin-rule-strong ' +
+  'bg-admin-ground-input px-sm py-2xs font-admin-ui text-caption text-admin-ink ' +
+  'placeholder:text-admin-ink-secondary aria-[invalid=true]:border-admin-rule-alarm';
 
+// Buttons are all one size. An oversized primary action is the pattern
+// §2.4 rejects, and the room never shouts (admin story part 5).
+const buttonBase =
+  'admin-target inline-flex items-center justify-center rounded-admin px-sm py-2xs ' +
+  'font-admin-ui text-caption font-semibold disabled:opacity-60';
+
+/** The filled control: type metal. Never the client accent. */
 export const primaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-brand-primary ' +
-  'px-4 py-2 font-semibold text-brand-surface hover:bg-brand-primary-dark disabled:opacity-60';
+  `${buttonBase} bg-admin-ink text-admin-ink-inverse hover:bg-admin-ink/90`;
 
 export const secondaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand border ' +
-  'border-brand-ink/20 bg-brand-surface px-4 py-2 font-semibold text-brand-ink ' +
-  'hover:bg-brand-surface-alt disabled:opacity-60';
+  `${buttonBase} border-admin-hairline border-admin-rule-strong bg-admin-ground-raised ` +
+  'text-admin-ink hover:bg-admin-ground-input';
 
+/**
+ * A destructive control: the alarm ground inside the alarm rule, at NORMAL
+ * size, with nothing animated. The label is the caller's, and it repeats the
+ * consequence — "Delete this page", never "Confirm" (admin story moment 3).
+ */
 export const dangerButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand border ' +
-  'border-danger/40 bg-danger/10 px-4 py-2 font-semibold text-danger ' +
-  'hover:bg-danger/20 disabled:opacity-60';
+  `${buttonBase} border-admin-hairline border-admin-rule-alarm bg-admin-ground-alarm ` +
+  'text-admin-state-error hover:bg-admin-ground-alarm/70';
+
+/** A quiet in-row control: still a button, still a 24px target. */
+export const linkButtonClass =
+  'admin-target inline-flex items-center rounded-admin px-2xs py-3xs font-admin-ui text-folio ' +
+  'text-admin-ink-link underline underline-offset-2 hover:text-admin-ink disabled:opacity-60';
 
 /** A labelled text-ish input. `error` is the server's message, verbatim. */
 export function TextField({
@@ -43,12 +80,12 @@ export function TextField({
     .filter(Boolean)
     .join(' ');
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-semibold text-brand-ink">
+    <div className="flex flex-col gap-3xs">
+      <label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className="text-sm text-brand-ink-muted">
+        <p id={hintId} className={fieldHintClass}>
           {hint}
         </p>
       ) : null}
@@ -62,14 +99,7 @@ export function TextField({
         aria-describedby={describedBy || undefined}
         {...rest}
       />
-      {error ? (
-        <p id={errorId} className="text-sm text-danger">
-          <span aria-hidden="true" className="font-semibold">
-            !{' '}
-          </span>
-          {error}
-        </p>
-      ) : null}
+      {error ? <FieldError id={errorId} message={error} /> : null}
     </div>
   );
 }
@@ -83,12 +113,12 @@ export function TextAreaField({ label, value, onChange, error, hint, rows = 3, .
     .filter(Boolean)
     .join(' ');
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-semibold text-brand-ink">
+    <div className="flex flex-col gap-3xs">
+      <label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className="text-sm text-brand-ink-muted">
+        <p id={hintId} className={fieldHintClass}>
           {hint}
         </p>
       ) : null}
@@ -102,11 +132,7 @@ export function TextAreaField({ label, value, onChange, error, hint, rows = 3, .
         aria-describedby={describedBy || undefined}
         {...rest}
       />
-      {error ? (
-        <p id={errorId} className="text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
+      {error ? <FieldError id={errorId} message={error} /> : null}
     </div>
   );
 }
@@ -120,12 +146,12 @@ export function SelectField({ label, value, onChange, options, error, hint, ...r
     .filter(Boolean)
     .join(' ');
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-semibold text-brand-ink">
+    <div className="flex flex-col gap-3xs">
+      <label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className="text-sm text-brand-ink-muted">
+        <p id={hintId} className={fieldHintClass}>
           {hint}
         </p>
       ) : null}
@@ -144,11 +170,7 @@ export function SelectField({ label, value, onChange, options, error, hint, ...r
           </option>
         ))}
       </select>
-      {error ? (
-        <p id={errorId} className="text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
+      {error ? <FieldError id={errorId} message={error} /> : null}
     </div>
   );
 }
@@ -158,22 +180,22 @@ export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
   const id = useId();
   const hintId = `${id}-hint`;
   return (
-    <div className="flex items-start gap-2">
+    <div className="flex items-start gap-xs">
       <input
         id={id}
         type="checkbox"
-        className="mt-1 h-5 w-5 rounded-brand border-brand-ink/30"
+        className="mt-3xs h-5 w-5 rounded-admin border-admin-rule-strong bg-admin-ground-input"
         checked={Boolean(checked)}
         onChange={(event) => onChange(event.target.checked)}
         aria-describedby={hint ? hintId : undefined}
         {...rest}
       />
       <div className="flex flex-col">
-        <label htmlFor={id} className="text-sm font-semibold text-brand-ink">
+        <label htmlFor={id} className={fieldLabelClass}>
           {label}
         </label>
         {hint ? (
-          <p id={hintId} className="text-sm text-brand-ink-muted">
+          <p id={hintId} className={fieldHintClass}>
             {hint}
           </p>
         ) : null}
@@ -183,10 +205,39 @@ export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
 }
 
 /**
- * The server's rejection, shown verbatim: the whole message plus each
- * `field: reason` segment it joined. role="alert" because a failed save is
- * the urgent case the guidelines reserve it for; tabIndex -1 so a submit
- * handler can move focus here.
+ * A field's own query: a mark, a word, and the reason under the field.
+ *
+ * Exported, because the room has fields this file does not build — a group
+ * of checkboxes with one shared error, a list with no single input of its
+ * own — and a second spelling of this markup is a second answer to "what
+ * does a rejected field look like". Renders nothing without a message, so a
+ * caller can pass one through unconditionally.
+ *
+ * `role` is normally left off: a form with several fields that fires several
+ * alerts at once is noise, which is why a rejected save is announced once,
+ * by ServerErrorSummary. A surface with ONE thing that can be rejected — the
+ * upload modal's file — has no summary to carry the announcement, so it asks
+ * for role="alert" here. The markup and the appearance stay the same either
+ * way, which is the whole point of this component.
+ */
+export function FieldError({ id, message, role }) {
+  if (!message) return null;
+  return (
+    <p id={id} role={role} className="text-folio text-admin-state-error">
+      <span aria-hidden="true" className="font-semibold">
+        !{' '}
+      </span>
+      {message}
+    </p>
+  );
+}
+
+/**
+ * The query — the server's rejection, shown verbatim: the whole message plus
+ * each `field: reason` segment it joined. It renders on the alarm ground
+ * inside the alarm rule, `role="alert"` because a failed save is the urgent
+ * case the guidelines reserve it for, and `tabIndex -1` so a submit handler
+ * can move focus here. The failed value is never discarded.
  */
 export function ServerErrorSummary({ error, errorRef, title = 'The server rejected this save' }) {
   if (!error) return null;
@@ -196,41 +247,179 @@ export function ServerErrorSummary({ error, errorRef, title = 'The server reject
       role="alert"
       ref={errorRef}
       tabIndex={-1}
-      className="rounded-brand border border-danger/40 bg-danger/10 px-4 py-3 text-danger"
+      className="rounded-admin border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm text-admin-state-error"
     >
-      <p className="font-semibold">{title}</p>
+      <p className="text-caption font-semibold">{title}</p>
       {segments.length > 1 ? (
-        <ul className="mt-2 list-disc ps-5 text-sm">
+        <ul className="mt-2xs list-disc ps-5 font-admin-data text-folio">
           {segments.map((segment, index) => (
             <li key={`${segment.message}-${index}`}>{segment.message}</li>
           ))}
         </ul>
       ) : (
-        <p className="mt-1 text-sm">{error.message}</p>
+        <p className="mt-3xs font-admin-data text-folio">{error.message}</p>
       )}
     </div>
   );
 }
 
-/** A saved/idle status line. Routine confirmations use role="status". */
+/** A saved/idle status line, stated in place. Routine work uses role=status. */
 export function SaveStatus({ message }) {
   return (
-    <p role="status" className="text-sm text-brand-ink-muted">
+    <p role="status" className="text-caption text-admin-ink-secondary">
       {message}
     </p>
   );
 }
 
-/** Card wrapper shared by every admin panel. */
-export function Panel({ title, description, children, actions }) {
+/** Notice ink and ground per tone. Each tone always carries its own words. */
+const NOTICE_TONES = Object.freeze({
+  info: 'border-admin-rule-hairline bg-admin-ground-raised text-admin-ink',
+  ok: 'border-admin-rule-hairline bg-admin-ground-raised text-admin-state-ok',
+  caution: 'border-admin-rule-hairline bg-admin-ground-proof text-admin-state-caution',
+  error: 'border-admin-rule-alarm bg-admin-ground-alarm text-admin-state-error',
+});
+
+/**
+ * A result stated in place, next to the control that caused it, and it
+ * stays. A toast may repeat it; a toast may never be the only record of what
+ * happened (admin story part 5).
+ *
+ * @param {{ tone?: 'info'|'ok'|'caution'|'error', message: React.ReactNode }} props
+ */
+export function Notice({ tone = 'info', message, children }) {
   return (
-    <section className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface p-4 sm:p-6">
+    <p
+      role={tone === 'error' ? 'alert' : 'status'}
+      className={`rounded-admin border-admin-hairline px-sm py-2xs text-caption ${
+        NOTICE_TONES[tone] ?? NOTICE_TONES.info
+      }`}
+    >
+      {message}
+      {children}
+    </p>
+  );
+}
+
+/**
+ * A destructive moment (admin story moment 3).
+ *
+ * The trigger opens a still surface: the alarm ground inside the alarm rule,
+ * a sentence naming what is removed, where it goes, and whether anything
+ * survives, and a confirm button that repeats the consequence at normal
+ * size. Nothing animates — no shake, no pulse, no countdown, no colour
+ * transition. A still surface reads as serious; a moving one reads as a
+ * game.
+ *
+ * @param {object} props
+ * @param {string} props.trigger the verb-first label that opens the moment
+ * @param {string} props.confirmLabel the verb-first label that does the work
+ * @param {string} props.consequence what is lost, in one plain sentence
+ * @param {string} [props.permanence] said the same way every time it applies
+ * @param {() => void} props.onConfirm
+ * @param {boolean} [props.disabled]
+ * @param {string} [props.busyLabel] shown while the call is in flight
+ * @param {boolean} [props.busy]
+ * @param {string} [props.title] heading for the moment
+ */
+export function DestructiveConfirm({
+  trigger,
+  confirmLabel,
+  consequence,
+  permanence,
+  onConfirm,
+  disabled = false,
+  busy = false,
+  busyLabel,
+  title,
+  className = '',
+}) {
+  const [open, setOpen] = useState(false);
+  const headingId = useId();
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className={`${dangerButtonClass} ${className}`}
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+      >
+        {trigger}
+      </button>
+    );
+  }
+  return (
+    <section
+      aria-labelledby={headingId}
+      className={`flex flex-col gap-xs rounded-admin border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm ${className}`}
+    >
+      <h2 id={headingId} className="text-caption font-semibold text-admin-state-error">
+        {title ?? trigger}
+      </h2>
+      <p className="max-w-[65ch] text-caption text-admin-ink">
+        {consequence}
+        {permanence ? ` ${permanence}` : ''}
+      </p>
+      <div className="flex flex-wrap items-center gap-xs">
+        <button
+          type="button"
+          className={dangerButtonClass}
+          disabled={busy}
+          onClick={() => onConfirm()}
+        >
+          {busy ? (busyLabel ?? confirmLabel) : confirmLabel}
+        </button>
+        <button
+          type="button"
+          className={secondaryButtonClass}
+          disabled={busy}
+          onClick={() => setOpen(false)}
+        >
+          Keep it
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * A ruled region of the stone. Regions are separated by rules and by tint,
+ * never by a floating rounded card and never by a shadow: elevation in this
+ * room is tint (admin story part 6).
+ *
+ * `flush` drops the panel's own padding so a galley's hairline rows run the
+ * full measure to the panel rule and supply their own gutters. It is a prop
+ * rather than a `p-0` in `className` because Tailwind emits the named
+ * spacing steps AFTER the numeric ones — `p-md` would win the cascade and
+ * the override would silently do nothing.
+ */
+export function Panel({
+  title,
+  description,
+  children,
+  actions,
+  className = '',
+  flush = false,
+}) {
+  return (
+    <section
+      className={`rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised ${
+        flush ? '' : 'p-md'
+      } ${className}`}
+    >
       {title ? (
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div
+          className={`${
+            flush ? 'px-md pt-md ' : ''
+          }mb-sm flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline pb-2xs`}
+        >
           <div>
-            <h2 className="font-heading text-xl font-semibold text-brand-ink">{title}</h2>
+            <h2 className="font-admin-ui text-lead font-semibold text-admin-ink">{title}</h2>
             {description ? (
-              <p className="mt-1 text-sm text-brand-ink-muted">{description}</p>
+              <p className="mt-3xs max-w-[65ch] text-caption text-admin-ink-secondary">
+                {description}
+              </p>
             ) : null}
           </div>
           {actions}

@@ -1,27 +1,26 @@
 /* Event Runner — documentation site (issue #108).
 
-   This file adds only what the docs shell needs on top of styles.css:
-   the two-column layout, the prose measure, and code/table styles. Every
-   color comes from the tokens defined in styles.css, so the landing page,
-   the docs, and the demo stay one visual system. No gradients, no
-   shadows, no blur, no motion beyond what styles.css already allows. */
+   Only what the docs shell needs on top of styles.css: the two-column
+   layout, the prose measure, and code and table styles. It mints no token;
+   every name it reads is declared in docs/tokens.css or docs/styles.css.
 
-/* ---------- Header, breadcrumbs ---------- */
+   The rules it is held to are in docs/interface-guidelines.md, "The project
+   site". */
 
-.brand-mark {
-  display: block;
-}
+/* ---------- Breadcrumbs ---------- */
 
 .breadcrumbs {
-  padding-block: 1.25rem 0;
-  font-size: 0.9rem;
-  color: var(--color-text-secondary);
+  padding-block: var(--space-md) 0;
+  font-family: var(--font-data);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-leading);
+  color: rgb(var(--color-text-secondary-rgb));
 }
 
 .breadcrumbs ol {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem 0.6rem;
+  gap: var(--space-2xs) var(--space-xs);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -29,17 +28,17 @@
 
 .breadcrumbs li + li::before {
   content: "/";
-  margin-inline-end: 0.6rem;
-  color: var(--color-border);
+  margin-inline-end: var(--space-xs);
+  color: rgb(var(--rule-strong-rgb));
 }
 
 .breadcrumbs a {
-  color: var(--color-text-secondary);
+  color: rgb(var(--color-text-secondary-rgb));
 }
 
 @media (hover: hover) {
   .breadcrumbs a:hover {
-    color: var(--color-text);
+    color: rgb(var(--color-text-primary-rgb));
   }
 }
 
@@ -48,31 +47,38 @@
 .docs-layout {
   display: grid;
   grid-template-columns: 15rem minmax(0, 1fr);
-  gap: 3rem;
+  gap: var(--space-2xl);
   align-items: start;
-  padding-block: 1.75rem 3.5rem;
+  padding-block: var(--space-lg) var(--space-2xl);
 }
 
 .docs-main {
   min-width: 0;
 }
 
-/* ---------- Section navigation ---------- */
+/* ---------- Section navigation ----------
+
+   The docket the admin uses: a standing grouped list of words down the
+   leading edge, each group head a folio on a hairline. */
 
 .docs-nav {
   position: sticky;
-  top: 1.5rem;
-  font-size: 0.95rem;
+  top: var(--space-lg);
+  font-family: var(--font-data);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-leading);
 }
 
 .docs-nav-section {
-  margin: 1.5rem 0 0.5rem;
-  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  margin: var(--space-lg) 0 var(--space-2xs);
+  padding-block-end: var(--space-2xs);
+  border-block-end: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
+  font-family: var(--folio-font);
+  font-size: var(--folio-size);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--folio-tracking);
   text-transform: uppercase;
-  color: var(--color-text-secondary);
+  color: rgb(var(--folio-text-rgb));
 }
 
 .docs-nav-section:first-child {
@@ -83,31 +89,45 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  border-inline-start: 1px solid var(--color-border);
+  border-inline-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
 .docs-nav li a {
   display: block;
-  padding: 0.3rem 0 0.3rem 0.75rem;
-  color: var(--color-text-secondary);
+  padding: var(--space-2xs) 0 var(--space-2xs) var(--space-sm);
+  color: rgb(var(--color-text-secondary-rgb));
   text-decoration: none;
 }
 
-/* The current item thickens the nav rail it already sits on. This is a
-   state indicator paired with aria-current and a weight change, not a
-   decorative left edge. */
+/* Dense is not cramped. A mouse gets the docket's own rhythm above — a
+   caption line and 4px, entries flush against each other so there is no
+   dead space between two words. A finger gets the 44px bar instead
+   (interface guidelines, Accessibility). The word does not move on its
+   line and neither the size nor the leading changes: only the air around
+   the word grows, so the docket still reads as a list of words rather
+   than a stack of buttons. A caption line at this leading is under 21px,
+   so 12px each side carries most of the bar and the floor carries the
+   rest at the smallest caption size. */
+@media (pointer: coarse) {
+  .docs-nav li a {
+    padding-block: var(--space-sm);
+    min-block-size: 44px;
+  }
+}
+
+/* The current item thickens the rail it already sits on. Four signals, never
+   colour alone: the marker, the weight, the ink step, and aria-current. */
 .docs-nav li a.is-current {
-  color: var(--color-text);
-  font-weight: 600;
-  box-shadow: none;
-  border-inline-start: 2px solid var(--color-accent);
-  margin-inline-start: -1px;
-  padding-inline-start: calc(0.75rem - 1px);
+  color: rgb(var(--color-text-primary-rgb));
+  font-weight: var(--weight-semibold);
+  border-inline-start: var(--rule-strong-width) solid rgb(var(--color-accent-rgb));
+  margin-inline-start: calc(-1 * var(--rule-hairline-width));
+  padding-inline-start: calc(var(--space-sm) - var(--rule-hairline-width));
 }
 
 @media (hover: hover) {
   .docs-nav li a:hover {
-    color: var(--color-text);
+    color: rgb(var(--color-text-primary-rgb));
     text-decoration: underline;
     text-underline-offset: 0.25em;
   }
@@ -115,46 +135,62 @@
 
 /* ---------- Prose ---------- */
 
+/* `overflow-wrap` inherits, so this is the whole of "every text container
+   breaks a long word" for the article: a bare URL or an unbroken identifier
+   in a paragraph, a list item, or a cell breaks instead of widening the page
+   (interface guidelines, "The project site"). It cannot reach a code block,
+   which is `white-space: pre` and scrolls in its own container. */
 .prose {
-  max-width: 44rem;
+  max-width: var(--measure);
+  overflow-wrap: break-word;
 }
 
 .prose h1 {
-  margin: 0 0 1rem;
-  font-size: clamp(2rem, 4vw, 2.6rem);
-  font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-h1);
+  font-weight: var(--weight-bold);
+  line-height: var(--text-h1-leading);
+  letter-spacing: var(--text-h1-tracking);
 }
 
+/* The strong rule sits ABOVE the heading, never under it. */
 .prose h2 {
-  margin: 2.75rem 0 0.85rem;
-  padding-block-end: 0.4rem;
-  border-block-end: 1px solid var(--color-border);
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  margin: var(--space-xl) 0 var(--space-sm);
+  padding-block-start: var(--space-sm);
+  border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
+  font-size: var(--text-h2);
+  font-weight: var(--weight-semibold);
+  line-height: var(--text-h2-leading);
+  letter-spacing: var(--text-h2-tracking);
 }
 
+/* A subsection is not a section boundary, so it takes no rule. The heading
+   face, the weight, the step, and the space above it are the whole signal —
+   and on a runbook with forty of them, a rule per heading stops reading as
+   structure and starts reading as ruling. */
 .prose h3 {
-  margin: 2rem 0 0.6rem;
-  font-size: 1.18rem;
-  font-weight: 700;
+  margin: var(--space-xl) 0 var(--space-xs);
+  font-size: var(--text-h3);
+  font-weight: var(--weight-bold);
+  line-height: var(--text-h3-leading);
+  letter-spacing: var(--text-h3-tracking);
 }
 
-.prose h4 {
-  margin: 1.6rem 0 0.5rem;
-  font-family: "Bricolage Grotesque", "Arial Black", "Avenir Next Condensed", sans-serif;
-  font-size: 1.02rem;
-  font-weight: 700;
+.prose h4,
+.prose h5,
+.prose h6 {
+  margin: var(--space-md) 0 var(--space-xs);
+  font-family: var(--font-heading);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  line-height: var(--text-h3-leading);
 }
 
 /* styles.css sizes the landing hero's lede for a two-column layout; in a
    single prose column it should run the full measure. */
 .prose .lede {
   max-width: none;
-  margin-block-end: 1rem;
-  font-size: 1.12rem;
+  margin-block-end: var(--space-md);
 }
 
 .prose p,
@@ -163,64 +199,63 @@
 }
 
 .prose p {
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-md);
 }
 
 .prose > ul,
 .prose > ol {
-  margin: 0 0 1rem;
-  padding-inline-start: 1.35rem;
+  margin: 0 0 var(--space-md);
+  padding-inline-start: var(--space-lg);
 }
 
 .prose li {
-  margin-block-end: 0.35rem;
+  margin-block-end: var(--space-2xs);
 }
 
 .prose li > ul,
 .prose li > ol {
-  margin-block: 0.35rem;
-  padding-inline-start: 1.2rem;
+  margin-block: var(--space-2xs);
+  padding-inline-start: var(--space-md);
 }
 
 .prose li.task-item {
   list-style: none;
-  margin-inline-start: -1.35rem;
+  margin-inline-start: calc(-1 * var(--space-lg));
 }
 
 .prose li.task-item input {
-  margin-inline-end: 0.45rem;
-  accent-color: var(--color-accent);
+  margin-inline-end: var(--space-2xs);
+  accent-color: rgb(var(--color-accent-rgb));
 }
 
 .prose hr {
-  margin-block: 2.5rem;
+  margin-block: var(--space-xl);
   border: 0;
-  border-block-start: 1px solid var(--color-border);
+  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
+/* The rule is structure, so it takes a rule token and never brand color. */
 .prose blockquote {
-  margin: 0 0 1rem;
-  padding: 0.1rem 0 0.1rem 1rem;
-  border-inline-start: 2px solid var(--color-border);
-  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-md);
+  padding: 0 0 0 var(--space-md);
+  border-inline-start: var(--rule-strong-width) solid rgb(var(--rule-strong-rgb));
+  color: rgb(var(--color-text-secondary-rgb));
 }
 
 .prose img {
   max-width: 100%;
   height: auto;
-  border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
+  border: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+  border-radius: var(--radius-base);
 }
 
-/* The anchor duplicates a link the reader can already get from the address
-   bar, so it stays out of the way until it is wanted. It is a real link
-   throughout: keyboard focus reveals it, and it keeps its label for
-   assistive technology. */
+/* Out of the way until it is wanted, and a real link throughout: keyboard
+   focus reveals it, and it keeps its label for assistive technology. */
 .heading-anchor {
-  margin-inline-start: 0.4rem;
-  color: var(--color-accent-text);
+  margin-inline-start: var(--space-2xs);
+  color: rgb(var(--color-accent-rgb));
   text-decoration: none;
-  font-weight: 400;
+  font-weight: var(--weight-regular);
   opacity: 0;
 }
 
@@ -233,85 +268,98 @@ h6:hover > .heading-anchor {
   opacity: 1;
 }
 
-/* ---------- Code ---------- */
+/* ---------- Code ----------
+
+   The value a reader copies, in the mono role, on the alternate ground
+   inside a hairline. Elevation is tint, never shadow. */
 
 .prose code {
-  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.88em;
-  overflow-wrap: break-word;
 }
 
 .prose :not(pre) > code {
   padding: 0.1em 0.32em;
-  border: 1px solid var(--color-border);
-  border-radius: 0.3rem;
-  background: var(--color-surface-tint);
+  border: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+  border-radius: var(--radius-base);
+  background: rgb(var(--color-surface-alt-rgb));
 }
 
 .prose pre {
-  margin: 0 0 1.25rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: 0.6rem;
-  background: var(--color-surface-tint);
+  margin: 0 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+  border-radius: var(--radius-base);
+  background: rgb(var(--color-surface-alt-rgb));
   overflow-x: auto;
 }
 
 .prose pre code {
-  font-size: 0.86rem;
-  line-height: 1.55;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-leading);
   white-space: pre;
 }
 
-/* ---------- Tables ---------- */
+/* ---------- Tables ----------
+
+   Hairlines separate the rows; nothing boxes the table in. The scroller keeps
+   a wide table inside its column instead of widening the page. */
 
 .table-scroll {
-  margin-block-end: 1.25rem;
+  margin-block-end: var(--space-md);
   overflow-x: auto;
-  border: 1px solid var(--color-border);
-  border-radius: 0.6rem;
+  border-block: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
 .prose table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.95rem;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-leading);
 }
 
 .prose th,
 .prose td {
-  padding: 0.55rem 0.85rem;
+  padding: var(--space-xs) var(--space-sm);
   text-align: start;
   vertical-align: top;
-  border-block-start: 1px solid var(--color-border);
+  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
 .prose thead th {
   border-block-start: 0;
-  background: var(--color-surface-tint);
-  font-weight: 600;
+  border-block-end: var(--rule-strong-width) solid rgb(var(--section-rule-rgb));
+  font-family: var(--font-data);
+  font-size: var(--folio-size);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--folio-tracking);
+  text-transform: uppercase;
+  color: rgb(var(--folio-text-rgb));
   white-space: nowrap;
 }
 
-/* ---------- On this page ---------- */
+/* ---------- On this page ----------
+
+   A contents list, not a panel: no ground, no border, and no closing rule —
+   the strong rule on the first h2 below it already ends it. */
 
 .contents {
-  margin-block-end: 2rem;
-  padding: 0.9rem 1.1rem;
-  border: 1px solid var(--color-border);
-  border-radius: 0.7rem;
-  background: var(--color-surface);
-  font-size: 0.95rem;
+  margin-block-end: var(--space-xl);
+  font-family: var(--font-data);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-leading);
 }
 
 .contents-title {
-  margin: 0 0 0.5rem;
-  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  margin: 0 0 var(--space-xs);
+  padding-block-end: var(--space-2xs);
+  border-block-end: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
+  font-family: var(--folio-font);
+  font-size: var(--folio-size);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--folio-tracking);
   text-transform: uppercase;
-  color: var(--color-text-secondary);
+  color: rgb(var(--folio-text-rgb));
 }
 
 .contents ul {
@@ -319,75 +367,88 @@ h6:hover > .heading-anchor {
   margin: 0;
   padding: 0;
   columns: 2;
-  column-gap: 1.5rem;
+  column-gap: var(--space-lg);
 }
 
 .contents li {
-  margin-block-end: 0.25rem;
+  margin-block-end: var(--space-3xs);
   break-inside: avoid;
 }
 
 /* ---------- Documentation home ---------- */
 
 .docs-section {
-  margin-block-start: 2.5rem;
+  margin-block-start: var(--page-section-gap);
 }
 
 .docs-index-list {
   list-style: none;
-  margin: 0;
+  margin: var(--space-md) 0 0;
   padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: 0.7rem;
-  background: var(--color-surface);
 }
 
 .docs-index-list li {
   margin: 0;
-  padding: 0.75rem 1rem;
-  border-block-start: 1px solid var(--color-border);
-}
-
-.docs-index-list li:first-child {
-  border-block-start: 0;
+  padding-block: var(--page-row-pad-block);
+  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
 .docs-index-list a {
-  font-weight: 600;
+  font-family: var(--font-heading);
+  font-size: var(--text-h3);
+  font-weight: var(--weight-bold);
+  line-height: var(--text-h3-leading);
+  letter-spacing: var(--text-h3-tracking);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .docs-index-list a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
 }
 
 .docs-index-list span {
   display: block;
-  color: var(--color-text-secondary);
-  font-size: 0.95rem;
+  margin-block-start: var(--space-3xs);
+  color: rgb(var(--color-text-secondary-rgb));
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-leading);
 }
 
 /* ---------- Source note and pagination ---------- */
 
 .source-note {
-  max-width: 44rem;
-  margin: 2.5rem 0 0;
-  padding-block-start: 1.25rem;
-  border-block-start: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-  font-size: 0.92rem;
+  max-width: var(--measure);
+  margin: var(--space-xl) 0 0;
+  padding-block-start: var(--space-md);
+  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+  font-family: var(--font-data);
+  color: rgb(var(--color-text-secondary-rgb));
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-leading);
 }
 
+/* One rule opens the pager, not one per link: the pair is a single region,
+   and the source note above it already closes the article on a hairline. */
 .page-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-block-start: 1.5rem;
+  gap: var(--space-md);
+  margin-block-start: var(--space-xl);
+  border-block-start: var(--rule-strong-width) solid rgb(var(--section-rule-rgb));
 }
 
+/* The "Previous"/"Next" word above the title is a direction label inside a
+   link, not a label above a heading, so the eyebrow ban does not reach it —
+   there is no heading here. */
 .page-nav-link {
   flex: 1 1 14rem;
-  padding: 0.7rem 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: 0.6rem;
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-weight: 600;
+  padding-block: var(--space-sm) var(--space-xs);
+  color: rgb(var(--color-text-primary-rgb));
+  font-family: var(--font-heading);
+  font-weight: var(--weight-bold);
   text-decoration: none;
 }
 
@@ -397,17 +458,20 @@ h6:hover > .heading-anchor {
 
 .page-nav-link span {
   display: block;
-  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  margin-block-end: var(--space-3xs);
+  font-family: var(--folio-font);
+  font-size: var(--folio-size);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--folio-tracking);
   text-transform: uppercase;
-  color: var(--color-text-secondary);
+  color: rgb(var(--folio-text-rgb));
 }
 
 @media (hover: hover) {
   .page-nav-link:hover {
-    border-color: var(--color-accent);
+    color: rgb(var(--color-accent-rgb));
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
 }
 
@@ -416,7 +480,7 @@ h6:hover > .heading-anchor {
 @media (max-width: 56rem) {
   .docs-layout {
     grid-template-columns: minmax(0, 1fr);
-    gap: 2.5rem;
+    gap: var(--space-xl);
   }
 
   /* On a narrow screen the full index below the article is more useful
@@ -425,8 +489,8 @@ h6:hover > .heading-anchor {
   .docs-nav {
     position: static;
     order: 2;
-    padding-block-start: 1.5rem;
-    border-block-start: 1px solid var(--color-border);
+    padding-block-start: var(--space-lg);
+    border-block-start: var(--rule-strong-width) solid rgb(var(--section-rule-rgb));
   }
 
   .docs-main {
@@ -435,5 +499,61 @@ h6:hover > .heading-anchor {
 
   .contents ul {
     columns: 1;
+  }
+}
+
+/* ---------- Print ----------
+
+   The palette switch is in docs/tokens.css, which re-points the ink, the
+   ground, and the rules at the light values under print media. This block
+   declares no colour; it only decides what a sheet of paper is for.
+
+   What comes off the printer is the document: the masthead so the page says
+   where it came from, the breadcrumbs so it says where it sits, the contents
+   list, and the article. The docket, the site nav, and the previous/next
+   pager are ways of getting to another page, and paper cannot follow a link,
+   so they leave rather than sit there dead. With the docket gone the layout
+   is one column -- the track has to go too, or the article would keep the
+   empty 15rem beside it. */
+
+@media print {
+  .docs-nav,
+  .page-nav,
+  .site-header nav {
+    display: none;
+  }
+
+  .docs-layout {
+    display: block;
+    padding-block: var(--space-md);
+  }
+
+  /* The measure is set for a screen column; a sheet is its own measure. */
+  .prose {
+    max-width: none;
+  }
+
+  /* A heading should not be the last thing on a sheet, and a table or a code
+     block should not be split when it can be helped. */
+  .prose h1,
+  .prose h2,
+  .prose h3,
+  .prose h4 {
+    break-after: avoid;
+  }
+
+  .prose pre,
+  .table-scroll {
+    break-inside: avoid;
+  }
+
+  /* Nothing scrolls on paper: a wide table or a long line has to wrap or be
+     let out of its box, because a scroller prints as a clipped column. */
+  .table-scroll {
+    overflow-x: visible;
+  }
+
+  .prose pre code {
+    white-space: pre-wrap;
   }
 }

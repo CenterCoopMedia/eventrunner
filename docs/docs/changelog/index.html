@@ -23,11 +23,12 @@
   <meta name="twitter:description" content="What changed, release by release.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta name="twitter:image:alt" content="Event Runner documentation">
-  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
   <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
 </head>
@@ -37,10 +38,15 @@
   <div class="wrap">
     <header class="site-header">
       <a class="brand" href="/eventrunner/">
-        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
-        <span class="brand-text">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2.5" y="2" width="3" height="20"/>
+          <rect x="5.5" y="2" width="16" height="3"/>
+          <rect x="5.5" y="11" width="9.5" height="2"/>
+          <rect x="5.5" y="19.5" width="13" height="2.5"/>
+        </svg>
+        <span class="brand-words">
           <strong>Event Runner</strong>
-          <span>Documentation</span>
+          <span class="brand-line">Documentation</span>
         </span>
       </a>
       <nav aria-label="Site">
@@ -73,6 +79,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
           <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
@@ -105,7 +112,33 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The landing page and the documentation site now use the product&#39;s own design language: the same
+          token names the app ships, the editorial type scale, rules and folios instead of cards, and a
+          complete dark palette that follows the reader&#39;s system setting. The page content, links, and
+          social-card metadata are unchanged (design brief §5.3).</li>
+          <li>Admin documentation now uses the words staff see rather than the names the code uses: site style,
+          header, illustrations, page preview, and advanced color settings. The interface guidelines
+          keep the internal names and mark them as internal.</li>
+          <li>The product documentation is now two depths. <code>docs/ADMIN_GUIDE.md</code> is the operator path — a
+          six-step visual setup, then every admin screen in the order the work happens — and the new
+          <code>docs/design-reference.md</code> is the complete engine: all six site styles as first-class
+          capabilities with a recommended configuration each, the four header treatments, the page
+          templates and the axes under them, site-level navigation, the illustration sets, the three token
+          tiers, the composition rules, print behaviour, the fixed admin identity, and the extension points.</li>
+          <li>The Pages site&#39;s scale and palette are generated from <code>design/tokens/</code> into <code>docs/tokens.css</code>
+          rather than hand-copied into <code>docs/styles.css</code>; <code>build-pages --check</code> fails on a stale copy.</li>
+          <li>The Pages site has a mark again — a stem and the system&#39;s three rule weights — carried by the
+          masthead, the favicon, and both regenerated social cards. Section boundaries now vary by weight
+          instead of drawing one identical rule each, and the folio floor is caption size.</li>
           <li>Updated canonical repository and GitHub Pages paths to <code>CenterCoopMedia/eventrunner</code> (#97).</li>
+          </ul>
+          <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>A site restyled after deployment printed the palette it shipped with, not the one on screen —
+          and only from a dark screen, because the generated print block outranked the runtime one. The
+          runtime theme element now emits its own print block from the live resolved light palette at the
+          same specificity, and the generated block stays as the no-JavaScript fallback.</li>
+          <li>A heading containing a long identifier scrolled a whole documentation page sideways at 320px.</li>
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
@@ -149,7 +182,7 @@
           <li>Playwright end-to-end suite on the Firebase emulators (#38): four critical journeys — OTP sign-in, CMS publish/isolation, the speaker invite pipeline, and ticket-claim-to-bookmark — seeded once per run via the same <code>init-event.cjs</code>/<code>seed-demo-event.cjs</code> operator scripts a real deployment uses, driven through <code>scripts/dev/run-e2e.sh</code> (<code>firebase emulators:exec</code> wrapping <code>vite</code>) and a new <code>e2e</code> CI job that clones the rules job&#39;s emulator/Java setup. OTP and invite-token capture reads a dedicated <code>E2E_MAIL_FILE</code> sink the console email provider appends to, replacing an unreliable scrape of colorized emulator stdout.</li>
           <li><code>docs/POSTMARK_PROVISIONING.md</code>: an end-to-end Postmark account/server/stream provisioning runbook plus the missing <code>EMAIL_ACCOUNT_API_KEY</code> secret documentation in <code>.env.example</code> and the ADR/deploy-runbook secret tables (#4).</li>
           </ul>
-          <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
+          <h3 id="fixed-1">Fixed<a class="heading-anchor" href="#fixed-1" aria-label="Link to this section">#</a></h3>
           <ul>
           <li>Firebase deployment validation no longer requires <code>VITE_FIREBASE_MEASUREMENT_ID</code> when Google Analytics is disabled (#101).</li>
           </ul>

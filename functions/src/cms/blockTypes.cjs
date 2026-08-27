@@ -41,7 +41,7 @@ const BLOCK_TYPES = Object.freeze({
   text: blockType({
     id: 'text',
     label: 'Text',
-    description: 'A single plain-text value: headings, labels, short copy.',
+    description: 'A single plain-text value: Headings, labels, short copy.',
     fields: [field('value', 'string', true)],
   }),
   richtext: blockType({
@@ -53,17 +53,22 @@ const BLOCK_TYPES = Object.freeze({
   image: blockType({
     id: 'image',
     label: 'Image',
-    description: 'An image by URL. Alt text is required, not optional.',
+    description:
+      'An image by URL. Alt text is required, not optional. focalX and focalY name ' +
+      'the part of the picture a fixed crop must keep, as percentages from the top ' +
+      'left; both default to the centre.',
     fields: [
       field('url', 'url', true),
       field('alt', 'string', true),
       field('caption', 'string', false),
+      field('focalX', 'number', false),
+      field('focalY', 'number', false),
     ],
   }),
   cta: blockType({
     id: 'cta',
     label: 'Call to action',
-    description: 'A button or prominent link: label plus destination.',
+    description: 'A button or prominent link: Label plus destination.',
     fields: [
       field('label', 'string', true),
       field('url', 'url', true),
@@ -73,10 +78,17 @@ const BLOCK_TYPES = Object.freeze({
   stat: blockType({
     id: 'stat',
     label: 'Statistic',
-    description: 'A headline number with its caption, e.g. "450 / attendees".',
+    description:
+      'A number that carries evidence: The figure and its caption, plus the four parts ' +
+      'every stat must state — the finding in words, what it counts, where it came from, ' +
+      'and what a screen reader hears. All six are required to write one.',
     fields: [
       field('value', 'string', true),
       field('label', 'string', true),
+      field('takeaway', 'string', true),
+      field('description', 'string', true),
+      field('source', 'string', true),
+      field('alt', 'string', true),
       field('order', 'number', false),
     ],
   }),
@@ -111,6 +123,52 @@ const BLOCK_TYPES = Object.freeze({
     ],
   }),
 });
+
+/**
+ * The stat write contract (design brief §2.1.1), field by field, with the
+ * sentence that says what each part is for.
+ *
+ * SIX PARTS, NOT FOUR. The four evidence parts are what make a number a
+ * stat rather than a decoration, and they were enforced from PR3 on — but
+ * the figure and its caption were left out of the check even though the
+ * registry marks both required, so a block could be written with a
+ * takeaway, a description, a source and alt text and NO NUMBER: a stat
+ * block with nothing to show. StatBlock renders whatever it is given, so
+ * that document reaches a reader as a caption with a hole where the figure
+ * should be. All six are the contract for a block being created or edited.
+ *
+ * The words are the operator's, not the schema's: a rejection has to tell
+ * whoever is writing the block what to write.
+ */
+const STAT_CONTRACT = Object.freeze({
+  value: 'carry the figure itself',
+  label: 'caption the figure in a few words',
+  takeaway: 'state the finding in words, not the category',
+  description: 'say what the number counts and over what period',
+  source: 'name where the number came from and the date you read it',
+  alt: 'describe the finding for a screen reader',
+});
+
+/**
+ * Every missing part of the stat contract, each naming its field.
+ *
+ * ENFORCED AT THE WRITE, NOT AT THE READ. A stat block already stored in
+ * the legacy `{ value, label }` shape stays valid, keeps publishing, and
+ * keeps rendering (StatBlock renders both shapes) — nothing sweeps the
+ * corpus and nothing drops content. What this stops is a stat block being
+ * WRITTEN without its parts, from PR3 on.
+ *
+ * Pure, and a no-op for every other block type.
+ *
+ * @param {object} fields the block's fields as they will be stored
+ * @returns {string[]}
+ */
+function statContractErrors(fields) {
+  if (!fields || fields.blockType !== 'stat') return [];
+  return Object.entries(STAT_CONTRACT)
+    .filter(([id]) => typeof fields[id] !== 'string' || fields[id].trim().length === 0)
+    .map(([id, why]) => `${id}: a stat block must ${why}`);
+}
 
 /**
  * True only for ids defined in BLOCK_TYPES. Own-property check, so
@@ -151,7 +209,8 @@ function draftCollectionFor(name) {
 module.exports = {
   BLOCK_TYPES,
   isKnownBlockType,
+  statContractErrors,
   PUBLISHABLE_COLLECTIONS,
   draftCollectionFor,
-  internals: { FIELD_TYPES },
+  internals: { FIELD_TYPES, STAT_CONTRACT },
 };

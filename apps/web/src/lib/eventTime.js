@@ -179,6 +179,27 @@ export function formatSessionTimeRange(eventConfig, session) {
   };
 }
 
+/**
+ * A session's START on its own: `{ startIso, startLabel }`, with the AM/PM
+ * always carried. Null where the session's day or start time cannot be
+ * resolved.
+ *
+ * formatSessionTimeRange drops the period from the start of a range that
+ * does not cross noon ("9:30–10:00 AM"), which is right for a range and
+ * wrong for a time standing alone — a schedule-grid row header reading
+ * "9:00" states half a time. Asking the same formatter for a range with no
+ * end is what makes the period come back, so there is still one formatter
+ * and one set of rules about how a time reads.
+ *
+ * @param {object} eventConfig
+ * @param {object} session
+ * @returns {{ startIso: string, startLabel: string }|null}
+ */
+export function formatSessionStart(eventConfig, session) {
+  const range = formatSessionTimeRange(eventConfig, { ...session, endTime: null });
+  return range ? { startIso: range.startIso, startLabel: range.startLabel } : null;
+}
+
 /** "YYYY-MM-DD" one calendar day later, UTC-safe (no local-timezone DST). */
 function rollDateForward(dateStr) {
   const [y, mo, d] = dateStr.split('-').map(Number);
@@ -199,4 +220,42 @@ export function formatDayDate(day, timeZone) {
     month: 'long',
     day: 'numeric',
   }).format(instant);
+}
+
+/**
+ * The configured days as one dateline for the masthead nameplate (design
+ * brief §2.1): "October 14–16, 2026" within a month, "October 30 – November
+ * 1, 2026" across one, "December 31, 2026 – January 1, 2027" across a year.
+ *
+ * Runtime config/event can deliver a malformed or empty `days` array, so
+ * every unresolvable date is dropped and an empty result returns null — the
+ * nameplate simply renders without its dateline rather than blanking the
+ * shell that wraps every route.
+ *
+ * The en dash is the range dash (interface guidelines: Typography); the
+ * spaced form is used where either side already carries a space, which is
+ * the ordinary typographic rule for a range of multi-word endpoints.
+ */
+export function formatEventDateRange(days, timeZone) {
+  const instants = (Array.isArray(days) ? days : [])
+    .map((day) => zonedDateTime(day?.date, '12:00', timeZone))
+    .filter(Boolean)
+    .sort((a, b) => a - b);
+  if (instants.length === 0) return null;
+
+  const first = instants[0];
+  const last = instants[instants.length - 1];
+  const parts = (instant, options) => partsIn(timeZone, instant, options);
+  const startParts = parts(first, { year: 'numeric', month: 'long', day: 'numeric' });
+  const endParts = parts(last, { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const startFull = `${startParts.month} ${startParts.day}, ${startParts.year}`;
+  if (first.getTime() === last.getTime()) return startFull;
+  if (startParts.year !== endParts.year) {
+    return `${startFull} – ${endParts.month} ${endParts.day}, ${endParts.year}`;
+  }
+  if (startParts.month !== endParts.month) {
+    return `${startParts.month} ${startParts.day} – ${endParts.month} ${endParts.day}, ${endParts.year}`;
+  }
+  return `${startParts.month} ${startParts.day}–${endParts.day}, ${endParts.year}`;
 }

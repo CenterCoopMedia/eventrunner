@@ -3,12 +3,20 @@
 // allowedBlocks, maxBlocks) comes from the page's own doc — the CURRENT one
 // (draft if it has one, else live), same as AdminPageEditor reads it — so a
 // section just renamed in a draft shows its new label here immediately.
+//
+// The galley pattern here is the same one AdminContentSection.jsx (step 3,
+// singular) uses for its blocks: hairline rows in a Panel, no zebra, no row
+// cards. This list carries no publish state of its own — a section is
+// structure, not a record — so its rows carry only the count in the data
+// face.
 import { Link, useParams } from 'react-router-dom';
-import EmptyState from '../../components/EmptyState.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
 import { Panel, secondaryButtonClass } from '../components/formControls.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+} from '../components/adminChrome.jsx';
 
 export default function AdminContentSections() {
   const { pageId } = useParams();
@@ -19,11 +27,11 @@ export default function AdminContentSections() {
   const sections = page?.current?.sections ?? [];
 
   if (pagesLoading && !page) {
-    return <LoadingState label="Loading page…" />;
+    return <AdminLoadingState label="Loading page…" />;
   }
   if (!pagesLoading && !page) {
     return (
-      <EmptyState
+      <AdminEmptyState
         title="No such page"
         description="That page id has neither a published nor a draft revision."
         action={
@@ -36,30 +44,26 @@ export default function AdminContentSections() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-brand-ink">
-            {page.current?.label || page.id} — sections
-          </h1>
-          <p className="text-sm text-brand-ink-muted">
-            Each section holds the content blocks the public page renders in
-            that slot.
-          </p>
-        </div>
-        <Link to=".." relative="path" className={secondaryButtonClass}>
-          Back to content
-        </Link>
-      </div>
+    <div className="flex flex-col gap-md">
+      <AdminPageHeader
+        title={page.current?.label || page.id}
+        identifiers={`${sections.length} section${sections.length === 1 ? '' : 's'}`}
+        description="Each section holds the content blocks the public page renders in that slot."
+        actions={
+          <Link to=".." relative="path" className={secondaryButtonClass}>
+            Back to content
+          </Link>
+        }
+      />
 
       {sections.length === 0 ? (
-        <EmptyState
+        <AdminEmptyState
           title="No sections"
           description="Add a section to this page in Pages before editing its content."
         />
       ) : (
-        <Panel>
-          <ul className="divide-y divide-brand-ink/10">
+        <Panel flush>
+          <ul>
             {sections.map((section) => {
               const count = contentRows.filter(
                 (row) => row.current?.section === section.id,
@@ -67,24 +71,26 @@ export default function AdminContentSections() {
               return (
                 <li
                   key={section.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3"
+                  className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
                 >
-                  <div className="min-w-0">
-                    <Link
-                      to={section.id}
-                      className="touch-target inline-flex items-center rounded-brand font-semibold text-brand-ink underline underline-offset-4 hover:text-brand-primary-dark"
-                    >
-                      {section.label || section.id}
+                  <div className="flex flex-wrap items-center justify-between gap-sm px-md py-xs">
+                    <div className="min-w-0">
+                      <Link
+                        to={section.id}
+                        className="admin-target inline-flex items-center rounded-admin font-semibold text-admin-ink underline underline-offset-4"
+                      >
+                        {section.label || section.id}
+                      </Link>
+                      <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
+                        {contentLoading ? 'Loading…' : `${count} block${count === 1 ? '' : 's'}`}
+                        {' · max '}
+                        {section.maxBlocks}
+                      </p>
+                    </div>
+                    <Link to={section.id} className={secondaryButtonClass}>
+                      Open
                     </Link>
-                    <p className="mt-1 truncate text-sm text-brand-ink-muted">
-                      {contentLoading ? 'Loading…' : `${count} block${count === 1 ? '' : 's'}`}
-                      {' · max '}
-                      {section.maxBlocks}
-                    </p>
                   </div>
-                  <Link to={section.id} className={secondaryButtonClass}>
-                    Open
-                  </Link>
                 </li>
               );
             })}

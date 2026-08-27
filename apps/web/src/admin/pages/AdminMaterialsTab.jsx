@@ -21,10 +21,11 @@ import {
   ServerErrorSummary,
   SelectField,
   TextField,
-  dangerButtonClass,
+  DestructiveConfirm,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AdminPageHeader from '../components/adminChrome.jsx';
 
 const REVIEW_LABEL = { pending: 'Pending review', approved: 'Approved', rejected: 'Rejected' };
 
@@ -54,7 +55,7 @@ function AddLinkForm({ sessionId, onAdded }) {
   }
 
   return (
-    <form className="flex flex-col gap-3" onSubmit={submit}>
+    <form className="flex flex-col gap-sm" onSubmit={submit}>
       <ServerErrorSummary error={error} />
       <TextField label="Link URL" value={url} onChange={setUrl} type="url" required />
       <TextField
@@ -104,15 +105,16 @@ function MaterialRow({ material, onChanged }) {
   }
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 rounded-brand border border-brand-ink/10 bg-brand-surface-alt p-3">
-      <div>
-        <p className="font-medium text-brand-ink">{material.filename}</p>
-        <p className="text-sm text-brand-ink-muted">
-          <span>{material.type === 'link' ? material.url : material.storagePath}</span> ·{' '}
+    <li className="flex flex-wrap items-center justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline py-xs last:border-b-0">
+      <div className="min-w-0">
+        <p className="font-semibold text-admin-ink">{material.filename}</p>
+        <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
+          <span>{material.type === 'link' ? material.url : material.storagePath}</span>
+          {' · '}
           <span>{REVIEW_LABEL[material.reviewStatus] ?? material.reviewStatus}</span>
         </p>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-xs">
         {material.reviewStatus !== 'approved' ? (
           <button type="button" className={secondaryButtonClass} disabled={busy} onClick={() => review('approved')}>
             Approve
@@ -123,9 +125,16 @@ function MaterialRow({ material, onChanged }) {
             Reject
           </button>
         ) : null}
-        <button type="button" className={dangerButtonClass} disabled={busy} onClick={remove}>
-          Delete
-        </button>
+        <DestructiveConfirm
+          trigger="Delete"
+          title={`Delete ${material.filename}`}
+          confirmLabel="Delete this material"
+          busy={busy}
+          disabled={busy}
+          consequence="The file is removed from the session’s materials list, and anyone holding its link gets nothing."
+          permanence="This cannot be undone."
+          onConfirm={remove}
+        />
       </div>
     </li>
   );
@@ -175,15 +184,11 @@ export default function AdminMaterialsTab() {
   }, [load]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-brand-ink">Materials</h1>
-        <p className="text-sm text-brand-ink-muted">
-          Manage a session's slide decks and links. Materials are visible to attendees only once
-          approved, and the underlying URL stays embargoed until the session ends unless you or
-          the session's speaker are viewing it.
-        </p>
-      </div>
+    <div className="flex flex-col gap-md">
+      <AdminPageHeader
+        title="Materials"
+        description="Manage a session’s slide decks and links. Materials are visible to attendees only once approved, and the underlying URL stays embargoed until the session ends unless you or the session’s speaker are viewing it."
+      />
 
       <Panel title="Choose a session">
         <SelectField
@@ -203,11 +208,11 @@ export default function AdminMaterialsTab() {
           <Panel title="Materials for this session">
             <ServerErrorSummary error={error} />
             {loading ? (
-              <SaveStatus message="Loading…" />
+              <SaveStatus message="Loading materials…" />
             ) : materials.length === 0 ? (
-              <p className="text-sm text-brand-ink-muted">No materials yet.</p>
+              <p className="text-caption text-admin-ink-secondary">No materials yet.</p>
             ) : (
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col">
                 {materials.map((material) => (
                   <MaterialRow key={material.id} material={material} onChanged={load} />
                 ))}

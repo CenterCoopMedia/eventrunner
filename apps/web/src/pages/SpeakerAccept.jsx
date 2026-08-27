@@ -20,6 +20,10 @@
 // and it is deliberately separate from the sign-in: a speaker who reaches
 // this page signed in as the wrong account must be able to see WHICH account
 // before they bind an invitation to it.
+//
+// Editorial base restyle (design brief §2.1, §2.4): every step sits in a
+// hairline-ruled block tinted by --color-surface-alt — the same device
+// SignInPanel uses — rather than a shadowed, rounded card.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -32,19 +36,10 @@ import {
   validateSpeakerInvite,
 } from '../lib/speakerInvites.js';
 import { IS_DEMO } from '../lib/demoMode.js';
-
-const primaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand ' +
-  'bg-brand-primary px-4 py-2 font-semibold text-brand-surface ' +
-  'hover:bg-brand-primary-dark disabled:opacity-60';
-
-const secondaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand ' +
-  'border border-brand-ink/20 bg-brand-surface px-4 py-2 font-semibold ' +
-  'text-brand-ink hover:bg-brand-surface-alt disabled:opacity-60';
+import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
 
 const Panel = ({ children }) => (
-  <div className="mt-6 space-y-4 rounded-brand-lg border border-brand-ink/10 bg-brand-surface p-6">
+  <div className="mt-lg space-y-md border-hairline border-rule-hairline bg-surface-alt p-lg">
     {children}
   </div>
 );
@@ -58,18 +53,18 @@ const Panel = ({ children }) => (
 function DemoInviteNotice() {
   return (
     <article className="mx-auto max-w-md">
-      <h1 className="text-3xl font-semibold text-brand-ink">Your invitation</h1>
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Your invitation</h1>
       <Panel>
-        <p className="font-heading text-lg font-semibold text-brand-ink">
+        <p className="font-heading text-h3 font-semibold text-text-primary">
           Invitations are disabled in this demo
         </p>
-        <p className="text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+        <p className="text-body text-text-secondary text-pretty">
           On a real deployment this page checks the invitation link an
           organizer emailed you, then links it to the account you sign in
           with. This is a read-only tour of a fictional event, so no
           invitation is checked and nothing leaves your browser.
         </p>
-        <Link to="/" className={primaryButtonClass}>
+        <Link to="/" className={primaryActionClass}>
           Back to the event
         </Link>
       </Panel>
@@ -180,8 +175,8 @@ export default function SpeakerAccept() {
   if (loading || check.state === 'checking') {
     return (
       <article className="mx-auto max-w-md">
-        <h1 className="text-3xl font-semibold text-brand-ink">Your invitation</h1>
-        <div className="mt-6">
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Your invitation</h1>
+        <div className="mt-lg">
           <LoadingState label="Checking your invitation…" />
         </div>
       </article>
@@ -191,7 +186,7 @@ export default function SpeakerAccept() {
   if (check.state === 'unreachable') {
     return (
       <article className="mx-auto max-w-md">
-        <h1 className="text-3xl font-semibold text-brand-ink">Your invitation</h1>
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Your invitation</h1>
         <EmptyState
           title="We could not check your invitation"
           description="This looks like a connection problem rather than a problem with your link. Check your connection and reload this page."
@@ -203,7 +198,7 @@ export default function SpeakerAccept() {
   if (check.state === 'expired') {
     return (
       <article className="mx-auto max-w-md">
-        <h1 className="text-3xl font-semibold text-brand-ink">Your invitation</h1>
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Your invitation</h1>
         <EmptyState
           title="This invitation has expired"
           description="Invitation links stop working after two weeks. Ask the organizers to send you a new one — nothing is lost, and the new link works the same way."
@@ -215,7 +210,7 @@ export default function SpeakerAccept() {
   if (check.state === 'invalid') {
     return (
       <article className="mx-auto max-w-md">
-        <h1 className="text-3xl font-semibold text-brand-ink">Your invitation</h1>
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Your invitation</h1>
         <EmptyState
           title="This invitation link is not valid"
           description="It may have already been used, been replaced by a newer invitation, or been copied incompletely. Ask the organizers to send you a new one."
@@ -227,9 +222,9 @@ export default function SpeakerAccept() {
   if (accepted) {
     return (
       <article className="mx-auto max-w-md">
-        <h1 className="text-3xl font-semibold text-brand-ink">You are confirmed</h1>
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">You are confirmed</h1>
         <Panel>
-          <p role="status" className="text-brand-ink">
+          <p role="status" className="text-text-primary">
             Thank you{accepted.speakerName ? `, ${accepted.speakerName}` : ''} — your
             invitation is accepted and linked to this account.
           </p>
@@ -238,12 +233,12 @@ export default function SpeakerAccept() {
               (the attendee users/{uid} record) — same route
               speaker.accepted's email CTA now points at
               (functions/src/speakers/invites.cjs). */}
-          <p className="text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+          <p className="text-body text-text-secondary text-pretty">
             Next, write your speaker profile — your biography, photograph, and
             organization — for the public programme. It appears publicly once
             an organizer has reviewed it.
           </p>
-          <Link to="/speaker/profile" className={primaryButtonClass}>
+          <Link to="/speaker/profile" className={primaryActionClass}>
             Write your speaker profile
           </Link>
         </Panel>
@@ -255,8 +250,8 @@ export default function SpeakerAccept() {
 
   return (
     <article className="mx-auto max-w-md">
-      <h1 className="text-3xl font-semibold text-brand-ink">Your invitation</h1>
-      <p className="mt-2 text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Your invitation</h1>
+      <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
         {invite.speakerName ? `${invite.speakerName}, you` : 'You'} are invited to
         take part as a {invite.inviteType || 'speaker'}.
         {invite.invitedEmailMasked
@@ -266,7 +261,7 @@ export default function SpeakerAccept() {
 
       {user ? (
         <Panel>
-          <p className="text-brand-ink">
+          <p className="text-text-primary">
             You are signed in{user.email ? ` as ${user.email}` : ''}.
           </p>
           {error ? (
@@ -274,7 +269,7 @@ export default function SpeakerAccept() {
               ref={errorRef}
               tabIndex={-1}
               role="alert"
-              className="flex items-start gap-2 rounded-brand border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
+              className="flex items-start gap-xs border-hairline border-danger/40 bg-danger/10 px-sm py-xs font-data text-caption text-danger"
             >
               <span aria-hidden="true" className="font-semibold">
                 !
@@ -292,8 +287,8 @@ export default function SpeakerAccept() {
               succeed — sign in at the invited inbox, which the emailed code
               does without a password. */}
           {error?.code === 'email-mismatch' ? (
-            <div className="space-y-3">
-              <p className="text-brand-ink" style={{ textWrap: 'pretty' }}>
+            <div className="space-y-sm">
+              <p className="text-body text-text-secondary text-pretty">
                 Sign in with{' '}
                 {error.invitedEmailMasked ? (
                   <strong>{error.invitedEmailMasked}</strong>
@@ -304,7 +299,7 @@ export default function SpeakerAccept() {
                 account there. If you would rather use this account, ask the
                 organizers to re-send the invitation to it.
               </p>
-              <button type="button" onClick={() => signOut()} className={primaryButtonClass}>
+              <button type="button" onClick={() => signOut()} className={primaryActionClass}>
                 Sign in with the invited address
               </button>
             </div>
@@ -314,7 +309,7 @@ export default function SpeakerAccept() {
                 type="button"
                 onClick={accept}
                 disabled={accepting}
-                className={primaryButtonClass}
+                className={primaryActionClass}
               >
                 {accepting ? 'Accepting…' : 'Accept the invitation'}
               </button>
@@ -322,7 +317,7 @@ export default function SpeakerAccept() {
                   generally: the account is the thing that has to change, and
                   signing out here keeps the token in the URL so the page
                   comes straight back to this step. */}
-              <button type="button" onClick={() => signOut()} className={secondaryButtonClass}>
+              <button type="button" onClick={() => signOut()} className={secondaryActionClass}>
                 Use a different account
               </button>
             </>
@@ -330,13 +325,13 @@ export default function SpeakerAccept() {
         </Panel>
       ) : (
         <>
-          <p className="mt-4 text-brand-ink" style={{ textWrap: 'pretty' }}>
+          <p className="mt-md text-body text-text-secondary text-pretty">
             Sign in with the address this invitation was sent to
             {invite.invitedEmailMasked ? ` (${invite.invitedEmailMasked})` : ''} to
             accept it. The quickest way is a one-time code emailed to that
             address — no password needed.
           </p>
-          <div className="mt-4">
+          <div className="mt-md">
             <SignInPanel />
           </div>
         </>

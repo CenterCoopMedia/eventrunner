@@ -1,39 +1,33 @@
-// Pages list (issue #13): every cmsPages document with its publish state —
-// live revision, draft revision, or both — plus the entry points to create,
-// edit, and publish.
+// Pages list (issue #13): the galley — every cmsPages document with its
+// publish state, plus the entry points to create, edit, and publish.
 //
-// The two-revision model (spec §8.4) is visible rather than hidden: a page
-// can be "Never published" (draft only), have "Unpublished changes" (a dirty
-// draft over a live doc), or be "Published". Publishing is a Firestore
-// revision copy via cmsPublish, so it happens right here — no deploy.
+// The two-revision model (spec §8.4) is visible rather than hidden. It is
+// said in the admin's three words (admin/recordState.js): a page is `Draft`
+// (draft only), `Live with unpublished changes` (a dirty draft over a live
+// doc), or `Live`. Publishing is a Firestore revision copy via cmsPublish,
+// so it happens right here — no deploy.
+//
+// Moment 1: a row with a draft sits on the proof ground, the word is always
+// beside it, and a successful publish resolves the tint away over 160ms on
+// opacity — instantly under reduced motion.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
-import EmptyState from '../../components/EmptyState.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { summarizePublish } from '../publishResult.js';
-import { Panel, primaryButtonClass, secondaryButtonClass } from '../components/formControls.jsx';
-
-const STATE_CLASSES = {
-  published: 'border-success/40 bg-success/10 text-success',
-  dirty: 'border-warning/40 bg-warning/10 text-warning',
-  unpublished: 'border-brand-ink/20 bg-brand-surface-alt text-brand-ink-muted',
-  unknown: 'border-brand-ink/20 bg-brand-surface-alt text-brand-ink-muted',
-};
-
-function StateChip({ state }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-brand border px-2 py-1 text-xs font-semibold ${
-        STATE_CLASSES[state.id] ?? STATE_CLASSES.unknown
-      }`}
-    >
-      {state.label}
-    </span>
-  );
-}
+import {
+  Notice,
+  Panel,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from '../components/formControls.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  RecordState,
+  proofRowClass,
+} from '../components/adminChrome.jsx';
 
 export default function AdminPagesList() {
   const { rows, loading, error } = useAdminPages();
@@ -42,8 +36,12 @@ export default function AdminPagesList() {
   const [publishing, setPublishing] = useState(null);
   const [notice, setNotice] = useState(null);
   const [resumeQueueId, setResumeQueueId] = useState(null);
+  // Rows that published in THIS session. Their proof tint resolves to the
+  // base ground rather than vanishing: the row is the same row, and the
+  // operator watched it change (moment 1).
+  const [resolvedIds, setResolvedIds] = useState(() => new Set());
 
-  const pendingIds = rows.filter((row) => row.state.id !== 'published').map((row) => row.id);
+  const pendingIds = rows.filter((row) => row.state.id !== 'live').map((row) => row.id);
 
   async function publishAll() {
     setPublishing('all');
@@ -72,7 +70,10 @@ export default function AdminPagesList() {
   /** cmsPublish answers 200 even when it skipped what you asked for. */
   function reportPublish(response, requestedIds) {
     const verdict = summarizePublish(response, 'cmsPages', requestedIds);
-    setNotice({ tone: verdict.ok ? 'info' : 'error', message: verdict.message });
+    setNotice({ tone: verdict.ok ? 'ok' : 'error', message: verdict.message });
+    if (verdict.ok) {
+      setResolvedIds((current) => new Set([...current, ...requestedIds]));
+    }
     showToast(verdict.message, verdict.ok ? undefined : { tone: 'error' });
   }
 
@@ -95,106 +96,105 @@ export default function AdminPagesList() {
   const dirtyCount = pendingIds.length;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-brand-ink">Pages</h1>
-          <p className="text-sm text-brand-ink-muted">
-            Every page on the site, and whether its latest edit is live yet.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {resumeQueueId ? (
-            <button
-              type="button"
-              className={secondaryButtonClass}
-              onClick={resumePublish}
-              disabled={publishing !== null}
-            >
-              {publishing === 'resume' ? 'Resuming…' : 'Resume publish'}
-            </button>
-          ) : null}
-          {dirtyCount > 0 ? (
-            <button
-              type="button"
-              className={secondaryButtonClass}
-              onClick={publishAll}
-              disabled={publishing !== null}
-            >
-              {publishing === 'all' ? 'Publishing…' : `Publish all (${dirtyCount})`}
-            </button>
-          ) : null}
-          <Link to="new" className={primaryButtonClass}>
-            New page
-          </Link>
-        </div>
-      </div>
+    <div className="flex flex-col gap-md">
+      <AdminPageHeader
+        title="Pages"
+        description="Every page on the site, and whether its latest edit is live yet."
+        identifiers={`${rows.length} page${rows.length === 1 ? '' : 's'}`}
+        actions={
+          <>
+            {resumeQueueId ? (
+              <button
+                type="button"
+                className={secondaryButtonClass}
+                onClick={resumePublish}
+                disabled={publishing !== null}
+              >
+                {publishing === 'resume' ? 'Resuming…' : 'Resume publish'}
+              </button>
+            ) : null}
+            {dirtyCount > 0 ? (
+              <button
+                type="button"
+                className={secondaryButtonClass}
+                onClick={publishAll}
+                disabled={publishing !== null}
+              >
+                {publishing === 'all' ? 'Publishing…' : `Publish all (${dirtyCount})`}
+              </button>
+            ) : null}
+            <Link to="new" className={primaryButtonClass}>
+              Create a page
+            </Link>
+          </>
+        }
+      />
 
-      {notice ? (
-        <p
-          role={notice.tone === 'error' ? 'alert' : 'status'}
-          className={
-            notice.tone === 'error'
-              ? 'rounded-brand border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger'
-              : 'rounded-brand border border-success/40 bg-success/10 px-3 py-2 text-sm text-success'
-          }
-        >
-          {notice.message}
-        </p>
-      ) : null}
+      {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 
       {error ? (
-        <p role="status" className="rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
-          We lost the connection to the page list; showing the last values we
-          received and retrying.
-        </p>
+        <Notice
+          tone="caution"
+          message="We lost the connection to the page list; showing the last values we received and retrying."
+        />
       ) : null}
 
       {loading ? (
-        <LoadingState label="Loading pages…" />
+        <AdminLoadingState label="Loading pages…" />
       ) : rows.length === 0 ? (
-        <EmptyState
+        <AdminEmptyState
           title="No pages yet"
           description="Create the first page — a title, a path, and the sections its content lives in."
           action={
             <Link to="new" className={primaryButtonClass}>
-              New page
+              Create a page
             </Link>
           }
         />
       ) : (
-        <Panel>
-          <ul className="divide-y divide-brand-ink/10">
+        <Panel flush>
+          {/* The galley: hairline rows, fixed column order, no zebra
+              striping and no row cards — the hairline already does that
+              work, and striping is the tell of a default table. */}
+          <ul>
             {rows.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      to={row.id}
-                      className="touch-target inline-flex items-center rounded-brand font-semibold text-brand-ink underline underline-offset-4 hover:text-brand-primary-dark"
-                    >
-                      {row.current?.label || row.id}
-                    </Link>
-                    <StateChip state={row.state} />
-                    {row.current?.systemPage ? (
-                      <span className="rounded-brand border border-brand-ink/20 px-2 py-1 text-xs text-brand-ink-muted">
-                        System page
-                      </span>
-                    ) : null}
-                    {row.current?.visible === false ? (
-                      <span className="rounded-brand border border-brand-ink/20 px-2 py-1 text-xs text-brand-ink-muted">
-                        Hidden
-                      </span>
-                    ) : null}
+              <li
+                key={row.id}
+                className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(
+                  row.state.id,
+                  resolvedIds.has(row.id),
+                )}`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-sm px-md py-xs">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
+                      <Link
+                        to={row.id}
+                        className="admin-target inline-flex items-center rounded-admin font-semibold text-admin-ink underline underline-offset-4"
+                      >
+                        {row.current?.label || row.id}
+                      </Link>
+                      <RecordState state={row.state} />
+                      {row.current?.systemPage ? (
+                        <span className="font-admin-data text-folio text-admin-ink-secondary">
+                          System page
+                        </span>
+                      ) : null}
+                      {row.current?.visible === false ? (
+                        <span className="font-admin-data text-folio text-admin-ink-secondary">
+                          Hidden
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
+                      {row.current?.path} · {(row.current?.sections ?? []).length} section
+                      {(row.current?.sections ?? []).length === 1 ? '' : 's'}
+                    </p>
                   </div>
-                  <p className="mt-1 truncate text-sm text-brand-ink-muted">
-                    {row.current?.path} · {(row.current?.sections ?? []).length} section
-                    {(row.current?.sections ?? []).length === 1 ? '' : 's'}
-                  </p>
+                  <Link to={row.id} className={secondaryButtonClass}>
+                    Edit this page
+                  </Link>
                 </div>
-                <Link to={row.id} className={secondaryButtonClass}>
-                  Edit
-                </Link>
               </li>
             ))}
           </ul>

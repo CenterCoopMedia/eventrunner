@@ -6,6 +6,9 @@
 // bookkeeping (`seeded`, `seededAt`). So a doc loaded for editing is filtered
 // down to the accepted key set before it goes back over the wire — otherwise
 // every edit of a seeded page would fail with "seeded: unknown field".
+import { recordStateOf } from './recordState.js';
+import { DEFAULT_SECTION_SLOT, slotOf, statedPageLayout } from '../lib/pageLayout.js';
+import { templateOf } from '../lib/pageTemplates.js';
 
 /** Keys a cmsPages doc may carry (mirrors PAGE_KEYS on the server). */
 export const PAGE_KEYS = Object.freeze([
@@ -17,6 +20,8 @@ export const PAGE_KEYS = Object.freeze([
   'visible',
   'systemPage',
   'sections',
+  'layout',
+  'template',
 ]);
 
 export const SECTION_KEYS = Object.freeze([
@@ -27,6 +32,7 @@ export const SECTION_KEYS = Object.freeze([
   'maxBlocks',
   'reorderable',
   'defaultBlocks',
+  'slot',
 ]);
 
 export const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
@@ -44,6 +50,22 @@ function pick(source, keys) {
  * accepted keys, with the shape normalized so the editor's controlled inputs
  * never receive undefined.
  *
+ * THE LAYOUT IS THE ONE PLACE ABSENCE IS LOAD-BEARING, so it is carried
+ * here as what the document actually states and nothing more. A page that
+ * never chose a density is following the active preset's (shared/theme
+ * resolveShape, read by SystemPage through statedPageLayout); opening that
+ * page filled in with `comfortable` and saving it back would silently
+ * commit the page to a density the operator never picked, and it would stop
+ * following the preset from then on — a theme change that used to move the
+ * page would no longer reach it. One open-and-save of an untouched page did
+ * that to all four variants.
+ *
+ * A missing key is therefore not filled in. The editor's selects show
+ * PAGE_LAYOUT_DEFAULTS for whatever the page leaves unstated (the layout a
+ * page with no stored value renders at, so the control still shows what the
+ * reader sees), and setting one is what makes it stated: presence in this
+ * map IS the record of the operator having chosen.
+ *
  * @param {object|null} doc
  * @returns {object}
  */
@@ -57,6 +79,13 @@ export function toEditablePage(doc) {
     order: typeof base.order === 'number' ? base.order : 0,
     visible: base.visible !== false,
     systemPage: base.systemPage === true,
+    // What the document states, and only that — see above.
+    layout: statedPageLayout(base),
+    // The task the operator picked, or `null` where none was. NEVER
+    // inferred from the layout values: a page whose three variants happen
+    // to match "Long read" has not chosen Long read, and an editor that
+    // showed one would be reporting a decision nobody made.
+    template: templateOf(base),
     sections: Array.isArray(base.sections)
       ? base.sections.map((section) => {
           const s = pick(section ?? {}, SECTION_KEYS);
@@ -67,6 +96,7 @@ export function toEditablePage(doc) {
             allowedBlocks: Array.isArray(s.allowedBlocks) ? [...s.allowedBlocks] : [],
             maxBlocks: Number.isInteger(s.maxBlocks) ? s.maxBlocks : 1,
             reorderable: s.reorderable !== false,
+            slot: slotOf(s),
             defaultBlocks: Array.isArray(s.defaultBlocks)
               ? s.defaultBlocks.map((block) => {
                   const b = pick(block ?? {}, DEFAULT_BLOCK_KEYS);
@@ -97,6 +127,7 @@ export function blankSection() {
     allowedBlocks: ['text', 'richtext'],
     maxBlocks: 6,
     reorderable: true,
+    slot: DEFAULT_SECTION_SLOT,
     defaultBlocks: [],
   };
 }
@@ -121,6 +152,17 @@ export function toPagePayload(page) {
     order: Number.isFinite(order) ? order : page.order,
     visible: Boolean(page.visible),
     systemPage: Boolean(page.systemPage),
+    // Only the variants the page states. A key the document never carried
+    // stays absent unless the operator moved that control — saving a page
+    // must not decide, on its behalf, four things it never said. `layout`
+    // itself is always sent, empty map and all: the server accepts a page
+    // that states nothing, and sending the key makes "states nothing" an
+    // answer rather than an omission.
+    layout: statedPageLayout(page),
+    // Sent as null rather than omitted, for the same reason `layout` is
+    // always sent: "no template" is an answer the server accepts, and
+    // sending it makes clearing one possible at all.
+    template: templateOf(page),
     sections: (page.sections ?? []).map((section) => {
       const maxBlocks = Number(section.maxBlocks);
       return {
@@ -130,6 +172,7 @@ export function toPagePayload(page) {
         allowedBlocks: [...(section.allowedBlocks ?? [])],
         maxBlocks: Number.isInteger(maxBlocks) ? maxBlocks : section.maxBlocks,
         reorderable: Boolean(section.reorderable),
+        slot: slotOf(section),
         defaultBlocks: (section.defaultBlocks ?? []).map((block) => ({
           field: block.field ?? '',
           blockType: block.blockType ?? '',
@@ -145,15 +188,14 @@ export function toPagePayload(page) {
  * `dirty` is the draft's own status field (store.cjs writes 'dirty' on every
  * draft write and flips it to 'clean' at publish).
  *
+ * The WORDS are the admin's three, and they live in one place
+ * (admin/recordState.js) so pages, content, speakers, badges, and branding
+ * cannot drift into four spellings of the same fact.
+ *
  * @param {{ live: object|null, draft: object|null }} revisions
  */
 export function publishStateOf({ live, draft }) {
-  if (!live && draft) return { id: 'unpublished', label: 'Never published' };
-  if (live && draft && draft.status === 'dirty') {
-    return { id: 'dirty', label: 'Unpublished changes' };
-  }
-  if (live) return { id: 'published', label: 'Published' };
-  return { id: 'unknown', label: 'Unknown' };
+  return recordStateOf({ live, draft });
 }
 
 /**

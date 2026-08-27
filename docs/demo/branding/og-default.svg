@@ -2,10 +2,10 @@
   <!-- Neutral placeholder OG image. Replaced per event via the branding/
        ogDefault Storage slot; the deploy pipeline can also rasterize a PNG
        from config. Grayscale rgb() only. -->
-  <rect width="1200" height="630" fill="rgb(237 232 220)"/>
-  <rect x="80" y="80" width="1040" height="470" rx="24" fill="none" stroke="rgb(148 160 172)" stroke-width="4"/>
-  <circle cx="600" cy="265" r="80" fill="none" stroke="rgb(92 107 122)" stroke-width="16"/>
-  <circle cx="600" cy="265" r="28" fill="rgb(92 107 122)"/>
-  <rect x="420" y="410" width="360" height="24" rx="12" fill="rgb(92 107 122)"/>
-  <rect x="480" y="456" width="240" height="16" rx="8" fill="rgb(148 160 172)"/>
+  <rect width="1200" height="630" fill="rgb(240 240 238)"/>
+  <rect x="80" y="80" width="1040" height="470" rx="24" fill="none" stroke="rgb(148 150 154)" stroke-width="4"/>
+  <circle cx="600" cy="265" r="80" fill="none" stroke="rgb(91 93 97)" stroke-width="16"/>
+  <circle cx="600" cy="265" r="28" fill="rgb(91 93 97)"/>
+  <rect x="420" y="410" width="360" height="24" rx="12" fill="rgb(91 93 97)"/>
+  <rect x="480" y="456" width="240" height="16" rx="8" fill="rgb(148 150 154)"/>
 </svg>

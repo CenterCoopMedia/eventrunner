@@ -13,8 +13,7 @@
 // from answering before the probe has.
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import EmptyState from '../components/EmptyState.jsx';
-import LoadingState from '../components/LoadingState.jsx';
+import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx';
 import AdminLayout from './AdminLayout.jsx';
 import AdminPagesList from './pages/AdminPagesList.jsx';
 import AdminPageEditor from './pages/AdminPageEditor.jsx';
@@ -45,8 +44,10 @@ export function AdminGate({ children }) {
   // flash "you don't have admin access" at every admin on every load.
   if (loading || (user && adminStatus === 'unknown')) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-12">
-        <LoadingState label="Checking your access…" />
+      <div className="admin-room min-h-screen bg-admin-ground font-admin-ui text-admin-ink">
+        <div className="mx-auto w-full max-w-3xl px-md py-lg">
+          <AdminLoadingState label="Checking your access…" />
+        </div>
       </div>
     );
   }
@@ -65,11 +66,13 @@ export function AdminGate({ children }) {
   }
   if (adminStatus !== 'admin') {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-12">
-        <EmptyState
-          title="You don’t have admin access"
-          description="This area is limited to the event's administrators. If you think that's wrong, ask an organizer to add your address to the admin list."
-        />
+      <div className="admin-room min-h-screen bg-admin-ground font-admin-ui text-admin-ink">
+        <div className="mx-auto w-full max-w-3xl px-md py-lg">
+          <AdminEmptyState
+            title="You don’t have admin access"
+            description="This area is limited to the event’s administrators. If you think that’s wrong, ask an organizer to add your address to the admin list."
+          />
+        </div>
       </div>
     );
   }
@@ -121,9 +124,9 @@ export default function AdminApp() {
           <Route
             path="*"
             element={
-              <EmptyState
+              <AdminEmptyState
                 title="Admin page not found"
-                description="That admin screen doesn’t exist. Use the tabs above."
+                description="That admin screen doesn’t exist. Pick a section from the docket."
               />
             }
           />

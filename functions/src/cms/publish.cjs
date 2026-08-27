@@ -34,6 +34,7 @@ const { sendError, badRequest, notFound, methodNotAllowed } = require('../core/e
 const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
 const { listDirty, publishDocs, logAdminAction, isValidDocId } = require('./store.cjs');
 const { requestSitePublish } = require('./publisher.cjs');
+const { checkSchedulePublishSet } = require('../schedule/sessions.cjs');
 
 const MAX_DOC_IDS = 2000;
 const QUEUE_LIST_DEFAULT = 20;
@@ -81,6 +82,27 @@ async function resolveRequest({ db }, body) {
     return { ok: false, message: `docIds must be 1-${MAX_DOC_IDS} document ids.` };
   }
   return { ok: true, request: { [collection]: [...new Set(docIds)] } };
+}
+
+/**
+ * Structural refusals for a resolved request, before any queue row is
+ * written: a publish that cannot be right should not exist as a row to
+ * resume.
+ *
+ * Only cmsSchedule has one today — a child session may not go live ahead of
+ * its parent (schedule/sessions.cjs checkSchedulePublishSet). The draft
+ * world lets a child name a parent that is still a draft, which is correct
+ * for editing and wrong the moment only the child is published: the live
+ * schedule then carries a calling point whose service does not exist.
+ *
+ * @param {{ db }} deps @param {Record<string, string[]>} request
+ * @returns {Promise<string|null>} the refusal message, or null
+ */
+async function structuralRefusal({ db }, request) {
+  const sessions = request?.cmsSchedule;
+  if (!Array.isArray(sessions) || sessions.length === 0) return null;
+  const verdict = await checkSchedulePublishSet({ db, docIds: sessions });
+  return verdict.ok ? null : verdict.errors.join('; ');
 }
 
 /**
@@ -132,6 +154,11 @@ function createCmsPublishHandler({
       if (!request || typeof request !== 'object') {
         return badRequest(res, 'That queue row has no stored request to resume.');
       }
+      // Re-checked on resume, not trusted from the first run: the world has
+      // moved since the row was written, and a parent deleted in between
+      // must stop the remainder of the run.
+      const refusal = await structuralRefusal({ db }, request);
+      if (refusal) return badRequest(res, refusal);
       await queueRef.set({ status: 'running', error: null, updatedAt: new Date(now()) }, { merge: true });
     } else {
       const resolved = await resolveRequest({ db }, req.body);
@@ -141,6 +168,8 @@ function createCmsPublishHandler({
         // Nothing dirty: no queue row for a no-op.
         return res.status(200).json({ queueId: null, status: 'done', results: {} });
       }
+      const refusal = await structuralRefusal({ db }, request);
+      if (refusal) return badRequest(res, refusal);
       queueRef = db.collection('cmsPublishQueue').doc();
       await queueRef.set({
         status: 'running',
@@ -338,5 +367,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { resolveRequest, MAX_DOC_IDS, SETTABLE_STATUSES },
+  internals: { resolveRequest, structuralRefusal, MAX_DOC_IDS, SETTABLE_STATUSES },
 };

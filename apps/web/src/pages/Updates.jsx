@@ -4,11 +4,32 @@
 // direct-navigation-bypasses-nav gate as every other optional route
 // (Sponsors.jsx, SessionDetail.jsx). This is also the page updatesMeta's
 // self-fetched SSR meta describes when no specific post id is requested.
+//
+// A CHRONOLOGICAL FEED WITH A SPINE (design brief §2.1, §5.1; this review).
+//
+// The dated column was right about the date; what it was missing was
+// continuity. This page is a thread of time — what changed, newest first —
+// and a run of rows that merely happen to carry dates does not read as one.
+// So a hairline runs down the leading edge of every entry and each entry
+// hangs a short tick off it, and the run is cut into standing heads a
+// reader recognizes: "Pinned" first if the operator held anything to the
+// top, then one head per month, then "Undated" for posts with no resolvable
+// date. Pinned is not a date, which is exactly why it gets a name instead
+// of a month it would otherwise drag to the top of the page.
+//
+// Nothing is boxed. The spine is a rule, the heads are folios on rules, and
+// "Pinned" on an entry is the small ruled rectangle Tag established (issue
+// #113): never a pill, never a colored badge, and beside the title, never
+// above it.
 import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import { publishDateLabel, sortUpdates, toPublishDate } from '../lib/updateDates.js';
+import SystemPage from '../components/SystemPage.jsx';
+import SectionHead from '../components/editorial/SectionHead.jsx';
+import Tag from '../components/editorial/Tag.jsx';
+import { groupUpdates, publishDateLabel, sortUpdates, toPublishDate } from '../lib/updateDates.js';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 /** First ~200 chars of the body, word-boundary trimmed, for the list card. */
 function excerpt(body, maxLen = 200) {
@@ -30,10 +51,7 @@ export default function Updates() {
         title="This event doesn’t have public updates"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -47,44 +65,75 @@ export default function Updates() {
   const visible = sortUpdates(updates.filter((u) => u?.visible !== false));
 
   return (
-    <article>
-      <h1 className="font-heading text-3xl font-semibold text-brand-ink">Updates</h1>
+    <SystemPage pageId="updates">
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Updates</h1>
       {visible.length === 0 ? (
-        <div className="mt-6">
+        <div className="mt-lg">
           <EmptyState
             title="No updates yet"
             description="Announcements appear here once they are published."
           />
         </div>
       ) : (
-        <ul className="mt-6 space-y-4">
-          {visible.map((update) => {
-            const dateLabel = publishDateLabel(update.publishAt);
-            return (
-              <li
-                key={update.id}
-                className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
-              >
-                <Link
-                  to={`/updates/${update.id}`}
-                  className="font-heading text-lg text-brand-ink underline-offset-2 hover:text-brand-primary-dark hover:underline"
-                >
-                  {update.pinned ? <span aria-hidden="true">📌 </span> : null}
-                  {update.title}
-                </Link>
-                {dateLabel ? (
-                  <p className="mt-1 text-sm text-brand-ink-muted">
-                    <time dateTime={toPublishDate(update.publishAt).toISOString()}>{dateLabel}</time>
-                  </p>
-                ) : null}
-                {excerpt(update.body) ? (
-                  <p className="mt-2 text-brand-ink-muted">{excerpt(update.body)}</p>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+        <div className="update-feed mt-lg">
+          {groupUpdates(visible).map((run, index) => (
+            <section
+              key={`${run.kind}-${run.label}`}
+              aria-labelledby={`update-run-${index}`}
+              className="mt-lg first:mt-0"
+            >
+              <SectionHead
+                variant="folio"
+                level={2}
+                id={`update-run-${index}`}
+                title={run.label}
+                rule="hairline"
+              />
+              <ul className="mt-sm">
+                {run.members.map((update) => {
+                  const dateLabel = publishDateLabel(update.publishAt);
+                  const publishDate = toPublishDate(update.publishAt);
+                  const body = excerpt(update.body);
+                  return (
+                    <li key={update.id} className="update-feed__entry">
+                      {/* Title first, day second. An entry on the spine is
+                          one column at every width, so a date set above the
+                          heading would be an eyebrow, and the ban holds at
+                          every size (brief §2.4). SessionCard.jsx carries
+                          the same order for the same reason. */}
+                      <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
+                        <h3 className="font-heading text-h3 font-semibold text-text-primary">
+                          <Link to={`/updates/${update.id}`} className="hover:underline">
+                            {update.title}
+                          </Link>
+                        </h3>
+                        {update.pinned ? <Tag>Pinned</Tag> : null}
+                      </div>
+                      {/* The day, in the mono face with tabular figures —
+                          the run's head already carries the month, so the
+                          entry says the day and does not repeat it. */}
+                      <p className="mt-3xs font-mono text-caption text-text-secondary">
+                        {dateLabel ? (
+                          <time dateTime={publishDate.toISOString()}>{dateLabel}</time>
+                        ) : (
+                          <span>Undated</span>
+                        )}
+                      </p>
+                      {body ? (
+                        <p
+                          className="mt-xs max-w-prose text-body text-text-secondary text-pretty"
+                        >
+                          {body}
+                        </p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
-    </article>
+    </SystemPage>
   );
 }

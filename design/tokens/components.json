@@ -1,0 +1,121 @@
+{
+  "$schema-note": "Tier 3 of the design brief (2026-08-27) §3.1. One component contract each. A component token exists when a component needs a value the theme may change on its own, and it defaults to a tier 2 token.",
+  "$shape-note": "A token whose name ends in -rgb names the tier 2 color token it defaults to; the generator emits it in both mode blocks so it follows the mode. Every other token holds a literal CSS value, normally a var() pointing at tier 2.",
+  "$scope-note": "PR1 shipped the session card, the masthead nameplate, the lead image, and the two rule contracts. PR2 adds the contracts the six presets and their curated options remap: an option remaps existing tokens and NEVER adds a property name (brief §3.4), so every name a preset file mentions is declared here first. Every token here is read by a render path in apps/web/src/index.css — a token an option offers but nothing renders is a promise the interface does not keep, so a new contract lands with the rule that draws it. The two-axis schedule grid itself still lands in PR3; these values are what the row is set in either way.",
+  "session-card": {
+    "--session-card-rule-rgb": "--rule-hairline-rgb",
+    "--session-card-surface-rgb": "--color-surface-rgb",
+    "$stamp-note": "The Zine stamp (brief §2.4, 'Exception two'): a flat, unblurred, ink-tinted offset layer at a fixed small distance. Zero offset is the flat-block variant, which every other preset holds.",
+    "--session-card-stamp-rgb": "--color-accent-rgb",
+    "--session-card-rule-width": "var(--rule-hairline-width)",
+    "--session-card-stamp-offset": "0",
+    "$stamp-tint-note": "How much of that ink the second pass lays down. The brief calls the layer 'tinted with theme ink or the accent' and the Zine story spends the accent at full strength twice a page, never more — so a stamp on every row of a programme has to be a tint, not the full accent. Full ink is the contract default here because it is the neutral value; Zine's stamped block, the one choice that ever draws the layer, sets the tint it wants. Flat still means flat: a tint is one colour at one strength, with no blur and no gradient.",
+    "--session-card-stamp-alpha": "1",
+    "--session-card-lead-scale": "1",
+    "$gap-note": "The gutter between the listings column and the row's text at wide viewports. At narrow ones the row is a single column and the gutter is not drawn.",
+    "--session-card-gap": "var(--space-md)",
+    "--session-card-pad-block": "var(--space-md)",
+    "--session-card-pad-inline": "0"
+  },
+  "nameplate": {
+    "--nameplate-rule-rgb": "--rule-nameplate-rgb",
+    "--nameplate-text-rgb": "--color-text-primary-rgb",
+    "--nameplate-frame-rgb": "--rule-hairline-rgb",
+    "--nameplate-rule-width": "var(--rule-nameplate-width)",
+    "$treatment-note": "The three nameplate treatments each preset ships (brief §4) move these four. The rule above the name is the double-rule treatment; the frame is the boxed and framed treatments; the alignment and the metadata placement are the layout. Metadata inside the rule-bounded nameplate block is part of the nameplate device, never an eyebrow (brief §2.4).",
+    "--nameplate-rule-top-width": "0",
+    "--nameplate-frame-width": "0",
+    "$corner-mark-note": "Atlas draws coordinate marks at two corners of the title block (brief §4.6). A mark states a position, so it appears only where something is being located: every other preset holds zero width and renders no mark at all.",
+    "--nameplate-corner-mark-width": "0",
+    "--nameplate-align": "start",
+    "--nameplate-meta-placement": "block",
+    "--nameplate-size": "var(--text-nameplate)",
+    "--nameplate-leading": "var(--text-nameplate-leading)",
+    "--nameplate-tracking": "var(--text-nameplate-tracking)",
+    "--nameplate-gap": "var(--space-sm)"
+  },
+  "lead-image": {
+    "--lead-image-aspect": "3 / 2",
+    "--lead-image-width": "22rem"
+  },
+  "$section-rule-note": "The section boundary (brief §2.1): the rule, then the gap, then the head. The gap is one of the three surfaces config/theme.density reaches, so index.css multiplies it by --density-step.",
+  "section-rule": {
+    "--section-rule-rgb": "--rule-strong-rgb",
+    "--section-rule-width": "var(--rule-strong-width)",
+    "--section-rule-gap": "var(--space-sm)"
+  },
+  "$page-note": "The hybrid page shell (brief §6.1, §6.2). A system page's composable sections sit at --page-section-gap from what comes before them, and a ruled directory row is padded at --page-row-pad-block. Both are what the `density` layout variant moves: tight, comfortable, and loose remap them in index.css, and a page that states no density keeps the preset's own.",
+  "page": {
+    "--page-section-gap": "var(--space-2xl)",
+    "--page-row-pad-block": "var(--space-md)"
+  },
+  "folio-rule": {
+    "--folio-rule-rgb": "--rule-hairline-rgb",
+    "--folio-text-rgb": "--color-text-secondary-rgb",
+    "--folio-rule-width": "var(--rule-hairline-width)",
+    "$struck-note": "A rule above the folio as well as below it is Zine's struck folio: the typewriter section break of a photocopied programme. Plain text plus rules, never a chip.",
+    "--folio-rule-top-width": "0",
+    "--folio-font": "var(--font-data)",
+    "--folio-size": "var(--text-folio)",
+    "--folio-tracking": "var(--text-folio-tracking)",
+    "--folio-gap": "var(--space-xs)"
+  },
+  "$schedule-note": "The schedule presentation variants (brief §4, visual stories part 6c) and the grid itself (§2.1 'Grid schedule'). The agenda number is real sequence data, never zero-padded (brief §2.4).",
+  "$schedule-forward-note": "The one expressive moment on the public site (brief §2.2): a track column comes forward on a user action. The state is a TINT of the column's ground, which lands in both motion settings; the lift is the motion, and index.css draws it only under a no-preference query. The other columns are never dimmed, so the page is readable at every frame. --schedule-trace-width is Atlas's traced line — the forward column's cells connect down the sheet — and it is zero everywhere else, which paints nothing at all.",
+  "schedule": {
+    "--schedule-grid-rgb": "--rule-hairline-rgb",
+    "--schedule-forward-rgb": "--color-surface-alt-rgb",
+    "--schedule-trace-rgb": "--color-accent-rgb",
+    "--schedule-row-leading": "var(--text-body-leading)",
+    "--schedule-data-size": "var(--text-caption)",
+    "--schedule-number-display": "none",
+    "--schedule-cell-pad-block": "var(--space-xs)",
+    "--schedule-cell-pad-inline": "var(--space-sm)",
+    "--schedule-time-width": "7rem",
+    "--schedule-forward-lift": "var(--space-3xs)",
+    "--schedule-trace-width": "0"
+  },
+  "$back-issue-note": "The back issue (brief §2.1): a past day, or a past event, drops to the archive tokens, gains the \"Back issue\" folio, and loses its live controls. NOTHING IS HIDDEN. The device REDUCES a palette rather than introducing one: inside a back issue the accents resolve to the archive ink, which is the same text-secondary the contrast test already measures on both grounds, so an archive is quieter without ever being less readable.",
+  "back-issue": {
+    "--back-issue-ink-rgb": "--color-text-secondary-rgb",
+    "--back-issue-rule-rgb": "--rule-hairline-rgb"
+  },
+  "$plate-note": "The Field Guide botanical plate (brief §4.5): a framed drawing with a hairline border and a plate number in the folio style. A plate is drawn linework and never a hero image. The frame is a DOUBLE hairline, drawn as a border plus an outline at the same width. Zero frame and zero pad is the device off: the wrapper then adds no rule, no space, and no reflow, which is what every preset but Field Guide holds.",
+  "plate": {
+    "--plate-frame-rgb": "--rule-hairline-rgb",
+    "--plate-frame-width": "0",
+    "--plate-pad": "0",
+    "$number-note": "The plate number is real sequence data — day three is PLATE III — never a decorative zero-padded number (brief §2.4). `none` keeps it out of the document and out of the accessibility tree in every preset that is not a plate book.",
+    "--plate-number-display": "none"
+  },
+  "$specimen-label-note": "The Field Guide specimen label (brief §4.5): a small ruled block stating a name, a date, and a place. It carries session metadata and speaker credit lines, it sits below or beside the title it labels, and it is never a chip and never takes a pill radius. Zero rule width, zero padding, and a hidden key is the device off: the block is then the plain caption line it replaced.",
+  "specimen-label": {
+    "--specimen-label-rule-rgb": "--rule-hairline-rgb",
+    "--specimen-label-rule-width": "0",
+    "--specimen-label-pad": "0",
+    "--specimen-label-key-display": "none"
+  },
+  "$map-grid-note": "The Atlas map grid (brief §4.6): a faint coordinate grid behind a section, held below the hairline contrast level, with pointer-events: none. Zero size turns it off.",
+  "map-grid": {
+    "--map-grid-rgb": "--rule-hairline-rgb",
+    "--map-grid-size": "0"
+  },
+  "$route-mark-note": "The Atlas route mark (brief §4.6): the line letter in the heading face inside a survey-drawn shape, always with the line's name beside it. A route mark is never a coloured pill, and colour is never the only signal.",
+  "route-mark": {
+    "--route-mark-rgb": "--color-accent-rgb",
+    "--route-mark-ink-rgb": "--color-surface-rgb",
+    "--route-mark-radius": "0"
+  },
+  "$callout-note": "Zine's handwritten callout (brief §4.3). --callout-font is a component token, not a fifth semantic role (§3.1, §3.2): one callout per page, real copy, at one fixed angle. A client may point it at var(--font-heading) and drop the script face. Every other preset holds the heading face and a zero angle.",
+  "callout": {
+    "--callout-rgb": "--color-text-primary-rgb",
+    "--callout-font": "var(--font-heading)",
+    "--callout-angle": "0deg",
+    "--callout-size": "var(--text-lead)"
+  },
+  "$marginalia-note": "The drawn pen marks (Zine) and the pencil line (Field Guide). Its own on/off control, independent of the block variant, and off by default in both presets. A mark never lands on a single word inside a headline, which keeps the system clear of the banned headline-underline trick (brief §2.4).",
+  "marginalia": {
+    "--marginalia-rgb": "--color-ink-motif-rgb",
+    "--marginalia-display": "none"
+  }
+}

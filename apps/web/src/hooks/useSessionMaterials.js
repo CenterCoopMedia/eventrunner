@@ -1,6 +1,6 @@
 // The approved-materials list (and count) for one session (issue #23,
 // spec §4.4). One listener per mount over `session_materials_public`,
-// shared by SessionCard's MaterialsPill (count only) and SessionDetail's
+// shared by session/MaterialsLink.jsx (count only) and SessionDetail's
 // materials list (the full rows) — same "shared subscription hook" shape
 // as useMyBookmarks.js.
 import { useEffect, useState } from 'react';
@@ -42,7 +42,7 @@ export function useSessionMaterials(sessionId) {
 
 /**
  * Materials count for a session, or null when there are none — the shape
- * SessionCard's MaterialsPill (`if (!count) return null`) expects. This is
+ * session/MaterialsLink.jsx (`if (!count) return null`) expects. This is
  * the live replacement for SessionCard.jsx's TODO-stubbed
  * useSessionMaterialsCount.
  *

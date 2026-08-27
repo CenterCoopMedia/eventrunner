@@ -1,0 +1,154 @@
+{
+  "$schema-note": "One theme preset (design brief 2026-08-27, §4.2). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
+  "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 2.",
+  "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin.",
+  "$first-class-note": "See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.",
+  "id": "newsroom",
+  "label": "Newsroom",
+  "summary": "A well-made news site on a good day. Named sections, one strong rule each, numbers that never borrow the headline face.",
+  "bestFor": "Publications, media summits, and newsrooms that put something out every day.",
+
+  "$palette-words-light": "cool newsprint white, desk black, one saturated editorial accent, muted data slate, hairline silver, section-rule graphite, caption grey, archive fog",
+  "$palette-words-dark": "charcoal desk, screen-lit soft white, night-retuned editorial accent, dimmed data slate, graphite rule, ash grey, low-lamp caption grey, archive slate",
+  "palette": {
+    "light": {
+      "surface": [246, 247, 249],
+      "surfaceAlt": [236, 238, 242],
+      "ink": [22, 24, 29],
+      "inkMuted": [88, 95, 108],
+      "primary": [178, 30, 50],
+      "primaryDark": [140, 20, 38],
+      "primaryLight": [224, 148, 158],
+      "accent": [46, 84, 126],
+      "success": [22, 96, 62],
+      "warning": [134, 82, 10],
+      "danger": [170, 32, 44],
+      "highlight": [124, 90, 14],
+      "keynote": [82, 54, 140]
+    },
+    "dark": {
+      "surface": [23, 25, 30],
+      "surfaceAlt": [34, 37, 44],
+      "ink": [232, 235, 240],
+      "inkMuted": [160, 168, 180],
+      "primary": [240, 122, 134],
+      "primaryDark": [248, 168, 176],
+      "primaryLight": [118, 56, 66],
+      "accent": [130, 172, 216],
+      "success": [116, 200, 150],
+      "warning": [228, 174, 88],
+      "danger": [242, 136, 142],
+      "highlight": [222, 190, 108],
+      "keynote": [186, 164, 240]
+    }
+  },
+
+  "$font-note": "Brief §4.2. Plex Sans handles captions and data so numbers never borrow the headline face; Plex Mono carries the figure column.",
+  "fonts": {
+    "heading": "fraunces",
+    "body": "newsreader",
+    "data": "plex-sans",
+    "mono": "plex-mono"
+  },
+
+  "shape": { "radius": "small", "texture": "flat", "density": "comfortable" },
+  "motifSet": "none",
+
+  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4).",
+  "tokens": {
+    "--folio-font": "var(--font-data)",
+    "--section-rule-width": "var(--rule-strong-width)"
+  },
+
+  "options": {
+    "headingFace": {
+      "label": "Heading face",
+      "prompt": "The desk’s headline voice.",
+      "default": "fraunces",
+      "choices": [
+        {
+          "id": "fraunces",
+          "label": "Fraunces",
+          "why": "The designed headline. Its soft-serif wonk is what makes the site read as edited rather than generated.",
+          "fonts": { "heading": "fraunces" }
+        },
+        {
+          "id": "newsreader-display",
+          "label": "Newsreader at display weights",
+          "why": "The wire-service desk. Running the body face up to headline size gives a quieter, more traditional publication that still belongs to the same newsroom.",
+          "fonts": { "heading": "newsreader" }
+        },
+        {
+          "id": "archivo-condensed",
+          "label": "Archivo bold condensed",
+          "why": "Grotesque headlines are a real newsroom tradition, and they keep the story while letting a client trade warmth for punch.",
+          "fonts": { "heading": "archivo-condensed" }
+        }
+      ]
+    },
+    "nameplate": {
+      "label": "Header style",
+      "prompt": "The masthead bar.",
+      "default": "rule-bounded-bar",
+      "choices": [
+        {
+          "id": "rule-bounded-bar",
+          "label": "Rule-bounded bar",
+          "why": "Name left, dates right, the strong rule under the whole bar. The standing masthead of a site that publishes every day.",
+          "tokens": {
+            "--nameplate-align": "start",
+            "--nameplate-rule-width": "var(--rule-strong-width)",
+            "--nameplate-meta-placement": "inline"
+          }
+        },
+        {
+          "id": "stacked-with-deck",
+          "label": "Stacked with a deck",
+          "why": "The deck is a newsroom device, not marketing copy, so it must state a fact about the event.",
+          "tokens": {
+            "--nameplate-align": "start",
+            "--nameplate-rule-width": "var(--rule-hairline-width)",
+            "--nameplate-meta-placement": "block",
+            "--nameplate-gap": "var(--space-xs)"
+          }
+        },
+        {
+          "id": "section-aware-bar",
+          "label": "Section-aware bar",
+          "why": "The running head of a news site; it reinforces the table-of-contents idea the section rules set up.",
+          "tokens": {
+            "--nameplate-align": "start",
+            "--nameplate-size": "var(--text-h1)",
+            "--nameplate-rule-width": "var(--rule-strong-width)",
+            "--nameplate-meta-placement": "inline"
+          }
+        }
+      ]
+    },
+    "component": {
+      "label": "Schedule style",
+      "prompt": "How a session listing is set.",
+      "default": "hairline-row",
+      "choices": [
+        {
+          "id": "hairline-row",
+          "label": "Hairline row",
+          "why": "A hairline-separated row with title, time, track, speaker. The listing of a publication.",
+          "tokens": {
+            "--session-card-lead-scale": "1",
+            "--session-card-rule-width": "var(--rule-hairline-width)"
+          }
+        },
+        {
+          "id": "lead-and-rest",
+          "label": "Lead and rest",
+          "why": "The lead story and the digest under it, which is how a news page ranks things without cards, shadows, or colored edges.",
+          "tokens": {
+            "--session-card-lead-scale": "1.35",
+            "--session-card-rule-width": "var(--rule-hairline-width)"
+          }
+        }
+      ]
+    }
+  }
+}

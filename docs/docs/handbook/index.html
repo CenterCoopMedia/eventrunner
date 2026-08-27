@@ -23,11 +23,12 @@
   <meta name="twitter:description" content="The non-technical guide, split by who you are.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta name="twitter:image:alt" content="Event Runner documentation">
-  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
   <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
 </head>
@@ -37,10 +38,15 @@
   <div class="wrap">
     <header class="site-header">
       <a class="brand" href="/eventrunner/">
-        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
-        <span class="brand-text">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2.5" y="2" width="3" height="20"/>
+          <rect x="5.5" y="2" width="16" height="3"/>
+          <rect x="5.5" y="11" width="9.5" height="2"/>
+          <rect x="5.5" y="19.5" width="13" height="2.5"/>
+        </svg>
+        <span class="brand-words">
           <strong>Event Runner</strong>
-          <span>Documentation</span>
+          <span class="brand-line">Documentation</span>
         </span>
       </a>
       <nav aria-label="Site">
@@ -73,6 +79,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
           <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>

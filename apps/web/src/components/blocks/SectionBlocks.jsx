@@ -11,6 +11,7 @@ import StatBlock from './StatBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
 import FaqItemBlock from './FaqItemBlock.jsx';
 import LinkGroupBlock from './LinkGroupBlock.jsx';
+import Folio from '../editorial/Folio.jsx';
 
 const blockKey = (block, index) =>
   block.id ?? `${block.section}__${block.field ?? index}`;
@@ -23,15 +24,18 @@ function LinkGroups({ blocks }) {
     groups.get(name).push(block);
   }
   return (
-    <div className="grid gap-6 sm:grid-cols-2">
+    <div className="grid gap-lg sm:grid-cols-2">
       {[...groups.entries()].map(([name, links]) => (
         <div key={name || 'ungrouped'}>
+          {/* The group name is a folio on a hairline: it heads its own list,
+              which is what a folio is for. It is not an eyebrow — nothing
+              sits above a heading here (design brief §2.4). */}
           {name ? (
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-brand-ink-muted">
+            <Folio as="h3" className="border-t-hairline border-t-rule-hairline pt-2xs">
               {name}
-            </h3>
+            </Folio>
           ) : null}
-          <ul className="mt-2 space-y-1">
+          <ul className="mt-xs space-y-3xs">
             {links.map((block, i) => (
               <LinkGroupBlock key={blockKey(block, i)} block={block} />
             ))}
@@ -45,21 +49,21 @@ function LinkGroups({ blocks }) {
 // How each batched run renders. Ids outside this map render individually.
 const RUN_RENDERERS = {
   stat: (run) => (
-    <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <dl className="grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
       {run.map((block, i) => (
         <StatBlock key={blockKey(block, i)} block={block} />
       ))}
     </dl>
   ),
   list_item: (run) => (
-    <ul className="list-disc space-y-2 ps-5">
+    <ul className="list-disc space-y-xs ps-5">
       {run.map((block, i) => (
         <ListItemBlock key={blockKey(block, i)} block={block} />
       ))}
     </ul>
   ),
   faq_item: (run) => (
-    <div className="space-y-3">
+    <div className="space-y-sm">
       {run.map((block, i) => (
         <FaqItemBlock key={blockKey(block, i)} block={block} />
       ))}
@@ -94,5 +98,5 @@ export default function SectionBlocks({ blocks }) {
     }
   }
 
-  return <div className="space-y-6">{rendered}</div>;
+  return <div className="space-y-lg">{rendered}</div>;
 }

@@ -28,9 +28,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
+import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
-import EmptyState from '../../components/EmptyState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import {
@@ -40,9 +40,21 @@ import {
   blockTypeLabel,
 } from '../blockTypes.js';
 import { blankPage, blankSection, toEditablePage, toPagePayload } from '../pageDoc.js';
+import {
+  PAGE_LAYOUT_DEFAULTS,
+  PAGE_LAYOUT_VALUES,
+} from '../../lib/pageLayout.js';
+import { NAV_PLACEMENT_LABELS } from '../../lib/themeRuntime.js';
+import {
+  PAGE_TEMPLATES,
+  PAGE_TEMPLATE_IDS,
+  templateLayout,
+} from '../../lib/pageTemplates.js';
 import { summarizePublish } from '../publishResult.js';
 import {
   CheckboxField,
+  DestructiveConfirm,
+  FieldError,
   Panel,
   SaveStatus,
   SelectField,
@@ -50,9 +62,112 @@ import {
   TextAreaField,
   TextField,
   dangerButtonClass,
+  fieldLabelClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  RecordState,
+} from '../components/adminChrome.jsx';
+
+// THE OPERATOR PICKS A TASK, NOT A LAYOUT (this review).
+//
+// This panel used to be four selects — Header, Arrangement, Density,
+// Navigation — one per variant in the internal layout system. That asks an
+// operator to assemble a page out of design-system parts, in the design
+// system's words, with no way of knowing which of the twelve combinations
+// the house has an opinion about. It is the difference between "what shape
+// is this page" (a question with an answer) and "what value should
+// `arrangement` take" (a question about our code).
+//
+// So the main editor offers one control: which of six named tasks this page
+// is. Picking one sets the whole bundle at once (lib/pageTemplates.js). The
+// individual variants moved behind the Advanced disclosure below, where a
+// page that genuinely needs to differ from its template can still say so —
+// the same place AdminBranding.jsx keeps its raw token overrides. Nothing
+// was taken away: every value the system has is still settable here, one at
+// a time, by an operator who knows which one they want.
+//
+// NAVIGATION IS THE SITE'S ANSWER, WITH A PAGE-LEVEL EXCEPTION. Where the
+// nav sits is set once for the whole site on the Branding tab
+// (config/theme.navPlacement), because a shell that moves between pages
+// stops being a shell. That is the default this control shows, by name, so
+// an operator can see what the site says without leaving the page.
+//
+// A page may still overrule it, and it sits in Advanced because that is
+// what it is: a deliberate exception for the one page that needs it, not a
+// question every page has to answer. Setting it does NOT clear the
+// template — nav is not one of the three values a template bundles, so a
+// Long read with a rail beside it is still a Long read.
+
+/** The value the template select shows for a page that named no task. */
+const CUSTOM_TEMPLATE = 'custom';
+
+/** Plain words for the layout variants (design brief §6.1, §8.5). */
+const LAYOUT_LABELS = Object.freeze({
+  header: 'Header',
+  arrangement: 'Arrangement',
+  density: 'Density',
+});
+
+const LAYOUT_HINTS = Object.freeze({
+  header: 'Every page carries a nameplate. Compact makes it smaller; it never turns off.',
+  arrangement: 'How this page lays its items out.',
+  density: 'How much space sits between things on this page.',
+});
+
+/** The three variants a template bundles, in editor order. */
+const EDITABLE_LAYOUT_KEYS = Object.freeze(['header', 'arrangement', 'density']);
+
+/**
+ * The value the navigation control shows for a page that states none: it
+ * takes whatever the site is set to. Empty string rather than a word,
+ * because "follow the site" is the ABSENCE of a page-level value, and the
+ * change handler deletes the key rather than writing a fourth enum member
+ * the validator would have to learn.
+ */
+const SITE_NAV_PLACEMENT = '';
+
+
+/** One word per enum value, so a select never reads like a field name. */
+const LAYOUT_VALUE_LABELS = Object.freeze({
+  nameplate: 'Full nameplate',
+  'nameplate-compact': 'Compact nameplate',
+  grid: 'Grid',
+  list: 'List',
+  tight: 'Tight',
+  comfortable: 'Comfortable',
+  loose: 'Loose',
+});
+
+// WHERE A SECTION GOES, SAID IN TERMS OF THE PAGE (this review).
+//
+// A hybrid page has a built-in feature — the schedule, the speaker
+// directory — and a section is inserted before it or after it. That is two
+// choices, and the operator is choosing an INSERTION POINT, so the words
+// name the feature they are relative to.
+//
+// "Above", "main", and "below" were never the operator's words. They are
+// the storage keys, and they stay the storage keys: `main` and `below` both
+// render after the feature (`below` after every `main`), and a section
+// stored as `below` before this change keeps that value and that position
+// unless the operator moves the control. Which is why the value shown for a
+// section is derived rather than passed straight through — see slotValue.
+const SLOT_CHOICES = Object.freeze([
+  { value: 'above', label: 'Before the main feature' },
+  { value: 'main', label: 'After the main feature' },
+]);
+
+/**
+ * Which of the two insertion points a stored slot reads as. `below` is a
+ * third stored position with no third name: it renders after the feature,
+ * so that is what the control says about it.
+ */
+function slotValue(slot) {
+  return slot === 'above' ? 'above' : 'main';
+}
 
 /** Move item `from` → `to` in a copy of `list`. */
 function moved(list, from, to) {
@@ -69,6 +184,11 @@ export default function AdminPageEditor({ mode }) {
   const call = useAdminApi();
   const { showToast } = useToast();
   const { rows, loading, findRow } = useAdminPages();
+  // What the site is set to, so the "follow the site" option can say what
+  // following it means instead of sending the operator to another tab to
+  // find out.
+  const { theme } = useEventConfig();
+  const siteNavPlacement = resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
 
   const [page, setPage] = useState(() => blankPage());
   const [error, setError] = useState(null);
@@ -77,6 +197,9 @@ export default function AdminPageEditor({ mode }) {
   // Set once a create has landed, so the form switches to editing that
   // document instead of trying to create it again.
   const [savedId, setSavedId] = useState(null);
+  // The individual layout variants, behind their own disclosure. Closed by
+  // default: the template above is the answer for almost every page.
+  const [layoutOpen, setLayoutOpen] = useState(false);
   // Set when a publish fails part-way: the queue row the retry must resume.
   const [resumeQueueId, setResumeQueueId] = useState(null);
   const errorRef = useRef(null);
@@ -109,11 +232,11 @@ export default function AdminPageEditor({ mode }) {
   const errorFor = (field) => fieldErrors.get(field);
 
   if (mode === 'edit' && loading && !row) {
-    return <LoadingState label="Loading page…" />;
+    return <AdminLoadingState label="Loading page…" />;
   }
   if (mode === 'edit' && !loading && !row) {
     return (
-      <EmptyState
+      <AdminEmptyState
         title="No such page"
         description="That page id has neither a published nor a draft revision."
         action={
@@ -230,32 +353,29 @@ export default function AdminPageEditor({ mode }) {
 
   return (
     <form
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-md"
       onSubmit={(event) => {
         event.preventDefault();
         save({ publish: false });
       }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-brand-ink">
-            {mode === 'create' ? 'New page' : page.label || page.id}
-          </h1>
-          <p className="text-sm text-brand-ink-muted">
-            Saving writes a draft. Publishing copies that draft to the live
-            revision the public site reads.
-          </p>
-        </div>
-        <Link to=".." relative="path" className={secondaryButtonClass}>
-          Back to pages
-        </Link>
-      </div>
+      <AdminPageHeader
+        title={mode === 'create' ? 'New page' : page.label || page.id}
+        state={row ? <RecordState state={row.state} /> : null}
+        identifiers={isExisting ? page.id : null}
+        description="Saving writes a draft. Publishing copies that draft to the live revision the public site reads."
+        actions={
+          <Link to=".." relative="path" className={secondaryButtonClass}>
+            Back to pages
+          </Link>
+        }
+      />
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
       <Panel title="Page" description="How the page is identified, ordered, and linked.">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           <TextField
             label="Page id"
             value={page.id}
@@ -297,7 +417,7 @@ export default function AdminPageEditor({ mode }) {
             error={errorFor('order')}
             hint="Lower numbers sort first."
           />
-          <div className="flex flex-col justify-center gap-3">
+          <div className="flex flex-col justify-center gap-xs">
             <CheckboxField
               label="Visible"
               checked={page.visible}
@@ -305,11 +425,112 @@ export default function AdminPageEditor({ mode }) {
               hint="Hidden pages stay out of the public site even once published."
             />
             {isSystemPage ? (
-              <p className="text-sm text-brand-ink-muted">
-                This is a system page: it has a dedicated route in the app, so
+              <p className="text-caption text-admin-ink-secondary">
+                This is a system page: It has a dedicated route in the app, so
                 it cannot be deleted or turned into a regular page.
               </p>
             ) : null}
+          </div>
+        </div>
+      </Panel>
+
+      <Panel
+        title="Page template"
+        description={
+          isSystemPage
+            ? 'What kind of page this is. The page keeps its built-in feature; the template shapes everything around it.'
+            : 'What kind of page this is.'
+        }
+      >
+        <SelectField
+          label="Template"
+          value={page.template ?? CUSTOM_TEMPLATE}
+          options={[
+            ...PAGE_TEMPLATE_IDS.map((id) => ({ value: id, label: PAGE_TEMPLATES[id].label })),
+            { value: CUSTOM_TEMPLATE, label: 'Custom — set by hand below' },
+          ]}
+          onChange={(value) => {
+            // Picking a task sets every value that task has an opinion
+            // about, in one move. Picking "Custom" changes no value at
+            // all — it only records that no task is claimed, so the page
+            // stops being described by a template it no longer matches.
+            const bundle = templateLayout(value);
+            update(
+              bundle
+                ? { template: value, layout: { ...page.layout, ...bundle } }
+                : { template: null },
+            );
+          }}
+          error={errorFor('template')}
+          hint={
+            page.template
+              ? PAGE_TEMPLATES[page.template].description
+              : 'This page sets its shape by hand. Pick a template to take the house’s answers instead.'
+          }
+        />
+        <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            aria-expanded={layoutOpen}
+            aria-controls="admin-page-layout-advanced"
+            onClick={() => setLayoutOpen((open) => !open)}
+          >
+            {layoutOpen ? 'Hide the individual settings' : 'Change the individual settings'}
+          </button>
+          <div id="admin-page-layout-advanced" hidden={!layoutOpen} className="mt-sm">
+            <p className="mb-sm max-w-[65ch] text-caption text-admin-ink-secondary">
+              The parts a template sets. Change one and the page stops following
+              its template — the template above reads “Custom” from then on, and
+              picking a template again sets all three back.
+            </p>
+            <div className="grid gap-sm sm:grid-cols-2">
+              {EDITABLE_LAYOUT_KEYS.map((key) => (
+                <SelectField
+                  key={key}
+                  label={LAYOUT_LABELS[key]}
+                  value={page.layout?.[key] ?? PAGE_LAYOUT_DEFAULTS[key]}
+                  options={PAGE_LAYOUT_VALUES[key].map((value) => ({
+                    value,
+                    label: LAYOUT_VALUE_LABELS[value] ?? value,
+                  }))}
+                  onChange={(value) =>
+                    update({ template: null, layout: { ...page.layout, [key]: value } })
+                  }
+                  error={errorFor(`layout.${key}`)}
+                  hint={LAYOUT_HINTS[key]}
+                />
+              ))}
+            </div>
+            <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
+              <SelectField
+                label="Navigation on this page"
+                value={page.layout?.navPlacement ?? SITE_NAV_PLACEMENT}
+                options={[
+                  {
+                    value: SITE_NAV_PLACEMENT,
+                    label: `Follow the site setting — ${NAV_PLACEMENT_LABELS[siteNavPlacement]}`,
+                  },
+                  ...PAGE_LAYOUT_VALUES.navPlacement.map((value) => ({
+                    value,
+                    label: `Only this page: ${NAV_PLACEMENT_LABELS[value]}`,
+                  })),
+                ]}
+                onChange={(value) => {
+                  // "Follow the site" is the absence of a page-level value,
+                  // so it DELETES the key rather than storing a word
+                  // meaning "nothing". A page that says nothing and a page
+                  // that says "top" are different facts, and only the
+                  // second survives a later change to the site setting.
+                  const { navPlacement: _dropped, ...rest } = page.layout ?? {};
+                  update({
+                    layout: value === SITE_NAV_PLACEMENT ? rest : { ...rest, navPlacement: value },
+                  });
+                }}
+                error={errorFor('layout.navPlacement')}
+                hint="The site sets this once for every page, on the Branding tab. Change it here only for a page that genuinely needs to differ — the template above is unaffected either way."
+              />
+            </div>
           </div>
         </div>
       </Panel>
@@ -328,23 +549,23 @@ export default function AdminPageEditor({ mode }) {
         }
       >
         {page.sections.length === 0 ? (
-          <p className="text-sm text-brand-ink-muted">
+          <p className="text-caption text-admin-ink-secondary">
             No sections yet. A page with no sections renders nothing.
           </p>
         ) : (
-          <ol className="flex flex-col gap-6">
+          <ol className="flex flex-col gap-md">
             {page.sections.map((section, sectionIndex) => {
               const at = `sections[${sectionIndex}]`;
               return (
                 <li
                   key={sectionIndex}
-                  className="rounded-brand border border-brand-ink/10 bg-brand-surface-alt p-4"
+                  className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground p-sm"
                 >
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-heading text-lg font-semibold text-brand-ink">
+                  <div className="mb-xs flex flex-wrap items-center justify-between gap-2xs border-admin-rule-hairline border-b-admin-hairline pb-2xs">
+                    <h3 className="font-admin-ui text-lead font-semibold text-admin-ink">
                       {section.label || section.id || `Section ${sectionIndex + 1}`}
                     </h3>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2xs">
                       <button
                         type="button"
                         className={secondaryButtonClass}
@@ -382,7 +603,7 @@ export default function AdminPageEditor({ mode }) {
                     </div>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-sm sm:grid-cols-2">
                     <TextField
                       label={`Section ${sectionIndex + 1} id`}
                       value={section.id}
@@ -417,6 +638,19 @@ export default function AdminPageEditor({ mode }) {
                         }
                       />
                     </div>
+                    {/* A custom page has no built-in feature component, so
+                        there is nothing for a section to sit above or below
+                        — the control only exists on a system page. */}
+                    {isSystemPage ? (
+                      <SelectField
+                        label={`Section ${sectionIndex + 1} position`}
+                        value={slotValue(section.slot)}
+                        options={SLOT_CHOICES}
+                        onChange={(value) => updateSection(sectionIndex, { slot: value })}
+                        error={errorFor(`${at}.slot`)}
+                        hint="Where this section is inserted, relative to the page's built-in feature."
+                      />
+                    ) : null}
                     <div className="sm:col-span-2">
                       <TextAreaField
                         label={`Section ${sectionIndex + 1} description`}
@@ -430,17 +664,15 @@ export default function AdminPageEditor({ mode }) {
                     </div>
                   </div>
 
-                  <fieldset className="mt-4">
-                    <legend className="text-sm font-semibold text-brand-ink">
+                  <fieldset className="mt-sm">
+                    <legend className={fieldLabelClass}>
                       Allowed block types
                     </legend>
-                    <p className="text-sm text-brand-ink-muted">
+                    <p className="text-caption text-admin-ink-secondary">
                       Which of the registry’s block types this section accepts.
                     </p>
-                    {errorFor(`${at}.allowedBlocks`) ? (
-                      <p className="text-sm text-danger">{errorFor(`${at}.allowedBlocks`)}</p>
-                    ) : null}
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <FieldError message={errorFor(`${at}.allowedBlocks`)} />
+                    <div className="mt-2xs grid gap-2xs sm:grid-cols-2">
                       {BLOCK_TYPE_IDS.map((blockTypeId) => (
                         <CheckboxField
                           key={blockTypeId}
@@ -459,9 +691,9 @@ export default function AdminPageEditor({ mode }) {
                     </div>
                   </fieldset>
 
-                  <div className="mt-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h4 className="text-sm font-semibold text-brand-ink">Blocks</h4>
+                  <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2xs">
+                      <h4 className="text-caption font-semibold text-admin-ink">Blocks</h4>
                       <button
                         type="button"
                         className={secondaryButtonClass}
@@ -482,11 +714,11 @@ export default function AdminPageEditor({ mode }) {
                       </button>
                     </div>
                     {section.defaultBlocks.length === 0 ? (
-                      <p className="mt-2 text-sm text-brand-ink-muted">
+                      <p className="mt-2xs text-caption text-admin-ink-secondary">
                         No blocks yet.
                       </p>
                     ) : (
-                      <ol className="mt-2 flex flex-col gap-4">
+                      <ol className="mt-2xs flex flex-col gap-sm">
                         {section.defaultBlocks.map((block, blockIndex) => {
                           const bat = `${at}.defaultBlocks[${blockIndex}]`;
                           const allowed = section.allowedBlocks.length
@@ -500,9 +732,9 @@ export default function AdminPageEditor({ mode }) {
                           return (
                             <li
                               key={blockIndex}
-                              className="rounded-brand border border-brand-ink/10 bg-brand-surface p-3"
+                              className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-input p-xs"
                             >
-                              <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="grid gap-xs sm:grid-cols-2">
                                 <TextField
                                   label={`Block ${blockIndex + 1} field — section ${sectionIndex + 1}`}
                                   value={block.field}
@@ -532,7 +764,7 @@ export default function AdminPageEditor({ mode }) {
                                   />
                                 </div>
                               </div>
-                              <div className="mt-3 flex flex-wrap gap-2">
+                              <div className="mt-xs flex flex-wrap gap-2xs">
                                 <button
                                   type="button"
                                   className={secondaryButtonClass}
@@ -595,7 +827,7 @@ export default function AdminPageEditor({ mode }) {
         )}
       </Panel>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-xs">
         <button type="submit" className={secondaryButtonClass} disabled={busy !== null}>
           {busy === 'draft' ? 'Saving…' : 'Save draft'}
         </button>
@@ -618,17 +850,24 @@ export default function AdminPageEditor({ mode }) {
           </button>
         ) : null}
         {isExisting ? (
-          <button
-            type="button"
-            className={dangerButtonClass}
-            disabled={busy !== null || isSystemPage}
-            title={
-              isSystemPage ? 'System pages cannot be deleted.' : undefined
-            }
-            onClick={remove}
-          >
-            {busy === 'delete' ? 'Deleting…' : 'Delete page'}
-          </button>
+          // A system page has no delete at all: the server refuses it, and
+          // the Page panel already states why in words. Offering a control
+          // the server will reject is worse than offering none.
+          isSystemPage ? null : (
+            <DestructiveConfirm
+              trigger="Delete this page"
+              title={`Delete ${page.label || page.id}`}
+              confirmLabel="Delete this page"
+              busyLabel="Deleting…"
+              busy={busy === 'delete'}
+              disabled={busy !== null}
+              consequence={`The live page and its draft both go, and ${
+                page.path || 'its path'
+              } stops resolving on the public site. The content blocks inside it are not deleted.`}
+              permanence="This cannot be undone."
+              onConfirm={remove}
+            />
+          )
         ) : null}
       </div>
     </form>

@@ -39,7 +39,7 @@ Packs `packages/shared` into `functions/vendor/shared.tgz` (spec §1.1); run by 
 ### `init-event.cjs`
 
 Bootstraps a fresh deployment (spec §5.1, issue #18). Writes the five `config/*` documents plus
-`config/bootstrap.adminEmails`, seeds the ten default pages (§5.3) and their placeholder content
+`config/bootstrap.adminEmails`, seeds the twelve default pages (§5.3) and their placeholder content
 (§5.4), seeds the provider-aware privacy and terms templates (§5.5), uploads the neutral branding
 placeholders, then prints the manual checklist (§5.6) and the launch-readiness table.
 
@@ -185,9 +185,16 @@ Renders the documentation site GitHub Pages serves at
 source; the HTML under `docs/docs/` is generated output and is committed.
 
 ```sh
-node scripts/build-pages.cjs                    # write docs/docs/
+node scripts/build-pages.cjs                    # write docs/tokens.css + docs/docs/
 node scripts/build-pages.cjs --check            # compare only, write nothing
 ```
+
+It also writes `docs/tokens.css`, the Pages site's scale and palette. Those values are not a copy:
+they are resolved from `design/tokens/` through `scripts/lib/tokens.cjs`, the same generator that
+writes `apps/web/src/generated/theme.css`, narrowed to the tokens the site uses. `docs/styles.css`
+is the handwritten half — layout, devices, rhythm — and reads them by name. The token generator is
+reached through `scripts/lib/shared-theme.cjs` rather than the bare `shared/theme` specifier,
+because the documentation CI tier has no `node_modules` for the workspace link to live in.
 
 `scripts/lib/pages-manifest.cjs` lists every published document and its route. A document reaches
 the site only by being listed there, so historical planning records under `docs/plans/` stay out of
@@ -197,9 +204,9 @@ Relative links to other published documents become site routes; links to anythin
 repository become GitHub URLs, and the build lists them.
 
 `--check` is the freshness gate, and it works like `generate-content.cjs --check`: it fails on any
-file whose committed bytes differ from a fresh render, and on any unexpected file left in
-`docs/docs/`. `scripts/build-pages.test.cjs` runs it, so the documentation CI tier enforces it with
-the runner's Node and no `npm install`.
+file whose committed bytes differ from a fresh render, on any unexpected file left in `docs/docs/`,
+and on a `docs/tokens.css` that no longer matches `design/tokens/`. `scripts/build-pages.test.cjs`
+runs it, so the documentation CI tier enforces it with the runner's Node and no `npm install`.
 
 ### `verify-sender-domain.cjs`
 

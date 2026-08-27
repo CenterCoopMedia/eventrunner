@@ -19,6 +19,12 @@
 // it admin-only even for its own owner — see profile.cjs's module doc: the
 // pipeline fields this endpoint deliberately omits, email/inviteToken/
 // approvedAt, are exactly why a direct rule was not the fix here).
+//
+// Editorial base restyle (design brief §2.1, §2.4): inputs and buttons carry
+// the hairline-rule tokens SignInPanel established, and the status notes sit
+// in flat-tint blocks rather than a rounded card. Every visible `<label>`
+// stays a control label above its own input — the eyebrow ban's one named
+// exception (§2.4).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SELF_EDITABLE_SPEAKER_FIELDS } from 'shared/speaker';
@@ -34,14 +40,7 @@ import {
   getOwnSpeakerProfile,
   updateOwnSpeakerProfile,
 } from '../lib/speakerProfileApi.js';
-
-const inputClass =
-  'touch-target w-full rounded-brand border border-brand-ink/20 bg-brand-surface px-3 py-2 ' +
-  'text-brand-ink placeholder:text-brand-ink-muted aria-[invalid=true]:border-danger';
-
-const primaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-brand-primary ' +
-  'px-4 py-2 font-semibold text-brand-surface hover:bg-brand-primary-dark disabled:opacity-60';
+import { inputClass, primaryActionClass } from '../components/controlClasses.js';
 
 const STATUS_COPY = {
   draft: null,
@@ -178,12 +177,12 @@ export default function SpeakerProfile() {
     // page. Staying on /speaker/profile the whole time sidesteps both.
     return (
       <article className="mx-auto max-w-md">
-        <h1 className="font-heading text-3xl font-semibold text-brand-ink">Sign in to continue</h1>
-        <p className="mt-2 text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Sign in to continue</h1>
+        <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
           Your speaker profile is part of your account, so it lives behind sign-in. Sign in below to pick
           up right where you left off.
         </p>
-        <div className="mt-6">
+        <div className="mt-lg">
           <SignInPanel />
         </div>
       </article>
@@ -192,8 +191,8 @@ export default function SpeakerProfile() {
 
   if (accountStatus === 'pending-account') {
     return (
-      <div className="mt-6">
-        <LoadingState label="Setting up your account" />
+      <div className="mt-lg">
+        <LoadingState label="Setting up your account…" />
       </div>
     );
   }
@@ -204,7 +203,7 @@ export default function SpeakerProfile() {
         title="This account is not linked to a speaker"
         description="If you were invited as a speaker, accept the invitation in that email first — it links this account to your speaker record."
         action={
-          <Link to="/profile" className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface">
+          <Link to="/profile" className={primaryActionClass}>
             Go to your account
           </Link>
         }
@@ -218,7 +217,7 @@ export default function SpeakerProfile() {
         title="Your speaker profile could not be loaded"
         description={load.error}
         action={
-          <button type="button" onClick={loadProfile} className={primaryButtonClass}>
+          <button type="button" onClick={loadProfile} className={primaryActionClass}>
             Try again
           </button>
         }
@@ -228,8 +227,8 @@ export default function SpeakerProfile() {
 
   if (load.status === 'loading' || form == null) {
     return (
-      <div className="mt-6">
-        <LoadingState label="Loading your speaker profile" />
+      <div className="mt-lg">
+        <LoadingState label="Loading your speaker profile…" />
       </div>
     );
   }
@@ -317,22 +316,22 @@ export default function SpeakerProfile() {
 
   return (
     <article className="mx-auto max-w-2xl">
-      <h1 className="font-heading text-3xl font-semibold text-brand-ink">Your speaker profile</h1>
-      <p className="mt-2 text-brand-ink-muted">
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Your speaker profile</h1>
+      <p className="mt-xs max-w-prose text-body text-text-secondary">
         This is what appears on the public programme once an organizer approves it.
       </p>
       {statusNote ? (
-        <p role="status" className="mt-4 rounded-brand border border-brand-ink/10 bg-brand-surface-alt px-3 py-2 text-sm text-brand-ink">
+        <p role="status" className="mt-md border-hairline border-rule-hairline bg-surface-alt px-sm py-xs font-data text-caption text-text-primary">
           {statusNote.text}
         </p>
       ) : null}
       {hasPendingEdits ? (
-        <p role="status" className="mt-2 rounded-brand border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
+        <p role="status" className="mt-xs border-hairline border-warning/40 bg-warning/10 px-sm py-xs font-data text-caption text-warning">
           {PENDING_EDITS_NOTE}
         </p>
       ) : null}
 
-      <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
+      <form className="mt-xl space-y-lg" onSubmit={handleSubmit} noValidate>
         <SpeakerPhotoField
           user={user}
           speakerId={speakerId}
@@ -340,15 +339,15 @@ export default function SpeakerProfile() {
           onChange={(path) => setField('headshotPath', path)}
         />
 
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-lg sm:grid-cols-2">
           <div>
-            <label htmlFor="firstName" className="block font-semibold text-brand-ink">
+            <label htmlFor="firstName" className="block font-semibold text-text-primary">
               First name
             </label>
             <input
               id="firstName"
               ref={nameRef}
-              className={`mt-1 ${inputClass}`}
+              className={`mt-2xs ${inputClass}`}
               value={form.firstName}
               onChange={(e) => setField('firstName', e.target.value)}
               aria-invalid={nameError ? 'true' : undefined}
@@ -357,12 +356,12 @@ export default function SpeakerProfile() {
             />
           </div>
           <div>
-            <label htmlFor="lastName" className="block font-semibold text-brand-ink">
+            <label htmlFor="lastName" className="block font-semibold text-text-primary">
               Last name
             </label>
             <input
               id="lastName"
-              className={`mt-1 ${inputClass}`}
+              className={`mt-2xs ${inputClass}`}
               value={form.lastName}
               onChange={(e) => setField('lastName', e.target.value)}
               aria-invalid={nameError ? 'true' : undefined}
@@ -372,31 +371,31 @@ export default function SpeakerProfile() {
           </div>
         </div>
         {nameError ? (
-          <p id="speaker-name-error" role="alert" className="text-sm text-danger">
+          <p id="speaker-name-error" role="alert" className="font-data text-caption text-danger">
             {nameError}
           </p>
         ) : null}
 
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-lg sm:grid-cols-2">
           <div>
-            <label htmlFor="jobTitle" className="block font-semibold text-brand-ink">
+            <label htmlFor="jobTitle" className="block font-semibold text-text-primary">
               Role
             </label>
             <input
               id="jobTitle"
-              className={`mt-1 ${inputClass}`}
+              className={`mt-2xs ${inputClass}`}
               value={form.jobTitle}
               onChange={(e) => setField('jobTitle', e.target.value)}
               autoComplete="organization-title"
             />
           </div>
           <div>
-            <label htmlFor="organization" className="block font-semibold text-brand-ink">
+            <label htmlFor="organization" className="block font-semibold text-text-primary">
               Organization
             </label>
             <input
               id="organization"
-              className={`mt-1 ${inputClass}`}
+              className={`mt-2xs ${inputClass}`}
               value={form.organization}
               onChange={(e) => setField('organization', e.target.value)}
               autoComplete="organization"
@@ -405,23 +404,23 @@ export default function SpeakerProfile() {
         </div>
 
         <div>
-          <label htmlFor="bio" className="block font-semibold text-brand-ink">
+          <label htmlFor="bio" className="block font-semibold text-text-primary">
             Biography
           </label>
           <textarea
             id="bio"
             rows={5}
-            className={`mt-1 ${inputClass}`}
+            className={`mt-2xs ${inputClass}`}
             value={form.bio}
             onChange={(e) => setField('bio', e.target.value)}
           />
         </div>
 
         <fieldset>
-          <legend className="font-semibold text-brand-ink">Social links</legend>
-          <div className="mt-2 space-y-2">
+          <legend className="font-semibold text-text-primary">Social links</legend>
+          <div className="mt-xs space-y-xs">
             {form.socialRows.map((row, index) => (
-              <div key={index} className="flex flex-wrap items-center gap-2">
+              <div key={index} className="flex flex-wrap items-center gap-xs">
                 <label className="sr-only" htmlFor={`social-label-${index}`}>
                   Platform
                 </label>
@@ -444,7 +443,7 @@ export default function SpeakerProfile() {
                 />
                 <button
                   type="button"
-                  className="touch-target rounded-brand px-3 py-2 text-brand-ink-muted underline hover:bg-brand-surface-alt"
+                  className="touch-target rounded-brand px-sm py-xs font-data text-caption text-text-secondary underline hover:bg-surface-alt"
                   onClick={() => removeSocialRow(index)}
                 >
                   Remove
@@ -454,14 +453,14 @@ export default function SpeakerProfile() {
           </div>
           <button
             type="button"
-            className="touch-target mt-2 inline-flex items-center rounded-brand border border-brand-ink/20 px-3 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"
+            className="touch-target mt-xs inline-flex items-center rounded-brand border-hairline border-rule-hairline px-sm py-xs font-data text-caption font-semibold text-text-primary hover:bg-surface-alt"
             onClick={addSocialRow}
           >
             + Add another link
           </button>
         </fieldset>
 
-        <button type="submit" className={primaryButtonClass} disabled={saving}>
+        <button type="submit" className={primaryActionClass} disabled={saving}>
           {saving ? 'Saving…' : 'Save speaker profile'}
         </button>
       </form>

@@ -388,3 +388,109 @@ test('publish endpoints: 400 on a queueId the real SDK would throw on', async ()
   }
   assert.equal(db.writes.length, 0);
 });
+
+// --- a child session never goes live ahead of its parent (brief §4.6) --------
+
+/** A parent draft and a child draft of it, neither published yet. */
+function parentAndChildDb(extra = {}) {
+  return makeFakeDb({
+    'cmsSchedule_drafts/session-parent': {
+      title: 'Workshop', dayId: 'day-2', visible: true, status: 'dirty',
+    },
+    'cmsSchedule_drafts/session-clinic': {
+      title: 'Clinic', dayId: 'day-2', parentId: 'session-parent', visible: true, status: 'dirty',
+    },
+    ...extra,
+  });
+}
+
+test('publishing a child whose parent is unpublished is refused, naming both', async () => {
+  const db = parentAndChildDb();
+  const res = fakeRes();
+  await createCmsPublishHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docIds: ['session-clinic'] } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(
+    res.body.error.message,
+    /^session-clinic: this session runs inside "session-parent", which is not published/,
+  );
+  assert.match(res.body.error.message, /publish them together, or publish the parent first/);
+  // Refused before any work: nothing live, and no queue row to resume.
+  assert.deepEqual(db.ids('cmsSchedule'), []);
+  assert.deepEqual(db.ids('cmsPublishQueue'), []);
+});
+
+test('publishing the pair together is accepted — that is the other way to satisfy it', async () => {
+  const db = parentAndChildDb();
+  const res = fakeRes();
+  await createCmsPublishHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docIds: ['session-clinic', 'session-parent'] } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.ids('cmsSchedule').sort(), ['session-clinic', 'session-parent']);
+});
+
+test('a parent already live satisfies it, and { all: true } does by construction', async () => {
+  const live = parentAndChildDb({
+    'cmsSchedule/session-parent': { title: 'Workshop', dayId: 'day-2', visible: true, revision: 1 },
+  });
+  const res = fakeRes();
+  await createCmsPublishHandler(deps(live))(
+    req({ body: { collection: 'cmsSchedule', docIds: ['session-clinic'] } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(live.read('cmsSchedule', 'session-clinic').revision, 1);
+
+  const all = parentAndChildDb();
+  const allRes = fakeRes();
+  await createCmsPublishHandler(deps(all))(req({ body: { all: true } }), allRes);
+  assert.equal(allRes.statusCode, 200);
+  assert.deepEqual(all.ids('cmsSchedule').sort(), ['session-clinic', 'session-parent']);
+});
+
+test('a docId with no draft publishes nothing, so it needs no parent', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-clinic': { title: 'Clinic', parentId: 'ghost', visible: true, revision: 1 },
+  });
+  const res = fakeRes();
+  await createCmsPublishHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docIds: ['session-clinic'] } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.results.cmsSchedule.skipped, [{ docId: 'session-clinic', reason: 'no-draft' }]);
+});
+
+test('a resume re-checks the parent rule against the world as it is now', async () => {
+  const db = parentAndChildDb();
+  const failed = db.collection('cmsPublishQueue').doc('q1');
+  await failed.set({
+    status: 'failed',
+    request: { cmsSchedule: ['session-clinic'] },
+    progress: {},
+  });
+  const res = fakeRes();
+  await createCmsPublishHandler(deps(db))(req({ body: { queueId: 'q1' } }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /which is not published/);
+  // The row is left failed, not flipped to running.
+  assert.equal(db.read('cmsPublishQueue', 'q1').status, 'failed');
+});
+
+test('the publish-set rule binds cmsSchedule only', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/hero__title': {
+      value: 'x', parentId: 'not-a-session', visible: true, status: 'dirty',
+    },
+  });
+  const res = fakeRes();
+  await createCmsPublishHandler(deps(db))(
+    req({ body: { collection: 'cmsContent', docIds: ['hero__title'] } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+});

@@ -18,10 +18,25 @@
 // until the request starts, validation on submit with aria-invalid and focus
 // moved to the error, 429 surfaced as friendly role="status" copy with a
 // countdown, tabular numerals on timers, 44px touch targets.
+//
+// Editorial base restyle (design brief §2.1, §2.4): the form sits in a
+// hairline-ruled block tinted by --color-surface-alt rather than a
+// shadowed card — elevation by tint, never depth. The "or" divider between
+// the Google and email paths is drawn with the hairline rule tokens
+// (§2.1's rule device), not a raw color literal. Countdown and code digits
+// take the mono face with tabular figures (§3.2): they are values a reader
+// compares, not running prose. Every form `<label>` stays above its input —
+// that is a control label, the one exemption the eyebrow ban names (§2.4),
+// never an eyebrow to "fix".
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { OtpRequestError, useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
+import {
+  inputClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from './controlClasses.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -46,24 +61,9 @@ function formatClock(totalSeconds) {
   return `${minutes}:${seconds}`;
 }
 
-const inputClass =
-  'touch-target w-full rounded-brand border border-brand-ink/20 bg-brand-surface px-3 py-2 ' +
-  'text-brand-ink placeholder:text-brand-ink-muted ' +
-  'aria-[invalid=true]:border-danger';
-
-export const primaryButtonClass =
-  'touch-target inline-flex w-full items-center justify-center rounded-brand ' +
-  'bg-brand-primary px-4 py-2 font-semibold text-brand-surface ' +
-  'hover:bg-brand-primary-dark disabled:opacity-60';
-
-export const secondaryButtonClass =
-  'touch-target inline-flex w-full items-center justify-center rounded-brand ' +
-  'border border-brand-ink/20 bg-brand-surface px-4 py-2 font-semibold ' +
-  'text-brand-ink hover:bg-brand-surface-alt disabled:opacity-60';
-
 const linkButtonClass =
-  'touch-target inline-flex items-center rounded-brand px-2 py-1 underline ' +
-  'underline-offset-2 text-brand-ink-muted hover:text-brand-ink';
+  'touch-target inline-flex items-center rounded-brand px-2xs py-3xs font-data text-caption underline ' +
+  'underline-offset-2 text-text-secondary hover:text-text-primary';
 
 /**
  * Inline form error: not color alone (icon + text), focusable so submit
@@ -76,7 +76,7 @@ export function FormError({ id, message, errorRef }) {
       id={id}
       ref={errorRef}
       tabIndex={-1}
-      className="flex items-start gap-2 rounded-brand border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
+      className="flex items-start gap-xs rounded-brand border-hairline border-danger/40 bg-danger/10 px-sm py-xs font-data text-caption text-danger"
     >
       <span aria-hidden="true" className="font-semibold">
         !
@@ -232,7 +232,7 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
   }, [step]);
 
   return (
-    <div className="space-y-6 rounded-brand-lg border border-brand-ink/10 bg-brand-surface p-6">
+    <div className="space-y-lg border-hairline border-rule-hairline bg-surface-alt p-lg">
       {error?.field === null && (
         <FormError id="signin-error" message={error.message} errorRef={errorRef} />
       )}
@@ -246,16 +246,16 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
         {busy === 'google' ? 'Waiting for Google…' : 'Continue with Google'}
       </button>
 
-      <div className="flex items-center gap-3" aria-hidden="true">
-        <span className="h-px flex-1 bg-brand-ink/10" />
-        <span className="text-sm text-brand-ink-muted">or</span>
-        <span className="h-px flex-1 bg-brand-ink/10" />
+      <div className="flex items-center gap-sm" aria-hidden="true">
+        <span className="h-0 flex-1 border-t-hairline border-t-rule-hairline" />
+        <span className="font-data text-caption text-text-secondary">or</span>
+        <span className="h-0 flex-1 border-t-hairline border-t-rule-hairline" />
       </div>
 
       {step === 'email' ? (
-        <form onSubmit={requestCode} noValidate className="space-y-4">
-          <div className="space-y-1">
-            <label htmlFor="signin-email" className="block font-semibold text-brand-ink">
+        <form onSubmit={requestCode} noValidate className="space-y-sm">
+          <div className="space-y-3xs">
+            <label htmlFor="signin-email" className="block font-semibold text-text-primary">
               Email address
             </label>
             <input
@@ -282,12 +282,12 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
           <button type="submit" disabled={busy === 'send'} className={primaryButtonClass}>
             {busy === 'send' ? 'Sending code…' : 'Email me a code'}
           </button>
-          <p role="status" className="text-sm text-brand-ink-muted">
+          <p role="status" className="font-data text-caption text-text-secondary">
             {retrySeconds > 0 ? (
               <>
                 You have requested several codes recently. You can request
                 another in{' '}
-                <span aria-hidden="true" data-numeric>
+                <span aria-hidden="true" data-numeric className="font-mono">
                   {formatClock(retrySeconds)}
                 </span>
                 <span className="sr-only">
@@ -303,13 +303,13 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
           </p>
         </form>
       ) : (
-        <form onSubmit={submitCode} noValidate className="space-y-4">
-          <p id="signin-code-hint" className="text-brand-ink" style={{ textWrap: 'pretty' }}>
+        <form onSubmit={submitCode} noValidate className="space-y-sm">
+          <p id="signin-code-hint" className="text-text-primary text-pretty">
             We emailed a six-digit code to <strong>{email}</strong>. Enter it
             here within {expiresInMinutes} minutes.
           </p>
-          <div className="space-y-1">
-            <label htmlFor="signin-code" className="block font-semibold text-brand-ink">
+          <div className="space-y-3xs">
+            <label htmlFor="signin-code" className="block font-semibold text-text-primary">
               Six-digit code
             </label>
             <input
@@ -332,7 +332,7 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
                   ? 'signin-code-hint signin-code-error'
                   : 'signin-code-hint'
               }
-              className={`${inputClass} tracking-[0.3em]`}
+              className={`${inputClass} font-mono tracking-[0.3em]`}
               data-numeric
             />
           </div>
@@ -350,12 +350,12 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
           >
             {busy === 'verify' ? 'Signing in…' : 'Sign in'}
           </button>
-          <p role="status" className="text-sm text-brand-ink-muted">
+          <p role="status" className="font-data text-caption text-text-secondary">
             {retrySeconds > 0 ? (
               <>
                 You have requested several codes recently. You can request
                 another in{' '}
-                <span aria-hidden="true" data-numeric>
+                <span aria-hidden="true" data-numeric className="font-mono">
                   {formatClock(retrySeconds)}
                 </span>
                 <span className="sr-only">
@@ -370,7 +370,7 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
             ) : expirySeconds > 0 ? (
               <>
                 Your code expires in{' '}
-                <span aria-hidden="true" data-numeric>
+                <span aria-hidden="true" data-numeric className="font-mono">
                   {formatClock(expirySeconds)}
                 </span>
                 <span className="sr-only">
@@ -384,7 +384,7 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
               'Your code has expired. Email yourself a new one below.'
             )}
           </p>
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-xs">
             <button
               type="button"
               onClick={requestCode}
@@ -425,11 +425,11 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
  */
 function DemoSignInNotice() {
   return (
-    <div className="space-y-3 rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-6">
-      <p className="font-heading text-lg font-semibold text-brand-ink">
+    <div className="space-y-sm border-hairline border-rule-hairline bg-surface-alt p-lg">
+      <p className="font-heading text-h3 font-semibold text-text-primary">
         Sign-in is disabled in this demo
       </p>
-      <p className="text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+      <p className="text-text-secondary text-pretty">
         This is a read-only tour of a fictional event. Accounts, bookmarks,
         the attendee directory, and the admin CMS all work on a real
         deployment — ask us for a walkthrough.

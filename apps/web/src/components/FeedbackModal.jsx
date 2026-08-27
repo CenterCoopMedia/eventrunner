@@ -14,15 +14,22 @@
 // None of these checks are enforced here: the server is the actual gate,
 // and this modal just carries the signals it needs. Fails soft — a
 // submission error is shown inline; it never throws out of the component.
+//
+// Editorial base restyle (design brief §2.1, §2.4): the dialog's elevation
+// is a tinted ink scrim (--color-text-primary at low alpha, no blur) behind
+// a strong-rule frame — never a shadow, never a rounded card. The fields
+// come from components/forms/publicForm.jsx, which reads the tier-2 tokens
+// this surface reads: this is a visitor-facing form, so it must never take
+// the admin identity's grounds and faces (design brief §3.1, §5.2). The
+// buttons are the shared action classes from controlClasses.js, sized by
+// their own content rather than stretched across the dialog. Every form
+// `<label>` in SelectField/TextAreaField/TextField stays above its input —
+// a control label is the one exemption the eyebrow ban names (§2.4), never
+// an eyebrow to "fix".
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
-import {
-  SelectField,
-  TextAreaField,
-  TextField,
-  primaryButtonClass,
-  secondaryButtonClass,
-} from '../admin/components/formControls.jsx';
+import { SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
+import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 
 const CATEGORY_OPTIONS = [
   { value: 'feedback', label: 'General feedback' },
@@ -85,22 +92,22 @@ export default function FeedbackModal({ onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-brand-ink/40 px-4 py-8"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/40 px-md py-xl"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-brand-lg border border-brand-ink/10 bg-brand-surface p-6"
+        className="w-full max-w-lg border-strong border-rule-strong bg-surface p-lg"
         onClick={(event) => event.stopPropagation()}
       >
         {sent ? (
-          <div className="flex flex-col gap-4">
-            <h2 id={titleId} className="font-heading text-xl font-semibold text-brand-ink">
+          <div className="flex flex-col gap-md">
+            <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
               Thanks for letting us know
             </h2>
-            <p role="status" className="text-sm text-brand-ink-muted">
+            <p role="status" className="font-data text-caption text-text-secondary">
               {/* Receipt-only wording: the backend's confirmation send is
                   best-effort and swallows its own failures (spec: a failed
                   send never turns an already-durable submission into a
@@ -108,22 +115,22 @@ export default function FeedbackModal({ onClose }) {
                   email was actually delivered — only that the message
                   itself was received. */}
               We got your feedback.
-              {email.trim() ? " If you left an email, we'll try to send a confirmation." : null}
+              {email.trim() ? ' If you left an email, we’ll try to send a confirmation.' : null}
             </p>
             <div>
-              <button type="button" className={primaryButtonClass} onClick={onClose}>
+              <button type="button" className={primaryActionClass} onClick={onClose}>
                 Close
               </button>
             </div>
           </div>
         ) : (
-          <form className="flex flex-col gap-4" onSubmit={submit}>
-            <h2 id={titleId} className="font-heading text-xl font-semibold text-brand-ink">
+          <form className="flex flex-col gap-md" onSubmit={submit}>
+            <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
               Share feedback
             </h2>
 
             {error ? (
-              <p role="alert" className="rounded-brand border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+              <p role="alert" className="rounded-brand border-hairline border-danger/40 bg-danger/10 px-sm py-xs font-data text-caption text-danger">
                 {error}
               </p>
             ) : null}
@@ -146,7 +153,7 @@ export default function FeedbackModal({ onClose }) {
               type="email"
               value={email}
               onChange={setEmail}
-              hint="Leave your email if you'd like a reply."
+              hint="Leave your email if you’d like a reply."
             />
 
             {/* Honeypot: visually hidden, out of tab order, and never
@@ -163,11 +170,11 @@ export default function FeedbackModal({ onClose }) {
               />
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" className={secondaryButtonClass} onClick={onClose}>
+            <div className="flex flex-wrap justify-end gap-xs">
+              <button type="button" className={secondaryActionClass} onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className={primaryButtonClass} disabled={submitting}>
+              <button type="submit" className={primaryActionClass} disabled={submitting}>
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
             </div>

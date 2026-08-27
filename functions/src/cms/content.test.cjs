@@ -375,6 +375,47 @@ test('cmsDeleteContent on a cmsSchedule doc cascades: its materials and their pu
   assert.notEqual(db.read('session_materials', 'other'), undefined);
 });
 
+test('cmsDeleteContent refuses to orphan a session’s children, naming them', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { title: 'Workshop', dayId: 'day-2', visible: true, revision: 1 },
+    'cmsSchedule/session-clinic': { title: 'Clinic', dayId: 'day-2', parentId: 'session-parent', visible: true, revision: 1 },
+    // An unpublished child is a child too.
+    'cmsSchedule_drafts/session-lab': { title: 'Lab', dayId: 'day-2', parentId: 'session-parent', status: 'dirty' },
+  });
+  const res = fakeRes();
+  await createCmsDeleteContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-parent' } }),
+    res,
+  );
+  assert.equal(res.statusCode, 409);
+  assert.match(res.body.error.message, /Cannot delete session "session-parent": 2 sessions still run inside it/);
+  assert.match(res.body.error.message, /session-clinic/);
+  assert.match(res.body.error.message, /session-lab/);
+  assert.match(res.body.error.message, /Move those sessions to another parent or delete them first\./);
+  // Nothing was deleted, and no materials cascade ran on a refused delete.
+  assert.notEqual(db.read('cmsSchedule', 'session-parent'), undefined);
+  assert.notEqual(db.read('cmsSchedule', 'session-clinic'), undefined);
+  assert.equal(db.ids('admin_logs').length, 0);
+});
+
+test('cmsDeleteContent deletes a session once its children are gone', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { title: 'Workshop', dayId: 'day-2', visible: true, revision: 1 },
+    'cmsSchedule_drafts/session-parent': { title: 'Workshop', status: 'clean', basedOnRevision: 1 },
+    // A child of a DIFFERENT session must not hold this one hostage.
+    'cmsSchedule/session-clinic': { title: 'Clinic', dayId: 'day-2', parentId: 'session-other', visible: true, revision: 1 },
+  });
+  const res = fakeRes();
+  await createCmsDeleteContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-parent' } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.deleted, ['cmsSchedule/session-parent', 'cmsSchedule_drafts/session-parent']);
+  assert.equal(db.read('cmsSchedule', 'session-parent'), undefined);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-parent'), undefined);
+});
+
 test('cmsDeleteContent on a non-cmsSchedule collection never queries session_materials', async () => {
   const db = makeFakeDb({
     'cmsContent/hero__title': { value: 'live', visible: true, revision: 1 },
@@ -644,6 +685,297 @@ test('collections without speaker references are untouched by the seam', async (
   // cmsContent has no speakers; a stray speakerIds field is ordinary content.
   await createCmsCreateContentHandler(deps(db))(
     req({ body: { section: 'hero', field: 'blurb', fields: { speakerIds: ['ghost'] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+});
+
+// --- the stat contract (design brief §2.1.1) --------------------------------
+
+const FULL_STAT = Object.freeze({
+  blockType: 'stat',
+  value: '420',
+  label: 'attendees expected',
+  takeaway: 'Registration is close to filling the hall',
+  description: 'Confirmed registrations across all three days.',
+  source: 'Registration list, read 1 September 2026.',
+  alt: 'Confirmed registrations stand at 420 of 450 seats.',
+});
+
+test('a stat block with evidence but no figure is rejected, naming the figure and its caption', async () => {
+  // The registry has always marked value and label required; the write
+  // contract now enforces them, so "all the evidence, no number" — a
+  // caption with a hole where the figure goes — cannot be written.
+  const db = makeFakeDb();
+  const { value, label, ...evidenceOnly } = FULL_STAT;
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: evidenceOnly } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  for (const part of ['value:', 'label:']) {
+    assert.ok(res.body.error.message.includes(part), `names ${part}`);
+  }
+  assert.equal(db.read('cmsContent_drafts', 'stats__attendees'), undefined);
+});
+
+test('creating a stat block without its four parts is rejected, naming each one', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { blockType: 'stat', value: '420', label: 'attendees' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  for (const part of ['takeaway:', 'description:', 'source:', 'alt:']) {
+    assert.ok(res.body.error.message.includes(part), `names ${part}`);
+  }
+  // Nothing was written: the refusal aborts the transaction.
+  assert.equal(db.read('cmsContent_drafts', 'stats__attendees'), undefined);
+});
+
+test('a stat block carrying all four parts is written', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { ...FULL_STAT } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsContent_drafts', 'stats__attendees').takeaway, FULL_STAT.takeaway);
+});
+
+test('a blank part is as missing as an absent one', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { ...FULL_STAT, source: '   ' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^source: /);
+});
+
+test('a legacy stat block keeps publishing and rendering; only WRITING it that way stops', async () => {
+  // The stored shape is untouched — nothing sweeps the corpus, and the
+  // live doc a reader sees is exactly what it was.
+  const db = makeFakeDb({
+    'cmsContent/stats__attendees': {
+      blockType: 'stat', value: '420', label: 'Attendees expected', visible: true, revision: 2,
+    },
+  });
+  const res = fakeRes();
+  await createGetSiteContentHandler({ db })({ method: 'GET' }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.content[0].value, '420');
+
+  // An edit of that legacy block has to bring it up to contract.
+  const update = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { value: '450' } } }),
+    update,
+  );
+  assert.equal(update.statusCode, 400);
+  assert.match(update.body.error.message, /takeaway: /);
+  assert.equal(db.read('cmsContent', 'stats__attendees').value, '420');
+});
+
+test('the contract is checked on the MERGED result, not just the payload', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/stats__attendees': { ...FULL_STAT, section: 'stats', field: 'attendees' },
+  });
+  const res = fakeRes();
+  // The payload names only the figure; the stored draft supplies the parts.
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { value: '450' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsContent_drafts', 'stats__attendees').value, '450');
+
+  // And clearing a part is a rejection, not a silent drop.
+  const cleared = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { alt: DELETE_FIELD_SENTINEL } } }),
+    cleared,
+  );
+  assert.equal(cleared.statusCode, 400);
+  assert.match(cleared.body.error.message, /^alt: /);
+});
+
+test('the contract binds stat blocks only, and cmsContent only', async () => {
+  const db = makeFakeDb();
+  const text = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'title', fields: { blockType: 'text', value: 'Welcome' } } }),
+    text,
+  );
+  assert.equal(text.statusCode, 200);
+
+  // A session is not a block: `stat` means nothing in cmsSchedule.
+  const session = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-1', fields: { blockType: 'stat', title: 'Welcome' } } }),
+    session,
+  );
+  assert.equal(session.statusCode, 200);
+});
+
+// --- the session structure seam (design brief §4.6) -------------------------
+
+test('a session save validates its track letter, naming the field', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-1', fields: { dayId: 'day-1', track: 'Line A' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^track: /);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-1'), undefined);
+});
+
+test('a session save rejects a parent that does not exist, naming the id', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-1', fields: { dayId: 'day-1', parentId: 'session-ghost' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /no session exists with id "session-ghost"/);
+});
+
+test('a session save rejects a track the event does not define, naming the ones it does', async () => {
+  const db = makeFakeDb({
+    'config/event': { tracks: [{ letter: 'A', name: 'Practice' }] },
+  });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-1', fields: { dayId: 'day-1', track: 'B' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^track: "B" is not one of this event's tracks \(A\)/);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-1'), undefined);
+});
+
+test('a session save accepts a track and a parent on the same day', async () => {
+  const db = makeFakeDb({
+    'config/event': { tracks: [{ letter: 'A', name: 'Practice' }, { letter: 'B', name: 'Sustainability' }] },
+    'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop', track: 'B' },
+  });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        collection: 'cmsSchedule',
+        docId: 'session-child',
+        fields: { dayId: 'day-2', title: 'Clinic', track: 'B', parentId: 'session-parent' },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  const draft = db.read('cmsSchedule_drafts', 'session-child');
+  assert.equal(draft.track, 'B');
+  assert.equal(draft.parentId, 'session-parent');
+});
+
+test('a session save rejects a child on a different line from its parent', async () => {
+  const db = makeFakeDb({
+    'config/event': { tracks: [{ letter: 'A', name: 'Practice' }, { letter: 'B', name: 'Sustainability' }] },
+    'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop', track: 'B' },
+  });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        collection: 'cmsSchedule',
+        docId: 'session-child',
+        fields: { dayId: 'day-2', title: 'Clinic', track: 'A', parentId: 'session-parent' },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^track: "A" is not the track of its parent "session-parent"/);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-child'), undefined);
+});
+
+test('a child with no track of its own is written as it was sent — it inherits', async () => {
+  const db = makeFakeDb({
+    'config/event': { tracks: [{ letter: 'B', name: 'Sustainability' }] },
+    'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop', track: 'B' },
+  });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        collection: 'cmsSchedule',
+        docId: 'session-child',
+        fields: { dayId: 'day-2', title: 'Clinic', parentId: 'session-parent' },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  // Absence stays absence: nothing writes the parent's letter onto the child.
+  assert.equal('track' in db.read('cmsSchedule_drafts', 'session-child'), false);
+});
+
+test('an update is judged on the MERGED session, not the payload alone', async () => {
+  // The stored draft already names the parent; this edit only moves the day.
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { dayId: 'day-2' },
+    'cmsSchedule_drafts/session-child': { dayId: 'day-2', parentId: 'session-parent' },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-child', fields: { dayId: 'day-3' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /a child session\s+runs on its parent's day|child session/);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-child').dayId, 'day-2');
+});
+
+test('moving a parent session strands nothing: the edit is rejected, naming the children', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop', visible: true, revision: 1 },
+    'cmsSchedule/session-clinic': { dayId: 'day-2', title: 'Clinic', parentId: 'session-parent', visible: true, revision: 1 },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-parent', fields: { dayId: 'day-3' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /carries 1 child session \(session-clinic\)/);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-parent'), undefined);
+});
+
+test('a parent may still be edited in every way that does not strand a child', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop', visible: true, revision: 1 },
+    'cmsSchedule/session-clinic': { dayId: 'day-2', title: 'Clinic', parentId: 'session-parent', visible: true, revision: 1 },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-parent', fields: { title: 'Workshop, renamed' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-parent').title, 'Workshop, renamed');
+});
+
+test('the session seam leaves every other collection alone', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  // `track` and `parentId` are ordinary content anywhere but a session.
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'blurb', fields: { blockType: 'text', value: 'x', track: 'Line A', parentId: 'nope' } } }),
     res,
   );
   assert.equal(res.statusCode, 200);

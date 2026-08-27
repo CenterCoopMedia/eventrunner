@@ -18,7 +18,7 @@ import { subscribeWithRetry } from './retrySubscription.js';
 //
 // A naive per-session `where('sessionId', '==', id)` listener, one per
 // caller, costs one Firestore listener PER RENDERED CARD: a schedule page
-// listing N sessions opens N listeners for their MaterialsPills, and
+// listing N sessions opens N listeners for their MaterialsLinks, and
 // SessionDetail opens a second one of its own (the pill's count AND the
 // full list both call this). None of that scales with the page — session_
 // materials_public is small enough per event that one WHOLE-COLLECTION

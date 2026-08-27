@@ -93,7 +93,7 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
       .toBe('approved');
 
     // Bookmark a session — gated on config/features.sessionBookmarks (on)
-    // and on an approved attendee (components/SessionCard.jsx BookmarkPill),
+    // and on an approved attendee (components/session/BookmarkAction.jsx),
     // which is exactly the state this attendee just reached.
     await page.goto(`/schedule/${sessionId}`);
     const bookmarkButton = page.getByRole('button', { name: /^bookmark$/i });
@@ -101,7 +101,7 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
     await bookmarkButton.click();
     await expect(page.getByRole('button', { name: /^bookmarked$/i })).toBeVisible();
     // The click above only confirms the OPTIMISTIC UI update
-    // (components/SessionCard.jsx BookmarkPill); wait for the server write
+    // (components/session/BookmarkAction.jsx); wait for the server write
     // itself (users/{uid}/bookmarks/{sessionId}) before relying on it from
     // another page below.
     await expect

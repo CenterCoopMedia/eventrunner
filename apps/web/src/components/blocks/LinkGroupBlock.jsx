@@ -5,6 +5,11 @@
 //
 // url is CMS-authored data (unvalidated server-side beyond reserved-key
 // checks), so it goes through the same href allowlist as richtext links.
+//
+// It is an inline link in running content, not one of the four control
+// shapes in controlClasses.js, so it draws the prose-link treatment the
+// .rich-text anchor rule already sets in index.css: accent ink, an
+// underline at 40%, accent-strong on hover.
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
 
 export default function LinkGroupBlock({ block }) {
@@ -13,7 +18,7 @@ export default function LinkGroupBlock({ block }) {
     <li>
       <a
         href={block.url}
-        className="touch-target inline-flex items-center text-brand-primary underline decoration-brand-primary/40 underline-offset-2 hover:text-brand-primary-dark"
+        className="touch-target inline-flex items-center text-body text-accent underline decoration-accent/40 underline-offset-2 hover:text-accent-strong"
       >
         {block.label}
       </a>

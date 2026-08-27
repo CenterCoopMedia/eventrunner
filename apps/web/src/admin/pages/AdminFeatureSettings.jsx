@@ -12,11 +12,13 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import {
   CheckboxField,
+  FieldError,
   Panel,
   SaveStatus,
   ServerErrorSummary,
   primaryButtonClass,
 } from '../components/formControls.jsx';
+import AdminPageHeader from '../components/adminChrome.jsx';
 
 /** Flag id → the sentence an operator needs to decide. */
 const FEATURE_HINTS = {
@@ -96,31 +98,26 @@ export default function AdminFeatureSettings() {
   }
 
   return (
-    <form className="flex flex-col gap-6" onSubmit={submit}>
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-brand-ink">Features</h1>
-        <p className="text-sm text-brand-ink-muted">
-          What the site offers. Turning a feature off hides its route as well as
-          its navigation.
-        </p>
-      </div>
+    <form className="flex flex-col gap-md" onSubmit={submit}>
+      <AdminPageHeader
+        title="Features"
+        description="What the site offers. Turning a feature off hides its route as well as its navigation."
+      />
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
       <Panel>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-sm sm:grid-cols-2">
           {KNOWN_FEATURE_KEYS.map((key) => (
-            <div key={key} className="flex flex-col gap-1">
+            <div key={key} className="flex flex-col gap-3xs">
               <CheckboxField
                 label={key}
                 checked={form[key]}
                 hint={FEATURE_HINTS[key]}
                 onChange={(checked) => setForm((c) => ({ ...c, [key]: checked }))}
               />
-              {fieldErrors.get(`features.${key}`) ? (
-                <p className="text-sm text-danger">{fieldErrors.get(`features.${key}`)}</p>
-              ) : null}
+              <FieldError message={fieldErrors.get(`features.${key}`)} />
             </div>
           ))}
         </div>

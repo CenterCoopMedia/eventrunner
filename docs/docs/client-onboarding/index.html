@@ -23,11 +23,12 @@
   <meta name="twitter:description" content="The provisioning checklist from first call to handover.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta name="twitter:image:alt" content="Event Runner documentation">
-  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
   <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
 </head>
@@ -37,10 +38,15 @@
   <div class="wrap">
     <header class="site-header">
       <a class="brand" href="/eventrunner/">
-        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
-        <span class="brand-text">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2.5" y="2" width="3" height="20"/>
+          <rect x="5.5" y="2" width="16" height="3"/>
+          <rect x="5.5" y="11" width="9.5" height="2"/>
+          <rect x="5.5" y="19.5" width="13" height="2.5"/>
+        </svg>
+        <span class="brand-words">
           <strong>Event Runner</strong>
-          <span>Documentation</span>
+          <span class="brand-line">Documentation</span>
         </span>
       </a>
       <nav aria-label="Site">
@@ -73,6 +79,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/" aria-current="page" class="is-current">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
           <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
@@ -165,7 +172,7 @@
           </code></pre>
           <p>Repeat <code>--admin</code> for a second address if you already know it — item 5 below still applies if you
           don&#39;t yet.</p>
-          <p>This seeds <code>config/*</code>, the ten default pages, placeholder CMS content, the two legal page
+          <p>This seeds <code>config/*</code>, the twelve default pages, placeholder CMS content, the two legal page
           templates (flagged <code>reviewRequired</code>, see item 4 below), the client-visible email template
           overrides, and the placeholder branding assets. It then prints the manual checklist below and the
           seven-row launch-readiness table as <strong>warnings</strong> — init itself never fails on an unmet item; only
@@ -302,7 +309,7 @@
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/CLIENT_ONBOARDING.md"><code>docs/CLIENT_ONBOARDING.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">
-          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/admin-guide/"><span>Previous</span>Admin guide</a>
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/design-reference/"><span>Previous</span>Site design reference</a>
           <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/deploy-runbook/"><span>Next</span>Deploy runbook</a>
         </nav>
       </main>

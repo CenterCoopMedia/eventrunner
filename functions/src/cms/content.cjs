@@ -23,7 +23,7 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
-const { draftCollectionFor } = require('./blockTypes.cjs');
+const { draftCollectionFor, statContractErrors } = require('./blockTypes.cjs');
 const {
   writeDraft,
   deleteBoth,
@@ -34,6 +34,7 @@ const {
   internals: storeInternals,
 } = require('./store.cjs');
 const { validateSpeakerReferences } = require('../speakers/references.cjs');
+const { validateSessionStructure, checkSessionDeletable } = require('../schedule/sessions.cjs');
 const { deleteMaterialsForSession } = require('../materials/store.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -183,6 +184,52 @@ async function checkSpeakerReferences({ db, tx = null, collection, fields }) {
 }
 
 /**
+ * The session structure seam (design brief §4.6): `track` and `parentId`.
+ *
+ * Same shape as the speaker seam beside it, and for the same reasons — the
+ * check runs over the RESULT of the merge (a session whose stored draft
+ * already names a missing parent must not be quietly re-saved with the
+ * dangling reference intact), and it reads inside the write transaction, so
+ * a parent deleted or re-parented mid-save aborts this write rather than
+ * slipping past a check that has already run.
+ *
+ * @param {{ db: object, tx?: object, collection: string, docId: string, fields: object }} args
+ * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
+ */
+async function checkSessionStructure({ db, tx = null, collection, docId, fields }) {
+  if (collection !== 'cmsSchedule') return { ok: true };
+  return validateSessionStructure({ db, tx, docId, fields });
+}
+
+/**
+ * Block-shape contracts at the content-write seam (design brief §2.1.1).
+ *
+ * These generic endpoints deliberately validate no block shape — the
+ * registry describes fields, and the editor fills them in — with ONE
+ * exception, and it is a design rule rather than a data-integrity one: a
+ * stat block must carry its four parts. A number presented as evidence with
+ * no finding, no period, no source, and no alt text is the pattern the brief
+ * rejects, and from PR3 on it fails validation as well as review.
+ *
+ * The check runs over the RESULT of the merge, exactly like the speaker
+ * reference check: what matters is the block that ends up stored, not the
+ * half of it this particular request happened to send.
+ *
+ * Only cmsContent carries blocks. A stat block already stored in the legacy
+ * `{ value, label }` shape is untouched — it publishes and renders as it
+ * always did; what it cannot do any more is be written that way.
+ *
+ * @param {{ collection: string, fields: object }} args
+ * @returns {{ ok: true } | { ok: false, message: string }}
+ */
+function checkBlockContract({ collection, fields }) {
+  if (collection !== 'cmsContent') return { ok: true };
+  const errors = statContractErrors(fields);
+  if (errors.length > 0) return { ok: false, message: errors.join('; ') };
+  return { ok: true };
+}
+
+/**
  * An HTTP-shaped rejection thrown from inside a transaction body, so a
  * refusal aborts the transaction (writing nothing) instead of returning a
  * verdict the caller would have to unwind by hand.
@@ -249,6 +296,18 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
           fields: omitDeletedFields({ ...checked.fields, ...extraFields }),
         });
         if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
+
+        const contract = checkBlockContract({ collection, fields: references.fields });
+        if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
+
+        const structure = await checkSessionStructure({
+          db,
+          tx,
+          collection,
+          docId,
+          fields: references.fields,
+        });
+        if (!structure.ok) throw new RequestError(400, 'bad-request', structure.message);
 
         const written = await writeDraft({
           db,
@@ -325,6 +384,18 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
         });
         if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
 
+        const contract = checkBlockContract({ collection, fields: references.fields });
+        if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
+
+        const structure = await checkSessionStructure({
+          db,
+          tx,
+          collection,
+          docId,
+          fields: references.fields,
+        });
+        if (!structure.ok) throw new RequestError(400, 'bad-request', structure.message);
+
         const written = await writeDraft({
           db,
           tx,
@@ -361,11 +432,30 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
     const target = resolveTarget(req.body);
     if (!target.ok) return badRequest(res, target.message);
 
-    const { livePath, draftPath } = await deleteBoth({
-      db,
-      collection: target.collection,
-      docId: target.docId,
-    });
+    // A session that still holds children is not deletable (brief §4.6):
+    // removing it would leave every child pointing at a document that does
+    // not exist, with nothing left in the system to notice. The check reads
+    // the children in the SAME transaction that removes the parent, so a
+    // child created between the check and the delete aborts it rather than
+    // being orphaned by a verdict that had already passed. Every other
+    // collection deletes through the plain batch path, unchanged.
+    let paths;
+    try {
+      paths = target.collection === 'cmsSchedule'
+        ? await db.runTransaction(async (tx) => {
+            const deletable = await checkSessionDeletable({ db, tx, docId: target.docId });
+            if (!deletable.ok) throw new RequestError(409, 'has-children', deletable.message);
+            return deleteBoth({ db, tx, collection: target.collection, docId: target.docId });
+          })
+        : await deleteBoth({ db, collection: target.collection, docId: target.docId });
+    } catch (err) {
+      if (err?.httpError) {
+        const { status, code, message } = err.httpError;
+        return sendError(res, status, code, message);
+      }
+      throw err;
+    }
+    const { livePath, draftPath } = paths;
 
     // Cascade cleanup (issue #23 follow-up, spec §4.4): deleting a
     // cmsSchedule doc must not orphan its session_materials /
@@ -470,6 +560,8 @@ module.exports = {
     resolveTarget,
     validateFields,
     checkSpeakerReferences,
+    checkSessionStructure,
+    checkBlockContract,
     isValidDocId,
     SECTION_FIELD_RE,
     GENERIC_COLLECTIONS,

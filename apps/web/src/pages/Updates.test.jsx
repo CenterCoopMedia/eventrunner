@@ -47,7 +47,9 @@ function renderUpdates({ features = { updates: true }, updates = [] } = {}) {
       <EventConfigContext.Provider
         value={{ eventConfig: {}, features, theme: {}, badges: null, source: 'snapshot' }}
       >
-        <ContentContext.Provider value={{ updates, getBlock: () => null }}>
+        <ContentContext.Provider
+          value={{ updates, getBlock: () => null, getPage: () => null, getSectionBlocks: () => [] }}
+        >
           <Updates />
         </ContentContext.Provider>
       </EventConfigContext.Provider>
@@ -83,5 +85,46 @@ describe('Updates', () => {
   it('shows an empty state when there are no published updates yet', () => {
     renderUpdates({ updates: [] });
     expect(screen.getByRole('heading', { name: 'No updates yet' })).toBeInTheDocument();
+  });
+
+  it('labels a post with no resolvable publish date rather than leaving the date column blank', () => {
+    // The feed is dated (design brief §2.1), so every entry states its
+    // date. A post whose publishAt never resolved still gets a word — an
+    // empty cell would read as a rendering fault, not as missing data —
+    // and it runs under its own "Undated" head rather than being filed in a
+    // month it never had.
+    renderUpdates({ updates: [{ ...NEWER, id: 'update-undated', publishAt: null }] });
+    expect(screen.getByRole('heading', { level: 2, name: 'Undated' })).toBeInTheDocument();
+    expect(screen.getAllByText('Undated').length).toBeGreaterThan(0);
+    expect(screen.getByText(NEWER.title)).toBeInTheDocument();
+  });
+
+  // THE FEED'S RUNS (this review): pinned first because pinned is not a
+  // date, then one head per month, then the undated.
+  it('heads the feed with Pinned, then months, newest first', () => {
+    renderUpdates({
+      updates: [
+        { id: 'u-pin', title: 'Held to the top', pinned: true, publishAt: '2026-08-02T09:00:00Z' },
+        { id: 'u-oct', title: 'October post', publishAt: '2026-10-03T09:00:00Z' },
+        { id: 'u-sep', title: 'September post', publishAt: '2026-09-04T09:00:00Z' },
+      ],
+    });
+    const heads = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent.trim());
+    // Pinned first — an August post held to the top must not drag August's
+    // month head above October's.
+    expect(heads[0]).toBe('Pinned');
+    expect(heads[1]).toBe('October 2026');
+    expect(heads[2]).toBe('September 2026');
+  });
+
+  it('puts the title before the date, so the date never stacks above the heading', () => {
+    // The eyebrow ban is absolute and holds at every size (design brief
+    // §2.4). An entry on the spine is one column at every width, so the
+    // title has to come first in the source. SessionCard.jsx carries the
+    // same rule for the schedule.
+    const { container } = renderUpdates({ updates: [NEWER] });
+    const heading = container.querySelector('.update-feed__entry h3');
+    const time = container.querySelector('.update-feed__entry time');
+    expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

@@ -18,6 +18,12 @@ vi.mock('../contexts/ProfileContext.jsx', () => ({
 vi.mock('../lib/profileSource.js', () => ({
   subscribeDirectory: (...args) => subscribeDirectoryMock(...args),
 }));
+// The page shell reads the cmsPages document for its layout and its slot
+// sections (components/SystemPage.jsx). This route has no seeded page, which
+// is exactly the "no document, default layout, no sections" case.
+vi.mock('../contexts/ContentContext.jsx', () => ({
+  useContent: () => ({ getPage: () => null, getSectionBlocks: () => [] }),
+}));
 
 const { default: Attendees } = await import('./Attendees.jsx');
 
@@ -87,8 +93,10 @@ describe('Attendees', () => {
       { id: 'u1', displayName: 'Amara Diallo', photoPath: 'profile-photos/u1/photo.png' },
       { id: 'u2', displayName: 'Zeke Alvarez' },
     ]);
-    const directory = within(screen.getByRole('article'));
-    expect(directory.getByText('Z')).toBeInTheDocument();
+    // The lettered avatar, not the "Z" letter head above the group — the
+    // index now has both, and they are different devices.
+    const avatars = screen.getByRole('article').querySelectorAll('.attendee-index__entry span');
+    expect([...avatars].some((node) => node.textContent === 'Z')).toBe(true);
     const images = screen.getByRole('article').querySelectorAll('img');
     expect(images).toHaveLength(1);
     expect(images[0].getAttribute('src')).toContain(
@@ -119,13 +127,13 @@ describe('Attendees', () => {
   it('shows a loading state until a snapshot arrives, and the empty state only for a real empty result', () => {
     renderPage();
     // No snapshot yet: "nobody signed up" would be a lie at this point.
-    expect(screen.getByRole('status', { name: 'Loading the attendee directory' }))
+    expect(screen.getByRole('status', { name: 'Loading the attendee directory…' }))
       .toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'No attendee profiles yet' })).toBeNull();
 
     pushProfiles([]);
     expect(screen.getByRole('heading', { name: 'No attendee profiles yet' })).toBeInTheDocument();
-    expect(screen.queryByRole('status', { name: 'Loading the attendee directory' })).toBeNull();
+    expect(screen.queryByRole('status', { name: 'Loading the attendee directory…' })).toBeNull();
   });
 
   it('renders a profile whose fields are the wrong type instead of crashing the directory', () => {
@@ -166,5 +174,48 @@ describe('Attendees', () => {
     expect(
       screen.getByRole('heading', { name: 'The directory is unavailable right now' }),
     ).toBeInTheDocument();
+  });
+
+  // THE INDEX (this review): letter groups, because a reader here is
+  // searching for a name rather than reading a list.
+  describe('the letter index', () => {
+    it('heads each letter group and counts the people under it', () => {
+      renderPage();
+      pushProfiles([
+        { id: 'u1', displayName: 'Amara Diallo' },
+        { id: 'u2', displayName: 'Ada Okonkwo' },
+        { id: 'u3', displayName: 'Zeke Alvarez' },
+      ]);
+      const directory = within(screen.getByRole('article'));
+      expect(directory.getByRole('heading', { level: 2, name: /^A/ })).toBeInTheDocument();
+      expect(directory.getByRole('heading', { level: 2, name: /^Z/ })).toBeInTheDocument();
+      expect(directory.getByText('2 people')).toBeInTheDocument();
+      expect(directory.getByText('1 person')).toBeInTheDocument();
+    });
+
+    it('files a name this alphabet does not cover under # rather than under A', () => {
+      // A group nobody can find is worse than a group with an odd name.
+      renderPage();
+      pushProfiles([
+        { id: 'u1', displayName: '3Sixty Media' },
+        { id: 'u2', displayName: 'Amara Diallo' },
+      ]);
+      const directory = within(screen.getByRole('article'));
+      expect(directory.getByRole('heading', { level: 2, name: /^#/ })).toBeInTheDocument();
+      expect(directory.getByText('3Sixty Media')).toBeInTheDocument();
+    });
+
+    it('groups follow the list’s own sort, never a second disagreeing rule', () => {
+      renderPage();
+      pushProfiles([
+        { id: 'u3', displayName: 'Zeke Alvarez' },
+        { id: 'u1', displayName: 'Amara Diallo' },
+      ]);
+      const heads = [...screen.getByRole('article').querySelectorAll('h2')].map((h) =>
+        h.textContent.trim(),
+      );
+      expect(heads[0].startsWith('A')).toBe(true);
+      expect(heads[1].startsWith('Z')).toBe(true);
+    });
   });
 });
