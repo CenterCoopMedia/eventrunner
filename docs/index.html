@@ -23,16 +23,17 @@
   <meta name="twitter:description" content="White-label event CMS. One Firebase project per event. Staff run the site. The Center for Cooperative Media operates it.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
   <meta name="twitter:image:alt" content="Event Runner: a white-label event CMS from the Center for Cooperative Media">
-  <!-- The two grounds this site paints, and the only place the palette is
-       written as hex: a browser chrome color cannot read a custom property.
-       They are --brand-surface-rgb in each mode, from styles.css.
-       scripts/build-pages.cjs copies these two tags onto every generated
-       documentation page, so this is the one place they are maintained. -->
+  <!-- The two grounds this site paints. Browser chrome cannot read a custom
+       property, so this is the one place the palette is written as hex:
+       --brand-surface-rgb in each mode. build-pages checks both against
+       docs/tokens.css and fails on a stale one, and copies them onto every
+       generated documentation page. -->
   <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#17191e" media="(prefers-color-scheme: dark)">
 
   <link rel="preload" href="fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>

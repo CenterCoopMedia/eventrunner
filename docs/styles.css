@@ -60,144 +60,27 @@
 
 /* ---------- Tokens ----------
 
-   THIS SITE MINTS NO PALETTE (design brief §5.3). Every custom property below
-   carries the name the product ships, and every value is copied from
-   apps/web/src/generated/theme.css: the scales and tier-3 contracts from its
-   attribute-free `:root` block, the light colors from `:root[data-mode=
-   'light']`, the dark colors from `:root[data-mode='dark']`. Those are the
-   BASE blocks — the ones no `data-theme` preset has remapped — because this
-   site is Event Runner's own surface and not a client deployment.
+   The scale and the palette are generated: docs/tokens.css, written by
+   scripts/build-pages.cjs from design/tokens/ through the same generator
+   that writes apps/web/src/generated/theme.css. Loaded before this file,
+   and `build-pages --check` fails on a stale copy.
 
-   Why the values are copied instead of read: docs/ is a static GitHub Pages
-   site. It has no Firebase SDK and no `config/theme` document, so it cannot
-   walk the chain that writes theme.css at deploy time (ADR §7.2). Copying is
-   the only way one palette can serve both surfaces.
-
-   THE CONTRACT WHEN A BASE TOKEN CHANGES: copy the two mode blocks again.
-   scripts/build-pages.test.cjs re-measures every foreground/background pair
-   this site declares, in both modes, and asserts that neither block is
-   missing a token the other has — so a half-copied palette fails the build
-   rather than shipping a half-dark site.
-
-   Colors keep the space-separated RGB-triple form the product uses (brief
-   §3.6), so a name here resolves to exactly the value it resolves to there.
-   Rules below read them through `rgb(var(--…-rgb))`.
-
-   docs/ is outside the ESLint hex sweep (eslint.config.mjs `ignores`), which
-   is the only reason raw channel values may sit in this file at all. Keep
-   every rule below token-sourced regardless: never write a color into a
-   declaration, only a `var(--…)`. */
+   What stays here is what is this site's own: the three faces it serves,
+   the device contracts it composes, and its measure. Never write a color
+   into a declaration below — only `rgb(var(--…-rgb))`. */
 
 :root {
-  /* Tier 1 — the primitives the scales below resolve through (brief §3.1).
-     Only the steps this site uses are copied; an unused step earns no place
-     (interface guidelines, Colors). */
-  --er-size-folio-min: 0.6875rem;
-  --er-size-folio-max: 0.75rem;
-  --er-size-caption-min: 0.8125rem;
-  --er-size-caption-max: 0.875rem;
-  --er-size-body-min: 1rem;
-  --er-size-body-max: 1.0625rem;
-  --er-size-lead-min: 1.125rem;
-  --er-size-lead-max: 1.3125rem;
-  --er-size-h3-min: 1.25rem;
-  --er-size-h3-max: 1.5rem;
-  --er-size-h2-min: 1.625rem;
-  --er-size-h2-max: 2.25rem;
-  --er-size-h1-min: 2.25rem;
-  --er-size-h1-max: 3.5rem;
-  --er-space-3xs: 0.125rem;
-  --er-space-2xs: 0.25rem;
-  --er-space-xs: 0.5rem;
-  --er-space-sm: 0.75rem;
-  --er-space-md: 1rem;
-  --er-space-lg: 1.5rem;
-  --er-space-xl: 2.5rem;
-  --er-space-2xl: 4rem;
-  --er-space-3xl: 6rem;
-  --er-width-hairline: 1px;
-  --er-width-strong: 2px;
-  --er-width-nameplate: 3px;
-  --er-weight-regular: 400;
-  --er-weight-medium: 500;
-  --er-weight-semibold: 600;
-  --er-weight-bold: 700;
-  --er-duration-slow: 200ms;
-  --er-easing-out: cubic-bezier(0, 0, 0.2, 1);
-
-  /* Tier 2 — the fluid editorial type scale (brief §3.7). Seven of the eight
-     steps: `--text-nameplate` is the full masthead of a public event page,
-     and this site's masthead is the compact treatment at `--text-h3`, so the
-     step is not copied. */
-  --text-folio: clamp(var(--er-size-folio-min), 0.666rem + 0.09vw, var(--er-size-folio-max));
-  --text-folio-leading: 1.2;
-  --text-folio-tracking: 0.08em;
-  --text-caption: clamp(var(--er-size-caption-min), 0.791rem + 0.09vw, var(--er-size-caption-max));
-  --text-caption-leading: 1.45;
-  --text-caption-tracking: 0.01em;
-  --text-body: clamp(var(--er-size-body-min), 0.978rem + 0.09vw, var(--er-size-body-max));
-  --text-body-leading: 1.6;
-  --text-body-tracking: 0em;
-  --text-lead: clamp(var(--er-size-lead-min), 1.059rem + 0.28vw, var(--er-size-lead-max));
-  --text-lead-leading: 1.5;
-  --text-lead-tracking: -0.005em;
-  --text-h3: clamp(var(--er-size-h3-min), 1.162rem + 0.38vw, var(--er-size-h3-max));
-  --text-h3-leading: 1.25;
-  --text-h3-tracking: -0.01em;
-  --text-h2: clamp(var(--er-size-h2-min), 1.405rem + 0.94vw, var(--er-size-h2-max));
-  --text-h2-leading: 1.18;
-  --text-h2-tracking: -0.015em;
-  --text-h1: clamp(var(--er-size-h1-min), 1.81rem + 1.88vw, var(--er-size-h1-max));
-  --text-h1-leading: 1.08;
-  --text-h1-tracking: -0.02em;
-
-  /* Tier 2 — spacing scale (brief §3.7). The gap between groups is at least
-     twice the gap inside one: xs pairs with md, sm with lg, md with xl. */
-  --space-3xs: var(--er-space-3xs);
-  --space-2xs: var(--er-space-2xs);
-  --space-xs: var(--er-space-xs);
-  --space-sm: var(--er-space-sm);
-  --space-md: var(--er-space-md);
-  --space-lg: var(--er-space-lg);
-  --space-xl: var(--er-space-xl);
-  --space-2xl: var(--er-space-2xl);
-  --space-3xl: var(--er-space-3xl);
-
-  /* Tier 2 — rule widths (brief §3.7). Rules are structure, so each weight is
-     a width plus a color; the colors are mode-scoped below. */
-  --rule-hairline-width: var(--er-width-hairline);
-  --rule-strong-width: var(--er-width-strong);
-  --rule-nameplate-width: var(--er-width-nameplate);
-
-  /* Tier 2 — font roles, never family names (brief §3.2). `data` is the voice
-     beside the text; `mono` is the value a reader would copy or compare. The
-     three bundled faces are the ones docs/fonts already carries. */
+  /* Font roles, never family names (brief §3.2). These are NOT the preset's
+     type map: this site serves its own three faces from docs/fonts, so the
+     roles are named here rather than generated. `data` is the voice beside
+     the text; `mono` is a value a reader would copy or compare. */
   --font-heading: "Bricolage Grotesque", "Arial Black", "Avenir Next Condensed", sans-serif;
   --font-body: "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-data: "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-  /* Tier 2 — radius scale, the product's 'small' step. Flat surfaces on a
-     near-square corner: nothing here is a pill and nothing is a card. */
-  --radius-base: 2px;
-  --radius-large: 4px;
-
-  /* Tier 2 — motion (brief §2.2). This site animates exactly one thing: the
-     press on a button. That is functional motion, it starts from a user
-     action, and it runs on `scale` alone. There is no signature interaction
-     here and nothing else moves, so only the step that step uses is copied. */
-  --motion-slow: var(--er-duration-slow);
-  --motion-ease: var(--er-easing-out);
-
-  /* Tier 2 — named weights, so no rule below writes a raw number. */
-  --weight-regular: var(--er-weight-regular);
-  --weight-medium: var(--er-weight-medium);
-  --weight-semibold: var(--er-weight-semibold);
-  --weight-bold: var(--er-weight-bold);
-
-  /* Tier 3 — the device contracts this site renders (brief §3.1). Same names,
-     same defaults as the product: the masthead nameplate, the folio, the
-     section rule, and the page rhythm. */
+  /* Tier 3 — the device contracts this site composes (brief §3.1). Same
+     names as the product; the values are this surface's own. */
   --nameplate-rule-width: var(--rule-nameplate-width);
   --nameplate-gap: var(--space-sm);
   --section-rule-width: var(--rule-strong-width);
@@ -215,73 +98,6 @@
      page. */
   --measure: 44rem;
   --max: 68rem;
-}
-
-/* Light palette — copied from `:root[data-mode='light']` in
-   apps/web/src/generated/theme.css. This is also the first-paint baseline:
-   a reader with no color-scheme preference gets a fully styled page. */
-:root {
-  color-scheme: light;
-
-  --brand-primary-rgb: 178 30 50;
-  --brand-primary-dark-rgb: 140 20 38;
-  --brand-surface-rgb: 246 247 249;
-  --brand-surface-alt-rgb: 236 238 242;
-  --brand-ink-rgb: 22 24 29;
-  --brand-ink-muted-rgb: 88 95 108;
-  --semantic-success-rgb: 22 96 62;
-  --semantic-warning-rgb: 134 82 10;
-  --color-surface-rgb: var(--brand-surface-rgb);
-  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
-  --color-text-primary-rgb: var(--brand-ink-rgb);
-  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
-  --color-accent-rgb: var(--brand-primary-rgb);
-  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
-  --rule-hairline-rgb: 215 216 218;
-  --rule-strong-rgb: 123 124 128;
-  --rule-nameplate-rgb: 22 24 29;
-  --color-border-control-rgb: 130 131 135;
-  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
-  --nameplate-text-rgb: var(--color-text-primary-rgb);
-  --section-rule-rgb: var(--rule-strong-rgb);
-  --folio-rule-rgb: var(--rule-hairline-rgb);
-  --folio-text-rgb: var(--color-text-secondary-rgb);
-}
-
-/* Dark palette — copied from `:root[data-mode='dark']`. It is its own
-   palette, never light reversed (brief §3.3), and it is COMPLETE: every
-   token the light block declares is declared again here, so nothing falls
-   back to a light value. The product switches modes on a `data-mode`
-   attribute a runtime writes; a static site has no runtime, so this surface
-   follows the reader's own setting instead. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-
-    --brand-primary-rgb: 240 122 134;
-    --brand-primary-dark-rgb: 248 168 176;
-    --brand-surface-rgb: 23 25 30;
-    --brand-surface-alt-rgb: 34 37 44;
-    --brand-ink-rgb: 232 235 240;
-    --brand-ink-muted-rgb: 160 168 180;
-    --semantic-success-rgb: 116 200 150;
-    --semantic-warning-rgb: 228 174 88;
-    --color-surface-rgb: var(--brand-surface-rgb);
-    --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
-    --color-text-primary-rgb: var(--brand-ink-rgb);
-    --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
-    --color-accent-rgb: var(--brand-primary-rgb);
-    --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
-    --rule-hairline-rgb: 52 54 59;
-    --rule-strong-rgb: 138 141 146;
-    --rule-nameplate-rgb: 232 235 240;
-    --color-border-control-rgb: 132 134 139;
-    --nameplate-rule-rgb: var(--rule-nameplate-rgb);
-    --nameplate-text-rgb: var(--color-text-primary-rgb);
-    --section-rule-rgb: var(--rule-strong-rgb);
-    --folio-rule-rgb: var(--rule-hairline-rgb);
-    --folio-text-rgb: var(--color-text-secondary-rgb);
-  }
 }
 
 /* ---------- Base ---------- */

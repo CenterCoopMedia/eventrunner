@@ -9,25 +9,34 @@
  * committed `docs/docs/` tree that GitHub Pages serves, wrapped in one
  * shared shell that matches the landing page's visual system (#105).
  *
+ * It also writes `docs/tokens.css`: the site's palette, resolved from
+ * `design/tokens/` through the same generator that writes
+ * `apps/web/src/generated/theme.css`. `docs/styles.css` is the handwritten
+ * half — layout, devices, and rhythm — and reads those tokens by name.
+ *
  * Usage:
- *   node scripts/build-pages.cjs            # write docs/docs/
+ *   node scripts/build-pages.cjs            # write docs/tokens.css + docs/docs/
  *   node scripts/build-pages.cjs --check    # compare only, write nothing
  *
  * `--check` is the freshness gate, and it mirrors
  * scripts/generate-content.cjs --check: it fails on any file whose
- * committed bytes differ from a fresh render, and on any unexpected file
- * left behind in the output directory. It runs from
- * scripts/build-pages.test.cjs so the credential-free documentation CI
+ * committed bytes differ from a fresh render, on any unexpected file left
+ * behind in the output directory, and on a stale `docs/tokens.css`. It runs
+ * from scripts/build-pages.test.cjs so the credential-free documentation CI
  * tier enforces it without an npm install.
  *
- * No dependencies, by design: the documentation CI tier runs on the
- * runner's Node with no `npm ci`.
+ * No third-party dependencies, by design: that CI tier runs on the runner's
+ * Node with no `npm ci`. The workspace link npm writes is missing there too,
+ * which is why the token generator is reached through
+ * `scripts/lib/shared-theme.cjs` rather than by its bare specifier.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 
 const { renderMarkdown, escapeHtml, plainText } = require('./lib/markdown-pages.cjs');
+const { DEFAULT_PRESET_ID, rgbToHex } = require('./lib/shared-theme.cjs');
+const { buildTokenCss, loadTokens, resolveColorTokens } = require('./lib/tokens.cjs');
 const {
   DOCS_BASE,
   REPO_BLOB,
@@ -42,6 +51,7 @@ const {
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(ROOT, 'docs', 'docs');
 const LANDING_PAGE = path.join(ROOT, 'docs', 'index.html');
+const TOKENS_FILE = 'tokens.css';
 
 const PRODUCT = 'Event Runner';
 const SITE_URL = `${SITE_ORIGIN}${SITE_BASE}`;
@@ -59,24 +69,201 @@ const PRELOADED_FONTS = ['source-sans-3-latin.woff2', 'bricolage-grotesque-latin
 
 const EXTERNAL_SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
 
+/* -------------------------------------------------------------- palette ---
+
+   The site mints no palette. It renders the product's own default look, so
+   the values come from the token generator rather than from a copy: the
+   design/tokens JSON resolved through the same `resolveColorTokens` that
+   writes apps/web/src/generated/theme.css, for the preset a new deployment
+   starts on. `docs/tokens.css` is the generated result and is not edited by
+   hand; `docs/styles.css` keeps the layout, which is written by hand.
+
+   `SITE_COLOR_TOKENS` is the subset this site actually renders — an unused
+   step earns no place (interface guidelines, Colors). A name here that the
+   generator does not emit fails the build, and so does a `--…-rgb` a
+   stylesheet reads that is not listed (scripts/build-pages.test.cjs). */
+
+/* The scale steps this site sets type and space on. Everything here is a
+   straight copy of the product's own value, which is why it is generated.
+   What is NOT here is deliberately local and stays in docs/styles.css: the
+   font roles (this site serves its own three self-hosted faces, not the
+   preset's type map), the device contracts it composes, and the measure. */
+const SITE_SCALE_TOKENS = Object.freeze([
+  '--er-size-folio-min', '--er-size-folio-max',
+  '--er-size-caption-min', '--er-size-caption-max',
+  '--er-size-body-min', '--er-size-body-max',
+  '--er-size-lead-min', '--er-size-lead-max',
+  '--er-size-h3-min', '--er-size-h3-max',
+  '--er-size-h2-min', '--er-size-h2-max',
+  '--er-size-h1-min', '--er-size-h1-max',
+  '--er-space-3xs', '--er-space-2xs', '--er-space-xs', '--er-space-sm', '--er-space-md',
+  '--er-space-lg', '--er-space-xl', '--er-space-2xl', '--er-space-3xl',
+  '--er-width-hairline', '--er-width-strong', '--er-width-nameplate',
+  '--er-weight-regular', '--er-weight-medium', '--er-weight-semibold', '--er-weight-bold',
+  '--er-duration-slow', '--er-easing-out',
+  '--text-folio', '--text-folio-leading', '--text-folio-tracking',
+  '--text-caption', '--text-caption-leading', '--text-caption-tracking',
+  '--text-body', '--text-body-leading', '--text-body-tracking',
+  '--text-lead', '--text-lead-leading', '--text-lead-tracking',
+  '--text-h3', '--text-h3-leading', '--text-h3-tracking',
+  '--text-h2', '--text-h2-leading', '--text-h2-tracking',
+  '--text-h1', '--text-h1-leading', '--text-h1-tracking',
+  '--space-3xs', '--space-2xs', '--space-xs', '--space-sm', '--space-md',
+  '--space-lg', '--space-xl', '--space-2xl', '--space-3xl',
+  '--rule-hairline-width', '--rule-strong-width', '--rule-nameplate-width',
+  '--radius-base', '--radius-large',
+  '--motion-slow', '--motion-ease',
+  '--weight-regular', '--weight-medium', '--weight-semibold', '--weight-bold',
+]);
+
+const SITE_COLOR_TOKENS = Object.freeze([
+  '--brand-primary-rgb',
+  '--brand-primary-dark-rgb',
+  '--brand-surface-rgb',
+  '--brand-surface-alt-rgb',
+  '--brand-ink-rgb',
+  '--brand-ink-muted-rgb',
+  '--semantic-success-rgb',
+  '--semantic-warning-rgb',
+  '--color-surface-rgb',
+  '--color-surface-alt-rgb',
+  '--color-text-primary-rgb',
+  '--color-text-secondary-rgb',
+  '--color-accent-rgb',
+  '--color-accent-strong-rgb',
+  '--rule-hairline-rgb',
+  '--rule-strong-rgb',
+  '--rule-nameplate-rgb',
+  '--color-border-control-rgb',
+  '--nameplate-rule-rgb',
+  '--nameplate-text-rgb',
+  '--section-rule-rgb',
+  '--folio-rule-rgb',
+  '--folio-text-rgb',
+]);
+
 /**
- * Copy the landing page's `theme-color` tags verbatim.
+ * The base light and dark palettes, resolved from design/tokens.
  *
- * A browser-chrome color cannot read a custom property, so the two grounds
- * `docs/styles.css` paints are written out as hex once, in docs/index.html.
- * Copying them from there keeps the documentation shell in step with the
- * landing page and keeps color literals out of this script, where the
- * hex-literal lint ban applies.
+ * @returns {{ names: string[], light: Record<string,string>, dark: Record<string,string> }}
+ */
+function sitePalette() {
+  const { names, values } = resolveColorTokens({ preset: DEFAULT_PRESET_ID }, loadTokens());
+  const emitted = new Set(names);
+  const missing = SITE_COLOR_TOKENS.filter((name) => !emitted.has(name));
+  if (missing.length > 0) {
+    throw new Error(`build-pages: the token generator emits no ${missing.join(', ')}`);
+  }
+  // Generator order, not list order: an alias has to follow what it aliases.
+  const ordered = names.filter((name) => SITE_COLOR_TOKENS.includes(name));
+  return { names: ordered, light: values.light, dark: values.dark };
+}
+
+/**
+ * The scale steps, read back out of the generated stylesheet's `:root`.
  *
- * @param {string} landingHtml
+ * Reading the generator's own output is what makes this a copy of the
+ * product's values rather than a second opinion about them. A name declared
+ * twice — the preset remaps some of what the base block sets — resolves to
+ * the last one, exactly as the cascade would.
+ *
+ * @returns {string[]} `name: value;` pairs in the order the generator writes
+ */
+function siteScale() {
+  const css = buildTokenCss({ preset: DEFAULT_PRESET_ID });
+  const block = css.match(/^:root \{\n([\s\S]*?)\n\}/);
+  if (!block) throw new Error('build-pages: the token generator wrote no :root block');
+  const declared = new Map();
+  for (const [, name, value] of block[1].matchAll(/^\s*(--[\w-]+):\s*(.+);$/gm)) {
+    if (SITE_SCALE_TOKENS.includes(name)) declared.set(name, value);
+  }
+  const missing = SITE_SCALE_TOKENS.filter((name) => !declared.has(name));
+  if (missing.length > 0) {
+    throw new Error(`build-pages: the token generator writes no ${missing.join(', ')}`);
+  }
+  return [...declared].map(([name, value]) => `${name}: ${value};`);
+}
+
+/**
+ * `docs/tokens.css` — the generated half of the site's stylesheet.
+ *
+ * @returns {string}
+ */
+function buildTokensCss() {
+  const { names, light, dark } = sitePalette();
+  const declare = (values, indent) => names.map((name) => `${indent}${name}: ${values[name]};`);
+  return [
+    '/* GENERATED by scripts/build-pages.cjs — edit design/tokens/, not this file.',
+    '',
+    `   The base scale and palette of the ${DEFAULT_PRESET_ID} site style: what a new`,
+    '   deployment renders, and what this site wears. Same values as',
+    '   apps/web/src/generated/theme.css, from the same generator, narrowed to',
+    '   the tokens this site uses. docs/styles.css holds the handwritten half.',
+    '',
+    '   The product switches modes on a data-mode attribute a runtime writes.',
+    '   A static site has no runtime, so this one follows the reader\'s own',
+    '   setting. Dark is its own palette, never light reversed, and it is',
+    '   complete: every color declared once below is declared again after it. */',
+    '',
+    ':root {',
+    ...siteScale().map((line) => `  ${line}`),
+    '}',
+    '',
+    ':root {',
+    '  color-scheme: light;',
+    '',
+    ...declare(light, '  '),
+    '}',
+    '',
+    '@media (prefers-color-scheme: dark) {',
+    '  :root {',
+    '    color-scheme: dark;',
+    '',
+    ...declare(dark, '    '),
+    '  }',
+    '}',
+    '',
+  ].join('\n');
+}
+
+/**
+ * The two `theme-color` tags, built from the palette.
+ *
+ * Browser chrome cannot read a custom property, so these two grounds are the
+ * one place the site states a color as hex. They are `--brand-surface-rgb`
+ * in each mode, computed here rather than typed anywhere.
+ *
  * @returns {string[]} complete meta tags
  */
-function themeColorTags(landingHtml) {
-  const tags = [...landingHtml.matchAll(/<meta\s+name="theme-color"[^>]*>/gi)].map((match) => match[0]);
-  if (tags.length === 0) {
-    throw new Error('docs/index.html has no theme-color meta tag to mirror');
-  }
-  return tags;
+function themeColorTags() {
+  const { light, dark } = sitePalette();
+  const ground = (values) => rgbToHex(values['--brand-surface-rgb'].split(/\s+/).map(Number));
+  return [
+    `<meta name="theme-color" content="${ground(light)}" media="(prefers-color-scheme: light)">`,
+    `<meta name="theme-color" content="${ground(dark)}" media="(prefers-color-scheme: dark)">`,
+  ];
+}
+
+/**
+ * Check the landing page's own `theme-color` tags against the palette.
+ *
+ * docs/index.html is written by hand, so its two tags are the last colors on
+ * this site a person could get wrong. A stale one fails the build with the
+ * line to paste in.
+ *
+ * @param {string} landingHtml
+ * @returns {string[]} the problems found
+ */
+function themeColorProblems(landingHtml) {
+  const found = [...landingHtml.matchAll(/<meta\s+name="theme-color"[^>]*>/gi)].map((m) => m[0]);
+  if (found.length === 0) return ['docs/index.html declares no theme-color meta tag'];
+  const expected = themeColorTags();
+  const missing = expected.filter((tag) => !found.includes(tag));
+  const extra = found.filter((tag) => !expected.includes(tag));
+  return [
+    ...missing.map((tag) => `docs/index.html is missing: ${tag}`),
+    ...extra.map((tag) => `docs/index.html declares a stale ground: ${tag}`),
+  ];
 }
 
 /**
@@ -178,6 +365,7 @@ function head({ title, description, canonical, themeTags, ogType }) {
     ...PRELOADED_FONTS.map((file) => (
       `  <link rel="preload" href="${SITE_BASE}fonts/${file}" as="font" type="font/woff2" crossorigin>`
     )),
+    `  <link rel="stylesheet" href="${SITE_BASE}${TOKENS_FILE}">`,
     `  <link rel="stylesheet" href="${SITE_BASE}styles.css">`,
     `  <link rel="stylesheet" href="${SITE_BASE}docs.css">`,
     '</head>',
@@ -434,18 +622,19 @@ function indent(html, spaces) {
  * Render the whole site into memory.
  *
  * @param {{ root?: string }} [options]
- * @returns {{ files: Map<string,string>, departures: Array, errors: string[], headingsByRoute: Map }}
+ * @returns {{ files: Map<string,string>, tokensCss: string, departures: Array,
+ *             errors: string[], headingsByRoute: Map }}
  */
 function buildSite({ root = ROOT } = {}) {
   const landing = fs.readFileSync(
     root === ROOT ? LANDING_PAGE : path.join(root, 'docs', 'index.html'),
     'utf8',
   );
-  const themeTags = themeColorTags(landing);
+  const themeTags = themeColorTags();
   const routes = routesBySource();
   const pages = pagesInOrder();
   const departures = [];
-  const errors = [];
+  const errors = themeColorProblems(landing);
   const files = new Map();
   const headingsByRoute = new Map();
 
@@ -457,7 +646,7 @@ function buildSite({ root = ROOT } = {}) {
   const index = renderIndex({ themeTags, pages });
   files.set(index.path, index.contents);
 
-  return { files, departures, errors, headingsByRoute };
+  return { files, tokensCss: buildTokensCss(), departures, errors, headingsByRoute };
 }
 
 /**
@@ -522,8 +711,8 @@ function usage() {
   return [
     'Usage: node scripts/build-pages.cjs [--check]',
     '',
-    '  --check   compare docs/docs against a fresh render and exit non-zero',
-    '            on any difference; writes nothing',
+    `  --check   compare docs/docs and docs/${TOKENS_FILE} against a fresh`,
+    '            render and exit non-zero on any difference; writes nothing',
   ].join('\n');
 }
 
@@ -559,15 +748,22 @@ function main(argv = []) {
 
   const site = buildSite();
   if (site.errors.length > 0) {
-    console.error('build-pages: the source Markdown has broken links:');
+    console.error('build-pages: the sources this site is built from do not hold together:');
     for (const error of site.errors) console.error(`- ${error}`);
     return 1;
   }
 
+  const tokensPath = path.join(ROOT, 'docs', TOKENS_FILE);
+
   if (argv.includes('--check')) {
     const { differences, unexpected } = compare(site.files, OUTPUT_DIR);
-    if (differences.length > 0 || unexpected.length > 0) {
+    const tokensStale = !fs.existsSync(tokensPath)
+      || fs.readFileSync(tokensPath, 'utf8').replace(/\r\n/g, '\n') !== site.tokensCss;
+    if (differences.length > 0 || unexpected.length > 0 || tokensStale) {
       const lines = [];
+      if (tokensStale) {
+        lines.push(`docs/${TOKENS_FILE} does not match the tokens in design/tokens/`);
+      }
       if (differences.length > 0) {
         lines.push(
           `${differences.length} file(s) differ from docs/docs:`,
@@ -587,12 +783,19 @@ function main(argv = []) {
       );
       return 1;
     }
-    console.log(`build-pages --check: ${site.files.size} file(s) match the committed site`);
+    console.log(
+      `build-pages --check: ${site.files.size} file(s) and docs/${TOKENS_FILE} ` +
+      'match the committed site',
+    );
     return 0;
   }
 
+  fs.writeFileSync(tokensPath, site.tokensCss);
   writeSite(site.files, OUTPUT_DIR);
-  console.log(`build-pages: rebuilt docs/docs from empty, ${site.files.size} file(s)`);
+  console.log(
+    `build-pages: rebuilt docs/${TOKENS_FILE} and docs/docs from empty, ` +
+    `${site.files.size} file(s)`,
+  );
   if (site.departures.length > 0) {
     const unique = [...new Set(site.departures.map((departure) => departure.repoPath))].sort();
     console.log(
@@ -608,9 +811,22 @@ if (require.main === module) process.exitCode = main(process.argv.slice(2));
 
 module.exports = {
   buildSite,
+  buildTokensCss,
   compare,
   linkResolver,
   main,
   themeColorTags,
-  internals: { OUTPUT_DIR, PRODUCT, listExisting, plainText, resolveOutputPath, writeSite },
+  themeColorProblems,
+  internals: {
+    OUTPUT_DIR,
+    PRODUCT,
+    SITE_COLOR_TOKENS,
+    SITE_SCALE_TOKENS,
+    TOKENS_FILE,
+    listExisting,
+    plainText,
+    resolveOutputPath,
+    sitePalette,
+    writeSite,
+  },
 };

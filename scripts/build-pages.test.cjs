@@ -19,7 +19,15 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { buildSite, compare, linkResolver, themeColorTags, internals } = require('./build-pages.cjs');
+const {
+  buildSite,
+  buildTokensCss,
+  compare,
+  linkResolver,
+  themeColorProblems,
+  themeColorTags,
+  internals,
+} = require('./build-pages.cjs');
 const { renderMarkdown, renderInline, slugify, escapeHtml } = require('./lib/markdown-pages.cjs');
 const { DOCS_BASE, SECTIONS, pagesInOrder, routesBySource } = require('./lib/pages-manifest.cjs');
 
@@ -186,14 +194,35 @@ test('every page carries the required metadata', () => {
   }
 });
 
-test('theme colors are mirrored from the landing page', () => {
-  const landing = fs.readFileSync(path.join(ROOT, 'docs', 'index.html'), 'utf8');
-  const tags = themeColorTags(landing);
+test('the theme colors are the palette grounds, on every page', () => {
+  const tags = themeColorTags();
   assert.equal(tags.length, 2);
   for (const [, html] of site.files) {
     for (const tag of tags) assert.ok(html.includes(tag));
   }
-  assert.throws(() => themeColorTags('<html></html>'), /theme-color/);
+  // The landing page is written by hand, so its two tags are the last colors
+  // on this site a person could get wrong. A stale one fails the build.
+  const landing = fs.readFileSync(path.join(ROOT, 'docs', 'index.html'), 'utf8');
+  assert.deepEqual(themeColorProblems(landing), []);
+  assert.deepEqual(themeColorProblems('<html></html>'), [
+    'docs/index.html declares no theme-color meta tag',
+  ]);
+  // Composed, so no hex color literal appears in source (spec §7.6).
+  const stale = landing.replace(/content="#[0-9a-f]{6}"/i, `content="#${'0'.repeat(6)}"`);
+  assert.ok(themeColorProblems(stale).some((problem) => /stale ground/.test(problem)));
+});
+
+test('every page loads the generated tokens before the handwritten styles', () => {
+  // The palette has to be declared before the rules that read it are parsed
+  // — and a page that linked only styles.css would render unstyled colors.
+  for (const [file, html] of site.files) {
+    const tokens = html.indexOf(`${internals.TOKENS_FILE}"`);
+    const styles = html.indexOf('styles.css"');
+    assert.ok(tokens > 0, `${file} does not load ${internals.TOKENS_FILE}`);
+    assert.ok(tokens < styles, `${file} loads ${internals.TOKENS_FILE} after styles.css`);
+  }
+  const landing = fs.readFileSync(path.join(ROOT, 'docs', 'index.html'), 'utf8');
+  assert.ok(landing.indexOf(`${internals.TOKENS_FILE}"`) < landing.indexOf('styles.css"'));
 });
 
 test('every page has one h1, a skip link, and a main landmark', () => {
@@ -588,8 +617,35 @@ function contrastRatio(first, second) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+const TOKENS_CSS = fs.readFileSync(path.join(ROOT, 'docs', internals.TOKENS_FILE), 'utf8');
+
+test('the committed token stylesheet matches design/tokens', () => {
+  // The whole point of generating it: a token that moves in design/tokens/
+  // and not here is a site wearing last month's palette. Same gate as the
+  // committed pages above, and `build-pages --check` enforces it in CI.
+  assert.equal(TOKENS_CSS.replace(/\r\n/g, '\n'), buildTokensCss());
+});
+
+test('the generated stylesheet declares every token it promises, and no more', () => {
+  const declared = new Set([...TOKENS_CSS.matchAll(/^\s*(--[\w-]+):/gm)].map((m) => m[1]));
+  const promised = [...internals.SITE_COLOR_TOKENS, ...internals.SITE_SCALE_TOKENS];
+  assert.deepEqual([...declared].sort(), [...new Set(promised)].sort());
+});
+
+test('the handwritten stylesheets declare no token the generated one owns', () => {
+  // Two declarations of one name is how a generated value gets quietly
+  // overridden by a stale hand copy — the thing generating it removed.
+  const owned = new Set([...internals.SITE_COLOR_TOKENS, ...internals.SITE_SCALE_TOKENS]);
+  for (const name of ['styles.css', 'docs.css']) {
+    const css = fs.readFileSync(path.join(ROOT, 'docs', name), 'utf8');
+    for (const [, token] of css.matchAll(/^\s*(--[\w-]+):/gm)) {
+      assert.ok(!owned.has(token), `docs/${name} redeclares the generated ${token}`);
+    }
+  }
+});
+
 /**
- * The two mode palettes docs/styles.css declares, each resolved to channels.
+ * The two mode palettes docs/tokens.css declares, each resolved to channels.
  *
  * A palette block is any `:root { … }` that declares `--brand-surface-rgb`,
  * which skips the scale block above them. Values are either a triple or a
@@ -625,8 +681,7 @@ test('the two mode palettes declare exactly the same tokens', () => {
   // Design brief §8.2: a half-applied dark mode is a bug, not a polish item.
   // The static site has no runtime to write `data-mode`, so this comparison is
   // what stands in for the product's dark-mode completeness test.
-  const css = fs.readFileSync(path.join(ROOT, 'docs', 'styles.css'), 'utf8');
-  const [light, dark] = paletteBlocks(css);
+  const [light, dark] = paletteBlocks(TOKENS_CSS);
   assert.ok(Object.keys(light).length > 10, 'the light palette did not parse');
   assert.deepEqual(
     Object.keys(dark).sort(),
@@ -636,8 +691,7 @@ test('the two mode palettes declare exactly the same tokens', () => {
 });
 
 test('the token palette clears the contrast ratios its roles promise', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'docs', 'styles.css'), 'utf8');
-  const [light, dark] = paletteBlocks(css);
+  const [light, dark] = paletteBlocks(TOKENS_CSS);
 
   // Every foreground/background pair this site actually renders. Text pairs
   // clear 4.5:1; the control boundary and the strong rule are non-text UI and
@@ -682,7 +736,7 @@ test('every color the stylesheets use is declared by both palettes', () => {
   const css = ['styles.css', 'docs.css']
     .map((name) => fs.readFileSync(path.join(ROOT, 'docs', name), 'utf8'))
     .join('\n');
-  const [light, dark] = paletteBlocks(css);
+  const [light, dark] = paletteBlocks(TOKENS_CSS);
   const used = new Set([...css.matchAll(/rgb\(var\((--[\w-]+-rgb)\)\)/g)].map((match) => match[1]));
   assert.ok(used.size > 5, 'no color usage parsed');
   for (const name of used) {

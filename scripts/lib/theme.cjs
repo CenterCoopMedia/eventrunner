@@ -30,7 +30,7 @@ const {
   hexToRgb,
   resolveLegacyColors,
   rgbToHex,
-} = require('shared/theme');
+} = require('./shared-theme.cjs');
 
 /** camelCase theme key → CSS custom property stem (`--<stem>-rgb`). */
 const CSS_VARIABLE_STEM = Object.freeze({

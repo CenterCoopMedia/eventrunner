@@ -87,7 +87,7 @@ const {
   resolveShape,
   resolveThemePalettes,
   isRgb,
-} = require('shared/theme');
+} = require('./shared-theme.cjs');
 const { FONT_SETS, RADIUS_SCALES } = require('./theme.cjs');
 
 const TOKENS_DIR = path.resolve(__dirname, '..', '..', 'design', 'tokens');
