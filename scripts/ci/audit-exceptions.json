@@ -1,0 +1,103 @@
+[
+  {
+    "package": "firebase-admin",
+    "exposure": "production",
+    "severity": "moderate",
+    "advisories": [
+      "https://github.com/advisories/GHSA-w5hq-g745-h8pq"
+    ],
+    "affects": [
+      "firebase-admin",
+      "firebase-functions",
+      "@google-cloud/firestore",
+      "@google-cloud/storage",
+      "google-gax",
+      "google-auth-library",
+      "gaxios",
+      "gcp-metadata",
+      "gtoken",
+      "retry-request",
+      "teeny-request",
+      "uuid"
+    ],
+    "rationale": "The whole chain traces to one uuid advisory (a missing buffer bounds check), reached through google-gax, gaxios, retry-request, and teeny-request. firebase-admin and firebase-functions are already pinned to their latest release inside the declared major (13.10.0 and 6.6.0). npm's proposed fix is firebase-admin@10.3.0, an older major version -- a downgrade, not a fix. No forward-compatible release resolves the transitive uuid chain yet. Tracked upstream; re-check when firebase-admin publishes a 13.x or 14.x patch.",
+    "reviewedBy": "amditisj@montclair.edu",
+    "reviewDate": "2026-08-27"
+  },
+  {
+    "package": "react-router-dom",
+    "exposure": "production",
+    "severity": "moderate",
+    "advisories": [
+      "https://github.com/advisories/GHSA-wrjc-x8rr-h8h6",
+      "https://github.com/advisories/GHSA-337j-9hxr-rhxg"
+    ],
+    "affects": [
+      "react-router-dom",
+      "react-router"
+    ],
+    "rationale": "react-router-dom is already at 6.30.6, the latest release inside the declared ^6.30.1 range. The fix requires react-router-dom@7.18.2, a major-version rewrite of the router API. Scheduling that migration separately from this audit pass.",
+    "reviewedBy": "amditisj@montclair.edu",
+    "reviewDate": "2026-08-27"
+  },
+  {
+    "package": "vite",
+    "exposure": "build",
+    "severity": "high",
+    "advisories": [
+      "https://github.com/advisories/GHSA-4w7w-66w2-5vf9",
+      "https://github.com/advisories/GHSA-v6wh-96g9-6wx3",
+      "https://github.com/advisories/GHSA-fx2h-pf6j-xcff"
+    ],
+    "affects": [
+      "vite",
+      "esbuild"
+    ],
+    "rationale": "apps/web pins vite@^5.4.19 and is already at 5.4.21, the last 5.x release ever published. The fix needs vite@6.4.3 or later, a major upgrade with breaking config and plugin API changes. Vite only runs the local dev server and the build step; it never ships to a deployed environment or handles untrusted input in production. Not blocking CI under the production-only audit policy.",
+    "reviewedBy": "amditisj@montclair.edu",
+    "reviewDate": "2026-08-27"
+  },
+  {
+    "package": "firebase-tools",
+    "exposure": "devTooling",
+    "severity": "high",
+    "advisories": [
+      "https://github.com/advisories/GHSA-w5hq-g745-h8pq"
+    ],
+    "affects": [
+      "firebase-tools",
+      "@google-cloud/pubsub",
+      "gaxios",
+      "tar",
+      "uuid"
+    ],
+    "rationale": "firebase-tools carries no advisory of its own; its high severity comes from bundled tar (see the tar entry below) plus a transitive uuid finding. It is a devDependency used only to run local emulators and to deploy from a developer or release machine; it never ships in a deployed artifact. Pinned to ^14.11.1 and already at 14.27.0, the newest 14.x release. The fix is firebase-tools@15.28.1, a major upgrade. Scheduling that upgrade and its migration notes separately.",
+    "reviewedBy": "amditisj@montclair.edu",
+    "reviewDate": "2026-08-27"
+  },
+  {
+    "package": "tar",
+    "exposure": "devTooling",
+    "severity": "critical",
+    "advisories": [
+      "https://github.com/advisories/GHSA-34x7-hfp2-rc4v",
+      "https://github.com/advisories/GHSA-8qq5-rm4j-mr97",
+      "https://github.com/advisories/GHSA-83g3-92jg-28cx",
+      "https://github.com/advisories/GHSA-qffp-2rhf-9h96",
+      "https://github.com/advisories/GHSA-9ppj-qmqm-q256",
+      "https://github.com/advisories/GHSA-r6q2-hw4h-h46w",
+      "https://github.com/advisories/GHSA-vmf3-w455-68vh",
+      "https://github.com/advisories/GHSA-w8wr-v893-vjvp",
+      "https://github.com/advisories/GHSA-23hp-3jrh-7fpw",
+      "https://github.com/advisories/GHSA-8x88-c5mf-7j5w",
+      "https://github.com/advisories/GHSA-gvwx-54wh-qm9j",
+      "https://github.com/advisories/GHSA-r292-9mhp-454m"
+    ],
+    "affects": [
+      "tar"
+    ],
+    "rationale": "tar is a transitive devDependency pulled in by firebase-tools, only used to unpack CLI/emulator archives on a developer or release machine; it is never a runtime dependency of a deployed function or the web app. The fix requires the same firebase-tools@15.28.1 major upgrade tracked above. Scheduling together with that migration.",
+    "reviewedBy": "amditisj@montclair.edu",
+    "reviewDate": "2026-08-27"
+  }
+]

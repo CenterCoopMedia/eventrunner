@@ -44,6 +44,18 @@ of that deployment — not through this repository. Issues in the shared
 codebase discovered via a deployment may be reported here through the private
 channels above, but do not include client data in the report.
 
+## Dependency audit policy
+
+CI runs `npm audit --omit=dev` on every pull request and fails the build on
+any high or critical finding in a production dependency. A finding only
+passes when a maintainer has logged it, with a reason, in
+[`scripts/ci/audit-exceptions.json`](scripts/ci/audit-exceptions.json). That
+file is the running record of every known vulnerability we have chosen not to
+fix yet — package, advisory link, severity, exposure, why it is unfixed, and
+the date we last reviewed it. Findings in build tools or local dev tooling
+(for example the Firebase CLI or Vite) are tracked there too, but they never
+fail CI on their own.
+
 ## No bounty program
 
 We do not operate a bug bounty and cannot offer monetary rewards for reports.
