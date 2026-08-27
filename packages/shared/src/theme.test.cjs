@@ -37,6 +37,9 @@ const {
   deriveDarkColors,
   deriveRuleColors,
   resolveMode,
+  THEME_HEADERS,
+  DEFAULT_HEADER,
+  resolveHeader,
 } = require('./theme.cjs');
 
 /** WCAG 1.4.11: the non-text bar a form-control boundary must clear. */
@@ -268,6 +271,24 @@ test('resolveMode reads the policy, and an unknown policy falls back to the defa
   assert.equal(resolveMode(undefined, true), DEFAULT_MODE_POLICY);
   assert.equal(resolveMode('sepia', true), DEFAULT_MODE_POLICY);
   assert.ok(THEME_MODE_POLICIES.includes(DEFAULT_MODE_POLICY));
+});
+
+test('the four headers are the whole vocabulary, and standard is the base', () => {
+  assert.deepEqual([...THEME_HEADERS], ['standard', 'masthead', 'compact', 'minimal']);
+  assert.equal(DEFAULT_HEADER, 'standard');
+  assert.equal(THEME_HEADERS[0], DEFAULT_HEADER);
+});
+
+test('the theme states the default header and a page may override it', () => {
+  assert.equal(resolveHeader('masthead'), 'masthead');
+  assert.equal(resolveHeader('masthead', 'minimal'), 'minimal');
+  // A theme that names none, and a page that names none, both fall to the
+  // base rather than to no header at all.
+  assert.equal(resolveHeader(undefined), DEFAULT_HEADER);
+  assert.equal(resolveHeader('masthead', undefined), 'masthead');
+  assert.equal(resolveHeader('letterpress'), DEFAULT_HEADER);
+  assert.equal(resolveHeader('masthead', 'letterpress'), 'masthead');
+  assert.equal(resolveHeader('constructor'), DEFAULT_HEADER);
 });
 
 test('the font roles are heading, body, data, and mono — accent is not one of them', () => {

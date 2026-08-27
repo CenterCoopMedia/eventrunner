@@ -143,7 +143,8 @@ Never use a device as decoration.
 
 | Device | What it is | Where to use it | The rule |
 |---|---|---|---|
-| **Masthead nameplate** | A rule-bounded title block. It holds the event name, the dates, and the edition line. | The page header of every public page. | Never a hero banner with a background image. Never a photo behind the name. The nameplate is type and rules only. |
+| **Masthead nameplate** | A rule-bounded title block. It holds the event name, the dates, and the edition line. | The header of a deployment whose theme names the `masthead` or `compact` treatment (§2.5.1). | Never a hero banner with a background image. Never a photo behind the name. The nameplate is type and rules only. Never mandatory: a theme chooses it. |
+| **Lead image** | One picture beside the opening copy, or below it at narrow viewports. | The opening section of a page whose subject has a face, a place, or a room. | See §2.5.2. Text never sits over it. Alt text, a token-fixed crop, and a stated focal point are all required. One per page. |
 | **Hairline rules** | Low-contrast 1px rules that separate content. | Section boundaries, table rows, folios, column gutters. | A rule replaces a card border. A rule never carries brand color. Rules use the `--rule-*` tokens only. |
 | **Folios** | A small-caps plain-text label beside a rule. It states the section, the day, or the page role. | A section boundary, a schedule day head, an archive label, a margin, or a running header. | Never a chip. Never a pill. Never a colored badge. Text plus rule only. A folio never sits directly above a heading. See §2.4. |
 | **Multi-column long form** | Two or three text columns at wide viewports. | Long prose pages: about, travel, code of conduct, policy pages. | Apply columns only above the `lg` breakpoint. Keep 60–75 characters per line (interface guidelines, Typography). Never column-split a list of controls. |
@@ -323,6 +324,95 @@ The stamp is allowed only when it passes all six tests:
 The stamp buys Zine nothing else: no drop shadow, no depth stack, no second offset layer. Zine also
 ships the flat-block variant, which is the same block with the stamp off. That variant needs no
 exception, and a client may pick it.
+
+### 2.5 A neutral base and an expressive theme
+
+The base system is what a deployment renders before a theme states anything. It must be neutral. A
+theme is where the character lives, and a theme may be very expressive indeed.
+
+This section binds both halves. Read it with §2.1: the devices in §2.1 are the vocabulary, and this
+section says who chooses which of them a deployment uses.
+
+#### 2.5.1 The four public headers
+
+A public page renders one of four headers. The active theme names the default for its deployment,
+and a page may state its own. `standard` is the base: a theme that names no header renders it, and
+so does a stored value outside this list.
+
+| Header | What it draws | Where it fits |
+|---|---|---|
+| **`standard`** | The event name at heading size, the dates and place beside it, the navigation under a hairline. | The base. A conference, a university event, a nonprofit convening — any event whose own identity should lead. |
+| **`masthead`** | The masthead nameplate device in full (§2.1), with the navigation under it. | An event that wants the authority of a publication. Broadsheet and Newsroom default to it. |
+| **`compact`** | The nameplate device at running-header size: the short name and the dates on one baseline, between the same two rules. | A long site where the header must not push the page's subject down. |
+| **`minimal`** | The client's mark and the navigation. Nothing else. | A deployment whose own logo is the identity and needs no second voice. |
+
+Bind these:
+
+- Every treatment carries the site identity and the navigation. A header that drops either fails
+  review.
+- The identity repeats on every page, so it is never a heading. Every page owns its own `<h1>`.
+- **Never print the same words twice.** `masthead` sets the event name at display size. Where a
+  page's own headline is that same name, the page keeps its `<h1>` for structure and does not print
+  it a second time. The other three treatments set the identity at running-header size, so a page
+  headline that repeats it is not a repetition a reader sees.
+- No treatment puts text over an image, and none of them is a hero banner.
+- A theme may name any of the four. Never make one of them mandatory across every deployment.
+
+#### 2.5.2 The lead image
+
+A page may open with one image. The image sits beside the opening copy at wide viewports and below
+it at narrow ones.
+
+Bind these:
+
+- **Never over the copy.** No text sits on the picture and the picture never sits behind text. A
+  lead image is a composed layout, not a hero banner.
+- **Alt text is required.** An image with no alt text does not render. An empty `alt` is for
+  decoration, and the one image that opens a page is not decoration.
+- **The crop is stable.** The aspect ratio is a token, so swapping the picture never reflows the
+  page.
+- **The editor states the focal point.** Two percentages from the top left say what the fixed crop
+  must keep. Both default to the centre.
+- **One per page.** A second image in the opening section is not rendered there.
+
+#### 2.5.3 Flat surfaces are the default
+
+Flat is the base. The page ground paints no texture on its own.
+
+A texture is a theme opt-in. `config/theme.texture` names one, and paper, dot, grid, and grain are
+theme treatments, never base treatments. Keep texture where it creates atmosphere or separates one
+plane from another. Never add it as decoration.
+
+#### 2.5.4 Client identity leads
+
+The shared system supplies type, spacing, rules, focus, and accessibility. It does not supply a
+look that every client then works around.
+
+Bind these:
+
+- A fresh deployment seeds a neutral palette. Every brand slot is a grey, so the first hue a reader
+  sees is the client's own. Semantic slots keep their hues, because a status color that is grey
+  states nothing.
+- A fresh deployment seeds one neutral face for every role. A theme brings the pairing.
+- The seeded branding placeholders are neutral. They carry no product's mark and no product's
+  color.
+- No deployment reads as Event Runner first and the client's event second.
+
+#### 2.5.5 Ambition is not the thing being trimmed
+
+This section adds contracts. It removes no capability, and a later pull request must not read it as
+permission to remove one.
+
+- The masthead and the nameplate stay strong, fully developed choices. The neutral contracts sit
+  beside them. They never replace them and never weaken them.
+- Every theme may choose an expressive default. A neutral fallback always exists beneath it.
+- Texture, rules, folios, drop caps, and unusual typography stay wherever they build hierarchy or
+  atmosphere. Never flatten a surface toward generic institutional UI.
+- Control complexity with defaults and contracts. Never control it by deleting a capability.
+
+The target is one sentence: an ambitious system, with clear defaults, and room for a client to
+express itself. A reviewer who is choosing between "make this smaller" and "make this clearer"
+picks clearer.
 
 ---
 
@@ -790,7 +880,9 @@ Restyle the public site in full. Move it onto the new base system and the preset
 
 Bind these:
 
-- Every public page gets a masthead nameplate header. Remove the hero-banner pattern.
+- Every public page gets one of the four headers in §2.5.1. The active theme names which. Remove
+  the hero-banner pattern.
+- A page may open with one lead image beside its opening copy (§2.5.2). Text never sits over it.
 - Every section boundary uses rules and folios. Remove decorative card chrome.
 - `SessionCard` loses the colored left edge. `TypeBadge` loses the pill radius. This closes #113.
 - The schedule page gains the grid layout at wide viewports and keeps the list at narrow ones.
@@ -888,7 +980,7 @@ A system page keeps its core feature component. A system page also gains two new
 
 **Layout variants.** A system page can change shape from data. The variants are:
 
-- `header` — the nameplate style.
+- `header` — which of the four headers in §2.5.1 the page renders.
 - `arrangement` — grid or list.
 - `density` — tight, comfortable, or loose.
 - `navPlacement` — top or side.
@@ -906,7 +998,7 @@ Add a page-level `layout` object:
 
 ```ts
 layout: {
-  header: 'nameplate' | 'nameplate-compact',
+  header: 'standard' | 'masthead' | 'compact' | 'minimal',
   arrangement: 'grid' | 'list',
   density: 'tight' | 'comfortable' | 'loose',
   navPlacement: 'top' | 'side'
@@ -919,13 +1011,17 @@ Add a `slot` field to each section:
 slot: 'above' | 'below' | 'main'
 ```
 
-**The header enum has no `none`.** `nameplate-compact` is the minimum. Every public page carries a
-nameplate (§5.1), so a page that renders no header at all is not a layout variant. It is a page
-that lost its identity. Reject the value on write.
+**The header enum has no `none`.** `minimal` is the minimum. Every public page carries the site
+identity and the navigation (§2.5.1), so a page that renders no header at all is not a layout
+variant. It is a page that lost its identity. Reject the value on write.
+
+**A page states a header only to differ from its theme.** The value a page omits resolves to the
+theme's default, and a stored value outside the enum resolves to `standard` rather than to no
+header at all.
 
 **`main` is the default, and it has stated semantics.** On a system page, sections in the `main`
 slot render immediately after the core feature component and before every `below` section. The
-order down the page is: nameplate, `above` sections, core component, `main` sections, `below`
+order down the page is: header, `above` sections, core component, `main` sections, `below`
 sections.
 
 That default is what keeps existing data working. A section stored before this schema landed
@@ -973,7 +1069,10 @@ it. Never rebase a phase onto `main` while the phase below it is still open.
 - Add the motif token layer and the `none` set. Ship no motif art yet.
 - Add `data-mode`, the mode policy in `config/theme`, and the first-paint blocks from §3.3.
 - Map Tailwind to the new tokens.
-- Restyle the public site to the editorial base with the current palette.
+- Restyle the public site on the base system, with a neutral seeded palette (§2.5.4).
+- Ship the four headers from §2.5.1, the nameplate device behind two of them, and the theme field
+  that names the default.
+- Ship the lead image from §2.5.2.
 - Apply §2.1 devices: nameplate, rules, folios.
 - Restyle stat presentation and render both stat shapes. Legacy stat blocks keep rendering. The
   §2.1.1 contract is not enforced in this phase.

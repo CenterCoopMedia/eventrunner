@@ -2,29 +2,29 @@
 // Everything renders from context — no hardcoded event name, city, or date
 // (event-neutrality).
 //
-// The header is the masthead nameplate (design brief §2.1, §5.1): every
-// public page carries one, and there is no hero banner anywhere. The home
-// page takes the full treatment; every other page takes the compact one, so
-// the reader always knows which paper they are holding without the masthead
-// pushing the page's own subject below the fold. Brief §6.2 moves that
-// choice into stored page data (`layout.header`) in PR3; until then the
-// shell picks it from the route.
+// The header comes from the active theme (docs/interface-guidelines.md,
+// Headers). A page's own stated header will win over the theme's once the
+// cmsPages layout object lands; resolveHeader already takes it.
 //
-// On the home page the masthead is the page's subject, so the nameplate
-// carries the <h1> and the page's own lead headline follows under it. On
-// every other page the masthead is a running header and the page owns its
-// <h1>. Either way there is exactly one per page.
-//
-// Navigation is in the editorial register: text links, no pills, no tinted
-// ground. The active item is marked twice over (§8.1 — never color alone):
-// heavier weight plus a strong rule under the word.
+// The active nav item is marked twice over (never color alone): heavier
+// weight plus a strong rule under the word.
 import { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
+import { resolveHeader } from 'shared/theme';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
-import Nameplate, { buildNameplate } from './editorial/Nameplate.jsx';
+import Header from './Header.jsx';
+import { buildNameplate } from './editorial/Nameplate.jsx';
 import FeedbackModal from './FeedbackModal.jsx';
 import DemoBanner from './DemoBanner.jsx';
+
+// The mark is bigger under a masthead than in a running header. Each entry
+// pairs the class that draws the box with the pixel size, so the <img>
+// attributes and the CSS can never state different sizes.
+const MARK_SIZE = {
+  masthead: { className: 'h-10 w-10', px: 40 },
+  running: { className: 'h-6 w-6', px: 24 },
+};
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', end: true },
@@ -46,7 +46,6 @@ function navClass({ isActive }) {
 
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
-  const { pathname } = useLocation();
   // Branding slots come from config/theme (spec §7.2 logos). A slot holds
   // either a flat seeded path (`branding/mark.svg`, which also ships in the
   // bundle) or an uploaded asset (`branding/{assetId}/{name}`, which exists
@@ -66,50 +65,54 @@ export default function Layout() {
   const supportEmail = legal.supportEmail;
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
-  const isHome = pathname === '/';
-  const plate = buildNameplate(eventConfig, { compact: !isHome });
+  const headerVariant = resolveHeader(theme?.header);
+  // Only the event bar prefers the short name.
+  const plate = buildNameplate(eventConfig, { compact: headerVariant === 'compact' });
+  const markSize = headerVariant === 'masthead' ? MARK_SIZE.masthead : MARK_SIZE.running;
 
   return (
-    <div className="bg-paper flex min-h-screen flex-col">
+    <div className="page-surface flex min-h-screen flex-col">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
       <DemoBanner />
-      <header className="bg-brand-surface">
+      <header className="bg-surface">
         <div className="mx-auto w-full max-w-5xl px-md">
-          <Nameplate
-            variant={isHome ? 'full' : 'compact'}
-            nameAs={isHome ? 'h1' : 'p'}
+          <Header
+            variant={headerVariant}
             name={plate.name}
             dates={plate.dates}
-            edition={plate.edition}
-            to="/"
+            place={plate.edition}
             mark={
               markSrc && !markFailed ? (
+                // width/height must match the box the class draws. They
+                // reserve the space before the stylesheet applies, so a
+                // wrong pair moves the header on first paint.
                 <img
                   src={markSrc}
                   alt=""
-                  className={isHome ? 'h-10 w-10' : 'h-6 w-6'}
-                  width="32"
-                  height="32"
+                  className={markSize.className}
+                  width={markSize.px}
+                  height={markSize.px}
                   onError={() => setMarkFailed(true)}
                 />
               ) : null
             }
-          />
-          <nav aria-label="Main" className="border-b-hairline border-b-rule-hairline">
-            <ul className="flex flex-wrap items-center gap-x-md">
-              {NAV_ITEMS.filter((item) => !item.feature || features[item.feature]).map(
-                (item) => (
-                  <li key={item.to}>
-                    <NavLink to={item.to} end={item.end} className={navClass}>
-                      {item.label}
-                    </NavLink>
-                  </li>
-                ),
-              )}
-            </ul>
-          </nav>
+          >
+            <nav aria-label="Main">
+              <ul className="flex flex-wrap items-center gap-x-md">
+                {NAV_ITEMS.filter((item) => !item.feature || features[item.feature]).map(
+                  (item) => (
+                    <li key={item.to}>
+                      <NavLink to={item.to} end={item.end} className={navClass}>
+                        {item.label}
+                      </NavLink>
+                    </li>
+                  ),
+                )}
+              </ul>
+            </nav>
+          </Header>
         </div>
       </header>
       {/* Ordinary pages sit on a flat surface. The Atlas sheet — the faint
@@ -124,8 +127,8 @@ export default function Layout() {
       >
         <Outlet />
       </main>
-      <footer className="bg-brand-surface">
-        <div className="mx-auto max-w-5xl px-md">
+      <footer className="bg-surface">
+        <div className="mx-auto w-full max-w-5xl px-md">
           <div className="section-rule pb-xl pt-md font-data text-caption text-text-secondary">
             <p className="font-heading text-body font-semibold text-text-primary">
               {eventConfig?.name}
@@ -147,7 +150,7 @@ export default function Layout() {
             {features.feedbackInbox ? (
               <button
                 type="button"
-                className="touch-target mt-md inline-flex items-center rounded-brand border-hairline border-rule-hairline px-sm py-2xs text-text-primary hover:bg-brand-surface-alt"
+                className="touch-target mt-md inline-flex items-center rounded-brand border-hairline border-rule-hairline px-sm py-2xs text-text-primary hover:bg-surface-alt"
                 onClick={() => setFeedbackOpen(true)}
               >
                 Share feedback

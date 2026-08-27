@@ -32,7 +32,13 @@ describe('valueFieldsOf', () => {
   });
 
   it('is unaffected for a type with no order field of its own', () => {
-    expect(valueFieldsOf('image').map((f) => f.id)).toEqual(['url', 'alt', 'caption']);
+    expect(valueFieldsOf('image').map((f) => f.id)).toEqual([
+      'url',
+      'alt',
+      'caption',
+      'focalX',
+      'focalY',
+    ]);
   });
 
   it('is empty for an unknown or missing block type', () => {

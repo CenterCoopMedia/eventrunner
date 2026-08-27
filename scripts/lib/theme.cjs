@@ -27,6 +27,7 @@
  */
 
 const {
+  DEFAULT_HEADER,
   DEFAULT_MODE_POLICY,
   DEFAULT_PRESET_ID,
   hexToRgb,
@@ -255,10 +256,14 @@ function defaultTheme() {
     // A field the document does not name is a field the style decides, and
     // the theme editor writes one only when an operator picks it under
     // Advanced.
+    //
     // Mode policy (design brief §3.3): 'light' | 'dark' | 'system'. A fresh
     // deployment starts light, which is what every deployment made before
     // the field existed also renders.
     mode: DEFAULT_MODE_POLICY,
+    // Which header the public pages render (design brief §2.1). The theme
+    // states the deployment default; a page may override it.
+    header: DEFAULT_HEADER,
     logos: { ...PLACEHOLDER_LOGOS },
     placeholderLogos: Object.keys(PLACEHOLDER_LOGOS),
   };

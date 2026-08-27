@@ -6,7 +6,7 @@
 // in lib/chunkReload.js, and otherwise offers the reader a plain retry.
 import { Component } from 'react';
 import { isChunkLoadError, reloadOnce } from '../lib/chunkReload.js';
-import { primaryButtonClass } from './SignInPanel.jsx';
+import { primaryButtonClass } from './controlClasses.js';
 
 export default class ChunkErrorBoundary extends Component {
   constructor(props) {

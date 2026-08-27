@@ -18,6 +18,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import Tag from '../components/editorial/Tag.jsx';
 import { publishDateLabel, sortUpdates, toPublishDate } from '../lib/updateDates.js';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 /** First ~200 chars of the body, word-boundary trimmed, for the list card. */
 function excerpt(body, maxLen = 200) {
@@ -39,10 +40,7 @@ export default function Updates() {
         title="This event doesn’t have public updates"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -73,34 +71,35 @@ export default function Updates() {
             const body = excerpt(update.body);
             return (
               <li key={update.id} className="border-t-hairline border-t-rule-hairline">
-                <div className="grid gap-2xs py-md sm:grid-cols-[9.5rem,1fr] sm:gap-md">
-                  <p className="font-mono text-caption text-text-secondary">
+                {/* Title first in the source, date second — the same order
+                    SessionCard.jsx uses, and for the same reason: below `sm`
+                    this becomes one column, and a date stacked above a
+                    heading is an eyebrow (brief §2.4). At `sm` and up the
+                    grid puts the date back in its own left-hand column. */}
+                <div className="grid py-md sm:grid-cols-[9.5rem,1fr] sm:gap-x-md">
+                  <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs sm:col-start-2 sm:row-start-1">
+                    <h2 className="font-heading text-h3 font-semibold text-text-primary">
+                      <Link to={`/updates/${update.id}`} className="hover:underline">
+                        {update.title}
+                      </Link>
+                    </h2>
+                    {update.pinned ? <Tag>Pinned</Tag> : null}
+                  </div>
+                  <p className="mt-2xs font-mono text-caption text-text-secondary sm:col-start-1 sm:row-start-1 sm:mt-0">
                     {dateLabel ? (
                       <time dateTime={publishDate.toISOString()}>{dateLabel}</time>
                     ) : (
                       <span>Undated</span>
                     )}
                   </p>
-                  <div>
-                    <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
-                      <h2 className="font-heading text-h3 font-semibold text-text-primary">
-                        <Link to={`/updates/${update.id}`} className="hover:underline">
-                          {update.title}
-                        </Link>
-                      </h2>
-                      {update.pinned ? (
-                        <Tag>Pinned</Tag>
-                      ) : null}
-                    </div>
-                    {body ? (
-                      <p
-                        className="mt-xs max-w-prose text-body text-text-secondary"
-                        style={{ textWrap: 'pretty' }}
-                      >
-                        {body}
-                      </p>
-                    ) : null}
-                  </div>
+                  {body ? (
+                    <p
+                      className="mt-xs max-w-prose text-body text-text-secondary sm:col-start-2 sm:row-start-2"
+                      style={{ textWrap: 'pretty' }}
+                    >
+                      {body}
+                    </p>
+                  ) : null}
                 </div>
               </li>
             );

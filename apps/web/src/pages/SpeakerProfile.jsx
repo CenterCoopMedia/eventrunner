@@ -40,7 +40,7 @@ import {
   getOwnSpeakerProfile,
   updateOwnSpeakerProfile,
 } from '../lib/speakerProfileApi.js';
-import { inputClass, primaryButtonClass } from '../components/forms/publicForm.jsx';
+import { inputClass, primaryActionClass } from '../components/controlClasses.js';
 
 const STATUS_COPY = {
   draft: null,
@@ -203,7 +203,7 @@ export default function SpeakerProfile() {
         title="This account is not linked to a speaker"
         description="If you were invited as a speaker, accept the invitation in that email first — it links this account to your speaker record."
         action={
-          <Link to="/profile" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+          <Link to="/profile" className={primaryActionClass}>
             Go to your account
           </Link>
         }
@@ -217,7 +217,7 @@ export default function SpeakerProfile() {
         title="Your speaker profile could not be loaded"
         description={load.error}
         action={
-          <button type="button" onClick={loadProfile} className={primaryButtonClass}>
+          <button type="button" onClick={loadProfile} className={primaryActionClass}>
             Try again
           </button>
         }
@@ -460,7 +460,7 @@ export default function SpeakerProfile() {
           </button>
         </fieldset>
 
-        <button type="submit" className={primaryButtonClass} disabled={saving}>
+        <button type="submit" className={primaryActionClass} disabled={saving}>
           {saving ? 'Saving…' : 'Save speaker profile'}
         </button>
       </form>

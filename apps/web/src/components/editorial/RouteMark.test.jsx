@@ -139,8 +139,8 @@ describe('the paper overlay', () => {
     // under [data-texture='flat'], so any surface reaching a reader before
     // the attribute was written — or with no attribute at all — got the dot
     // pattern nobody asked for. An opt-in gate cannot leak.
-    expect(indexCss).toContain(":root[data-texture='paper'] .bg-paper::before");
-    expect(indexCss).not.toMatch(/^\s*\.bg-paper::before \{/m);
-    expect(indexCss).not.toContain(":root[data-texture='flat'] .bg-paper::before");
+    expect(indexCss).toContain(":root[data-texture='paper'] .page-surface::before");
+    expect(indexCss).not.toMatch(/^\s*\.page-surface::before \{/m);
+    expect(indexCss).not.toContain(":root[data-texture='flat'] .page-surface::before");
   });
 });

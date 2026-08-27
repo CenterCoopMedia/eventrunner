@@ -13,24 +13,14 @@
 // is the one thing the eyebrow ban explicitly does not touch, brief §2.4),
 // its hint under the label, the field inside a boundary that clears 3:1, and
 // the error under the field as text — never colour alone.
+//
+// The class strings themselves are not here. Every shared control shape on
+// the public site — the input, the filled action, the outlined action, the
+// quiet one — has exactly one copy, in components/controlClasses.js. These
+// fields read the input shape from there, so a field a builder composes by
+// hand and a field built here draw the same control.
 import { useId } from 'react';
-
-// The boundary is --color-border-control, not --rule-hairline (design brief
-// §8.1 polish, WCAG 1.4.11): a rule is tuned for low-contrast section
-// dividers, and a form control's boundary needs 3:1 against its ground.
-export const inputClass =
-  'touch-target w-full rounded-brand border-hairline border-control bg-surface px-sm py-xs ' +
-  'font-body text-body text-text-primary placeholder:text-text-secondary ' +
-  'aria-[invalid=true]:border-danger';
-
-export const primaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-accent px-md py-xs ' +
-  'font-data text-caption font-semibold text-surface hover:bg-accent-strong disabled:opacity-60';
-
-export const secondaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand border-hairline ' +
-  'border-rule-hairline bg-surface px-md py-xs font-data text-caption font-semibold ' +
-  'text-text-primary hover:bg-surface-alt disabled:opacity-60';
+import { inputClass } from '../controlClasses.js';
 
 function describedBy(hint, hintId, error, errorId) {
   return [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined;

@@ -12,6 +12,7 @@ import LoadingState from '../components/LoadingState.jsx';
 import { SessionPills, SpeakerNames, TypeBadge, useSessionSpeakerNames } from '../components/SessionCard.jsx';
 import SessionMaterialsList from '../components/SessionMaterialsList.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 function NotFoundState({ search }) {
   return (
@@ -21,7 +22,7 @@ function NotFoundState({ search }) {
       action={
         <Link
           to={{ pathname: '/schedule', search }}
-          className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
+          className={primaryActionClass}
         >
           Back to the schedule
         </Link>
@@ -53,10 +54,7 @@ export default function SessionDetail() {
         title="This event doesn’t have a public schedule"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }

@@ -106,11 +106,15 @@ const DEMO_ANSWERS = Object.freeze({
       organizerName: '[Demo] Harborlight Cooperative',
     },
   },
-  // Overlaid on `defaultTheme()` (spec §2.2, §7.2). The demo runs a named
-  // preset rather than a bespoke palette: Newsroom is the story written for
-  // a publication that publishes every day, which is what the fixture is.
-  // Its cool newsprint ground is not the warm tan canvas the anti-pattern
-  // checklist (#105) rejects.
+  // Overlaid on `defaultTheme()` (spec §2.2, §7.2). The product default is
+  // neutral; this fixture is not, and that is the point of the showcase —
+  // it is what a deployment looks like when a client takes the expressive
+  // choices the system offers (design brief §2.5.5).
+  //
+  // The demo runs a named preset rather than a bespoke palette: Newsroom is
+  // the story written for a publication that publishes every day, which is
+  // what the fixture is. Its cool newsprint ground is not the warm tan
+  // canvas the anti-pattern checklist (#105) rejects.
   theme: {
     preset: DEMO_PRESET_ID,
     // `colors` is an OUTPUT for a preset document (design brief §5.2): the
@@ -121,7 +125,10 @@ const DEMO_ANSWERS = Object.freeze({
     // The preset names the type map, the shape, and the motif default, so
     // the fixture states none of them. `mode` is light, so the demo renders
     // the same way it always has; the dark palette is generated beside it.
+    // The header is the one treatment the preset does not name, and the
+    // showcase takes the masthead.
     mode: 'light',
+    header: 'masthead',
   },
 });
 

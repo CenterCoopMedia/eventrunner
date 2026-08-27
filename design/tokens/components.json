@@ -1,7 +1,7 @@
 {
   "$schema-note": "Tier 3 of the design brief (2026-08-27) §3.1. One component contract each. A component token exists when a component needs a value the theme may change on its own, and it defaults to a tier 2 token.",
   "$shape-note": "A token whose name ends in -rgb names the tier 2 color token it defaults to; the generator emits it in both mode blocks so it follows the mode. Every other token holds a literal CSS value, normally a var() pointing at tier 2.",
-  "$scope-note": "PR1 shipped the session card, the masthead nameplate, and the two rule contracts. PR2 adds the contracts the six presets and their curated options remap: an option remaps existing tokens and NEVER adds a property name (brief §3.4), so every name a preset file mentions is declared here first. Every token here is read by a render path in apps/web/src/index.css — a token an option offers but nothing renders is a promise the interface does not keep, so a new contract lands with the rule that draws it. The two-axis schedule grid itself still lands in PR3; these values are what the row is set in either way.",
+  "$scope-note": "PR1 shipped the session card, the masthead nameplate, the lead image, and the two rule contracts. PR2 adds the contracts the six presets and their curated options remap: an option remaps existing tokens and NEVER adds a property name (brief §3.4), so every name a preset file mentions is declared here first. Every token here is read by a render path in apps/web/src/index.css — a token an option offers but nothing renders is a promise the interface does not keep, so a new contract lands with the rule that draws it. The two-axis schedule grid itself still lands in PR3; these values are what the row is set in either way.",
   "session-card": {
     "--session-card-rule-rgb": "--rule-hairline-rgb",
     "--session-card-surface-rgb": "--color-surface-rgb",
@@ -33,6 +33,10 @@
     "--nameplate-leading": "var(--text-nameplate-leading)",
     "--nameplate-tracking": "var(--text-nameplate-tracking)",
     "--nameplate-gap": "var(--space-sm)"
+  },
+  "lead-image": {
+    "--lead-image-aspect": "3 / 2",
+    "--lead-image-width": "22rem"
   },
   "$section-rule-note": "The section boundary (brief §2.1): the rule, then the gap, then the head. The gap is one of the three surfaces config/theme.density reaches, so index.css multiplies it by --density-step.",
   "section-rule": {

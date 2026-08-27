@@ -16,6 +16,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SpecimenLabel from '../components/editorial/SpecimenLabel.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function Speakers() {
   const { features } = useEventConfig();
@@ -27,10 +28,7 @@ export default function Speakers() {
         title="This event doesn’t have a public speaker directory"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -73,7 +71,7 @@ export default function Speakers() {
                       <AssetImage
                         path={speaker.headshotPath}
                         alt=""
-                        className="h-10 w-10 shrink-0 self-center rounded-brand bg-brand-surface object-cover"
+                        className="h-10 w-10 shrink-0 self-center rounded-brand bg-surface object-cover"
                       />
                     ) : null}
                     <h2 className="font-heading text-h3 font-semibold text-text-primary">

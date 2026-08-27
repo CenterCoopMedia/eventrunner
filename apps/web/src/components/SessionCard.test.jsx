@@ -623,4 +623,15 @@ describe('SessionCard shape rules, issue 113', () => {
     const time = container.querySelector('time');
     expect(time.closest('p').className).toContain('font-mono');
   });
+
+  it('puts the title before the time, so the time never stacks above the heading', () => {
+    // The eyebrow ban is absolute and holds at every size (design brief
+    // §2.4). This row is one column below `sm`, so the title has to come
+    // first in the source; the grid moves the time back into its own
+    // left-hand column once there is room for one.
+    const { container } = renderCard();
+    const heading = container.querySelector('h3');
+    const time = container.querySelector('time');
+    expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

@@ -168,6 +168,20 @@ test('validateTheme enforces hex colors', () => {
   assert.equal(validateTheme({}).ok, false);
 });
 
+test('validateTheme accepts the four headers and names an unknown one', () => {
+  /* eslint-disable no-restricted-syntax */
+  const colors = { primary: '#336699' };
+  /* eslint-enable no-restricted-syntax */
+  for (const header of ['standard', 'masthead', 'compact', 'minimal']) {
+    assert.equal(validateTheme({ colors, header }).ok, true, header);
+  }
+  // Absent is fine: a document from before the field existed still saves.
+  assert.equal(validateTheme({ colors }).ok, true);
+  const bad = validateTheme({ colors, header: 'letterpress' });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.startsWith('theme.header:')));
+});
+
 test('validateBadgesConfig enforces unique ids and positive maxPicks', () => {
   const good = validateBadgesConfig({
     categories: [

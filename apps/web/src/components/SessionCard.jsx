@@ -118,7 +118,7 @@ export function TypeBadge({ type }) {
 // The feature-flag controls under a session. Rectangles on the theme radius,
 // not pills (brief §2.4): the same shape rule TypeBadge now follows.
 const actionClass =
-  'touch-target inline-flex items-center gap-2xs rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-brand-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
+  'touch-target inline-flex items-center gap-2xs rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
 
 /**
  * Bookmark toggle pill (spec §9 "Bookmarks"). Feature-gated by
@@ -217,7 +217,15 @@ function CalendarPill({ eventConfig, session }) {
   };
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-2xs font-data text-caption text-text-secondary">
+    // The visible "Add to calendar:" text is hidden from a screen reader so
+    // it is not read as a stray line, so the group carries the same words as
+    // its name instead. Without that, a screen reader announces ".ics",
+    // "Google", and "Outlook" with nothing to say what they add to.
+    <span
+      className="inline-flex flex-wrap items-center gap-2xs font-data text-caption text-text-secondary"
+      role="group"
+      aria-label="Add to calendar"
+    >
       <span aria-hidden="true">Add to calendar:</span>
       <button type="button" className={actionClass} onClick={onDownload}>
         .ics
@@ -328,7 +336,7 @@ function ReactionsPill({ session }) {
           // counts, nothing worth rendering when a reaction has zero.
           if (count === 0) return null;
           return (
-            <span key={emoji} className={actionClass} aria-hidden="false">
+            <span key={emoji} className={actionClass}>
               <span aria-hidden="true">{emoji}</span> {count}
             </span>
           );
@@ -444,14 +452,34 @@ export default function SessionCard({
     // The literal modifier matters: Tailwind scans for class names as
     // whole strings, so `session-block--lead` is written out rather than
     // assembled (components/editorial/purge.test.js).
+    //
+    // The title comes first in the source and the time follows it. The time
+    // is a label beside a heading, so it must never stack above one: the
+    // eyebrow ban holds at every size (brief §2.4), and one column is what
+    // this row becomes below `sm`. Reading the title first is also the
+    // better order to hear. At `sm` and up the grid places the time back in
+    // its own left-hand column beside the title, which is where the eye
+    // wants it once there is room for a column.
     <li className={lead ? 'session-block session-block--lead' : 'session-block'}>
       {/* The face is the first ink pass; the stamp behind it is the second,
           printed off register (brief §2.4, "Exception two", Zine only). At
           the zero offset every other preset holds, the face covers the
           stamp exactly and this is the plain ruled row it has always
           been. */}
-      <article className="session-block__face grid gap-y-2xs sm:grid-cols-[9.5rem,1fr]">
-        <p className="session-block__data font-mono text-text-secondary">
+      <article className="session-block__face grid sm:grid-cols-[9.5rem,1fr]">
+        <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs sm:col-start-2 sm:row-start-1">
+          <h3 className="session-block__title font-heading font-semibold text-text-primary">
+            {linkToDetail ? (
+              <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
+                {session.title}
+              </Link>
+            ) : (
+              session.title
+            )}
+          </h3>
+          <TypeBadge type={session.type} />
+        </div>
+        <p className="session-block__data mt-2xs font-mono text-text-secondary sm:col-start-1 sm:row-start-1 sm:mt-0">
           {position ? <span className="session-block__number">{position}</span> : null}
           {range ? (
             <>
@@ -461,25 +489,13 @@ export default function SessionCard({
                   –<time dateTime={range.endIso}>{range.endLabel}</time>
                 </>
               ) : null}
-              {range.zone ? <span className="ms-1">{range.zone}</span> : null}
+              {range.zone ? <span className="ms-2xs">{range.zone}</span> : null}
             </>
           ) : (
             <span>Time to be announced</span>
           )}
         </p>
-        <div>
-          <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
-            <h3 className="session-block__title font-heading font-semibold text-text-primary">
-              {linkToDetail ? (
-                <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
-                  {session.title}
-                </Link>
-              ) : (
-                session.title
-              )}
-            </h3>
-            <TypeBadge type={session.type} />
-          </div>
+        <div className="sm:col-start-2 sm:row-start-2">
           {/* The room, as a specimen label (brief §4.5). Under five presets
               the label draws no rules and shows no field name, so this is
               the caption line it has always been; under Field Guide the same

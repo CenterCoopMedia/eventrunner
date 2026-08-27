@@ -23,12 +23,7 @@ import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
-
-// Page actions in the editorial register: a ruled rectangle on the theme
-// radius, never a filled pill (design brief §2.4) — the same class
-// Schedule.jsx's own page actions use.
-const ACTION_CLASS =
-  'touch-target inline-flex items-center rounded-brand border-hairline border-rule-hairline px-md py-2xs font-data text-caption font-medium text-text-primary hover:bg-brand-surface-alt';
+import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
 export default function MySchedule() {
   const { eventConfig, features } = useEventConfig();
@@ -79,7 +74,7 @@ export default function MySchedule() {
         title="This event doesn’t have a personal schedule"
         description="Everything else about the event is on the schedule page."
         action={
-          <Link to="/schedule" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+          <Link to="/schedule" className={primaryActionClass}>
             Go to the schedule
           </Link>
         }
@@ -101,7 +96,7 @@ export default function MySchedule() {
         title="Sign in to see your schedule"
         description="Bookmark sessions from the schedule page and they’ll show up here."
         action={
-          <Link to="/signin" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+          <Link to="/signin" className={primaryActionClass}>
             Sign in
           </Link>
         }
@@ -119,14 +114,14 @@ export default function MySchedule() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-xs">
-          <Link to="/schedule" className={ACTION_CLASS}>
+          <Link to="/schedule" className={quietActionClass}>
             Full schedule
           </Link>
           {features.icsExport && mySessions.length > 0 ? (
             <button
               type="button"
               onClick={() => downloadIcs(icsFileName('my-schedule'), buildIcsCalendar(eventConfig, mySessions))}
-              className={ACTION_CLASS}
+              className={quietActionClass}
             >
               Download my schedule (.ics)
             </button>
@@ -144,7 +139,7 @@ export default function MySchedule() {
             title="No bookmarked sessions yet"
             description="Browse the schedule and bookmark the sessions you don’t want to miss."
             action={
-              <Link to="/schedule" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+              <Link to="/schedule" className={primaryActionClass}>
                 Browse the schedule
               </Link>
             }

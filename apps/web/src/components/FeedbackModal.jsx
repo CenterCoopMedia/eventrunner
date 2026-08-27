@@ -26,13 +26,8 @@
 // (§2.4), never an eyebrow to "fix".
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
-import {
-  SelectField,
-  TextAreaField,
-  TextField,
-  primaryButtonClass as modalPrimaryButtonClass,
-  secondaryButtonClass as modalSecondaryButtonClass,
-} from './forms/publicForm.jsx';
+import { SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
+import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 
 const CATEGORY_OPTIONS = [
   { value: 'feedback', label: 'General feedback' },
@@ -121,7 +116,7 @@ export default function FeedbackModal({ onClose }) {
               {email.trim() ? " If you left an email, we’ll try to send a confirmation." : null}
             </p>
             <div>
-              <button type="button" className={modalPrimaryButtonClass} onClick={onClose}>
+              <button type="button" className={primaryActionClass} onClick={onClose}>
                 Close
               </button>
             </div>
@@ -174,10 +169,10 @@ export default function FeedbackModal({ onClose }) {
             </div>
 
             <div className="flex flex-wrap justify-end gap-xs">
-              <button type="button" className={modalSecondaryButtonClass} onClick={onClose}>
+              <button type="button" className={secondaryActionClass} onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className={modalPrimaryButtonClass} disabled={submitting}>
+              <button type="submit" className={primaryActionClass} disabled={submitting}>
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
             </div>

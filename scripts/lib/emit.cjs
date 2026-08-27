@@ -125,6 +125,10 @@ function emitEventConfig({ event, features, theme }) {
     // <html>. Colors stay out of this projection — they go to theme.css as
     // RGB triples — but the motif set is an attribute, not a color.
     motifSet: theme.motifSet,
+    // The header the theme names for its public pages (design brief §2.1).
+    // A document from before the field existed has none, and the shell
+    // resolves that to the base header.
+    header: theme.header,
     logos: theme.logos,
   };
   return [

@@ -456,8 +456,9 @@ function rootBlock(theme, tokens) {
   push('--radius-large', radius.large);
 
   group(
-    "Tier 2 — texture treatment: 'paper' | 'flat'. " +
-    'Components read this through the bg-paper utility layer in index.css.',
+    "Tier 2 — texture treatment: config/theme.texture = 'flat' | 'paper'. " +
+    'Flat is the base; a texture is a theme opt-in, painted by the ' +
+    '.page-surface layer in index.css.',
   );
   push('--texture', shape.texture);
 

@@ -36,15 +36,7 @@ import {
   validateSpeakerInvite,
 } from '../lib/speakerInvites.js';
 import { IS_DEMO } from '../lib/demoMode.js';
-
-const primaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-accent ' +
-  'px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong disabled:opacity-60';
-
-const secondaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand ' +
-  'border-hairline border-rule-hairline bg-surface px-md py-xs font-data text-caption font-semibold ' +
-  'text-text-primary hover:bg-surface-alt disabled:opacity-60';
+import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
 
 const Panel = ({ children }) => (
   <div className="mt-lg space-y-md border-hairline border-rule-hairline bg-surface-alt p-lg">
@@ -72,7 +64,7 @@ function DemoInviteNotice() {
           with. This is a read-only tour of a fictional event, so no
           invitation is checked and nothing leaves your browser.
         </p>
-        <Link to="/" className={primaryButtonClass}>
+        <Link to="/" className={primaryActionClass}>
           Back to the event
         </Link>
       </Panel>
@@ -246,7 +238,7 @@ export default function SpeakerAccept() {
             organization — for the public programme. It appears publicly once
             an organizer has reviewed it.
           </p>
-          <Link to="/speaker/profile" className={primaryButtonClass}>
+          <Link to="/speaker/profile" className={primaryActionClass}>
             Write your speaker profile
           </Link>
         </Panel>
@@ -307,7 +299,7 @@ export default function SpeakerAccept() {
                 account there. If you would rather use this account, ask the
                 organizers to re-send the invitation to it.
               </p>
-              <button type="button" onClick={() => signOut()} className={primaryButtonClass}>
+              <button type="button" onClick={() => signOut()} className={primaryActionClass}>
                 Sign in with the invited address
               </button>
             </div>
@@ -317,7 +309,7 @@ export default function SpeakerAccept() {
                 type="button"
                 onClick={accept}
                 disabled={accepting}
-                className={primaryButtonClass}
+                className={primaryActionClass}
               >
                 {accepting ? 'Accepting…' : 'Accept the invitation'}
               </button>
@@ -325,7 +317,7 @@ export default function SpeakerAccept() {
                   generally: the account is the thing that has to change, and
                   signing out here keeps the token in the URL so the page
                   comes straight back to this step. */}
-              <button type="button" onClick={() => signOut()} className={secondaryButtonClass}>
+              <button type="button" onClick={() => signOut()} className={secondaryActionClass}>
                 Use a different account
               </button>
             </>

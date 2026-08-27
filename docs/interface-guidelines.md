@@ -16,7 +16,9 @@ Typography and rules do the visual work. Color decorates very little, and shadow
 
 | Device | Component | What it is | The rule |
 |---|---|---|---|
-| Masthead nameplate | `Nameplate` | The rule-bounded title block: event name, dates, edition line. | Every public page carries one. Type and rules only — never a hero banner, never a photo behind the name. `full` opens the home page; `compact` runs as a header everywhere else. |
+| Public header | `Header` | The site identity plus the navigation, in one of four treatments. | See Headers below. The active theme names the treatment; `standard` is the base. Every treatment carries both halves, and none of them is a heading. |
+| Masthead nameplate | `Nameplate` | The rule-bounded title block: event name, dates, edition line. | Type and rules only — never a hero banner, never a photo behind the name. `full` is the `masthead` header; `compact` is the `compact` one. A theme chooses it; it is never mandatory. |
+| Lead image | `LeadImage` | One optional picture beside the opening copy, or below it at narrow viewports. | Alt text is required or the image does not render. The crop is fixed by token and the editor states the focal point. Text never sits over it. One per page. |
 | Folio | `Folio` | A small-caps plain-text label sitting on a hairline rule. | Text plus rule. Never a chip, never a pill, never a colored badge. **Never directly above a heading** — see the eyebrow ban below. |
 | Rule | `Rule` | A standalone hairline, strong, or nameplate rule. | A rule replaces a card border. A rule never carries brand color and reads only the `--rule-*` tokens. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node. |
 | Section boundary | `SectionHead` | One strong rule, then the section heading with the folio beside it on a hairline. | Reach for this instead of composing a folio and a heading by hand. Its `folio` variant makes the folio itself the heading, which is what a schedule day head needs. |
@@ -29,6 +31,33 @@ Two things are **not** eyebrows and must never be "fixed" to satisfy this rule:
 - A form `<label>` above its own input. That is a control label.
 
 Cards, boxes, and chrome: a rule replaces a card border wherever a rule can do the job. Elevation is tint, not shadow — where a surface must sit above another, shift its tone with a low-opacity overlay of the theme's ink or accent.
+
+## Headers
+
+A public page renders one of four headers (design brief §2.5.1). `config/theme.header` names the deployment's default and a page may state its own; `standard` is the base, and a value outside the four resolves to it rather than to no header at all.
+
+| Treatment | What it draws |
+|---|---|
+| `standard` | The event name at heading size, the dates and place beside it, the navigation under a hairline. The base. |
+| `masthead` | The nameplate device at full size, with the navigation under it. |
+| `compact` | The nameplate device at running-header size: short name and dates on one baseline. |
+| `minimal` | The client's mark and the navigation, and nothing else. |
+
+- Every treatment carries the site identity **and** the navigation. Dropping either fails review.
+- The identity repeats on every page, so it is never a heading. Every page owns its own `<h1>`.
+- `masthead` sets the event name at display size, so a page headline that is that same name keeps its `<h1>` for structure and is not printed a second time. The other three set the identity at running-header size, where no repetition is visible.
+- No treatment puts text over an image, and none of them is a hero banner.
+- Never make one treatment mandatory across every deployment.
+
+## The base and the theme
+
+The base is what a deployment renders before its theme states anything, and it is neutral. The theme is where the character lives (design brief §2.5).
+
+- **Flat is the base.** The page ground paints no texture on its own. `config/theme.texture` opts into one, and only then. Keep texture where it builds atmosphere or separates one plane from another; never add it as decoration.
+- **The seeded palette is grey.** Every brand slot in a fresh deployment is achromatic, so the first hue a reader sees is the client's own. Semantic slots keep their hues, because a status color that is grey states nothing.
+- **The seeded type is one neutral face for every role.** A theme brings the pairing.
+- **Client identity leads.** This system supplies type, spacing, rules, focus, and accessibility. It never makes a deployment read as Event Runner first and the client's event second.
+- **Neutral is a default, not a ceiling.** A theme may be very expressive. The masthead, texture, folios, drop caps, and unusual typography stay fully developed choices, and a neutral fallback always exists beneath them. Control complexity with defaults and contracts, never by deleting a capability.
 
 ## User interface
 

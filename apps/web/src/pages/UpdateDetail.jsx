@@ -14,6 +14,7 @@ import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { publishDateLabel, toPublishDate } from '../lib/updateDates.js';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 function NotFoundState() {
   return (
@@ -21,10 +22,7 @@ function NotFoundState() {
       title="This update is not available"
       description="It may not be published yet, or the link may be out of date."
       action={
-        <Link
-          to="/updates"
-          className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
-        >
+        <Link to="/updates" className={primaryActionClass}>
           Back to updates
         </Link>
       }
@@ -43,10 +41,7 @@ export default function UpdateDetail() {
         title="This event doesn’t have public updates"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }

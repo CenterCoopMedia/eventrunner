@@ -7,9 +7,12 @@ const { defaultTheme, rgbToHex, hexToRgb, PLACEHOLDER_LOGOS } = require('./theme
 const { validateTheme } = require('shared/config');
 const {
   DEFAULT_PRESET_ID,
+  DEFAULT_TEXTURE,
   THEME_PRESET_IDS,
+  THEME_TEXTURES,
   getPreset,
   resolveLegacyColors,
+  resolveShape,
 } = require('shared/theme');
 
 test('the default theme passes the real config/theme validator', () => {
@@ -32,6 +35,17 @@ test('every logo slot starts as a placeholder the readiness branding row can see
   for (const slot of theme.placeholderLogos) {
     assert.match(theme.logos[slot], /^branding\//);
   }
+});
+
+test('a fresh deployment paints a flat surface: a texture is a style\u2019s to state', () => {
+  // The seed names no texture, so the STYLE decides — and Institutional,
+  // the style a fresh deployment starts on, is flat. The rule the base
+  // branch wrote still holds; it is now read through the style rather than
+  // copied into the document (owner review, 2026-08-27, §0).
+  assert.equal(defaultTheme().texture, undefined);
+  assert.equal(resolveShape(defaultTheme()).texture, 'flat');
+  assert.equal(DEFAULT_TEXTURE, 'flat');
+  assert.equal(THEME_TEXTURES[0], DEFAULT_TEXTURE, 'the default is the first offered value');
 });
 
 test('the seed starts on the default preset, with its palette materialized', () => {
@@ -65,4 +79,21 @@ test('the seed starts on the default preset, with its palette materialized', () 
   // No per-client color arrives from a script default: the palette is the
   // preset's, and the preset ships no client's brand.
   assert.equal(theme.fonts.heading, undefined, 'the preset names the type map, not the seed');
+});
+
+test('the seed supplies a style, never a client’s own identity', () => {
+  // Client identity leads (design brief §2.5.4). The seed used to hold that
+  // by shipping a grey palette; §0's owner review moved it, because a fresh
+  // deployment now starts on a real style rather than on nothing. The rule
+  // is the same and the measurement moved with it: what a client sets —
+  // their brand colour and their marks — is what the seed must NOT invent.
+  // Everything else on the page is the style's to state.
+  const theme = defaultTheme();
+  assert.equal(theme.brandColor, undefined, 'the brand colour is the client’s to set');
+  assert.deepEqual(theme.fonts, {}, 'the type map is the style’s to name');
+  assert.deepEqual(
+    theme.placeholderLogos.sort(),
+    Object.keys(theme.logos).sort(),
+    'every logo slot is still a placeholder, so no mark is shipped as the client’s',
+  );
 });

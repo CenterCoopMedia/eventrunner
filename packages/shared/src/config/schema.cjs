@@ -15,6 +15,7 @@ const {
   THEME_COLOR_KEYS,
   THEME_FONT_ROLES,
   THEME_FONT_SET_IDS,
+  THEME_HEADERS,
   THEME_LOGO_SLOTS,
   THEME_MODE_POLICIES,
   THEME_RADIUS_IDS,
@@ -365,6 +366,7 @@ function validateTheme(theme) {
     ['radius', THEME_RADIUS_IDS],
     ['density', THEME_DENSITIES],
     ['mode', THEME_MODE_POLICIES],
+    ['header', THEME_HEADERS],
   ];
   for (const [field, allowed] of enums) {
     if (theme[field] == null) continue;

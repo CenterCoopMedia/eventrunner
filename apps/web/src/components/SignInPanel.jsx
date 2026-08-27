@@ -34,9 +34,9 @@ import { useToast } from '../contexts/ToastContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
 import {
   inputClass,
-  primaryButtonClass as basePrimaryButtonClass,
-  secondaryButtonClass as baseSecondaryButtonClass,
-} from './forms/publicForm.jsx';
+  primaryButtonClass,
+  secondaryButtonClass,
+} from './controlClasses.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -60,12 +60,6 @@ function formatClock(totalSeconds) {
   const seconds = String(totalSeconds % 60).padStart(2, '0');
   return `${minutes}:${seconds}`;
 }
-
-// The public tier's own controls (components/forms/publicForm.jsx). The
-// sign-in panel is a narrow column, so its buttons are the same controls at
-// full width — the shape differs, the tokens do not.
-export const primaryButtonClass = `${basePrimaryButtonClass} w-full`;
-export const secondaryButtonClass = `${baseSecondaryButtonClass} w-full`;
 
 const linkButtonClass =
   'touch-target inline-flex items-center rounded-brand px-2xs py-3xs font-data text-caption underline ' +

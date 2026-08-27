@@ -107,6 +107,7 @@ export const theme = {
   optionPicks: {},
   fonts: {},
   mode: 'light',
+  header: 'masthead',
   logos: {
     primary: 'branding/logo.svg',
     mark: 'branding/mark.svg',

@@ -2,9 +2,9 @@
   <!-- Neutral placeholder wordmark slot: a mark plus a generic label bar.
        Replaced per event via the branding/ Storage slots. No real name or
        brand; grayscale rgb() only. -->
-  <rect x="4" y="4" width="56" height="56" rx="14" fill="rgb(92 107 122)"/>
-  <circle cx="32" cy="32" r="17" fill="none" stroke="rgb(245 245 244)" stroke-width="4"/>
-  <circle cx="32" cy="32" r="6" fill="rgb(245 245 244)"/>
-  <rect x="76" y="18" width="150" height="12" rx="6" fill="rgb(92 107 122)"/>
-  <rect x="76" y="38" width="96" height="8" rx="4" fill="rgb(148 160 172)"/>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="rgb(91 93 97)"/>
+  <circle cx="32" cy="32" r="17" fill="none" stroke="rgb(250 250 249)" stroke-width="4"/>
+  <circle cx="32" cy="32" r="6" fill="rgb(250 250 249)"/>
+  <rect x="76" y="18" width="150" height="12" rx="6" fill="rgb(91 93 97)"/>
+  <rect x="76" y="38" width="96" height="8" rx="4" fill="rgb(148 150 154)"/>
 </svg>

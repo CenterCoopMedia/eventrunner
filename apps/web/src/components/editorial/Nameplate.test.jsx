@@ -1,11 +1,10 @@
-// The masthead nameplate (design brief §2.1, §5.1).
+// The nameplate device the `masthead` header draws (design brief §2.1).
 //
 // Two things are load-bearing here and both are checked below: the block is
 // type and rules only (no banner, no background image), and its dates and
 // edition line sit INSIDE the rule-bounded block, which is the one place
-// brief §2.4 allows metadata near a title. The name is a heading on exactly
-// one page: on the home page the masthead IS the subject and carries the
-// <h1>, and on a running header it is a <p> so the page's own <h1> stands.
+// brief §2.4 allows metadata near a title. The name is not a heading — the
+// site identity repeats on every page, so each page keeps its own <h1>.
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -88,9 +87,9 @@ describe('Nameplate', () => {
     expect(screen.queryByRole('heading')).toBeNull();
   });
 
-  it('carries the h1 where the masthead is the page subject', () => {
-    // The home page: the nameplate IS the title, and the stored lead
-    // headline follows under it (design brief §2.1).
+  it('can still carry a heading where a caller asks for one', () => {
+    // The shell never asks: the header identity is a running site name. The
+    // prop stays because a page whose subject IS the nameplate can use it.
     renderPlate({ name: '[Fixture] Harbour Summit', nameAs: 'h1', nameId: 'site-title' });
     const heading = screen.getByRole('heading', {
       level: 1,
