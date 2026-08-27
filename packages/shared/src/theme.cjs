@@ -34,10 +34,10 @@ const DEFAULT_MODE_POLICY = 'light';
  * Font roles (brief §3.2). Tokens name a role, never a family.
  *
  * `data` carries tabular data and captions. `mono` carries figures,
- * timestamps, and code. They are two roles, not one: a preset normally
+ * timestamps, and code. They are two roles, not one: A preset normally
  * pairs a sans for captions with a mono for numbers, and one token cannot
- * say both. Until PR2 bundles a mono face, `mono` falls back to the data
- * face.
+ * say both. All six presets name a mono face; a document that names none
+ * falls the role through to the data face.
  *
  * `accent` is NOT a role. PR2 removed the `--font-accent` alias and the
  * grandfathered `accent` key with it (brief §3.2, §7). Zine's handwritten
@@ -255,9 +255,10 @@ function overrideTokenKey(name) {
  *
  * These four are DESIGNED, not derived. A dark ground computed from a
  * client's light surface would land wherever that surface happened to be —
- * a warm tan surface would give a brown ground. So PR1 pins one neutral
- * dark ground, slightly cool and never pure black, with a warm off-white
- * ink on it. PR2 replaces these per preset.
+ * a warm tan surface would give a brown ground. So one neutral dark ground
+ * is pinned here, slightly cool and never pure black, with a warm off-white
+ * ink on it. Every preset authors its own dark palette and never reaches
+ * this; it is the ground a document that names no preset falls back to.
  *
  * Measured against each other: ink on surface is 14.6:1, muted ink on
  * surface is 7.9:1, and both clear the bar on the alternate surface too.
@@ -409,8 +410,10 @@ const DARK_SOFT_STEP = 0.35;
  * `primaryDark` means "more emphasis", and more emphasis on a dark ground
  * is brighter, not darker.
  *
- * Presets bring hand-designed dark palettes in PR2. This is the
- * conservative derivation that makes dark mode complete in PR1.
+ * Every preset ships a hand-designed dark palette, so this derivation runs
+ * only for a document that names no preset — one written before presets
+ * existed, or a palette an operator set by hand under Advanced. It is the
+ * conservative path that keeps dark mode complete for those.
  *
  * @param {Record<string, readonly number[]>} light role → `[r, g, b]`
  * @returns {Record<string, number[]>} the same roles, dark values

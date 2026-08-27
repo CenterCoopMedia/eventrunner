@@ -190,7 +190,7 @@ export const PRESET_COPY = Object.freeze({
     options: {
       headingFace: {
         label: 'Heading face',
-        prompt: 'The sign face. Body stays Libre Franklin and data stays Overpass Mono under every option. Every option must hold at nameplate size, at the h3 step, and inside a route mark.',
+        prompt: 'The sign face. Body stays Libre Franklin and data stays Overpass Mono under every option.',
         choices: {
           overpass: {
             label: 'Overpass',

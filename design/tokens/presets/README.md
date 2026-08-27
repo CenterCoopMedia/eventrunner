@@ -234,7 +234,9 @@ A mapped city on its transit network. A survey sheet and a departure board at on
 
 ### Heading face — `headingFace`
 
-The sign face. Body stays Libre Franklin and data stays Overpass Mono under every option. Every option must hold at nameplate size, at the h3 step, and inside a route mark.
+The sign face. Body stays Libre Franklin and data stays Overpass Mono under every option.
+
+**bar-note.** Every choice below has to hold at nameplate size, at the h3 step, and inside a route mark. That is the bar the set was curated against; it is not a decision an operator makes, so it does not sit in the prompt.
 
 - **Overpass** *(recommended)* — The highway sign. It is drawn from road lettering, so route marks, station names, and transfer lines all speak in the voice the story needs.
 - **Libre Franklin extrabold** — Franklin Gothic set American transit and news signage for a century, so running the body face up to heading size keeps the system whole and costs nothing extra.

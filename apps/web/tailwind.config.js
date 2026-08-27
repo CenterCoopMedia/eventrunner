@@ -11,10 +11,11 @@
 //
 // Everything below EXTENDS the Tailwind defaults rather than replacing them.
 // This branch restyles the public pages and the editorial devices onto the
-// token utilities. The admin panel, the shared media widgets, and a handful
-// of public blocks are still on the brand-* names and the default Tailwind
-// sizes; leaving the defaults in place keeps those compiling and rendering
-// until PR2 moves them over.
+// tier 2 role utilities, and moves the admin onto its own admin-* identity.
+// What is still on the brand-* names and the default Tailwind sizes is the
+// content blocks, the shared media widgets, and a few standalone public
+// components. Leaving the defaults in place is what keeps those compiling
+// and rendering until they move too.
 const fontStep = (step) => [
   `var(--text-${step})`,
   { lineHeight: `var(--text-${step}-leading)`, letterSpacing: `var(--text-${step}-tracking)` },
@@ -40,7 +41,7 @@ export default {
         highlight: 'rgb(var(--semantic-highlight-rgb) / <alpha-value>)',
         keynote: 'rgb(var(--semantic-keynote-rgb) / <alpha-value>)',
         // Tier 2 role names (brief §3.1). The restyled surfaces read these;
-        // the brand-* names above stay for the surfaces PR2 still moves.
+        // the brand-* names above stay for the surfaces still to move.
         surface: 'rgb(var(--color-surface-rgb) / <alpha-value>)',
         'surface-alt': 'rgb(var(--color-surface-alt-rgb) / <alpha-value>)',
         'text-primary': 'rgb(var(--color-text-primary-rgb) / <alpha-value>)',
@@ -101,8 +102,8 @@ export default {
         // writable from config/theme.
         'admin-ui': 'var(--admin-font-ui)',
         'admin-data': 'var(--admin-font-data)',
-        // There is no `accent` face. PR2 removed the retired --font-accent
-        // alias (brief §3.2, §7). Zine's handwritten callout runs on the
+        // There is no `accent` face. The retired --font-accent alias is
+        // gone (brief §3.2, §7). Zine's handwritten callout runs on the
         // --callout-font component token, which the callout component reads
         // directly rather than through a utility.
       },
