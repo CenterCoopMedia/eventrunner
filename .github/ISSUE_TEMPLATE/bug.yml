@@ -10,7 +10,7 @@ body:
         Use this form when the **shared product** misbehaves.
 
         - How-to ("how do I bookmark a session"): [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a)
-        - CCM is operating your site and you need access or a content fix: email info@collaborativejournalism.org
+        - CCM is operating your site and you need access or a content fix: email info@eventrunner.org
         - Security: [private report](https://github.com/CenterCoopMedia/eventrunner/security/advisories/new)
 
         Do not paste attendee names, emails, ticket IDs, or other client data.
@@ -118,5 +118,5 @@ body:
           required: true
         - label: This is a product bug, not a request for CCM to change content on a hosted site.
           required: true
-        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to the [Code of Conduct](https://centercoopmedia.github.io/eventrunner/docs/code-of-conduct/).
           required: true

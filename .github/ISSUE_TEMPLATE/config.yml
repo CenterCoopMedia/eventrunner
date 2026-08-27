@@ -5,13 +5,13 @@ contact_links:
     about: How-to questions and "is this supposed to work this way." Not a bug in the shared code.
   - name: We want CCM to run our event
     url: https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general
-    about: Hosting, licensing, and onboarding. You can also email info@collaborativejournalism.org.
+    about: Hosting, licensing, and onboarding. You can also email info@eventrunner.org.
   - name: Hosted-event support
-    url: mailto:info@collaborativejournalism.org
+    url: mailto:info@eventrunner.org
     about: If CCM already operates your site, email for access, content, and outages. Do not file that here.
   - name: Report a vulnerability
     url: https://github.com/CenterCoopMedia/eventrunner/security/advisories/new
     about: Private disclosure only. Do not file a public issue.
   - name: Read the handbook
-    url: https://github.com/CenterCoopMedia/eventrunner/wiki
+    url: https://centercoopmedia.github.io/eventrunner/docs/handbook/
     about: Attendee, staff, and client guides.

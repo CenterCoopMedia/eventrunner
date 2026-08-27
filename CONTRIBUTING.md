@@ -2,29 +2,29 @@
 
 Thanks for wanting to help. This is the public platform repo. The live Collaborative Journalism Summit site stays in `jamditis/cjs2026` and is not the place to send platform PRs.
 
-By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). Reports go to info@collaborativejournalism.org.
+By participating you agree to the [Code of Conduct](https://centercoopmedia.github.io/eventrunner/docs/code-of-conduct/). Reports go to info@eventrunner.org.
 
 ## Where to start
 
-Pick the path that matches what you are doing. If you are not changing code, you probably want [Discussions](https://github.com/CenterCoopMedia/eventrunner/discussions) or the [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki), not a pull request.
+Pick the path that matches what you are doing. If you are not changing code, you probably want [Discussions](https://github.com/CenterCoopMedia/eventrunner/discussions) or the [handbook](https://centercoopmedia.github.io/eventrunner/docs/handbook/), not a pull request.
 
 | You are… | Do this |
 |---|---|
 | An attendee who cannot sign in, find a session, or open materials | [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) |
 | Event staff stuck in the CMS, schedule, or speaker tools | [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) |
-| An organization that wants CCM to run your event | [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) or email info@collaborativejournalism.org |
+| An organization that wants CCM to run your event | [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) or email info@eventrunner.org |
 | Reporting a bug in the shared product | [Bug form](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml) |
 | Asking for a product change | [Feature form](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=feature.yml) |
 | Sending code or docs | Open or link an issue, then a pull request |
 
-If CCM is operating the event site for you and the problem is access, content, or your specific deployment, email info@collaborativejournalism.org. That is support, not a public ticket.
+If CCM is operating the event site for you and the problem is access, content, or your specific deployment, email info@eventrunner.org. That is support, not a public ticket.
 
 ## Contribution policy
 
 We take:
 
 - Bug fixes with a failing test when one can exist
-- Features that match the [roadmap](docs/ROADMAP.md) or have a linked, accepted issue
+- Features that match the [roadmap](https://centercoopmedia.github.io/eventrunner/docs/roadmap/) or have a linked, accepted issue
 - Docs, wiki corrections, and accessibility fixes
 - Repro cases that do not include real attendee or client data
 
@@ -37,7 +37,7 @@ We will bounce:
 - Features already cut from v1 (video generator, bulk broadcast, invoicing, social feeds, speaker chat) unless a linked issue reopens the case
 - Drive-by refactors with no product change
 
-The [governance](GOVERNANCE.md) note is the short version of who decides.
+The [governance](https://centercoopmedia.github.io/eventrunner/docs/governance/) note is the short version of who decides.
 
 ## Dev setup
 
@@ -55,7 +55,7 @@ npm run test:rules   # needs Java 21+ for the Firebase emulators
 
 No `.env` and no cloud credentials are required for any of these — `test:rules` starts local Firestore and Storage emulators against a `demo-*` project id.
 
-`apps/web` has its own vitest suite (`npm run test -w apps/web`) and its own dev loop against the Functions/Firestore/Auth emulators — see [apps/web/README.md](apps/web/README.md) for the full commands, including the Playwright-driven sign-in smoke test (`scripts/dev/login-smoke.mjs`).
+`apps/web` has its own vitest suite (`npm run test -w apps/web`) and its own dev loop against the Functions/Firestore/Auth emulators — see [apps/web/README.md](https://github.com/CenterCoopMedia/eventrunner/blob/main/apps/web/README.md) for the full commands, including the Playwright-driven sign-in smoke test (`scripts/dev/login-smoke.mjs`).
 
 ## How to send a change
 
@@ -88,13 +88,13 @@ Forgot on a commit that is not pushed yet: `git commit --amend -s`. Forgot on se
 
 `ticket_sync_queue` is the only queue in this system, and it is not a precedent. It exists for one reason the code cannot work around: the ticketing provider's own read APIs are eventually consistent, so an order a webhook announces is often not readable yet. It is scoped to `functions/src/ticketing/`, capped at six attempts, and raises an operator alert when it gives up — nothing is ever dropped silently.
 
-Everything else sends, writes, or fails in the request that asked for it. Email in particular has no queue: a managed provider owns retry and pacing (spec §3.1). A pull request that adds a second queue, a scheduled retry collection, a "pending work" document set, or a drain function needs an ADR first — say what makes the work impossible to do inline, and why a provider or a trigger cannot do it. See [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md) §3.3 and §10 question 9.
+Everything else sends, writes, or fails in the request that asked for it. Email in particular has no queue: a managed provider owns retry and pacing (spec §3.1). A pull request that adds a second queue, a scheduled retry collection, a "pending work" document set, or a drain function needs an ADR first — say what makes the work impossible to do inline, and why a provider or a trigger cannot do it. See the [architecture decision record](https://centercoopmedia.github.io/eventrunner/docs/architecture/) §3.3 and §10 question 9.
 
 ### Accessibility
 
 UI changes need a keyboard path and visible focus. If you change a flow that attendees or staff use, say how you checked it (keyboard, zoom, or a screen reader). Do not rely on color alone.
 
-The full interface bar — accessibility, typography, color tokens, motion, and microcopy — is [docs/interface-guidelines.md](docs/interface-guidelines.md). UI pull requests are reviewed against it.
+The full interface bar — accessibility, typography, color tokens, motion, and microcopy — is in the [interface guidelines](https://centercoopmedia.github.io/eventrunner/docs/interface-guidelines/). UI pull requests are reviewed against it.
 
 ## Tests
 
@@ -148,16 +148,16 @@ until that operator update is made.
 
 ## Releases
 
-Tags, `CHANGELOG.md` hygiene, and what a release includes are in [RELEASING.md](RELEASING.md).
+Tags, `CHANGELOG.md` hygiene, and what a release includes are in [Releasing](https://centercoopmedia.github.io/eventrunner/docs/releasing/).
 
 One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 
 ## Security
 
-Do not open a public issue for a vulnerability. Use [private reporting](https://github.com/CenterCoopMedia/eventrunner/security) or see [SECURITY.md](SECURITY.md).
+Do not open a public issue for a vulnerability. Use [private reporting](https://github.com/CenterCoopMedia/eventrunner/security) or see [Security](https://centercoopmedia.github.io/eventrunner/docs/security/).
 
 ## Questions
 
 - Product and "how do I": [Discussions](https://github.com/CenterCoopMedia/eventrunner/discussions)
-- Handbook for attendees, staff, and clients: [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki)
-- Hosted-event support: info@collaborativejournalism.org
+- Handbook for attendees, staff, and clients: [handbook](https://centercoopmedia.github.io/eventrunner/docs/handbook/)
+- Hosted-event support: info@eventrunner.org

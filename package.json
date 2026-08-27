@@ -12,6 +12,8 @@
   "scripts": {
     "build": "npm run build -w apps/web",
     "build:demo": "node scripts/build-demo.cjs",
+    "build:pages": "node scripts/build-pages.cjs --write",
+    "check:pages": "node scripts/build-pages.cjs --check",
     "lint": "eslint .",
     "prepare:functions": "node scripts/prepare-functions.cjs",
     "test": "node --test \"packages/shared/src/**/*.test.cjs\" \"functions/src/**/*.test.cjs\" \"scripts/**/*.test.cjs\"",
@@ -29,6 +31,7 @@
     "firebase": "^12.1.0",
     "firebase-tools": "^14.11.1",
     "globals": "^16.3.0",
+    "marked": "18.0.11",
     "vitest": "^3.2.4"
   },
   "engines": {

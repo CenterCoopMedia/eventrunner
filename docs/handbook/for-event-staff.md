@@ -38,4 +38,4 @@ Your operator chose Eventbrite, a spreadsheet import, or no ticketing. Signup em
 - The site is down
 - You need a new day added after launch and the admin will not let you
 
-info@collaborativejournalism.org
+info@eventrunner.org

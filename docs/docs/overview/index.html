@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eventrunner overview | Eventrunner</title>
+  <meta name="description" content="A white-label event CMS for conferences and gatherings. Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates">
+  <meta name="theme-color" content="#114b8b">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/overview/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/docs/assets/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Eventrunner overview | Eventrunner">
+  <meta property="og:description" content="A white-label event CMS for conferences and gatherings. Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/overview/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/docs/assets/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Eventrunner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Eventrunner overview | Eventrunner">
+  <meta name="twitter:description" content="A white-label event CMS for conferences and gatherings. Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/docs/assets/og-default.png">
+  <meta name="twitter:image:alt" content="Eventrunner documentation">
+  <link rel="stylesheet" href="/eventrunner/docs/assets/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header"><a class="site-name" href="/eventrunner/">Eventrunner</a><nav aria-label="Site"><a href="/eventrunner/docs/">Documentation</a><a href="/eventrunner/demo/">Demo</a><a href="https://github.com/CenterCoopMedia/eventrunner">Repository</a></nav></header>
+  <div class="page-layout">
+    <aside class="section-nav"><nav aria-label="Product documentation"><h2>Product</h2><ul><li><a aria-current="page" href="/eventrunner/docs/overview/">Eventrunner overview</a></li><li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li><li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li><li><a href="/eventrunner/docs/architecture/">Architecture decision record</a></li></ul></nav></aside>
+    <main id="main"><nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/eventrunner/docs/">Documentation</a></li><li>Product</li><li aria-current="page">Eventrunner overview</li></ol></nav><nav class="page-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="toc-level-2"><a href="#who-it-is-for">Who it is for</a></li><li class="toc-level-2"><a href="#what-v1-includes">What v1 includes</a></li><li class="toc-level-2"><a href="#operating-model">Operating model</a></li><li class="toc-level-2"><a href="#repo-layout">Repo layout</a></li><li class="toc-level-2"><a href="#develop">Develop</a></li><li class="toc-level-2"><a href="#license-and-trademark">License and trademark</a></li><li class="toc-level-2"><a href="#security">Security</a></li><li class="toc-level-2"><a href="#support">Support</a></li></ol></nav><article class="document-content"><h1 id="run-of-show">Run of Show</h1>
+<p>A white-label event CMS for conferences and gatherings. Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates it. Client staff run the site from the admin CMS. They never touch the code.</p>
+<p><strong>License:</strong> <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>. The code is free. The trademark is the exclusivity lever: nobody else can market hosting under this name.</p>
+<p><strong>Status:</strong> Public extraction in progress. The <a href="https://centercoopmedia.github.io/eventrunner/docs/architecture/">v1 architecture spec</a> and <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">feature triage</a> are the contract. Work is tracked on the <a href="https://centercoopmedia.github.io/eventrunner/docs/roadmap/">roadmap</a> and the <a href="https://github.com/orgs/CenterCoopMedia/projects/2">project board</a>.</p>
+<p>Site: <a href="https://centercoopmedia.github.io/eventrunner/">centercoopmedia.github.io/eventrunner</a>
+Handbook: <a href="https://centercoopmedia.github.io/eventrunner/docs/handbook/">handbook</a></p>
+<p>A public demo instance and README screenshots are pending the operator&#39;s deploy of that instance
+(see <a href="https://github.com/CenterCoopMedia/eventrunner/issues/35">#35</a>) — this section gets the link
+and images once that deployment exists.</p>
+<h2 id="who-it-is-for">Who it is for</h2>
+<p>Nonprofit and journalism organizations, universities, and event producers who want a staff-run event site: schedule, speakers, registration, materials, and a block-based CMS.</p>
+<p>The reference implementation is the <a href="https://summit.collaborativejournalism.org">2026 Collaborative Journalism Summit</a> site (<code>jamditis/cjs2026</code>). That repo stays the live production event. This repo is a new extract, not a fork. Features cut from v1 stay in the summit repo.</p>
+<h2 id="what-v1-includes">What v1 includes</h2>
+<ul>
+<li>Block-based CMS with draft/publish</li>
+<li>Schedule, sessions, bookmarks, ICS/calendar links</li>
+<li>Speaker invite, accept, profile, and approval</li>
+<li>Attendee directory and profiles</li>
+<li>Sponsors and organizations</li>
+<li>Google sign-in and emailed 6-digit OTP codes</li>
+<li>Session materials with embargo</li>
+<li>Media library</li>
+<li>Eventbrite plus manual/CSV ticketing adapters</li>
+<li>Per-event theming</li>
+<li>Transactional email through a provider adapter (Postmark is the reference)</li>
+</ul>
+<p>What v1 does not include is listed in the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">triage record</a>. Video generation, bulk broadcast email, invoicing, Airtable, social feeds, and speaker chat stay out.</p>
+<h2 id="operating-model">Operating model</h2>
+<p>One Firebase project per client event. Configuration is two tiers:</p>
+<ol>
+<li><strong>Deploy-time</strong> environment variables (project id, providers, public URL). Documented in <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/.env.example"><code>.env.example</code></a>.</li>
+<li><strong>Runtime</strong> Firestore <code>config/*</code> documents that client admins edit: name, dates, venue, theme, badges.</li>
+</ol>
+<p>See spec §2.</p>
+<h2 id="repo-layout">Repo layout</h2>
+<pre><code>apps/web            Vite frontend (not landed yet)
+functions           Cloud Functions by domain module (not landed yet)
+packages/shared     Config schema, lifecycle clock, time, registration, badges
+scripts             Operator tools (not landed yet)
+docs                Spec, roadmap, and the GitHub Pages site
+</code></pre>
+<p><code>packages/shared</code> is CommonJS with hand-written ESM shims so the same module serves Vite and Cloud Functions with no transpile step.</p>
+<h2 id="develop">Develop</h2>
+<p>Node 22+.</p>
+<pre><code class="language-bash">npm test
+</code></pre>
+<p>That runs the shared-package suite on Node&#39;s built-in test runner. No install step and no credentials. The emulator loop (<code>npm run dev:emulators</code>) lands with the web app and functions.</p>
+<p>Rules that apply to every PR:</p>
+<ul>
+<li>No hardcoded event name, city, hex color, or domain. Event identity comes from config.</li>
+<li><code>ticket_sync_queue</code> is the only queue in the system.</li>
+<li>CI must stay credential-free so fork PRs can run every check.</li>
+</ul>
+<p>See <a href="https://centercoopmedia.github.io/eventrunner/docs/contributing/">Contributing</a>.</p>
+<h2 id="license-and-trademark">License and trademark</h2>
+<p>Copyright 2026 Center for Cooperative Media. Licensed under the Apache License, Version 2.0. See <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">LICENSE</a> and <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/NOTICE">NOTICE</a>.</p>
+<p>Apache-2.0 does not grant trademark rights. &quot;Run of Show&quot; as a product name is reserved to the Center for Cooperative Media.</p>
+<h2 id="security">Security</h2>
+<p>Do not open a public issue for a vulnerability. Use <a href="https://github.com/CenterCoopMedia/eventrunner/security">private vulnerability reporting</a> or email <a href="mailto:info@eventrunner.org">info@eventrunner.org</a>. See <a href="https://centercoopmedia.github.io/eventrunner/docs/security/">Security</a>.</p>
+<p>Operator-run client deployments are out of scope for public reports. Email the operator of that deployment.</p>
+<h2 id="support">Support</h2>
+<table>
+<thead>
+<tr>
+<th>You are…</th>
+<th>Start here</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Attendee or event staff with a how-to</td>
+<td><a href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a">Q&amp;A</a></td>
+</tr>
+<tr>
+<td>An organization that wants a hosted event</td>
+<td><a href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general">General</a></td>
+</tr>
+<tr>
+<td>Reporting a product bug</td>
+<td><a href="https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml">Bug form</a></td>
+</tr>
+<tr>
+<td>CCM already hosts your site</td>
+<td><a href="mailto:info@eventrunner.org">info@eventrunner.org</a></td>
+</tr>
+<tr>
+<td>Changing the code</td>
+<td><a href="https://centercoopmedia.github.io/eventrunner/docs/contributing/">Contributing</a></td>
+</tr>
+</tbody></table>
+<p>The <a href="https://centercoopmedia.github.io/eventrunner/docs/handbook/">handbook</a> is for attendees, staff, and clients. <a href="https://centercoopmedia.github.io/eventrunner/docs/governance/">Governance</a> is who decides.</p>
+<p>An initiative of the Center for Cooperative Media at Montclair State University.</p>
+</article><nav class="document-pagination" aria-label="Document navigation"><a rel="next" href="/eventrunner/docs/roadmap/">Roadmap</a></nav></main>
+  </div>
+</body>
+</html>

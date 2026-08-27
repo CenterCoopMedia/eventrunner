@@ -26,4 +26,4 @@ Not up yet. That is [issue 35](https://github.com/CenterCoopMedia/eventrunner/is
 
 ## Who do I talk to about money or a contract?
 
-Email info@collaborativejournalism.org. Do not negotiate that in a public issue.
+Email info@eventrunner.org. Do not negotiate that in a public issue.

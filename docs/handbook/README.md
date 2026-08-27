@@ -16,9 +16,9 @@ This wiki is for **people using a site**, not for people changing the code.
 - Public site: [centercoopmedia.github.io/eventrunner](https://centercoopmedia.github.io/eventrunner/)
 - [FAQ](faq.md)
 - [Glossary](glossary.md)
-- [Roadmap](https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/ROADMAP.md)
+- [Roadmap](https://centercoopmedia.github.io/eventrunner/docs/roadmap/)
 - [Project board](https://github.com/orgs/CenterCoopMedia/projects/2) — titles are technical; the **What this is** column is the plain-language version
 
 ## Contributing code
 
-If you are sending a pull request, start at [CONTRIBUTING.md](https://github.com/CenterCoopMedia/eventrunner/blob/main/CONTRIBUTING.md). The short version of who decides is [GOVERNANCE.md](https://github.com/CenterCoopMedia/eventrunner/blob/main/GOVERNANCE.md).
+If you are sending a pull request, start at [Contributing](https://centercoopmedia.github.io/eventrunner/docs/contributing/). The short version of who decides is [Governance](https://centercoopmedia.github.io/eventrunner/docs/governance/).

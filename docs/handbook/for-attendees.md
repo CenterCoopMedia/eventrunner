@@ -25,4 +25,4 @@ Your public profile is the slice other attendees can see. The rest stays on your
 1. Confirm you are on the event's real site (the URL the organizer published).
 2. Try a second browser or a private window — leftover sign-in state causes a lot of "it won't load" reports.
 3. Ask in [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a). Say you are an attendee.
-4. If CCM runs the event, you can also email info@collaborativejournalism.org.
+4. If CCM runs the event, you can also email info@eventrunner.org.

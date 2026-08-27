@@ -11,7 +11,7 @@ Use the smallest door that fits. Public posts should not include ticket IDs, oth
 | "I wish the product did…" | [Ideas](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=ideas) |
 | "Our event is running on this" | [Show and tell](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=show-and-tell) |
 | The shared product is wrong | [Bug form](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml) |
-| CCM already hosts you, and you need access or a content fix | info@collaborativejournalism.org |
+| CCM already hosts you, and you need access or a content fix | info@eventrunner.org |
 | A security problem in the code | [Private report](https://github.com/CenterCoopMedia/eventrunner/security/advisories/new) |
 
 ## Discussions vs issues
@@ -27,4 +27,4 @@ Use the smallest door that fits. Public posts should not include ticket IDs, oth
 - Screenshots of an admin screen that show personal data
 - Private sender-domain or billing details
 
-Email those to info@collaborativejournalism.org if CCM is your operator.
+Email those to info@eventrunner.org if CCM is your operator.

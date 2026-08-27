@@ -1,5 +1,5 @@
 name: Docs
-description: Something in the README, wiki, or contributor guide is wrong or missing.
+description: Something in the README, handbook, or contributor guide is wrong or missing.
 title: "[Docs] "
 labels: ["type:docs"]
 type: Task
@@ -7,13 +7,13 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this for the [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki) and contributor docs. How-to questions still belong in [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a).
+        Use this for the [handbook](https://centercoopmedia.github.io/eventrunner/docs/handbook/) and contributor docs. How-to questions still belong in [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a).
   - type: dropdown
     id: surface
     attributes:
       label: Where
       options:
-        - Wiki (attendee / staff / client handbook)
+        - Handbook (attendee / staff / client handbook)
         - README
         - CONTRIBUTING or GOVERNANCE
         - SECURITY or SUPPORT
@@ -38,5 +38,5 @@ body:
     attributes:
       label: Before you submit
       options:
-        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to the [Code of Conduct](https://centercoopmedia.github.io/eventrunner/docs/code-of-conduct/).
           required: true

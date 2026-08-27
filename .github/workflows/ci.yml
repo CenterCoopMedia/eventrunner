@@ -95,20 +95,27 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
-    # This tier intentionally uses only the runner's Node installation. It
-    # checks local links and generated Pages HTML without an npm install.
+    # The documentation generator uses the exact checked-in Marked version.
+    # Its workspace lockfile requires the shared package tarball first, so the
+    # install stays confined to this focused documentation tier.
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install documentation dependencies
+        run: npm ci
       - name: Check documentation links and Pages markup
         run: node scripts/check-docs.cjs
       - name: Run documentation checker tests
         run: node --test scripts/check-docs.test.cjs
       - name: Run focused documentation generator tests
-        run: |
-          if [ -f scripts/build-pages.cjs ]; then
-            test -f scripts/build-pages.test.cjs
-            node --test scripts/build-pages.test.cjs
-          fi
+        run: node --test scripts/build-pages.test.cjs
+      - name: Check generated documentation freshness
+        run: node scripts/build-pages.cjs --check
 
   lint:
     name: Lint

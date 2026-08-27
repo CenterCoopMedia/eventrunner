@@ -5,7 +5,7 @@ body:
       value: |
         Use this if you want the Center for Cooperative Media to run an event site for you, or you have a question about licensing.
 
-        The code is Apache-2.0. CCM sells the operated service. If CCM already hosts your event and you need day-to-day support, email info@collaborativejournalism.org instead.
+        The code is Apache-2.0. CCM sells the operated service. If CCM already hosts your event and you need day-to-day support, email info@eventrunner.org instead.
   - type: dropdown
     id: org
     attributes:
@@ -36,5 +36,5 @@ body:
     attributes:
       label: Before you post
       options:
-        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to the [Code of Conduct](https://centercoopmedia.github.io/eventrunner/docs/code-of-conduct/).
           required: true

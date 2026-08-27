@@ -14,7 +14,7 @@ Pick, once:
 
 - `<GCP_PROJECT_ID>` — the Firebase/GCP project for this client (create it first —
   §2 below covers Firebase-specific prerequisites).
-- `<GH_ORG>/<GH_REPO>` — this repository, e.g. `your-org/run-of-show`.
+- `<GH_ORG>/<GH_REPO>` — this repository, e.g. `your-org/your-repository`.
 - `<CLIENT_ENV>` — the GitHub Environment name for this client, e.g. `cjs2027`. This is the
   value operators pass as `client` to `workflow_dispatch`, and it must exactly match the
   `AUTO_DEPLOY_ENVIRONMENTS` entry if this client also auto-deploys on push (§4).

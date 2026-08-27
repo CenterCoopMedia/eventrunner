@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roadmap | Eventrunner</title>
+  <meta name="description" content="v1 is five phases. The architecture spec and triage record are the contract. Issues in this repo are the queue.">
+  <meta name="theme-color" content="#114b8b">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/roadmap/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/docs/assets/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Roadmap | Eventrunner">
+  <meta property="og:description" content="v1 is five phases. The architecture spec and triage record are the contract. Issues in this repo are the queue.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/roadmap/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/docs/assets/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Eventrunner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Roadmap | Eventrunner">
+  <meta name="twitter:description" content="v1 is five phases. The architecture spec and triage record are the contract. Issues in this repo are the queue.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/docs/assets/og-default.png">
+  <meta name="twitter:image:alt" content="Eventrunner documentation">
+  <link rel="stylesheet" href="/eventrunner/docs/assets/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header"><a class="site-name" href="/eventrunner/">Eventrunner</a><nav aria-label="Site"><a href="/eventrunner/docs/">Documentation</a><a href="/eventrunner/demo/">Demo</a><a href="https://github.com/CenterCoopMedia/eventrunner">Repository</a></nav></header>
+  <div class="page-layout">
+    <aside class="section-nav"><nav aria-label="Product documentation"><h2>Product</h2><ul><li><a href="/eventrunner/docs/overview/">Eventrunner overview</a></li><li><a aria-current="page" href="/eventrunner/docs/roadmap/">Roadmap</a></li><li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li><li><a href="/eventrunner/docs/architecture/">Architecture decision record</a></li></ul></nav></aside>
+    <main id="main"><nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/eventrunner/docs/">Documentation</a></li><li>Product</li><li aria-current="page">Roadmap</li></ol></nav><nav class="page-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="toc-level-2"><a href="#m1-prerequisites-and-repo-bootstrap-effectively-complete">M1: Prerequisites and repo bootstrap — effectively complete</a></li><li class="toc-level-2"><a href="#m2-scaffold-and-core-port-complete">M2: Scaffold and core port — complete</a></li><li class="toc-level-2"><a href="#m3-feature-port-wave-complete">M3: Feature port wave — complete</a></li><li class="toc-level-2"><a href="#m4-ticketing-adapter-complete">M4: Ticketing adapter — complete</a></li><li class="toc-level-2"><a href="#m5-packaging-and-transfer-in-progress-77">M5: Packaging and transfer — in progress (77%)</a></li><li class="toc-level-2"><a href="#after-v1">After v1</a></li></ol></nav><article class="document-content"><h1 id="roadmap">Roadmap</h1>
+<p>v1 is five phases. The architecture spec and triage record are the contract. Issues in this repo are the queue.</p>
+<h2 id="m1-prerequisites-and-repo-bootstrap-effectively-complete">M1: Prerequisites and repo bootstrap — effectively complete</h2>
+<p>Legal and operator setup that gated the public repo. Two residual operator tasks are closing today.</p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Copyright holder and LICENSE grantor: Center for Cooperative Media</li>
+<li><input checked="" disabled="" type="checkbox"> CCM GitHub organization with operator admin</li>
+<li><input checked="" disabled="" type="checkbox"> Trademark screen and domain acquisition for the working name</li>
+<li><input checked="" disabled="" type="checkbox"> Postmark account (one account, per-client message streams)</li>
+<li><input checked="" disabled="" type="checkbox"> Workspaces layout, day-one legal files, credential-free CI</li>
+</ul>
+<h2 id="m2-scaffold-and-core-port-complete">M2: Scaffold and core port — complete</h2>
+<p>A fresh Firebase project boots to a working generic event site, including event-neutral emailed-code login.</p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Event configuration layer (deploy-time env + runtime <code>config/*</code>)</li>
+<li><input checked="" disabled="" type="checkbox"> Shared workspace package with functions vendor packing</li>
+<li><input checked="" disabled="" type="checkbox"> Email core and adapters (Postmark, webhook, console)</li>
+<li><input checked="" disabled="" type="checkbox"> Operator notifier and telemetry</li>
+<li><input checked="" disabled="" type="checkbox"> OTP authentication with tokenized templates</li>
+<li><input checked="" disabled="" type="checkbox"> CMS content with two-revision draft/publish</li>
+<li><input checked="" disabled="" type="checkbox"> Pages-as-data</li>
+<li><input checked="" disabled="" type="checkbox"> Admin config mutation endpoints</li>
+<li><input checked="" disabled="" type="checkbox"> Theming</li>
+<li><input checked="" disabled="" type="checkbox"> Schedule and bookmarks</li>
+<li><input checked="" disabled="" type="checkbox"> Attendee profiles</li>
+<li><input checked="" disabled="" type="checkbox"> <code>init-event</code> bootstrap</li>
+<li><input checked="" disabled="" type="checkbox"> Credential-free CI and per-client deploy matrix</li>
+</ul>
+<h2 id="m3-feature-port-wave-complete">M3: Feature port wave — complete</h2>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Speaker canonical store and invite pipeline</li>
+<li><input checked="" disabled="" type="checkbox"> Speaker profile wizard and public pages</li>
+<li><input checked="" disabled="" type="checkbox"> Session materials (two collections, embargo)</li>
+<li><input checked="" disabled="" type="checkbox"> Media library with Storage rules hardening</li>
+<li><input checked="" disabled="" type="checkbox"> Session reactions</li>
+<li><input checked="" disabled="" type="checkbox"> Badges from per-event config</li>
+<li><input checked="" disabled="" type="checkbox"> Schedule PDF and <code>updatesMeta</code> SSR</li>
+<li><input checked="" disabled="" type="checkbox"> Live-updates admin form and feedback inbox</li>
+</ul>
+<h2 id="m4-ticketing-adapter-complete">M4: Ticketing adapter — complete</h2>
+<p>Last, because everything else has to be stable first.</p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> TicketingProvider core (tickets collection, webhook dedup, sync queue)</li>
+<li><input checked="" disabled="" type="checkbox"> Eventbrite adapter</li>
+<li><input checked="" disabled="" type="checkbox"> Manual/CSV adapter</li>
+<li><input checked="" disabled="" type="checkbox"> Registration state machine</li>
+<li><input checked="" disabled="" type="checkbox"> Provider-owned registration prompts and ticket templates</li>
+</ul>
+<h2 id="m5-packaging-and-transfer-in-progress-77">M5: Packaging and transfer — in progress (~77%)</h2>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Operator documentation (deploy runbook, client onboarding, admin guide)</li>
+<li><input disabled="" type="checkbox"> Public demo instance with synthetic event (#35)</li>
+<li><input checked="" disabled="" type="checkbox"> Cloud Run site-publisher</li>
+<li><input checked="" disabled="" type="checkbox"> Community scaffolding completion</li>
+<li><input checked="" disabled="" type="checkbox"> E2E suite on emulators in CI</li>
+<li><input checked="" disabled="" type="checkbox"> First public push and issue migration (this repository)</li>
+<li><input disabled="" type="checkbox"> Eventbrite sandbox verification (#79)</li>
+</ul>
+<h2 id="after-v1">After v1</h2>
+<ul>
+<li>Simple announcements email on the provider abstraction</li>
+<li>More ticketing adapters</li>
+<li>Social layer or speaker chat only if a client pays for them</li>
+<li>Multi-tenant single-deployment architecture only if deploy-per-client stops scaling</li>
+</ul>
+<p>See <a href="/eventrunner/docs/architecture/">docs/adr/0001-event-platform-v1.md</a> and docs/plans/2026-08-16-event-platform-v1-triage.md.</p>
+</article><nav class="document-pagination" aria-label="Document navigation"><a rel="prev" href="/eventrunner/docs/overview/">Eventrunner overview</a><a rel="next" href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></nav></main>
+  </div>
+</body>
+</html>

@@ -15,8 +15,8 @@ Run of Show is a public Apache-2.0 project operated by the Center for Cooperativ
 | Something in the shared code is wrong | [Issue](https://github.com/CenterCoopMedia/eventrunner/issues/new/choose) using the bug form |
 | A change to the platform | Issue using the feature form, then a PR linked to it |
 | "How do I…?" on a live event site | [Discussions](https://github.com/CenterCoopMedia/eventrunner/discussions) (Q&A) |
-| "We want CCM to run our event" | Discussions (General) or email info@collaborativejournalism.org |
-| A hosted site CCM operates for you is broken | Email info@collaborativejournalism.org — not a public issue |
+| "We want CCM to run our event" | Discussions (General) or email info@eventrunner.org |
+| A hosted site CCM operates for you is broken | Email info@eventrunner.org — not a public issue |
 | A security problem in this repo | [Private vulnerability reporting](https://github.com/CenterCoopMedia/eventrunner/security) |
 
 ## Review

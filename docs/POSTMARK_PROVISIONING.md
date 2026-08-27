@@ -15,9 +15,9 @@ Decided model (`docs/adr/0001-event-platform-v1.md` §3.1, Q3): **one CCM-owned 
 not one account per client. Sender domains are verified per client. The API key that
 `EMAIL_PROVIDER_API_KEY` holds is per **deployment environment**, never shared across clients.
 
-**CCM's own domain, `runofshow.net`, is the first (dev/demo) deployment this runbook stands up** —
-sender address `events@runofshow.net` — so §2–6 below use it as the worked example throughout, with
-its actual DNS steps (CCM's DNS is in Cloudflare). A real client's sender domain and DNS host will
+**CCM's own domain, `eventrunner.org`, is the first deployment this runbook stands up** — sender
+address `info@eventrunner.org` — so §2–6 below use it as the worked example throughout, with its
+actual DNS steps (CCM's DNS is in Cloudflare). A real client's sender domain and DNS host will
 differ; where that matters, the step says so and gives the general form alongside the concrete one.
 
 **Account creation itself is manual operator work and is out of scope here** — it is split into a
@@ -48,7 +48,8 @@ that actually carries a distinct token, so provisioning happens at the Server le
 Manual, done once, ahead of the first client. Split into a follow-up issue — see the note at the
 end. Roughly:
 
-1. Sign up for the Postmark account under an org-owned CCM email (not a personal address).
+1. Sign up for the Postmark account under a work-controlled organizational address, not a personal
+   address.
 2. Note the account's Account Token (Account → API Tokens) — this is `EMAIL_ACCOUNT_API_KEY`,
    shared across every client deployment (it is account-scoped by design; there is only one).
    It stays in operator-controlled storage only (§3) — no deployed function binds it, so it never
@@ -61,10 +62,9 @@ end. Roughly:
 
 1. Postmark → **Servers** → **Add server**. Name it after the deployment
    (`<EVENT_SLUG>` from `.env.example`) so the server list stays legible as deployments accumulate.
-   For the first, dev/demo deployment this section provisions: name it `runofshow-dev` (or
-   whatever `EVENT_SLUG` that environment actually uses — check `.env.example`/the environment's
-   GitHub Environment variables rather than assuming).
-2. Server type: **Live**, not the default demo/test server — even for the dev deployment, so its
+   For the Eventrunner deployment, name it `Event Runner`. For a client deployment, use the name
+   assigned to that deployment rather than reusing `Event Runner`.
+2. Server type: **Live**, not the default demo/test server, so its
    sending behavior (rate limits, bounce handling) matches what a real client server will do.
 3. Open the new Server → **API Tokens** tab → copy the Server Token. This is
    `EMAIL_PROVIDER_API_KEY` for this deployment's environment.
@@ -110,7 +110,7 @@ is **not** a deployment secret — no deployed function binds it via `defineSecr
 in either list). Its only consumer is the operator-run `scripts/verify-sender-domain.cjs`. Keep it
 in operator-controlled storage (the team password manager, or wherever this account's other
 credentials already live) and inject it only as a local environment variable when running that
-script (§4c) — do **not** create it as a GitHub Environment secret, do **not** mirror it into a
+script (§4d) — do **not** create it as a GitHub Environment secret, do **not** mirror it into a
 client's Secret Manager, and do **not** grant any runtime service account access to it. It is the
 one account-scoped credential shared across every client deployment, which is exactly why it does
 not belong inside a per-client project's trust boundary: granting a client's runtime SA access to
@@ -119,12 +119,12 @@ what any of them need.
 
 Without `EMAIL_ACCOUNT_API_KEY` set when the script runs, `verifySenderDomain()` reports every
 check `unknown` rather than failing, so a missing key reads as "can't tell" in
-`scripts/verify-sender-domain.cjs`'s output, not as an error. Have it ready before §4c.
+`scripts/verify-sender-domain.cjs`'s output, not as an error. Have it ready before §4d.
 
 ## 4. Verify the sender domain
 
 This is `docs/CLIENT_ONBOARDING.md` §3 item 4, reproduced here with the Postmark-side and (for
-`runofshow.net`) Cloudflare-side detail. General shape: get whoever controls DNS for the sender
+`eventrunner.org`) Cloudflare-side detail. General shape: get whoever controls DNS for the sender
 domain to publish two Postmark-issued records plus one DMARC policy; Postmark shows the exact
 values once the domain is added to the Server. **Do not invent the record values below** — they are
 per-account and Postmark generates them when you add the domain; treat the ones shown here as
@@ -133,28 +133,26 @@ illustrative of the *shape*, and copy the real values from Postmark's UI.
 ### 4a. Add the domain in Postmark
 
 Client's Server → **Sender Signatures** (or the Server's **Domains** tab) → **Add Domain** →
-enter the sender domain (`runofshow.net` for the dev/demo deployment; a real client's own domain
-otherwise — never a `*.runofshow.net` subdomain unless that client specifically doesn't have their
-own). Postmark then displays:
+enter the sender domain (`eventrunner.org` for the Eventrunner deployment; a real client's own
+domain otherwise). Postmark then displays:
 
-- a **DKIM** TXT record: host something like `pm._domainkey.runofshow.net`, value a long
-  `k=rsa; p=...` string,
-- a **Return-Path** CNAME: host something like `pm-bounces.runofshow.net`, value something like
-  `pm.mtasv.net`.
+- a **DKIM** TXT record: host `<selector>._domainkey.eventrunner.org`, where `<selector>` is the
+  value Postmark shows, and a long `k=rsa; p=...` value,
+- a **Return-Path** CNAME: host `pm-bounces.eventrunner.org`, with the target Postmark shows.
 
 Copy both exactly as shown — Postmark's UI is the source of truth for the actual host/value pair,
 not this document.
 
-### 4b. Publish the records — Cloudflare (runofshow.net)
+### 4b. Publish the records — Cloudflare (eventrunner.org)
 
-CCM's DNS for `runofshow.net` is managed in Cloudflare. In the Cloudflare dashboard for the zone →
+CCM's DNS for `eventrunner.org` is managed in Cloudflare. In the Cloudflare dashboard for the zone →
 **DNS** → **Records** → **Add record**, twice:
 
 | Field | DKIM record | Return-Path record |
 |---|---|---|
 | Type | `TXT` | `CNAME` |
-| Name | the host Postmark gave (e.g. `pm._domainkey`) — Cloudflare appends the zone automatically, so enter just the subdomain part, not the full `....runofshow.net` | the host Postmark gave (e.g. `pm-bounces`) |
-| Content / Target | the `p=...` value Postmark gave, exactly, quotes and all if Cloudflare's editor asks for a quoted TXT | the target Postmark gave (e.g. `pm.mtasv.net`) |
+| Name | the `<selector>._domainkey` host Postmark gave — Cloudflare appends the zone automatically, so enter just the subdomain part, not the full domain | `pm-bounces` |
+| Content / Target | the `p=...` value Postmark gave, exactly, quotes and all if Cloudflare's editor asks for a quoted TXT | the target Postmark gave |
 | Proxy status | n/a (TXT records aren't proxied) | **must be "DNS only" (grey cloud), not "Proxied" (orange cloud)** |
 | TTL | Auto | Auto |
 
@@ -170,15 +168,29 @@ Then, separately, publish DMARC — not a Postmark record, the domain owner's ow
 |---|---|
 | Type | `TXT` |
 | Name | `_dmarc` |
-| Content | `v=DMARC1; p=none; rua=mailto:events@runofshow.net` for a first pass (a `p=none` "report only" policy — tighten to `quarantine`/`reject` later once DMARC reports look clean; a real client's `rua` address is theirs, not CCM's) |
+| Content | `v=DMARC1; p=none; rua=mailto:info@eventrunner.org` |
 | Proxy status | n/a |
 
-For a real client, replace "Cloudflare dashboard for `runofshow.net`" above with wherever *their*
+This is Eventrunner's report-only policy. A real client's `rua` address is theirs, not CCM's.
+
+For a real client, replace "Cloudflare dashboard for `eventrunner.org`" above with wherever *their*
 DNS is hosted — the record shapes (TXT for DKIM and DMARC, CNAME for Return-Path, CNAME never
 proxied through anything that isn't plain DNS) are the same regardless of host; only the UI for
 adding them differs.
 
-### 4c. Confirm with the script
+For Eventrunner, Postmark has verified the DKIM and Return-Path records. The root SPF record
+includes Cloudflare Email Routing, and the DMARC policy above is active. Keep those inbound-routing
+records separate from the Postmark records in this section.
+
+### 4c. Route incoming email with Cloudflare
+
+Cloudflare Email Routing handles inbound mail for `info@eventrunner.org`. The operator configured
+that address to forward to an approved work-controlled destination. This routing rule is separate
+from Postmark: it does not authenticate outbound messages or replace Postmark's DKIM and Return-Path records.
+Manage the inbound routing configuration in Cloudflare; do not treat it as proof that outbound
+Postmark delivery is configured.
+
+### 4d. Confirm with the script
 
 From an operator (or provisioning-agent) machine, with this deployment's `EMAIL_PROVIDER_API_KEY`
 loaded and the account token from operator storage (§3) — not from the client's GitHub Environment
@@ -189,11 +201,11 @@ EVENT_EMAIL_PROVIDER=postmark \
 EMAIL_PROVIDER_API_KEY=<server token from §2.3> \
 EMAIL_ACCOUNT_API_KEY=<account token from §1.2, operator storage> \
 EVENT_FIREBASE_PROJECT_ID=<GCP_PROJECT_ID for this deployment> \
-  node scripts/verify-sender-domain.cjs --domain runofshow.net
+  node scripts/verify-sender-domain.cjs --domain eventrunner.org
 ```
 
 (Omit `--domain` once `config/event.sender.email` is seeded — e.g. after `init-event.cjs` has run
-with `events@runofshow.net` as the sender address — and the script reads the domain from there
+with `info@eventrunner.org` as the sender address — and the script reads the domain from there
 instead.)
 
 On a pass this is the only writer of `config/event.sender.domainVerified` / `domainVerifiedAt` —
@@ -212,10 +224,8 @@ HTTP Basic credentials embedded in the webhook URL itself, checked against
 1. Generate a random `user:pass` pair for this deployment — never reused across deployments
    (rotating it means re-registering the URL below). For example:
 
-   ```sh
-   printf 'runofshow-dev:%s\n' "$(openssl rand -hex 20)"
-   # → runofshow-dev:9f2c...   (use the whole "user:pass" string as EMAIL_WEBHOOK_BASIC_AUTH)
-   ```
+   Generate and store distinct `<webhook-user>:<webhook-password>` credentials in
+   operator-controlled storage. Do not reuse them for another deployment.
 
 2. Store it as the `EMAIL_WEBHOOK_BASIC_AUTH` GitHub Environment secret for `<CLIENT_ENV>`
    (`docs/DEPLOY_RUNBOOK.md` §3), then in Secret Manager the same way as step 3 above.
@@ -229,13 +239,11 @@ HTTP Basic credentials embedded in the webhook URL itself, checked against
    webhook:
 
    ```
-   https://<user>:<pass>@<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook
+   https://<webhook-user>:<webhook-password>@<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook
    ```
 
-   For the `runofshow-dev` example: `https://runofshow-dev:9f2c...@us-central1-<GCP_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook`,
-   using the region and project id that deployment's GitHub Environment variables actually name
-   (`EVENT_FIREBASE_REGION`, `EVENT_FIREBASE_PROJECT_ID`) — copy those from the environment rather
-   than guessing.
+   Use the region and project id that deployment's GitHub Environment variables actually name
+   (`EVENT_FIREBASE_REGION`, `EVENT_FIREBASE_PROJECT_ID`) rather than guessing.
 
    Enable the **Delivery**, **Bounce**, and **SpamComplaint** triggers only. Leave **Open**, **Click**,
    and **SubscriptionChange** off: `parseDeliveryEvent()` in `functions/src/email/providers/
@@ -259,10 +267,10 @@ Before calling a deployment's Postmark setup done:
       **not** a GitHub Environment secret or Secret Manager entry on this (or any) client project,
       since no deployed function binds it.
 - [ ] `node scripts/verify-sender-domain.cjs` exits `0` for this deployment's sender domain
-      (`runofshow.net` for the dev/demo deployment) — not just "unknown"; unknown means one of the
+      (`eventrunner.org` for the Eventrunner deployment) — not just "unknown"; unknown means one of the
       two keys above is missing or wrong, not that the domain is fine.
 - [ ] The DKIM TXT and Return-Path CNAME are visible in the DNS host (Cloudflare, for
-      `runofshow.net`) exactly as Postmark's UI showed them, and the Return-Path CNAME's proxy
+      `eventrunner.org`) exactly as Postmark's UI showed them, and the Return-Path CNAME's proxy
       status is "DNS only" (grey cloud), not "Proxied".
 - [ ] `EMAIL_WEBHOOK_BASIC_AUTH` is set (GitHub Environment secret + Secret Manager) and the
       matching `user:pass` is embedded in the webhook URL registered in Postmark, on the Delivery,

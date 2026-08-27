@@ -7,7 +7,7 @@ body:
         Use this when you are **using** an event site and cannot finish a task.
 
         - The shared product is wrong: [open a bug](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml)
-        - CCM hosts your event and you need access or a content change: email info@collaborativejournalism.org
+        - CCM hosts your event and you need access or a content change: email info@eventrunner.org
         - Do not post ticket numbers, full emails, or other people's names.
   - type: dropdown
     id: role
@@ -53,5 +53,5 @@ body:
       options:
         - label: This post does not include real emails, ticket IDs, or other people's personal data.
           required: true
-        - label: I agree to the [Code of Conduct](https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to the [Code of Conduct](https://centercoopmedia.github.io/eventrunner/docs/code-of-conduct/).
           required: true

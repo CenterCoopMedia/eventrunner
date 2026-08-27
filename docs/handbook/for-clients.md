@@ -28,4 +28,4 @@ What v1 does not include is in the [triage record](https://github.com/CenterCoop
 
 ## How to start
 
-Open a [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) thread or email info@collaborativejournalism.org. Do not send an attendee list to GitHub.
+Open a [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) thread or email info@eventrunner.org. Do not send an attendee list to GitHub.

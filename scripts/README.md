@@ -178,6 +178,29 @@ never sets the flag, so every one of those branches compiles away — `deploy-cl
 deploy-time export of a real client (§8.6). `--out` is refused outside the repository, because the
 destination is deleted before the copy. The script commits nothing.
 
+### `build-pages.cjs`
+
+Builds the GitHub Pages documentation from the repository Markdown sources. The explicit manifest
+in `scripts/build-pages.cjs` is the public documentation index; Markdown remains authoritative and
+the generated presentation tree is committed under `docs/docs/`. The generator preserves
+`docs/.nojekyll`, does not use Jekyll, and does not edit the public landing page or `docs/demo/`.
+
+```sh
+npm run build:pages                 # render docs/docs/ from the manifest
+npm run check:pages                 # fail when docs/docs/ is stale or incomplete
+node scripts/build-pages.cjs --write
+node scripts/build-pages.cjs --check
+```
+
+Run `npm run build:pages` after changing an included Markdown source, the manifest, or the shared
+documentation renderer. Commit the resulting `docs/docs/` files with the source change, then run
+`npm run check:pages`. Do not hand-edit generated files. The asset bundle copies the checked-in
+Source Sans 3 font into `docs/docs/assets/`; it makes no font CDN request. Raw HTML and unsafe URL
+schemes in Markdown are not emitted as executable links or markup.
+
+`scripts/assets/documentation-og.png` is the checked-in 1200 by 630 PNG with the Eventrunner mark
+and wordmark. The generator copies it byte-for-byte to `docs/docs/assets/og-default.png`.
+
 ### `verify-sender-domain.cjs`
 
 Wraps the configured EmailProvider's `verifySenderDomain()` as the onboarding checklist command

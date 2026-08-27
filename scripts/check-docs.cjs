@@ -30,7 +30,7 @@ const BASE_PAGE_METADATA = [
   ['language', /<html\b[^>]*\blang=['"][^'"]+['"]/i],
   ['viewport', /<meta\b[^>]*name=['"]viewport['"]/i],
   ['title', /<title>[^<]+<\/title>/i],
-  ['description', /<meta\b[^>]*name=['"]description['"]/i],
+  ['description', /<meta\b(?=[^>]*\bname=['"]description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['favicon', /<link\b(?=[^>]*\brel=['"]icon['"])(?=[^>]*\btype=['"]image\/svg\+xml['"])(?=[^>]*\bhref=['"][^'"]+\.svg(?:[?#][^'"]*)?['"])[^>]*>/i],
 ];
 
@@ -41,10 +41,31 @@ const GENERATED_PAGE_METADATA = [
   ['og:type', /<meta\b(?=[^>]*\bproperty=['"]og:type['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['og:url', /<meta\b(?=[^>]*\bproperty=['"]og:url['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['og:image', /<meta\b(?=[^>]*\bproperty=['"]og:image['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['og:image:alt', /<meta\b(?=[^>]*\bproperty=['"]og:image:alt['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['twitter:card', /<meta\b(?=[^>]*\bname=['"]twitter:card['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['twitter:title', /<meta\b(?=[^>]*\bname=['"]twitter:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['twitter:description', /<meta\b(?=[^>]*\bname=['"]twitter:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['twitter:image', /<meta\b(?=[^>]*\bname=['"]twitter:image['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:image:alt', /<meta\b(?=[^>]*\bname=['"]twitter:image:alt['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+];
+
+const LANDING_PAGE_METADATA = [
+  ['canonical', /<link\b(?=[^>]*\brel=['"]canonical['"])(?=[^>]*\bhref=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/['"])[^>]*>/i],
+  ['og:title', /<meta\b(?=[^>]*\bproperty=['"]og:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['og:description', /<meta\b(?=[^>]*\bproperty=['"]og:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['og:type', /<meta\b(?=[^>]*\bproperty=['"]og:type['"])(?=[^>]*\bcontent=['"]website['"])[^>]*>/i],
+  ['og:url', /<meta\b(?=[^>]*\bproperty=['"]og:url['"])(?=[^>]*\bcontent=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/['"])[^>]*>/i],
+  ['og:image', /<meta\b(?=[^>]*\bproperty=['"]og:image['"])(?=[^>]*\bcontent=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/docs\/assets\/og-default\.png['"])[^>]*>/i],
+  ['og:image:type', /<meta\b(?=[^>]*\bproperty=['"]og:image:type['"])(?=[^>]*\bcontent=['"]image\/png['"])[^>]*>/i],
+  ['og:image:width', /<meta\b(?=[^>]*\bproperty=['"]og:image:width['"])(?=[^>]*\bcontent=['"]1200['"])[^>]*>/i],
+  ['og:image:height', /<meta\b(?=[^>]*\bproperty=['"]og:image:height['"])(?=[^>]*\bcontent=['"]630['"])[^>]*>/i],
+  ['og:image:alt', /<meta\b(?=[^>]*\bproperty=['"]og:image:alt['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:card', /<meta\b(?=[^>]*\bname=['"]twitter:card['"])(?=[^>]*\bcontent=['"]summary_large_image['"])[^>]*>/i],
+  ['twitter:title', /<meta\b(?=[^>]*\bname=['"]twitter:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:description', /<meta\b(?=[^>]*\bname=['"]twitter:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:image', /<meta\b(?=[^>]*\bname=['"]twitter:image['"])(?=[^>]*\bcontent=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/docs\/assets\/og-default\.png['"])[^>]*>/i],
+  ['twitter:image:alt', /<meta\b(?=[^>]*\bname=['"]twitter:image:alt['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['documentation entry point', /<a\b[^>]*\bhref=['"]\/eventrunner\/docs\/['"][^>]*>/i],
 ];
 
 function listFiles(root, predicate, relativeRoot = root) {
@@ -175,6 +196,7 @@ function checkPages(root) {
   });
   const text = fs.readFileSync(pagePath, 'utf8');
   const errors = BASE_PAGE_METADATA
+    .concat(LANDING_PAGE_METADATA)
     .filter(([, expression]) => !expression.test(text))
     .map(([name]) => `docs/index.html: missing ${name}`);
   for (const relativePath of pagePaths) {

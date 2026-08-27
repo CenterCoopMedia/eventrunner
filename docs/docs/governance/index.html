@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Governance | Eventrunner</title>
+  <meta name="description" content="Run of Show is a public Apache-2.0 project operated by the Center for Cooperative Media at Montclair State University.">
+  <meta name="theme-color" content="#114b8b">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/governance/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/docs/assets/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Governance | Eventrunner">
+  <meta property="og:description" content="Run of Show is a public Apache-2.0 project operated by the Center for Cooperative Media at Montclair State University.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/governance/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/docs/assets/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Eventrunner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Governance | Eventrunner">
+  <meta name="twitter:description" content="Run of Show is a public Apache-2.0 project operated by the Center for Cooperative Media at Montclair State University.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/docs/assets/og-default.png">
+  <meta name="twitter:image:alt" content="Eventrunner documentation">
+  <link rel="stylesheet" href="/eventrunner/docs/assets/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header"><a class="site-name" href="/eventrunner/">Eventrunner</a><nav aria-label="Site"><a href="/eventrunner/docs/">Documentation</a><a href="/eventrunner/demo/">Demo</a><a href="https://github.com/CenterCoopMedia/eventrunner">Repository</a></nav></header>
+  <div class="page-layout">
+    <aside class="section-nav"><nav aria-label="Project documentation"><h2>Project</h2><ul><li><a href="/eventrunner/docs/contributing/">Contributing</a></li><li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li><li><a aria-current="page" href="/eventrunner/docs/governance/">Governance</a></li><li><a href="/eventrunner/docs/support/">Support</a></li><li><a href="/eventrunner/docs/security/">Security</a></li><li><a href="/eventrunner/docs/releasing/">Releasing</a></li><li><a href="/eventrunner/docs/changelog/">Changelog</a></li></ul></nav></aside>
+    <main id="main"><nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/eventrunner/docs/">Documentation</a></li><li>Project</li><li aria-current="page">Governance</li></ol></nav><nav class="page-toc" aria-label="On this page"><h2>On this page</h2><ol><li class="toc-level-2"><a href="#who-decides">Who decides</a></li><li class="toc-level-2"><a href="#what-belongs-where">What belongs where</a></li><li class="toc-level-2"><a href="#review">Review</a></li><li class="toc-level-2"><a href="#releases">Releases</a></li></ol></nav><article class="document-content"><h1 id="governance">Governance</h1>
+<p>Run of Show is a public Apache-2.0 project operated by the Center for Cooperative Media at Montclair State University.</p>
+<h2 id="who-decides">Who decides</h2>
+<ul>
+<li><strong>Product and license:</strong> CCM. The working name and mark stay with CCM even though the code is Apache-2.0.</li>
+<li><strong>Operator:</strong> the person running deployments and GitHub admin (currently Joe Amditis). Releases, branch protection, and environment secrets live here so they do not depend on a third-party account.</li>
+<li><strong>Architecture:</strong> the <a href="/eventrunner/docs/architecture/">v1 spec</a> and triage record are the contract. Changes to those decisions land as a new ADR, not a drive-by PR.</li>
+</ul>
+<h2 id="what-belongs-where">What belongs where</h2>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Where it goes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Something in the shared code is wrong</td>
+<td><a href="https://github.com/CenterCoopMedia/eventrunner/issues/new/choose">Issue</a> using the bug form</td>
+</tr>
+<tr>
+<td>A change to the platform</td>
+<td>Issue using the feature form, then a PR linked to it</td>
+</tr>
+<tr>
+<td>&quot;How do I…?&quot; on a live event site</td>
+<td><a href="https://github.com/CenterCoopMedia/eventrunner/discussions">Discussions</a> (Q&amp;A)</td>
+</tr>
+<tr>
+<td>&quot;We want CCM to run our event&quot;</td>
+<td>Discussions (General) or email <a href="mailto:info@eventrunner.org">info@eventrunner.org</a></td>
+</tr>
+<tr>
+<td>A hosted site CCM operates for you is broken</td>
+<td>Email <a href="mailto:info@eventrunner.org">info@eventrunner.org</a> — not a public issue</td>
+</tr>
+<tr>
+<td>A security problem in this repo</td>
+<td><a href="https://github.com/CenterCoopMedia/eventrunner/security">Private vulnerability reporting</a></td>
+</tr>
+</tbody></table>
+<h2 id="review">Review</h2>
+<ul>
+<li>One logical change per pull request.</li>
+<li>Every commit is signed off under the <a href="https://developercertificate.org/">Developer Certificate of Origin</a>.</li>
+<li>CI must stay green on the PR, including from forks, with no secrets.</li>
+<li>Maintainers may request changes, close out-of-scope work, or move a conversation to Discussions.</li>
+</ul>
+<h2 id="releases">Releases</h2>
+<p>Tagged releases follow Keep a Changelog in <a href="/eventrunner/docs/changelog/">CHANGELOG.md</a>. Only the latest tag is a supported security line. See <a href="/eventrunner/docs/security/">SECURITY.md</a>.</p>
+</article><nav class="document-pagination" aria-label="Document navigation"><a rel="prev" href="/eventrunner/docs/code-of-conduct/">Code of conduct</a><a rel="next" href="/eventrunner/docs/support/">Support</a></nav></main>
+  </div>
+</body>
+</html>
