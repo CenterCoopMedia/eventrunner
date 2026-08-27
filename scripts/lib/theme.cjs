@@ -27,7 +27,9 @@ const {
   DEFAULT_MODE_POLICY,
   DEFAULT_PRESET_ID,
   getPreset,
+  hexToRgb,
   resolveLegacyColors,
+  rgbToHex,
 } = require('shared/theme');
 
 /** camelCase theme key → CSS custom property stem (`--<stem>-rgb`). */
@@ -214,20 +216,6 @@ const PLACEHOLDER_LOGOS = Object.freeze({
   favicon: 'branding/favicon.svg',
 });
 
-/** @param {readonly number[]} rgb @returns {string} `#rrggbb` */
-function rgbToHex(rgb) {
-  return `#${rgb.map((c) => Math.max(0, Math.min(255, c | 0)).toString(16).padStart(2, '0')).join('')}`;
-}
-
-/** @param {string} hex `#rgb` or `#rrggbb` @returns {number[]|null} */
-function hexToRgb(hex) {
-  if (typeof hex !== 'string') return null;
-  const body = hex.replace(/^#/, '');
-  const full = body.length === 3 ? body.split('').map((c) => c + c).join('') : body;
-  if (!/^[0-9a-fA-F]{6}$/.test(full)) return null;
-  return [full.slice(0, 2), full.slice(2, 4), full.slice(4, 6)].map((p) => parseInt(p, 16));
-}
-
 /**
  * The seeded `config/theme` document. Passes `validateTheme` (colors are
  * hex) and carries the placeholder-logo bookkeeping the launch-readiness
@@ -276,6 +264,9 @@ module.exports = {
   FONT_SETS,
   RADIUS_SCALES,
   PLACEHOLDER_LOGOS,
+  // Re-exported from shared/theme, which owns the one implementation. The
+  // seed path and its tests read them from here because that is where they
+  // have always been.
   rgbToHex,
   hexToRgb,
   defaultTheme,
