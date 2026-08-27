@@ -398,12 +398,10 @@ describe('page editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).page.layout).toEqual({
-      header: 'nameplate',
-      arrangement: 'grid',
-      density: 'comfortable',
-      navPlacement: 'side',
-    });
+    // The two controls the operator moved, and nothing else: a page that
+    // never chose a density or a header keeps choosing neither, so it goes
+    // on following the theme instead of being pinned by a save.
+    expect(bodyOf(0).page.layout).toEqual({ arrangement: 'grid', navPlacement: 'side' });
   });
 
   it('opens a stored layout on what the page says, not on the defaults', async () => {

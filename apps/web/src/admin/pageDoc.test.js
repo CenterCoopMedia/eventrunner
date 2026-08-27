@@ -100,21 +100,57 @@ describe('cmsPages key parity with the server', () => {
 });
 
 describe('layout and slot', () => {
-  it('opens a page with no stored layout on the defaults', () => {
-    expect(toEditablePage(STORED).layout).toEqual(PAGE_LAYOUT_DEFAULTS);
+  // Absence is a fact about the page, not a gap to fill: a page that never
+  // chose a density follows the active preset's, and an open-and-save must
+  // not quietly commit it to one.
+  it('opens a page with no stored layout stating nothing', () => {
+    expect(toEditablePage(STORED).layout).toEqual({});
   });
 
-  it('keeps a stored layout and fills in what it leaves out', () => {
+  it('keeps a stored layout and invents nothing around it', () => {
     const page = toEditablePage({ ...STORED, layout: { navPlacement: 'side' } });
-    expect(page.layout.navPlacement).toBe('side');
-    expect(page.layout.density).toBe(PAGE_LAYOUT_DEFAULTS.density);
+    expect(page.layout).toEqual({ navPlacement: 'side' });
+  });
+
+  it('drops a stored value the system does not recognize', () => {
+    const page = toEditablePage({ ...STORED, layout: { density: 'airy', arrangement: 'grid' } });
+    expect(page.layout).toEqual({ arrangement: 'grid' });
+  });
+
+  it('round-trips absence: opening and saving states nothing new', () => {
+    expect(toPagePayload(toEditablePage(STORED)).layout).toEqual({});
+    // …and the key is still sent, so "states nothing" is an answer.
+    expect(toPagePayload(toEditablePage(STORED))).toHaveProperty('layout');
+  });
+
+  it('sends what the operator changed, and only that', () => {
+    const page = toEditablePage(STORED);
+    // What the editor's onChange does: set the one key the select moved.
+    page.layout = { ...page.layout, arrangement: 'grid' };
+    expect(toPagePayload(page).layout).toEqual({ arrangement: 'grid' });
+  });
+
+  it('keeps a stated value stated across a round trip', () => {
+    const stored = { ...STORED, layout: { density: 'tight' } };
+    const payload = toPagePayload(toEditablePage(stored));
+    expect(payload.layout).toEqual({ density: 'tight' });
+    // A page that states the default value still states it.
+    const explicit = { ...STORED, layout: { density: PAGE_LAYOUT_DEFAULTS.density } };
+    expect(toPagePayload(toEditablePage(explicit)).layout)
+      .toEqual({ density: PAGE_LAYOUT_DEFAULTS.density });
   });
 
   it('reads a section with no slot as main, and sends it back whole', () => {
     const page = toEditablePage(STORED);
     expect(page.sections[0].slot).toBe('main');
     expect(toPagePayload(page).sections[0].slot).toBe('main');
-    expect(toPagePayload(page).layout).toEqual(PAGE_LAYOUT_DEFAULTS);
+  });
+
+  it('sends a layout the server accepts, stated or not', () => {
+    for (const layout of [undefined, { density: 'tight' }, { header: 'nameplate-compact' }]) {
+      const verdict = backend.validatePageDoc(toPagePayload(toEditablePage({ ...STORED, layout })));
+      expect(verdict.errors).toEqual([]);
+    }
   });
 });
 

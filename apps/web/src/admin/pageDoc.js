@@ -7,13 +7,7 @@
 // down to the accepted key set before it goes back over the wire — otherwise
 // every edit of a seeded page would fail with "seeded: unknown field".
 import { recordStateOf } from './recordState.js';
-import {
-  DEFAULT_SECTION_SLOT,
-  PAGE_LAYOUT_DEFAULTS,
-  PAGE_LAYOUT_KEYS,
-  resolvePageLayout,
-  slotOf,
-} from '../lib/pageLayout.js';
+import { DEFAULT_SECTION_SLOT, slotOf, statedPageLayout } from '../lib/pageLayout.js';
 
 /** Keys a cmsPages doc may carry (mirrors PAGE_KEYS on the server). */
 export const PAGE_KEYS = Object.freeze([
@@ -54,6 +48,22 @@ function pick(source, keys) {
  * accepted keys, with the shape normalized so the editor's controlled inputs
  * never receive undefined.
  *
+ * THE LAYOUT IS THE ONE PLACE ABSENCE IS LOAD-BEARING, so it is carried
+ * here as what the document actually states and nothing more. A page that
+ * never chose a density is following the active preset's (shared/theme
+ * resolveShape, read by SystemPage through statedPageLayout); opening that
+ * page filled in with `comfortable` and saving it back would silently
+ * commit the page to a density the operator never picked, and it would stop
+ * following the preset from then on — a theme change that used to move the
+ * page would no longer reach it. One open-and-save of an untouched page did
+ * that to all four variants.
+ *
+ * A missing key is therefore not filled in. The editor's selects show
+ * PAGE_LAYOUT_DEFAULTS for whatever the page leaves unstated (the layout a
+ * page with no stored value renders at, so the control still shows what the
+ * reader sees), and setting one is what makes it stated: presence in this
+ * map IS the record of the operator having chosen.
+ *
  * @param {object|null} doc
  * @returns {object}
  */
@@ -67,9 +77,8 @@ export function toEditablePage(doc) {
     order: typeof base.order === 'number' ? base.order : 0,
     visible: base.visible !== false,
     systemPage: base.systemPage === true,
-    // A page with no stored layout opens on the defaults, so the controls
-    // show what it actually renders at rather than four empty selects.
-    layout: resolvePageLayout(base),
+    // What the document states, and only that — see above.
+    layout: statedPageLayout(base),
     sections: Array.isArray(base.sections)
       ? base.sections.map((section) => {
           const s = pick(section ?? {}, SECTION_KEYS);
@@ -136,12 +145,13 @@ export function toPagePayload(page) {
     order: Number.isFinite(order) ? order : page.order,
     visible: Boolean(page.visible),
     systemPage: Boolean(page.systemPage),
-    // Sent whole, and only with values the server accepts: the editor holds
-    // all four variants, so a save states the page's shape outright rather
-    // than leaving the reader to infer half of it.
-    layout: Object.fromEntries(
-      PAGE_LAYOUT_KEYS.map((key) => [key, page.layout?.[key] ?? PAGE_LAYOUT_DEFAULTS[key]]),
-    ),
+    // Only the variants the page states. A key the document never carried
+    // stays absent unless the operator moved that control — saving a page
+    // must not decide, on its behalf, four things it never said. `layout`
+    // itself is always sent, empty map and all: the server accepts a page
+    // that states nothing, and sending the key makes "states nothing" an
+    // answer rather than an omission.
+    layout: statedPageLayout(page),
     sections: (page.sections ?? []).map((section) => {
       const maxBlocks = Number(section.maxBlocks);
       return {
