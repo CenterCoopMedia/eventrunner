@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+<g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" stroke-linejoin="miter">
+<path d="M40,16 L16,16 L16,40"/>
+<path d="M120,16 L144,16 L144,40"/>
+<path d="M40,144 L16,144 L16,120"/>
+<path d="M120,144 L144,144 L144,120"/>
+</g>
+<g stroke="currentColor" stroke-width="1" fill="none">
+<line x1="16.00" y1="16.00" x2="8.00" y2="8.00"/>
+<line x1="144.00" y1="16.00" x2="152.00" y2="8.00"/>
+<line x1="16.00" y1="144.00" x2="8.00" y2="152.00"/>
+<line x1="144.00" y1="144.00" x2="152.00" y2="152.00"/>
+</g>
+<g stroke="currentColor" stroke-width="1" fill="none">
+<line x1="28" y1="13" x2="28" y2="19"/>
+<line x1="13" y1="28" x2="19" y2="28"/>
+<line x1="132" y1="13" x2="132" y2="19"/>
+<line x1="141" y1="28" x2="147" y2="28"/>
+<line x1="28" y1="141" x2="28" y2="147"/>
+<line x1="13" y1="132" x2="19" y2="132"/>
+<line x1="132" y1="141" x2="132" y2="147"/>
+<line x1="141" y1="132" x2="147" y2="132"/>
+</g>
+</svg>
