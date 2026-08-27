@@ -76,7 +76,7 @@ export default function Layout() {
       </a>
       <DemoBanner />
       <header className="bg-brand-surface">
-        <div className="mx-auto w-full max-w-5xl px-4">
+        <div className="mx-auto w-full max-w-5xl px-md">
           <Nameplate
             variant={isHome ? 'full' : 'compact'}
             nameAs={isHome ? 'h1' : 'p'}
@@ -112,11 +112,11 @@ export default function Layout() {
           </nav>
         </div>
       </header>
-      <main id="main-content" className="mx-auto w-full max-w-5xl flex-1 px-4 pb-2xl pt-xl">
+      <main id="main-content" className="mx-auto w-full max-w-5xl flex-1 px-md pb-2xl pt-xl">
         <Outlet />
       </main>
       <footer className="bg-brand-surface">
-        <div className="mx-auto max-w-5xl px-4">
+        <div className="mx-auto max-w-5xl px-md">
           <div className="section-rule pb-xl pt-md font-data text-caption text-text-secondary">
             <p className="font-heading text-body font-semibold text-text-primary">
               {eventConfig?.name}

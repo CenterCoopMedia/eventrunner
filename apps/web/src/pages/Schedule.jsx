@@ -151,11 +151,11 @@ export default function Schedule() {
       </header>
 
       {loading ? (
-        <div className="mt-6">
+        <div className="mt-lg">
           <LoadingState label="Loading the schedule" />
         </div>
       ) : !hasAnySession || !activeDay ? (
-        <div className="mt-6">
+        <div className="mt-lg">
           <EmptyState
             title="The schedule isn’t published yet"
             description="Sessions appear here as soon as they’re announced — check back closer to the event."

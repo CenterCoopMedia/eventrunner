@@ -124,7 +124,7 @@ export function TypeBadge({ type }) {
 // The feature-flag controls under a session. Rectangles on the theme radius,
 // not pills (brief §2.4): the same shape rule TypeBadge now follows.
 const actionClass =
-  'touch-target inline-flex items-center gap-1 rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-brand-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
+  'touch-target inline-flex items-center gap-2xs rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-brand-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
 
 /**
  * Bookmark toggle pill (spec §9 "Bookmarks"). Feature-gated by
@@ -223,7 +223,7 @@ function CalendarPill({ eventConfig, session }) {
   };
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-1 text-sm text-brand-ink-muted">
+    <span className="inline-flex flex-wrap items-center gap-2xs font-data text-caption text-text-secondary">
       <span aria-hidden="true">Add to calendar:</span>
       <button type="button" className={actionClass} onClick={onDownload}>
         .ics
@@ -325,7 +325,7 @@ function ReactionsPill({ session }) {
   if (!interactive && !hasAnyCount) return null;
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-1" role="group" aria-label="Session reactions">
+    <span className="inline-flex flex-wrap items-center gap-2xs" role="group" aria-label="Session reactions">
       {REACTION_KINDS.map((emoji) => {
         const count = displayCounts[emoji] || 0;
         const mine = myActiveReaction === emoji;
@@ -372,7 +372,7 @@ export function SessionPills({ session, eventConfig, features = {}, bookmarked =
     features.sessionBookmarks || features.sessionMaterials || features.sessionReactions || features.icsExport;
   if (!hasPills) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-xs">
       {features.sessionBookmarks ? <BookmarkPill session={session} bookmarked={bookmarked} /> : null}
       {features.sessionMaterials ? <MaterialsPill session={session} /> : null}
       {features.sessionReactions ? <ReactionsPill session={session} /> : null}
