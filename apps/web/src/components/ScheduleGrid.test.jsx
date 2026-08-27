@@ -153,6 +153,19 @@ describe('the schedule grid', () => {
 });
 
 describe('the column that comes forward', () => {
+  /**
+   * The letters the rendered grid is currently bringing forward.
+   *
+   * Read from `data-track-forward`, which is the attribute the stylesheet
+   * matches on — so what this reports is the state a reader actually meets,
+   * not a second copy of it kept for the tests to read.
+   */
+  function forwardLetters(container) {
+    return [...new Set(
+      [...container.querySelectorAll('[data-track-forward]')].map((el) => el.dataset.track),
+    )];
+  }
+
   it('gives every line a head that is a real control, named by its line', () => {
     renderGrid();
     for (const name of ['Practice', 'Sustainability']) {
@@ -168,11 +181,9 @@ describe('the column that comes forward', () => {
       'aria-pressed',
       'true',
     );
-    expect(container.querySelector('.schedule-grid').dataset.forward).toBe('A');
     // Every cell of that column carries the state, and no other cell does.
-    const forward = [...container.querySelectorAll('[data-track-forward]')];
-    expect(forward.length).toBeGreaterThan(0);
-    expect(forward.every((el) => el.dataset.track === 'A')).toBe(true);
+    expect(forwardLetters(container)).toEqual(['A']);
+    expect(container.querySelectorAll('[data-track-forward]').length).toBeGreaterThan(1);
   });
 
   it('lets the same press take it back', () => {
@@ -181,31 +192,46 @@ describe('the column that comes forward', () => {
     fireEvent.click(head);
     fireEvent.click(head);
     expect(head).toHaveAttribute('aria-pressed', 'false');
-    expect(container.querySelector('.schedule-grid').dataset.forward).toBeUndefined();
+    expect(forwardLetters(container)).toEqual([]);
   });
 
   it('previews a column as the keyboard reaches it, and lets go on the way out', () => {
     const { container } = renderGrid();
-    const grid = container.querySelector('.schedule-grid');
     fireEvent.focus(screen.getByRole('button', { name: 'Sustainability' }));
-    expect(grid.dataset.forward).toBe('B');
+    expect(forwardLetters(container)).toEqual(['B']);
     // Focus is a preview, not a choice: the button is not pressed.
     expect(screen.getByRole('button', { name: 'Sustainability' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
     fireEvent.blur(screen.getByRole('button', { name: 'Sustainability' }));
-    expect(grid.dataset.forward).toBeUndefined();
+    expect(forwardLetters(container)).toEqual([]);
   });
 
   it('keeps a pressed column forward after focus moves on', () => {
     const { container } = renderGrid();
-    const grid = container.querySelector('.schedule-grid');
     const head = screen.getByRole('button', { name: 'Practice' });
     fireEvent.focus(head);
     fireEvent.click(head);
     fireEvent.blur(head);
-    expect(grid.dataset.forward).toBe('A');
+    expect(forwardLetters(container)).toEqual(['A']);
     expect(head).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('goes on previewing an unpressed column while the press left focus on it', () => {
+    // A press in a browser FOCUSES the head first, so unpressing leaves the
+    // reader still on it — and focus is a preview. The column stays forward
+    // until focus goes, and `aria-pressed` is the honest record of the
+    // choice in the meantime. Without the focus event this reads as the
+    // column going back, which is not the sequence a pointer produces.
+    const { container } = renderGrid();
+    const head = screen.getByRole('button', { name: 'Practice' });
+    fireEvent.focus(head);
+    fireEvent.click(head);
+    fireEvent.click(head);
+    expect(head).toHaveAttribute('aria-pressed', 'false');
+    expect(forwardLetters(container)).toEqual(['A']);
+    fireEvent.blur(head);
+    expect(forwardLetters(container)).toEqual([]);
   });
 });

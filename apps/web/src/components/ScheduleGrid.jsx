@@ -99,7 +99,7 @@ export default function ScheduleGrid({ day, entries, columns, eventConfig }) {
   const rows = buildGridRows(entries, columns);
 
   return (
-    <table className="schedule-grid" data-forward={forward ?? undefined}>
+    <table className="schedule-grid">
       <caption className="sr-only">{`${day.label}, sessions by track`}</caption>
       <thead>
         <tr>
