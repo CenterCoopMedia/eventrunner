@@ -12,8 +12,9 @@ import { render, screen } from '@testing-library/react';
 
 let eventConfig;
 let heroBlocks;
+let theme;
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
-  useEventConfig: () => ({ eventConfig }),
+  useEventConfig: () => ({ eventConfig, theme }),
 }));
 vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({
@@ -36,6 +37,7 @@ const LEAD = {
 
 beforeEach(() => {
   heroBlocks = [];
+  theme = undefined;
 });
 
 describe('Home', () => {
@@ -63,6 +65,37 @@ describe('Home', () => {
   it('renders nothing for the tagline when it is absent', () => {
     eventConfig = { name: 'Demo Event', days: [] };
     expect(() => render(<Home />)).not.toThrow();
+  });
+
+  it('does not print the event name twice under a masthead', () => {
+    // The masthead has already set the name at display size. The page keeps
+    // exactly one <h1>, and only its second printing goes.
+    eventConfig = { name: 'Fallback title', days: [] };
+    theme = { header: 'masthead' };
+    render(<Home />);
+    const heading = screen.getByRole('heading', { level: 1, name: 'Fallback title' });
+    expect(heading.className).toBe('sr-only');
+  });
+
+  it('prints the page headline under a masthead when it is not the event name', () => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    theme = { header: 'masthead' };
+    render(<Home />);
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Fallback title' }).className,
+    ).not.toContain('sr-only');
+  });
+
+  it('prints the page headline under every other header', () => {
+    eventConfig = { name: 'Fallback title', days: [] };
+    for (const header of ['standard', 'compact', 'minimal']) {
+      theme = { header };
+      const { unmount } = render(<Home />);
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Fallback title' }).className,
+      ).not.toContain('sr-only');
+      unmount();
+    }
   });
 });
 

@@ -45,6 +45,7 @@ A public page renders one of four headers (design brief §2.5.1). `config/theme.
 
 - Every treatment carries the site identity **and** the navigation. Dropping either fails review.
 - The identity repeats on every page, so it is never a heading. Every page owns its own `<h1>`.
+- `masthead` sets the event name at display size, so a page headline that is that same name keeps its `<h1>` for structure and is not printed a second time. The other three set the identity at running-header size, where no repetition is visible.
 - No treatment puts text over an image, and none of them is a hero banner.
 - Never make one treatment mandatory across every deployment.
 

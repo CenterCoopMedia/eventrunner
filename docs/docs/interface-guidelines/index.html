@@ -167,6 +167,7 @@
           <ul>
           <li>Every treatment carries the site identity <strong>and</strong> the navigation. Dropping either fails review.</li>
           <li>The identity repeats on every page, so it is never a heading. Every page owns its own <code>&lt;h1&gt;</code>.</li>
+          <li><code>masthead</code> sets the event name at display size, so a page headline that is that same name keeps its <code>&lt;h1&gt;</code> for structure and is not printed a second time. The other three set the identity at running-header size, where no repetition is visible.</li>
           <li>No treatment puts text over an image, and none of them is a hero banner.</li>
           <li>Never make one treatment mandatory across every deployment.</li>
           </ul>

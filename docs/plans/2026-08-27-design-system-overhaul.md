@@ -292,6 +292,10 @@ Bind these:
 - Every treatment carries the site identity and the navigation. A header that drops either fails
   review.
 - The identity repeats on every page, so it is never a heading. Every page owns its own `<h1>`.
+- **Never print the same words twice.** `masthead` sets the event name at display size. Where a
+  page's own headline is that same name, the page keeps its `<h1>` for structure and does not print
+  it a second time. The other three treatments set the identity at running-header size, so a page
+  headline that repeats it is not a repetition a reader sees.
 - No treatment puts text over an image, and none of them is a hero banner.
 - A theme may name any of the four. Never make one of them mandatory across every deployment.
 

@@ -9,6 +9,7 @@
 // identity, not this page's subject. Nothing sits above that heading.
 //
 // The opening section may carry one lead image, beside the copy or below it.
+import { resolveHeader } from 'shared/theme';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -20,7 +21,7 @@ import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
 
 export default function Home() {
-  const { eventConfig, features } = useEventConfig();
+  const { eventConfig, features, theme } = useEventConfig();
   const { getPage, getSectionBlocks, getBlock, source } = useContent();
 
   const page = getPage('home') ?? getPage('/');
@@ -51,6 +52,12 @@ export default function Home() {
   const otherSections = (page?.sections ?? []).filter(
     (section) => section.id !== 'hero',
   );
+  // The masthead sets the event name at display size, so a headline that
+  // only repeats it would print the same words twice down the page. The
+  // page keeps its <h1> either way — a reader on a screen reader still
+  // hears exactly one — and only the second printing goes.
+  const titleRepeatsMasthead =
+    resolveHeader(theme?.header) === 'masthead' && leadTitle === eventConfig.name;
 
   return (
     // data-content-source mirrors ContentContext's own `source` field
@@ -68,7 +75,14 @@ export default function Home() {
         <div className="flex flex-col gap-lg lg:flex-row lg:items-start">
           <div className="min-w-0 flex-1">
             {leadTitle ? (
-              <h1 id="hero-title" className="font-heading text-h1 font-semibold text-text-primary">
+              <h1
+                id="hero-title"
+                className={
+                  titleRepeatsMasthead
+                    ? 'sr-only'
+                    : 'font-heading text-h1 font-semibold text-text-primary'
+                }
+              >
                 {leadTitle}
               </h1>
             ) : null}
@@ -76,7 +90,7 @@ export default function Home() {
               <p
                 className={[
                   'max-w-prose text-lead text-text-secondary',
-                  leadTitle ? 'mt-sm' : '',
+                  leadTitle && !titleRepeatsMasthead ? 'mt-sm' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
