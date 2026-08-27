@@ -49,6 +49,11 @@ const DEVICE_CLASSES = [
   '.specimen-label__key',
   '.session-block',
   '.session-block__face',
+  // The transfer line: a RECORDED move between two places (brief §4.6).
+  // Not preset-gated any more — a surveyed walking time is a fact, and a
+  // fact five presets hide is a fact withheld from the reader who needed
+  // it. So it has to survive the build in every preset.
+  '.transfer-line',
   '.callout',
   '.nameplate__coordinate',
   // The hybrid page shell and its density variant (brief §6.1, §6.2).

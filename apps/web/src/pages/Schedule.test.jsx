@@ -22,6 +22,24 @@ const fixtureConfig = {
     { id: 'fx-day-1', label: 'Day one', date: '2026-10-15' },
     { id: 'fx-day-2', label: 'Day two', date: '2026-10-16' },
   ],
+  // A SURVEYED venue, deliberately: the schedule list must state no
+  // transfer even when the walk between two consecutive rows is recorded
+  // and known, because the reader scanning a programme is not walking it.
+  venue: {
+    places: [
+      { id: 'fx-hall', name: '[Fixture] Main hall' },
+      { id: 'fx-lab', name: '[Fixture] Editing lab', floor: 'Second floor' },
+    ],
+    movements: [
+      { from: 'fx-hall', to: 'fx-lab', walkingMinutes: 6 },
+      {
+        from: 'fx-lab',
+        to: 'fx-hall',
+        walkingMinutes: 4,
+        accessibleRoute: '[Fixture] Lift by the cloakroom.',
+      },
+    ],
+  },
 };
 
 const fixtureSessions = [
@@ -35,6 +53,7 @@ const fixtureSessions = [
     title: '[Fixture] Afternoon editing lab',
     description: null,
     location: 'Room B',
+    placeId: 'fx-lab',
     type: 'workshop',
     speakerIds: [],
     visible: true,
@@ -48,6 +67,7 @@ const fixtureSessions = [
     title: '[Fixture] Morning kickoff',
     description: '[Fixture] What the day covers.',
     location: 'Main hall',
+    placeId: 'fx-hall',
     type: 'keynote',
     speakerIds: ['fx-speaker-1'],
     visible: true,
@@ -309,10 +329,12 @@ describe('SchedulePage editorial register', () => {
     expect(screen.getByText(/Plate II \u00b7/)).toBeInTheDocument();
   });
 
-  it('states the room and never infers a movement from it', () => {
-    // A room that differs from the one before it is not a recorded
-    // transfer, and the schema records none. So the room is stated and the
-    // page says nothing about moving between the two.
+  it('states the room and never draws a transfer between two rows', () => {
+    // The fixture venue RECORDS the walk from the hall to the lab, and
+    // these two rows are in that order. The list still says nothing, and
+    // that is the point: a recorded movement says what a move costs, not
+    // that this reader is making it. A reader scanning the programme
+    // skipped that session, or is following one track out of five.
     renderSchedule();
     const rows = [...document.querySelectorAll('section ul li')];
     expect(rows[0].textContent).toContain('Main hall');
@@ -413,6 +435,51 @@ describe('the two views of a day', () => {
       });
       expect(points).toBeInTheDocument();
       expect(onScreen().getByText('[Fixture] Breakout clinic')).toBeInTheDocument();
+    });
+  });
+
+  // A CALLING POINT IS THE ONE SCHEDULE ROW THAT STATES A MOVE (brief §4.6;
+  // shared/venue.cjs). A child runs INSIDE its parent, so a reader at the
+  // calling point was in the parent's room a moment ago — the sequence is
+  // the data, not a guess about a reader's route.
+  describe('a calling point in another place', () => {
+    const parent = { ...fixtureSessions[1], placeId: 'fx-hall' };
+    const child = (overrides) => ({
+      id: 'fx-clinic',
+      dayId: 'fx-day-1',
+      startTime: '09:20',
+      endTime: '09:45',
+      title: '[Fixture] Breakout clinic',
+      parentId: 'fx-early',
+      speakerIds: [],
+      visible: true,
+      order: 1,
+      ...overrides,
+    });
+
+    it('states the recorded move from the parent’s place', () => {
+      withViewport(false, () => {
+        renderSchedule({ scheduleData: [parent, child({ placeId: 'fx-lab' })] });
+        expect(
+          screen.getByText(
+            /Transfer from \[Fixture\] Main hall to \[Fixture\] Editing lab, Second floor — 6 min walk/,
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('says nothing when the calling point is in the same place', () => {
+      withViewport(false, () => {
+        renderSchedule({ scheduleData: [parent, child({ placeId: 'fx-hall' })] });
+        expect(screen.queryByText(/Transfer from/)).toBeNull();
+      });
+    });
+
+    it('says nothing when the calling point names no place', () => {
+      withViewport(false, () => {
+        renderSchedule({ scheduleData: [parent, child({ location: 'Somewhere else' })] });
+        expect(screen.queryByText(/Transfer from/)).toBeNull();
+      });
     });
   });
 });

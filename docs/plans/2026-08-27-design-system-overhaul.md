@@ -681,12 +681,24 @@ theme's whole idea:
   the heading face inside a survey-drawn shape, always with the line's name beside it.
 - Rooms and venues are **stations**. A station has a name, a symbol, and a place on the sheet.
 - Moving between sessions is a **transfer**, and where the data records one the site states it
-  plainly in signage voice: "Transfer to Line B · Hall 2 · 6 min walk." State where you are, where
-  it is, and how long it takes. **A transfer is never inferred.** The schedule schema records no
-  movement — a session carries a day, a time, a title, a room, a track, and its speakers — so
-  today nothing is stated and the room renders plainly. Comparing one session's room string with
-  the next one's is a guess in the voice of a fact, and the reader cannot tell the two apart. The
-  statement returns when the schema carries a stated transfer to read from.
+  plainly in signage voice: "Transfer from Main hall to Room A, first floor — 6 min walk." State
+  where you are, where it is, and how long it takes. **A transfer is never inferred.** Comparing
+  one session's room string with the next one's is a guess in the voice of a fact, and the reader
+  cannot tell the two apart.
+- The movement model is what makes the statement sayable (`shared/venue.cjs`, `config/event
+  .venue`). `places[]` names the rooms a session can point at by `placeId`; `movements[]` records
+  one move — `from`, `to`, `walkingMinutes`, and an optional `accessibleRoute` in the operator's
+  own words. A movement is **one-way** and is never reversed, never chained, and never estimated;
+  a recorded `0` means "across the corridor" and reads as "under a minute". Where no record
+  exists the site says nothing, which is what an unrecorded route honestly looks like.
+- **The record says what a move costs; it does not say the reader is making it.** So the line
+  renders in exactly two places, both of which carry a stated sequence: between two sessions the
+  reader BOOKMARKED (my schedule), and from a parent session to a calling point inside it in
+  another place. Never between two consecutive rows of the full programme — that reader skipped
+  a session, or is following one line out of five.
+- The line is **not preset-gated**. A surveyed walking time is a fact, and a fact five presets
+  hide is a fact withheld from the reader who needed it most. Presets may style it; none may
+  suppress it.
 
 Bind the safety rule: a line is told apart by its letter and its name first. A line colour, where a
 client sets one, is a second signal and never the only one (§8.1). Read the Atlas visual story in

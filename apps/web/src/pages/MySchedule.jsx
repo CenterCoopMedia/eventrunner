@@ -10,7 +10,7 @@
 // Editorial base restyle (design brief §2.1, §5.1): the day head is the same
 // folio-on-a-rule SectionHead device Schedule.jsx uses, and the page actions
 // are ruled rectangles rather than filled pill buttons.
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
@@ -20,10 +20,28 @@ import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import TransferLine from '../components/TransferLine.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
+import { sessionMovement } from 'shared/venue';
 
+// THIS IS THE ONE LIST A TRANSFER BELONGS IN (design brief §4.6;
+// shared/venue.cjs).
+//
+// A recorded movement says what it costs to go from one place to another.
+// It does not say that this reader is going. On the full schedule nobody
+// is: a reader scanning the programme skipped that session, or is
+// following one track out of five, and a transfer line between two
+// consecutive rows would be the old inference wearing better data.
+//
+// Here the reader has said it themselves. These are the sessions THEY
+// bookmarked, grouped by day and in programme order, so consecutive
+// entries are an itinerary they wrote. Between two of them the site may
+// state the walk — if, and only if, somebody recorded that exact move.
+// Where nothing was recorded the gap says nothing, which is what an
+// unrecorded route honestly looks like.
+//
 // Page actions in the editorial register: a ruled rectangle on the theme
 // radius, never a filled pill (design brief §2.4) — the same class
 // Schedule.jsx's own page actions use.
@@ -172,15 +190,34 @@ export default function MySchedule() {
               {/* No gap between rows: each SessionCard opens with its own
                   hairline, so the rules ARE the separation (brief §2.1). */}
               <ul className="mt-sm">
-                {(myByDay.get(day.id) ?? []).map((session) => (
-                  <SessionCard
-                    key={session.id}
-                    session={session}
-                    eventConfig={eventConfig}
-                    features={features}
-                    bookmarked
-                  />
-                ))}
+                {(myByDay.get(day.id) ?? []).map((session, index, list) => {
+                  // The move INTO this session, from the one the reader
+                  // attends before it. `null` for the first of the day —
+                  // arriving is not transferring — and null wherever the
+                  // pair has no recorded route, which is most pairs in most
+                  // venues and renders as nothing at all.
+                  const movement =
+                    index > 0 ? sessionMovement(eventConfig, list[index - 1], session) : null;
+                  return (
+                    <Fragment key={session.id}>
+                      {/* Its own item in the itinerary, because that is
+                          what it is: the step between two sessions, not a
+                          property of either. SessionCard renders the <li>
+                          for the session itself. */}
+                      {movement ? (
+                        <li>
+                          <TransferLine movement={movement} />
+                        </li>
+                      ) : null}
+                      <SessionCard
+                        session={session}
+                        eventConfig={eventConfig}
+                        features={features}
+                        bookmarked
+                      />
+                    </Fragment>
+                  );
+                })}
               </ul>
             </section>
           ))

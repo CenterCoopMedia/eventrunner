@@ -580,6 +580,23 @@
     mask-image: url('/icons/wayfinding/step-free.svg');
   }
 
+  /* Transfer line: a recorded move between two of the venue's places
+     (brief §4.6; shared/venue.cjs). It is set in from the leading edge and
+     opens on a hairline, so it reads as a note about the gap between two
+     entries rather than as a property of either one.
+
+     IT IS NOT PRESET-GATED. The old line was switched on by an Atlas token
+     and hidden in the other five, which was defensible when it was a
+     flourish in a story about a transport network. What renders here is a
+     walking time somebody surveyed, and a fact five presets hide is a fact
+     withheld from the reader who needed it most. A preset may restyle this
+     block. None may set it to `display: none`. */
+  .transfer-line {
+    border-inline-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    padding-inline-start: var(--space-sm);
+    margin-block: var(--space-xs);
+  }
+
   /* Botanical plate: a framed opener, drawn as a DOUBLE hairline (brief
      §4.5). The border is the inner rule and the outline is the outer one,
      both at --plate-frame-width, so the doubling needs no second element.
