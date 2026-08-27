@@ -5,8 +5,14 @@
 // name on their card, who their profile is visible to, and where their
 // registration stands. Registration status is deliberately shown ONLY here,
 // to its owner — it is not part of the public projection (spec §4.1).
+//
+// It is bounded by a hairline rule rather than an ink-derived border, its
+// ink reads the tier 2 role names, its type sits on the named scale, and its
+// two actions are the shared filled and outlined controls (design brief
+// §3.1, §3.7) — the vocabulary SessionCard and the restyled pages use.
 import { Link } from 'react-router-dom';
 import { useProfile } from '../contexts/ProfileContext.jsx';
+import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 
 const VISIBILITY_LABELS = {
   public: 'Visible to anyone',
@@ -25,7 +31,11 @@ const STATUS_LABELS = {
 };
 
 const cardClass =
-  'rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5';
+  'rounded-brand-lg border-hairline border-rule-hairline bg-surface-alt p-md';
+
+// The card's own heading: the section-heading step every other block-level
+// heading on the site uses (EmptyState, SessionMaterialsList).
+const headingClass = 'font-heading text-h3 font-semibold text-text-primary';
 
 export default function ProfileSidebar() {
   const { profile, status, needsProfileSetup } = useProfile();
@@ -33,16 +43,13 @@ export default function ProfileSidebar() {
   if (status === 'signed-out') {
     return (
       <aside aria-labelledby="profile-sidebar-heading" className={cardClass}>
-        <h2 id="profile-sidebar-heading" className="font-heading text-lg text-brand-ink">
+        <h2 id="profile-sidebar-heading" className={headingClass}>
           Your profile
         </h2>
-        <p className="mt-2 text-sm text-brand-ink-muted">
+        <p className="mt-xs text-body text-text-secondary">
           Sign in to add your profile to the attendee directory.
         </p>
-        <Link
-          to="/signin"
-          className="touch-target mt-4 inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-        >
+        <Link to="/signin" className={`${primaryActionClass} mt-md`}>
           Sign in
         </Link>
       </aside>
@@ -52,10 +59,10 @@ export default function ProfileSidebar() {
   if (status === 'pending-account') {
     return (
       <aside aria-labelledby="profile-sidebar-heading" className={cardClass}>
-        <h2 id="profile-sidebar-heading" className="font-heading text-lg text-brand-ink">
+        <h2 id="profile-sidebar-heading" className={headingClass}>
           Your profile
         </h2>
-        <p role="status" className="mt-2 text-sm text-brand-ink-muted">
+        <p role="status" className="mt-xs text-body text-text-secondary">
           Setting up your account. This takes a moment after your first sign-in.
         </p>
       </aside>
@@ -68,46 +75,43 @@ export default function ProfileSidebar() {
 
   return (
     <aside aria-labelledby="profile-sidebar-heading" className={cardClass}>
-      <h2 id="profile-sidebar-heading" className="font-heading text-lg text-brand-ink">
+      <h2 id="profile-sidebar-heading" className={headingClass}>
         Your profile
       </h2>
-      <p className="mt-2 font-semibold text-brand-ink">
+      <p className="mt-xs text-body font-semibold text-text-primary">
         {profile?.displayName || 'No name yet'}
       </p>
       {profile?.jobTitle || profile?.organization ? (
-        <p className="text-sm text-brand-ink-muted">
+        <p className="mt-3xs font-data text-caption text-text-secondary">
           {[profile.jobTitle, profile.organization].filter(Boolean).join(' · ')}
         </p>
       ) : null}
-      <dl className="mt-4 space-y-2 text-sm">
+      <dl className="mt-md space-y-xs font-data text-caption">
         {visibilityLabel ? (
           <div>
-            <dt className="text-brand-ink-muted">Directory visibility</dt>
-            <dd className="text-brand-ink">{visibilityLabel}</dd>
+            <dt className="text-text-secondary">Directory visibility</dt>
+            <dd className="text-text-primary">{visibilityLabel}</dd>
           </div>
         ) : null}
         {registrationLabel ? (
           <div>
-            <dt className="text-brand-ink-muted">Registration</dt>
-            <dd className="text-brand-ink">{registrationLabel}</dd>
+            <dt className="text-text-secondary">Registration</dt>
+            <dd className="text-text-primary">{registrationLabel}</dd>
           </div>
         ) : null}
         {badgeCount > 0 ? (
           <div>
-            <dt className="text-brand-ink-muted">Badges</dt>
-            <dd className="text-brand-ink">{badgeCount} selected</dd>
+            <dt className="text-text-secondary">Badges</dt>
+            <dd className="text-text-primary">{badgeCount} selected</dd>
           </div>
         ) : null}
       </dl>
       {needsProfileSetup ? (
-        <p className="mt-4 text-sm text-brand-ink-muted">
+        <p className="mt-md text-body text-text-secondary">
           Your profile is not complete yet, so it does not appear in the directory.
         </p>
       ) : null}
-      <Link
-        to="/profile"
-        className="touch-target mt-4 inline-flex items-center rounded-brand border border-brand-ink/20 bg-brand-surface px-4 py-2 font-semibold text-brand-ink hover:bg-brand-surface-alt"
-      >
+      <Link to="/profile" className={`${secondaryActionClass} mt-md`}>
         {needsProfileSetup ? 'Complete your profile' : 'Edit your profile'}
       </Link>
     </aside>

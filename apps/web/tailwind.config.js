@@ -10,11 +10,11 @@
 // is what keeps opacity modifiers like bg-brand-primary/10 working.
 //
 // Everything below EXTENDS the Tailwind defaults rather than replacing them.
-// This branch restyles the public pages and the editorial devices onto the
-// token utilities. The admin panel, the shared media widgets, and a handful
-// of public blocks are still on the brand-* names and the default Tailwind
-// sizes; leaving the defaults in place keeps those compiling and rendering
-// until PR2 moves them over.
+// This branch restyles the public pages, the block renderers, and the
+// editorial devices onto the token utilities. The admin panel, the shared
+// media widgets, and the toast are still on the brand-* names and the
+// default Tailwind sizes; leaving the defaults in place keeps those
+// compiling and rendering until PR2 moves them over.
 const fontStep = (step) => [
   `var(--text-${step})`,
   { lineHeight: `var(--text-${step}-leading)`, letterSpacing: `var(--text-${step}-tracking)` },
@@ -39,7 +39,7 @@ export default {
         danger: 'rgb(var(--semantic-danger-rgb) / <alpha-value>)',
         highlight: 'rgb(var(--semantic-highlight-rgb) / <alpha-value>)',
         keynote: 'rgb(var(--semantic-keynote-rgb) / <alpha-value>)',
-        // Tier 2 role names (brief §3.1). The restyled surfaces read these;
+        // Tier 2 role names (brief §3.1). Every public surface reads these;
         // the brand-* names above stay for the surfaces PR2 still moves.
         surface: 'rgb(var(--color-surface-rgb) / <alpha-value>)',
         'surface-alt': 'rgb(var(--color-surface-alt-rgb) / <alpha-value>)',
