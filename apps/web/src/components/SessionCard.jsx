@@ -20,6 +20,7 @@ import {
   downloadIcs,
   icsFileName,
 } from '../utils/calendar.js';
+import Tag from './editorial/Tag.jsx';
 
 /**
  * Resolve a session's `speakerIds` against the live `speakers_public`
@@ -97,8 +98,10 @@ export function SpeakerNames({
 /**
  * The session type as a small ruled rectangle beside the title (issue #113).
  *
+ * The shape lives in editorial/Tag.jsx — one tag shape for the whole site,
+ * so the directory, the updates feed, and the schedule cannot drift apart.
  * It is not a pill: the fully rounded shape is a rejected pattern (design
- * brief §2.4), and the radius is now `--radius-base`, which the concentric
+ * brief §2.4), and the radius is `--radius-base`, which the concentric
  * radius rule keeps in step with everything else the theme draws (interface
  * guidelines, User interface). Keynote emphasis is a flat tint plus the word
  * itself — never a colored edge, and never color alone (§8.1).
@@ -107,18 +110,7 @@ export function TypeBadge({ type }) {
   if (typeof type !== 'string' || !type) return null;
   // Session types are CMS vocabulary — presented, never interpreted, except
   // the platform-level keynote emphasis token from config/theme (spec §7.2).
-  const isKeynote = type === 'keynote';
-  return (
-    <span
-      className={[
-        'inline-flex items-center whitespace-nowrap rounded-brand border-hairline px-2xs py-3xs font-data text-folio font-medium uppercase text-text-primary',
-        isKeynote ? 'border-keynote/40 bg-keynote/10' : 'border-rule-hairline bg-surface-alt',
-      ].join(' ')}
-      style={{ letterSpacing: 'var(--text-folio-tracking)' }}
-    >
-      {type}
-    </span>
-  );
+  return <Tag tone={type === 'keynote' ? 'keynote' : 'default'}>{type}</Tag>;
 }
 
 // The feature-flag controls under a session. Rectangles on the theme radius,

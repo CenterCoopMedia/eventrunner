@@ -131,9 +131,17 @@
   }
 
   /* Typography for the sanitized richtext subset (RichTextBlock,
-     FaqItemBlock). Only the tags sanitizeHtml allows are styled here. */
+     FaqItemBlock). Only the tags sanitizeHtml allows are styled here — one
+     rule per tag in lib/sanitizeHtml.js's ALLOWED_TAGS, so a selector below
+     exists if and only if the sanitizer still permits that tag.
+
+     Sizes read the type-scale steps (tailwind.config.js fontStep), not
+     Tailwind's default text-* scale, so a client's preset retunes prose the
+     same way it retunes headings. There is no --text-h4 step (brief §3.7
+     names eight steps and h4 is not one of them); --text-lead sits between
+     h3 and body, which is exactly where an h4 belongs, so h4 borrows it. */
   .rich-text {
-    @apply text-brand-ink;
+    @apply text-body text-text-primary;
     text-wrap: pretty;
   }
   .rich-text p,
@@ -141,7 +149,7 @@
   .rich-text ol,
   .rich-text blockquote,
   .rich-text pre {
-    @apply mt-3 first:mt-0;
+    @apply mt-sm first:mt-0;
   }
   .rich-text ul {
     @apply list-disc ps-5;
@@ -150,41 +158,44 @@
     @apply list-decimal ps-5;
   }
   .rich-text li {
-    @apply mt-1;
+    @apply mt-2xs;
   }
   .rich-text h2,
   .rich-text h3,
   .rich-text h4 {
-    @apply mt-6 font-semibold text-brand-ink first:mt-0;
+    @apply mt-lg font-semibold text-text-primary first:mt-0;
   }
   .rich-text h2 {
-    @apply text-2xl;
+    @apply text-h2;
   }
   .rich-text h3 {
-    @apply text-xl;
+    @apply text-h3;
   }
   .rich-text h4 {
-    @apply text-lg;
+    @apply text-lead;
   }
   .rich-text a {
-    @apply text-brand-primary underline decoration-brand-primary/40 underline-offset-2;
+    @apply text-accent underline decoration-accent/40 underline-offset-2;
     text-underline-position: from-font;
     text-decoration-skip-ink: auto;
   }
   .rich-text a:hover {
-    @apply text-brand-primary-dark;
+    @apply text-accent-strong;
   }
+  /* The quote rule is a typographic device (brief §2.1's hairline-rules
+     row), not the banned colored card edge (§2.4): it draws in rule-token
+     ink, at the strong rule width, and never in brand/accent color. */
   .rich-text blockquote {
-    @apply border-s-4 border-brand-primary/30 ps-4 text-brand-ink-muted;
+    @apply border-s-strong border-rule-strong ps-md text-text-secondary;
   }
   .rich-text code {
-    @apply rounded-brand bg-brand-ink/5 px-1 py-0.5 text-sm;
+    @apply rounded-brand bg-text-primary/5 px-2xs py-3xs font-mono text-caption;
   }
   .rich-text pre {
-    @apply overflow-x-auto rounded-brand bg-brand-ink/5 p-4 text-sm;
+    @apply overflow-x-auto rounded-brand bg-text-primary/5 p-md font-mono text-caption;
   }
   .rich-text hr {
-    @apply my-6 border-brand-ink/10;
+    @apply my-lg border-t-hairline border-t-rule-hairline;
   }
 }
 
