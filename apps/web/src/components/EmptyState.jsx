@@ -14,19 +14,27 @@
 //
 // The admin has no motif layer at all (admin identity story): the room is
 // not a preset, so nothing here is shared with it.
+// The block sits inside a Plate, which is Field Guide's moment 3: "a section
+// with no content yet renders the empty-state motif inside the plate frame
+// with the label line blank and one plain sentence under it". The plate
+// draws no frame and takes no space in the other five presets, so this is
+// the same empty state they already had.
 import Motif from './editorial/Motif.jsx';
+import Plate from './editorial/Plate.jsx';
 import Rule from './editorial/Rule.jsx';
 
 export default function EmptyState({ title, description, action = null }) {
   return (
     <div className="py-2xl">
       <Rule />
-      <Motif slot="empty-state" className="mt-lg" />
-      <h2 className="mt-lg font-heading text-h3 font-semibold text-text-primary">{title}</h2>
-      {description ? (
-        <p className="mt-xs max-w-prose text-body text-text-secondary">{description}</p>
-      ) : null}
-      {action ? <div className="mt-md">{action}</div> : null}
+      <Plate className="mt-lg">
+        <Motif slot="empty-state" />
+        <h2 className="mt-lg font-heading text-h3 font-semibold text-text-primary">{title}</h2>
+        {description ? (
+          <p className="mt-xs max-w-prose text-body text-text-secondary">{description}</p>
+        ) : null}
+        {action ? <div className="mt-md">{action}</div> : null}
+      </Plate>
     </div>
   );
 }

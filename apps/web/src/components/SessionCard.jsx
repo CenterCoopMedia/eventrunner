@@ -20,6 +20,7 @@ import {
   downloadIcs,
   icsFileName,
 } from '../utils/calendar.js';
+import SpecimenLabel from './editorial/SpecimenLabel.jsx';
 import Tag from './editorial/Tag.jsx';
 
 /**
@@ -428,9 +429,14 @@ export default function SessionCard({
             </h3>
             <TypeBadge type={session.type} />
           </div>
-          {session.location ? (
-            <p className="mt-2xs font-data text-caption text-text-secondary">{session.location}</p>
-          ) : null}
+          {/* The room, as a specimen label (brief §4.5). Under five presets
+              the label draws no rules and shows no field name, so this is
+              the caption line it has always been; under Field Guide the same
+              markup is the collection tag the story asks for. */}
+          <SpecimenLabel
+            className="mt-2xs"
+            fields={[{ key: 'Place', value: session.location }]}
+          />
           {session.description ? (
             <p
               className="mt-xs max-w-prose text-body text-text-secondary"

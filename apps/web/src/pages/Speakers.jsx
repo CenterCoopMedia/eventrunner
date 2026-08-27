@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import SpecimenLabel from '../components/editorial/SpecimenLabel.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
 
 export default function Speakers() {
@@ -53,7 +54,7 @@ export default function Speakers() {
         // and the affiliation in the data face beside it. A rule replaces
         // the card border, so nothing here is boxed.
         <ul className="mt-lg">
-          {speakers.map((speaker) => {
+          {speakers.map((speaker, index) => {
             // jobTitle and organization are separate canonical fields, not
             // the one free-text "Role, Organization" string the old
             // name-joined store carried. Either may be blank.
@@ -79,11 +80,18 @@ export default function Speakers() {
                       {speaker.displayName}
                     </h2>
                   </Link>
-                  {affiliation ? (
-                    <p className="mt-2xs font-data text-caption text-text-secondary">
-                      {affiliation}
-                    </p>
-                  ) : null}
+                  {/* The credit line as a specimen label (visual story,
+                      Field Guide, moment 2): the directory reads as the
+                      index of a collection rather than a grid of profile
+                      cards. The pencil line goes under the FIRST entry only
+                      — "at most one per page" — and it is off until a client
+                      turns marginalia on. Every other preset renders the
+                      same caption line it always did. */}
+                  <SpecimenLabel
+                    className="mt-2xs"
+                    pencil={index === 0}
+                    fields={[{ key: 'Affiliation', value: affiliation }]}
+                  />
                 </div>
                 {speaker.bio ? (
                   <p

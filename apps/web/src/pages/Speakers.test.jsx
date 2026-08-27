@@ -78,7 +78,13 @@ describe('Speakers', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Rae Okonkwo' })).toHaveClass(
       'font-heading',
     );
-    expect(screen.getByText('Editor, [Demo] Cooperative')).toHaveClass('font-data');
+    // The credit line is a specimen label (brief §4.5) — a ruled block in
+    // Field Guide, the same plain caption line everywhere else — so the
+    // data face sits on the field, and the value is the text inside it.
+    expect(screen.getByText('Editor, [Demo] Cooperative').closest('p')).toHaveClass(
+      'specimen-label__field',
+      'font-data',
+    );
   });
 
   it('gates on the speakers feature flag', () => {

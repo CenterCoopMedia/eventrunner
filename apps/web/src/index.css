@@ -166,6 +166,59 @@
     border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
   }
 
+  /* Botanical plate: a framed opener, drawn as a DOUBLE hairline (brief
+     §4.5). The border is the inner rule and the outline is the outer one,
+     both at --plate-frame-width, so the doubling needs no second element.
+     An outline is drawn outside the box and takes no space, which is what
+     keeps a preset that leaves the width at zero completely unchanged —
+     and --plate-pad is zero there too, so the wrapper adds nothing at all.
+     A plate holds linework and words. It never holds a photograph. */
+  .plate {
+    border: var(--plate-frame-width) solid rgb(var(--plate-frame-rgb));
+    outline: var(--plate-frame-width) solid rgb(var(--plate-frame-rgb));
+    outline-offset: var(--space-3xs);
+    padding: var(--plate-pad);
+  }
+
+  /* The plate number in a folio (visual story, Field Guide, moment 1):
+     "PLATE III · SATURDAY 14 MARCH". Real sequence data, so it is real text
+     in the document — and `display: none` in the five presets that are not
+     plate books keeps it out of the accessibility tree there rather than
+     leaving a screen reader to read a number the page never sets. */
+  .plate-number {
+    display: var(--plate-number-display);
+  }
+
+  /* Specimen label: the collection tag (brief §4.5). A ruled block, never a
+     chip and never a pill — the radius stays out of this device entirely.
+     At zero rule width and zero padding it IS the caption line it replaced,
+     which is how five presets keep the page they already had. */
+  .specimen-label {
+    border-block: var(--specimen-label-rule-width) solid rgb(var(--specimen-label-rule-rgb));
+    padding-block: var(--specimen-label-pad);
+  }
+  .specimen-label__key {
+    display: var(--specimen-label-key-display);
+    padding-inline-end: var(--space-2xs);
+    font-size: var(--text-folio);
+    letter-spacing: var(--text-folio-tracking);
+    text-transform: uppercase;
+  }
+
+  /* Marginalia: the pen that went over the page afterwards. Off until a
+     client turns it on (--marginalia-display), decorative, inert to the
+     pointer, and STATIC — no draw-on animation in any preset. */
+  .marginalia {
+    display: var(--marginalia-display);
+    pointer-events: none;
+    color: rgb(var(--marginalia-rgb));
+  }
+  .marginalia svg {
+    display: block;
+    inline-size: 100%;
+    block-size: 0.375rem;
+  }
+
   /* Motif slot (brief §2.3, §3.8; components/editorial/Motif.jsx).
      ONE of the two render forms the brief allows: the slot token is a
      mask-image and the paint is --color-ink-motif, so a drawing inherits

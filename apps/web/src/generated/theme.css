@@ -178,7 +178,13 @@
 
   /* Tier 3 — plate contract (brief §3.1). */
   --plate-frame-width: 0;
-  --plate-pad: var(--space-md);
+  --plate-pad: 0;
+  --plate-number-display: none;
+
+  /* Tier 3 — specimen-label contract (brief §3.1). */
+  --specimen-label-rule-width: 0;
+  --specimen-label-pad: 0;
+  --specimen-label-key-display: none;
 
   /* Tier 3 — map-grid contract (brief §3.1). */
   --map-grid-size: 0;
@@ -254,6 +260,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -301,6 +308,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -348,6 +356,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -399,6 +408,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -446,6 +456,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -493,6 +504,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -540,6 +552,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -587,6 +600,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -634,6 +648,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -681,6 +696,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -728,6 +744,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -775,6 +792,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -822,6 +840,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -869,6 +888,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);
@@ -916,6 +936,7 @@
   --folio-text-rgb: var(--color-text-secondary-rgb);
   --schedule-grid-rgb: var(--rule-hairline-rgb);
   --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
   --map-grid-rgb: var(--rule-hairline-rgb);
   --route-mark-rgb: var(--color-accent-rgb);
   --route-mark-ink-rgb: var(--color-surface-rgb);

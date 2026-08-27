@@ -52,9 +52,14 @@
   "shape": { "radius": "sharp", "texture": "paper", "density": "comfortable" },
   "motifSet": "botanical",
 
-  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The plate frame is a hairline; the double rule is the plate device's own doubling.",
+  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The plate frame is a hairline; the double rule is the plate device's own doubling. The specimen label is the one preset that turns its rules and its field names on: a label in this world is a tag, and a tag states what each field is.",
   "tokens": {
     "--plate-frame-width": "var(--rule-hairline-width)",
+    "--plate-pad": "var(--space-md)",
+    "--plate-number-display": "inline",
+    "--specimen-label-rule-width": "var(--rule-hairline-width)",
+    "--specimen-label-pad": "var(--space-2xs)",
+    "--specimen-label-key-display": "inline",
     "--folio-font": "var(--font-data)",
     "--marginalia-display": "none"
   },

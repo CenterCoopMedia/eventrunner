@@ -19,6 +19,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import { PlateNumber } from '../components/editorial/Plate.jsx';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 
@@ -197,9 +198,18 @@ export default function Schedule() {
               title={activeDay.label}
               folio={
                 formatDayDate(activeDay, eventConfig.timezone) ? (
-                  <time dateTime={activeDay.date}>
-                    {formatDayDate(activeDay, eventConfig.timezone)}
-                  </time>
+                  <>
+                    {/* "PLATE III · SATURDAY 14 MARCH" (visual story, Field
+                        Guide, moment 1). The number is the day's real
+                        position in the programme, so it is sequence data and
+                        never a decorative 01/02/03 (brief §2.4). It is set
+                        only where the page is a plate book: the token, not a
+                        theme test in here, decides that. */}
+                    <PlateNumber position={days.indexOf(activeDay) + 1} />
+                    <time dateTime={activeDay.date}>
+                      {formatDayDate(activeDay, eventConfig.timezone)}
+                    </time>
+                  </>
                 ) : null
               }
             />

@@ -54,11 +54,20 @@
     "--schedule-data-size": "var(--text-caption)",
     "--schedule-number-display": "none"
   },
-  "$plate-note": "The Field Guide botanical plate (brief §4.5): a framed drawing with a hairline border and a plate number in the folio style. A plate is drawn linework and never a hero image.",
+  "$plate-note": "The Field Guide botanical plate (brief §4.5): a framed drawing with a hairline border and a plate number in the folio style. A plate is drawn linework and never a hero image. The frame is a DOUBLE hairline, drawn as a border plus an outline at the same width. Zero frame and zero pad is the device off: the wrapper then adds no rule, no space, and no reflow, which is what every preset but Field Guide holds.",
   "plate": {
     "--plate-frame-rgb": "--rule-hairline-rgb",
     "--plate-frame-width": "0",
-    "--plate-pad": "var(--space-md)"
+    "--plate-pad": "0",
+    "$number-note": "The plate number is real sequence data — day three is PLATE III — never a decorative zero-padded number (brief §2.4). `none` keeps it out of the document and out of the accessibility tree in every preset that is not a plate book.",
+    "--plate-number-display": "none"
+  },
+  "$specimen-label-note": "The Field Guide specimen label (brief §4.5): a small ruled block stating a name, a date, and a place. It carries session metadata and speaker credit lines, it sits below or beside the title it labels, and it is never a chip and never takes a pill radius. Zero rule width, zero padding, and a hidden key is the device off: the block is then the plain caption line it replaced.",
+  "specimen-label": {
+    "--specimen-label-rule-rgb": "--rule-hairline-rgb",
+    "--specimen-label-rule-width": "0",
+    "--specimen-label-pad": "0",
+    "--specimen-label-key-display": "none"
   },
   "$map-grid-note": "The Atlas map grid (brief §4.6): a faint coordinate grid behind a section, held below the hairline contrast level, with pointer-events: none. Zero size turns it off.",
   "map-grid": {

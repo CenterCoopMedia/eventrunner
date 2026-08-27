@@ -699,6 +699,11 @@ const PRESETS = Object.freeze({
     motifSet: 'botanical',
     tokens: {
       '--plate-frame-width': 'var(--rule-hairline-width)',
+      '--plate-pad': 'var(--space-md)',
+      '--plate-number-display': 'inline',
+      '--specimen-label-rule-width': 'var(--rule-hairline-width)',
+      '--specimen-label-pad': 'var(--space-2xs)',
+      '--specimen-label-key-display': 'inline',
       '--folio-font': 'var(--font-data)',
       '--marginalia-display': 'none',
     },
