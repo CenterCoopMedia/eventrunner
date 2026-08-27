@@ -103,7 +103,7 @@
   --rule-strong-width: var(--er-width-strong);
   --rule-nameplate-width: var(--er-width-nameplate);
 
-  /* Tier 2 — font roles (brief §3.2). The active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright — all resolved to a bundled set id (spec §7.4). Preset: Newsroom. */
+  /* Tier 2 — font roles (brief §3.2). The active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright — all resolved to a bundled set id (spec §7.4). Preset: newsroom. */
   --font-heading: 'Fraunces', 'Source Serif 4', Georgia, serif;
   --font-body: 'Newsreader', 'Source Serif 4', Georgia, serif;
   --font-data: 'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
@@ -203,7 +203,7 @@
   /* Tier 3 — marginalia contract (brief §3.1). */
   --marginalia-display: none;
 
-  /* Preset remaps — Newsroom and its picked options. An option remaps existing tier 2 and tier 3 tokens and never adds a property name (brief §3.4), so every name here is declared above. */
+  /* Preset remaps — newsroom and its picked options. An option remaps existing tier 2 and tier 3 tokens and never adds a property name (brief §3.4), so every name here is declared above. */
   --folio-font: var(--font-data);
   --section-rule-width: var(--rule-strong-width);
   --nameplate-align: start;
@@ -371,7 +371,7 @@
    properties: no block below introduces a property name the blocks
    above do not already carry. data-theme picks which one wins. */
 
-/* Institutional — light. */
+/* civic — light. */
 :root[data-theme='civic'][data-mode='light'],
 [data-theme='civic'][data-mode='light'] {
   --brand-primary-rgb: 26 82 150;
@@ -419,7 +419,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Institutional — dark. */
+/* civic — dark. */
 :root[data-theme='civic'][data-mode='dark'],
 [data-theme='civic'][data-mode='dark'] {
   --brand-primary-rgb: 128 178 238;
@@ -467,7 +467,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Newsroom — light, the active preset, with this deployment's overrides. */
+/* newsroom — light, the active preset, with this deployment's overrides. */
 :root[data-theme='newsroom'][data-mode='light'],
 [data-theme='newsroom'][data-mode='light'] {
   --brand-primary-rgb: 178 30 50;
@@ -515,7 +515,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Newsroom — dark, the active preset, with this deployment's overrides. */
+/* newsroom — dark, the active preset, with this deployment's overrides. */
 :root[data-theme='newsroom'][data-mode='dark'],
 [data-theme='newsroom'][data-mode='dark'] {
   --brand-primary-rgb: 240 122 134;
@@ -563,7 +563,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Broadsheet — light. */
+/* broadsheet — light. */
 :root[data-theme='broadsheet'][data-mode='light'],
 [data-theme='broadsheet'][data-mode='light'] {
   --brand-primary-rgb: 26 58 110;
@@ -611,7 +611,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Broadsheet — dark. */
+/* broadsheet — dark. */
 :root[data-theme='broadsheet'][data-mode='dark'],
 [data-theme='broadsheet'][data-mode='dark'] {
   --brand-primary-rgb: 130 170 226;
@@ -659,7 +659,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Atlas — light. */
+/* atlas — light. */
 :root[data-theme='atlas'][data-mode='light'],
 [data-theme='atlas'][data-mode='light'] {
   --brand-primary-rgb: 180 38 34;
@@ -707,7 +707,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Atlas — dark. */
+/* atlas — dark. */
 :root[data-theme='atlas'][data-mode='dark'],
 [data-theme='atlas'][data-mode='dark'] {
   --brand-primary-rgb: 244 122 112;
@@ -755,7 +755,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Field Guide — light. */
+/* field-guide — light. */
 :root[data-theme='field-guide'][data-mode='light'],
 [data-theme='field-guide'][data-mode='light'] {
   --brand-primary-rgb: 43 86 54;
@@ -803,7 +803,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Field Guide — dark. */
+/* field-guide — dark. */
 :root[data-theme='field-guide'][data-mode='dark'],
 [data-theme='field-guide'][data-mode='dark'] {
   --brand-primary-rgb: 142 192 142;
@@ -851,7 +851,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Zine — light. */
+/* zine — light. */
 :root[data-theme='zine'][data-mode='light'],
 [data-theme='zine'][data-mode='light'] {
   --brand-primary-rgb: 198 26 84;
@@ -899,7 +899,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Zine — dark. */
+/* zine — dark. */
 :root[data-theme='zine'][data-mode='dark'],
 [data-theme='zine'][data-mode='dark'] {
   --brand-primary-rgb: 244 124 166;

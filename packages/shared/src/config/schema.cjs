@@ -283,7 +283,7 @@ function validateTheme(theme) {
         const spec = preset.options?.[group];
         if (!spec) {
           errors.push(
-            `theme.optionPicks.${group}: the ${preset.label} preset has no option group ` +
+            `theme.optionPicks.${group}: the ${preset.id} preset has no option group ` +
             `by that name (expected ${Object.keys(preset.options || {}).join(', ')})`,
           );
           continue;

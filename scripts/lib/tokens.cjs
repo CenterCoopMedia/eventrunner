@@ -434,7 +434,7 @@ function rootBlock(theme, tokens) {
     'Tier 2 — font roles (brief §3.2). The active preset\'s type map, then its ' +
     'picked heading-face option, then any role config/theme.fonts names ' +
     'outright — all resolved to a bundled set id (spec §7.4).' +
-    (preset ? ` Preset: ${preset.label}.` : ' No preset: config/theme.fonts only.'),
+    (preset ? ` Preset: ${preset.id}.` : ' No preset: config/theme.fonts only.'),
   );
   for (const role of THEME_FONT_ROLES) {
     if (stacks[role]) push(`--font-${role}`, stacks[role]);
@@ -489,7 +489,7 @@ function rootBlock(theme, tokens) {
   const presetTokens = resolvePresetTokens(theme);
   if (Object.keys(presetTokens).length > 0 || Object.keys(componentStacks).length > 0) {
     group(
-      `Preset remaps — ${preset ? preset.label : 'none'} and its picked options. ` +
+      `Preset remaps — ${preset ? preset.id : 'none'} and its picked options. ` +
       'An option remaps existing tier 2 and tier 3 tokens and never adds a ' +
       'property name (brief §3.4), so every name here is declared above.',
     );
@@ -682,7 +682,7 @@ function buildTokenCss(theme, { tokensDir } = {}) {
             scopedSelector(`[data-theme='${id}'][data-mode='${mode}']`),
             preset.names,
             preset.values[mode],
-            `${getPreset(id).label} — ${mode}` +
+            `${id} — ${mode}` +
             (id === activePreset ? ', the active preset, with this deployment\'s overrides.' : '.'),
           ),
         );

@@ -50,6 +50,7 @@ import {
   rgbTripleToHex,
 } from '../../lib/themeRuntime.js';
 import { clearThemePreview } from '../themePreview.js';
+import { choiceCopy, presetCopy } from '../presetCopy.js';
 import {
   DestructiveConfirm,
   Notice,
@@ -302,6 +303,9 @@ export default function AdminBranding() {
     contrastFailures.find((failure) => failure.mode === mode && failure.foreground === key);
 
   const preset = getPreset(form.preset);
+  // The words for the picked style. The rendering values and the copy are
+  // two generated outputs of one source, so a style always has both.
+  const copy = presetCopy(form.preset);
   const accent = adminAccentVerdict(candidate, proofMode);
 
   async function submit(event) {
@@ -378,7 +382,7 @@ export default function AdminBranding() {
                 value={form.preset}
                 options={[
                   { value: '', label: 'None — this deployment’s stored palette' },
-                  ...PRESET_IDS.map((id) => ({ value: id, label: getPreset(id).label })),
+                  ...PRESET_IDS.map((id) => ({ value: id, label: presetCopy(id).label })),
                 ]}
                 onChange={(value) =>
                   setForm((c) => ({
@@ -391,9 +395,9 @@ export default function AdminBranding() {
                 }
                 error={fieldErrors.get('theme.preset')}
               />
-              {preset ? (
+              {copy ? (
                 <p className="max-w-[65ch] text-caption text-admin-ink-secondary">
-                  {preset.summary}
+                  {copy.summary} <span className="text-admin-ink-data">Best for: {copy.bestFor}</span>
                 </p>
               ) : null}
             </div>
@@ -402,22 +406,21 @@ export default function AdminBranding() {
           {preset ? (
             <Panel
               title="Options"
-              description={`The curated choices ${preset.label} offers. Each one remaps tokens the preset already declares — it never invents a value.`}
+              description={`The curated choices ${copy.label} offers. Each one remaps tokens the preset already declares — it never invents a value.`}
             >
               <div className="flex flex-col gap-sm">
                 {Object.entries(preset.options ?? {}).map(([group, spec]) => {
-                  const picked = (spec.choices ?? []).find(
-                    (choice) => choice.id === form.optionPicks[group],
-                  );
+                  const groupCopy = copy.options[group];
+                  const picked = choiceCopy(form.preset, group, form.optionPicks[group]);
                   return (
                     <SelectField
                       key={group}
-                      label={spec.label}
-                      hint={picked?.why ?? spec.prompt}
+                      label={groupCopy.label}
+                      hint={picked?.why ?? groupCopy.prompt}
                       value={form.optionPicks[group] ?? spec.default}
                       options={(spec.choices ?? []).map((choice) => ({
                         value: choice.id,
-                        label: choice.label,
+                        label: groupCopy.choices[choice.id].label,
                       }))}
                       onChange={(value) =>
                         setForm((c) => ({

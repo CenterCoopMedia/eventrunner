@@ -4,19 +4,80 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const { buildPresetCatalog, PRESET_ORDER, TARGET } = require('./build-preset-catalog.cjs');
+const {
+  buildPresetCatalog,
+  PRESET_ORDER,
+  TARGET,
+  COPY_TARGET,
+  DOC_TARGET,
+} = require('./build-preset-catalog.cjs');
 const { PRESETS, ADMIN_TOKEN_SET, THEME_MOTIF_SET_IDS } = require('shared/theme');
 
-test('the committed catalog matches the design tokens it mirrors', () => {
-  // The source of truth is design/tokens/. This file is the mirror that
-  // reaches Cloud Functions, where only functions/ is uploaded and
-  // packages/shared arrives as a packed tarball. A stale mirror would let
-  // the browser and the publish path resolve a preset differently.
-  assert.equal(
-    fs.readFileSync(TARGET, 'utf8'),
-    buildPresetCatalog(),
-    'packages/shared/src/presetCatalog.cjs is stale — run node scripts/build-preset-catalog.cjs',
+test('all three committed outputs match the design tokens they mirror', () => {
+  // The source of truth is design/tokens/. One read of it writes three
+  // files, split by who reads them: the rendering values that reach Cloud
+  // Functions, the words the theme editor puts on screen, and the design
+  // prose a human reads. A stale mirror would let the browser and the
+  // publish path resolve a style differently, or let the editor describe a
+  // choice the catalog no longer offers.
+  const built = buildPresetCatalog();
+  const stale = (file) => `${file} is stale — run node scripts/build-preset-catalog.cjs`;
+  assert.equal(fs.readFileSync(TARGET, 'utf8'), built.runtime, stale(TARGET));
+  assert.equal(fs.readFileSync(COPY_TARGET, 'utf8'), built.copy, stale(COPY_TARGET));
+  assert.equal(fs.readFileSync(DOC_TARGET, 'utf8'), built.doc, stale(DOC_TARGET));
+});
+
+test('the runtime catalog carries rendering values and no prose', () => {
+  // Owner review 2026-08-27. `packages/shared` is packed into
+  // functions/vendor and uploaded on every deploy, where a style's name and
+  // the reason behind a curated choice cannot be read by anything. The
+  // runtime catalog carries what renders; the words live beside the editor
+  // that shows them, and the design notes live in the documentation
+  // catalog.
+  const prose = ['label', 'summary', 'bestFor', 'why', 'prompt'];
+  const found = [];
+  const walk = (value, trail) => {
+    if (Array.isArray(value)) return value.forEach((inner) => walk(inner, trail));
+    if (!value || typeof value !== 'object') return;
+    for (const [key, inner] of Object.entries(value)) {
+      if (prose.includes(key)) found.push(`${trail}.${key}`);
+      walk(inner, `${trail}.${key}`);
+    }
+  };
+  walk(PRESETS, 'PRESETS');
+  assert.deepEqual(found, []);
+
+  // What it does carry is everything the resolver asks it for.
+  for (const [id, preset] of Object.entries(PRESETS)) {
+    assert.deepEqual(
+      Object.keys(preset).filter((key) => key !== 'componentFonts' && key !== 'tokens').sort(),
+      ['fonts', 'id', 'motifSet', 'options', 'palette', 'shape'],
+      `${id} carries the rendering values and nothing else`,
+    );
+  }
+
+  // And the copy output carries a word for every id the runtime offers.
+  const copy = fs.readFileSync(COPY_TARGET, 'utf8');
+  for (const [id, preset] of Object.entries(PRESETS)) {
+    assert.match(copy, new RegExp(`(^|\\W)'?${id}'?:`, 'm'), `${id} has copy`);
+    for (const group of Object.keys(preset.options)) {
+      assert.match(copy, new RegExp(`${group}:`), `${id}.${group} has copy`);
+    }
+  }
+});
+
+test('the documentation catalog names every style and marks the recommended choice', () => {
+  const doc = fs.readFileSync(DOC_TARGET, 'utf8');
+  assert.match(doc, /GENERATED FILE/);
+  for (const id of PRESET_ORDER) {
+    assert.ok(doc.includes(`\`data-theme="${id}"\``), `${id} is documented`);
+  }
+  // One "(recommended)" marker per option group across the whole catalog.
+  const groups = Object.values(PRESETS).reduce(
+    (total, preset) => total + Object.keys(preset.options).length,
+    0,
   );
+  assert.equal(doc.match(/\*\(recommended\)\*/g).length, groups);
 });
 
 test('the mirror carries every preset, and carries no note key', () => {
@@ -38,8 +99,6 @@ test('the mirror carries every preset, and carries no note key', () => {
 test('every preset states the whole contract the brief §4 requires', () => {
   for (const [id, preset] of Object.entries(PRESETS)) {
     assert.equal(preset.id, id);
-    assert.ok(preset.label, `${id} has a label`);
-    assert.ok(preset.summary, `${id} states its personality in one line`);
 
     // Two authored palettes, the same roles in both. "Dark mode is its own
     // palette. It is never light mode reversed" (brief §3.3).
@@ -81,10 +140,11 @@ test('every preset states the whole contract the brief §4 requires', () => {
       assert.equal(new Set(ids).size, ids.length, `${id} ${group}: choice ids are unique`);
       assert.ok(ids.includes(spec.default), `${id} ${group}: the default is one of the choices`);
       for (const choice of spec.choices) {
-        // "The visual-story specs define the options and state, one sentence
-        // each, why an option still belongs" (brief §4).
-        assert.ok(choice.label, `${id} ${group}/${choice.id} has a label`);
-        assert.ok(choice.why && choice.why.length > 20, `${id} ${group}/${choice.id} says why`);
+        // A choice remaps tokens, or fonts, or both — never nothing.
+        assert.ok(
+          choice.tokens || choice.fonts,
+          `${id} ${group}/${choice.id} remaps something`,
+        );
       }
     }
   }

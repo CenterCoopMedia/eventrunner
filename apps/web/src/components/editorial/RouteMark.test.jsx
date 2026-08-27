@@ -104,7 +104,9 @@ describe('map grid', () => {
     // A background with a zero size paints nothing, so the size token turns
     // the device off with no second token and no theme test.
     expect(themeCss).toContain('--map-grid-size: 0;');
-    const atlas = themeCss.match(/Atlas — light[\s\S]*?\}/)[0];
+    // The generated stylesheet names each block by style ID, not by label:
+    // the runtime catalog carries no labels since the copy split.
+    const atlas = themeCss.match(/atlas — light[\s\S]*?\}/)[0];
     expect(atlas).toContain('--map-grid-rgb:');
   });
 
