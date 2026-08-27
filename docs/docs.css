@@ -501,3 +501,59 @@ h6:hover > .heading-anchor {
     columns: 1;
   }
 }
+
+/* ---------- Print ----------
+
+   The palette switch is in docs/tokens.css, which re-points the ink, the
+   ground, and the rules at the light values under print media. This block
+   declares no colour; it only decides what a sheet of paper is for.
+
+   What comes off the printer is the document: the masthead so the page says
+   where it came from, the breadcrumbs so it says where it sits, the contents
+   list, and the article. The docket, the site nav, and the previous/next
+   pager are ways of getting to another page, and paper cannot follow a link,
+   so they leave rather than sit there dead. With the docket gone the layout
+   is one column -- the track has to go too, or the article would keep the
+   empty 15rem beside it. */
+
+@media print {
+  .docs-nav,
+  .page-nav,
+  .site-header nav {
+    display: none;
+  }
+
+  .docs-layout {
+    display: block;
+    padding-block: var(--space-md);
+  }
+
+  /* The measure is set for a screen column; a sheet is its own measure. */
+  .prose {
+    max-width: none;
+  }
+
+  /* A heading should not be the last thing on a sheet, and a table or a code
+     block should not be split when it can be helped. */
+  .prose h1,
+  .prose h2,
+  .prose h3,
+  .prose h4 {
+    break-after: avoid;
+  }
+
+  .prose pre,
+  .table-scroll {
+    break-inside: avoid;
+  }
+
+  /* Nothing scrolls on paper: a wide table or a long line has to wrap or be
+     let out of its box, because a scroller prints as a clipped column. */
+  .table-scroll {
+    overflow-x: visible;
+  }
+
+  .prose pre code {
+    white-space: pre-wrap;
+  }
+}

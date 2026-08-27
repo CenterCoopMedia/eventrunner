@@ -143,3 +143,43 @@
     --folio-text-rgb: var(--color-text-secondary-rgb);
   }
 }
+
+/* Print palette. Paper has no dark mode: a reader who prints a page from
+   a dark screen gets the light edition. Every rule on this site reads the
+   ink, ground, and rule tokens and nothing else, so re-pointing them here
+   is the whole switch and no print rule has to know a mode exists.
+
+   `prefers-color-scheme` still reports dark while printing, so the block
+   above still matches. This one carries the same `:root` specificity and
+   comes after it, which is what settles it. The product needs a selector
+   list here because a runtime writes its mode onto the element; a static
+   site has no runtime, so source order is enough. */
+@media print {
+  :root {
+    color-scheme: light;
+
+    --brand-primary-rgb: 178 30 50;
+    --brand-primary-dark-rgb: 140 20 38;
+    --brand-surface-rgb: 246 247 249;
+    --brand-surface-alt-rgb: 236 238 242;
+    --brand-ink-rgb: 22 24 29;
+    --brand-ink-muted-rgb: 88 95 108;
+    --semantic-success-rgb: 22 96 62;
+    --semantic-warning-rgb: 134 82 10;
+    --color-surface-rgb: var(--brand-surface-rgb);
+    --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+    --color-text-primary-rgb: var(--brand-ink-rgb);
+    --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+    --color-accent-rgb: var(--brand-primary-rgb);
+    --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+    --rule-hairline-rgb: 215 216 218;
+    --rule-strong-rgb: 123 124 128;
+    --rule-nameplate-rgb: 22 24 29;
+    --color-border-control-rgb: 130 131 135;
+    --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+    --nameplate-text-rgb: var(--color-text-primary-rgb);
+    --section-rule-rgb: var(--rule-strong-rgb);
+    --folio-rule-rgb: var(--rule-hairline-rgb);
+    --folio-text-rgb: var(--color-text-secondary-rgb);
+  }
+}

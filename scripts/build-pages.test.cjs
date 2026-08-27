@@ -710,6 +710,35 @@ test('the two mode palettes declare exactly the same tokens', () => {
   );
 });
 
+test('printing a page from a dark screen gets the light edition', () => {
+  // "Paper has no dark mode" (design-reference.md, Print) binds this site too,
+  // and it is the reader on a dark screen who finds out. Every rule here reads
+  // the ink, ground, and rule tokens, so re-pointing them under print media is
+  // the whole switch.
+  const [light, , print] = paletteBlocks(TOKENS_CSS);
+  assert.ok(print, 'docs/tokens.css declares no print palette');
+  assert.match(
+    TOKENS_CSS,
+    /@media print \{\n {2}:root \{\n {4}color-scheme: light;/,
+    'the print block does not open on a light :root',
+  );
+  assert.deepEqual(
+    Object.keys(print).sort(),
+    Object.keys(light).sort(),
+    'the print palette is not token-for-token the light one',
+  );
+  for (const name of Object.keys(light)) {
+    assert.deepEqual(print[name], light[name], `${name} does not print its light value`);
+  }
+
+  // `prefers-color-scheme` still reports dark while printing, so the dark
+  // block still matches and only source order settles it.
+  assert.ok(
+    TOKENS_CSS.indexOf('@media print') > TOKENS_CSS.indexOf('@media (prefers-color-scheme: dark)'),
+    'the print block does not come after the dark block, so dark would win on paper',
+  );
+});
+
 test('the token palette clears the contrast ratios its roles promise', () => {
   const [light, dark] = paletteBlocks(TOKENS_CSS);
 
