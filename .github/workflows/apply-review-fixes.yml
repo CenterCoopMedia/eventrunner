@@ -1,0 +1,35 @@
+name: Apply review fixes once
+
+on:
+  push:
+    branches:
+      - agent/plain-language-copy
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/plain-language-copy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply exact replacements
+        run: node scripts/dev/apply-review-fixes.cjs
+      - name: Remove temporary helpers
+        run: |
+          rm -f .github/workflows/apply-review-fixes.yml
+          rm -f scripts/dev/apply-review-fixes.cjs
+          rm -f scripts/dev/apply-copy-edits.cjs
+      - name: Commit the review fixes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -s -m 'fix(copy): address connector review findings'
+          git push origin HEAD:agent/plain-language-copy
