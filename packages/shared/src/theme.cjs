@@ -700,6 +700,20 @@ function resolveThemePalettes(theme) {
  * Contrast is measured against the actual rendered background, not the page
  * background (interface guidelines, Colors), so each text role is measured
  * on both surfaces it can sit on.
+ *
+ * `primaryDark` is here for the same reason `primary` is: it is a rendered
+ * text pair, not a decoration. Two components put it against `surface` and
+ * they pull in opposite directions —
+ *
+ *   - `CtaBlock` paints it as the HOVER BACKGROUND of a filled button whose
+ *     label is `surface`, so the pair is surface-on-primaryDark;
+ *   - `LinkGroupBlock` (and the admin's own links, and
+ *     `SessionMaterialsList`) render it as TEXT on `surface`.
+ *
+ * Contrast is symmetric, so one pair covers both, and it has to hold at the
+ * 4.5:1 text bar in both directions. Without it a client could publish a
+ * palette whose emphasis step read fine as a background and vanished as a
+ * link — the publish gate measured `primary` and let `primaryDark` through.
  */
 const THEME_CONTRAST_PAIRS = Object.freeze([
   Object.freeze({ foreground: 'ink', background: 'surface', min: 4.5 }),
@@ -707,6 +721,7 @@ const THEME_CONTRAST_PAIRS = Object.freeze([
   Object.freeze({ foreground: 'inkMuted', background: 'surface', min: 4.5 }),
   Object.freeze({ foreground: 'inkMuted', background: 'surfaceAlt', min: 4.5 }),
   Object.freeze({ foreground: 'primary', background: 'surface', min: 4.5 }),
+  Object.freeze({ foreground: 'primaryDark', background: 'surface', min: 4.5 }),
   Object.freeze({ foreground: 'control', background: 'surface', min: 3 }),
   Object.freeze({ foreground: 'control', background: 'surfaceAlt', min: 3 }),
 ]);

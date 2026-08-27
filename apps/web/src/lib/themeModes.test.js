@@ -147,6 +147,10 @@ const TEXT_PAIRS = [
   ['--color-text-secondary-rgb', '--color-surface-rgb', 4.5],
   ['--color-text-secondary-rgb', '--color-surface-alt-rgb', 4.5],
   ['--color-accent-rgb', '--color-surface-rgb', 4.5],
+  // The emphasis step renders as text (LinkGroupBlock, SessionMaterialsList)
+  // and as a filled button's hover ground under a surface label (CtaBlock).
+  // Contrast is symmetric, so one measurement covers both readings.
+  ['--brand-primary-dark-rgb', '--color-surface-rgb', 4.5],
   // A rule is structure, not text, so it holds the non-text bar only in
   // its strong weight; a hairline is deliberately below it.
   ['--rule-strong-rgb', '--color-surface-rgb', 3],
@@ -231,6 +235,9 @@ describe.each(THEME_PRESET_IDS.map((id) => ({ id, preset: getPreset(id) })))(
         ['inkMuted', 'surface', 4.5],
         ['inkMuted', 'surfaceAlt', 4.5],
         ['primary', 'surface', 4.5],
+        // The emphasis step is a rendered text pair too: a filled button's
+        // hover ground under a surface label, and a link's colour on surface.
+        ['primaryDark', 'surface', 4.5],
         ['accent', 'surface', 4.5],
       ];
       for (const [fg, bg, bar] of pairs) {

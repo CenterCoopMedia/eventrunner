@@ -13,6 +13,11 @@ const {
   DARK_GROUND_RGB,
   DARK_MIN_CONTRAST,
   DARK_MIN_CONTRAST_UI,
+  THEME_CONTRAST_PAIRS,
+  THEME_PRESET_IDS,
+  findThemeContrastFailures,
+  getPreset,
+  rgbToHex,
   contrastRatio,
   relativeLuminance,
   mixRgb,
@@ -176,6 +181,71 @@ test('rule colors invert with the mode, so a rule reads on either ground', () =>
     relativeLuminance(dark.hairline) > relativeLuminance(DARK_GROUND_RGB.surface),
     'dark hairline lifts off the ground',
   );
+});
+
+// ------------------------------------- the publish-time contract (brief §5.2)
+
+test('the contrast contract measures primaryDark on surface, in both directions', () => {
+  // CtaBlock paints primaryDark as the hover BACKGROUND under a surface
+  // label; LinkGroupBlock and SessionMaterialsList render it as TEXT on
+  // surface. Contrast is symmetric, so the one pair covers both — and it is
+  // the text bar, because one of the two really is text.
+  const pair = THEME_CONTRAST_PAIRS.find(
+    (p) => p.foreground === 'primaryDark' && p.background === 'surface',
+  );
+  assert.ok(pair, 'primaryDark on surface is part of the contract');
+  assert.equal(pair.min, 4.5);
+});
+
+test('a primaryDark that cannot be read on the surface fails the publish gate', () => {
+  // A pre-preset document: its stored colors ARE the light palette, so the
+  // failure lands in light mode. The dark mode is derived and lifted, so it
+  // clears the bar on its own — which is the point of measuring both.
+  const failing = {
+    colors: {
+      ...Object.fromEntries(
+        Object.entries(LIGHT).map(([role, rgb]) => [role, rgbToHex(rgb)]),
+      ),
+      // Two steps off the surface: fine as a tint, unreadable as a link.
+      primaryDark: rgbToHex(mixRgb(LIGHT.surface, LIGHT.primary, 0.2)),
+    },
+  };
+  const failures = findThemeContrastFailures(failing);
+  const named = failures.filter((f) => f.foreground === 'primaryDark');
+  assert.equal(named.length, 1, 'the pair fails once, in the mode that fails');
+  assert.equal(named[0].mode, 'light');
+  assert.equal(named[0].background, 'surface');
+  assert.match(named[0].message, /primaryDark on surface in light mode is \d+\.\d\d:1/);
+  assert.ok(named[0].ratio < 4.5);
+
+  // The same document with its real emphasis step publishes clean.
+  const passing = {
+    colors: Object.fromEntries(
+      Object.entries(LIGHT).map(([role, rgb]) => [role, rgbToHex(rgb)]),
+    ),
+  };
+  assert.deepEqual(findThemeContrastFailures(passing), []);
+});
+
+test('every preset passes the whole contract, primaryDark included', () => {
+  // A designed palette must pass BY CONSTRUCTION (brief §8.1), so extending
+  // the contract has to be checked against the six palettes before it can
+  // ship. None of them needed retuning: the emphasis step is darker than the
+  // brand color it steps off, and the brand color already clears 4.5:1.
+  for (const id of THEME_PRESET_IDS) {
+    assert.deepEqual(findThemeContrastFailures({ preset: id }), [], `${id} publishes clean`);
+    const preset = getPreset(id);
+    for (const mode of ['light', 'dark']) {
+      const palette = preset.palette[mode];
+      const ratio = contrastRatio(palette.primaryDark, palette.surface);
+      assert.ok(
+        ratio >= 4.5,
+        `${id} ${mode}: primaryDark on surface is ${ratio.toFixed(2)}:1`,
+      );
+      // And it really is the emphasis step, not a second name for primary.
+      assert.notDeepEqual(palette.primaryDark, palette.primary);
+    }
+  }
 });
 
 test('resolveMode reads the policy, and an unknown policy falls back to the default', () => {
