@@ -113,7 +113,7 @@ Four header styles, and a site picks one. The header is the site's identity, and
 
 ## Schedule style
 
-How a session is set out on the schedule. Every site style names its own choices, because a session listing is one of the two places a style is most itself — the posted or numbered agenda for Institutional, the hairline row or the lead-and-rest ranking for Newsroom, the flat, stamped, or struck block for Zine, the ruled programme or the agate block for Broadsheet, the specimen label or the field-notes column for Field Guide, the departure board, line diagram, or gazetteer list for Atlas.
+How a session is set out on the schedule. Every site style names its own choices, because a session listing is one of the two places a style is most itself — the posted or numbered agenda for Institutional, the hairline row or the lead-and-rest ranking for Newsroom, the flat block, the stamped block, or the struck folio for Zine, the ruled programme or the agate block for Broadsheet, the specimen label or the field-notes column for Field Guide, the departure board, line diagram, or gazetteer list for Atlas.
 
 Whichever is picked, the day still reads twice and both readings are first-class: a grid at wide viewports when the event lists tracks, and a time-ordered list everywhere else. A schedule style retunes how a session is drawn. It never decides which of those two views a reader gets.
 

@@ -25,7 +25,7 @@ Work down the controls in this order.
 
 **Site style.** The base look: a light palette, a dark palette, a type pairing, a shape, a header, and a default set of illustrations. Each one is finished work with a recommended configuration already chosen — you should not have to touch anything else to get a good result. The three on the launch surface have been run against real client content; the other three are fully functional and are grouped separately so you try them on your own event first. Picking a style replaces every value you have not changed yourself.
 
-**Logos and assets.** Two slots are asked for here — the primary logo and the square icon — and the other three sit behind **More image slots**: the footer logo, the social sharing image, and the favicon. All five use the same image picker the Media tab uses.
+**Logo and icon.** Two slots are asked for here — the primary logo and the square icon — and the other three sit behind **More image slots**: the footer logo, the social sharing image, and the favicon. All five use the same image picker the Media tab uses.
 
 **Main brand colour.** One colour, as a hex value. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. Leave it blank to keep the site style's own colour.
 
