@@ -3,75 +3,124 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  collectFiles,
+  extractVisibleFragments,
   findFindings,
   isExcluded,
-  isLongDashScope,
-  maskCodeToVisibleText,
-  textToScan,
 } = require('./check-copy-style.cjs');
 
-test('maskCodeToVisibleText keeps strings and JSX text but removes comments and regexes', () => {
+test('code extraction keeps strings and JSX text but removes comments and regexes', () => {
   const source = [
     "const label = 'This is robust copy.'; // robust in a comment",
     'const matcher = /regex-only-token/u; /* seamless in a block comment */',
-    'const detail = `Use a full stop — not a long dash.`;',
-    'const view = <p>Choose a style — then save it.</p>;',
+    'const detail = `Use a full stop, not a long dash.`;',
+    "const view = <p>Admin's copy stays visible.</p>;",
   ].join('\n');
-  const visible = maskCodeToVisibleText(source);
+  const visible = extractVisibleFragments(source, 'apps/web/src/example.jsx')
+    .map(({ text }) => text)
+    .join('\n');
 
   assert.match(visible, /This is robust copy\./u);
   assert.doesNotMatch(visible, /robust in a comment/u);
   assert.doesNotMatch(visible, /seamless in a block comment/u);
   assert.doesNotMatch(visible, /regex-only-token/u);
-  assert.match(visible, /Use a full stop — not a long dash\./u);
-  assert.match(visible, /Choose a style — then save it\./u);
-  assert.equal(visible.split('\n').length, source.split('\n').length);
+  assert.match(visible, /Admin's copy stays visible\./u);
 });
 
-test('findFindings reports blocked phrases and punctuation on audience-facing code lines', () => {
+test('an apostrophe in JSX text does not expose later JSX comments', () => {
+  const source = [
+    'const view = (',
+    "  <section>Admin's copy.{/* A robust internal comment. */}<span>Save.</span></section>",
+    ');',
+  ].join('\n');
+
+  assert.deepEqual(findFindings(source, 'apps/web/src/example.jsx'), []);
+});
+
+test('JSX text adjacent to an expression is checked', () => {
+  const source = 'const view = <p>A robust {name} workflow.</p>;';
+  const findings = findFindings(source, 'apps/web/src/example.jsx');
+
+  assert.deepEqual(
+    findings.map(({ line, rule, match }) => ({ line, rule, match })),
+    [{ line: 1, rule: 'stock-promotion', match: 'robust' }],
+  );
+});
+
+test('findFindings reports blocked phrases in string literals', () => {
   const source = [
     "const first = 'A seamless workflow.';",
-    "const second = 'Choose a style — then save it.';",
+    "const second = 'Select a style. Save the page.';",
   ].join('\n');
   const findings = findFindings(source, 'apps/web/src/example.js');
 
   assert.deepEqual(
     findings.map(({ line, rule }) => ({ line, rule })),
-    [
-      { line: 1, rule: 'stock-promotion' },
-      { line: 2, rule: 'long-dash' },
-    ],
+    [{ line: 1, rule: 'stock-promotion' }],
   );
 });
 
-test('findFindings accepts direct operational copy', () => {
-  const source = "const message = 'Select a style. Save the page.';";
-  assert.deepEqual(findFindings(source, 'apps/web/src/example.js'), []);
+test('curly apostrophes do not bypass rhetorical-frame checks', () => {
+  const source = "const message = 'Whether you’re ready or not, continue.';";
+  const findings = findFindings(source, 'apps/web/src/example.js');
+
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, 'rhetorical-frame');
+  assert.equal(findings[0].match, 'Whether you’re');
 });
 
-test('a standalone long dash placeholder is not treated as prose', () => {
-  const source = "const missingValue = '—';";
-  assert.deepEqual(findFindings(source, 'apps/web/src/example.js'), []);
-});
-
-test('long-dash enforcement is limited to current audience-facing surfaces', () => {
-  assert.equal(isLongDashScope('apps/web/src/pages/Home.jsx'), true);
-  assert.equal(isLongDashScope('design/tokens/presets/atlas.json'), true);
-  assert.equal(isLongDashScope('docs/index.html'), true);
-  assert.equal(isLongDashScope('docs/DEPLOY_RUNBOOK.md'), false);
-  assert.equal(isLongDashScope('README.md'), false);
-
-  const internal = 'The build runs here — then deploys.';
-  assert.deepEqual(findFindings(internal, 'README.md'), []);
-  assert.equal(
-    findFindings(internal, 'design/tokens/presets/atlas.json')[0].rule,
-    'long-dash',
+test('preset scanning includes rendered fields and excludes private notes', () => {
+  const clean = JSON.stringify(
+    {
+      '$palette-note': 'A robust internal calibration note.',
+      id: 'example',
+      label: 'Example',
+      summary: 'A direct layout description.',
+      bestFor: 'Use this style for small events.',
+      options: {
+        headingFace: {
+          label: 'Heading face',
+          prompt: 'Choose the heading typeface.',
+          default: 'one',
+          choices: [
+            {
+              id: 'one',
+              label: 'One',
+              why: 'Uses one typeface for headings.',
+            },
+          ],
+        },
+      },
+    },
+    null,
+    2,
   );
+  assert.deepEqual(
+    findFindings(clean, 'design/tokens/presets/example.json'),
+    [],
+  );
+
+  const blocked = clean.replace(
+    'A direct layout description.',
+    'A robust layout description.',
+  );
+  const findings = findFindings(
+    blocked,
+    'design/tokens/presets/example.json',
+  );
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, 'stock-promotion');
 });
 
-test('literal file parsing language is not a design metaphor', () => {
-  const source = "const message = 'That file could not be read as text.';";
-  assert.deepEqual(findFindings(source, 'apps/web/src/example.js'), []);
+test('current operator runbooks are part of the scan', () => {
+  const files = collectFiles();
+  for (const file of [
+    'docs/DEPLOY_RUNBOOK.md',
+    'docs/POSTMARK_PROVISIONING.md',
+    'docs/EVENTBRITE_VERIFICATION.md',
+  ]) {
+    assert.equal(files.includes(file), true, file);
+  }
 });
 
 test('generated preset documentation and fixtures are excluded', () => {
@@ -80,18 +129,17 @@ test('generated preset documentation and fixtures are excluded', () => {
     isExcluded('functions/src/ticketing/providers/__fixtures__/README.md'),
     true,
   );
-  assert.deepEqual(
-    findFindings(
-      'A seamless layout — with a story that reads as authority.',
-      'design/tokens/presets/README.md',
-    ),
-    [],
-  );
 });
 
-test('textToScan removes HTML comments but keeps visible text', () => {
-  const source = '<!-- robust internal note -->\n<p>Use the saved style.</p>';
-  const scanned = textToScan(source, 'docs/index.html');
-  assert.doesNotMatch(scanned, /robust internal note/u);
-  assert.match(scanned, /Use the saved style/u);
+test('Markdown comments and code examples are not prose', () => {
+  const source = [
+    '<!-- robust internal note -->',
+    'Use the saved style.',
+    '```js',
+    "const label = 'seamless';",
+    '```',
+    'Run `robust-command` after the build.',
+  ].join('\n');
+
+  assert.deepEqual(findFindings(source, 'docs/example.md'), []);
 });
