@@ -270,6 +270,23 @@ function venueAddress(venue = {}) {
  * they are correct as soon as init runs"). Keyed `<section>.<field>`;
  * anything absent here falls through to `placeholderBlock`.
  */
+/**
+ * The four parts of the stat contract (design brief §2.1.1) as seeded
+ * placeholder copy. Each one names what the operator has to supply, in the
+ * same `[Replace] ` form every other placeholder uses (§5.4).
+ *
+ * @param {string} subject what this particular number is about
+ * @returns {{ takeaway: string, description: string, source: string, alt: string }}
+ */
+function statContract(subject) {
+  return {
+    takeaway: `[Replace] State what ${subject} shows, in words.`,
+    description: `[Replace] Say what this number counts, and over what period.`,
+    source: '[Replace] Name where the number came from, and the date you read it.',
+    alt: '[Replace] Describe the finding for a screen reader.',
+  };
+}
+
 const CONFIG_SEEDS = Object.freeze({
   'hero.title': ({ event }) => ({ value: event.name }),
   'hero.register_cta': ({ event, tierA }) => ({
@@ -277,8 +294,13 @@ const CONFIG_SEEDS = Object.freeze({
     url: event.registration?.externalUrl || tierA?.publicUrl || 'https://example.org',
     external: true,
   }),
-  'stats.attendees': () => ({ value: '0', label: 'Attendees expected' }),
-  'stats.sessions': () => ({ value: '0', label: 'Sessions planned' }),
+  // A stat carries the four-part contract from PR3 on (design brief
+  // §2.1.1), and a seeded stat is no exception: the figure and its caption
+  // are correct as seeded, and the four parts arrive as the instruction for
+  // what to write, because nobody but the operator knows what this number
+  // will count or where it came from.
+  'stats.attendees': () => ({ value: '0', label: 'attendees expected', ...statContract('attendance') }),
+  'stats.sessions': () => ({ value: '0', label: 'sessions planned', ...statContract('the session count') }),
   'travel_venue.venue_name': ({ event }) => ({
     value: event.venue?.name || '[Replace] Venue name.',
   }),
@@ -323,7 +345,7 @@ function placeholderBlock(blockType, description) {
     case 'cta':
       return { label: '[Replace] Button label', url: 'https://example.org', external: true };
     case 'stat':
-      return { value: '0', label: text };
+      return { value: '0', label: text, ...statContract('this number') };
     case 'list_item':
       return { text };
     case 'faq_item':

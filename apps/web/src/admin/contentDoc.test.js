@@ -26,7 +26,14 @@ describe('DELETE_FIELD_SENTINEL', () => {
 
 describe('valueFieldsOf', () => {
   it('excludes the shared order field even for types that declare their own', () => {
-    expect(valueFieldsOf('stat').map((f) => f.id)).toEqual(['value', 'label']);
+    expect(valueFieldsOf('stat').map((f) => f.id)).toEqual([
+      'value',
+      'label',
+      'takeaway',
+      'description',
+      'source',
+      'alt',
+    ]);
     expect(valueFieldsOf('list_item').map((f) => f.id)).toEqual(['text']);
     expect(valueFieldsOf('link_group').map((f) => f.id)).toEqual(['group', 'label', 'url']);
   });
@@ -43,20 +50,56 @@ describe('valueFieldsOf', () => {
 
 describe('toEditableContent / toContentFields round-trip', () => {
   it('reads a doc’s value fields and the shared order back out unchanged', () => {
-    const doc = { blockType: 'stat', value: '450', label: 'Attendees', order: 3, visible: true };
+    const doc = {
+      blockType: 'stat',
+      value: '450',
+      label: 'attendees',
+      takeaway: 'The hall is full',
+      description: 'Confirmed registrations across all three days.',
+      source: 'Registration list, read 1 September 2026.',
+      alt: 'Confirmed registrations stand at 450.',
+      order: 3,
+      visible: true,
+    };
     const editable = toEditableContent(doc, doc.blockType);
     expect(editable).toEqual({
       blockType: 'stat',
       order: 3,
       visible: true,
-      values: { value: '450', label: 'Attendees' },
+      values: {
+        value: '450',
+        label: 'attendees',
+        takeaway: 'The hall is full',
+        description: 'Confirmed registrations across all three days.',
+        source: 'Registration list, read 1 September 2026.',
+        alt: 'Confirmed registrations stand at 450.',
+      },
     });
     expect(toContentFields(editable)).toEqual({
       blockType: 'stat',
       order: 3,
       value: '450',
-      label: 'Attendees',
+      label: 'attendees',
+      takeaway: 'The hall is full',
+      description: 'Confirmed registrations across all three days.',
+      source: 'Registration list, read 1 September 2026.',
+      alt: 'Confirmed registrations stand at 450.',
     });
+  });
+
+  it('opens a legacy stat block with its four contract parts blank', () => {
+    // Compat is law at the READ (design brief §2.1.1): a stored
+    // `{ value, label }` block still loads. What the operator meets is four
+    // empty required fields, which is what makes the next save bring the
+    // block up to contract instead of quietly rewriting it as it was.
+    const editable = toEditableContent({ blockType: 'stat', value: '420', label: 'Attendees' }, 'stat');
+    expect(editable.values.takeaway).toBe('');
+    expect(validateRequiredContent(editable).map((e) => e.field)).toEqual([
+      'takeaway',
+      'description',
+      'source',
+      'alt',
+    ]);
   });
 
   it('never reads a per-type "order" field into the editable values', () => {
@@ -69,7 +112,15 @@ describe('toEditableContent / toContentFields round-trip', () => {
 
   it('omits an unset optional numeric field rather than sending NaN', () => {
     const fields = toContentFields(blankContent('stat'));
-    expect(fields).toEqual({ blockType: 'stat', value: '', label: '' });
+    expect(fields).toEqual({
+      blockType: 'stat',
+      value: '',
+      label: '',
+      takeaway: '',
+      description: '',
+      source: '',
+      alt: '',
+    });
   });
 });
 

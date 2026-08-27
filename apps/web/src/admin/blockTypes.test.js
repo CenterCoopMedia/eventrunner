@@ -8,6 +8,7 @@ import * as blockTypesCjs from '../../../../functions/src/cms/blockTypes.cjs';
 import {
   BLOCK_TYPES,
   BLOCK_TYPE_IDS,
+  STAT_CONTRACT_HINTS,
   blockTypeFieldSummary,
   blockTypeFor,
   blockTypeLabel,
@@ -47,5 +48,24 @@ describe('admin block palette', () => {
     expect(blockTypeFieldSummary('image')).toBe(
       'url (url) · alt (string) · caption (string, optional)',
     );
+  });
+
+  // The stat contract (design brief §2.1.1) is enforced on write from PR3
+  // on, so the editor must ask for exactly the parts the server demands —
+  // no silent fifth prompt, and no part the operator is never told about.
+  it('prompts for exactly the four parts the server enforces', () => {
+    const enforced = Object.keys(blockTypesCjs.internals.STAT_CONTRACT);
+    expect(Object.keys(STAT_CONTRACT_HINTS).sort()).toEqual([...enforced].sort());
+    for (const id of enforced) {
+      expect(BLOCK_TYPES.stat.fields.find((field) => field.id === id)?.required, id).toBe(true);
+    }
+  });
+
+  it('keeps the legacy figure and caption on the stat block', () => {
+    // Compat is law: the shape a stored stat block already has stays part
+    // of the type, so a legacy document still renders and still edits.
+    const ids = BLOCK_TYPES.stat.fields.map((field) => field.id);
+    expect(ids).toContain('value');
+    expect(ids).toContain('label');
   });
 });

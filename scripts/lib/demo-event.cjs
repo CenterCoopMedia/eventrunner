@@ -159,8 +159,30 @@ const DEMO_CONTENT = Object.freeze({
   highlights__first: {
     text: 'Small workshop rooms, capped at thirty seats, so there is time for real questions.',
   },
-  stats__attendees: { value: '420', label: 'Attendees expected' },
-  stats__sessions: { value: '38', label: 'Sessions planned' },
+  // Both stats carry the four-part contract (design brief §2.1.1): the
+  // finding in words, what the number counts, where it came from, and what
+  // a screen reader hears. The demo is what a well-run event looks like, so
+  // it shows the shape the contract asks for rather than a bare figure.
+  stats__attendees: {
+    value: '420',
+    label: 'attendees expected',
+    takeaway: 'Registration is close to filling the hall',
+    description:
+      'Confirmed registrations across all three days, against the 450 seats Harborlight Hall ' +
+      'holds.',
+    source: 'Summit registration list, read 1 September 2026.',
+    alt: 'Confirmed registrations stand at 420 of the 450 seats available.',
+  },
+  stats__sessions: {
+    value: '38',
+    label: 'sessions planned',
+    takeaway: 'Two thirds of the programme is hands-on workshops',
+    description:
+      'Sessions on the published programme across the three days, counting workshops, panels, ' +
+      'and plenaries.',
+    source: 'Summit programme, read 1 September 2026.',
+    alt: 'Of 38 planned sessions, 25 are workshops and 13 are panels or plenaries.',
+  },
   faq_items__what_is_this: {
     question: 'What is the Harborlight Media Summit?',
     answer:

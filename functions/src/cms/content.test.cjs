@@ -648,3 +648,117 @@ test('collections without speaker references are untouched by the seam', async (
   );
   assert.equal(res.statusCode, 200);
 });
+
+// --- the stat contract (design brief §2.1.1) --------------------------------
+
+const FULL_STAT = Object.freeze({
+  blockType: 'stat',
+  value: '420',
+  label: 'attendees expected',
+  takeaway: 'Registration is close to filling the hall',
+  description: 'Confirmed registrations across all three days.',
+  source: 'Registration list, read 1 September 2026.',
+  alt: 'Confirmed registrations stand at 420 of 450 seats.',
+});
+
+test('creating a stat block without its four parts is rejected, naming each one', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { blockType: 'stat', value: '420', label: 'attendees' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  for (const part of ['takeaway:', 'description:', 'source:', 'alt:']) {
+    assert.ok(res.body.error.message.includes(part), `names ${part}`);
+  }
+  // Nothing was written: the refusal aborts the transaction.
+  assert.equal(db.read('cmsContent_drafts', 'stats__attendees'), undefined);
+});
+
+test('a stat block carrying all four parts is written', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { ...FULL_STAT } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsContent_drafts', 'stats__attendees').takeaway, FULL_STAT.takeaway);
+});
+
+test('a blank part is as missing as an absent one', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { ...FULL_STAT, source: '   ' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^source: /);
+});
+
+test('a legacy stat block keeps publishing and rendering; only WRITING it that way stops', async () => {
+  // The stored shape is untouched — nothing sweeps the corpus, and the
+  // live doc a reader sees is exactly what it was.
+  const db = makeFakeDb({
+    'cmsContent/stats__attendees': {
+      blockType: 'stat', value: '420', label: 'Attendees expected', visible: true, revision: 2,
+    },
+  });
+  const res = fakeRes();
+  await createGetSiteContentHandler({ db })({ method: 'GET' }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.content[0].value, '420');
+
+  // An edit of that legacy block has to bring it up to contract.
+  const update = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { value: '450' } } }),
+    update,
+  );
+  assert.equal(update.statusCode, 400);
+  assert.match(update.body.error.message, /takeaway: /);
+  assert.equal(db.read('cmsContent', 'stats__attendees').value, '420');
+});
+
+test('the contract is checked on the MERGED result, not just the payload', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/stats__attendees': { ...FULL_STAT, section: 'stats', field: 'attendees' },
+  });
+  const res = fakeRes();
+  // The payload names only the figure; the stored draft supplies the parts.
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { value: '450' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsContent_drafts', 'stats__attendees').value, '450');
+
+  // And clearing a part is a rejection, not a silent drop.
+  const cleared = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'stats', field: 'attendees', fields: { alt: DELETE_FIELD_SENTINEL } } }),
+    cleared,
+  );
+  assert.equal(cleared.statusCode, 400);
+  assert.match(cleared.body.error.message, /^alt: /);
+});
+
+test('the contract binds stat blocks only, and cmsContent only', async () => {
+  const db = makeFakeDb();
+  const text = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'title', fields: { blockType: 'text', value: 'Welcome' } } }),
+    text,
+  );
+  assert.equal(text.statusCode, 200);
+
+  // A session is not a block: `stat` means nothing in cmsSchedule.
+  const session = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-1', fields: { blockType: 'stat', title: 'Welcome' } } }),
+    session,
+  );
+  assert.equal(session.statusCode, 200);
+});

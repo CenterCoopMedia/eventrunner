@@ -21,7 +21,12 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
-import { BLOCK_TYPE_IDS, blockTypeFor, blockTypeLabel } from '../blockTypes.js';
+import {
+  BLOCK_TYPE_IDS,
+  STAT_CONTRACT_HINTS,
+  blockTypeFor,
+  blockTypeLabel,
+} from '../blockTypes.js';
 import {
   blankContent,
   staleFieldDeletions,
@@ -50,6 +55,16 @@ import AdminPageHeader, {
   RecordState,
 } from '../components/adminChrome.jsx';
 
+/**
+ * What to write in this field, where the system has something to say. Only
+ * the stat contract does today (design brief §2.1.1): its four parts are
+ * required on write, so the editor states what each one is for rather than
+ * leaving an operator to guess from the field name.
+ */
+function hintFor(blockTypeId, fieldId) {
+  return blockTypeId === 'stat' ? STAT_CONTRACT_HINTS[fieldId] : undefined;
+}
+
 /** One control per registry field, chosen by the field's declared type. */
 function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
   const fields = valueFieldsOf(blockTypeId);
@@ -66,6 +81,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
         const label = `${field.id}${field.required ? '' : ' (optional)'}`;
         const value = values[field.id];
         const error = errorFor(field.id);
+        const hint = hintFor(blockTypeId, field.id);
         if (field.type === 'boolean') {
           return (
             <div key={field.id} className="flex items-center">
@@ -139,6 +155,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
             value={value}
             onChange={(next) => onChange(field.id, next)}
             error={error}
+            hint={hint}
           />
         );
       })}

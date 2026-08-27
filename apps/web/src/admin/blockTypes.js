@@ -44,10 +44,17 @@ export const BLOCK_TYPES = Object.freeze({
   stat: {
     id: 'stat',
     label: 'Statistic',
-    description: 'A headline number with its caption, e.g. "450 / attendees".',
+    description:
+      'A number that carries evidence: the figure and its caption, plus the four parts ' +
+      'every stat must state — the finding in words, what it counts, where it came from, ' +
+      'and what a screen reader hears.',
     fields: [
       { id: 'value', type: 'string', required: true },
       { id: 'label', type: 'string', required: true },
+      { id: 'takeaway', type: 'string', required: true },
+      { id: 'description', type: 'string', required: true },
+      { id: 'source', type: 'string', required: true },
+      { id: 'alt', type: 'string', required: true },
       { id: 'order', type: 'number', required: false },
     ],
   },
@@ -81,6 +88,21 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'order', type: 'number', required: false },
     ],
   },
+});
+
+/**
+ * What to write in each part of the stat contract (design brief §2.1.1),
+ * shown under that field in the block editor. The server enforces the same
+ * four parts and rejects a write that misses one (blockTypes.cjs
+ * statContractErrors); blockTypes.test.js pins the two field sets together,
+ * so the editor can never prompt for a part the server ignores, or stay
+ * silent about one it demands.
+ */
+export const STAT_CONTRACT_HINTS = Object.freeze({
+  takeaway: 'State the finding in words. “Two thirds of sessions are workshops”, not “Session types”.',
+  description: 'Say what the number counts, and over what period.',
+  source: 'Name where the number came from, and the date you read it.',
+  alt: 'Describe the finding for a screen reader. Do not describe the shape of the chart.',
 });
 
 /** Registry order — the palette's display order. */

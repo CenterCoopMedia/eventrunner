@@ -73,10 +73,17 @@ const BLOCK_TYPES = Object.freeze({
   stat: blockType({
     id: 'stat',
     label: 'Statistic',
-    description: 'A headline number with its caption, e.g. "450 / attendees".',
+    description:
+      'A number that carries evidence: the figure and its caption, plus the four parts ' +
+      'every stat must state — the finding in words, what it counts, where it came from, ' +
+      'and what a screen reader hears.',
     fields: [
       field('value', 'string', true),
       field('label', 'string', true),
+      field('takeaway', 'string', true),
+      field('description', 'string', true),
+      field('source', 'string', true),
+      field('alt', 'string', true),
       field('order', 'number', false),
     ],
   }),
@@ -111,6 +118,42 @@ const BLOCK_TYPES = Object.freeze({
     ],
   }),
 });
+
+/**
+ * The four-part stat contract (design brief §2.1.1), field by field, with
+ * the sentence that says what each part is for. A large number with a small
+ * caption under it is not a stat block; these four are what make it one.
+ *
+ * The words are the operator's, not the schema's: a rejection has to tell
+ * whoever is writing the block what to write.
+ */
+const STAT_CONTRACT = Object.freeze({
+  takeaway: 'state the finding in words, not the category',
+  description: 'say what the number counts and over what period',
+  source: 'name where the number came from and the date you read it',
+  alt: 'describe the finding for a screen reader',
+});
+
+/**
+ * Every missing part of the stat contract, each naming its field.
+ *
+ * ENFORCED AT THE WRITE, NOT AT THE READ. A stat block already stored in
+ * the legacy `{ value, label }` shape stays valid, keeps publishing, and
+ * keeps rendering (StatBlock renders both shapes) — nothing sweeps the
+ * corpus and nothing drops content. What this stops is a stat block being
+ * WRITTEN without its four parts, from PR3 on.
+ *
+ * Pure, and a no-op for every other block type.
+ *
+ * @param {object} fields the block's fields as they will be stored
+ * @returns {string[]}
+ */
+function statContractErrors(fields) {
+  if (!fields || fields.blockType !== 'stat') return [];
+  return Object.entries(STAT_CONTRACT)
+    .filter(([id]) => typeof fields[id] !== 'string' || fields[id].trim().length === 0)
+    .map(([id, why]) => `${id}: a stat block must ${why}`);
+}
 
 /**
  * True only for ids defined in BLOCK_TYPES. Own-property check, so
@@ -151,7 +194,8 @@ function draftCollectionFor(name) {
 module.exports = {
   BLOCK_TYPES,
   isKnownBlockType,
+  statContractErrors,
   PUBLISHABLE_COLLECTIONS,
   draftCollectionFor,
-  internals: { FIELD_TYPES },
+  internals: { FIELD_TYPES, STAT_CONTRACT },
 };

@@ -343,6 +343,32 @@ describe('creating and editing a block', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  // The stat contract (design brief §2.1.1) is enforced from PR3 on: the
+  // editor asks for all four parts and refuses to save without them, and
+  // the server rejects a write that misses one.
+  it('requires all four parts of the stat contract, and says what each is for', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    await renderAt('/admin/content/scholarships/intro/_new');
+
+    fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'stat1' } });
+    fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'stat' } });
+    fireEvent.change(screen.getByLabelText(/^value/), { target: { value: '42' } });
+    fireEvent.change(screen.getByLabelText(/^label/), { target: { value: 'scholarships awarded' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    const alert = await screen.findByRole('alert');
+    for (const part of ['takeaway', 'description', 'source', 'alt']) {
+      expect(alert).toHaveTextContent(`${part}: is required.`);
+      expect(screen.getByLabelText(new RegExp(`^${part}`))).toHaveAttribute('aria-invalid', 'true');
+    }
+    // Each field says what belongs in it, so "required" is actionable.
+    expect(screen.getByLabelText(/^takeaway/)).toHaveAccessibleDescription(
+      /State the finding in words/,
+    );
+    expect(screen.getByLabelText(/^source/)).toHaveAccessibleDescription(/the date you read it/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('clears the old block type’s stale fields when switching types', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [CTA_BLOCK_DRAFT];
@@ -351,7 +377,21 @@ describe('creating and editing a block', () => {
     await renderAt('/admin/content/scholarships/intro/cta1');
     fireEvent.change(await screen.findByLabelText('Block type'), { target: { value: 'stat' } });
     fireEvent.change(screen.getByLabelText(/^value/), { target: { value: '42' } });
-    fireEvent.change(screen.getByLabelText(/^label/), { target: { value: 'Scholarships awarded' } });
+    fireEvent.change(screen.getByLabelText(/^label/), { target: { value: 'scholarships awarded' } });
+    // A stat carries its four-part contract (design brief §2.1.1), and the
+    // editor will not save one without it.
+    fireEvent.change(screen.getByLabelText(/^takeaway/), {
+      target: { value: 'The fund placed every applicant it could' },
+    });
+    fireEvent.change(screen.getByLabelText(/^description/), {
+      target: { value: 'Awards made from the 2026 fund, across both rounds.' },
+    });
+    fireEvent.change(screen.getByLabelText(/^source/), {
+      target: { value: 'Scholarship committee minutes, read 1 September 2026.' },
+    });
+    fireEvent.change(screen.getByLabelText(/^alt/), {
+      target: { value: 'The fund awarded 42 scholarships in 2026.' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -362,7 +402,11 @@ describe('creating and editing a block', () => {
       blockType: 'stat',
       order: 2, // unaffected — the shared Order control, not a per-type field
       value: '42',
-      label: 'Scholarships awarded',
+      label: 'scholarships awarded',
+      takeaway: 'The fund placed every applicant it could',
+      description: 'Awards made from the 2026 fund, across both rounds.',
+      source: 'Scholarship committee minutes, read 1 September 2026.',
+      alt: 'The fund awarded 42 scholarships in 2026.',
       url: '__cms_delete_field__',
       external: '__cms_delete_field__',
     });

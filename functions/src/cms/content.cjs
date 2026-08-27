@@ -23,7 +23,7 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
-const { draftCollectionFor } = require('./blockTypes.cjs');
+const { draftCollectionFor, statContractErrors } = require('./blockTypes.cjs');
 const {
   writeDraft,
   deleteBoth,
@@ -183,6 +183,34 @@ async function checkSpeakerReferences({ db, tx = null, collection, fields }) {
 }
 
 /**
+ * Block-shape contracts at the content-write seam (design brief §2.1.1).
+ *
+ * These generic endpoints deliberately validate no block shape — the
+ * registry describes fields, and the editor fills them in — with ONE
+ * exception, and it is a design rule rather than a data-integrity one: a
+ * stat block must carry its four parts. A number presented as evidence with
+ * no finding, no period, no source, and no alt text is the pattern the brief
+ * rejects, and from PR3 on it fails validation as well as review.
+ *
+ * The check runs over the RESULT of the merge, exactly like the speaker
+ * reference check: what matters is the block that ends up stored, not the
+ * half of it this particular request happened to send.
+ *
+ * Only cmsContent carries blocks. A stat block already stored in the legacy
+ * `{ value, label }` shape is untouched — it publishes and renders as it
+ * always did; what it cannot do any more is be written that way.
+ *
+ * @param {{ collection: string, fields: object }} args
+ * @returns {{ ok: true } | { ok: false, message: string }}
+ */
+function checkBlockContract({ collection, fields }) {
+  if (collection !== 'cmsContent') return { ok: true };
+  const errors = statContractErrors(fields);
+  if (errors.length > 0) return { ok: false, message: errors.join('; ') };
+  return { ok: true };
+}
+
+/**
  * An HTTP-shaped rejection thrown from inside a transaction body, so a
  * refusal aborts the transaction (writing nothing) instead of returning a
  * verdict the caller would have to unwind by hand.
@@ -249,6 +277,9 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
           fields: omitDeletedFields({ ...checked.fields, ...extraFields }),
         });
         if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
+
+        const contract = checkBlockContract({ collection, fields: references.fields });
+        if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
 
         const written = await writeDraft({
           db,
@@ -324,6 +355,9 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
           fields: omitDeletedFields({ ...base, ...checked.fields, ...extraFields }),
         });
         if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
+
+        const contract = checkBlockContract({ collection, fields: references.fields });
+        if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
 
         const written = await writeDraft({
           db,
