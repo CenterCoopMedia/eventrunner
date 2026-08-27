@@ -15,10 +15,11 @@ Every `cmsPages` document (About, Travel, Conduct, and anything else seeded or a
 publish state visible in the list: **Never published** (draft only), **Unpublished changes** (a
 published page with a dirty draft), or fully published. Create, edit, and publish from here.
 
-Each page also sets its own **layout**: the header (full or compact nameplate — a page always has
-one), whether it arranges its items as a grid or a list, how much space sits between things, and
-whether navigation runs across the top or down the side. A page that has never been given a layout
-renders the defaults, so nothing changes until you change it.
+Each page also sets its own **layout**: the **header style** (full or compact — every page has a
+header, and compact makes it smaller rather than turning it off), whether it arranges its items as
+a grid or a list, how much space sits between things, and whether navigation runs across the top or
+down the side. A page that has never been given a layout renders the defaults, so nothing changes
+until you change it.
 
 A **system page** — home, schedule, speakers, sponsors — keeps its built-in content and lets you
 put sections around it. Each section on one of those pages picks a position: above the main
@@ -182,10 +183,40 @@ complete set of categories back.
 
 ### Branding
 
-The palette (`config/theme.colors`), the three font roles (from the bundled open-license font
-sets — no external font CDN), and the five logo slots, each backed by the same image picker the
-Media tab uses. Changes here restyle the live public site with no separate deploy — this is a
-config write, not a code change.
+One tab decides how the whole public site looks. It splits in two: the controls on one side, and a
+**page preview** on the other that renders your own pages with the draft applied. Pick which page
+to preview and whether to preview it light or dark. Nothing reaches the public site until you
+publish.
+
+Work down the controls in this order:
+
+- **Site style.** The base look: a light palette, a dark palette, a type pairing, a shape, and a
+  default set of illustrations. Six ship, and you can also leave the site on the palette this
+  deployment already stores. Picking a site style replaces every value you have not changed
+  yourself.
+- **Options.** The curated choices that site style offers — the heading face, the **header style**
+  the masthead uses on every page, and the session block. Each one retunes the site style. None of
+  them invents a value of its own.
+- **Illustrations.** A set of small drawings that carry the site style's vocabulary, or none. They
+  take the site's own ink and never carry a color of their own.
+- **Light or dark.** Always light, always dark, or follow the reader's own setting. Every site
+  style defines both.
+- **Admin marker color.** The one client color this admin panel uses, and it marks your place in
+  the navigation. If it is too faint to read on the admin background, the marker falls back to its
+  own ink and the editor tells you so. Your value is stored exactly as you typed it.
+- **Logos and assets.** Five slots — primary logo, square mark, footer logo, social sharing image,
+  and favicon — each backed by the same image picker the Media tab uses.
+- **Advanced color settings.** Any single color, changed by hand, per mode: a light tab and a dark
+  tab hold separate values. The four font roles, the texture, and the corner radius live here too.
+  Most staff never open this.
+
+**A contrast failure stops a publish, not a save.** A draft may hold two colors too close together
+to read. Publishing that draft is refused, and the message names the pair, the mode, and the ratio
+it measured. Fix the pair, then publish again.
+
+Fonts come from the bundled open-license font sets, so no page asks an external font service for
+anything. Changes here restyle the live public site with no separate deploy — this is a config
+write, not a code change.
 
 ## Legal pages (Settings, or wherever the review banner points)
 
