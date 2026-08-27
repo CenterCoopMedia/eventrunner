@@ -8,6 +8,7 @@ const {
   checkSessionTrack,
   checkSessionParent,
   validateSessionStructure,
+  resolveSessionTrack,
 } = require('./sessions.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 
@@ -101,9 +102,36 @@ test('a parentId must be a document id, and never the session itself', () => {
     validateSessionShape(session({ parentId: 'a/b' }), 'session-1').errors[0],
     /^parentId: must be a session document id/,
   );
+  for (const bad of ['', '.', '..', 'a/b', 'x'.repeat(301), 42, null]) {
+    const fields = { ...session(), parentId: bad };
+    if (bad === '' || bad === null) {
+      // Clearing the field is how an editor says "no parent".
+      assert.equal(validateSessionShape(fields, 'session-1').ok, true, JSON.stringify(bad));
+      continue;
+    }
+    assert.equal(validateSessionShape(fields, 'session-1').ok, false, JSON.stringify(bad));
+  }
   const self = validateSessionShape(session({ parentId: 'session-1' }), 'session-1');
   assert.equal(self.ok, false);
   assert.match(self.errors[0], /cannot be its own parent \("session-1"\)/);
+});
+
+test('any session that can be created can be named as a parent', async () => {
+  // The endpoints key a session by isValidDocId, so ids with dots, spaces
+  // and capitals are creatable — and therefore have to be nameable. A
+  // narrower rule here would strand those sessions with no way to point at
+  // them.
+  for (const id of ['keynote.day1', 'Session 3', 'a'.repeat(300)]) {
+    const shape = validateSessionShape(session({ parentId: id }), 'session-child');
+    assert.deepEqual(shape, { ok: true, errors: [] }, id);
+    const db = makeFakeDb({ [`cmsSchedule/${id}`]: { dayId: 'day-2' } });
+    const verdict = await checkSessionParent({
+      db,
+      docId: 'session-child',
+      fields: session({ parentId: id }),
+    });
+    assert.deepEqual(verdict, { ok: true, errors: [] }, id);
+  }
 });
 
 test('an orphan parent is rejected, naming the id', async () => {
@@ -201,6 +229,71 @@ test('a draft child counts too — an unpublished child still makes this a paren
   });
   assert.equal(verdict.ok, false);
   assert.ok(verdict.errors.some((e) => e.includes('already has child sessions')));
+});
+
+// --- a child runs on its parent's line (design brief §4.6) ------------------
+
+test('a child may state no track at all: it inherits its parent’s', async () => {
+  const db = makeFakeDb({ 'cmsSchedule/session-parent': { dayId: 'day-2', track: 'B' } });
+  const verdict = await checkSessionParent({
+    db,
+    docId: 'session-child',
+    fields: session({ parentId: 'session-parent' }),
+  });
+  assert.deepEqual(verdict, { ok: true, errors: [] });
+});
+
+test('a child may repeat its parent’s track', async () => {
+  const db = makeFakeDb({ 'cmsSchedule/session-parent': { dayId: 'day-2', track: 'B' } });
+  const verdict = await checkSessionParent({
+    db,
+    docId: 'session-child',
+    fields: session({ parentId: 'session-parent', track: 'B' }),
+  });
+  assert.deepEqual(verdict, { ok: true, errors: [] });
+});
+
+test('a child on another line is rejected, naming both tracks', async () => {
+  const db = makeFakeDb({ 'cmsSchedule/session-parent': { dayId: 'day-2', track: 'B' } });
+  const verdict = await checkSessionParent({
+    db,
+    docId: 'session-child',
+    fields: session({ parentId: 'session-parent', track: 'A' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.errors[0], /^track: "A" is not the track of its parent "session-parent"/);
+  assert.match(verdict.errors[0], /which runs on "B"/);
+});
+
+test('a track on a child of a parent that runs on none is rejected too', async () => {
+  const db = makeFakeDb({ 'cmsSchedule/session-parent': { dayId: 'day-2' } });
+  const verdict = await checkSessionParent({
+    db,
+    docId: 'session-child',
+    fields: session({ parentId: 'session-parent', track: 'A' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.errors[0], /which runs on no track/);
+});
+
+test('resolveSessionTrack: own line first, the parent’s otherwise', () => {
+  const parent = { id: 'p', dayId: 'day-2', track: 'B' };
+  const byId = { p: parent, plain: { id: 'plain', dayId: 'day-2' } };
+  assert.equal(resolveSessionTrack({ track: 'A' }, byId), 'A');
+  assert.equal(resolveSessionTrack({ parentId: 'p' }, byId), 'B');
+  assert.equal(resolveSessionTrack({ track: 'B', parentId: 'p' }, byId), 'B');
+  // A session on no line, a parent on no line, and a parent the renderer
+  // does not hold all read the same way: no line.
+  assert.equal(resolveSessionTrack({ dayId: 'day-2' }, byId), null);
+  assert.equal(resolveSessionTrack({ parentId: 'plain' }, byId), null);
+  assert.equal(resolveSessionTrack({ parentId: 'ghost' }, byId), null);
+  assert.equal(resolveSessionTrack(null, byId), null);
+  assert.equal(resolveSessionTrack({ parentId: 'p' }, null), null);
+});
+
+test('resolveSessionTrack reads a Map as well as a plain object', () => {
+  const byId = new Map([['p', { track: 'C' }]]);
+  assert.equal(resolveSessionTrack({ parentId: 'p' }, byId), 'C');
 });
 
 test('a session with no parent never reads anything', async () => {

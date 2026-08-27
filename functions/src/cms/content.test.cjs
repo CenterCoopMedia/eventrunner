@@ -824,6 +824,48 @@ test('a session save accepts a track and a parent on the same day', async () => 
   assert.equal(draft.parentId, 'session-parent');
 });
 
+test('a session save rejects a child on a different line from its parent', async () => {
+  const db = makeFakeDb({
+    'config/event': { tracks: [{ letter: 'A', name: 'Practice' }, { letter: 'B', name: 'Sustainability' }] },
+    'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop', track: 'B' },
+  });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        collection: 'cmsSchedule',
+        docId: 'session-child',
+        fields: { dayId: 'day-2', title: 'Clinic', track: 'A', parentId: 'session-parent' },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^track: "A" is not the track of its parent "session-parent"/);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-child'), undefined);
+});
+
+test('a child with no track of its own is written as it was sent — it inherits', async () => {
+  const db = makeFakeDb({
+    'config/event': { tracks: [{ letter: 'B', name: 'Sustainability' }] },
+    'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop', track: 'B' },
+  });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        collection: 'cmsSchedule',
+        docId: 'session-child',
+        fields: { dayId: 'day-2', title: 'Clinic', parentId: 'session-parent' },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  // Absence stays absence: nothing writes the parent's letter onto the child.
+  assert.equal('track' in db.read('cmsSchedule_drafts', 'session-child'), false);
+});
+
 test('an update is judged on the MERGED session, not the payload alone', async () => {
   // The stored draft already names the parent; this edit only moves the day.
   const db = makeFakeDb({

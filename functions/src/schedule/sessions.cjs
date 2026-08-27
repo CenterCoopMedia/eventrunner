@@ -34,13 +34,11 @@
  */
 
 const { TRACK_LETTER_RE } = require('shared/config');
+const { isValidDocId } = require('../cms/store.cjs');
 
 /** The live sessions collection and its draft sibling (§8.4). */
 const SESSIONS = 'cmsSchedule';
 const SESSIONS_DRAFTS = 'cmsSchedule_drafts';
-
-/** A session document id: no slashes, no dots — a Firestore path segment. */
-const SESSION_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 /** Where the event's track definitions live (shared/config validates them). */
 const CONFIG_COLLECTION = 'config';
@@ -77,7 +75,14 @@ function validateSessionShape(fields, docId) {
 
   const parentId = fields?.parentId;
   if (parentId !== undefined && parentId !== null && parentId !== '') {
-    if (typeof parentId !== 'string' || !SESSION_ID_RE.test(parentId)) {
+    // The SAME document-id contract the create/update endpoints apply to a
+    // session's own id (cms/store.cjs isValidDocId, via resolveTarget), and
+    // deliberately not a narrower one. A stricter rule here would make some
+    // sessions unnameable as parents — a session created as `keynote.day1`
+    // or `Session 3` exists, publishes, and renders, but could never be
+    // pointed at, and the operator would be told its id was not "a session
+    // document id" by the very system that let them create it.
+    if (!isValidDocId(parentId)) {
       errors.push(`parentId: must be a session document id, got ${JSON.stringify(parentId)}`);
     } else if (parentId === docId) {
       errors.push(`parentId: a session cannot be its own parent ("${docId}")`);
@@ -187,16 +192,70 @@ async function findChildIds({ db, tx, docId }) {
 }
 
 /**
+ * The line a child may state (brief §4.6).
+ *
+ * A child session runs inside its parent — a clinic inside a workshop
+ * block, a breakout inside a plenary — so it runs on its parent's line.
+ * Two answers are therefore correct, and only two: say nothing and inherit,
+ * or say the same letter the parent says. Anything else is a session the
+ * grid cannot place, because its parent puts it in one column and its own
+ * field puts it in another.
+ *
+ * Absence stays first-class: a child with no track is not missing data, it
+ * is a child that inherits (resolveSessionTrack does the inheriting for
+ * renderers), so nothing forces a letter onto it.
+ *
+ * @param {{ childTrack: unknown, parent: object, parentId: string }} args
+ * @returns {string[]} at most one error
+ */
+function checkChildTrack({ childTrack, parent, parentId }) {
+  const child = statedTrack(childTrack);
+  if (child === null) return [];
+  const parentLine = statedTrack(parent?.track);
+  if (child === parentLine) return [];
+  return [
+    `track: "${child}" is not the track of its parent "${parentId}" ` +
+    `(${parentLine === null ? 'which runs on no track' : `which runs on "${parentLine}"`}) — ` +
+    'a child session runs on its parent\'s line, so leave its track unset to inherit, ' +
+    'or set it to the same letter',
+  ];
+}
+
+/**
+ * The track a session RENDERS on: its own if it states one, otherwise its
+ * parent's — which is what "a child inherits its parent's line" means at
+ * the reading end, and why a child is allowed to state nothing at all.
+ *
+ * Parents are one level deep, so this never recurses: a parent's own track
+ * is the end of the chain.
+ *
+ * @param {object|null} session
+ * @param {Map<string, object>|Record<string, object>|null} byId every session
+ *   the renderer holds, keyed by document id (a Map or a plain object)
+ * @returns {string|null} the letter, or null for a session on no line
+ */
+function resolveSessionTrack(session, byId) {
+  const own = statedTrack(session?.track);
+  if (own !== null) return own;
+  const parentId = session?.parentId;
+  if (typeof parentId !== 'string' || parentId.trim().length === 0) return null;
+  const parent = byId instanceof Map ? byId.get(parentId) : byId?.[parentId];
+  return statedTrack(parent?.track);
+}
+
+/**
  * The parent reference, checked against what is actually stored. Reads run
  * inside the caller's transaction for the same reason the speaker seam's
  * do: a check in a separate round trip is only advisory, and the write it
  * guards can land after the world it checked has moved.
  *
- * Four refusals, each naming what is wrong:
+ * Five refusals, each naming what is wrong:
  *
  *   - the parent does not exist (an orphan);
  *   - the parent is itself a child (depth is one);
  *   - the parent runs on another day (a child inherits its parent's day);
+ *   - the child states a different track from its parent (a child runs on
+ *     its parent's line — see checkChildTrack);
  *   - this session already has children of its own, so making it a child
  *     would build a cycle — this is the second half of every cycle, and
  *     refusing it is what makes "one level deep" hold across two writes
@@ -231,6 +290,7 @@ async function checkSessionParent({ db, tx = null, docId, fields }) {
       'runs on its parent\'s day',
     );
   }
+  errors.push(...checkChildTrack({ childTrack: fields.track, parent, parentId }));
 
   const children = (await findChildIds({ db, tx, docId })).filter((id) => id !== docId);
   if (children.length > 0) {
@@ -271,13 +331,14 @@ module.exports = {
   checkSessionTrack,
   checkSessionParent,
   validateSessionStructure,
+  resolveSessionTrack,
   internals: {
     SESSIONS,
     SESSIONS_DRAFTS,
-    SESSION_ID_RE,
     findChildIds,
     readSession,
     readTrackLetters,
     statedTrack,
+    checkChildTrack,
   },
 };
