@@ -25,6 +25,17 @@ trailing `(demo)` rather than the usual leading `[Demo]`, because a leading
 bracket files every name in the index under `#`, which is correct behaviour and
 a useless screenshot.
 
+## Two frames are older than the branch
+
+`04-schedule-list-390.png` and `10-updates-feed-1440.png` were taken before the
+time and the date moved BELOW the title they label. Both showed the caption
+stacked above the heading, which is an eyebrow and banned at every size (design
+brief §2.4); the shipped order is the title first, then the date. Everything
+else in both frames — the spine, the heads, the runs, the column order — is
+what ships. They are kept rather than reshot because the dense fixture behind
+them lives outside the repo and a half-rebuilt set would be harder to trust
+than a named exception.
+
 ## The two paths
 
 | File | What it shows |
