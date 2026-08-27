@@ -28,7 +28,7 @@ import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js
 // radius, never a filled pill (design brief §2.4) — the same class
 // Schedule.jsx's own page actions use.
 const ACTION_CLASS =
-  'touch-target inline-flex items-center rounded-brand border-hairline border-rule-hairline px-md py-2xs font-data text-caption font-medium text-text-primary hover:bg-brand-surface-alt';
+  'touch-target inline-flex items-center rounded-brand border-hairline border-rule-hairline px-md py-2xs font-data text-caption font-medium text-text-primary hover:bg-surface-alt';
 
 export default function MySchedule() {
   const { eventConfig, features } = useEventConfig();

@@ -25,7 +25,7 @@ import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js
 // Page actions in the editorial register: a ruled rectangle on the theme
 // radius, never a pill (design brief §2.4).
 const ACTION_CLASS =
-  'touch-target inline-flex items-center rounded-brand border-hairline border-rule-hairline px-md py-2xs font-data text-caption font-medium text-text-primary hover:bg-brand-surface-alt';
+  'touch-target inline-flex items-center rounded-brand border-hairline border-rule-hairline px-md py-2xs font-data text-caption font-medium text-text-primary hover:bg-surface-alt';
 
 // One day of the programme. The active day is marked twice over — heavier
 // weight plus a strong rule under the word — because color alone never

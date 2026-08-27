@@ -4,7 +4,7 @@
 // plain text and nothing more. It still announces via role="status".
 export default function LoadingState({ label = 'Loading …' }) {
   return (
-    <p role="status" aria-label={label} className="py-8 font-data text-caption text-text-secondary">
+    <p role="status" aria-label={label} className="py-xl font-data text-caption text-text-secondary">
       {label}
     </p>
   );

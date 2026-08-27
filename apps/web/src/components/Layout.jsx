@@ -18,6 +18,14 @@ import { buildNameplate } from './editorial/Nameplate.jsx';
 import FeedbackModal from './FeedbackModal.jsx';
 import DemoBanner from './DemoBanner.jsx';
 
+// The mark is bigger under a masthead than in a running header. Each entry
+// pairs the class that draws the box with the pixel size, so the <img>
+// attributes and the CSS can never state different sizes.
+const MARK_SIZE = {
+  masthead: { className: 'h-10 w-10', px: 40 },
+  running: { className: 'h-6 w-6', px: 24 },
+};
+
 const NAV_ITEMS = [
   { to: '/', label: 'Home', end: true },
   { to: '/schedule', label: 'Schedule', feature: 'schedule' },
@@ -60,6 +68,7 @@ export default function Layout() {
   const headerVariant = resolveHeader(theme?.header);
   // Only the event bar prefers the short name.
   const plate = buildNameplate(eventConfig, { compact: headerVariant === 'compact' });
+  const markSize = headerVariant === 'masthead' ? MARK_SIZE.masthead : MARK_SIZE.running;
 
   return (
     <div className="page-surface flex min-h-screen flex-col">
@@ -67,7 +76,7 @@ export default function Layout() {
         Skip to main content
       </a>
       <DemoBanner />
-      <header className="bg-brand-surface">
+      <header className="bg-surface">
         <div className="mx-auto w-full max-w-5xl px-md">
           <Header
             variant={headerVariant}
@@ -76,12 +85,15 @@ export default function Layout() {
             place={plate.edition}
             mark={
               markSrc && !markFailed ? (
+                // width/height must match the box the class draws. They
+                // reserve the space before the stylesheet applies, so a
+                // wrong pair moves the header on first paint.
                 <img
                   src={markSrc}
                   alt=""
-                  className={headerVariant === 'masthead' ? 'h-10 w-10' : 'h-6 w-6'}
-                  width="32"
-                  height="32"
+                  className={markSize.className}
+                  width={markSize.px}
+                  height={markSize.px}
                   onError={() => setMarkFailed(true)}
                 />
               ) : null
@@ -106,8 +118,8 @@ export default function Layout() {
       <main id="main-content" className="mx-auto w-full max-w-5xl flex-1 px-md pb-2xl pt-xl">
         <Outlet />
       </main>
-      <footer className="bg-brand-surface">
-        <div className="mx-auto max-w-5xl px-md">
+      <footer className="bg-surface">
+        <div className="mx-auto w-full max-w-5xl px-md">
           <div className="section-rule pb-xl pt-md font-data text-caption text-text-secondary">
             <p className="font-heading text-body font-semibold text-text-primary">
               {eventConfig?.name}
@@ -129,7 +141,7 @@ export default function Layout() {
             {features.feedbackInbox ? (
               <button
                 type="button"
-                className="touch-target mt-md inline-flex items-center rounded-brand border-hairline border-rule-hairline px-sm py-2xs text-text-primary hover:bg-brand-surface-alt"
+                className="touch-target mt-md inline-flex items-center rounded-brand border-hairline border-rule-hairline px-sm py-2xs text-text-primary hover:bg-surface-alt"
                 onClick={() => setFeedbackOpen(true)}
               >
                 Share feedback

@@ -44,6 +44,13 @@ export default function Home() {
     typeof title?.value === 'string' && title.value.trim()
       ? title.value
       : eventConfig.name;
+  // config/event is runtime data, so the tagline may arrive as an empty
+  // string. Test for content, not for the type: an empty string would
+  // otherwise render an empty paragraph and its margin as a stray gap.
+  const tagline =
+    typeof eventConfig.tagline === 'string' && eventConfig.tagline.trim()
+      ? eventConfig.tagline
+      : null;
   const heroBlocks = getSectionBlocks('hero');
   const heroCtas = heroBlocks.filter((block) => block.blockType === 'cta');
   // One lead image at most. An editor who stores several images in the
@@ -86,7 +93,7 @@ export default function Home() {
                 {leadTitle}
               </h1>
             ) : null}
-            {typeof eventConfig.tagline === 'string' ? (
+            {tagline ? (
               <p
                 className={[
                   'max-w-prose text-lead text-text-secondary',
@@ -96,7 +103,7 @@ export default function Home() {
                   .join(' ')}
                 style={{ textWrap: 'pretty' }}
               >
-                {eventConfig.tagline}
+                {tagline}
               </p>
             ) : null}
             {subtitle ? (

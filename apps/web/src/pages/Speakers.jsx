@@ -72,7 +72,7 @@ export default function Speakers() {
                       <AssetImage
                         path={speaker.headshotPath}
                         alt=""
-                        className="h-10 w-10 shrink-0 self-center rounded-brand bg-brand-surface object-cover"
+                        className="h-10 w-10 shrink-0 self-center rounded-brand bg-surface object-cover"
                       />
                     ) : null}
                     <h2 className="font-heading text-h3 font-semibold text-text-primary">

@@ -116,7 +116,7 @@ export function TypeBadge({ type }) {
 // The feature-flag controls under a session. Rectangles on the theme radius,
 // not pills (brief §2.4): the same shape rule TypeBadge now follows.
 const actionClass =
-  'touch-target inline-flex items-center gap-2xs rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-brand-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
+  'touch-target inline-flex items-center gap-2xs rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
 
 /**
  * Bookmark toggle pill (spec §9 "Bookmarks"). Feature-gated by
@@ -215,7 +215,15 @@ function CalendarPill({ eventConfig, session }) {
   };
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-2xs font-data text-caption text-text-secondary">
+    // The visible "Add to calendar:" text is hidden from a screen reader so
+    // it is not read as a stray line, so the group carries the same words as
+    // its name instead. Without that, a screen reader announces ".ics",
+    // "Google", and "Outlook" with nothing to say what they add to.
+    <span
+      className="inline-flex flex-wrap items-center gap-2xs font-data text-caption text-text-secondary"
+      role="group"
+      aria-label="Add to calendar"
+    >
       <span aria-hidden="true">Add to calendar:</span>
       <button type="button" className={actionClass} onClick={onDownload}>
         .ics
@@ -326,7 +334,7 @@ function ReactionsPill({ session }) {
           // counts, nothing worth rendering when a reaction has zero.
           if (count === 0) return null;
           return (
-            <span key={emoji} className={actionClass} aria-hidden="false">
+            <span key={emoji} className={actionClass}>
               <span aria-hidden="true">{emoji}</span> {count}
             </span>
           );
@@ -409,7 +417,7 @@ export default function SessionCard({
                   –<time dateTime={range.endIso}>{range.endLabel}</time>
                 </>
               ) : null}
-              {range.zone ? <span className="ms-1">{range.zone}</span> : null}
+              {range.zone ? <span className="ms-2xs">{range.zone}</span> : null}
             </>
           ) : (
             <span>Time to be announced</span>
