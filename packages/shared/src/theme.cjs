@@ -65,6 +65,30 @@ const THEME_TEXTURES = Object.freeze(['flat', 'paper']);
 /** The texture a theme document without a `texture` field renders. */
 const DEFAULT_TEXTURE = 'flat';
 
+/**
+ * What `config/theme.header` may say (design brief §2.1). The active theme
+ * names the default header for its deployment; `standard` is the base.
+ */
+const THEME_HEADERS = Object.freeze(['standard', 'masthead', 'compact', 'minimal']);
+
+/** The header a theme that names none renders. */
+const DEFAULT_HEADER = 'standard';
+
+/**
+ * Resolve the header a page renders. The theme supplies the default and a
+ * page's stated header wins over it; anything unrecognized falls to the base
+ * rather than rendering no header at all.
+ *
+ * @param {unknown} themeHeader what `config/theme.header` says
+ * @param {unknown} [pageHeader] what the page's `layout.header` says
+ * @returns {'standard'|'masthead'|'compact'|'minimal'}
+ */
+function resolveHeader(themeHeader, pageHeader) {
+  if (THEME_HEADERS.includes(pageHeader)) return pageHeader;
+  if (THEME_HEADERS.includes(themeHeader)) return themeHeader;
+  return DEFAULT_HEADER;
+}
+
 /** What `config/theme.radius` may say (spec §7.2). */
 const THEME_RADIUS_IDS = Object.freeze(['sharp', 'soft', 'round']);
 
@@ -73,7 +97,7 @@ const THEME_LOGO_SLOTS = Object.freeze(['primary', 'mark', 'footer', 'ogDefault'
 
 /** Every top-level field a `config/theme` document may carry. */
 const THEME_DOC_KEYS = Object.freeze([
-  'colors', 'fonts', 'texture', 'radius', 'mode', 'logos', 'placeholderLogos',
+  'colors', 'fonts', 'texture', 'radius', 'mode', 'header', 'logos', 'placeholderLogos',
 ]);
 
 /**
@@ -353,6 +377,9 @@ module.exports = {
   THEME_FONT_SET_IDS,
   THEME_TEXTURES,
   DEFAULT_TEXTURE,
+  THEME_HEADERS,
+  DEFAULT_HEADER,
+  resolveHeader,
   THEME_RADIUS_IDS,
   THEME_LOGO_SLOTS,
   THEME_DOC_KEYS,

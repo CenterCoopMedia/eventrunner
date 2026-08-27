@@ -115,6 +115,10 @@ function emitEventConfig({ event, features, theme }) {
     // write data-mode on <html>; a document from before the field existed
     // has no `mode` and the runtime defaults it to light.
     mode: theme.mode,
+    // The header the theme names for its public pages (design brief §2.1).
+    // A document from before the field existed has none, and the shell
+    // resolves that to the base header.
+    header: theme.header,
     logos: theme.logos,
   };
   return [

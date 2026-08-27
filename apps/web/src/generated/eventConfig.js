@@ -111,6 +111,7 @@ export const theme = {
   texture: 'flat',
   radius: 'sharp',
   mode: 'light',
+  header: 'standard',
   logos: {
     primary: 'branding/logo.svg',
     mark: 'branding/mark.svg',

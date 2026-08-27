@@ -16,7 +16,7 @@
  * deployment and an operator replaces it from the admin Settings UI.
  */
 
-const { DEFAULT_MODE_POLICY, DEFAULT_TEXTURE } = require('shared/theme');
+const { DEFAULT_MODE_POLICY, DEFAULT_TEXTURE, DEFAULT_HEADER } = require('shared/theme');
 
 /** Brand + semantic slots as [r, g, b]. Order is the emitted CSS order. */
 const NEUTRAL_PALETTE_RGB = Object.freeze({
@@ -126,6 +126,9 @@ function defaultTheme() {
     texture: DEFAULT_TEXTURE,
     radius: 'soft',
     mode: DEFAULT_MODE_POLICY,
+    // Which header the public pages render (design brief §2.1). The theme
+    // states the deployment default; a page may override it.
+    header: DEFAULT_HEADER,
     logos: { ...PLACEHOLDER_LOGOS },
     placeholderLogos: Object.keys(PLACEHOLDER_LOGOS),
   };
