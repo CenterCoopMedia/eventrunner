@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The landing page and the documentation site now use the product's own design language: the same
+  token names the app ships, the editorial type scale, rules and folios instead of cards, and a
+  complete dark palette that follows the reader's system setting. The page content, links, and
+  social-card metadata are unchanged (design brief §5.3).
+- Admin documentation now uses the words staff see rather than the names the code uses: site style,
+  header style, illustrations, page preview, and advanced color settings. The interface guidelines
+  keep the internal names and mark them as internal.
 - Updated canonical repository and GitHub Pages paths to `CenterCoopMedia/eventrunner` (#97).
 
 ### Added
