@@ -15,6 +15,11 @@
 // distinguish causes the server deliberately does not distinguish. Telling
 // a stranger typing order numbers WHICH of those was true is exactly the
 // oracle the single response code exists to close off.
+//
+// Editorial base restyle (design brief §2.1, §2.4): the form and the result
+// sit in a hairline-ruled block tinted by --color-surface-alt, the same
+// device SignInPanel and the speaker-invite page use — never a shadowed,
+// rounded card.
 import { useCallback, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -22,16 +27,16 @@ import EmptyState from '../components/EmptyState.jsx';
 import { TicketClaimError, verifyTicketOrder } from '../lib/ticketClaim.js';
 
 const primaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand ' +
-  'bg-brand-primary px-4 py-2 font-semibold text-brand-surface ' +
-  'hover:bg-brand-primary-dark disabled:opacity-60';
+  'touch-target inline-flex items-center justify-center rounded-brand bg-accent ' +
+  'px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong disabled:opacity-60';
 
 const inputClass =
-  'touch-target w-full rounded-brand border border-brand-ink/20 bg-brand-surface px-3 py-2 ' +
-  'text-brand-ink placeholder:text-brand-ink-muted aria-[invalid=true]:border-danger';
+  'touch-target w-full rounded-brand border-hairline border-rule-hairline bg-surface px-sm py-xs ' +
+  'font-body text-body text-text-primary placeholder:text-text-secondary ' +
+  'aria-[invalid=true]:border-danger';
 
 const Panel = ({ children }) => (
-  <div className="mt-6 space-y-4 rounded-brand-lg border border-brand-ink/10 bg-brand-surface p-6">
+  <div className="mt-lg space-y-md border-hairline border-rule-hairline bg-surface-alt p-lg">
     {children}
   </div>
 );
@@ -86,15 +91,12 @@ export default function TicketClaim() {
   if (!user) {
     return (
       <article className="mx-auto max-w-md">
-        <h1 className="text-3xl font-semibold text-brand-ink">Claim your ticket</h1>
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1>
         <EmptyState
           title="Sign in to claim your ticket"
           description="Claiming a ticket links it to your account, so it lives behind sign-in."
           action={
-            <Link
-              to="/signin"
-              className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-            >
+            <Link to="/signin" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
               Sign in
             </Link>
           }
@@ -106,9 +108,9 @@ export default function TicketClaim() {
   if (result) {
     return (
       <article className="mx-auto max-w-md">
-        <h1 className="text-3xl font-semibold text-brand-ink">Ticket claimed</h1>
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Ticket claimed</h1>
         <Panel>
-          <p role="status" className="text-brand-ink">
+          <p role="status" className="text-text-primary">
             {result.claimed > 1
               ? `${result.claimed} tickets on that order are now linked to your account.`
               : 'Your ticket is now linked to your account.'}
@@ -123,14 +125,14 @@ export default function TicketClaim() {
 
   return (
     <article className="mx-auto max-w-md">
-      <h1 className="text-3xl font-semibold text-brand-ink">Claim your ticket</h1>
-      <p className="mt-2 text-brand-ink-muted" style={{ textWrap: 'pretty' }}>
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1>
+      <p className="mt-xs max-w-prose text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
         You are signed in{user.email ? ` as ${user.email}` : ''}. Enter the order number from
         your confirmation email to link your ticket to this account.
       </p>
       <Panel>
         <form onSubmit={submit} noValidate>
-          <label htmlFor="order-number" className="block font-medium text-brand-ink">
+          <label htmlFor="order-number" className="block font-semibold text-text-primary">
             Order number
           </label>
           <input
@@ -143,7 +145,7 @@ export default function TicketClaim() {
             onChange={(event) => setOrderNumber(event.target.value)}
             aria-invalid={error ? 'true' : undefined}
             aria-describedby={error ? 'order-number-error' : undefined}
-            className={`${inputClass} mt-1`}
+            className={`mt-2xs ${inputClass}`}
           />
           {error ? (
             <p
@@ -151,7 +153,7 @@ export default function TicketClaim() {
               ref={errorRef}
               tabIndex={-1}
               role="alert"
-              className="mt-2 flex items-start gap-2 rounded-brand border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
+              className="mt-xs flex items-start gap-xs border-hairline border-danger/40 bg-danger/10 px-sm py-xs font-data text-caption text-danger"
             >
               <span aria-hidden="true" className="font-semibold">
                 !
@@ -159,7 +161,7 @@ export default function TicketClaim() {
               <span>{error.message}</span>
             </p>
           ) : null}
-          <button type="submit" disabled={submitting} className={`${primaryButtonClass} mt-4`}>
+          <button type="submit" disabled={submitting} className={`${primaryButtonClass} mt-md`}>
             {submitting ? 'Checking…' : 'Claim ticket'}
           </button>
         </form>

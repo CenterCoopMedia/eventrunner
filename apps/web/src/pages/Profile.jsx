@@ -10,6 +10,12 @@
 // submit button stays enabled until the request starts, validation on submit
 // with aria-invalid plus focus moved to the first error, and the save result
 // announced through the toast region.
+//
+// Editorial base restyle (design brief §2.1, §2.4): inputs and buttons carry
+// the hairline-rule tokens SignInPanel established rather than a raw border
+// color, and the "Badges" subsection opens with the SectionHead device
+// instead of a bare heading. Every visible `<label>` here stays a control
+// label above its own input — the eyebrow ban's one named exception (§2.4).
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PROFILE_VISIBILITIES } from 'shared/profile';
@@ -20,6 +26,7 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ProfilePhotoField from '../components/media/ProfilePhotoField.jsx';
+import SectionHead from '../components/editorial/SectionHead.jsx';
 import { deleteOwnPhoto } from '../lib/mediaSource.js';
 
 const VISIBILITY_COPY = {
@@ -38,12 +45,13 @@ const VISIBILITY_COPY = {
 };
 
 const inputClass =
-  'touch-target w-full rounded-brand border border-brand-ink/20 bg-brand-surface px-3 py-2 ' +
-  'text-brand-ink placeholder:text-brand-ink-muted aria-[invalid=true]:border-danger';
+  'touch-target w-full rounded-brand border-hairline border-rule-hairline bg-surface px-sm py-xs ' +
+  'font-body text-body text-text-primary placeholder:text-text-secondary ' +
+  'aria-[invalid=true]:border-danger';
 
 const primaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-brand-primary ' +
-  'px-4 py-2 font-semibold text-brand-surface hover:bg-brand-primary-dark disabled:opacity-60';
+  'touch-target inline-flex items-center justify-center rounded-brand bg-accent ' +
+  'px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong disabled:opacity-60';
 
 /**
  * config/badges as the form needs it: one group per category, carrying the
@@ -133,10 +141,7 @@ export default function Profile() {
         title="Sign in to set up your profile"
         description="Your profile is part of your account, so it lives behind sign-in."
         action={
-          <Link
-            to="/signin"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
-          >
+          <Link to="/signin" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
             Go to sign in
           </Link>
         }
@@ -221,27 +226,27 @@ export default function Profile() {
 
   return (
     <article className="mx-auto max-w-2xl">
-      <h1 className="font-heading text-3xl font-semibold text-brand-ink">
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">
         {needsProfileSetup ? 'Complete your profile' : 'Your profile'}
       </h1>
-      <p className="mt-2 text-brand-ink-muted">
+      <p className="mt-xs max-w-prose text-body text-text-secondary">
         This is what other attendees see about you. Everything except your name is optional.
       </p>
 
-      <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
+      <form className="mt-xl space-y-lg" onSubmit={handleSubmit} noValidate>
         <ProfilePhotoField
           uid={user.uid}
           value={form.photoPath}
           onChange={(path) => setField('photoPath', path)}
         />
         <div>
-          <label htmlFor="displayName" className="block font-semibold text-brand-ink">
+          <label htmlFor="displayName" className="block font-semibold text-text-primary">
             Name
           </label>
           <input
             id="displayName"
             ref={nameRef}
-            className={`mt-1 ${inputClass}`}
+            className={`mt-2xs ${inputClass}`}
             value={form.displayName}
             onChange={(e) => setField('displayName', e.target.value)}
             aria-invalid={nameError ? 'true' : undefined}
@@ -249,31 +254,31 @@ export default function Profile() {
             autoComplete="name"
           />
           {nameError ? (
-            <p id="displayName-error" role="alert" className="mt-1 text-sm text-danger">
+            <p id="displayName-error" role="alert" className="mt-2xs font-data text-caption text-danger">
               {nameError}
             </p>
           ) : null}
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-lg sm:grid-cols-2">
           <div>
-            <label htmlFor="pronouns" className="block font-semibold text-brand-ink">
+            <label htmlFor="pronouns" className="block font-semibold text-text-primary">
               Pronouns
             </label>
             <input
               id="pronouns"
-              className={`mt-1 ${inputClass}`}
+              className={`mt-2xs ${inputClass}`}
               value={form.pronouns}
               onChange={(e) => setField('pronouns', e.target.value)}
             />
           </div>
           <div>
-            <label htmlFor="jobTitle" className="block font-semibold text-brand-ink">
+            <label htmlFor="jobTitle" className="block font-semibold text-text-primary">
               Role
             </label>
             <input
               id="jobTitle"
-              className={`mt-1 ${inputClass}`}
+              className={`mt-2xs ${inputClass}`}
               value={form.jobTitle}
               onChange={(e) => setField('jobTitle', e.target.value)}
               autoComplete="organization-title"
@@ -282,12 +287,12 @@ export default function Profile() {
         </div>
 
         <div>
-          <label htmlFor="organization" className="block font-semibold text-brand-ink">
+          <label htmlFor="organization" className="block font-semibold text-text-primary">
             Organization
           </label>
           <input
             id="organization"
-            className={`mt-1 ${inputClass}`}
+            className={`mt-2xs ${inputClass}`}
             value={form.organization}
             onChange={(e) => setField('organization', e.target.value)}
             autoComplete="organization"
@@ -295,36 +300,36 @@ export default function Profile() {
         </div>
 
         <div>
-          <label htmlFor="bio" className="block font-semibold text-brand-ink">
+          <label htmlFor="bio" className="block font-semibold text-text-primary">
             About you
           </label>
           <textarea
             id="bio"
             rows={4}
-            className={`mt-1 ${inputClass}`}
+            className={`mt-2xs ${inputClass}`}
             value={form.bio}
             onChange={(e) => setField('bio', e.target.value)}
           />
         </div>
 
         <fieldset>
-          <legend className="font-semibold text-brand-ink">Who can see your profile</legend>
-          <div className="mt-2 space-y-2">
+          <legend className="font-semibold text-text-primary">Who can see your profile</legend>
+          <div className="mt-xs space-y-xs">
             {visibilityOptions.map((value) => (
-              <label key={value} className="flex items-start gap-3 rounded-brand p-2">
+              <label key={value} className="flex items-start gap-sm rounded-brand p-xs">
                 <input
                   type="radio"
                   name="profileVisibility"
                   value={value}
                   checked={form.profileVisibility === value}
                   onChange={() => setField('profileVisibility', value)}
-                  className="mt-1"
+                  className="mt-3xs"
                 />
                 <span>
-                  <span className="block font-semibold text-brand-ink">
+                  <span className="block font-semibold text-text-primary">
                     {VISIBILITY_COPY[value].label}
                   </span>
-                  <span className="block text-sm text-brand-ink-muted">
+                  <span className="block font-data text-caption text-text-secondary">
                     {VISIBILITY_COPY[value].description}
                   </span>
                 </span>
@@ -334,10 +339,10 @@ export default function Profile() {
         </fieldset>
 
         {badgeCategories.length > 0 ? (
-          <section>
-            <h2 className="font-heading text-xl text-brand-ink">Badges</h2>
+          <section className="mt-xl">
+            <SectionHead level={2} title="Badges" />
             {nearBadgeLimit ? (
-              <p className="mt-1 text-sm text-brand-ink-muted" role="status">
+              <p className="mt-sm font-data text-caption text-text-secondary" role="status">
                 This event is close to the platform’s {MAX_TOTAL_BADGES}-badge total across all
                 categories, so some categories may offer fewer picks than usual.
               </p>
@@ -348,23 +353,23 @@ export default function Profile() {
               ).length;
               const atCap = category.maxPicks != null && picked >= category.maxPicks;
               return (
-                <fieldset key={category.id} className="mt-4">
-                  <legend className="font-semibold text-brand-ink">{category.label}</legend>
+                <fieldset key={category.id} className="mt-md">
+                  <legend className="font-semibold text-text-primary">{category.label}</legend>
                   {category.maxPicks != null ? (
-                    <p className="mt-1 text-sm text-brand-ink-muted" role="status">
+                    <p className="mt-2xs font-data text-caption text-text-secondary" role="status">
                       {atCap
                         ? `You’ve picked all ${category.maxPicks} — clear one to choose another.`
                         : `Pick up to ${category.maxPicks} (${picked} chosen).`}
                     </p>
                   ) : null}
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div className="mt-xs grid gap-xs sm:grid-cols-2">
                     {category.badges.map((badge) => {
                       const checked = form.badges.includes(badge.id);
                       return (
                         <label
                           key={badge.id}
-                          className={`flex items-center gap-3 rounded-brand p-2 ${
-                            !checked && atCap ? 'text-brand-ink-muted' : ''
+                          className={`flex items-center gap-sm rounded-brand p-xs ${
+                            !checked && atCap ? 'text-text-secondary' : ''
                           }`}
                         >
                           <input
@@ -373,7 +378,7 @@ export default function Profile() {
                             disabled={!checked && atCap}
                             onChange={() => toggleBadge(badge.id)}
                           />
-                          <span className="text-brand-ink">{badge.label}</span>
+                          <span className="text-text-primary">{badge.label}</span>
                         </label>
                       );
                     })}
