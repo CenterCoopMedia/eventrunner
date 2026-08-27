@@ -70,8 +70,12 @@ describe('EventConfigProvider demo theme override', () => {
     expect(screen.getByTestId('config-source')).toHaveTextContent('snapshot');
     expect(document.documentElement.dataset.theme).toBe('field-guide');
     expect(document.documentElement.dataset.mode).toBe('dark');
+    expect(runtimeStyle().textContent).toContain("--font-heading: 'Besley'");
     expect(runtimeStyle().textContent).toContain(
-      ":root[data-theme='field-guide'][data-mode='dark']",
+      ":root[data-theme][data-mode='dark']",
+    );
+    expect(runtimeStyle().textContent).toContain(
+      '--brand-surface-rgb: 28 28 27;',
     );
 
     act(() => {
