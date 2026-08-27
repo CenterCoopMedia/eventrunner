@@ -75,7 +75,10 @@ export default function Updates() {
                     SessionCard.jsx uses, and for the same reason: below `sm`
                     this becomes one column, and a date stacked above a
                     heading is an eyebrow (brief §2.4). At `sm` and up the
-                    grid puts the date back in its own left-hand column. */}
+                    grid puts the date back in its own left-hand column. The
+                    date column carries row-span-2, same as SessionCard.jsx,
+                    so a date that wraps cannot inflate row 1 and push the
+                    excerpt in row 2 down with it. */}
                 <div className="grid py-md sm:grid-cols-[9.5rem,1fr] sm:gap-x-md">
                   <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs sm:col-start-2 sm:row-start-1">
                     <h2 className="font-heading text-h3 font-semibold text-text-primary">
@@ -85,7 +88,7 @@ export default function Updates() {
                     </h2>
                     {update.pinned ? <Tag>Pinned</Tag> : null}
                   </div>
-                  <p className="mt-2xs font-mono text-caption text-text-secondary sm:col-start-1 sm:row-start-1 sm:mt-0">
+                  <p className="mt-2xs font-mono text-caption text-text-secondary sm:col-start-1 sm:row-start-1 sm:row-span-2 sm:mt-0">
                     {dateLabel ? (
                       <time dateTime={publishDate.toISOString()}>{dateLabel}</time>
                     ) : (

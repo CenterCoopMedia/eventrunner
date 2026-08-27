@@ -414,6 +414,11 @@ export default function SessionCard({
     // better order to hear. At `sm` and up the grid places the time back in
     // its own left-hand column beside the title, which is where the eye
     // wants it once there is room for a column.
+    //
+    // The time column carries row-span-2 so its own two rows of height
+    // (a time range that wraps, e.g. "10:30 AM–12:00 PM EDT") cannot inflate
+    // row 1 — the row the title/badge cell alone should size — and push the
+    // location/description cell in row 2 down with it.
     <li className="border-t-hairline border-t-rule-hairline">
       <article className="grid py-md sm:grid-cols-[9.5rem,1fr] sm:gap-x-md">
         <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs sm:col-start-2 sm:row-start-1">
@@ -428,7 +433,7 @@ export default function SessionCard({
           </h3>
           <TypeBadge type={session.type} />
         </div>
-        <p className="mt-2xs font-mono text-caption text-text-secondary sm:col-start-1 sm:row-start-1 sm:mt-0">
+        <p className="mt-2xs font-mono text-caption text-text-secondary sm:col-start-1 sm:row-start-1 sm:row-span-2 sm:mt-0">
           {range ? (
             <>
               <time dateTime={range.startIso}>{range.startLabel}</time>
