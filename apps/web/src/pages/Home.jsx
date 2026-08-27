@@ -5,13 +5,9 @@
 // links without a code change. All copy comes from the snapshot/runtime
 // content — nothing event-specific lives here.
 //
-// There is no hero banner (design brief §2.1, §5.1). The masthead nameplate
-// in the shell opens the page, and the lead headline follows it at
-// --text-h1, the way a lead story follows a paper's nameplate.
-//
-// The tagline sits BELOW the headline, never above it: the eyebrow ban is
-// absolute (brief §2.4), and supporting copy above a headline is exactly the
-// pattern it rejects.
+// The page owns its own <h1>: the shell's header carries the running site
+// identity, not this page's subject. No text sits above that heading — the
+// tagline and the supporting line follow it (brief §2.4).
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -38,15 +34,13 @@ export default function Home() {
   }
 
   const subtitle = getBlock('hero', 'subtitle');
-  // The shell's masthead nameplate carries the event name as this page's
-  // <h1> (design brief §2.1). The stored hero title is the lead headline
-  // that follows it — unless an editor typed the event name into it, in
-  // which case the nameplate has already set those words at nameplate size
-  // and repeating them under it is just the same headline twice.
+  // The stored hero title is this page's heading. Where an editor has not
+  // written one, the event's own name stands in — the page states what the
+  // data says and never invents a headline of its own.
   const leadTitle =
-    typeof title?.value === 'string' && title.value !== eventConfig.name
+    typeof title?.value === 'string' && title.value.trim()
       ? title.value
-      : null;
+      : eventConfig.name;
   const heroCtas = getSectionBlocks('hero').filter(
     (block) => block.blockType === 'cta',
   );
@@ -68,9 +62,9 @@ export default function Home() {
         {...(leadTitle ? { 'aria-labelledby': 'hero-title' } : { 'aria-label': 'Introduction' })}
       >
         {leadTitle ? (
-          <h2 id="hero-title" className="font-heading text-h1 font-semibold text-text-primary">
+          <h1 id="hero-title" className="font-heading text-h1 font-semibold text-text-primary">
             {leadTitle}
-          </h2>
+          </h1>
         ) : null}
         {typeof eventConfig.tagline === 'string' ? (
           <p

@@ -23,6 +23,17 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
 import Home from './Home.jsx';
 
 describe('Home', () => {
+  it('owns the page heading, and puts nothing above it', () => {
+    // The shell's header carries the running site identity, so this page's
+    // stored hero title is its own <h1> (design brief §2.1, §2.4).
+    eventConfig = { name: 'Demo Event', tagline: 'A gathering', days: [] };
+    const { container } = render(<Home />);
+    const heading = screen.getByRole('heading', { level: 1, name: 'Fallback title' });
+    expect(heading).toBeInTheDocument();
+    const section = container.querySelector('section');
+    expect(section.firstElementChild).toBe(heading);
+  });
+
   it('renders the tagline when it is a string', () => {
     eventConfig = { name: 'Demo Event', tagline: 'A gathering for demo people', days: [] };
     render(<Home />);

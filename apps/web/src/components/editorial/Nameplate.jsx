@@ -1,28 +1,17 @@
-// Nameplate — the masthead of the public site (design brief §2.1, §5.1).
+// Nameplate — the rule-bounded title block that the `masthead` header draws
+// (design brief §2.1). It carries the event name, the dates, and the edition
+// line, in type and rules only: never a hero banner, never a photo behind
+// the name.
 //
-// A rule-bounded title block carrying the event name, the dates, and the
-// edition line. It is type and rules only: never a hero banner, never a
-// background image, never a photo behind the name. It replaces the hero
-// pattern on every public page, and every public page carries one.
+// This is a theme device, not the base header. A theme opts into it through
+// config/theme.header; the base header is `standard` (Header.jsx).
 //
-// Two treatments, one device:
-//   'full'     the name at --text-nameplate with the dateline under it. The
-//              home page opener.
-//   'compact'  the same block at running-header size, name and dateline on
-//              one baseline. Every other page.
-// (The `layout.header` page variant in brief §6.2 chooses between them from
-// stored data; that schema lands in PR3. Until then the shell picks.)
+// The dates and the edition line sit INSIDE the rule-bounded block, which is
+// the one place brief §2.4 allows metadata beside a title.
 //
-// The dates and the edition line sit INSIDE the rule-bounded block, so they
-// are the nameplate device rather than an eyebrow — brief §2.4 names this
-// exception explicitly. Nothing else may sit above a title anywhere.
-//
-// The name is a heading on exactly one page. A running masthead repeats
-// everywhere, so on an inner page it is a <p> and the page's own <h1> is that
-// page's subject. On the home page the masthead IS the subject — the brief's
-// own front-page moment sets the nameplate first and the lead headline after
-// it — so the shell passes `nameAs="h1"` there. Either way a page carries
-// exactly one <h1> (§8.1, semantic heading order).
+// Two treatments: 'full' sets the name at --text-nameplate with the dateline
+// under it, 'compact' sets the same block at running-header size with the
+// name and dateline on one baseline.
 import { Link } from 'react-router-dom';
 import { formatEventDateRange } from '../../lib/eventTime.js';
 
@@ -58,8 +47,8 @@ export function buildNameplate(eventConfig, { compact = false } = {}) {
  *   variant?: 'full' | 'compact',
  *   to?: string | null,        // wraps the name in a link when set
  *   mark?: import('react').ReactNode,  // optional branding mark, inline
- *   nameAs?: string,           // 'p' by default; 'h1' where the masthead
- *                              // is the page's own subject
+ *   nameAs?: string,           // 'p' by default: the running site identity
+ *                              // is not a heading, so the page keeps its h1
  *   nameId?: string,
  *   className?: string,
  * }} props
