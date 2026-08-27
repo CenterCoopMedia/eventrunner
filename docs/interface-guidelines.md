@@ -5,6 +5,7 @@ Foundational rules for every `apps/web` surface — attendee pages, admin panel,
 ## How this connects to the rest of the repo
 
 - **Colors are theme tokens, never literals.** The ESLint hex sweep (spec §7.6) enforces the mechanical half; this document covers the design half. Every color you use must be a custom property from `config/theme` (spec §7) with a role-based name.
+- **Tokens come from `design/tokens/`.** The design system's three tiers, the motif layer, and every scale live in JSON there (design brief §3.5). `scripts/lib/tokens.cjs` turns that JSON into the custom properties `apps/web/src/generated/theme.css` carries, and `tailwind.config.js` maps the utilities onto them. Change a token by editing the JSON and regenerating. Never hand-edit the generated stylesheet.
 - **Accessibility is a merge requirement, not a nicety.** CONTRIBUTING already requires a keyboard path and visible focus for UI changes; the Accessibility section below is the working checklist behind that line.
 - **Event-neutrality applies to design too.** No hardcoded brand color, font stack "for this event," or copy that assumes one venue or city. If a design decision varies per client, it belongs in `config/theme` or CMS content.
 
@@ -28,6 +29,8 @@ Foundational rules for every `apps/web` surface — attendee pages, admin panel,
 ## Typography
 
 - Ship only `.woff2` — never TTF or OTF on the web. Fonts are self-hosted in `apps/web/public/fonts/` (spec §7.4).
+- Set type from the eight-step fluid scale: `text-nameplate`, `text-h1`, `text-h2`, `text-h3`, `text-lead`, `text-body`, `text-caption`, `text-folio` (design brief §3.7). Each step carries its own line height and tracking. Never pick a default Tailwind size instead.
+- Name a font by its role, never by its family: `font-heading`, `font-body`, `font-data`, `font-mono` (design brief §3.2). `font-accent` is the retired role and is an alias of `font-heading` for one release.
 - `font-variant-numeric: tabular-nums` on all dynamic values: timers, counters, prices, schedule columns.
 - Long-form text: 60–75 characters per line.
 - `text-wrap: balance` on headings, `text-wrap: pretty` on descriptions, neither on long-form.
@@ -45,7 +48,9 @@ Foundational rules for every `apps/web` surface — attendee pages, admin panel,
 - Name tokens by role, never by appearance or first use. Reserve `accent` for the brand color so `primary` doesn't mean both brand and body text.
 - Don't borrow a token from another role; when a role changes color, mint a new token.
 - Measure contrast against the actual rendered background, not the page background.
-- Dark mode is its own palette, not light mode reversed.
+- Dark mode is its own palette, not light mode reversed. Every color token is defined under both `:root[data-mode='light']` and `:root[data-mode='dark']`, and a token missing from either block is a bug (design brief §8.2).
+- The mode comes from `data-mode` on the root element. `config/theme.mode` sets the policy — `light`, `dark`, or `system` — and `lib/modeRuntime.js` writes the attribute. Never add a `.dark` class of your own.
+- Use the rule tokens for rules: `--rule-hairline-*`, `--rule-strong-*`, `--rule-nameplate-*` (design brief §3.7). A rule never borrows an ink step and never carries brand color.
 - One theme mechanism, used consistently. This repo's choice: the `config/theme`-driven custom-property chain (spec §7.2) — not ad-hoc `.dark` classes per component.
 - Define gradient interpolation: `in oklab` for even brightness, `in oklch` for vivid midtones.
 
@@ -69,7 +74,7 @@ Foundational rules for every `apps/web` surface — attendee pages, admin panel,
 
 ## Layout
 
-- The gap between groups is at least twice the gap inside one: 8px within, 16px+ between.
+- The gap between groups is at least twice the gap inside one: 8px within, 16px+ between. Use the named spacing steps (`--space-3xs` through `--space-3xl`), which are built to that rule: `xs` pairs with `md`, `sm` with `lg`, `md` with `xl`.
 - Logical properties (`margin-inline-start`, `padding-inline-end`), not directional values.
 - No fixed widths or heights on text containers.
 

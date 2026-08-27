@@ -377,6 +377,12 @@ variants when two presets share it.
 Six presets ship at launch. Each preset defines a light palette, a dark palette, a type pairing,
 shape and texture and density settings, a motif default, and a personality statement.
 
+Each preset must tell one visual story. The type pairing, the palette, the shape, the density, and
+the motifs must all serve that one story, and a preset whose parts pull in different directions
+fails review. Before any preset work starts in PR2, write a short visual-story spec for each
+preset: the narrative, the visual vocabulary, and the two or three signature moments that belong to
+that preset alone. The user reviews all six specs during PR2 planning.
+
 A client picks one preset. A client may then override any token. An override applies per mode.
 
 All faces must be self-hosted `woff2` (interface guidelines, Typography). All faces must carry the
