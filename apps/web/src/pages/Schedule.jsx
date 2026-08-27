@@ -42,6 +42,34 @@ function dayClass(isActive) {
   ].join(' ');
 }
 
+/**
+ * The room a reader moves to, for the session at `index` of a sorted day
+ * (design brief §4.6; visual story, Atlas, moment 2).
+ *
+ * A transfer is a real move: it exists only when this session sits in a
+ * different room from the one before it, and only when both rooms are
+ * stated. The first session of a day is an arrival, not a transfer, and two
+ * sessions in the same room are not a move at all.
+ *
+ * Both are runtime CMS values, so a non-string room is treated as absent
+ * rather than compared.
+ *
+ * @param {object[]} sessions the day's sessions, already sorted
+ * @param {number} index
+ * @returns {string|null}
+ */
+export function transferTarget(sessions, index) {
+  const room = (session) =>
+    typeof session?.location === 'string' && session.location.trim()
+      ? session.location.trim()
+      : null;
+  if (index < 1) return null;
+  const here = room(sessions[index]);
+  const before = room(sessions[index - 1]);
+  if (!here || !before || here === before) return null;
+  return here;
+}
+
 /** Sort sessions the same way everywhere they're grouped by day (Schedule
  * and MySchedule both use this). Start time first, then explicit `order`,
  * then title as a stable tiebreaker. */
@@ -221,13 +249,14 @@ export default function Schedule() {
               // No gap: every row opens with its own hairline, so the rules
               // are the separation a card border used to be.
               <ul className="mt-sm">
-                {activeSessions.map((session) => (
+                {activeSessions.map((session, index) => (
                   <SessionCard
                     key={session.id}
                     session={session}
                     eventConfig={eventConfig}
                     features={features}
                     bookmarked={bookmarkedIds.has(session.id)}
+                    transferTo={transferTarget(activeSessions, index)}
                   />
                 ))}
               </ul>

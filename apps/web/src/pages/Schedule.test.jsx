@@ -10,7 +10,7 @@ import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
-import Schedule from './Schedule.jsx';
+import Schedule, { transferTarget } from './Schedule.jsx';
 import { formatSessionTimeRange, zonedDateTime } from '../lib/eventTime.js';
 
 // Non-UTC zone on purpose: America/Chicago is UTC−5 (CDT) on the fixture
@@ -279,5 +279,43 @@ describe('SchedulePage editorial register', () => {
     const list = container.querySelector('section ul');
     expect(list.className).not.toContain('gap-3');
     expect(list.querySelector('li')).toHaveClass('border-t-hairline');
+  });
+
+  it('sets the day head plate number from the day’s real position', () => {
+    // Visual story, Field Guide, moment 1: "PLATE III · SATURDAY 14
+    // MARCH". Day two is Plate II because it is the second day, not because
+    // a designer liked the number — and the mark is set only where the
+    // token says the page is a plate book (index.css .plate-number).
+    renderSchedule();
+    expect(screen.getByText(/Plate I \u00b7/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Day two' }));
+    expect(screen.getByText(/Plate II \u00b7/)).toBeInTheDocument();
+  });
+
+  it('states a transfer only where the room actually changes', () => {
+    // Visual story, Atlas, moment 2. The first session of a day is an
+    // arrival, not a transfer; two sessions in one room are not a move.
+    renderSchedule();
+    const rows = [...document.querySelectorAll('section ul li')];
+    expect(rows[0].querySelector('.transfer-line')).toBeNull();
+    expect(rows[1].querySelector('.transfer-line').textContent).toBe('Transfer to Room B');
+  });
+});
+
+describe('transferTarget', () => {
+  const day = [
+    { location: 'Main hall' },
+    { location: 'Room B' },
+    { location: 'Room B' },
+    { location: '  ' },
+    { location: 42 },
+  ];
+
+  it('names the room a reader moves to, and nothing else', () => {
+    expect(transferTarget(day, 0)).toBeNull();
+    expect(transferTarget(day, 1)).toBe('Room B');
+    expect(transferTarget(day, 2)).toBeNull();
+    expect(transferTarget(day, 3)).toBeNull();
+    expect(transferTarget(day, 4)).toBeNull();
   });
 });

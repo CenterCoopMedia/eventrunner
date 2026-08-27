@@ -112,7 +112,15 @@ export default function Layout() {
           </nav>
         </div>
       </header>
-      <main id="main-content" className="mx-auto w-full max-w-5xl flex-1 px-md pb-2xl pt-xl">
+      {/* The sections are drawn on a sheet (brief §4.6): a faint coordinate
+          grid sits behind them, below hairline contrast and inert to the
+          pointer. --map-grid-size is zero in every preset but Atlas, and a
+          zero-size background paints nothing, so the sheet appears only
+          where the story has one. */}
+      <main
+        id="main-content"
+        className="map-grid mx-auto w-full max-w-5xl flex-1 px-md pb-2xl pt-xl"
+      >
         <Outlet />
       </main>
       <footer className="bg-brand-surface">

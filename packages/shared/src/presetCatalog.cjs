@@ -879,6 +879,7 @@ const PRESETS = Object.freeze({
     motifSet: 'cartographic',
     tokens: {
       '--map-grid-size': 'var(--space-xl)',
+      '--transfer-line-display': 'block',
       '--route-mark-radius': 'var(--radius-base)',
       '--session-card-pad-block': 'var(--space-xs)',
       '--folio-font': 'var(--font-data)',

@@ -56,6 +56,7 @@
   "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The map grid is held below hairline contrast and never becomes an image.",
   "tokens": {
     "--map-grid-size": "var(--space-xl)",
+    "--transfer-line-display": "block",
     "--route-mark-radius": "var(--radius-base)",
     "--session-card-pad-block": "var(--space-xs)",
     "--folio-font": "var(--font-data)",

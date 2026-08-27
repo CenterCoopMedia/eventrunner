@@ -166,6 +166,110 @@
     border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
   }
 
+  /* Map grid: the faint coordinate grid a section is drawn on (brief §4.6).
+     Held BELOW hairline contrast — it is felt rather than seen — and inert
+     to the pointer. The grid is the sheet, so it never moves and never
+     animates, including under the departure board's traced-line moment.
+
+     --map-grid-size is zero in every preset but Atlas, and a background
+     with a zero size is not painted at all, so the device turns itself off
+     with no second token and no theme test. The children are positioned so
+     they paint above the grid rather than under it. */
+  .map-grid {
+    position: relative;
+  }
+  .map-grid::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(
+        to right,
+        rgb(var(--map-grid-rgb) / 0.45) var(--rule-hairline-width),
+        transparent var(--rule-hairline-width)
+      ),
+      linear-gradient(
+        to bottom,
+        rgb(var(--map-grid-rgb) / 0.45) var(--rule-hairline-width),
+        transparent var(--rule-hairline-width)
+      );
+    background-size: var(--map-grid-size) var(--map-grid-size);
+  }
+  .map-grid > * {
+    position: relative;
+  }
+
+  /* Route mark: the line letter in the sign face inside a survey-drawn
+     shape (brief §4.6). Never a coloured pill — the radius follows the
+     theme's own scale, which is sharp in Atlas, and §2.4 rejects the fully
+     rounded shape with no exception. The letter is the signal; a colour is
+     only ever the second one. */
+  .route-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 1.75em;
+    min-block-size: 1.75em;
+    padding-inline: 0.3em;
+    border-radius: var(--route-mark-radius);
+    background-color: rgb(var(--route-mark-rgb));
+    color: rgb(var(--route-mark-ink-rgb));
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  /* Wayfinding icons: the sign set, masked over currentColor so one file
+     serves both modes and every icon inherits the ink of the line it sits
+     in. Each one always has its word beside it. */
+  .wayfinding-icon {
+    display: inline-block;
+    inline-size: 1em;
+    block-size: 1em;
+    vertical-align: -0.125em;
+    pointer-events: none;
+    background-color: currentColor;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
+  .wayfinding-icon--venue {
+    -webkit-mask-image: url('/icons/wayfinding/venue.svg');
+    mask-image: url('/icons/wayfinding/venue.svg');
+  }
+  .wayfinding-icon--room {
+    -webkit-mask-image: url('/icons/wayfinding/room.svg');
+    mask-image: url('/icons/wayfinding/room.svg');
+  }
+  .wayfinding-icon--line {
+    -webkit-mask-image: url('/icons/wayfinding/line.svg');
+    mask-image: url('/icons/wayfinding/line.svg');
+  }
+  .wayfinding-icon--transit {
+    -webkit-mask-image: url('/icons/wayfinding/transit.svg');
+    mask-image: url('/icons/wayfinding/transit.svg');
+  }
+  .wayfinding-icon--walk {
+    -webkit-mask-image: url('/icons/wayfinding/walk.svg');
+    mask-image: url('/icons/wayfinding/walk.svg');
+  }
+  .wayfinding-icon--step-free {
+    -webkit-mask-image: url('/icons/wayfinding/step-free.svg');
+    mask-image: url('/icons/wayfinding/step-free.svg');
+  }
+
+  /* Transfer line: "where you are, where it is" in signage voice (brief
+     §4.6). It is Atlas's vocabulary, not the system's, so it is set only
+     where --transfer-line-display says the schedule is a network — which
+     also keeps it out of the accessibility tree in the five presets whose
+     story has no transfers in it. */
+  .transfer-line {
+    display: var(--transfer-line-display);
+  }
+
   /* Botanical plate: a framed opener, drawn as a DOUBLE hairline (brief
      §4.5). The border is the inner rule and the outline is the outer one,
      both at --plate-frame-width, so the doubling needs no second element.
