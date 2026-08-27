@@ -5,10 +5,16 @@
 // edition line sit INSIDE the rule-bounded block, which is the one place
 // brief §2.4 allows metadata near a title. The name is not a heading — the
 // site identity repeats on every page, so each page keeps its own <h1>.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Nameplate, { buildNameplate } from './Nameplate.jsx';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const indexCss = fs.readFileSync(path.resolve(here, '..', '..', 'index.css'), 'utf8');
 
 function renderPlate(props) {
   return render(
@@ -147,5 +153,19 @@ describe('Nameplate', () => {
     const marks = container.querySelectorAll('.nameplate__coordinate');
     expect(marks).toHaveLength(2);
     for (const mark of marks) expect(mark).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('lays the lockup out the way the Header style sets the block', () => {
+    // A start-aligned masthead puts the name at one end of the measure and
+    // the dateline at the other, which is space-between. A CENTRED one wants
+    // neither end: with space-between, a dateline that wrapped under a long
+    // centred name landed at the start of the row, reading as a stray line.
+    // jsdom does not lay flex out, so the rule itself is what is checked.
+    expect(indexCss).toMatch(
+      /\.nameplate__lockup \{[^}]*justify-content: space-between;/,
+    );
+    expect(indexCss).toMatch(
+      /@container style\(--nameplate-align: center\) \{\s*\.nameplate__lockup \{\s*justify-content: center;/,
+    );
   });
 });

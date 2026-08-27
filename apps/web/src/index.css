@@ -210,6 +210,22 @@
       flex-basis: auto;
     }
   }
+  /* The lockup is laid out the way the block is set. `space-between` is what
+     a masthead set to the start wants: the name at one end of the measure and
+     the dateline at the other. A CENTRED masthead wants neither end — it
+     wants one centred lockup, and a dateline that wraps under a long name
+     wants to centre under it.
+
+     Without this, `space-between` sent the wrapped line to the start of a
+     row the centred name above it does not use, which read as a stray line
+     rather than as part of the block. `text-align` could not fix it: it sets
+     the text inside a flex item, and the item itself was the thing in the
+     wrong place. */
+  @container style(--nameplate-align: center) {
+    .nameplate__lockup {
+      justify-content: center;
+    }
+  }
 
   /* Lead image: beside the opening copy at wide viewports, below it at
      narrow ones. The crop is fixed by token so swapping the picture never
