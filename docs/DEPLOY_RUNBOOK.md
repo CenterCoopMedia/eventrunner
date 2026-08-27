@@ -351,7 +351,7 @@ client already past step 3 never needs it again.
   `attribute.repository/<GH_ORG>/<GH_REPO>` alone. A repository-only binding is the gap this runbook
   now closes: it lets any dispatched run on any branch of this repository impersonate the deploy
   service account.
-- Confirm the negative case, not just the positive one: `gh workflow run deploy.yml --ref
+- Confirm the negative case as well: `gh workflow run deploy.yml --ref
   <some-non-main-branch> -f client=<CLIENT_ENV>` must fail at the `google-github-actions/auth` step
   with a token-exchange `permission_denied` — that is the WIF condition doing its job. It should
   also fail earlier, at "Waiting for review" or immediately, if the deployment branch rule (§2) is
