@@ -1,6 +1,6 @@
 # Site design reference
 
-Everything the look of a client site is made of: the six site styles, the type, the illustrations, the headers, the page templates, the colour, the tokens under all of it, what prints, and where a developer extends it.
+Everything the look of a client site is made of: The six site styles, the type, the illustrations, the headers, the page templates, the colour, the tokens under all of it, what prints, and where a developer extends it.
 
 **This is the deep end, and you do not need it to run a site.** [`ADMIN_GUIDE.md`](ADMIN_GUIDE.md) is the operator's path — pick a style, add your logo, set your colour, preview, publish — and it is a complete answer for almost every event. Come here when you want to know what a control is doing underneath, when a recommended configuration is not quite right, or when you are adding to the system rather than using it.
 
@@ -11,11 +11,11 @@ Two audiences, one document. Where a section says **Staff** it is about a contro
 One chain, four links, and each one only overrides what it names:
 
 1. **The design tokens** (`design/tokens/*.json`) define every scale, contract, and primitive the system has. Nothing outside them is a value.
-2. **The site style** picks a base: two authored palettes, a type pairing, a shape, a header, a set of illustrations, and its own remaps of the tokens above.
+2. **The site style** picks a base: Two authored palettes, a type pairing, a shape, a header, a set of illustrations, and its own remaps of the tokens above.
 3. **The options** inside that style retune it — the heading face, the header style, the schedule style. An option remaps tokens the style already declares. It never invents a name.
-4. **The overrides** are the exceptional path: one colour, one font role, one radius, named outright.
+4. **The overrides** are the exceptional path: One colour, one font role, one radius, named outright.
 
-Whatever comes out of that is resolved once, in one place, and everything reads the result: the public site, the admin's page preview, the emails, and the PDF handout.
+Whatever comes out of that is resolved once, in one place, and everything reads the result: The public site, the admin's page preview, the emails, and the PDF handout.
 
 **Engine.** The stored document is `config/theme`. `packages/shared/src/theme.cjs` is the single resolver — the browser, the build-time generator, and the publish gate all call it, so none of them can disagree about what a document means. `scripts/lib/tokens.cjs` turns the resolved answer into `apps/web/src/generated/theme.css` at build time; `apps/web/src/lib/themeRuntime.js` turns the same answer into a `<style>` element at run time, so a publish restyles an open page with no deploy. `data-theme`, `data-mode`, and `data-motif-set` on the root element pick which blocks win.
 
@@ -23,9 +23,9 @@ Whatever comes out of that is resolved once, in one place, and everything reads 
 
 ## The six site styles
 
-Every style is finished work: two authored palettes, a type pairing that has been set against real event content, its own devices, and its own answers in every option group. None of them is a skin over another, and none of them is a lesser version of the default. What they differ in is what an event is *for*.
+Every style is finished work: Two authored palettes, a type pairing that has been set against real event content, its own devices, and its own answers in every option group. None of them is a skin over another, and none of them is a lesser version of the default. What they differ in is what an event is *for*.
 
-Three of them are the **launch surface** — run against real client content, and the ones the picker offers first. The other three are **still being proved**: fully functional, holding every gate, and grouped behind their own disclosure so staff try them on their own content before an event depends on them.
+Three of them are the **launch surface** — run against real client content, and the ones the picker offers first. The other three are **still being proved**: Fully functional, holding every gate, and grouped behind their own disclosure so staff try them on their own content before an event depends on them.
 
 ### Institutional — launch surface, and the default
 
@@ -55,7 +55,7 @@ Three of them are the **launch surface** — run against real client content, an
 *Made by hand, at a copier, the week before.* One loud display face, an even rhythm under it, and an accent spent twice a page.
 
 - **Suits**: An unconference, a community gathering, a student event, a workshop series — anything whose character is that it is not corporate.
-- **Type**: Karrik for headings over Source Sans 3 for reading, with Fragment Mono carrying times, room codes, and identifiers. The mono is the value face, not the page face: a long session description set in a typewriter face is slow to read at any length.
+- **Type**: Karrik for headings over Source Sans 3 for reading, with Fragment Mono carrying times, room codes, and identifiers. The mono is the value face, not the page face: A long session description set in a typewriter face is slow to read at any length.
 - **Shape**: Sharp corners, loose spacing.
 - **Devices**: The full-sheet header; the flat block for a session.
 - **Illustrations**: None.
@@ -86,7 +86,7 @@ Three of them are the **launch surface** — run against real client content, an
 
 ### Atlas — being proved
 
-*A mapped city on its transit network.* A survey sheet and a departure board at once: lines, stations, transfers.
+*A mapped city on its transit network.* A survey sheet and a departure board at once: Lines, stations, transfers.
 
 - **Suits**: A multi-venue event, a city-wide festival, anything where getting from one thing to the next is part of the problem.
 - **Type**: Overpass over Libre Franklin, with Overpass Mono carrying times and codes.
@@ -98,13 +98,13 @@ Three of them are the **launch surface** — run against real client content, an
 
 ## Header style
 
-Four header styles, and a site picks one. The header is the site's identity, and it repeats on every page — which is exactly why it is **not** a heading: every page owns its own `h1`, and the header sits outside it. Each site style also names its own three, tuned to it — Broadsheet's full measure, Newsroom's rule-bounded bar, Zine's full sheet — and those are the ones the picker offers once a style is chosen.
+Four header styles, and a site picks one. The header is the site's identity, and it repeats on every page — which is exactly why it is **not** a heading: Every page owns its own `h1`, and the header sits outside it. Each site style also names its own three, tuned to it — Broadsheet's full measure, Newsroom's rule-bounded bar, Zine's full sheet — and those are the ones the picker offers once a style is chosen.
 
 | Style | What it draws | Reach for it when |
 |---|---|---|
 | **Standard** | The event name at normal weight, the dates and place under it, the navigation. | The default. The identity is present and the page's own headline leads. |
-| **Masthead** | The rule-bounded title block at display size: name, dates, edition line. | The event's name is the point — a front page, a single-day event, an anniversary. |
-| **Compact** | The event bar: name and navigation on one line. | A long document site where every pixel above the text is spent. |
+| **Masthead** | The rule-bounded title block at display size: Name, dates, edition line. | The event's name is the point — a front page, a single-day event, an anniversary. |
+| **Compact** | The event bar: Name and navigation on one line. | A long document site where every pixel above the text is spent. |
 | **Minimal** | The mark and the navigation. No name. | The event's mark is well known, or the page is a utility. |
 
 **A page may override the site's choice**, and one usually should not. The site-wide value is what makes the header furniture a reader stops noticing; a page that differs is asking to be noticed, which is right for a front page and wrong for a policy page.
@@ -115,7 +115,7 @@ Four header styles, and a site picks one. The header is the site's identity, and
 
 How a session is set out on the schedule. Every site style names its own choices, because a session listing is one of the two places a style is most itself — the header is the other, which is why every style above names exactly one of each under **Devices** — the posted or numbered agenda for Institutional, the hairline row or the lead-and-rest ranking for Newsroom, the flat block, the stamped block, or the struck folio for Zine, the ruled programme or the agate block for Broadsheet, the specimen label or the field-notes column for Field Guide, the departure board, line diagram, or gazetteer list for Atlas.
 
-Whichever is picked, the day still reads twice and both readings are first-class: a grid at wide viewports when the event lists tracks, and a time-ordered list everywhere else. A schedule style retunes how a session is drawn. It never decides which of those two views a reader gets.
+Whichever is picked, the day still reads twice and both readings are first-class: A grid at wide viewports when the event lists tracks, and a time-ordered list everywhere else. A schedule style retunes how a session is drawn. It never decides which of those two views a reader gets.
 
 **Engine.** The `component` option group (`optionPicks.component`). Like every option, it remaps tokens the style already declares — the session contracts in tier 3 — and introduces no property name of its own.
 
@@ -127,7 +127,7 @@ Whichever is picked, the day still reads twice and both readings are first-class
 |---|---|
 | `heading` | Every heading, and the masthead. |
 | `body` | Everything a person reads as language. |
-| `data` | The voice beside the text: labels, folios, captions. |
+| `data` | The voice beside the text: Labels, folios, captions. |
 | `mono` | Anything a person would copy, paste, or compare character by character. |
 
 There is no fifth role. Zine's handwritten callout runs on a component token, which is a contract for one device rather than a role.
@@ -136,13 +136,13 @@ There is no fifth role. Zine's handwritten callout runs on a component token, wh
 
 **The bundled sets** are the only faces a site can use, and they are self-hosted. No page on a client site asks an external font service for anything, ever: Source Serif 4, Source Sans 3, Caveat, Libre Caslon Display, Libre Caslon Text, Libre Baskerville, Spectral, Fraunces, Newsreader, IBM Plex Sans, IBM Plex Mono, Archivo Condensed, Merriweather, Public Sans, Karrik, Bagnard, Avara, Fragment Mono, Besley, Vollkorn, Overpass, Overpass Mono, Libre Franklin.
 
-**Heading-face options** are the sanctioned way to change type: each style offers three, and they are chosen to still work with that style's body face. Naming a role outright is the override path, and it is where a pairing can go wrong.
+**Heading-face options** are the sanctioned way to change type: Each style offers three, and they are chosen to still work with that style's body face. Naming a role outright is the override path, and it is where a pairing can go wrong.
 
 **Engine.** Every bundled family is declared in the generated stylesheet, and only the ones a rendered element resolves to are downloaded — see [`interface-guidelines.md`](interface-guidelines.md), Typography, for why that has to be every set.
 
 ## Illustrations
 
-A set of small drawings that carry a style's vocabulary, in four slots: a section mark, a divider, a mark inside the header, and an empty state.
+A set of small drawings that carry a style's vocabulary, in four slots: A section mark, a divider, a mark inside the header, and an empty state.
 
 - **None** — no drawings. What Institutional, Newsroom, Zine, and Broadsheet ship.
 - **Botanical** — leaves, seed heads, specimen sprigs. Built for Field Guide, off by default.
@@ -161,7 +161,7 @@ An operator knows "this is a long read" and "this is a directory with an introdu
 
 | Template | What it is for |
 |---|---|
-| **Standard page** | The ordinary page: a running header, one column, normal spacing. Start here. |
+| **Standard page** | The ordinary page: A running header, one column, normal spacing. Start here. |
 | **Feature first** | Opens on its main content under the full masthead, for a page whose subject is the first thing to see. |
 | **Directory with introduction** | A few words, then entries in columns. Speakers, sponsors, anything that is a list of people or organizations. |
 | **Long read** | One column with air between things, for a page that is mostly text. |
@@ -176,13 +176,13 @@ Picking one sets every underlying value at once. The individual axes stay reacha
 
 - **Header style** — the four above.
 - **Arrangement** — `list` or `grid`. Whether the page's items run down or across.
-- **Density** — `tight`, `comfortable`, `loose`. A set of token remaps, never raw values: each step maps the page and session contracts onto the spacing scale, and the block nearest an element wins, which is how a page overrides the style for its own subtree and nowhere else.
+- **Density** — `tight`, `comfortable`, `loose`. A set of token remaps, never raw values: Each step maps the page and session contracts onto the spacing scale, and the block nearest an element wins, which is how a page overrides the style for its own subtree and nowhere else.
 
 ### Navigation is a site setting, not a page setting
 
 Where the navigation sits is part of what the site *is*. A reader who meets a top navigation on the home page and a rail on the schedule has been handed two sites, and the navigation stops being furniture they can stop noticing. It is one choice — `top` or `side` — and it covers every page.
 
-`side` moves the same navigation to the leading edge at wide viewports. It is one navigation either way: same landmark, same items, same place in the document, and below the wide breakpoint it is the top navigation again.
+`side` moves the same navigation to the leading edge at wide viewports. It is one navigation either way: Same landmark, same items, same place in the document, and below the wide breakpoint it is the top navigation again.
 
 **Engine.** The value lives in `config/theme` beside the style, the texture, the radius, and the mode policy. A page document's own stored value is still accepted on write and still read as that page's fallback, because deployments made before the move set it per page and an upgrade may not restyle their pages.
 
@@ -190,7 +190,7 @@ Where the navigation sits is part of what the site *is*. A reader who meets a to
 
 A system page — home, schedule, speakers, sponsors — keeps its built-in feature and lets you put sections around it. The control asks where relative to that feature: **before the main feature** or **after the main feature**.
 
-**Engine.** The stored positions are `above`, `main`, and `below`. A section with no position is `main`. `below` is a third stored position with no third name in the editor: it renders after every `main` section, and a section stored that way keeps both its value and its place unless the operator moves the control. A custom page has no built-in feature, so it ignores position entirely.
+**Engine.** The stored positions are `above`, `main`, and `below`. A section with no position is `main`. `below` is a third stored position with no third name in the editor: It renders after every `main` section, and a section stored that way keeps both its value and its place unless the operator moves the control. A custom page has no built-in feature, so it ignores position entirely.
 
 ## Colour
 
@@ -201,13 +201,13 @@ A system page — home, schedule, speakers, sponsors — keeps its built-in feat
 - The **darker and lighter** steps of it, for the states and the surfaces that need them.
 - The **rules** — hairline, strong, nameplate — which are the brand ink mixed into the ground at fixed shares, so a restyled site never keeps build-time rules on a new ground.
 - The **form control boundary**, mixed the same way but at a share high enough to clear the non-text contrast bar against either ground.
-- The **dark palette**, authored from the light one rather than inverted from it: a dark site is its own palette, and every colour is lifted to clear its bar on the dark ground rather than reused.
+- The **dark palette**, authored from the light one rather than inverted from it: A dark site is its own palette, and every colour is lifted to clear its bar on the dark ground rather than reused.
 
 Semantic colours — success, warning, danger, and the rest — come from the style and are not part of the brand decision. They mean what they mean, and a client's colour does not get to redefine them.
 
 ### Expert overrides
 
-Any single colour can be set by hand, per mode, under **Advanced colour settings**. A light tab and a dark tab hold separate values, and a blank field keeps the worked-out one. This is an **exceptional control**: it is there for the client whose brand guide names an exact value that the derivation does not reach, and every use of it takes a token out of the derivation permanently — it will no longer move when the brand colour moves. Most sites should never open it, and a site that has overridden a dozen values has usually picked the wrong style.
+Any single colour can be set by hand, per mode, under **Advanced colour settings**. A light tab and a dark tab hold separate values, and a blank field keeps the worked-out one. This is an **exceptional control**: It is there for the client whose brand guide names an exact value that the derivation does not reach, and every use of it takes a token out of the derivation permanently — it will no longer move when the brand colour moves. Most sites should never open it, and a site that has overridden a dozen values has usually picked the wrong style.
 
 There is no second brand colour anywhere in the system. The admin's own marker is worked out from the admin's ink against the admin ground, so there is nothing to set and nothing to get wrong.
 
@@ -237,7 +237,7 @@ Three tiers, and each one only reads the one below it.
 - Never borrow a token from another role. When a role changes colour, mint a new token.
 - Every colour token is defined under both modes. A token missing from either is a bug, not a polish item.
 - Rules read the rule tokens. A rule never borrows an ink step and never carries brand colour.
-- A form control's boundary reads the control token, never the hairline: a hairline is tuned for low-contrast structure and falls well short of the 3:1 bar.
+- A form control's boundary reads the control token, never the hairline: A hairline is tuned for low-contrast structure and falls well short of the 3:1 bar.
 
 **Colours are stored as space-separated RGB triples**, so the utility layer's `rgb(var(--…) / <alpha-value>)` keeps its opacity modifiers working.
 
@@ -251,12 +251,12 @@ The devices, and the one job each has. The implementations live in `apps/web/src
 - **Folio** — a small-caps plain-text label on a hairline. Never a chip, never a pill, never a coloured badge, and **never directly above a heading**.
 - **Rule** — hairline, strong, or nameplate. A rule replaces a card border. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node.
 - **Section boundary** — one strong rule, then the heading with the folio beside it. Reach for this rather than composing a folio and a heading by hand.
-- **Stat block** — four parts, all required: the finding in words, what the number counts and over what period, where it came from and when it was read, and a line describing it for a screen reader. A large number with a small caption under it is not a stat block, and the write path refuses one.
+- **Stat block** — four parts, all required: The finding in words, what the number counts and over what period, where it came from and when it was read, and a line describing it for a screen reader. A large number with a small caption under it is not a stat block, and the write path refuses one.
 - **Grid schedule** — time down the left, lettered tracks across the head, at wide viewports. A real table, and it degrades to the time-ordered list, which is the accessible baseline and not a lesser view.
 - **Back issue** — the archival state of a past day. Reduce the palette to the archive tokens, add the folio, remove the live controls. Never hide the content.
 - **Print view** — its own view, not the screen with the controls hidden.
 
-**The eyebrow ban is absolute.** Nothing sits directly above a heading — not a label, not a chip, not a small line of description, not a plain folio. It holds at every size, in every style. Two things are not eyebrows and must never be "fixed": metadata inside the rule-bounded nameplate block, and a form `<label>` above its own input.
+**The eyebrow ban is absolute.** Nothing sits directly above a heading — not a label, not a chip, not a small line of description, not a plain folio. It holds at every size, in every style. Two things are not eyebrows and must never be "fixed": Metadata inside the rule-bounded nameplate block, and a form `<label>` above its own input.
 
 **Elevation is tint, not shadow.** Where a surface must sit above another, shift its tone.
 
@@ -266,7 +266,7 @@ The full list of rejected patterns is in [`interface-guidelines.md`](interface-g
 
 ## Print
 
-**Paper has no dark mode.** Print any schedule page from a dark screen and you get the light edition: the print rules read the ink and rule tokens and nothing else, so re-pointing those at the light palette is the whole switch, and no print rule has to know a mode exists.
+**Paper has no dark mode.** Print any schedule page from a dark screen and you get the light edition: The print rules read the ink and rule tokens and nothing else, so re-pointing those at the light palette is the whole switch, and no print rule has to know a mode exists.
 
 **The handout is its own view.** Every day of the event, every session and every stop under it, tracks named by letter and by name, no buttons, no demo notice. Nothing has to be prepared for it.
 
@@ -278,8 +278,8 @@ The admin CMS is its own design surface and it does not restyle. It reads its ow
 
 - **Two faces, fixed.** Source Sans 3 for everything a person reads as language, IBM Plex Mono with tabular figures for everything the machine owns.
 - **Navigation is the docket**: A grouped standing list of words down the leading edge. No icon rail, no collapse to glyphs, no counts in bubbles.
-- **The active item carries four signals**, never colour alone: the marker, the weight, a ground shift, and the assistive-technology current-page state.
-- **The position marker is derived**, from the admin's own ink against the admin ground. It is not a client setting: there is no marker colour to choose, nothing to get wrong, and no failure state to explain.
+- **The active item carries four signals**, never colour alone: The marker, the weight, a ground shift, and the assistive-technology current-page state.
+- **The position marker is derived**, from the admin's own ink against the admin ground. It is not a client setting: There is no marker colour to choose, nothing to get wrong, and no failure state to explain.
 - **Three state words, everywhere**: Draft, Live, and Live with unpublished changes.
 - **A destructive action stands still and states what it costs.** Nothing animates in a destructive moment.
 
@@ -297,6 +297,6 @@ What a developer can add, and what the system will refuse.
 
 **A new illustration set.** Add it to the motif JSON with all four slots filled. A set with a hole in it renders nothing in that slot, which reads as a bug.
 
-**A new page template.** A template is a named, validated bundle of layout values plus the record of which task the operator meant. Add both, and state every axis: a template that left one unanswered would leave the page following the style for that one value while stating the others, which is the half-configured state templates exist to prevent.
+**A new page template.** A template is a named, validated bundle of layout values plus the record of which task the operator meant. Add both, and state every axis: A template that left one unanswered would leave the page following the style for that one value while stating the others, which is the half-configured state templates exist to prevent.
 
 **What a style may never do**: Grant itself an exception to a rejected pattern, introduce a property name, ship a remote font, or define a colour in one mode only.
