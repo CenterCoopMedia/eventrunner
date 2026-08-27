@@ -32,6 +32,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { OtpRequestError, useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
+import {
+  inputClass,
+  primaryButtonClass as basePrimaryButtonClass,
+  secondaryButtonClass as baseSecondaryButtonClass,
+} from './forms/publicForm.jsx';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -56,23 +61,11 @@ function formatClock(totalSeconds) {
   return `${minutes}:${seconds}`;
 }
 
-// The boundary is --color-border-control, not --rule-hairline (design brief
-// §8.1 polish, WCAG 1.4.11): a rule is tuned for low-contrast section
-// dividers, and a form control's boundary needs 3:1 against its ground.
-const inputClass =
-  'touch-target w-full rounded-brand border-hairline border-control bg-surface px-sm py-xs ' +
-  'font-body text-body text-text-primary placeholder:text-text-secondary ' +
-  'aria-[invalid=true]:border-danger';
-
-export const primaryButtonClass =
-  'touch-target inline-flex w-full items-center justify-center rounded-brand ' +
-  'bg-accent px-md py-xs font-data text-caption font-semibold text-surface ' +
-  'hover:bg-accent-strong disabled:opacity-60';
-
-export const secondaryButtonClass =
-  'touch-target inline-flex w-full items-center justify-center rounded-brand ' +
-  'border-hairline border-rule-hairline bg-surface px-md py-xs font-data text-caption font-semibold ' +
-  'text-text-primary hover:bg-surface-alt disabled:opacity-60';
+// The public tier's own controls (components/forms/publicForm.jsx). The
+// sign-in panel is a narrow column, so its buttons are the same controls at
+// full width — the shape differs, the tokens do not.
+export const primaryButtonClass = `${basePrimaryButtonClass} w-full`;
+export const secondaryButtonClass = `${baseSecondaryButtonClass} w-full`;
 
 const linkButtonClass =
   'touch-target inline-flex items-center rounded-brand px-2xs py-3xs font-data text-caption underline ' +

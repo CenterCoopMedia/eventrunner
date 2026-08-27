@@ -25,18 +25,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { TicketClaimError, verifyTicketOrder } from '../lib/ticketClaim.js';
-
-const primaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-accent ' +
-  'px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong disabled:opacity-60';
-
-// The boundary is --color-border-control, not --rule-hairline (design brief
-// §8.1 polish, WCAG 1.4.11): a rule is tuned for low-contrast section
-// dividers, and a form control's boundary needs 3:1 against its ground.
-const inputClass =
-  'touch-target w-full rounded-brand border-hairline border-control bg-surface px-sm py-xs ' +
-  'font-body text-body text-text-primary placeholder:text-text-secondary ' +
-  'aria-[invalid=true]:border-danger';
+import { inputClass, primaryButtonClass } from '../components/forms/publicForm.jsx';
 
 const Panel = ({ children }) => (
   <div className="mt-lg space-y-md border-hairline border-rule-hairline bg-surface-alt p-lg">

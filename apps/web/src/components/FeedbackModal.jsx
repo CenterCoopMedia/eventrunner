@@ -17,31 +17,28 @@
 //
 // Editorial base restyle (design brief §2.1, §2.4): the dialog's elevation
 // is a tinted ink scrim (--color-text-primary at low alpha, no blur) behind
-// a strong-rule frame — never a shadow, never a rounded card. The two
-// formControls.jsx button classes are local to that file's own (non-full-
-// width) call sites, so this modal keeps its own button classes rather than
-// importing theirs; both read the same tier-2 tokens the rest of the base
-// system uses. Every form `<label>` in SelectField/TextAreaField/TextField
-// stays above its input — a control label is the one exemption the eyebrow
-// ban names (§2.4), never an eyebrow to "fix".
+// a strong-rule frame — never a shadow, never a rounded card. The controls
+// come from components/forms/publicForm.jsx, which reads the tier-2 tokens
+// this surface reads: this is a visitor-facing form, so it must never take
+// the admin identity's grounds and faces (design brief §3.1, §5.2). Every
+// form `<label>` in SelectField/TextAreaField/TextField stays above its
+// input — a control label is the one exemption the eyebrow ban names
+// (§2.4), never an eyebrow to "fix".
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
-import { SelectField, TextAreaField, TextField } from '../admin/components/formControls.jsx';
+import {
+  SelectField,
+  TextAreaField,
+  TextField,
+  primaryButtonClass as modalPrimaryButtonClass,
+  secondaryButtonClass as modalSecondaryButtonClass,
+} from './forms/publicForm.jsx';
 
 const CATEGORY_OPTIONS = [
   { value: 'feedback', label: 'General feedback' },
   { value: 'bug', label: 'Something is broken' },
   { value: 'other', label: 'Other' },
 ];
-
-const modalPrimaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-accent px-md py-xs ' +
-  'font-data text-caption font-semibold text-surface hover:bg-accent-strong disabled:opacity-60';
-
-const modalSecondaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand border-hairline ' +
-  'border-rule-hairline bg-surface px-md py-xs font-data text-caption font-semibold ' +
-  'text-text-primary hover:bg-surface-alt';
 
 export default function FeedbackModal({ onClose }) {
   const titleId = useId();

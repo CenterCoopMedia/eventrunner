@@ -40,18 +40,7 @@ import {
   getOwnSpeakerProfile,
   updateOwnSpeakerProfile,
 } from '../lib/speakerProfileApi.js';
-
-// The boundary is --color-border-control, not --rule-hairline (design brief
-// §8.1 polish, WCAG 1.4.11): a rule is tuned for low-contrast section
-// dividers, and a form control's boundary needs 3:1 against its ground.
-const inputClass =
-  'touch-target w-full rounded-brand border-hairline border-control bg-surface px-sm py-xs ' +
-  'font-body text-body text-text-primary placeholder:text-text-secondary ' +
-  'aria-[invalid=true]:border-danger';
-
-const primaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-accent ' +
-  'px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong disabled:opacity-60';
+import { inputClass, primaryButtonClass } from '../components/forms/publicForm.jsx';
 
 const STATUS_COPY = {
   draft: null,

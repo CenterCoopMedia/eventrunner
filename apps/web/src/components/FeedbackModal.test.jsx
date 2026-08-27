@@ -72,11 +72,20 @@ describe('FeedbackModal', () => {
   it('draws its field borders on the accessible control token, not the hairline rule', () => {
     // WCAG 1.4.11: a form control's boundary needs 3:1 against its ground.
     // --rule-hairline is deliberately below that bar (design brief §3.7), so
-    // these fields (shared/admin's formControls.jsx) use --color-border-control
-    // instead.
+    // these fields (components/forms/publicForm.jsx) use
+    // --color-border-control instead.
     render(<FeedbackModal onClose={() => {}} />);
     expect(screen.getByLabelText('Message')).toHaveClass('border-control');
     expect(screen.getByLabelText('Message')).not.toHaveClass('border-rule-hairline');
+  });
+
+  it('is set in the public tier, never in the admin identity', () => {
+    // This is a visitor-facing form. The admin identity is fixed operator
+    // tooling (brief §5.2), so an admin-* token on this surface is a tier
+    // mismatch — the one PR1 flagged, and the reason publicForm.jsx exists.
+    const { container } = render(<FeedbackModal onClose={() => {}} />);
+    expect(container.innerHTML).not.toMatch(/admin-/);
+    expect(screen.getByLabelText('Message')).toHaveClass('bg-surface');
   });
 
   it('never asserts the confirmation email was delivered (Codex P2: the send is best-effort and can fail silently)', async () => {
