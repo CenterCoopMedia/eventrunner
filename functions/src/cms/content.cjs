@@ -34,7 +34,7 @@ const {
   internals: storeInternals,
 } = require('./store.cjs');
 const { validateSpeakerReferences } = require('../speakers/references.cjs');
-const { validateSessionStructure } = require('../schedule/sessions.cjs');
+const { validateSessionStructure, checkSessionDeletable } = require('../schedule/sessions.cjs');
 const { deleteMaterialsForSession } = require('../materials/store.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -432,11 +432,30 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
     const target = resolveTarget(req.body);
     if (!target.ok) return badRequest(res, target.message);
 
-    const { livePath, draftPath } = await deleteBoth({
-      db,
-      collection: target.collection,
-      docId: target.docId,
-    });
+    // A session that still holds children is not deletable (brief §4.6):
+    // removing it would leave every child pointing at a document that does
+    // not exist, with nothing left in the system to notice. The check reads
+    // the children in the SAME transaction that removes the parent, so a
+    // child created between the check and the delete aborts it rather than
+    // being orphaned by a verdict that had already passed. Every other
+    // collection deletes through the plain batch path, unchanged.
+    let paths;
+    try {
+      paths = target.collection === 'cmsSchedule'
+        ? await db.runTransaction(async (tx) => {
+            const deletable = await checkSessionDeletable({ db, tx, docId: target.docId });
+            if (!deletable.ok) throw new RequestError(409, 'has-children', deletable.message);
+            return deleteBoth({ db, tx, collection: target.collection, docId: target.docId });
+          })
+        : await deleteBoth({ db, collection: target.collection, docId: target.docId });
+    } catch (err) {
+      if (err?.httpError) {
+        const { status, code, message } = err.httpError;
+        return sendError(res, status, code, message);
+      }
+      throw err;
+    }
+    const { livePath, draftPath } = paths;
 
     // Cascade cleanup (issue #23 follow-up, spec §4.4): deleting a
     // cmsSchedule doc must not orphan its session_materials /

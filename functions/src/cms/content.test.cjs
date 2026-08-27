@@ -375,6 +375,47 @@ test('cmsDeleteContent on a cmsSchedule doc cascades: its materials and their pu
   assert.notEqual(db.read('session_materials', 'other'), undefined);
 });
 
+test('cmsDeleteContent refuses to orphan a session’s children, naming them', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { title: 'Workshop', dayId: 'day-2', visible: true, revision: 1 },
+    'cmsSchedule/session-clinic': { title: 'Clinic', dayId: 'day-2', parentId: 'session-parent', visible: true, revision: 1 },
+    // An unpublished child is a child too.
+    'cmsSchedule_drafts/session-lab': { title: 'Lab', dayId: 'day-2', parentId: 'session-parent', status: 'dirty' },
+  });
+  const res = fakeRes();
+  await createCmsDeleteContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-parent' } }),
+    res,
+  );
+  assert.equal(res.statusCode, 409);
+  assert.match(res.body.error.message, /Cannot delete session "session-parent": 2 sessions still run inside it/);
+  assert.match(res.body.error.message, /session-clinic/);
+  assert.match(res.body.error.message, /session-lab/);
+  assert.match(res.body.error.message, /Move those sessions to another parent or delete them first\./);
+  // Nothing was deleted, and no materials cascade ran on a refused delete.
+  assert.notEqual(db.read('cmsSchedule', 'session-parent'), undefined);
+  assert.notEqual(db.read('cmsSchedule', 'session-clinic'), undefined);
+  assert.equal(db.ids('admin_logs').length, 0);
+});
+
+test('cmsDeleteContent deletes a session once its children are gone', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-parent': { title: 'Workshop', dayId: 'day-2', visible: true, revision: 1 },
+    'cmsSchedule_drafts/session-parent': { title: 'Workshop', status: 'clean', basedOnRevision: 1 },
+    // A child of a DIFFERENT session must not hold this one hostage.
+    'cmsSchedule/session-clinic': { title: 'Clinic', dayId: 'day-2', parentId: 'session-other', visible: true, revision: 1 },
+  });
+  const res = fakeRes();
+  await createCmsDeleteContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-parent' } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.deleted, ['cmsSchedule/session-parent', 'cmsSchedule_drafts/session-parent']);
+  assert.equal(db.read('cmsSchedule', 'session-parent'), undefined);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-parent'), undefined);
+});
+
 test('cmsDeleteContent on a non-cmsSchedule collection never queries session_materials', async () => {
   const db = makeFakeDb({
     'cmsContent/hero__title': { value: 'live', visible: true, revision: 1 },

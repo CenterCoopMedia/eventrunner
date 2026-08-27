@@ -377,6 +377,43 @@ async function checkSessionChildren({ db, tx = null, docId, fields, children = n
 }
 
 /**
+ * May this session be deleted? (spec §8.4 step 4, brief §4.6.)
+ *
+ * Deleting a parent used to be the one way to build the orphan every other
+ * check in this module exists to prevent: deleteBoth removes the live
+ * document and its draft, the children keep their `parentId`, and every
+ * one of them now points at a session that does not exist. Nothing
+ * reconciles it — the children are not touched by the delete, they are
+ * still published, and the next reader gets a calling point with no
+ * service. The cost lands on whoever notices, not on whoever caused it.
+ *
+ * Refusing is right rather than cascading. A cascade would delete content
+ * the operator never named, from a button that says "delete this session";
+ * the children may be the sessions actually worth keeping. So the refusal
+ * names them and hands the decision back: re-parent them or delete them,
+ * then delete this.
+ *
+ * MUST RUN INSIDE THE DELETING TRANSACTION. As a pre-check it is only
+ * advisory — a child can be created between the check and the batch, which
+ * is exactly the window the session-save seam closes on its own writes.
+ *
+ * @param {{ db: object, tx?: object, docId: string }} args
+ * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
+ */
+async function checkSessionDeletable({ db, tx = null, docId }) {
+  const children = await findChildren({ db, tx, docId });
+  if (children.length === 0) return { ok: true };
+  const ids = children.map((child) => child.id);
+  return {
+    ok: false,
+    message:
+      `Cannot delete session "${docId}": ${ids.length} session${ids.length === 1 ? '' : 's'} ` +
+      `still run${ids.length === 1 ? 's' : ''} inside it (${ids.join(', ')}). ` +
+      'Move those sessions to another parent or delete them first.',
+  };
+}
+
+/**
  * Every half in one call, shape before reads: a malformed payload costs no
  * reads at all, and the checks that do read run together so one save reports
  * everything wrong with it rather than one thing per round trip.
@@ -411,6 +448,7 @@ module.exports = {
   checkSessionTrack,
   checkSessionParent,
   checkSessionChildren,
+  checkSessionDeletable,
   validateSessionStructure,
   resolveSessionTrack,
   internals: {

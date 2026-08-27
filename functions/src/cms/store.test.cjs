@@ -129,6 +129,35 @@ test('deleteBoth removes live and draft in a single batch', async () => {
   assert.equal(db.commitCount, 1);
 });
 
+test('deleteBoth inside a transaction still removes the pair, or neither', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/s1': { title: 'x', visible: true, revision: 1 },
+    'cmsSchedule_drafts/s1': { title: 'x', visible: true, status: 'clean', basedOnRevision: 1 },
+  });
+  const paths = await db.runTransaction((tx) =>
+    deleteBoth({ db, tx, collection: 'cmsSchedule', docId: 's1' }));
+  assert.deepEqual(paths, { livePath: 'cmsSchedule/s1', draftPath: 'cmsSchedule_drafts/s1' });
+  assert.equal(db.read('cmsSchedule', 's1'), undefined);
+  assert.equal(db.read('cmsSchedule_drafts', 's1'), undefined);
+  // The transaction owns the writes: no batch of its own was committed.
+  assert.equal(db.commitCount, 0);
+
+  // A body that throws deletes neither half.
+  const kept = makeFakeDb({
+    'cmsSchedule/s2': { title: 'x', visible: true, revision: 1 },
+    'cmsSchedule_drafts/s2': { title: 'x', visible: true, status: 'clean', basedOnRevision: 1 },
+  });
+  await assert.rejects(
+    kept.runTransaction(async (tx) => {
+      await deleteBoth({ db: kept, tx, collection: 'cmsSchedule', docId: 's2' });
+      throw new Error('refused');
+    }),
+    /refused/,
+  );
+  assert.notEqual(kept.read('cmsSchedule', 's2'), undefined);
+  assert.notEqual(kept.read('cmsSchedule_drafts', 's2'), undefined);
+});
+
 // --- unpublishDoc -----------------------------------------------------------
 
 test('unpublishDoc sets visible:false on the live doc only, keeping revision stamps', async () => {
