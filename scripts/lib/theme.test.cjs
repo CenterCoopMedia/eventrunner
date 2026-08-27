@@ -54,3 +54,16 @@ test('the seeded palette is event-neutral: no per-client color arrives from a sc
     assert.match(value, /^#[0-9a-f]{6}$/);
   }
 });
+
+test('a fresh deployment renders in ink on paper, so the client’s color leads', () => {
+  // The shared system supplies type, spacing, rules, and focus. It does not
+  // supply a look of its own for a client to work around, so every brand
+  // slot is a grey and the first hue on the page is the one the client sets
+  // (design brief §2.5.4). Semantic slots are exempt: a status color that is
+  // grey states nothing.
+  for (const [slot, rgb] of Object.entries(NEUTRAL_PALETTE_RGB)) {
+    if (!slot.startsWith('brand')) continue;
+    const spread = Math.max(...rgb) - Math.min(...rgb);
+    assert.ok(spread <= 8, `${slot} carries a hue (channel spread ${spread})`);
+  }
+});

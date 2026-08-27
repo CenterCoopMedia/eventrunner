@@ -11,23 +11,32 @@
  * stylesheet needs, so `--brand-primary-rgb: 42 157 143` and the stored
  * `#2a9d8f` come from one source instead of two lists that can drift.
  *
- * The palette itself is deliberately generic — a muted teal/terracotta on
- * warm paper, no client's brand — because init seeds it into a fresh
- * deployment and an operator replaces it from the admin Settings UI.
+ * The brand slots carry no hue at all. A fresh deployment renders in ink on
+ * paper, so the first color a reader sees is the client's own, the moment an
+ * operator sets it from the admin Settings UI. Only the semantic slots keep a
+ * hue, because red, amber, and green are what those states mean.
+ *
+ * Design brief §2.5.4 states the rule this palette follows.
  */
 
 const { DEFAULT_MODE_POLICY, DEFAULT_TEXTURE, DEFAULT_HEADER } = require('shared/theme');
 
-/** Brand + semantic slots as [r, g, b]. Order is the emitted CSS order. */
+/**
+ * Brand + semantic slots as [r, g, b]. Order is the emitted CSS order.
+ *
+ * Every brand slot is a grey: the seeded site is ink on paper and nothing
+ * else. The semantic slots keep their hues, because a status color that is
+ * grey states nothing.
+ */
 const NEUTRAL_PALETTE_RGB = Object.freeze({
-  brandPrimary: Object.freeze([42, 157, 143]),
-  brandPrimaryDark: Object.freeze([30, 114, 104]),
-  brandPrimaryLight: Object.freeze([95, 191, 179]),
-  brandAccent: Object.freeze([200, 75, 49]),
-  brandSurface: Object.freeze([245, 240, 230]),
-  brandSurfaceAlt: Object.freeze([237, 232, 220]),
-  brandInk: Object.freeze([44, 62, 80]),
-  brandInkMuted: Object.freeze([92, 107, 122]),
+  brandPrimary: Object.freeze([38, 40, 44]),
+  brandPrimaryDark: Object.freeze([23, 24, 27]),
+  brandPrimaryLight: Object.freeze([110, 112, 116]),
+  brandAccent: Object.freeze([56, 59, 64]),
+  brandSurface: Object.freeze([250, 250, 249]),
+  brandSurfaceAlt: Object.freeze([240, 240, 238]),
+  brandInk: Object.freeze([26, 27, 30]),
+  brandInkMuted: Object.freeze([91, 93, 97]),
   semanticSuccess: Object.freeze([22, 101, 52]),
   semanticWarning: Object.freeze([217, 119, 6]),
   semanticDanger: Object.freeze([202, 53, 83]),

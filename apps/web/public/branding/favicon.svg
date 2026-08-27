@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- Neutral placeholder favicon; replaced per event (spec §7.2 logos). -->
-  <rect x="2" y="2" width="28" height="28" rx="7" fill="rgb(92 107 122)"/>
-  <circle cx="16" cy="16" r="8" fill="none" stroke="rgb(245 245 244)" stroke-width="2.5"/>
-  <circle cx="16" cy="16" r="3" fill="rgb(245 245 244)"/>
+  <rect x="2" y="2" width="28" height="28" rx="7" fill="rgb(91 93 97)"/>
+  <circle cx="16" cy="16" r="8" fill="none" stroke="rgb(250 250 249)" stroke-width="2.5"/>
+  <circle cx="16" cy="16" r="3" fill="rgb(250 250 249)"/>
 </svg>
