@@ -25,7 +25,17 @@ export const WIDE_VIEWPORT = '(min-width: 64rem)';
  * @returns {boolean}
  */
 export function useMediaQuery(query, view = typeof window === 'undefined' ? undefined : window) {
-  const [matches, setMatches] = useState(false);
+  // Read once before the first paint, so a wide viewport draws the grid
+  // rather than drawing the list and swapping it a frame later. The answer
+  // is still `false` wherever the question cannot be asked.
+  const [matches, setMatches] = useState(() => {
+    if (!view || typeof view.matchMedia !== 'function') return false;
+    try {
+      return view.matchMedia(query).matches === true;
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     if (!view || typeof view.matchMedia !== 'function') return undefined;
