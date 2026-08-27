@@ -1,10 +1,8 @@
-// Header — the public site header, in one of four treatments (design brief
-// §2.1). The active theme names the default and a page may override it;
-// `standard` is the base. The identity repeats on every page, so it is never
-// a heading: each page owns its own <h1>.
+// Header — the site identity and the navigation, in one of four treatments.
+// The theme names the default and a page may override it; `standard` is the
+// base. The identity is never a heading: each page owns its own <h1>.
 //
-// The long form of this contract, and why the base is neutral, is in
-// docs/plans/2026-08-27-design-system-overhaul.md §2.1 and §2.5.
+// The four treatments and their rules: docs/interface-guidelines.md, Headers.
 import { Link } from 'react-router-dom';
 import { DEFAULT_HEADER, THEME_HEADERS } from 'shared/theme';
 import Nameplate from './editorial/Nameplate.jsx';
@@ -70,8 +68,8 @@ export default function Header({
   }
 
   if (treatment === 'minimal') {
-    // Mark and navigation only. Where a deployment has no mark the name
-    // stands in for it, and either way a screen reader hears the name.
+    // Where a deployment has no mark the name stands in for it, and either
+    // way a screen reader hears the name.
     return (
       <div className="flex flex-wrap items-center gap-x-md gap-y-2xs border-b-hairline border-b-rule-hairline py-sm">
         <p className="font-heading text-body text-text-primary">
@@ -92,8 +90,7 @@ export default function Header({
   }
 
   if (treatment === 'compact') {
-    // The event bar: the nameplate device at running-header size, so the
-    // name and the dates share one baseline between the same two rules.
+    // The nameplate device at running-header size.
     return (
       <div className="border-b-hairline border-b-rule-hairline">
         <Nameplate
@@ -109,8 +106,8 @@ export default function Header({
     );
   }
 
-  // standard — the base. The event name at normal weight, the dates, the
-  // navigation. No rule above the name, no device, nothing decorative.
+  // standard — the base: the name at normal weight, the dates, the
+  // navigation. No device, nothing decorative.
   return (
     <div className="border-b-hairline border-b-rule-hairline">
       <div className="flex flex-wrap items-baseline justify-between gap-x-md gap-y-3xs pt-md">

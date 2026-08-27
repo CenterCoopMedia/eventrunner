@@ -1,13 +1,8 @@
-// LeadImage — the one optional image that opens a page (design brief §2.5.2).
+// LeadImage — the one optional image that opens a page, beside the copy or
+// below it. The device requires alt text, a token-fixed crop, and a stated
+// focal point, and all three are enforced here.
 //
-// It sits beside the opening copy at wide viewports and below it at narrow
-// ones. Text never sits over it, so it is never a hero banner.
-//
-// The device requires three things and enforces all three here: alt text (an
-// image without it does not render), a stable crop (the aspect ratio is a
-// token, so swapping the picture never reflows the page), and a focal point
-// from the block's own data, so the fixed crop keeps the part of the picture
-// that matters.
+// The device and its rules: docs/interface-guidelines.md, Editorial devices.
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 
 /** Where the crop centres when the block states no focal point. */

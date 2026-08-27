@@ -52,12 +52,13 @@
       focus:rounded-brand focus:bg-brand-primary focus:px-4 focus:py-3 focus:text-brand-surface;
   }
 
-  /* The page ground. Flat is the base: the plain class paints no texture at
-     all, and a texture arrives only when config/theme.texture opts into one.
-     EventConfigProvider mirrors the resolved texture onto
-     documentElement.dataset.texture because a custom property cannot be
-     compared for equality in a selector. The overlay is decorative, so it
-     never intercepts the pointer. */
+  /* The page ground. Flat is the base; a texture arrives only when
+     config/theme.texture opts into one.
+
+     The selector reads documentElement.dataset.texture, which
+     EventConfigProvider mirrors the resolved value onto, because a custom
+     property cannot be compared for equality in a selector. The overlay is
+     decorative, so it never intercepts the pointer. */
   .page-surface {
     @apply relative bg-brand-surface;
   }
@@ -73,19 +74,16 @@
     background-size: 24px 24px;
   }
 
-  /* Editorial devices (design brief §2.1). Each class is the rendered form
-     of one tier-3 component contract, so a preset can retune the device by
-     remapping its tokens and no component has to change. The React
-     primitives in components/editorial/ compose these with Tailwind for
-     layout only.
+  /* Editorial devices. Each class is the rendered form of one tier-3
+     component contract, so a preset retunes a device by remapping its
+     tokens and no component changes. What each device is for, and the rules
+     a review applies to it: docs/interface-guidelines.md, Editorial devices.
 
      Rules are drawn with `border-block-*`, not a height, so the width token
      (1px / 2px / 3px) is the property it was written for and the device
      stays a hairline on a fractional-pixel display. */
 
-  /* Masthead nameplate: the rule-bounded title block that carries the event
-     name, the dates, and the edition line. Type and rules only — never a
-     hero banner, never a photo behind the name. */
+  /* Masthead nameplate: the rule-bounded title block. */
   .nameplate {
     border-block-start: var(--nameplate-rule-width) solid rgb(var(--nameplate-rule-rgb));
     border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
@@ -98,17 +96,17 @@
     color: rgb(var(--nameplate-text-rgb));
     text-wrap: balance;
   }
-  /* The compact treatment is the same device at running-header size: it
-     keeps both rules and the edition line, and only the name steps down. */
+  /* The same device at running-header size: both rules and the edition line
+     stay, and only the name steps down. */
   .nameplate--compact .nameplate__name {
     font-size: var(--text-h3);
     line-height: var(--text-h3-leading);
     letter-spacing: var(--text-h3-tracking);
   }
 
-  /* Lead image: the one optional image that opens a page. The crop is fixed
-     by token so swapping the picture never reflows the page, and the focal
-     point comes from the block's own data. Text never sits over it. */
+  /* Lead image: beside the opening copy at wide viewports, below it at
+     narrow ones. The crop is fixed by token so swapping the picture never
+     reflows the page. */
   .lead-image {
     display: block;
     inline-size: 100%;
@@ -125,9 +123,8 @@
     }
   }
 
-  /* Folio: a small-caps plain-text label that sits ON a rule at a section
-     boundary. Never a chip, never a pill, never a colored badge — and never
-     directly above a heading (brief §2.4, the absolute eyebrow ban). */
+  /* Folio: a small-caps plain-text label that sits ON a rule. Never above a
+     heading — the eyebrow ban is absolute. */
   .folio {
     font-size: var(--folio-size);
     line-height: var(--text-folio-leading);
@@ -139,7 +136,7 @@
     border-block-start: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
   }
 
-  /* Section rule: the one strong rule that opens a section (brief §2.1). */
+  /* Section rule: the one strong rule that opens a section. */
   .section-rule {
     border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
   }
@@ -196,9 +193,9 @@
   .rich-text a:hover {
     @apply text-accent-strong;
   }
-  /* The quote rule is a typographic device (brief §2.1's hairline-rules
-     row), not the banned colored card edge (§2.4): it draws in rule-token
-     ink, at the strong rule width, and never in brand/accent color. */
+  /* The quote rule draws in rule-token ink at the strong rule width, never
+     in brand or accent color, so it is a typographic rule and not the
+     rejected colored card edge. */
   .rich-text blockquote {
     @apply border-s-strong border-rule-strong ps-md text-text-secondary;
   }

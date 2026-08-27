@@ -1,17 +1,8 @@
-// Nameplate — the rule-bounded title block that the `masthead` header draws
-// (design brief §2.1). It carries the event name, the dates, and the edition
-// line, in type and rules only: never a hero banner, never a photo behind
-// the name.
+// Nameplate — the rule-bounded title block: the event name, the dates, and
+// the edition line, in type and rules only. `full` is the `masthead` header
+// and `compact` is the `compact` one (Header.jsx).
 //
-// This is a theme device, not the base header. A theme opts into it through
-// config/theme.header; the base header is `standard` (Header.jsx).
-//
-// The dates and the edition line sit INSIDE the rule-bounded block, which is
-// the one place brief §2.4 allows metadata beside a title.
-//
-// Two treatments: 'full' sets the name at --text-nameplate with the dateline
-// under it, 'compact' sets the same block at running-header size with the
-// name and dateline on one baseline.
+// The device and its rules: docs/interface-guidelines.md, Editorial devices.
 import { Link } from 'react-router-dom';
 import { formatEventDateRange } from '../../lib/eventTime.js';
 

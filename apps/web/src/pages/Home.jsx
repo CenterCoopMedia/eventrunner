@@ -6,12 +6,9 @@
 // content — nothing event-specific lives here.
 //
 // The page owns its own <h1>: the shell's header carries the running site
-// identity, not this page's subject. No text sits above that heading — the
-// tagline and the supporting line follow it (brief §2.4).
+// identity, not this page's subject. Nothing sits above that heading.
 //
-// The opening section may carry one lead image, beside the copy at wide
-// viewports and below it at narrow ones (brief §2.5.2). There is no hero
-// banner: text never sits over a picture.
+// The opening section may carry one lead image, beside the copy or below it.
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';

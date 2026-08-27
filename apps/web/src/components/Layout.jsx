@@ -2,17 +2,12 @@
 // Everything renders from context — no hardcoded event name, city, or date
 // (event-neutrality).
 //
-// The header comes from the active theme (design brief §2.1): config/theme
-// names one of the four treatments, and `standard` is what a theme that
-// names none renders. A page's own stated header will win over the theme's
-// once the cmsPages layout object lands; resolveHeader already takes it.
+// The header comes from the active theme (docs/interface-guidelines.md,
+// Headers). A page's own stated header will win over the theme's once the
+// cmsPages layout object lands; resolveHeader already takes it.
 //
-// The header identity is the running site name, not a page title, so every
-// page owns its own <h1> whichever treatment renders.
-//
-// Navigation is text links: no pills, no tinted ground. The active item is
-// marked twice over (§8.1 — never color alone): heavier weight plus a
-// strong rule under the word.
+// The active nav item is marked twice over (never color alone): heavier
+// weight plus a strong rule under the word.
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
@@ -63,8 +58,7 @@ export default function Layout() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const headerVariant = resolveHeader(theme?.header);
-  // Only the event bar prefers the short name; the other three carry the
-  // event's own name in full.
+  // Only the event bar prefers the short name.
   const plate = buildNameplate(eventConfig, { compact: headerVariant === 'compact' });
 
   return (
