@@ -892,3 +892,96 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* THE PRINTED PROGRAMME (design brief §2.1; every visual story, part 2,
+   "Print view"). A registration desk hands this out.
+
+   Print is not the screen with the controls hidden. The page carries a
+   second view written for paper — components/SchedulePrint.jsx — and this
+   block is what swaps them: the screen view leaves the layout, the printed
+   one enters it. Outside print media `.schedule-print` is `display: none`,
+   which keeps it out of the accessibility tree as well as out of the page,
+   so a screen reader never meets a session twice.
+
+   ONE PRINT VIEW, SIX REGISTERS. The rules below name the four type roles
+   and the rule tokens and nothing else, so the handout prints in whichever
+   register the active preset is: Broadsheet's programme page, Civic's
+   posted agenda, Field Guide's dated observation sheet, Atlas's pocket
+   timetable. No rule here asks which theme is on.
+
+   FULL CONTRAST. Everything prints in the primary ink, including the
+   support lines that sit in the secondary ink on screen. Paper has no
+   backlight, and a handout is read across a room. */
+.schedule-print {
+  display: none;
+}
+
+@media print {
+  /* No controls: a button on paper is a lie. */
+  .no-print,
+  nav,
+  footer,
+  .skip-link {
+    display: none;
+  }
+
+  .schedule-screen {
+    display: none;
+  }
+  .schedule-print {
+    display: block;
+    color: rgb(var(--color-text-primary-rgb));
+  }
+  .schedule-print p,
+  .schedule-print li {
+    color: rgb(var(--color-text-primary-rgb));
+  }
+
+  /* A day opens on a rule, the way a standing head does on screen. */
+  .schedule-print__day {
+    margin-block-start: var(--space-lg);
+    break-inside: auto;
+  }
+  .schedule-print__day-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: baseline;
+    border-block-end: var(--rule-strong-width) solid rgb(var(--rule-strong-rgb));
+    padding-block-end: var(--space-2xs);
+    font-family: var(--font-heading);
+    font-size: var(--text-h2);
+  }
+  .schedule-print__date {
+    font-family: var(--font-data);
+    font-size: var(--text-caption);
+  }
+
+  /* A ruled entry, and it never breaks across two sheets. */
+  .schedule-print__row {
+    display: grid;
+    grid-template-columns: var(--schedule-time-width) 1fr;
+    gap: var(--space-md);
+    border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    padding-block: var(--space-2xs);
+    break-inside: avoid;
+    font-size: var(--text-caption);
+  }
+  .schedule-print__time {
+    font-variant-numeric: tabular-nums;
+  }
+  .schedule-print__title {
+    font-size: var(--text-lead);
+  }
+  /* Calling points are listed, indented under the service they belong to,
+     and each one still says what it is part of. */
+  .schedule-print__calls {
+    margin-block-start: var(--space-3xs);
+    padding-inline-start: var(--space-md);
+  }
+  .schedule-print__calls li {
+    display: grid;
+    grid-template-columns: var(--schedule-time-width) 1fr;
+    gap: var(--space-md);
+  }
+}

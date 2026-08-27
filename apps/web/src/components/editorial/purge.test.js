@@ -67,6 +67,13 @@ const DEVICE_CLASSES = [
   '.calling-points__marker',
   // The archival treatment (brief §2.1).
   '.back-issue',
+  // The printed programme (brief §2.1, every visual story part 2).
+  '.schedule-print',
+  '.schedule-print__row',
+  '.schedule-print__time',
+  '.schedule-print__day-head',
+  '.schedule-print__calls',
+  '.no-print',
 ];
 
 describe('the built stylesheet', () => {

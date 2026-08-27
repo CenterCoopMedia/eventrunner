@@ -2,7 +2,7 @@
 // snapshot — providers nest, routes resolve, and the snapshot content
 // reaches the DOM with no Firebase connection (spec §2.4 first-paint path).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // The smoke test needs no Firebase env or network (spec §8.1 credential-free
@@ -133,7 +133,11 @@ describe('app shell', () => {
   it('renders the schedule from the snapshot with sessions grouped by day', () => {
     renderAt('/schedule');
     expect(screen.getByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument();
-    expect(screen.getByText('Welcome and orientation')).toBeInTheDocument();
+    // The page carries two views of the day — the screen one and the
+    // printed programme, which lists every day and prints only on paper.
+    // This asserts the one a reader is looking at (Schedule.test.jsx).
+    const onScreen = within(document.querySelector('.schedule-screen'));
+    expect(onScreen.getByText('Welcome and orientation')).toBeInTheDocument();
   });
 
   it('renders a designed empty state on unknown routes', () => {

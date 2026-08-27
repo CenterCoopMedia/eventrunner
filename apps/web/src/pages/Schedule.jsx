@@ -23,6 +23,7 @@ import SectionHead from '../components/editorial/SectionHead.jsx';
 import { PlateNumber } from '../components/editorial/Plate.jsx';
 import Marginalia from '../components/editorial/Marginalia.jsx';
 import ScheduleGrid from '../components/ScheduleGrid.jsx';
+import SchedulePrint from '../components/SchedulePrint.jsx';
 import { resolveTracks, withCallingPoints } from '../lib/scheduleGrid.js';
 import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
@@ -184,7 +185,9 @@ export default function Schedule() {
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-xs">
+        {/* Controls do not print: a button on paper is a lie (index.css,
+            the print block). */}
+        <div className="no-print flex flex-wrap items-center gap-xs">
           {features.sessionBookmarks && user && attendeeAccess ? (
             <Link to="/schedule/mine" className={ACTION_CLASS}>
               My schedule
@@ -217,116 +220,129 @@ export default function Schedule() {
         </div>
       ) : (
         <>
-          {days.length > 1 ? (
-            <div
-              role="group"
-              aria-label="Event days"
-              className="mt-lg flex flex-wrap gap-x-md border-b-hairline border-b-rule-hairline"
-            >
-              {days.map((day) => {
-                const isActive = day.id === activeDayId;
-                return (
-                  <button
-                    key={day.id}
-                    type="button"
-                    aria-pressed={isActive}
-                    onClick={() => setSelectedDayId(day.id)}
-                    className={dayClass(isActive)}
-                  >
-                    {day.label}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
-
-          <section
-            key={activeDay.id}
-            aria-labelledby={`day-${activeDay.id}`}
-            className={backIssue ? 'back-issue mt-xl' : 'mt-xl'}
-            {...(backIssue ? { 'data-back-issue': 'true' } : null)}
-          >
-            {/* The day head is a folio on a rule (brief §2.1): the standing
-                head of the day, with the date sitting on the same rule. It is
-                never stacked above the heading — it IS the heading. */}
-            <SectionHead
-              variant="folio"
-              level={2}
-              id={`day-${activeDay.id}`}
-              title={activeDay.label}
-              folio={
-                <>
-                  {/* "PLATE III · SATURDAY 14 MARCH" (visual story, Field
-                      Guide, moment 1). The number is the day's real
-                      position in the programme, so it is sequence data and
-                      never a decorative 01/02/03 (brief §2.4). It is set
-                      only where the page is a plate book: the token, not a
-                      theme test in here, decides that. */}
-                  <PlateNumber position={days.indexOf(activeDay) + 1} />
-                  {formatDayDate(activeDay, eventConfig.timezone) ? (
-                    <time dateTime={activeDay.date}>
-                      {formatDayDate(activeDay, eventConfig.timezone)}
-                    </time>
-                  ) : null}
-                  {/* The "Back issue" folio the device asks for, beside the
-                      day it labels — a folio never sits above a heading
-                      (brief §2.4). */}
-                  {backIssue ? (
-                    <>
-                      {formatDayDate(activeDay, eventConfig.timezone) ? ' · ' : null}
-                      Back issue
-                    </>
-                  ) : null}
-                </>
-              }
-            />
-            {/* The pen mark under the day head (visual story, Zine, moment
-                3): "a squiggle underline under a folio". It is one of the
-                two drawn marks a page may carry, it never lands on a word
-                inside a headline, and it is off until a client turns
-                marginalia on. */}
-            <Marginalia mark="squiggle" className="mt-3xs" />
-            {activeSessions.length === 0 ? (
-              <p className="mt-md max-w-prose text-body text-text-secondary">
-                No sessions are announced for {activeDay.label} yet.
-              </p>
-            ) : showGrid ? (
-              // The programme page: time down, lettered lines across (brief
-              // §2.1). It scrolls inside its own box rather than pushing
-              // the page sideways.
-              <div className="mt-sm overflow-x-auto">
-                <ScheduleGrid
-                  day={activeDay}
-                  entries={entries}
-                  columns={columns}
-                  eventConfig={eventConfig}
-                />
+          {/* The screen view and the printed programme are two views of the
+              same day, and exactly one of them is ever in the layout — and
+              in the accessibility tree — at a time. */}
+          <div className="schedule-screen">
+            {days.length > 1 ? (
+              <div
+                role="group"
+                aria-label="Event days"
+                className="mt-lg flex flex-wrap gap-x-md border-b-hairline border-b-rule-hairline"
+              >
+                {days.map((day) => {
+                  const isActive = day.id === activeDayId;
+                  return (
+                    <button
+                      key={day.id}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => setSelectedDayId(day.id)}
+                      className={dayClass(isActive)}
+                    >
+                      {day.label}
+                    </button>
+                  );
+                })}
               </div>
-            ) : (
-              // The time-ordered list. It is the other first-class view,
-              // not a lesser one (visual story, Civic, moment 1): fixed
-              // column order, tabular figures, every relationship stated.
-              // No gap: every row opens with its own hairline, so the rules
-              // are the separation a card border used to be.
-              <ul className="mt-sm">
-                {entries.map((entry, index) => (
-                  <SessionCard
-                    key={entry.session.id}
-                    session={entry.session}
+            ) : null}
+
+            <section
+              key={activeDay.id}
+              aria-labelledby={`day-${activeDay.id}`}
+              className={backIssue ? 'back-issue mt-xl' : 'mt-xl'}
+              {...(backIssue ? { 'data-back-issue': 'true' } : null)}
+            >
+              {/* The day head is a folio on a rule (brief §2.1): the standing
+                  head of the day, with the date sitting on the same rule. It is
+                  never stacked above the heading — it IS the heading. */}
+              <SectionHead
+                variant="folio"
+                level={2}
+                id={`day-${activeDay.id}`}
+                title={activeDay.label}
+                folio={
+                  <>
+                    {/* "PLATE III · SATURDAY 14 MARCH" (visual story, Field
+                        Guide, moment 1). The number is the day's real
+                        position in the programme, so it is sequence data and
+                        never a decorative 01/02/03 (brief §2.4). It is set
+                        only where the page is a plate book: the token, not a
+                        theme test in here, decides that. */}
+                    <PlateNumber position={days.indexOf(activeDay) + 1} />
+                    {formatDayDate(activeDay, eventConfig.timezone) ? (
+                      <time dateTime={activeDay.date}>
+                        {formatDayDate(activeDay, eventConfig.timezone)}
+                      </time>
+                    ) : null}
+                    {/* The "Back issue" folio the device asks for, beside the
+                        day it labels — a folio never sits above a heading
+                        (brief §2.4). */}
+                    {backIssue ? (
+                      <>
+                        {formatDayDate(activeDay, eventConfig.timezone) ? ' · ' : null}
+                        Back issue
+                      </>
+                    ) : null}
+                  </>
+                }
+              />
+              {/* The pen mark under the day head (visual story, Zine, moment
+                  3): "a squiggle underline under a folio". It is one of the
+                  two drawn marks a page may carry, it never lands on a word
+                  inside a headline, and it is off until a client turns
+                  marginalia on. */}
+              <Marginalia mark="squiggle" className="mt-3xs" />
+              {activeSessions.length === 0 ? (
+                <p className="mt-md max-w-prose text-body text-text-secondary">
+                  No sessions are announced for {activeDay.label} yet.
+                </p>
+              ) : showGrid ? (
+                // The programme page: time down, lettered lines across (brief
+                // §2.1). It scrolls inside its own box rather than pushing
+                // the page sideways.
+                <div className="mt-sm overflow-x-auto">
+                  <ScheduleGrid
+                    day={activeDay}
+                    entries={entries}
+                    columns={columns}
                     eventConfig={eventConfig}
-                    features={features}
-                    bookmarked={bookmarkedIds.has(entry.session.id)}
-                    backIssue={backIssue}
-                    transferTo={transferTarget(
-                      entries.map((one) => one.session),
-                      index,
-                    )}
-                    callingPoints={entry.children}
                   />
-                ))}
-              </ul>
-            )}
-          </section>
+                </div>
+              ) : (
+                // The time-ordered list. It is the other first-class view,
+                // not a lesser one (visual story, Civic, moment 1): fixed
+                // column order, tabular figures, every relationship stated.
+                // No gap: every row opens with its own hairline, so the rules
+                // are the separation a card border used to be.
+                <ul className="mt-sm">
+                  {entries.map((entry, index) => (
+                    <SessionCard
+                      key={entry.session.id}
+                      session={entry.session}
+                      eventConfig={eventConfig}
+                      features={features}
+                      bookmarked={bookmarkedIds.has(entry.session.id)}
+                      backIssue={backIssue}
+                      transferTo={transferTarget(
+                        entries.map((one) => one.session),
+                        index,
+                      )}
+                      callingPoints={entry.children}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+          {/* The handout: every day, every session, every calling point,
+              no controls (visual stories, part 2, "Print view"). */}
+          <SchedulePrint
+            days={days}
+            sessionsByDay={sessionsByDay}
+            columns={columns}
+            eventConfig={eventConfig}
+          />
         </>
       )}
     </SystemPage>

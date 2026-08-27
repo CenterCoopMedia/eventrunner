@@ -4,7 +4,7 @@
 // is fictional and distinct from the committed snapshot so nothing here
 // accidentally passes by matching demo copy.
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
@@ -118,6 +118,19 @@ function renderSchedule({
   );
 }
 
+/**
+ * The view a reader is looking at right now.
+ *
+ * The page carries two views of the same day: the screen view and the
+ * printed programme, which lists EVERY day and no controls. Only one of
+ * them is ever in the layout — `display: none` outside print media keeps
+ * the other out of the accessibility tree too — but jsdom applies no CSS,
+ * so a query that means "what the reader sees" says so here.
+ */
+function onScreen() {
+  return within(document.querySelector('.schedule-screen'));
+}
+
 describe('SchedulePage', () => {
   it('groups sessions by day and sorts the active day by start time', () => {
     renderSchedule();
@@ -131,13 +144,13 @@ describe('SchedulePage', () => {
     ]);
 
     // Hidden sessions and other-day sessions never leak into day one.
-    expect(screen.queryByText('[Fixture] Unpublished session')).toBeNull();
-    expect(screen.queryByText('[Fixture] Day-two roundtable')).toBeNull();
+    expect(onScreen().queryByText('[Fixture] Unpublished session')).toBeNull();
+    expect(onScreen().queryByText('[Fixture] Day-two roundtable')).toBeNull();
 
     // Day switching is a real, keyboard-reachable button.
     fireEvent.click(screen.getByRole('button', { name: 'Day two' }));
-    expect(screen.getByText('[Fixture] Day-two roundtable')).toBeInTheDocument();
-    expect(screen.queryByText('[Fixture] Morning kickoff')).toBeNull();
+    expect(onScreen().getByText('[Fixture] Day-two roundtable')).toBeInTheDocument();
+    expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
     expect(screen.getByRole('button', { name: 'Day two' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -228,7 +241,7 @@ describe('SchedulePage', () => {
       },
     });
     expect(screen.getByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument();
-    expect(screen.getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+    expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
   });
 
   it('is hidden behind config/features.schedule', () => {
@@ -378,8 +391,8 @@ describe('the two views of a day', () => {
     withViewport(false, () => {
       renderSchedule({ eventConfig: eventWithTracks, scheduleData: tracked });
       expect(screen.queryByRole('table')).toBeNull();
-      expect(screen.getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
-      expect(screen.getByText('[Fixture] Parallel session')).toBeInTheDocument();
+      expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+      expect(onScreen().getByText('[Fixture] Parallel session')).toBeInTheDocument();
     });
   });
 
@@ -388,7 +401,7 @@ describe('the two views of a day', () => {
     withViewport(true, () => {
       renderSchedule();
       expect(screen.queryByRole('table')).toBeNull();
-      expect(screen.getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+      expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
     });
   });
 
@@ -413,7 +426,7 @@ describe('the two views of a day', () => {
         name: /calling points of \[fixture\] morning kickoff/i,
       });
       expect(points).toBeInTheDocument();
-      expect(screen.getByText('[Fixture] Breakout clinic')).toBeInTheDocument();
+      expect(onScreen().getByText('[Fixture] Breakout clinic')).toBeInTheDocument();
     });
   });
 });
@@ -433,7 +446,7 @@ describe('the back issue', () => {
   it('keeps every word of a past day, and says it is an archive', () => {
     renderSchedule({ eventConfig: pastEvent, scheduleData: pastSessions });
     // Nothing is hidden: the session is still there, still linked.
-    expect(screen.getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+    expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
     expect(screen.getByText(/back issue/i)).toBeInTheDocument();
   });
 
