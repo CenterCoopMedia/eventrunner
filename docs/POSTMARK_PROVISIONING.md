@@ -311,7 +311,7 @@ If it does not exist yet, create it now following §2 exactly.
 ### 7.2. Store the Server token in the demo deployment
 
 The Server token is `EMAIL_PROVIDER_API_KEY` for the `eventrunner-demo` deployment specifically —
-**not** the Postmark Account Token, which stays operator-only (§7.6).
+**not** the Postmark Account Token, which stays operator-only (§7.7).
 
 ```sh
 # GitHub Environment secret (Settings → Environments → demo → Secrets):
@@ -348,17 +348,51 @@ printf 'eventrunner-demo:%s\n' "$(openssl rand -hex 20)"
 Store the whole string as the `EMAIL_WEBHOOK_BASIC_AUTH` GitHub Environment secret for `demo`, and
 mirror it into Secret Manager the same way as §7.2 above (same commands, different secret name).
 
-### 7.4. Switch the provider from `console` to `postmark`
+### 7.4. Move the demo sender onto the verified domain — do this before the switch
+
+The demo's seeded sender is `summit@example.org` (`scripts/lib/demo-event.cjs`). That is a
+placeholder on a domain nobody here owns, and Postmark refuses to send from an unverified sender
+domain — so flipping the provider to `postmark` while that address is still in `config/event` turns
+every demo sign-in email into a rejected send. Fix the sender first:
+
+1. Set the demo's sender address to `info@eventrunner.org` — the address on the domain §4 already
+   verified. Either edit it in the admin panel (Settings → sender) for the running deployment, or
+   re-run the seed against the demo project with the refreshed value:
+
+   ```sh
+   EVENT_FIREBASE_PROJECT_ID=eventrunner-demo node scripts/seed-demo-event.cjs --force
+   ```
+
+   (`--force` is required: `writeConfigDocs` skips a `config/*` document that already exists.)
+
+2. Re-run the verification script so `config/event.sender.domainVerified` is stamped for the
+   address the demo will actually send from:
+
+   ```sh
+   EVENT_EMAIL_PROVIDER=postmark \
+   EMAIL_PROVIDER_API_KEY=<server token from §7.2> \
+   EMAIL_ACCOUNT_API_KEY=<account token from §1.2, operator storage> \
+   EVENT_FIREBASE_PROJECT_ID=eventrunner-demo \
+     node scripts/verify-sender-domain.cjs
+   ```
+
+   No `--domain` flag: the script reads the domain from `config/event.sender.email`, which is the
+   point of doing this after step 1. It must exit 0 before you go on.
+
+**Success check:** `config/event.sender.email` reads `info@eventrunner.org` and
+`config/event.sender.domainVerified` is `true`.
+
+### 7.5. Switch the provider from `console` to `postmark`
 
 The demo deployed with `EVENT_EMAIL_PROVIDER=console` (Postmark wasn't approved yet at the time).
-Now that it is:
+Now that §7.4 has put a verified sender in place:
 
 - Update the `demo` GitHub Environment variable `EVENT_EMAIL_PROVIDER` from `console` to
   `postmark`.
 - Re-run the deploy dispatch (`deploy-client.yml` against `demo`) so the functions redeploy reading
   the new provider and the two secrets from §7.2–7.3.
 
-### 7.5. Register the delivery webhook
+### 7.6. Register the delivery webhook
 
 Before registering, confirm which stream sends actually use: check `config/providers.email.
 messageStream` for the demo deployment (unset → the Server's default `Outbound` stream). Register
@@ -380,7 +414,7 @@ Open/Click.
 **Success check:** the webhook shows registered in Postmark's Server → Webhooks list, on the
 correct stream, with exactly those three triggers enabled.
 
-### 7.6. Keep the Account Token out of the deployment, always
+### 7.7. Keep the Account Token out of the deployment, always
 
 `EMAIL_ACCOUNT_API_KEY` (the Postmark Account Token) stays in operator storage only — it is never a
 GitHub Environment secret or Secret Manager entry for `eventrunner-demo` (or any client project).
@@ -392,7 +426,7 @@ gh secret list --env demo        # should NOT list EMAIL_ACCOUNT_API_KEY
 gcloud secrets list --project=eventrunner-demo   # should NOT list EMAIL_ACCOUNT_API_KEY
 ```
 
-### 7.7. Verification round-trip: real OTP send + bounce, checked against `sent_emails`
+### 7.8. Verification round-trip: real OTP send + bounce, checked against `sent_emails`
 
 1. Trigger a real OTP sign-in against the `eventrunner-demo` deployment (sign in with an email
    address you control) — confirm the message shows up in Postmark's `Event Runner` Server →
@@ -410,7 +444,7 @@ gcloud secrets list --project=eventrunner-demo   # should NOT list EMAIL_ACCOUNT
 and both a successful delivery and a bounce event visibly update the matching `sent_emails` row in
 Firestore.
 
-### 7.8. Update the operator handoff doc's results section
+### 7.9. Update the operator handoff doc's results section
 
 Once done, update `docs/plans/2026-08-26-operator-handoff.md`'s results section (Workstream C
 checklist items — webhook registered, round-trip confirmed). Do not paste any token or secret

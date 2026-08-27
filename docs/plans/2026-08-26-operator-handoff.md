@@ -682,10 +682,20 @@ What's left, in order:
    export GOOGLE_APPLICATION_CREDENTIALS=<operator ADC, one-time>
    export EVENT_FIREBASE_PROJECT_ID=eventrunner-demo
    node scripts/init-event.cjs --answers docs/examples/demo-answers.json --admin <operator-admin@ccm-domain>
-   node scripts/seed-demo-event.cjs
+   node scripts/seed-demo-event.cjs --force
    ```
    Pass the real first-admin address as `--admin` — it wins over the template's placeholder
    `adminEmails` entry.
+
+   `--force` on the seed is load-bearing, not optional. `init-event.cjs` has just created every
+   `config/*` document from the answers file, which still carries `[Replace]` placeholders (the
+   tagline, the SEO description, the operator postal address). Without `--force`,
+   `writeConfigDocs` takes the `decideConfigWrite` "exists (re-run with `--force` to refresh)"
+   branch for every non-bootstrap config document and skips it, so the live config keeps those
+   placeholders instead of the demo content in `scripts/lib/demo-event.cjs` — and
+   `generate-content.cjs --demo --check` in step 4 is checking the generated snapshot, not the
+   deployment, so it would not catch the drift. `config/bootstrap` is unaffected either way: admin
+   emails merge additively, so the `--admin` address from the line above survives the refresh.
 4. Confirm `node scripts/generate-content.cjs --demo --check` exits 0 (should already hold by
    construction; this step confirms it, not fixes a drift).
 5. Readiness gate: attest Google sign-in (`init-event.cjs --attest-auth`) and the sender domain

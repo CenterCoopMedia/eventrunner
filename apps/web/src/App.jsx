@@ -32,12 +32,19 @@ import Profile from './pages/Profile.jsx';
 import Attendees from './pages/Attendees.jsx';
 import AttendeeProfile from './pages/AttendeeProfile.jsx';
 import LoadingState from './components/LoadingState.jsx';
+import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';
+import { clearReloadFlag } from './lib/chunkReload.js';
 
 // Code-split the admin CMS out of the public bundle (issue #95): AdminApp
 // and everything under src/admin/pages pull in the entire content-editing
 // surface, which ordinary visitors never touch. Loading it lazily keeps that
 // weight out of the chunk every visitor downloads on first paint.
-const AdminApp = lazy(() => import('./admin/AdminApp.jsx'));
+// A load that succeeds spends the one-reload budget in lib/chunkReload.js, so
+// the next deploy this tab lives through gets its own single recovery reload.
+const AdminApp = lazy(() => import('./admin/AdminApp.jsx').then((module) => {
+  clearReloadFlag();
+  return module;
+}));
 
 export function AppRoutes() {
   return (
@@ -50,9 +57,14 @@ export function AppRoutes() {
       <Route
         path="admin/*"
         element={
-          <Suspense fallback={<LoadingState label="Loading admin" />}>
-            <AdminApp />
-          </Suspense>
+          // The boundary sits OUTSIDE Suspense: a rejected dynamic import
+          // surfaces as a thrown error at the lazy boundary, not as a
+          // fallback, so a boundary inside Suspense would never see it.
+          <ChunkErrorBoundary>
+            <Suspense fallback={<LoadingState label="Loading admin" />}>
+              <AdminApp />
+            </Suspense>
+          </ChunkErrorBoundary>
         }
       />
       <Route element={<Layout />}>

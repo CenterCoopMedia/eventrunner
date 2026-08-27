@@ -138,6 +138,94 @@ test('checkAuditPolicy passes on a high finding covered by a matching exception'
   assert.deepEqual(failures, []);
 });
 
+// npm reports one finding per package at the worst severity across every
+// advisory that reaches it. A stale exception must not carry a newer, more
+// severe advisory through on the same package.
+function maskingReport() {
+  return {
+    vulnerabilities: {
+      'some-pkg': {
+        severity: 'critical',
+        via: [
+          {
+            source: 3,
+            name: 'some-pkg',
+            url: 'https://github.com/advisories/GHSA-old-2222-2222',
+            severity: 'moderate',
+          },
+          {
+            source: 4,
+            name: 'some-pkg',
+            url: 'https://github.com/advisories/GHSA-new-3333-3333',
+            severity: 'critical',
+          },
+        ],
+      },
+    },
+  };
+}
+
+function exceptionFor(advisories, severity = 'moderate') {
+  return {
+    package: 'some-pkg',
+    exposure: 'production',
+    severity,
+    advisories,
+    rationale: 'test fixture',
+    reviewedBy: 'test',
+    reviewDate: '2026-08-27',
+  };
+}
+
+test('an old exception on one advisory does not mask a new high or critical one', () => {
+  const dir = tempDir();
+  const exceptionsPath = writeExceptions(dir, [
+    exceptionFor(['https://github.com/advisories/GHSA-old-2222-2222']),
+  ]);
+  const { failures } = checkAuditPolicy({
+    exceptionsPath,
+    targets: ['.'],
+    runAuditFn: () => maskingReport(),
+  });
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].name, 'some-pkg');
+  assert.equal(failures[0].severity, 'critical');
+});
+
+test('a finding passes once every gating advisory has its own reviewed entry', () => {
+  const dir = tempDir();
+  const exceptionsPath = writeExceptions(dir, [
+    exceptionFor(['https://github.com/advisories/GHSA-old-2222-2222']),
+    exceptionFor(['https://github.com/advisories/GHSA-new-3333-3333'], 'critical'),
+  ]);
+  const { failures } = checkAuditPolicy({
+    exceptionsPath,
+    targets: ['.'],
+    runAuditFn: () => maskingReport(),
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('a moderate advisory alongside a reviewed critical one does not itself gate', () => {
+  const dir = tempDir();
+  const exceptionsPath = writeExceptions(dir, [
+    exceptionFor(['https://github.com/advisories/GHSA-new-3333-3333'], 'critical'),
+  ]);
+  const { failures } = checkAuditPolicy({
+    exceptionsPath,
+    targets: ['.'],
+    runAuditFn: () => maskingReport(),
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('a finding with no advisory to match fails closed', () => {
+  assert.equal(
+    isExcepted('some-pkg', [], [exceptionFor(['https://github.com/advisories/GHSA-old-2222-2222'])]),
+    false,
+  );
+});
+
 test('checkAuditPolicy fails closed on malformed audit output rather than passing', () => {
   const dir = tempDir();
   const exceptionsPath = writeExceptions(dir, []);

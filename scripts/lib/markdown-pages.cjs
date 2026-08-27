@@ -36,6 +36,11 @@ const HEADING_RE = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
 const FENCE_RE = /^(\s*)(`{3,}|~{3,})\s*(\S*)\s*$/;
 const THEMATIC_BREAK_RE = /^(?:\s*)(?:-{3,}|\*{3,}|_{3,})\s*$/;
 const TABLE_DELIMITER_RE = /^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?\s*$/;
+// A setext underline: `===` under a line makes it an h1, `---` an h2. It only
+// counts directly under paragraph text, which is what keeps it apart from a
+// thematic break (`---` on its own, after a blank line) and from a table's
+// delimiter row (which carries pipes).
+const SETEXT_UNDERLINE_RE = /^ {0,3}(=+|-+)[ \t]*$/;
 
 /**
  * Escape every character that could change the meaning of the surrounding
@@ -364,7 +369,13 @@ function splitTableRow(line) {
       const run = /^`+/.exec(trimmed.slice(index))[0].length;
       const end = findCodeSpanEnd(trimmed, index + run, run);
       const stop = end === -1 ? trimmed.length : end + run;
-      current += trimmed.slice(index, stop);
+      // The span is copied whole so a pipe inside it cannot split the cell.
+      // The escapes still have to be consumed here: inside a code span the
+      // inline renderer emits every character literally, so a `\|` left in
+      // place would reach the page as a visible backslash. GFM resolves the
+      // table escape first for exactly this reason -- `` `a \| b` `` is one
+      // cell reading `a | b`, not `a \| b`.
+      current += trimmed.slice(index, stop).replaceAll('\\|', '|');
       index = stop;
       continue;
     }
@@ -516,9 +527,28 @@ function renderBlocks(lines, context) {
     const paragraph = [];
     while (index < lines.length && lines[index].trim() !== '' && !isBlockStart(lines[index])) {
       if (lines[index].trim().startsWith('|') && TABLE_DELIMITER_RE.test(lines[index + 1] || '')) break;
+      // A `=` run is not a block start on its own, so the loop has to stop at
+      // one itself. (A `---` run already stops it as a thematic break.)
+      if (paragraph.length > 0 && SETEXT_UNDERLINE_RE.test(lines[index])) break;
       paragraph.push(lines[index].replace(/^\s+/, ''));
       index += 1;
     }
+
+    const setext = paragraph.length > 0 && index < lines.length
+      ? SETEXT_UNDERLINE_RE.exec(lines[index])
+      : null;
+    if (setext) {
+      const level = setext[1].startsWith('=') ? 1 : 2;
+      const text = paragraph.join(' ');
+      const slug = context.registerHeading(level, text);
+      out.push(
+        `<h${level} id="${escapeHtml(slug)}">${renderInline(text, context)}` +
+        `<a class="heading-anchor" href="#${escapeHtml(slug)}" aria-label="Link to this section">#</a></h${level}>`,
+      );
+      index += 1;
+      continue;
+    }
+
     if (paragraph.length === 0) {
       // A line that starts a block but was not consumed above cannot be
       // reached; guard anyway so a malformed document cannot spin here.
@@ -644,9 +674,14 @@ function renderMarkdown(source, options = {}) {
   const firstContent = lines.findIndex((line) => line.trim() !== '');
   if (firstContent !== -1) {
     const heading = HEADING_RE.exec(lines[firstContent]);
+    const underline = lines[firstContent + 1] || '';
     if (heading && heading[1].length === 1) {
       title = plainText(heading[2]);
       bodyLines = lines.slice(firstContent + 1);
+    } else if (!isBlockStart(lines[firstContent]) && SETEXT_UNDERLINE_RE.test(underline) && underline.trim().startsWith('=')) {
+      // The setext spelling of the same leading `# Title`.
+      title = plainText(lines[firstContent]);
+      bodyLines = lines.slice(firstContent + 2);
     }
   }
 

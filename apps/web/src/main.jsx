@@ -8,10 +8,19 @@ import { IS_DEMO } from './lib/demoMode.js';
 import '@generated/theme.css';
 import './index.css';
 import { initErrorReporting } from './lib/errorReporting.js';
+import { installChunkReload } from './lib/chunkReload.js';
 
 // Client-error telemetry (spec §9, issue #10): on in production builds by
 // default, off in dev/emulator unless VITE_ENABLE_CLIENT_ERROR_REPORTING=true.
 initErrorReporting();
+
+// A stale entry bundle can ask for a lazy chunk (the admin CMS, App.jsx) that
+// the current deploy no longer publishes. Vite reports the failed
+// modulepreload as `vite:preloadError`; one reload per tab picks up the
+// current bundle. The flag that limits it to one is cleared where the chunk
+// actually loads (App.jsx), not here — clearing it on every entry load would
+// re-arm the reload on the very page the reload landed on, and loop.
+installChunkReload();
 
 // Real deployments are served by Firebase Hosting, which rewrites every path
 // to index.html, so the app uses real URLs (BrowserRouter). The static demo

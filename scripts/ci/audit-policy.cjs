@@ -88,42 +88,67 @@ function loadExceptions(exceptionsPath = EXCEPTIONS_PATH) {
   return exceptions;
 }
 
-// A finding's own `via` list is either advisory objects (with a `url`) or
-// plain strings naming another vulnerable package one hop away. Walk that
-// chain to collect every advisory URL reachable from a top-level finding, so
-// an exception logged against the root advisory still matches a package
-// several hops downstream of it.
-function collectAdvisoryUrls(name, vulnerabilities, seen = new Set()) {
+// A finding's own `via` list is either advisory objects (with a `url` and its
+// own `severity`) or plain strings naming another vulnerable package one hop
+// away. Walk that chain to collect every advisory reachable from a top-level
+// finding, so an exception logged against the root advisory still matches a
+// package several hops downstream of it.
+function collectAdvisories(name, vulnerabilities, seen = new Set()) {
   if (seen.has(name)) return [];
   seen.add(name);
   const finding = vulnerabilities[name];
   if (!finding || !Array.isArray(finding.via)) return [];
-  const urls = [];
+  const advisories = [];
   for (const via of finding.via) {
     if (typeof via === 'string') {
-      urls.push(...collectAdvisoryUrls(via, vulnerabilities, seen));
+      advisories.push(...collectAdvisories(via, vulnerabilities, seen));
     } else if (via && typeof via.url === 'string') {
-      urls.push(via.url);
+      advisories.push({ url: via.url, severity: via.severity });
     }
   }
-  return urls;
+  return advisories;
 }
 
-function isExcepted(name, advisoryUrls, exceptions) {
-  return exceptions.some((entry) => {
-    if (entry.package !== name) return false;
-    if (entry.exposure !== 'production') return false;
-    return entry.advisories.some((url) => advisoryUrls.includes(url));
-  });
+function collectAdvisoryUrls(name, vulnerabilities, seen = new Set()) {
+  return collectAdvisories(name, vulnerabilities, seen).map((advisory) => advisory.url);
+}
+
+// npm groups every advisory that reaches one package under a single finding
+// and reports the WORST severity across them. So "this package has a logged
+// exception" is not enough: an exception filed months ago against a moderate
+// advisory would otherwise silently cover a high or critical advisory that
+// landed on the same package later. Every gating advisory therefore needs its
+// own entry, and a finding with nothing to match fails closed.
+function isExcepted(name, advisories, exceptions) {
+  const normalized = advisories.map((advisory) => (
+    typeof advisory === 'string' ? { url: advisory, severity: undefined } : advisory
+  ));
+  const reviewed = new Set(
+    exceptions
+      .filter((entry) => entry.package === name && entry.exposure === 'production')
+      .flatMap((entry) => entry.advisories),
+  );
+  // Advisories at the gating severities are what this policy is about. When
+  // npm reports no per-advisory severity at all (an older report shape), hold
+  // every collected advisory to the same rule rather than exempting the lot.
+  const gating = normalized.filter((advisory) => FAIL_SEVERITIES.has(advisory.severity));
+  const urls = (gating.length > 0 ? gating : normalized).map((advisory) => advisory.url);
+  if (urls.length === 0) return false;
+  return urls.every((url) => reviewed.has(url));
 }
 
 function evaluateReport(report, exceptions, target) {
   const failures = [];
   for (const [name, finding] of Object.entries(report.vulnerabilities)) {
     if (!FAIL_SEVERITIES.has(finding.severity)) continue;
-    const advisoryUrls = collectAdvisoryUrls(name, report.vulnerabilities);
-    if (isExcepted(name, advisoryUrls, exceptions)) continue;
-    failures.push({ target, name, severity: finding.severity, advisoryUrls });
+    const advisories = collectAdvisories(name, report.vulnerabilities);
+    if (isExcepted(name, advisories, exceptions)) continue;
+    failures.push({
+      target,
+      name,
+      severity: finding.severity,
+      advisoryUrls: advisories.map((advisory) => advisory.url),
+    });
   }
   return failures;
 }
@@ -170,6 +195,7 @@ if (require.main === module) {
 module.exports = {
   auditTargets,
   checkAuditPolicy,
+  collectAdvisories,
   collectAdvisoryUrls,
   evaluateReport,
   isExcepted,
