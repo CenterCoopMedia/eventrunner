@@ -187,7 +187,120 @@
     padding-block: var(--page-row-pad-block);
   }
 
-  /* The `density` layout variant (brief §6.1): tight, comfortable, loose.
+  /* FOUR DIRECTORIES, FOUR COMPOSITIONS (design brief §5.1, §6.1).
+     ------------------------------------------------------------------
+     Speakers, attendees, sponsors and updates were one composition wearing
+     four headings: `.directory-row` under a hairline, optionally in two
+     columns. That is a schema browser. They are not the same kind of list,
+     and reading each of them is a different job:
+
+       speakers    you are looking for a FACE you half remember
+       attendees   you are looking for a NAME you already know
+       sponsors    you are being shown WHO PAID FOR THIS, by weight
+       updates     you are catching up on WHAT CHANGED, newest first
+
+     So each gets the shape its job needs. Every one is still built from the
+     shared tokens — the same spacing scale, the same rules, the same ink,
+     the same radius, the same density remaps — and none of them becomes a
+     card. `.directory-row` stays for the plain case and for anything that
+     is genuinely a ruled list.
+
+     ------------------------------------------------------------------
+     SPEAKERS — a shelf of portraits. The headshot was a 40px thumbnail
+     beside a name, which is not a picture of anyone; at that size it is a
+     bullet. Here the portrait leads at a size a face survives, framed on
+     the alternate ground so a missing headshot is an empty frame rather
+     than a hole in the shelf. */
+  .portrait-shelf__plate {
+    padding-block: var(--page-row-pad-block);
+  }
+  .portrait-shelf__frame {
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    border-radius: var(--radius-base);
+    background-color: rgb(var(--color-surface-alt-rgb));
+  }
+  .portrait-shelf__frame > img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+
+  /* ------------------------------------------------------------------
+     ATTENDEES — an index, not a directory of profiles. Hundreds of names
+     you already know one of: the job is to find YOUR name, or the person
+     you met at lunch. So the entries are one compact line each and they sit
+     under letter heads, which is what makes a long list scannable at all.
+     The letter is a folio on a rule — the same standing head a schedule day
+     uses — and it STICKS to the top of the viewport while its group is on
+     screen, so the reader always knows which letter they are in. */
+  .attendee-index__letter {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    background-color: rgb(var(--color-surface-rgb));
+    padding-block-end: var(--space-3xs);
+  }
+  .attendee-index__entry {
+    padding-block: var(--space-2xs);
+  }
+
+  /* ------------------------------------------------------------------
+     SPONSORS — a logo wall, weighted by tier. A supporter's standing is
+     the one thing this page is actually for, and a list where every row is
+     the same size states the opposite of what the operator agreed to. So
+     the tier sets the mark's size, through one token per tier group rather
+     than a rule per tier: --logo-wall-mark-size is set inline from the
+     tier's rank, and the wall is built from it.
+
+     The mark is drawn on the alternate ground with the house radius, which
+     is what keeps a wall of wildly different logo files reading as one
+     wall. It is contained, never cropped: a sponsor's mark is their
+     property and `cover` would cut it. */
+  .logo-wall {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+  }
+  .logo-wall__mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--logo-wall-mark-size);
+    block-size: calc(var(--logo-wall-mark-size) * 0.6);
+    padding: var(--space-xs);
+    border-radius: var(--radius-base);
+    background-color: rgb(var(--color-surface-alt-rgb));
+  }
+  .logo-wall__mark > img {
+    max-inline-size: 100%;
+    max-block-size: 100%;
+    object-fit: contain;
+  }
+
+  /* ------------------------------------------------------------------
+     UPDATES — a feed with a spine. The dated column was right; what it was
+     missing was continuity. A hairline runs down the leading edge of the
+     whole run and each entry hangs a short tick off it, so the column reads
+     as one thread of time rather than as unrelated rows that happen to have
+     dates. Newest first, and the month is a standing head on the thread. */
+  .update-feed__entry {
+    position: relative;
+    padding-block: var(--page-row-pad-block);
+    padding-inline-start: var(--space-md);
+    border-inline-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+  }
+  .update-feed__entry::before {
+    content: '';
+    position: absolute;
+    inset-block-start: calc(var(--page-row-pad-block) + 0.6em);
+    inset-inline-start: 0;
+    inline-size: var(--space-sm);
+    block-size: var(--rule-hairline-width);
+    background-color: rgb(var(--rule-hairline-rgb));
+  }
+
+  /* The `density` layout variant (brief §6.1): tight, comfortable, loose.  /* The `density` layout variant (brief §6.1): tight, comfortable, loose.
      Each step REMAPS tier-3 tokens onto the spacing scale — it never mints
      a value and never adds a property name, which is the same rule a preset
      option follows (§3.4).

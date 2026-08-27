@@ -88,11 +88,32 @@ describe('Updates', () => {
   });
 
   it('labels a post with no resolvable publish date rather than leaving the date column blank', () => {
-    // The list is a dated column (design brief §2.1), so every row states
-    // its date. A post whose publishAt never resolved still gets a word —
-    // an empty cell would read as a rendering fault, not as missing data.
+    // The feed is dated (design brief §2.1), so every entry states its
+    // date. A post whose publishAt never resolved still gets a word — an
+    // empty cell would read as a rendering fault, not as missing data —
+    // and it runs under its own "Undated" head rather than being filed in a
+    // month it never had.
     renderUpdates({ updates: [{ ...NEWER, id: 'update-undated', publishAt: null }] });
-    expect(screen.getByText('Undated')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Undated' })).toBeInTheDocument();
+    expect(screen.getAllByText('Undated').length).toBeGreaterThan(0);
     expect(screen.getByText(NEWER.title)).toBeInTheDocument();
+  });
+
+  // THE FEED'S RUNS (this review): pinned first because pinned is not a
+  // date, then one head per month, then the undated.
+  it('heads the feed with Pinned, then months, newest first', () => {
+    renderUpdates({
+      updates: [
+        { id: 'u-pin', title: 'Held to the top', pinned: true, publishAt: '2026-08-02T09:00:00Z' },
+        { id: 'u-oct', title: 'October post', publishAt: '2026-10-03T09:00:00Z' },
+        { id: 'u-sep', title: 'September post', publishAt: '2026-09-04T09:00:00Z' },
+      ],
+    });
+    const heads = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent.trim());
+    // Pinned first — an August post held to the top must not drag August's
+    // month head above October's.
+    expect(heads[0]).toBe('Pinned');
+    expect(heads[1]).toBe('October 2026');
+    expect(heads[2]).toBe('September 2026');
   });
 });

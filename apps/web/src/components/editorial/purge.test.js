@@ -59,6 +59,18 @@ const DEVICE_CLASSES = [
   // The hybrid page shell and its density variant (brief §6.1, §6.2).
   '.page-section',
   '.directory-row',
+  // FOUR DIRECTORIES, FOUR COMPOSITIONS (brief §5.1). Each one is built
+  // from the shared tokens and each one carries its own device classes;
+  // a purged rule here does not paint a solid rectangle, it collapses the
+  // composition back into an undifferentiated stack, which is the state
+  // these classes exist to leave behind.
+  '.portrait-shelf__plate',
+  '.portrait-shelf__frame',
+  '.attendee-index__letter',
+  '.attendee-index__entry',
+  '.logo-wall',
+  '.logo-wall__mark',
+  '.update-feed__entry',
   // The schedule grid, its signature interaction, and the calling points
   // under a parent session (brief §2.1, §2.2, §4.6).
   '.schedule-grid',
