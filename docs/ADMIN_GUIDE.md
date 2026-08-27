@@ -42,10 +42,10 @@ overrule it for this page alone. Use it sparingly and on purpose — a rail besi
 directory is a decision; a rail on three pages out of nine is an accident. It is not part of a
 template, so setting it leaves the template alone.
 
-A **system page** — home, schedule, speakers, sponsors — keeps its built-in feature and lets you
-put sections around it. Each section on one of those pages picks where it is inserted: **before the
-main feature** or **after the main feature**. Custom pages have no built-in feature, so they have
-no insertion point to pick.
+A **system page** — home, schedule, speakers, sponsors, attendees, updates — keeps its built-in
+feature and lets you put sections around it. Each section on one of those pages picks where it is
+inserted: **before the main feature** or **after the main feature**. Custom pages have no built-in
+feature, so they have no insertion point to pick.
 
 ## Content (Pages → Content editor)
 
