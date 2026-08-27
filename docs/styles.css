@@ -1,6 +1,53 @@
 /* Event Runner — product site.
    Tokens are role-named; dark mode is its own palette, not inverted light. */
 
+/* Self-hosted fonts (fonts/, latin subsets only), same rule the app follows
+   in apps/web/public/fonts: no font-CDN request from any page this site
+   serves. This stylesheet is loaded by the landing page and by every
+   generated documentation page, so these faces cover the whole Pages surface.
+   Weights match what the stylesheets below actually ask for — nothing here is
+   downloaded "just in case". */
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  font-style: normal;
+  font-weight: 700 800;
+  font-display: swap;
+  src: url("fonts/bricolage-grotesque-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("fonts/source-sans-3-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("fonts/source-sans-3-italic-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/ibm-plex-mono-400-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/ibm-plex-mono-500-latin.woff2") format("woff2");
+}
+
 :root {
   color-scheme: light;
 
