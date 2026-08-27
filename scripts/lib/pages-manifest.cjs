@@ -130,6 +130,24 @@ const SECTIONS = Object.freeze([
         summary: 'Setup, tests, sign-off, and the proportional CI tiers.',
       },
       {
+        source: 'CODE_OF_CONDUCT.md',
+        route: 'code-of-conduct/',
+        title: 'Code of conduct',
+        summary: 'The behavior expected in every project space, and how to report a problem.',
+      },
+      {
+        source: 'GOVERNANCE.md',
+        route: 'governance/',
+        title: 'Governance',
+        summary: 'Who decides what, and how a decision gets made.',
+      },
+      {
+        source: 'RELEASING.md',
+        route: 'releasing/',
+        title: 'Releasing',
+        summary: 'How a tagged release is cut and what it promises.',
+      },
+      {
         source: 'docs/interface-guidelines.md',
         route: 'interface-guidelines/',
         title: 'Interface guidelines',
@@ -146,6 +164,12 @@ const SECTIONS = Object.freeze([
         route: 'roadmap/',
         title: 'Roadmap',
         summary: 'The five v1 milestones and what is left.',
+      },
+      {
+        source: 'CHANGELOG.md',
+        route: 'changelog/',
+        title: 'Changelog',
+        summary: 'What changed, release by release.',
       },
     ],
   },

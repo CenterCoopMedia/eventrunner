@@ -46,13 +46,16 @@ const LANDING_PAGE = path.join(ROOT, 'docs', 'index.html');
 const PRODUCT = 'Event Runner';
 const SITE_URL = `${SITE_ORIGIN}${SITE_BASE}`;
 const DOCS_URL = `${SITE_ORIGIN}${DOCS_BASE}`;
-const SOCIAL_IMAGE = `${SITE_URL}social-preview.png`;
+// The documentation site has its own social card, so a link to a guide is not
+// previewed as the product landing page (docs/social-preview.png).
+const SOCIAL_IMAGE = `${SITE_URL}og-default.png`;
+const SOCIAL_IMAGE_ALT = 'Event Runner documentation';
 const DOCS_DESCRIPTION =
   'Guides, runbooks, and decision records for Event Runner, the white-label event CMS ' +
   'operated by the Center for Cooperative Media.';
-const FONTS_HREF =
-  'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800' +
-  '&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap';
+// Fonts are self-hosted under docs/fonts and declared by styles.css, so no
+// page here reaches a font CDN. See docs/fonts/README.md.
+const PRELOADED_FONTS = ['source-sans-3-latin.woff2', 'bricolage-grotesque-latin.woff2'];
 
 const EXTERNAL_SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
 
@@ -160,15 +163,20 @@ function head({ title, description, canonical, themeTags, ogType }) {
     `  <meta property="og:description" content="${safeDescription}">`,
     `  <meta property="og:url" content="${escapeHtml(canonical)}">`,
     `  <meta property="og:image" content="${SOCIAL_IMAGE}">`,
+    '  <meta property="og:image:type" content="image/png">',
+    '  <meta property="og:image:width" content="1200">',
+    '  <meta property="og:image:height" content="630">',
+    `  <meta property="og:image:alt" content="${SOCIAL_IMAGE_ALT}">`,
     '  <meta name="twitter:card" content="summary_large_image">',
     `  <meta name="twitter:title" content="${safeTitle}">`,
     `  <meta name="twitter:description" content="${safeDescription}">`,
     `  <meta name="twitter:image" content="${SOCIAL_IMAGE}">`,
+    `  <meta name="twitter:image:alt" content="${SOCIAL_IMAGE_ALT}">`,
     ...themeTags.map((tag) => `  ${tag}`),
     '',
-    '  <link rel="preconnect" href="https://fonts.googleapis.com">',
-    '  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
-    `  <link href="${FONTS_HREF}" rel="stylesheet">`,
+    ...PRELOADED_FONTS.map((file) => (
+      `  <link rel="preload" href="${SITE_BASE}fonts/${file}" as="font" type="font/woff2" crossorigin>`
+    )),
     `  <link rel="stylesheet" href="${SITE_BASE}styles.css">`,
     `  <link rel="stylesheet" href="${SITE_BASE}docs.css">`,
     '</head>',
@@ -450,6 +458,50 @@ function buildSite({ root = ROOT } = {}) {
   return { files, departures, errors, headingsByRoute };
 }
 
+/**
+ * Absolute path for one generated file, refusing anything that would land
+ * outside the output directory.
+ *
+ * The names come from the manifest's own routes, so this is a guard against a
+ * bad manifest edit rather than untrusted input — but the write path below
+ * deletes the whole output tree first, and a `..` route would then aim that
+ * write at the rest of the repository.
+ *
+ * @param {string} outputDir
+ * @param {string} name
+ * @returns {string}
+ */
+function resolveOutputPath(outputDir, name) {
+  const target = path.resolve(outputDir, name);
+  const relative = path.relative(outputDir, target);
+  if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`build-pages: route escapes docs/docs: ${name}`);
+  }
+  return target;
+}
+
+/**
+ * Write the whole site, rebuilding the output directory from empty.
+ *
+ * Writing over the tree in place would leave the output of a route that has
+ * since been renamed sitting on the published site — exactly what `--check`'s
+ * "unexpected file" report keeps catching by hand. Deleting first makes the
+ * directory a pure function of the manifest.
+ *
+ * @param {Map<string,string>} files
+ * @param {string} outputDir
+ */
+function writeSite(files, outputDir) {
+  // Resolve every destination BEFORE deleting anything: a route that escapes
+  // the output directory must fail with the existing site still intact.
+  const writes = [...files].map(([name, contents]) => [resolveOutputPath(outputDir, name), contents]);
+  fs.rmSync(outputDir, { recursive: true, force: true });
+  for (const [target, contents] of writes) {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, contents);
+  }
+}
+
 function listExisting(directory) {
   if (!fs.existsSync(directory)) return [];
   const found = [];
@@ -537,12 +589,8 @@ function main(argv = []) {
     return 0;
   }
 
-  for (const [name, contents] of site.files) {
-    const target = path.join(OUTPUT_DIR, name);
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, contents);
-  }
-  console.log(`build-pages: wrote ${site.files.size} file(s) to docs/docs`);
+  writeSite(site.files, OUTPUT_DIR);
+  console.log(`build-pages: rebuilt docs/docs from empty, ${site.files.size} file(s)`);
   if (site.departures.length > 0) {
     const unique = [...new Set(site.departures.map((departure) => departure.repoPath))].sort();
     console.log(
@@ -562,5 +610,5 @@ module.exports = {
   linkResolver,
   main,
   themeColorTags,
-  internals: { OUTPUT_DIR, PRODUCT, listExisting, plainText },
+  internals: { OUTPUT_DIR, PRODUCT, listExisting, plainText, resolveOutputPath, writeSite },
 };

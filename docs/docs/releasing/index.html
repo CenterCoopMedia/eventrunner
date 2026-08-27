@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Releasing — Event Runner documentation</title>
+  <meta name="description" content="How a tagged release is cut and what it promises.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/releasing/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Releasing — Event Runner documentation">
+  <meta property="og:description" content="How a tagged release is cut and what it promises.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/releasing/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Releasing — Event Runner documentation">
+  <meta name="twitter:description" content="How a tagged release is cut and what it promises.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
+        <span class="brand-text">
+          <strong>Event Runner</strong>
+          <span>Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Releasing</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/" aria-current="page" class="is-current">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Releasing</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#version-scheme">Version scheme</a></li>
+              <li><a href="#changelog-hygiene">CHANGELOG hygiene</a></li>
+              <li><a href="#cutting-a-tag">Cutting a tag</a></li>
+              <li><a href="#what-a-release-includes">What a release includes</a></li>
+              <li><a href="#the-demo-build-docsdemo">The demo build (docs/demo/)</a></li>
+            </ul>
+          </nav>
+          <p>Tags mark a point in the platform&#39;s history other people can build on, cite, or deploy from —
+          they are not the deploy mechanism. <code>deploy-client.yml</code> (<code>docs/DEPLOY_RUNBOOK.md</code>) always deploys
+          from <code>main</code>, at whatever commit is there when an operator dispatches it or when a push lands. A
+          tag is a label a fork, a downstream integrator, or an operator doing a deliberate rollback
+          (<code>docs/DEPLOY_RUNBOOK.md</code> § Rolling back) can point at instead of an arbitrary SHA.</p>
+          <h2 id="version-scheme">Version scheme<a class="heading-anchor" href="#version-scheme" aria-label="Link to this section">#</a></h2>
+          <p><a href="https://semver.org/">Semantic Versioning</a>, tracked in <code>package.json</code>&#39;s root <code>version</code> field:</p>
+          <ul>
+          <li><strong>Patch</strong> (<code>0.1.x</code>): bug fixes, docs, CI/tooling changes — no schema or contract change.</li>
+          <li><strong>Minor</strong> (<code>0.x.0</code>): new features, new admin surfaces, new config fields with a safe default.
+          Backward compatible — an existing client deployment keeps working unmigrated.</li>
+          <li><strong>Major</strong> (<code>x.0.0</code>): a breaking change to <code>config/*</code> shape, Firestore rules, or anything an
+          existing client deployment would need a migration step for. Reserved and rare; discuss the
+          break in an issue before it lands, per <a href="/eventrunner/docs/contributing/">CONTRIBUTING.md</a>&#39;s contribution policy.</li>
+          </ul>
+          <p>The project is pre-1.0 (<code>0.x</code>) until the v1 feature set in
+          <a href="/eventrunner/docs/decisions/0001-event-platform-v1/">docs/adr/0001-event-platform-v1.md</a> is complete and has run a
+          real client event end to end. Before 1.0, a minor bump can still include a breaking change if it&#39;s
+          called out plainly in the changelog entry — SemVer&#39;s normal pre-1.0 allowance.</p>
+          <h2 id="changelog-hygiene">CHANGELOG hygiene<a class="heading-anchor" href="#changelog-hygiene" aria-label="Link to this section">#</a></h2>
+          <p><a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> format, already in use in
+          <a href="/eventrunner/docs/changelog/">CHANGELOG.md</a>.</p>
+          <ul>
+          <li>Every pull request that changes behavior (not a pure refactor, not a test-only change) adds an
+          entry under <code>## [Unreleased]</code>, in the category it belongs to (<code>Added</code>, <code>Changed</code>, <code>Fixed</code>,
+          <code>Removed</code>, <code>Security</code>) — creating the category heading if this PR is the first entry in it.</li>
+          <li>Write the entry for the person reading the changelog cold, not for someone who already read the
+          PR: what changed and why it matters, not the PR title. One line is normal; link the spec section
+          or issue number the way existing entries do.</li>
+          <li>Do not pre-date or pre-number an entry. It stays under <code>Unreleased</code> until the tag that ships it
+          exists.</li>
+          </ul>
+          <h2 id="cutting-a-tag">Cutting a tag<a class="heading-anchor" href="#cutting-a-tag" aria-label="Link to this section">#</a></h2>
+          <ol>
+          <li><p>Confirm <code>main</code> is green: CI (lint, unit, web unit, build, hygiene, demo, rules, DCO, secret scan)
+          — see <a href="/eventrunner/docs/contributing/">CONTRIBUTING.md</a>&#39;s test table.</p></li>
+          <li><p>Open a PR that:</p>
+          <ul>
+          <li>Retitles <code>## [Unreleased]</code> in <code>CHANGELOG.md</code> to <code>## [x.y.z] - YYYY-MM-DD</code>, and adds a fresh
+          empty <code>## [Unreleased]</code> above it.</li>
+          <li>Bumps <code>version</code> in the root <code>package.json</code> (and <code>apps/web/package.json</code> /
+          <code>functions/package.json</code> if their versions are tracked independently at that point) to match.</li>
+          <li>Sign off the commit(s) — same DCO rule as any other PR.</li>
+          </ul></li>
+          <li><p>Merge it to <code>main</code> like any other PR (review, green CI).</p></li>
+          <li><p>Tag the merge commit and push the tag:</p>
+          <pre><code class="language-sh">git checkout main &amp;&amp; git pull
+          git tag -s vX.Y.Z -m &quot;vX.Y.Z&quot;
+          git push origin vX.Y.Z
+          </code></pre>
+          <p><code>-s</code> signs the tag if you have a configured signing key; use <code>-a</code> instead if you don&#39;t — an
+          annotated tag either way, never a lightweight one, so the tag carries a message and a date.</p></li>
+          <li><p>Draft the GitHub Release from the tag (Releases → Draft a new release → choose the tag). Body
+          is the same <code>## [x.y.z]</code> section just added to <code>CHANGELOG.md</code> — do not write a second, different
+          description of the same release.</p></li>
+          </ol>
+          <p>This document does not itself cut a tag — it describes the process for the next person (or
+          session) that does.</p>
+          <h2 id="what-a-release-includes">What a release includes<a class="heading-anchor" href="#what-a-release-includes" aria-label="Link to this section">#</a></h2>
+          <p>A tag is a marker on the platform&#39;s source, not a build artifact and not a deploy. There is
+          nothing to attach to the GitHub Release beyond the changelog excerpt: no compiled bundle (each
+          client&#39;s <code>apps/web</code> build is produced fresh per deploy from <code>EVENT_*</code>/<code>VITE_FIREBASE_*</code> env, so a
+          prebuilt artifact would be wrong for every client but one), no Docker image, no npm package publish
+          (this repo is not published to a registry).</p>
+          <p>An operator who wants to deploy a specific tagged version rather than the tip of <code>main</code> checks out
+          that ref before dispatching, or passes it to whatever provisioning mechanism reads a
+          <code>source_revision</code> (see <code>docs/DEPLOY_RUNBOOK.md</code>); <code>deploy-client.yml</code> itself is triggered from
+          <code>main</code> (§1–2 of the runbook, and the WIF binding in particular is scoped to <code>refs/heads/main</code>), so
+          deploying from an arbitrary tag currently means merging that tag&#39;s tree to <code>main</code> first, not
+          dispatching against the tag directly.</p>
+          <h2 id="the-demo-build-docsdemo">The demo build (<code>docs/demo/</code>)<a class="heading-anchor" href="#the-demo-build-docsdemo" aria-label="Link to this section">#</a></h2>
+          <p><code>docs/demo/</code> is committed output, not generated at deploy time: <code>npm run build:demo</code>
+          (<code>scripts/build-demo.cjs</code>) runs a demo-mode <code>vite build</code> of <code>apps/web</code> against the committed
+          synthetic snapshot in <code>apps/web/src/generated/</code> and syncs the result into <code>docs/demo/</code>, which
+          GitHub Pages serves at <code>https://centercoopmedia.github.io/eventrunner/demo/</code>. Nobody runs this at
+          deploy time — it has to be rebuilt and committed by hand whenever its inputs change.</p>
+          <ul>
+          <li><strong>Rebuild and commit <code>docs/demo/</code> before tagging</strong> whenever a PR touched <code>apps/web/src/**</code> or
+          <code>apps/web/src/generated/**</code> since the last rebuild: <code>npm run build:demo</code>, review the diff, commit
+          it (a normal DCO-signed commit, same as any other change).</li>
+          <li><strong>CI catches a forgotten rebuild for you</strong> — the <code>demo</code> job (<code>.github/workflows/ci.yml</code>) runs
+          <code>node scripts/build-demo.cjs --check</code> on every push and PR and fails if a fresh build differs
+          from the committed <code>docs/demo/</code> (issue #94). Treat a red <code>demo</code> job as &quot;rebuild and commit&quot;,
+          never as a reason to touch <code>docs/demo/</code> by hand.</li>
+          <li><strong>The build is deterministic</strong>: repeated builds of unchanged input, including Vite&#39;s
+          content-hashed asset filenames, come out byte-for-byte identical (verified by hand; see
+          <code>scripts/build-demo.test.cjs</code> for the directory-diff logic <code>--check</code> is built on). That is what
+          makes the CI gate viable without flaking on unrelated reruns.</li>
+          <li><strong>The <code>--base</code> / rename caveat</strong>: <code>scripts/build-demo.cjs</code> defaults <code>--base</code> to
+          <code>/eventrunner/demo/</code>, matching this repo&#39;s current name and the fact that GitHub Pages serves
+          <code>docs/</code> from the repo root. Renaming the repository, or moving the demo to a different Pages
+          path, changes that URL — rerun with <code>--base /new-path/</code> (and <code>--out</code> if the destination
+          directory changes too) and recommit <code>docs/demo/</code>, or every asset URL the built <code>index.html</code>
+          emits will 404 under the new address. Nothing checks this automatically: <code>--check</code> only proves
+          the committed output matches a fresh build at the <em>current</em> <code>--base</code>, not that the <code>--base</code> is
+          still correct.</li>
+          </ul>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/RELEASING.md"><code>RELEASING.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/governance/"><span>Previous</span>Governance</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/interface-guidelines/"><span>Next</span>Interface guidelines</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

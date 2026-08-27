@@ -13,17 +13,21 @@
   <meta property="og:title" content="Postmark provisioning — Event Runner documentation">
   <meta property="og:description" content="Sender domain, message streams, and webhook cutover.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/postmark-provisioning/">
-  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Postmark provisioning — Event Runner documentation">
   <meta name="twitter:description" content="Sender domain, message streams, and webhook cutover.">
-  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
   <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
 </head>
@@ -78,9 +82,13 @@
         <p class="docs-nav-section">Build</p>
         <ul>
           <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
           <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
           <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
           <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
         </ul>
         <p class="docs-nav-section">Get help</p>
         <ul>
@@ -383,7 +391,7 @@
           <p>If it does not exist yet, create it now following §2 exactly.</p>
           <h3 id="72-store-the-server-token-in-the-demo-deployment">7.2. Store the Server token in the demo deployment<a class="heading-anchor" href="#72-store-the-server-token-in-the-demo-deployment" aria-label="Link to this section">#</a></h3>
           <p>The Server token is <code>EMAIL_PROVIDER_API_KEY</code> for the <code>eventrunner-demo</code> deployment specifically —
-          <strong>not</strong> the Postmark Account Token, which stays operator-only (§7.6).</p>
+          <strong>not</strong> the Postmark Account Token, which stays operator-only (§7.7).</p>
           <pre><code class="language-sh"># GitHub Environment secret (Settings → Environments → demo → Secrets):
           #   EMAIL_PROVIDER_API_KEY = the &quot;Event Runner&quot; Server Token
 
@@ -411,16 +419,43 @@
           </code></pre>
           <p>Store the whole string as the <code>EMAIL_WEBHOOK_BASIC_AUTH</code> GitHub Environment secret for <code>demo</code>, and
           mirror it into Secret Manager the same way as §7.2 above (same commands, different secret name).</p>
-          <h3 id="74-switch-the-provider-from-console-to-postmark">7.4. Switch the provider from <code>console</code> to <code>postmark</code><a class="heading-anchor" href="#74-switch-the-provider-from-console-to-postmark" aria-label="Link to this section">#</a></h3>
+          <h3 id="74-move-the-demo-sender-onto-the-verified-domain-do-this-before-the-switch">7.4. Move the demo sender onto the verified domain — do this before the switch<a class="heading-anchor" href="#74-move-the-demo-sender-onto-the-verified-domain-do-this-before-the-switch" aria-label="Link to this section">#</a></h3>
+          <p>The demo&#39;s seeded sender is <code>summit@example.org</code> (<code>scripts/lib/demo-event.cjs</code>). That is a
+          placeholder on a domain nobody here owns, and Postmark refuses to send from an unverified sender
+          domain — so flipping the provider to <code>postmark</code> while that address is still in <code>config/event</code> turns
+          every demo sign-in email into a rejected send. Fix the sender first:</p>
+          <ol>
+          <li><p>Set the demo&#39;s sender address to <code>info@eventrunner.org</code> — the address on the domain §4 already
+          verified. Either edit it in the admin panel (Settings → sender) for the running deployment, or
+          re-run the seed against the demo project with the refreshed value:</p>
+          <pre><code class="language-sh">EVENT_FIREBASE_PROJECT_ID=eventrunner-demo node scripts/seed-demo-event.cjs --force
+          </code></pre>
+          <p>(<code>--force</code> is required: <code>writeConfigDocs</code> skips a <code>config/*</code> document that already exists.)</p></li>
+          </ol>
+          <ol start="2">
+          <li><p>Re-run the verification script so <code>config/event.sender.domainVerified</code> is stamped for the
+          address the demo will actually send from:</p>
+          <pre><code class="language-sh">EVENT_EMAIL_PROVIDER=postmark \
+          EMAIL_PROVIDER_API_KEY=&lt;server token from §7.2&gt; \
+          EMAIL_ACCOUNT_API_KEY=&lt;account token from §1.2, operator storage&gt; \
+          EVENT_FIREBASE_PROJECT_ID=eventrunner-demo \
+            node scripts/verify-sender-domain.cjs
+          </code></pre>
+          <p>No <code>--domain</code> flag: the script reads the domain from <code>config/event.sender.email</code>, which is the
+          point of doing this after step 1. It must exit 0 before you go on.</p></li>
+          </ol>
+          <p><strong>Success check:</strong> <code>config/event.sender.email</code> reads <code>info@eventrunner.org</code> and
+          <code>config/event.sender.domainVerified</code> is <code>true</code>.</p>
+          <h3 id="75-switch-the-provider-from-console-to-postmark">7.5. Switch the provider from <code>console</code> to <code>postmark</code><a class="heading-anchor" href="#75-switch-the-provider-from-console-to-postmark" aria-label="Link to this section">#</a></h3>
           <p>The demo deployed with <code>EVENT_EMAIL_PROVIDER=console</code> (Postmark wasn&#39;t approved yet at the time).
-          Now that it is:</p>
+          Now that §7.4 has put a verified sender in place:</p>
           <ul>
           <li>Update the <code>demo</code> GitHub Environment variable <code>EVENT_EMAIL_PROVIDER</code> from <code>console</code> to
           <code>postmark</code>.</li>
           <li>Re-run the deploy dispatch (<code>deploy-client.yml</code> against <code>demo</code>) so the functions redeploy reading
           the new provider and the two secrets from §7.2–7.3.</li>
           </ul>
-          <h3 id="75-register-the-delivery-webhook">7.5. Register the delivery webhook<a class="heading-anchor" href="#75-register-the-delivery-webhook" aria-label="Link to this section">#</a></h3>
+          <h3 id="76-register-the-delivery-webhook">7.6. Register the delivery webhook<a class="heading-anchor" href="#76-register-the-delivery-webhook" aria-label="Link to this section">#</a></h3>
           <p>Before registering, confirm which stream sends actually use: check <code>config/providers.email.
           messageStream</code> for the demo deployment (unset → the Server&#39;s default <code>Outbound</code> stream). Register
           on that stream, in Postmark: <code>Event Runner</code> Server → the identified stream → <strong>Webhooks</strong> → add
@@ -435,7 +470,7 @@
           Open/Click.</p>
           <p><strong>Success check:</strong> the webhook shows registered in Postmark&#39;s Server → Webhooks list, on the
           correct stream, with exactly those three triggers enabled.</p>
-          <h3 id="76-keep-the-account-token-out-of-the-deployment-always">7.6. Keep the Account Token out of the deployment, always<a class="heading-anchor" href="#76-keep-the-account-token-out-of-the-deployment-always" aria-label="Link to this section">#</a></h3>
+          <h3 id="77-keep-the-account-token-out-of-the-deployment-always">7.7. Keep the Account Token out of the deployment, always<a class="heading-anchor" href="#77-keep-the-account-token-out-of-the-deployment-always" aria-label="Link to this section">#</a></h3>
           <p><code>EMAIL_ACCOUNT_API_KEY</code> (the Postmark Account Token) stays in operator storage only — it is never a
           GitHub Environment secret or Secret Manager entry for <code>eventrunner-demo</code> (or any client project).
           It&#39;s only used locally, as an environment variable, when running <code>scripts/verify-sender-domain.cjs</code>
@@ -443,7 +478,7 @@
           <pre><code class="language-sh">gh secret list --env demo        # should NOT list EMAIL_ACCOUNT_API_KEY
           gcloud secrets list --project=eventrunner-demo   # should NOT list EMAIL_ACCOUNT_API_KEY
           </code></pre>
-          <h3 id="77-verification-round-trip-real-otp-send-bounce-checked-against-sent_emails">7.7. Verification round-trip: real OTP send + bounce, checked against <code>sent_emails</code><a class="heading-anchor" href="#77-verification-round-trip-real-otp-send-bounce-checked-against-sent_emails" aria-label="Link to this section">#</a></h3>
+          <h3 id="78-verification-round-trip-real-otp-send-bounce-checked-against-sent_emails">7.8. Verification round-trip: real OTP send + bounce, checked against <code>sent_emails</code><a class="heading-anchor" href="#78-verification-round-trip-real-otp-send-bounce-checked-against-sent_emails" aria-label="Link to this section">#</a></h3>
           <ol>
           <li>Trigger a real OTP sign-in against the <code>eventrunner-demo</code> deployment (sign in with an email
           address you control) — confirm the message shows up in Postmark&#39;s <code>Event Runner</code> Server →
@@ -460,7 +495,7 @@
           <code>Event Runner</code> Server, the delivery webhook is authenticated and registered on the correct stream,
           and both a successful delivery and a bounce event visibly update the matching <code>sent_emails</code> row in
           Firestore.</p>
-          <h3 id="78-update-the-operator-handoff-docs-results-section">7.8. Update the operator handoff doc&#39;s results section<a class="heading-anchor" href="#78-update-the-operator-handoff-docs-results-section" aria-label="Link to this section">#</a></h3>
+          <h3 id="79-update-the-operator-handoff-docs-results-section">7.9. Update the operator handoff doc&#39;s results section<a class="heading-anchor" href="#79-update-the-operator-handoff-docs-results-section" aria-label="Link to this section">#</a></h3>
           <p>Once done, update <code>docs/plans/2026-08-26-operator-handoff.md</code>&#39;s results section (Workstream C
           checklist items — webhook registered, round-trip confirmed). Do not paste any token or secret
           value, only where it&#39;s stored.</p>

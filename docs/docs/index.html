@@ -13,17 +13,21 @@
   <meta property="og:title" content="Documentation — Event Runner">
   <meta property="og:description" content="Guides, runbooks, and decision records for Event Runner, the white-label event CMS operated by the Center for Cooperative Media.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/">
-  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Documentation — Event Runner">
   <meta name="twitter:description" content="Guides, runbooks, and decision records for Event Runner, the white-label event CMS operated by the Center for Cooperative Media.">
-  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
   <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
 </head>
@@ -78,9 +82,13 @@
         <p class="docs-nav-section">Build</p>
         <ul>
           <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
           <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
           <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
           <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
         </ul>
         <p class="docs-nav-section">Get help</p>
         <ul>
@@ -171,6 +179,18 @@
               <span>Setup, tests, sign-off, and the proportional CI tiers.</span>
             </li>
             <li>
+              <a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a>
+              <span>The behavior expected in every project space, and how to report a problem.</span>
+            </li>
+            <li>
+              <a href="/eventrunner/docs/governance/">Governance</a>
+              <span>Who decides what, and how a decision gets made.</span>
+            </li>
+            <li>
+              <a href="/eventrunner/docs/releasing/">Releasing</a>
+              <span>How a tagged release is cut and what it promises.</span>
+            </li>
+            <li>
               <a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a>
               <span>The interface rules the web app is held to.</span>
             </li>
@@ -181,6 +201,10 @@
             <li>
               <a href="/eventrunner/docs/roadmap/">Roadmap</a>
               <span>The five v1 milestones and what is left.</span>
+            </li>
+            <li>
+              <a href="/eventrunner/docs/changelog/">Changelog</a>
+              <span>What changed, release by release.</span>
             </li>
           </ul>
         </section>

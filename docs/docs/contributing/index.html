@@ -13,17 +13,21 @@
   <meta property="og:title" content="Contributing — Event Runner documentation">
   <meta property="og:description" content="Setup, tests, sign-off, and the proportional CI tiers.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/contributing/">
-  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Contributing — Event Runner documentation">
   <meta name="twitter:description" content="Setup, tests, sign-off, and the proportional CI tiers.">
-  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
   <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
 </head>
@@ -78,9 +82,13 @@
         <p class="docs-nav-section">Build</p>
         <ul>
           <li><a href="/eventrunner/docs/contributing/" aria-current="page" class="is-current">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
           <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
           <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
           <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
         </ul>
         <p class="docs-nav-section">Get help</p>
         <ul>
@@ -105,7 +113,7 @@
             </ul>
           </nav>
           <p>Thanks for wanting to help. This is the public platform repo. The live Collaborative Journalism Summit site stays in <code>jamditis/cjs2026</code> and is not the place to send platform PRs.</p>
-          <p>By participating you agree to the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md">Code of Conduct</a>. Reports go to info@eventrunner.org.</p>
+          <p>By participating you agree to the <a href="/eventrunner/docs/code-of-conduct/">Code of Conduct</a>. Reports go to info@eventrunner.org.</p>
           <h2 id="where-to-start">Where to start<a class="heading-anchor" href="#where-to-start" aria-label="Link to this section">#</a></h2>
           <p>Pick the path that matches what you are doing. If you are not changing code, you probably want <a href="https://github.com/CenterCoopMedia/eventrunner/discussions">Discussions</a> or the <a href="https://github.com/CenterCoopMedia/eventrunner/wiki">wiki</a>, not a pull request.</p>
           <div class="table-scroll">
@@ -141,7 +149,7 @@
           <li>Features already cut from v1 (video generator, bulk broadcast, invoicing, social feeds, speaker chat) unless a linked issue reopens the case</li>
           <li>Drive-by refactors with no product change</li>
           </ul>
-          <p>The <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/GOVERNANCE.md">governance</a> note is the short version of who decides.</p>
+          <p>The <a href="/eventrunner/docs/governance/">governance</a> note is the short version of who decides.</p>
           <h2 id="dev-setup">Dev setup<a class="heading-anchor" href="#dev-setup" aria-label="Link to this section">#</a></h2>
           <ol>
           <li>Fork and clone this repository.</li>
@@ -243,7 +251,7 @@
           until that operator update is made.</p>
           <p><code>npm run test:e2e</code> needs Java 21+ (the same Firestore/Storage emulators <code>test:rules</code> uses) and a Chromium build Playwright can find. It never runs <code>playwright install</code> itself: point <code>PLAYWRIGHT_BROWSERS_PATH</code> at an existing install, or run <code>npx playwright install --with-deps chromium</code> once yourself first — <code>.github/workflows/ci.yml</code>&#39;s <code>e2e</code> job does the latter, cached.</p>
           <h2 id="releases">Releases<a class="heading-anchor" href="#releases" aria-label="Link to this section">#</a></h2>
-          <p>Tags, <code>CHANGELOG.md</code> hygiene, and what a release includes are in <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/RELEASING.md">RELEASING.md</a>.</p>
+          <p>Tags, <code>CHANGELOG.md</code> hygiene, and what a release includes are in <a href="/eventrunner/docs/releasing/">RELEASING.md</a>.</p>
           <p>One lint rule to know about before it bites you: hex color literals (<code>#336699</code>) are banned everywhere except <code>functions/src/email/templates/**</code>, <code>functions/src/schedule/pdf.cjs</code>, and <code>apps/web/src/generated/theme.css</code>. Colors come from theme tokens.</p>
           <h2 id="security">Security<a class="heading-anchor" href="#security" aria-label="Link to this section">#</a></h2>
           <p>Do not open a public issue for a vulnerability. Use <a href="https://github.com/CenterCoopMedia/eventrunner/security">private reporting</a> or see <a href="/eventrunner/docs/security/">SECURITY.md</a>.</p>
@@ -257,7 +265,7 @@
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CONTRIBUTING.md"><code>CONTRIBUTING.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">
           <a class="page-nav-link" rel="prev" href="/eventrunner/docs/npm-name-claim/"><span>Previous</span>npm name claim</a>
-          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/interface-guidelines/"><span>Next</span>Interface guidelines</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/code-of-conduct/"><span>Next</span>Code of conduct</a>
         </nav>
       </main>
     </div>
