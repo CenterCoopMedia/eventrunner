@@ -97,6 +97,16 @@ describe('signed in', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
+  it('draws the order number field border on the accessible control token', async () => {
+    // WCAG 1.4.11: a form control's boundary needs 3:1 against its ground,
+    // and --rule-hairline is deliberately below that bar (design brief
+    // §3.7).
+    renderClaim();
+    const field = await screen.findByLabelText('Order number');
+    expect(field).toHaveClass('border-control');
+    expect(field).not.toHaveClass('border-rule-hairline');
+  });
+
   it('posts the order number with the ID token and confirms a single claimed ticket', async () => {
     routeFetch(jsonResponse(200, { ok: true, claimed: 1, registrationStatus: 'ticketed' }));
     renderClaim();

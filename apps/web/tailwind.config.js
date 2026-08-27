@@ -53,6 +53,10 @@ export default {
         'rule-hairline': 'rgb(var(--rule-hairline-rgb) / <alpha-value>)',
         'rule-strong': 'rgb(var(--rule-strong-rgb) / <alpha-value>)',
         'rule-nameplate': 'rgb(var(--rule-nameplate-rgb) / <alpha-value>)',
+        // A form control's boundary (input, select, textarea) needs 3:1
+        // against its ground (WCAG 1.4.11) — the hairline share falls well
+        // short of that, so control borders get their own token.
+        control: 'rgb(var(--color-border-control-rgb) / <alpha-value>)',
       },
       fontFamily: {
         heading: 'var(--font-heading)',

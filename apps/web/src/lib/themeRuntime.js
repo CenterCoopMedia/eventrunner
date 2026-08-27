@@ -53,9 +53,12 @@ const COLOR_PROPS = {
 // Rule weight → custom property (brief §3.7). Rules are structure, so their
 // color is ink mixed into the surface. A runtime override of ink or surface
 // has to move the rules with it, or a restyled site keeps build-time rules
-// on a new ground.
+// on a new ground. `control` rides the same table for the same reason: a
+// form control's border (WCAG 1.4.11) is ink mixed into the surface too, at
+// a share high enough to clear 3:1 against either ground.
 const RULE_PROPS = {
   hairline: '--rule-hairline-rgb',
+  control: '--color-border-control-rgb',
   strong: '--rule-strong-rgb',
   nameplate: '--rule-nameplate-rgb',
 };

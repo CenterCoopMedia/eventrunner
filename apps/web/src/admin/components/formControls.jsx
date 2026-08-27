@@ -8,8 +8,11 @@
 // rather than color alone.
 import { useId } from 'react';
 
+// The boundary is --color-border-control (design brief §2.4/§8.1 polish,
+// WCAG 1.4.11): a plain ink-opacity border reads at well under 3:1 against
+// the input's own ground, and a form control's boundary needs that bar.
 export const inputClass =
-  'touch-target w-full rounded-brand border border-brand-ink/20 bg-brand-surface px-3 py-2 ' +
+  'touch-target w-full rounded-brand border border-control bg-brand-surface px-3 py-2 ' +
   'text-brand-ink placeholder:text-brand-ink-muted aria-[invalid=true]:border-danger';
 
 export const primaryButtonClass =

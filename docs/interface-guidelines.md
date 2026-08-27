@@ -79,6 +79,7 @@ Both classes: never trigger motion from scroll position, never run ambient anima
 - Dark mode is its own palette, not light mode reversed. Every color token is defined under both `:root[data-mode='light']` and `:root[data-mode='dark']`, and a token missing from either block is a bug (design brief §8.2).
 - The mode comes from `data-mode` on the root element. `config/theme.mode` sets the policy — `light`, `dark`, or `system` — and `lib/modeRuntime.js` writes the attribute. Never add a `.dark` class of your own.
 - Use the rule tokens for rules: `--rule-hairline-*`, `--rule-strong-*`, `--rule-nameplate-*` (design brief §3.7). A rule never borrows an ink step and never carries brand color.
+- A form control's boundary (`input`, `select`, `textarea`) uses `--color-border-control`, never `--rule-hairline`. WCAG 1.4.11 needs 3:1 against the ground it renders on; a rule is tuned for low-contrast structure and falls well short of that bar.
 - One theme mechanism, used consistently. This repo's choice: the `config/theme`-driven custom-property chain (spec §7.2) — not ad-hoc `.dark` classes per component.
 - Define gradient interpolation: `in oklab` for even brightness, `in oklch` for vivid midtones.
 

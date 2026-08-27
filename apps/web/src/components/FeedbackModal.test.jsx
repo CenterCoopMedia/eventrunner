@@ -69,6 +69,16 @@ describe('FeedbackModal', () => {
     expect(honeypot).toHaveAttribute('tabIndex', '-1');
   });
 
+  it('draws its field borders on the accessible control token, not the hairline rule', () => {
+    // WCAG 1.4.11: a form control's boundary needs 3:1 against its ground.
+    // --rule-hairline is deliberately below that bar (design brief §3.7), so
+    // these fields (shared/admin's formControls.jsx) use --color-border-control
+    // instead.
+    render(<FeedbackModal onClose={() => {}} />);
+    expect(screen.getByLabelText('Message')).toHaveClass('border-control');
+    expect(screen.getByLabelText('Message')).not.toHaveClass('border-rule-hairline');
+  });
+
   it('never asserts the confirmation email was delivered (Codex P2: the send is best-effort and can fail silently)', async () => {
     submitFeedbackMock.mockResolvedValueOnce({ ok: true, id: 'f1' });
     render(<FeedbackModal onClose={() => {}} />);

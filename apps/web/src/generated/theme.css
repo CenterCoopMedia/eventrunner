@@ -188,6 +188,7 @@
   --rule-hairline-rgb: 216 217 217;
   --rule-strong-rgb: 123 129 134;
   --rule-nameplate-rgb: 22 33 44;
+  --color-border-control-rgb: 130 136 140;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --nameplate-rule-rgb: var(--rule-nameplate-rgb);
@@ -224,6 +225,7 @@
   --rule-hairline-rgb: 216 217 217;
   --rule-strong-rgb: 123 129 134;
   --rule-nameplate-rgb: 22 33 44;
+  --color-border-control-rgb: 130 136 140;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --nameplate-rule-rgb: var(--rule-nameplate-rgb);
@@ -260,6 +262,7 @@
   --rule-hairline-rgb: 54 56 60;
   --rule-strong-rgb: 142 142 141;
   --rule-nameplate-rgb: 238 236 231;
+  --color-border-control-rgb: 135 136 135;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --nameplate-rule-rgb: var(--rule-nameplate-rgb);

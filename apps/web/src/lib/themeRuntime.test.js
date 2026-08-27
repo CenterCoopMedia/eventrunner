@@ -98,6 +98,9 @@ describe('buildRuntimeThemeCss', () => {
     });
     expect(css).toContain('--rule-hairline-rgb: 216 217 217;');
     expect(css).toContain('--rule-nameplate-rgb: 22 33 44;');
+    // The control border rides the same derivation (WCAG 1.4.11 needs it to
+    // move with ink/surface exactly like the named rules do).
+    expect(css).toContain('--color-border-control-rgb: 130 136 140;');
     // Without both ends of the mix there is nothing to derive from, so the
     // build-time rules stand.
     expect(buildRuntimeThemeCss({ colors: { ink: hex('16212C') } })).not.toContain(

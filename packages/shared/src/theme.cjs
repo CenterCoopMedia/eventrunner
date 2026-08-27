@@ -148,9 +148,20 @@ const DARK_MIN_CONTRAST = 4.5;
  * The hairline is deliberately low contrast: it separates without drawing
  * the eye. The strong rule is a section divider a reader should see, so it
  * carries enough ink to clear the 3:1 non-text bar on either ground.
+ *
+ * `control` is not a rule at all — no component draws a border at this
+ * width — but it shares the same "ink mixed into the surface" derivation, so
+ * it rides the same table. A form control's boundary (WCAG 1.4.11) needs
+ * that same 3:1 non-text bar, and the hairline share is nowhere near it
+ * (~1.3:1 to ~1.5:1 across the two grounds and both modes). `control` mixes
+ * in enough ink to clear 3:1 against BOTH `surface` and `surfaceAlt`, in
+ * both modes, with a margin — a plain `border` swaps its background often
+ * enough that the hairline share, tuned only for the section-divider case,
+ * cannot be trusted to still clear the bar underneath it.
  */
 const RULE_INK_SHARE = Object.freeze({
   hairline: 0.14,
+  control: 0.52,
   strong: 0.55,
   nameplate: 1,
 });
@@ -298,7 +309,9 @@ function deriveDarkColors(light) {
 }
 
 /**
- * The three rule colors for one mode (brief §3.7).
+ * The rule colors for one mode (brief §3.7), one per `RULE_INK_SHARE`
+ * weight — the three named rules plus `control`, the form-control border
+ * share.
  *
  * @param {{ ink: readonly number[], surface: readonly number[] }} palette
  * @returns {Record<string, number[]>} weight → `[r, g, b]`

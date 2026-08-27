@@ -22,6 +22,9 @@ const {
   resolveMode,
 } = require('./theme.cjs');
 
+/** WCAG 1.4.11: the non-text bar a form-control boundary must clear. */
+const CONTROL_BORDER_MIN_CONTRAST = 3;
+
 /** The demo event's light palette, as RGB triples (no hex literals here). */
 const LIGHT = {
   primary: [21, 94, 117],
@@ -126,11 +129,41 @@ test('a malformed light palette entry is skipped, not guessed at', () => {
 
 test('rule colors are ink mixed into the surface, hairline lightest', () => {
   const light = deriveRuleColors({ ink: LIGHT.ink, surface: LIGHT.surface });
-  assert.deepEqual(Object.keys(light).sort(), ['hairline', 'nameplate', 'strong']);
+  assert.deepEqual(Object.keys(light).sort(), ['control', 'hairline', 'nameplate', 'strong']);
   assert.deepEqual(light.nameplate, [...LIGHT.ink]);
   const onSurface = (rgb) => contrastRatio(rgb, LIGHT.surface);
-  assert.ok(onSurface(light.hairline) < onSurface(light.strong));
+  assert.ok(onSurface(light.hairline) < onSurface(light.control));
+  assert.ok(onSurface(light.control) < onSurface(light.strong));
   assert.ok(onSurface(light.strong) < onSurface(light.nameplate));
+});
+
+test('the control border clears the 3:1 non-text bar against surface and surfaceAlt, in both modes', () => {
+  // WCAG 1.4.11: a form control's boundary needs 3:1 against the ground it
+  // actually renders on. Every input in the repo sits on either `surface`
+  // or `surfaceAlt` (design brief §3.3's two grounds), so both are checked,
+  // and both modes get their own designed ground — dark mode is its own
+  // palette, never light mode reversed.
+  const light = deriveRuleColors({ ink: LIGHT.ink, surface: LIGHT.surface });
+  const lightAlt = deriveRuleColors({ ink: LIGHT.ink, surface: LIGHT.surfaceAlt });
+  const dark = deriveRuleColors({ ink: DARK_GROUND_RGB.ink, surface: DARK_GROUND_RGB.surface });
+  const darkAlt = deriveRuleColors({
+    ink: DARK_GROUND_RGB.ink,
+    surface: DARK_GROUND_RGB.surfaceAlt,
+  });
+
+  const cases = [
+    ['light on surface', light.control, LIGHT.surface],
+    ['light on surfaceAlt', lightAlt.control, LIGHT.surfaceAlt],
+    ['dark on surface', dark.control, DARK_GROUND_RGB.surface],
+    ['dark on surfaceAlt', darkAlt.control, DARK_GROUND_RGB.surfaceAlt],
+  ];
+  for (const [label, border, ground] of cases) {
+    const ratio = contrastRatio(border, ground);
+    assert.ok(
+      ratio >= CONTROL_BORDER_MIN_CONTRAST,
+      `${label}: control border is ${ratio.toFixed(2)}:1, needs >= ${CONTROL_BORDER_MIN_CONTRAST}:1`,
+    );
+  }
 });
 
 test('rule colors invert with the mode, so a rule reads on either ground', () => {

@@ -28,7 +28,10 @@
 
     "--rule-hairline-rgb": { "rule": "hairline" },
     "--rule-strong-rgb": { "rule": "strong" },
-    "--rule-nameplate-rgb": { "rule": "nameplate" }
+    "--rule-nameplate-rgb": { "rule": "nameplate" },
+
+    "$border-control-note": "WCAG 1.4.11: a form-control boundary (input, select, textarea) needs 3:1 against the ground it renders on, not the hairline share the rules above use. --color-border-control-rgb mixes more ink (packages/shared/src/theme.cjs RULE_INK_SHARE.control) so it clears 3:1 against both --color-surface-rgb and --color-surface-alt-rgb, in both modes.",
+    "--color-border-control-rgb": { "rule": "control" }
   },
 
   "$text-note": "The fluid editorial scale, brief §3.7. Eight steps, no more: a preset may retune a step, a preset never adds one. The middle term of each clamp() carries the step from its small anchor to its large anchor between a 375px and a 1440px viewport.",

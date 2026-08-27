@@ -148,6 +148,11 @@ describe.each(THEMES)('$id theme', ({ file }) => {
     // A rule is structure, not text, so it holds the non-text bar only in
     // its strong weight; a hairline is deliberately below it.
     ['--rule-strong-rgb', '--color-surface-rgb', 3],
+    // A form control's boundary (input, select, textarea) is a non-text UI
+    // component under WCAG 1.4.11, so it holds the same 3:1 bar against
+    // every ground an input actually renders on.
+    ['--color-border-control-rgb', '--color-surface-rgb', 3],
+    ['--color-border-control-rgb', '--color-surface-alt-rgb', 3],
   ];
 
   it.each([
