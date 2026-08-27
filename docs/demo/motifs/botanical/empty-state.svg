@@ -1,16 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 320 420">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="96 48 128 310">
   <!--
     The unlabelled plate (visual story, Field Guide, moment 3): a frond
     mounted on a herbarium sheet, with the label line left blank.
 
-    DRAWN FOR THE SIZE IT IS SEEN AT. The slot renders this at 8rem tall, so
-    the whole drawing is scaled to roughly three tenths. Every stroke below
-    is chosen so that it still lands as a line at that scale: the thinnest
-    here is 1.2, which reads at about a third of a pixel, and nothing thinner
-    ships. An earlier pass carried six vein ticks per pinna at 0.6 — a tenth
-    of a pixel each, a hundred and twenty of them — which no display could
-    resolve and which greyed the frond into a smudge. Detail a reader cannot
-    see is not detail; it is dirt.
+    DRAWN FOR THE SIZE IT IS SEEN AT. The slot renders this at 8rem tall
+    under `mask-size: contain`, so what the viewBox says is what the scale
+    is. The box is drawn to the ink with one small even margin: an earlier
+    pass left a 320 by 420 sheet around a drawing 100 by 282, which was two
+    thirds empty and shrank the frond to three tenths for nothing. The plate
+    device around it supplies the margin a mounted specimen needs; the file
+    should not supply it twice.
+
+    Every stroke below is chosen so that it lands as a line at the scale
+    that leaves — the thinnest here is 1.2, and nothing thinner ships. An
+    earlier pass carried six vein ticks per pinna at 0.6, a hundred and
+    twenty of them, which no display could resolve and which greyed the
+    frond into a smudge. Detail a reader cannot see is not detail; it is
+    dirt.
 
     No frame either. EmptyState mounts this inside the plate device, and
     under Field Guide that device draws the double hairline itself. A second
