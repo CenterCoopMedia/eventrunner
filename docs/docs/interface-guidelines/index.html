@@ -116,6 +116,7 @@
           <h2 id="how-this-connects-to-the-rest-of-the-repo">How this connects to the rest of the repo<a class="heading-anchor" href="#how-this-connects-to-the-rest-of-the-repo" aria-label="Link to this section">#</a></h2>
           <ul>
           <li><strong>Colors are theme tokens, never literals.</strong> The ESLint hex sweep (spec §7.6) enforces the mechanical half; this document covers the design half. Every color you use must be a custom property from <code>config/theme</code> (spec §7) with a role-based name.</li>
+          <li><strong>Tokens come from <code>design/tokens/</code>.</strong> The design system&#39;s three tiers, the motif layer, and every scale live in JSON there (design brief §3.5). <code>scripts/lib/tokens.cjs</code> turns that JSON into the custom properties <code>apps/web/src/generated/theme.css</code> carries, and <code>tailwind.config.js</code> maps the utilities onto them. Change a token by editing the JSON and regenerating. Never hand-edit the generated stylesheet.</li>
           <li><strong>Accessibility is a merge requirement, not a nicety.</strong> CONTRIBUTING already requires a keyboard path and visible focus for UI changes; the Accessibility section below is the working checklist behind that line.</li>
           <li><strong>Event-neutrality applies to design too.</strong> No hardcoded brand color, font stack &quot;for this event,&quot; or copy that assumes one venue or city. If a design decision varies per client, it belongs in <code>config/theme</code> or CMS content.</li>
           </ul>
@@ -139,6 +140,8 @@
           <h2 id="typography">Typography<a class="heading-anchor" href="#typography" aria-label="Link to this section">#</a></h2>
           <ul>
           <li>Ship only <code>.woff2</code> — never TTF or OTF on the web. Fonts are self-hosted in <code>apps/web/public/fonts/</code> (spec §7.4).</li>
+          <li>Set type from the eight-step fluid scale: <code>text-nameplate</code>, <code>text-h1</code>, <code>text-h2</code>, <code>text-h3</code>, <code>text-lead</code>, <code>text-body</code>, <code>text-caption</code>, <code>text-folio</code> (design brief §3.7). Each step carries its own line height and tracking. Never pick a default Tailwind size instead.</li>
+          <li>Name a font by its role, never by its family: <code>font-heading</code>, <code>font-body</code>, <code>font-data</code>, <code>font-mono</code> (design brief §3.2). <code>font-accent</code> is the retired role and is an alias of <code>font-heading</code> for one release.</li>
           <li><code>font-variant-numeric: tabular-nums</code> on all dynamic values: timers, counters, prices, schedule columns.</li>
           <li>Long-form text: 60–75 characters per line.</li>
           <li><code>text-wrap: balance</code> on headings, <code>text-wrap: pretty</code> on descriptions, neither on long-form.</li>
@@ -156,7 +159,9 @@
           <li>Name tokens by role, never by appearance or first use. Reserve <code>accent</code> for the brand color so <code>primary</code> doesn&#39;t mean both brand and body text.</li>
           <li>Don&#39;t borrow a token from another role; when a role changes color, mint a new token.</li>
           <li>Measure contrast against the actual rendered background, not the page background.</li>
-          <li>Dark mode is its own palette, not light mode reversed.</li>
+          <li>Dark mode is its own palette, not light mode reversed. Every color token is defined under both <code>:root[data-mode=&#39;light&#39;]</code> and <code>:root[data-mode=&#39;dark&#39;]</code>, and a token missing from either block is a bug (design brief §8.2).</li>
+          <li>The mode comes from <code>data-mode</code> on the root element. <code>config/theme.mode</code> sets the policy — <code>light</code>, <code>dark</code>, or <code>system</code> — and <code>lib/modeRuntime.js</code> writes the attribute. Never add a <code>.dark</code> class of your own.</li>
+          <li>Use the rule tokens for rules: <code>--rule-hairline-*</code>, <code>--rule-strong-*</code>, <code>--rule-nameplate-*</code> (design brief §3.7). A rule never borrows an ink step and never carries brand color.</li>
           <li>One theme mechanism, used consistently. This repo&#39;s choice: the <code>config/theme</code>-driven custom-property chain (spec §7.2) — not ad-hoc <code>.dark</code> classes per component.</li>
           <li>Define gradient interpolation: <code>in oklab</code> for even brightness, <code>in oklch</code> for vivid midtones.</li>
           </ul>
@@ -180,7 +185,7 @@
           </ul>
           <h2 id="layout">Layout<a class="heading-anchor" href="#layout" aria-label="Link to this section">#</a></h2>
           <ul>
-          <li>The gap between groups is at least twice the gap inside one: 8px within, 16px+ between.</li>
+          <li>The gap between groups is at least twice the gap inside one: 8px within, 16px+ between. Use the named spacing steps (<code>--space-3xs</code> through <code>--space-3xl</code>), which are built to that rule: <code>xs</code> pairs with <code>md</code>, <code>sm</code> with <code>lg</code>, <code>md</code> with <code>xl</code>.</li>
           <li>Logical properties (<code>margin-inline-start</code>, <code>padding-inline-end</code>), not directional values.</li>
           <li>No fixed widths or heights on text containers.</li>
           </ul>
