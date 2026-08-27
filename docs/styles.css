@@ -87,7 +87,14 @@
   --section-rule-gap: var(--space-lg);
   --folio-rule-width: var(--rule-hairline-width);
   --folio-font: var(--font-data);
-  --folio-size: var(--text-folio);
+  /* The folio floor. `--text-folio` bottoms out at 11px, which is right for a
+     running head a reader glances past and too small for the folios this site
+     actually uses: the docket's group heads, a table's column heads, the
+     status words, the "Previous"/"Next" on the pager. Every one of those is a
+     functional label somebody has to read, so the floor is caption size
+     (interface guidelines, Typography; brief §2.4 on tiny subtext). The
+     tracking, the leading, and the case are the folio's own. */
+  --folio-size: var(--text-caption);
   --folio-tracking: var(--text-folio-tracking);
   --folio-gap: var(--space-xs);
   --page-section-gap: var(--space-2xl);
@@ -211,9 +218,14 @@ a {
   white-space: nowrap;
 }
 
-/* Section boundary: one strong rule opens the section, then the heading with
-   a hairline running out beside it. Same shape as the product's SectionHead,
-   which is what makes stacking a label above the heading impossible here. */
+/* Section boundary. Same shape as the product's SectionHead, which is what
+   makes stacking a label above the heading impossible here.
+
+   ONE RULE PER BOUNDARY, and the boundary states its own weight. A major
+   one opens on the strong rule; a secondary one is this heading with a
+   hairline running out beside it and the space above it. Both devices are
+   in use. What is not is both at once — a strong rule with a second rule
+   two lines under it is what turns a page of boundaries into ruling. */
 .section-head {
   display: flex;
   flex-wrap: wrap;
@@ -234,6 +246,10 @@ a {
   flex: 1 1 var(--space-2xl);
   align-self: center;
   border-block-start: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
+}
+
+.section-major > .section-head > .section-head__rule {
+  border-block-start: 0;
 }
 
 /* ---------- Masthead ----------
@@ -469,10 +485,21 @@ a {
 
 /* ---------- Sections ---------- */
 
+/* A secondary boundary: no rule above it. The heading, the hairline running
+   out beside it, and the space do the work. */
 .section {
-  padding-block: 0 var(--space-2xl);
-  border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
+  margin-block-start: var(--space-lg);
+  padding-block-end: var(--space-xl);
   scroll-margin-block-start: var(--space-lg);
+}
+
+/* A major boundary: the strong rule, and more air above it than a secondary
+   one gets — the two signals agree instead of competing. Three of them down
+   this page, at the three places the subject actually changes. */
+.section-major {
+  margin-block-start: var(--space-2xl);
+  padding-block-start: var(--space-md);
+  border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
 }
 
 /* `.note` sets its own leading gap, so it is excluded rather than reset. */
@@ -486,19 +513,20 @@ a {
   font-weight: var(--weight-bold);
 }
 
-/* Three ruled entries, not three cards. Each one opens on its own hairline,
-   so the row reads as one continuous rule at wide viewports and as a ruled
-   list when it stacks. */
+/* Three entries, not three cards. One hairline bounds the row; the column
+   gap and the heading face separate the three inside it, so there is no
+   second rule doing a job the gap already does. When the row stacks there is
+   no gap left to do it, and the hairline comes back between the items. */
 .feature-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0 var(--space-lg);
   margin-block-start: var(--space-lg);
+  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
 .feature {
   padding-block: var(--page-row-pad-block);
-  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
 .feature h3 {
@@ -613,6 +641,10 @@ a {
 
   .feature-list {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .feature + .feature {
+    border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
   }
 }
 

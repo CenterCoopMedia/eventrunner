@@ -149,10 +149,12 @@
   letter-spacing: var(--text-h2-tracking);
 }
 
+/* A subsection is not a section boundary, so it takes no rule. The heading
+   face, the weight, the step, and the space above it are the whole signal —
+   and on a runbook with forty of them, a rule per heading stops reading as
+   structure and starts reading as ruling. */
 .prose h3 {
-  margin: var(--space-lg) 0 var(--space-xs);
-  padding-block-start: var(--space-xs);
-  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+  margin: var(--space-xl) 0 var(--space-xs);
   font-size: var(--text-h3);
   font-weight: var(--weight-bold);
   line-height: var(--text-h3-leading);
@@ -328,13 +330,12 @@ h6:hover > .heading-anchor {
 
 /* ---------- On this page ----------
 
-   A folio on a hairline names it, and a hairline closes it. It is a contents
-   list, not a panel, so it has no ground and no border of its own. */
+   A folio on a hairline names it. It is a contents list, not a panel, so it
+   has no ground and no border of its own — and no closing rule either: the
+   strong rule on the first h2 below it is already the line that ends it. */
 
 .contents {
   margin-block-end: var(--space-xl);
-  padding-block-end: var(--space-sm);
-  border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
   font-family: var(--font-data);
   font-size: var(--text-caption);
   line-height: var(--text-caption-leading);
@@ -420,21 +421,22 @@ h6:hover > .heading-anchor {
   line-height: var(--text-caption-leading);
 }
 
+/* One rule opens the pager, not one per link: the pair is a single region,
+   and the source note above it already closes the article on a hairline. */
 .page-nav {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-md);
-  margin-block-start: var(--space-lg);
+  margin-block-start: var(--space-xl);
+  border-block-start: var(--rule-strong-width) solid rgb(var(--section-rule-rgb));
 }
 
-/* Each link opens on its own hairline instead of sitting in a bordered box.
-   The "Previous"/"Next" word above the title is a direction label inside a
+/* The "Previous"/"Next" word above the title is a direction label inside a
    link, not a label above a heading, so the eyebrow ban does not reach it —
    there is no heading here. */
 .page-nav-link {
   flex: 1 1 14rem;
   padding-block: var(--space-sm) var(--space-xs);
-  border-block-start: var(--rule-strong-width) solid rgb(var(--section-rule-rgb));
   color: rgb(var(--color-text-primary-rgb));
   font-family: var(--font-heading);
   font-weight: var(--weight-bold);
