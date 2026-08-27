@@ -57,7 +57,8 @@
     "--schedule-grid-rgb": "--rule-hairline-rgb",
     "--schedule-row-leading": "var(--text-body-leading)",
     "--schedule-data-size": "var(--text-caption)",
-    "--schedule-number-display": "none"
+    "--schedule-number-display": "none",
+    "--schedule-cell-pad-block": "var(--space-xs)"
   },
   "$plate-note": "The Field Guide botanical plate (brief §4.5): a framed drawing with a hairline border and a plate number in the folio style. A plate is drawn linework and never a hero image. The frame is a DOUBLE hairline, drawn as a border plus an outline at the same width. Zero frame and zero pad is the device off: the wrapper then adds no rule, no space, and no reflow, which is what every preset but Field Guide holds.",
   "plate": {

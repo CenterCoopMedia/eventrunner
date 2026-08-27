@@ -166,6 +166,17 @@ export function EventConfigProvider({ children }) {
     else delete document.documentElement.dataset.texture;
   }, [texture]);
 
+  // The preset's density, mirrored the same way and for the same reason
+  // (brief §4, §6.1). This is the density every page renders at unless a
+  // page states its own; a page that does writes `data-density` on its own
+  // <article> (components/SystemPage.jsx), and the [data-density] block
+  // nearest an element is the one that wins for it.
+  const density = resolveShape(themeDoc).density;
+  useEffect(() => {
+    if (density) document.documentElement.dataset.density = density;
+    else delete document.documentElement.dataset.density;
+  }, [density]);
+
   // Which preset, and which motif set (design brief §3.4, §3.8).
   //
   // Both are attributes for the same reason: a theme remaps custom

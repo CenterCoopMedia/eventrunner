@@ -13,6 +13,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 let theme;
 let eventConfig;
+let page;
 
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({
@@ -20,6 +21,13 @@ vi.mock('../contexts/EventConfigContext.jsx', () => ({
     features: {},
     theme,
   }),
+}));
+// The shell reads the current URL's page document for the two layout
+// variants it owns: which nameplate treatment the page takes, and where its
+// navigation sits (brief §6.1). A route with no document keeps the shell's
+// own rule, which is what these tests render unless they set one.
+vi.mock('../contexts/ContentContext.jsx', () => ({
+  useContent: () => ({ getPage: (key) => (page && page.path === key ? page : null) }),
 }));
 
 const { default: Layout } = await import('./Layout.jsx');
@@ -33,9 +41,10 @@ const FIXTURE_EVENT = {
   legal: {},
 };
 
-function renderShell(logos, { path = '/', event = FIXTURE_EVENT } = {}) {
+function renderShell(logos, { path = '/', event = FIXTURE_EVENT, pageDoc = null } = {}) {
   theme = { logos };
   eventConfig = event;
+  page = pageDoc;
   return render(
     <MemoryRouter
       initialEntries={[path]}
@@ -136,5 +145,71 @@ describe('Layout masthead', () => {
   it('renders the shell with no dateline when config/event carries no days', () => {
     const { container } = renderShell({}, { event: { shortName: 'EX2027', legal: {} } });
     expect(container.querySelector('.nameplate').textContent).toContain('EX2027');
+  });
+});
+
+describe('Layout variants (brief §6.1)', () => {
+  it('takes the treatment the page states, over the shell’s own rule', () => {
+    // An inner page that asks for the full masthead gets it...
+    const { container: full } = renderShell(
+      {},
+      { path: '/schedule', pageDoc: { path: '/schedule', layout: { header: 'nameplate' } } },
+    );
+    expect(full.querySelector('.nameplate')).not.toHaveClass('nameplate--compact');
+    expect(full.querySelector('.nameplate').textContent).toContain(
+      '[Fixture] Example Conference 2027',
+    );
+
+    // ...and the home page that asks for the running header gets that.
+    const { container: compact } = renderShell(
+      {},
+      { path: '/', pageDoc: { path: '/', layout: { header: 'nameplate-compact' } } },
+    );
+    expect(compact.querySelector('.nameplate')).toHaveClass('nameplate--compact');
+  });
+
+  it('keeps the page’s one h1 wherever the treatment moves', () => {
+    // The masthead carries the <h1> on the home page because the event is
+    // that page's subject — not because of which treatment it renders.
+    const { container } = renderShell(
+      {},
+      { path: '/schedule', pageDoc: { path: '/schedule', layout: { header: 'nameplate' } } },
+    );
+    expect(container.querySelector('header h1')).toBeNull();
+  });
+
+  it('ignores a header value the schema does not define', () => {
+    const { container } = renderShell(
+      {},
+      { path: '/schedule', pageDoc: { path: '/schedule', layout: { header: 'none' } } },
+    );
+    // There is no `none`: every public page carries a nameplate (§6.2).
+    expect(container.querySelector('.nameplate')).toHaveClass('nameplate--compact');
+  });
+
+  it('moves the nav to the leading edge without changing what it is', () => {
+    const { container: top } = renderShell({}, { path: '/schedule' });
+    const { container: side } = renderShell(
+      {},
+      { path: '/schedule', pageDoc: { path: '/schedule', layout: { navPlacement: 'side' } } },
+    );
+
+    // Same landmark, same items, same order — the rail is a placement, not
+    // a different navigation (§8.1).
+    const labels = (root) => [...root.querySelectorAll('nav a')].map((a) => a.textContent);
+    expect(labels(side)).toEqual(labels(top));
+    expect(side.querySelector('nav')).toHaveAttribute('aria-label', 'Main');
+
+    // The nav still precedes the content it navigates, so reading order and
+    // the skip link both hold.
+    const nav = side.querySelector('nav');
+    const main = side.querySelector('main');
+    expect(nav.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // At narrow viewports the rail is the top nav again: every rail rule is
+    // a `lg:` rule, and the hairline under it is the base state.
+    expect(nav.className).toContain('border-b-hairline');
+    expect(nav.className).toContain('lg:border-e-hairline');
+    expect(top.querySelector('nav').className).not.toContain('lg:');
   });
 });

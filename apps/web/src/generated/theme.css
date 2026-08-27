@@ -179,6 +179,7 @@
   --schedule-row-leading: var(--text-body-leading);
   --schedule-data-size: var(--text-caption);
   --schedule-number-display: none;
+  --schedule-cell-pad-block: var(--space-xs);
 
   /* Tier 3 — plate contract (brief §3.1). */
   --plate-frame-width: 0;

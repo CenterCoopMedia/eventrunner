@@ -52,6 +52,9 @@ const DEVICE_CLASSES = [
   '.transfer-line',
   '.callout',
   '.nameplate__coordinate',
+  // The hybrid page shell and its density variant (brief §6.1, §6.2).
+  '.page-section',
+  '.directory-row',
 ];
 
 describe('the built stylesheet', () => {

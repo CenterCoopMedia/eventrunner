@@ -8,10 +8,12 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 let speakers;
+let pageDoc = null;
 vi.mock('../contexts/ContentContext.jsx', () => ({
   // The page shell reads the cmsPages document for its layout and its
-  // slot sections (components/SystemPage.jsx); this directory has neither.
-  useContent: () => ({ speakers, getPage: () => null, getSectionBlocks: () => [] }),
+  // slot sections (components/SystemPage.jsx); this directory states no
+  // sections, and states a layout only where a test sets one.
+  useContent: () => ({ speakers, getPage: () => pageDoc, getSectionBlocks: () => [] }),
 }));
 let features = { speakers: true };
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
@@ -55,6 +57,28 @@ describe('Speakers', () => {
     const { container } = renderSpeakers();
     expect(screen.getByRole('heading', { level: 2, name: 'Rae Okonkwo' })).toBeInTheDocument();
     expect(container.querySelectorAll('li p')).toHaveLength(0);
+  });
+
+  it('renders the same entries in columns when the page states a grid', () => {
+    // `arrangement` changes the shape of the directory, never what it holds
+    // (brief §6.1). Every entry is still a hairline-opened row, and no cell
+    // becomes a card.
+    speakers = [PROJECTED, { ...PROJECTED, id: 'second', slug: 'second', displayName: 'Second' }];
+    pageDoc = { id: 'speakers', layout: { arrangement: 'grid' } };
+    const { container } = renderSpeakers();
+    pageDoc = null;
+    expect(container.querySelector('ul').className).toContain('sm:grid-cols-2');
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+    for (const row of container.querySelectorAll('li')) {
+      expect(row.className).toContain('border-t-rule-hairline');
+      expect(row.className).not.toContain('rounded');
+    }
+  });
+
+  it('runs one entry per row by default', () => {
+    speakers = [PROJECTED];
+    const { container } = renderSpeakers();
+    expect(container.querySelector('ul').className).not.toContain('grid-cols');
   });
 
   it('shows the not-announced empty state when the projection is empty', () => {

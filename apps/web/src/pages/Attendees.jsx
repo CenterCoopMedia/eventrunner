@@ -151,7 +151,7 @@ export default function Attendees() {
               return (
                 <li
                   key={profile.id}
-                  className="border-t-hairline border-t-rule-hairline py-md sm:grid sm:grid-cols-[1fr,2fr] sm:gap-md"
+                  className="directory-row border-t-hairline border-t-rule-hairline sm:grid sm:grid-cols-[1fr,2fr] sm:gap-md"
                 >
                   <div className="flex items-start gap-xs">
                     <ProfilePhoto

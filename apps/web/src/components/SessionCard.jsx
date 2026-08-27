@@ -438,7 +438,7 @@ export default function SessionCard({
           the zero offset every other preset holds, the face covers the
           stamp exactly and this is the plain ruled row it has always
           been. */}
-      <article className="session-block__face grid gap-2xs py-md sm:grid-cols-[9.5rem,1fr] sm:gap-md">
+      <article className="session-block__face grid gap-2xs sm:grid-cols-[9.5rem,1fr] sm:gap-md">
         <p className="font-mono text-caption text-text-secondary">
           {range ? (
             <>

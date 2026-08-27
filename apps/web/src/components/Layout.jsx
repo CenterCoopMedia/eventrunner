@@ -3,24 +3,35 @@
 // (event-neutrality).
 //
 // The header is the masthead nameplate (design brief §2.1, §5.1): every
-// public page carries one, and there is no hero banner anywhere. The home
-// page takes the full treatment; every other page takes the compact one, so
-// the reader always knows which paper they are holding without the masthead
-// pushing the page's own subject below the fold. Brief §6.2 moves that
-// choice into stored page data (`layout.header`) in PR3; until then the
-// shell picks it from the route.
+// public page carries one, and there is no hero banner anywhere. The page
+// states which treatment it takes in its own data — `layout.header` is
+// `nameplate` or `nameplate-compact`, and there is no `none` (brief §6.2).
+//
+// WHERE AN UNSTATED HEADER COMES FROM. A page that never chose a treatment
+// keeps the one the shell has always given it: the home page takes the full
+// masthead, every other page takes the running header, so the reader knows
+// which paper they are holding without the masthead pushing the page's own
+// subject below the fold. That is the same rule `statedPageLayout` follows
+// for density — a page that said nothing has not chosen the default, and
+// nothing it never stated may change its shape on upgrade.
 //
 // On the home page the masthead is the page's subject, so the nameplate
 // carries the <h1> and the page's own lead headline follows under it. On
 // every other page the masthead is a running header and the page owns its
-// <h1>. Either way there is exactly one per page.
+// <h1> — whichever treatment it renders. Either way there is exactly one
+// per page.
 //
 // Navigation is in the editorial register: text links, no pills, no tinted
 // ground. The active item is marked twice over (§8.1 — never color alone):
-// heavier weight plus a strong rule under the word.
+// heavier weight plus a strong rule under the word. `layout.navPlacement`
+// moves the same list to the leading edge at wide viewports; at narrow
+// viewports, and to a screen reader, the two placements are the same nav in
+// the same place in the document.
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { PAGE_LAYOUT_DEFAULTS, statedPageLayout } from '../lib/pageLayout.js';
 import { brandingSrc } from '../lib/mediaSource.js';
 import Nameplate, { buildNameplate } from './editorial/Nameplate.jsx';
 import FeedbackModal from './FeedbackModal.jsx';
@@ -46,6 +57,7 @@ function navClass({ isActive }) {
 
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
+  const { getPage } = useContent();
   const { pathname } = useLocation();
   // Branding slots come from config/theme (spec §7.2 logos). A slot holds
   // either a flat seeded path (`branding/mark.svg`, which also ships in the
@@ -67,7 +79,63 @@ export default function Layout() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const isHome = pathname === '/';
-  const plate = buildNameplate(eventConfig, { compact: !isHome });
+  // The page this URL renders, if it has a document. A route below a page
+  // (/schedule/:id) matches nothing here and keeps the shell's own rule,
+  // which is what it rendered before layouts existed.
+  const layout = statedPageLayout(getPage(pathname));
+  const compact = (layout.header ?? (isHome ? 'nameplate' : 'nameplate-compact')) ===
+    'nameplate-compact';
+  const navPlacement = layout.navPlacement ?? PAGE_LAYOUT_DEFAULTS.navPlacement;
+  const plate = buildNameplate(eventConfig, { compact });
+
+  // One nav, placed two ways. The list, its labels, its landmark, and its
+  // position in the document are identical either way — `side` only moves
+  // it to the leading edge at wide viewports, where there is room for a
+  // rail beside the page (brief §6.1).
+  const nav = (
+    <nav
+      aria-label="Main"
+      className={
+        navPlacement === 'side'
+          ? 'border-b-hairline border-b-rule-hairline lg:w-48 lg:shrink-0 lg:self-stretch lg:border-b-0 lg:border-e-hairline lg:border-e-rule-hairline lg:pe-md lg:pt-xl'
+          : 'border-b-hairline border-b-rule-hairline'
+      }
+    >
+      <ul
+        className={
+          navPlacement === 'side'
+            ? 'flex flex-wrap items-center gap-x-md lg:flex-col lg:items-start lg:gap-x-0'
+            : 'flex flex-wrap items-center gap-x-md'
+        }
+      >
+        {NAV_ITEMS.filter((item) => !item.feature || features[item.feature]).map((item) => (
+          <li key={item.to}>
+            <NavLink to={item.to} end={item.end} className={navClass}>
+              {item.label}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+
+  // The sections are drawn on a sheet (brief §4.6): a faint coordinate grid
+  // sits behind them, below hairline contrast and inert to the pointer.
+  // --map-grid-size is zero in every preset but Atlas, and a zero-size
+  // background paints nothing, so the sheet appears only where the story
+  // has one.
+  const main = (
+    <main
+      id="main-content"
+      className={
+        navPlacement === 'side'
+          ? 'map-grid min-w-0 flex-1 pb-2xl pt-xl'
+          : 'map-grid mx-auto w-full max-w-5xl flex-1 px-md pb-2xl pt-xl'
+      }
+    >
+      <Outlet />
+    </main>
+  );
 
   return (
     <div className="bg-paper flex min-h-screen flex-col">
@@ -78,7 +146,7 @@ export default function Layout() {
       <header className="bg-brand-surface">
         <div className="mx-auto w-full max-w-5xl px-md">
           <Nameplate
-            variant={isHome ? 'full' : 'compact'}
+            variant={compact ? 'compact' : 'full'}
             nameAs={isHome ? 'h1' : 'p'}
             name={plate.name}
             dates={plate.dates}
@@ -89,7 +157,7 @@ export default function Layout() {
                 <img
                   src={markSrc}
                   alt=""
-                  className={isHome ? 'h-10 w-10' : 'h-6 w-6'}
+                  className={compact ? 'h-6 w-6' : 'h-10 w-10'}
                   width="32"
                   height="32"
                   onError={() => setMarkFailed(true)}
@@ -97,32 +165,21 @@ export default function Layout() {
               ) : null
             }
           />
-          <nav aria-label="Main" className="border-b-hairline border-b-rule-hairline">
-            <ul className="flex flex-wrap items-center gap-x-md">
-              {NAV_ITEMS.filter((item) => !item.feature || features[item.feature]).map(
-                (item) => (
-                  <li key={item.to}>
-                    <NavLink to={item.to} end={item.end} className={navClass}>
-                      {item.label}
-                    </NavLink>
-                  </li>
-                ),
-              )}
-            </ul>
-          </nav>
+          {navPlacement === 'side' ? null : nav}
         </div>
       </header>
-      {/* The sections are drawn on a sheet (brief §4.6): a faint coordinate
-          grid sits behind them, below hairline contrast and inert to the
-          pointer. --map-grid-size is zero in every preset but Atlas, and a
-          zero-size background paints nothing, so the sheet appears only
-          where the story has one. */}
-      <main
-        id="main-content"
-        className="map-grid mx-auto w-full max-w-5xl flex-1 px-md pb-2xl pt-xl"
-      >
-        <Outlet />
-      </main>
+      {navPlacement === 'side' ? (
+        // The rail and the page it serves share one measure, so the nav
+        // sits at the leading edge of the page rather than at the edge of
+        // the window. Below `lg` the row stacks and this is the top nav
+        // again, in the same order, with the same rule under it.
+        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-md lg:flex-row lg:gap-xl">
+          {nav}
+          {main}
+        </div>
+      ) : (
+        main
+      )}
       <footer className="bg-brand-surface">
         <div className="mx-auto max-w-5xl px-md">
           <div className="section-rule pb-xl pt-md font-data text-caption text-text-secondary">

@@ -37,55 +37,84 @@ export default function Sponsors() {
 
   return (
     <SystemPage pageId="sponsors">
-      <h1 className="font-heading text-h1 font-semibold text-text-primary">Sponsors</h1>
-      {visible.length === 0 ? (
-        <div className="mt-lg">
-          <EmptyState
-            title="Sponsors have not been announced yet"
-            description="Supporting organizations appear here once they are published."
-          />
-        </div>
-      ) : (
-        // A ruled directory, not a card grid (design brief §2.1, §5.1): a
-        // hairline opens each row, the same device Speakers.jsx and
-        // SessionCard use in place of a card border. The tier sits below the
-        // organization's name in the data face — metadata beside a heading,
-        // never furniture above one (brief §2.4).
-        <ul className="mt-lg">
-          {visible.map((org) => (
-            <li
-              key={org.id}
-              className="border-t-hairline border-t-rule-hairline py-md sm:grid sm:grid-cols-[1fr,2fr] sm:gap-md"
+      {({ arrangement }) => (
+        <>
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">Sponsors</h1>
+          {visible.length === 0 ? (
+            <div className="mt-lg">
+              <EmptyState
+                title="Sponsors have not been announced yet"
+                description="Supporting organizations appear here once they are published."
+              />
+            </div>
+          ) : (
+            // A ruled directory, not a card grid (design brief §2.1, §5.1): a
+            // hairline opens each row, the same device Speakers.jsx and
+            // SessionCard use in place of a card border. The tier sits below
+            // the organization's name in the data face — metadata beside a
+            // heading, never furniture above one (brief §2.4).
+            //
+            // `arrangement` (brief §6.1) is the same choice the speaker
+            // directory offers: one entry per row, or the same entries in
+            // columns. A sponsor list is the common case for `grid`, and it
+            // is still a ruled directory — no cell becomes a card.
+            <ul
+              className={
+                arrangement === 'grid'
+                  ? 'mt-lg grid gap-x-xl sm:grid-cols-2 lg:grid-cols-3'
+                  : 'mt-lg'
+              }
             >
-              <div>
-                <h2 className="font-heading text-h3 font-semibold text-text-primary">
-                  {isSafeHref(org.url) ? (
-                    <a href={org.url} target="_blank" rel="noreferrer" className="hover:underline">
-                      {org.name}
-                    </a>
-                  ) : (
-                    org.name
-                  )}
-                </h2>
-                {/* The scale step owns the tracking (tailwind.config.js
-                    fontStep), so no raw tracking utility fights it. */}
-                {org.tier ? (
-                  <p className="mt-2xs font-data text-caption uppercase text-text-secondary">
-                    {org.tier}
-                  </p>
-                ) : null}
-              </div>
-              {org.description ? (
-                <p
-                  className="mt-xs max-w-prose text-body text-text-secondary sm:mt-0"
-                  style={{ textWrap: 'pretty' }}
+              {visible.map((org) => (
+                <li
+                  key={org.id}
+                  className={
+                    arrangement === 'grid'
+                      ? 'directory-row border-t-hairline border-t-rule-hairline'
+                      : 'directory-row border-t-hairline border-t-rule-hairline sm:grid sm:grid-cols-[1fr,2fr] sm:gap-md'
+                  }
                 >
-                  {org.description}
-                </p>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+                  <div>
+                    <h2 className="font-heading text-h3 font-semibold text-text-primary">
+                      {isSafeHref(org.url) ? (
+                        <a
+                          href={org.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline"
+                        >
+                          {org.name}
+                        </a>
+                      ) : (
+                        org.name
+                      )}
+                    </h2>
+                    {/* The scale step owns the tracking (tailwind.config.js
+                        fontStep), so no raw tracking utility fights it. */}
+                    {org.tier ? (
+                      <p className="mt-2xs font-data text-caption uppercase text-text-secondary">
+                        {org.tier}
+                      </p>
+                    ) : null}
+                  </div>
+                  {org.description ? (
+                    <p
+                      className={[
+                        'mt-xs max-w-prose text-body text-text-secondary',
+                        arrangement === 'grid' ? '' : 'sm:mt-0',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      style={{ textWrap: 'pretty' }}
+                    >
+                      {org.description}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </SystemPage>
   );

@@ -181,6 +181,43 @@
     margin-block-start: var(--page-section-gap);
   }
 
+  /* One ruled row of a directory: speakers, sponsors, attendees, updates.
+     A hairline opens it and the padding is the density's to set. */
+  .directory-row {
+    padding-block: var(--page-row-pad-block);
+  }
+
+  /* The `density` layout variant (brief §6.1): tight, comfortable, loose.
+     Each step REMAPS tier-3 tokens onto the spacing scale — it never mints
+     a value and never adds a property name, which is the same rule a preset
+     option follows (§3.4).
+
+     The attribute is written in two places, and that is the whole design:
+     the shell mirrors the PRESET's density onto <html>
+     (contexts/EventConfigContext.jsx), and a page that states one of its
+     own writes it on its own <article> (components/SystemPage.jsx). Custom
+     properties inherit, so the nearer block wins for the page's subtree and
+     the preset keeps the rest of the site. A page that states nothing sets
+     no attribute at all, so it cannot silently override the preset. */
+  [data-density='tight'] {
+    --page-section-gap: var(--space-xl);
+    --page-row-pad-block: var(--space-sm);
+    --session-card-pad-block: var(--space-sm);
+    --schedule-cell-pad-block: var(--space-2xs);
+  }
+  [data-density='comfortable'] {
+    --page-section-gap: var(--space-2xl);
+    --page-row-pad-block: var(--space-md);
+    --session-card-pad-block: var(--space-md);
+    --schedule-cell-pad-block: var(--space-xs);
+  }
+  [data-density='loose'] {
+    --page-section-gap: var(--space-3xl);
+    --page-row-pad-block: var(--space-lg);
+    --session-card-pad-block: var(--space-lg);
+    --schedule-cell-pad-block: var(--space-sm);
+  }
+
   /* The Zine stamp: a session block printed twice, the way a two-pass job
      prints off register (brief §2.4, "Exception two" — the ONE piece of
      box-behind-box layering this system allows, and it is a printing
@@ -227,6 +264,7 @@
      shows only where it is misregistered. */
   .session-block__face {
     position: relative;
+    padding-block: var(--session-card-pad-block);
     background-image: linear-gradient(
       rgb(var(--session-card-surface-rgb)),
       rgb(var(--session-card-surface-rgb))

@@ -21,6 +21,7 @@ import {
   useFeatures,
 } from './EventConfigContext.jsx';
 import Layout from '../components/Layout.jsx';
+import ContentContext from './ContentContext.jsx';
 import { eventConfig as snapshotEventConfig } from '@generated/eventConfig.js';
 
 // Compose hex test data at runtime — no hex color literals in source (§7.6).
@@ -187,7 +188,13 @@ describe('Layout nav', () => {
         future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <EventConfigProvider>
-          <Layout />
+          {/* The shell reads the current URL's page document for the two
+              layout variants it owns (brief §6.1). These tests are about
+              the config subscriptions, so the page lookup answers nothing
+              and the shell keeps its own rule. */}
+          <ContentContext.Provider value={{ getPage: () => null }}>
+            <Layout />
+          </ContentContext.Provider>
         </EventConfigProvider>
       </MemoryRouter>,
     );

@@ -74,7 +74,7 @@ export default function Updates() {
             const body = excerpt(update.body);
             return (
               <li key={update.id} className="border-t-hairline border-t-rule-hairline">
-                <div className="grid gap-2xs py-md sm:grid-cols-[9.5rem,1fr] sm:gap-md">
+                <div className="directory-row grid gap-2xs sm:grid-cols-[9.5rem,1fr] sm:gap-md">
                   <p className="font-mono text-caption text-text-secondary">
                     {dateLabel ? (
                       <time dateTime={publishDate.toISOString()}>{dateLabel}</time>

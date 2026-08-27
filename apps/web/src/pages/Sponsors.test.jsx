@@ -10,10 +10,12 @@ const UNSAFE_URL = 'javascript:alert(1)';
 const SAFE_URL = 'https://example.org';
 
 let organizationsData;
+let pageDoc = null;
 vi.mock('../contexts/ContentContext.jsx', () => ({
   // The page shell reads the cmsPages document for its layout and its
-  // slot sections (components/SystemPage.jsx); this directory has neither.
-  useContent: () => ({ organizationsData, getPage: () => null, getSectionBlocks: () => [] }),
+  // slot sections (components/SystemPage.jsx); this directory states no
+  // sections, and states a layout only where a test sets one.
+  useContent: () => ({ organizationsData, getPage: () => pageDoc, getSectionBlocks: () => [] }),
 }));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ features: { sponsors: true } }),
@@ -59,5 +61,20 @@ describe('Sponsors', () => {
     ];
     renderSponsors();
     expect(screen.getByRole('link', { name: 'Safe Org' })).toHaveAttribute('href', SAFE_URL);
+  });
+
+  it('runs the same ruled entries in columns when the page states a grid', () => {
+    // The layout variant changes the arrangement, not the directory (brief
+    // §6.1): the rows keep their hairline and nothing becomes a card.
+    organizationsData = [
+      { id: 'org-1', name: 'First', url: SAFE_URL, tier: 'Gold', description: 'd', visible: true },
+      { id: 'org-2', name: 'Second', url: SAFE_URL, tier: 'Gold', description: 'd', visible: true },
+    ];
+    pageDoc = { id: 'sponsors', layout: { arrangement: 'grid' } };
+    const { container } = renderSponsors();
+    pageDoc = null;
+    expect(container.querySelector('ul').className).toContain('sm:grid-cols-2');
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+    expect(container.querySelector('li').className).toContain('border-t-rule-hairline');
   });
 });
