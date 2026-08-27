@@ -5,22 +5,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
-
 const CODE_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx']);
 const SCANNED_EXTENSIONS = new Set([...CODE_EXTENSIONS, '.html', '.json', '.md']);
 
+// Current copy that a client, attendee, speaker, event staff member, or CCM
+// operator can encounter. Historical plans, architecture records, fixtures,
+// generated files, legal text, and tests are outside this check.
 const ROOT_FILES = Object.freeze([
   'README.md',
-  'apps/web/README.md',
-  'functions/README.md',
-  'scripts/README.md',
   'docs/index.html',
   'docs/ADMIN_GUIDE.md',
   'docs/CLIENT_ONBOARDING.md',
-  'docs/DEPLOY_RUNBOOK.md',
-  'docs/EVENTBRITE_VERIFICATION.md',
-  'docs/POSTMARK_PROVISIONING.md',
-  'docs/ROADMAP.md',
   'scripts/lib/demo-event.cjs',
   'scripts/lib/seed.cjs',
 ]);
@@ -36,7 +31,7 @@ const BLOCKED_RULES = Object.freeze([
   {
     id: 'stock-promotion',
     pattern:
-      /\b(?:seamless(?:ly)?|robust|effortless(?:ly)?|unlock(?:s|ed|ing)?|elevate(?:s|d|ing)?|empower(?:s|ed|ing)?|delve(?:s|d|ing)?|transformative|revolutionary)\b/giu,
+      /\b(?:seamless(?:ly)?|robust|effortless(?:ly)?|unlock(?:s|ed|ing)?|elevate(?:s|d|ing)?|empower(?:s|ed|ing)?|delve(?:s|d|ing)?|transformative|revolutionary|streamlined)\b/giu,
     guidance: 'State the action, result, or limit instead.',
   },
   {
@@ -60,7 +55,7 @@ const BLOCKED_RULES = Object.freeze([
   {
     id: 'design-metaphor',
     pattern:
-      /\b(?:reads as|read as|story written|on its feet|paper of record|on a good day|wears|dressed in)\b/giu,
+      /\b(?:reads? as (?:a|an|the|edited|generated)|story (?:reads|written)|on its feet|paper of record|on a good day|wears|dressed in)\b/giu,
     guidance: 'Describe the visible layout or behavior directly.',
   },
   {
@@ -75,15 +70,25 @@ const BLOCKED_RULES = Object.freeze([
   },
 ]);
 
-function isTestOrGenerated(relativePath) {
-  const normalized = relativePath.split(path.sep).join('/');
+function normalizePath(relativePath) {
+  return relativePath.split(path.sep).join('/');
+}
+
+function isExcluded(relativePath) {
+  const normalized = normalizePath(relativePath);
   return (
     normalized.includes('/generated/') ||
     normalized.includes('/__tests__/') ||
-    /(?:^|\/)(?:dist|node_modules|coverage)\//u.test(normalized) ||
-    /\.(?:test|spec)\.[^.]+$/u.test(normalized) ||
+    normalized.includes('/__fixtures__/') ||
+    normalized.startsWith('docs/plans/') ||
+    normalized.startsWith('docs/adr/') ||
+    normalized.startsWith('docs/architecture/') ||
+    normalized.startsWith('functions/vendor/') ||
+    normalized === 'design/tokens/presets/README.md' ||
     normalized === 'apps/web/src/setupTests.js' ||
-    normalized === 'apps/web/src/admin/presetCopy.js'
+    normalized === 'apps/web/src/admin/presetCopy.js' ||
+    /(?:^|\/)(?:dist|node_modules|coverage)\//u.test(normalized) ||
+    /\.(?:test|spec)\.[^.]+$/u.test(normalized)
   );
 }
 
@@ -91,61 +96,78 @@ function walk(relativeRoot) {
   const absoluteRoot = path.join(ROOT, relativeRoot);
   if (!fs.existsSync(absoluteRoot)) return [];
   const files = [];
+
   for (const entry of fs.readdirSync(absoluteRoot, { withFileTypes: true })) {
     const child = path.join(relativeRoot, entry.name);
     if (entry.isDirectory()) files.push(...walk(child));
     else if (
       entry.isFile() &&
       SCANNED_EXTENSIONS.has(path.extname(entry.name)) &&
-      !isTestOrGenerated(child)
+      !isExcluded(child)
     ) {
       files.push(child);
     }
   }
+
   return files;
 }
 
 function collectFiles() {
   const files = new Set();
+
   for (const relativePath of ROOT_FILES) {
-    if (fs.existsSync(path.join(ROOT, relativePath))) files.add(relativePath);
+    if (fs.existsSync(path.join(ROOT, relativePath)) && !isExcluded(relativePath)) {
+      files.add(relativePath);
+    }
   }
+
   for (const relativeRoot of RECURSIVE_ROOTS) {
     for (const relativePath of walk(relativeRoot)) files.add(relativePath);
   }
+
   return [...files].sort();
 }
 
-// Remove JavaScript comments while preserving strings, line breaks, and
-// character positions. This keeps findings on the source line a user edits.
-function stripCodeComments(source) {
-  let output = '';
+function previousTokenAllowsRegex(source, slashIndex) {
+  let cursor = slashIndex - 1;
+  while (cursor >= 0 && /\s/u.test(source[cursor])) cursor -= 1;
+  if (cursor < 0) return true;
+  if ('([{:;,=!?&|+-*%^~<>'.includes(source[cursor])) return true;
+
+  const prefix = source.slice(0, cursor + 1);
+  return /(?:^|\s)(?:return|case|throw|delete|void|typeof|instanceof|in|of|yield|await)\s*$/u.test(
+    prefix,
+  );
+}
+
+// Keep only text that can render or be returned to a user. Code, comments,
+// and regular expressions become spaces. Newlines and character positions
+// stay unchanged so each finding points to the source line a writer edits.
+function maskCodeToVisibleText(source) {
+  const output = Array.from(source, (char) => (char === '\n' ? '\n' : ' '));
   let state = 'code';
+  let quote = '';
   let escaped = false;
+  let inRegexClass = false;
 
   for (let index = 0; index < source.length; index += 1) {
     const char = source[index];
     const next = source[index + 1];
 
     if (state === 'line-comment') {
-      if (char === '\n') {
-        output += '\n';
-        state = 'code';
-      } else output += ' ';
+      if (char === '\n') state = 'code';
       continue;
     }
 
     if (state === 'block-comment') {
       if (char === '*' && next === '/') {
-        output += '  ';
         index += 1;
         state = 'code';
-      } else output += char === '\n' ? '\n' : ' ';
+      }
       continue;
     }
 
-    if (state === 'single' || state === 'double' || state === 'template') {
-      output += char;
+    if (state === 'regex') {
       if (escaped) {
         escaped = false;
         continue;
@@ -154,44 +176,91 @@ function stripCodeComments(source) {
         escaped = true;
         continue;
       }
-      if (
-        (state === 'single' && char === "'") ||
-        (state === 'double' && char === '"') ||
-        (state === 'template' && char === '`')
-      ) {
+      if (char === '[') inRegexClass = true;
+      else if (char === ']') inRegexClass = false;
+      else if (char === '/' && !inRegexClass) state = 'code';
+      continue;
+    }
+
+    if (state === 'string') {
+      output[index] = char;
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === quote) {
+        output[index] = ' ';
         state = 'code';
       }
       continue;
     }
 
     if (char === '/' && next === '/') {
-      output += '  ';
       index += 1;
       state = 'line-comment';
-    } else if (char === '/' && next === '*') {
-      output += '  ';
+      continue;
+    }
+    if (char === '/' && next === '*') {
       index += 1;
       state = 'block-comment';
-    } else {
-      output += char;
-      if (char === "'") state = 'single';
-      else if (char === '"') state = 'double';
-      else if (char === '`') state = 'template';
+      continue;
+    }
+    if (char === '/' && previousTokenAllowsRegex(source, index)) {
+      state = 'regex';
+      inRegexClass = false;
+      continue;
+    }
+    if (char === "'" || char === '"' || char === '`') {
+      quote = char;
+      state = 'string';
+      output[index] = ' ';
     }
   }
 
-  return output;
+  // JSX child text is not a JavaScript string literal. Add plain text found
+  // between adjacent tags. Braces are excluded because expressions are code.
+  const jsxText = />([^<>{}]*[\p{L}\p{N}][^<>{}]*)</gu;
+  for (const match of source.matchAll(jsxText)) {
+    const text = match[1];
+    const start = match.index + 1;
+    for (let offset = 0; offset < text.length; offset += 1) {
+      output[start + offset] = text[offset];
+    }
+  }
+
+  return output.join('');
 }
 
 function textToScan(source, relativePath) {
   const extension = path.extname(relativePath);
-  if (CODE_EXTENSIONS.has(extension)) return stripCodeComments(source);
+  if (CODE_EXTENSIONS.has(extension)) return maskCodeToVisibleText(source);
   if (extension === '.html') {
     return source.replace(/<!--[\s\S]*?-->/gu, (comment) =>
       comment.replace(/[^\n]/gu, ' '),
     );
   }
   return source;
+}
+
+function isLongDashScope(relativePath) {
+  const normalized = normalizePath(relativePath);
+  return (
+    normalized === 'docs/index.html' ||
+    normalized.startsWith('docs/handbook/') ||
+    /^design\/tokens\/presets\/[^/]+\.json$/u.test(normalized) ||
+    normalized === 'scripts/lib/demo-event.cjs' ||
+    normalized.startsWith('apps/web/src/') ||
+    normalized.startsWith('functions/src/email/templates/')
+  );
+}
+
+function ruleAppliesTo(rule, relativePath) {
+  if (rule.id === 'long-dash') return isLongDashScope(relativePath);
+  return true;
 }
 
 function lineNumberAt(source, index) {
@@ -202,20 +271,34 @@ function lineNumberAt(source, index) {
   return line;
 }
 
-function excerptAt(source, index) {
+function lineAt(source, index) {
   const lineStart = source.lastIndexOf('\n', index - 1) + 1;
   const lineEndValue = source.indexOf('\n', index);
   const lineEnd = lineEndValue === -1 ? source.length : lineEndValue;
-  return source.slice(lineStart, lineEnd).trim().replace(/\s+/gu, ' ').slice(0, 180);
+  return source.slice(lineStart, lineEnd);
+}
+
+function excerptAt(source, index) {
+  return lineAt(source, index).trim().replace(/\s+/gu, ' ').slice(0, 180);
+}
+
+function isStandaloneDash(scanned, index) {
+  return lineAt(scanned, index).trim() === '—';
 }
 
 function findFindings(source, relativePath, rules = BLOCKED_RULES) {
+  if (isExcluded(relativePath)) return [];
   const scanned = textToScan(source, relativePath);
   const findings = [];
 
   for (const rule of rules) {
+    if (!ruleAppliesTo(rule, relativePath)) continue;
     rule.pattern.lastIndex = 0;
+
     for (const match of scanned.matchAll(rule.pattern)) {
+      if (rule.id === 'long-dash' && isStandaloneDash(scanned, match.index)) {
+        continue;
+      }
       findings.push({
         path: relativePath,
         line: lineNumberAt(scanned, match.index),
@@ -246,7 +329,9 @@ function run() {
     return;
   }
 
-  console.error(`copy-style: found ${findings.length} blocked pattern(s) in ${files.length} files.`);
+  console.error(
+    `copy-style: found ${findings.length} blocked pattern(s) in ${files.length} files.`,
+  );
   for (const finding of findings) {
     console.error(
       `${finding.path}:${finding.line} [${finding.rule}] ${JSON.stringify(finding.match)}\n` +
@@ -263,6 +348,9 @@ module.exports = {
   BLOCKED_RULES,
   collectFiles,
   findFindings,
-  stripCodeComments,
+  isExcluded,
+  isLongDashScope,
+  maskCodeToVisibleText,
+  ruleAppliesTo,
   textToScan,
 };
