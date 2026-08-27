@@ -60,6 +60,28 @@ test('findFindings reports blocked phrases in string literals', () => {
   );
 });
 
+test('operational unlock instructions are allowed while promotion remains blocked', () => {
+  const source = [
+    "const action = 'Unlock the account.';",
+    "const claim = 'Unlock your full potential.';",
+  ].join('\n');
+  const findings = findFindings(source, 'apps/web/src/example.js');
+
+  assert.deepEqual(
+    findings.map(({ line, rule, match }) => ({ line, rule, match })),
+    [{ line: 2, rule: 'stock-promotion', match: 'Unlock' }],
+  );
+});
+
+test('escaped newlines do not advance reported source locations', () => {
+  const source = "const message = 'First line\\nA robust workflow.';";
+  const findings = findFindings(source, 'apps/web/src/example.js');
+
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].line, 1);
+  assert.equal(findings[0].excerpt.includes('First line\\nA robust workflow.'), true);
+});
+
 test('curly apostrophes do not bypass rhetorical-frame checks', () => {
   const source = "const message = 'Whether you’re ready or not, continue.';";
   const findings = findFindings(source, 'apps/web/src/example.js');
@@ -110,6 +132,43 @@ test('preset scanning includes rendered fields and excludes private notes', () =
   );
   assert.equal(findings.length, 1);
   assert.equal(findings[0].rule, 'stock-promotion');
+});
+
+test('preset field extraction does not depend on JSON property order', () => {
+  const source = JSON.stringify(
+    {
+      bestFor: 'Use this style for small events.',
+      summary: 'A direct layout description.',
+      label: 'Example',
+      options: {
+        headingFace: {
+          prompt: 'Choose a robust heading typeface.',
+          choices: [
+            {
+              why: 'Uses one typeface for headings.',
+              label: 'One',
+              id: 'one',
+            },
+          ],
+          label: 'Heading face',
+          default: 'one',
+        },
+      },
+      id: 'example',
+    },
+    null,
+    2,
+  );
+  const findings = findFindings(
+    source,
+    'design/tokens/presets/example.json',
+  );
+  const promptLine = source.slice(0, source.indexOf('Choose a robust')).split('\n').length;
+
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, 'stock-promotion');
+  assert.equal(findings[0].match, 'robust');
+  assert.equal(findings[0].line, promptLine);
 });
 
 test('current operator runbooks are part of the scan', () => {

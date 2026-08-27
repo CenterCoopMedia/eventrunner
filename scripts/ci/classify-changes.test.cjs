@@ -11,16 +11,18 @@ function selected(result) {
   return JOB_NAMES.filter((name) => result.jobs[name]);
 }
 
-test('docs-only changes select only the documentation tier', () => {
+test('docs-only changes select documentation checks and the copy gate', () => {
   const result = classifyPaths([
     'README.md',
+    'docs/ADMIN_GUIDE.md',
     'docs/handbook/faq.md',
     'CONTRIBUTING.md',
   ]);
 
   assert.equal(result.mode, 'docs');
-  assert.deepEqual(selected(result), ['docs']);
+  assert.deepEqual(selected(result), ['docs', 'lint']);
   assert.equal(result.jobs.demo, false);
+  assert.equal(result.jobs.audit, false);
   assert.equal(result.jobs.unit, false);
   assert.equal(result.jobs.unitWeb, false);
   assert.equal(result.jobs.rules, false);

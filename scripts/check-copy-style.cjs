@@ -35,7 +35,7 @@ const BLOCKED_RULES = Object.freeze([
   {
     id: 'stock-promotion',
     pattern:
-      /\b(?:seamless(?:ly)?|robust|effortless(?:ly)?|unlock(?:s|ed|ing)?|elevate(?:s|d|ing)?|empower(?:s|ed|ing)?|delve(?:s|d|ing)?|transformative|revolutionary|streamlined)\b/giu,
+      /\b(?:seamless(?:ly)?|robust|effortless(?:ly)?|elevate(?:s|d|ing)?|empower(?:s|ed|ing)?|delve(?:s|d|ing)?|transformative|revolutionary|streamlined)\b|\bunlock(?:s|ed|ing)?\b(?=\s+(?:(?:the|your|our|new|more|full|untapped)\s+){0,3}(?:potential|possibilit(?:y|ies)|power|value|insights?|opportunit(?:y|ies)|growth|impact|benefits?|capabilit(?:y|ies)|experience|future)\b)/giu,
     guidance: 'State the action, result, or limit instead.',
   },
   {
@@ -127,9 +127,9 @@ function collectFiles() {
   return [...files].sort();
 }
 
-function addFragment(fragments, text, startLine) {
+function addFragment(fragments, text, startLine, sourceText = text) {
   if (typeof text !== 'string' || !/[\p{L}\p{N}]/u.test(text)) return;
-  fragments.push({ text, startLine });
+  fragments.push({ text, startLine, sourceText });
 }
 
 function skipStringLiteral(node) {
@@ -153,21 +153,27 @@ function extractCodeFragments(source, relativePath) {
   const linter = new Linter({ configType: 'eslintrc' });
   linter.defineRule('collect-user-copy', {
     meta: { schema: [] },
-    create() {
+    create(context) {
+      const sourceCode = context.sourceCode ?? context.getSourceCode();
+      const addNodeFragment = (node, text) => {
+        addFragment(
+          fragments,
+          text,
+          node.loc.start.line,
+          sourceCode.getText(node),
+        );
+      };
+
       return {
         Literal(node) {
           if (typeof node.value !== 'string' || skipStringLiteral(node)) return;
-          addFragment(fragments, node.value, node.loc.start.line);
+          addNodeFragment(node, node.value);
         },
         TemplateElement(node) {
-          addFragment(
-            fragments,
-            node.value.cooked ?? node.value.raw,
-            node.loc.start.line,
-          );
+          addNodeFragment(node, node.value.cooked ?? node.value.raw);
         },
         JSXText(node) {
-          addFragment(fragments, node.value, node.loc.start.line);
+          addNodeFragment(node, node.value);
         },
       };
     },
@@ -238,23 +244,25 @@ function lineNumberAt(source, index) {
   return line;
 }
 
-function locateJsonString(source, key, value, cursor) {
+function locateJsonString(source, key, value, usedValueIndexes) {
   const keyToken = JSON.stringify(key);
   const valueToken = JSON.stringify(value);
-  let keyIndex = source.indexOf(keyToken, cursor);
+  let keyIndex = source.indexOf(keyToken);
 
   while (keyIndex !== -1) {
     const colon = source.indexOf(':', keyIndex + keyToken.length);
     if (colon === -1) break;
     let valueIndex = colon + 1;
     while (/\s/u.test(source[valueIndex])) valueIndex += 1;
-    if (source.startsWith(valueToken, valueIndex)) {
+    if (
+      source.startsWith(valueToken, valueIndex) &&
+      !usedValueIndexes.has(valueIndex)
+    ) {
+      usedValueIndexes.add(valueIndex);
       return {
-        fragment: {
-          text: value,
-          startLine: lineNumberAt(source, valueIndex),
-        },
-        cursor: valueIndex + valueToken.length,
+        text: value,
+        startLine: lineNumberAt(source, valueIndex),
+        sourceText: valueToken,
       };
     }
     keyIndex = source.indexOf(keyToken, keyIndex + keyToken.length);
@@ -272,13 +280,11 @@ function extractPresetFragments(source, relativePath) {
   }
 
   const fragments = [];
-  let cursor = 0;
+  const usedValueIndexes = new Set();
   const addField = (object, key) => {
     const value = object?.[key];
     if (typeof value !== 'string') return;
-    const located = locateJsonString(source, key, value, cursor);
-    fragments.push(located.fragment);
-    cursor = located.cursor;
+    fragments.push(locateJsonString(source, key, value, usedValueIndexes));
   };
 
   addField(preset, 'label');
@@ -327,6 +333,13 @@ function linesBefore(text, index) {
   return count;
 }
 
+function sourceMatchIndex(sourceText, matchText, startIndex) {
+  return sourceText.toLocaleLowerCase('en-US').indexOf(
+    matchText.toLocaleLowerCase('en-US'),
+    startIndex,
+  );
+}
+
 function findFindings(source, relativePath, rules = BLOCKED_RULES) {
   if (isExcluded(relativePath)) return [];
   const fragments = extractVisibleFragments(source, relativePath);
@@ -335,8 +348,20 @@ function findFindings(source, relativePath, rules = BLOCKED_RULES) {
   for (const fragment of fragments) {
     for (const rule of rules) {
       rule.pattern.lastIndex = 0;
+      let sourceSearchFrom = 0;
       for (const match of fragment.text.matchAll(rule.pattern)) {
-        const line = fragment.startLine + linesBefore(fragment.text, match.index);
+        let line = fragment.startLine + linesBefore(fragment.text, match.index);
+        if (typeof fragment.sourceText === 'string') {
+          const sourceIndex = sourceMatchIndex(
+            fragment.sourceText,
+            match[0],
+            sourceSearchFrom,
+          );
+          if (sourceIndex !== -1) {
+            line = fragment.startLine + linesBefore(fragment.sourceText, sourceIndex);
+            sourceSearchFrom = sourceIndex + match[0].length;
+          }
+        }
         findings.push({
           path: relativePath,
           line,
