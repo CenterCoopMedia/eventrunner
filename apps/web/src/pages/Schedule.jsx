@@ -24,6 +24,7 @@ import { PlateNumber } from '../components/editorial/Plate.jsx';
 import Marginalia from '../components/editorial/Marginalia.jsx';
 import ScheduleGrid from '../components/ScheduleGrid.jsx';
 import { resolveTracks, withCallingPoints } from '../lib/scheduleGrid.js';
+import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
@@ -158,6 +159,12 @@ export default function Schedule() {
   // lines means no second axis, so there is nothing for a grid to be.
   const columns = resolveTracks(eventConfig);
   const showGrid = wide && columns.length > 0 && entries.length > 0;
+  // The back issue (brief §2.1): a day the event has moved past, or a whole
+  // event the operator has archived. Nothing is hidden — the palette drops
+  // to the archive tokens, the day head says so, and the controls that act
+  // on a live event go away because there is nothing left to act on.
+  const archived = eventIsArchived(eventConfig);
+  const backIssue = activeDay ? isBackIssue(activeDay, eventConfig) : false;
   const hasAnySession = sessionsByDay.size > 0;
   const eventZoneLabel = activeDay
     ? zoneLabel(
@@ -183,7 +190,7 @@ export default function Schedule() {
               My schedule
             </Link>
           ) : null}
-          {features.icsExport && visibleSessions.length > 0 ? (
+          {features.icsExport && !archived && visibleSessions.length > 0 ? (
             <button
               type="button"
               onClick={() => {
@@ -233,7 +240,12 @@ export default function Schedule() {
             </div>
           ) : null}
 
-          <section key={activeDay.id} aria-labelledby={`day-${activeDay.id}`} className="mt-xl">
+          <section
+            key={activeDay.id}
+            aria-labelledby={`day-${activeDay.id}`}
+            className={backIssue ? 'back-issue mt-xl' : 'mt-xl'}
+            {...(backIssue ? { 'data-back-issue': 'true' } : null)}
+          >
             {/* The day head is a folio on a rule (brief §2.1): the standing
                 head of the day, with the date sitting on the same rule. It is
                 never stacked above the heading — it IS the heading. */}
@@ -243,20 +255,29 @@ export default function Schedule() {
               id={`day-${activeDay.id}`}
               title={activeDay.label}
               folio={
-                formatDayDate(activeDay, eventConfig.timezone) ? (
-                  <>
-                    {/* "PLATE III · SATURDAY 14 MARCH" (visual story, Field
-                        Guide, moment 1). The number is the day's real
-                        position in the programme, so it is sequence data and
-                        never a decorative 01/02/03 (brief §2.4). It is set
-                        only where the page is a plate book: the token, not a
-                        theme test in here, decides that. */}
-                    <PlateNumber position={days.indexOf(activeDay) + 1} />
+                <>
+                  {/* "PLATE III · SATURDAY 14 MARCH" (visual story, Field
+                      Guide, moment 1). The number is the day's real
+                      position in the programme, so it is sequence data and
+                      never a decorative 01/02/03 (brief §2.4). It is set
+                      only where the page is a plate book: the token, not a
+                      theme test in here, decides that. */}
+                  <PlateNumber position={days.indexOf(activeDay) + 1} />
+                  {formatDayDate(activeDay, eventConfig.timezone) ? (
                     <time dateTime={activeDay.date}>
                       {formatDayDate(activeDay, eventConfig.timezone)}
                     </time>
-                  </>
-                ) : null
+                  ) : null}
+                  {/* The "Back issue" folio the device asks for, beside the
+                      day it labels — a folio never sits above a heading
+                      (brief §2.4). */}
+                  {backIssue ? (
+                    <>
+                      {formatDayDate(activeDay, eventConfig.timezone) ? ' · ' : null}
+                      Back issue
+                    </>
+                  ) : null}
+                </>
               }
             />
             {/* The pen mark under the day head (visual story, Zine, moment
@@ -295,6 +316,7 @@ export default function Schedule() {
                     eventConfig={eventConfig}
                     features={features}
                     bookmarked={bookmarkedIds.has(entry.session.id)}
+                    backIssue={backIssue}
                     transferTo={transferTarget(
                       entries.map((one) => one.session),
                       index,

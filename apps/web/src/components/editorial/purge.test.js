@@ -65,6 +65,8 @@ const DEVICE_CLASSES = [
   '.schedule-grid__entry',
   '.calling-points__item',
   '.calling-points__marker',
+  // The archival treatment (brief §2.1).
+  '.back-issue',
 ];
 
 describe('the built stylesheet', () => {

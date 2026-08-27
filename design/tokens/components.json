@@ -67,6 +67,11 @@
     "--schedule-forward-lift": "var(--space-3xs)",
     "--schedule-trace-width": "0"
   },
+  "$back-issue-note": "The back issue (brief §2.1): a past day, or a past event, drops to the archive tokens, gains the \"Back issue\" folio, and loses its live controls. NOTHING IS HIDDEN. The device REDUCES a palette rather than introducing one: inside a back issue the accents resolve to the archive ink, which is the same text-secondary the contrast test already measures on both grounds, so an archive is quieter without ever being less readable.",
+  "back-issue": {
+    "--back-issue-ink-rgb": "--color-text-secondary-rgb",
+    "--back-issue-rule-rgb": "--rule-hairline-rgb"
+  },
   "$plate-note": "The Field Guide botanical plate (brief §4.5): a framed drawing with a hairline border and a plate number in the folio style. A plate is drawn linework and never a hero image. The frame is a DOUBLE hairline, drawn as a border plus an outline at the same width. Zero frame and zero pad is the device off: the wrapper then adds no rule, no space, and no reflow, which is what every preset but Field Guide holds.",
   "plate": {
     "--plate-frame-rgb": "--rule-hairline-rgb",

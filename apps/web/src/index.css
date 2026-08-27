@@ -445,6 +445,33 @@
     }
   }
 
+  /* The back issue (brief §2.1): yesterday's edition, still on the shelf.
+     A past day — or a past event — keeps every word and drops to the
+     archive tokens.
+
+     It REDUCES the palette rather than repainting it. Inside a back issue
+     the accents resolve to the archive ink, so the colour that means
+     "act on this" is simply not there any more; the ink, the rules, and
+     the grounds are untouched, which is what keeps every word at the
+     contrast it had. The archive ink is --color-text-secondary, a pair the
+     dark-mode completeness test already measures on both surfaces in both
+     modes, so this treatment cannot invent a failing pair.
+
+     The live controls are removed in the markup, not hidden here: a
+     control that a reader can reach but not use is worse than no control
+     (Schedule.jsx, SessionCard.jsx). */
+  .back-issue {
+    --color-accent-rgb: var(--back-issue-ink-rgb);
+    --color-accent-strong-rgb: var(--back-issue-ink-rgb);
+    --color-accent-soft-rgb: var(--back-issue-rule-rgb);
+    --color-accent-secondary-rgb: var(--back-issue-ink-rgb);
+    --semantic-keynote-rgb: var(--back-issue-ink-rgb);
+    --semantic-highlight-rgb: var(--back-issue-ink-rgb);
+    --route-mark-rgb: var(--back-issue-ink-rgb);
+    --schedule-trace-rgb: var(--back-issue-ink-rgb);
+    --session-card-stamp-rgb: var(--back-issue-rule-rgb);
+  }
+
   /* The handwritten callout (brief §4.3): real copy, one per page, at one
      fixed angle. Every preset but Zine holds a zero angle and the heading
      face, so the same element is simply a lead line there. */

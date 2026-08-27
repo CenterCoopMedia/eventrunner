@@ -417,3 +417,63 @@ describe('the two views of a day', () => {
     });
   });
 });
+
+describe('the back issue', () => {
+  // The fixture event runs in October 2026. These render it from a day the
+  // event has already passed, and from an operator's archive date.
+  const pastEvent = {
+    ...fixtureConfig,
+    announcedAt: '2026-01-01T00:00',
+    days: [
+      { id: 'fx-day-1', label: 'Day one', date: '2020-10-15', startTime: '09:00', endTime: '17:00' },
+    ],
+  };
+  const pastSessions = [{ ...fixtureSessions[1], dayId: 'fx-day-1' }];
+
+  it('keeps every word of a past day, and says it is an archive', () => {
+    renderSchedule({ eventConfig: pastEvent, scheduleData: pastSessions });
+    // Nothing is hidden: the session is still there, still linked.
+    expect(screen.getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+    expect(screen.getByText(/back issue/i)).toBeInTheDocument();
+  });
+
+  it('drops the day to the archive tokens', () => {
+    const { container } = renderSchedule({
+      eventConfig: pastEvent,
+      scheduleData: pastSessions,
+    });
+    const day = container.querySelector('section[data-back-issue]');
+    expect(day).not.toBeNull();
+    expect(day.className).toContain('back-issue');
+  });
+
+  it('takes the live controls away, and leaves the materials', () => {
+    renderSchedule({
+      eventConfig: pastEvent,
+      scheduleData: pastSessions,
+      features: { schedule: true, sessionBookmarks: true, icsExport: true },
+      auth: { user: { uid: 'u1' }, isAdmin: false, loading: false },
+      profile: { attendeeAccess: true },
+    });
+    // Bookmarking a session that has finished is an act on nothing.
+    expect(screen.queryByRole('button', { name: /^bookmark$/i })).toBeNull();
+    expect(screen.queryByText(/add to calendar/i)).toBeNull();
+  });
+
+  it('marks a live day as no such thing', () => {
+    const { container } = renderSchedule();
+    expect(container.querySelector('section[data-back-issue]')).toBeNull();
+    expect(screen.queryByText(/back issue/i)).toBeNull();
+  });
+
+  it('files the whole event once the operator archives it', () => {
+    const archived = { ...fixtureConfig, announcedAt: '2026-01-01T00:00', archivedAt: '2026-01-02T00:00' };
+    const { container } = renderSchedule({
+      eventConfig: archived,
+      features: { schedule: true, icsExport: true },
+    });
+    expect(container.querySelector('section[data-back-issue]')).not.toBeNull();
+    // The whole-schedule download acts on a live event too.
+    expect(screen.queryByRole('button', { name: /download schedule/i })).toBeNull();
+  });
+});

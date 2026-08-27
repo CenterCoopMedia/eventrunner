@@ -362,16 +362,35 @@ function ReactionsPill({ session }) {
  * @param {{ session: object, eventConfig: object, features?: object,
  *           bookmarked?: boolean }} props
  */
-export function SessionPills({ session, eventConfig, features = {}, bookmarked = false }) {
-  const hasPills =
-    features.sessionBookmarks || features.sessionMaterials || features.sessionReactions || features.icsExport;
+export function SessionPills({
+  session,
+  eventConfig,
+  features = {},
+  bookmarked = false,
+  backIssue = false,
+}) {
+  // A back issue keeps every word and loses its live controls (brief §2.1).
+  // Bookmarking a session that has finished, reacting to it, or adding it
+  // to a calendar are all acts on an event that is not happening: the
+  // controls go out of the document rather than sitting there disabled.
+  // The materials a session left behind are content, so they stay.
+  const hasPills = backIssue
+    ? features.sessionMaterials
+    : features.sessionBookmarks ||
+      features.sessionMaterials ||
+      features.sessionReactions ||
+      features.icsExport;
   if (!hasPills) return null;
   return (
     <div className="flex flex-wrap items-center gap-xs">
-      {features.sessionBookmarks ? <BookmarkPill session={session} bookmarked={bookmarked} /> : null}
+      {features.sessionBookmarks && !backIssue ? (
+        <BookmarkPill session={session} bookmarked={bookmarked} />
+      ) : null}
       {features.sessionMaterials ? <MaterialsPill session={session} /> : null}
-      {features.sessionReactions ? <ReactionsPill session={session} /> : null}
-      {features.icsExport ? <CalendarPill eventConfig={eventConfig} session={session} /> : null}
+      {features.sessionReactions && !backIssue ? <ReactionsPill session={session} /> : null}
+      {features.icsExport && !backIssue ? (
+        <CalendarPill eventConfig={eventConfig} session={session} />
+      ) : null}
     </div>
   );
 }
@@ -409,7 +428,8 @@ function TransferLine({ to }) {
 /**
  * @param {{ session: object, eventConfig: object, features?: object,
  *           bookmarked?: boolean, linkToDetail?: boolean,
- *           transferTo?: string | null, callingPoints?: object[] }} props
+ *           transferTo?: string | null, callingPoints?: object[],
+ *           backIssue?: boolean }} props
  */
 export default function SessionCard({
   session,
@@ -419,6 +439,7 @@ export default function SessionCard({
   linkToDetail = true,
   transferTo = null,
   callingPoints = [],
+  backIssue = false,
 }) {
   const speakerNames = useSessionSpeakerNames(session.speakerIds);
   const range = formatSessionTimeRange(eventConfig, session);
@@ -501,6 +522,7 @@ export default function SessionCard({
               eventConfig={eventConfig}
               features={features}
               bookmarked={bookmarked}
+              backIssue={backIssue}
             />
           </div>
         </div>
