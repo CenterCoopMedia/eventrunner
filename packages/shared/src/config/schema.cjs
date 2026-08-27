@@ -21,6 +21,7 @@ const {
   THEME_TEXTURES,
   THEME_PRESET_IDS,
   THEME_MOTIF_SET_IDS,
+  THEME_NAV_PLACEMENTS,
   THEME_MODES,
   getPreset,
   canonicalColorKey,
@@ -406,6 +407,12 @@ function validateTheme(theme) {
     ['texture', THEME_TEXTURES],
     ['radius', THEME_RADIUS_IDS],
     ['mode', THEME_MODE_POLICIES],
+    // Where the site puts its navigation. Site-level, because a shell that
+    // moves between pages stops being a shell (shared/theme
+    // THEME_NAV_PLACEMENTS). Optional: a document that says nothing leaves
+    // the placement to whatever a page document already stored, and then to
+    // the default.
+    ['navPlacement', THEME_NAV_PLACEMENTS],
   ];
   for (const [field, allowed] of enums) {
     if (theme[field] == null) continue;

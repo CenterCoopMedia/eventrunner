@@ -40,10 +40,13 @@ import {
 import { blankPage, blankSection, toEditablePage, toPagePayload } from '../pageDoc.js';
 import {
   PAGE_LAYOUT_DEFAULTS,
-  PAGE_LAYOUT_KEYS,
   PAGE_LAYOUT_VALUES,
-  SECTION_SLOTS,
 } from '../../lib/pageLayout.js';
+import {
+  PAGE_TEMPLATES,
+  PAGE_TEMPLATE_IDS,
+  templateLayout,
+} from '../../lib/pageTemplates.js';
 import { summarizePublish } from '../publishResult.js';
 import {
   CheckboxField,
@@ -79,20 +82,43 @@ function InlineFieldError({ message }) {
   );
 }
 
+// THE OPERATOR PICKS A TASK, NOT A LAYOUT (this review).
+//
+// This panel used to be four selects — Header, Arrangement, Density,
+// Navigation — one per variant in the internal layout system. That asks an
+// operator to assemble a page out of design-system parts, in the design
+// system's words, with no way of knowing which of the twelve combinations
+// the house has an opinion about. It is the difference between "what shape
+// is this page" (a question with an answer) and "what value should
+// `arrangement` take" (a question about our code).
+//
+// So the main editor offers one control: which of six named tasks this page
+// is. Picking one sets the whole bundle at once (lib/pageTemplates.js). The
+// individual variants moved behind the Advanced disclosure below, where a
+// page that genuinely needs to differ from its template can still say so —
+// the same place AdminBranding.jsx keeps its raw token overrides.
+//
+// Navigation left entirely: it is a site setting now, on the Branding tab
+// (config/theme.navPlacement).
+
+/** The value the template select shows for a page that named no task. */
+const CUSTOM_TEMPLATE = 'custom';
+
 /** Plain words for the layout variants (design brief §6.1, §8.5). */
 const LAYOUT_LABELS = Object.freeze({
   header: 'Header',
   arrangement: 'Arrangement',
   density: 'Density',
-  navPlacement: 'Navigation',
 });
 
 const LAYOUT_HINTS = Object.freeze({
   header: 'Every page carries a nameplate. Compact makes it smaller; it never turns off.',
   arrangement: 'How this page lays its items out.',
   density: 'How much space sits between things on this page.',
-  navPlacement: 'Where this page puts its navigation.',
 });
+
+/** The variants the editor still offers, in editor order. */
+const EDITABLE_LAYOUT_KEYS = Object.freeze(['header', 'arrangement', 'density']);
 
 /** One word per enum value, so a select never reads like a field name. */
 const LAYOUT_VALUE_LABELS = Object.freeze({
@@ -103,16 +129,34 @@ const LAYOUT_VALUE_LABELS = Object.freeze({
   tight: 'Tight',
   comfortable: 'Comfortable',
   loose: 'Loose',
-  top: 'Across the top',
-  side: 'Down the side',
 });
 
-/** Where a section sits around the page's built-in feature component. */
-const SLOT_LABELS = Object.freeze({
-  above: 'Above the main content',
-  main: 'With the main content',
-  below: 'Below the main content',
-});
+// WHERE A SECTION GOES, SAID IN TERMS OF THE PAGE (this review).
+//
+// A hybrid page has a built-in feature — the schedule, the speaker
+// directory — and a section is inserted before it or after it. That is two
+// choices, and the operator is choosing an INSERTION POINT, so the words
+// name the feature they are relative to.
+//
+// "Above", "main", and "below" were never the operator's words. They are
+// the storage keys, and they stay the storage keys: `main` and `below` both
+// render after the feature (`below` after every `main`), and a section
+// stored as `below` before this change keeps that value and that position
+// unless the operator moves the control. Which is why the value shown for a
+// section is derived rather than passed straight through — see slotValue.
+const SLOT_CHOICES = Object.freeze([
+  { value: 'above', label: 'Before the main feature' },
+  { value: 'main', label: 'After the main feature' },
+]);
+
+/**
+ * Which of the two insertion points a stored slot reads as. `below` is a
+ * third stored position with no third name: it renders after the feature,
+ * so that is what the control says about it.
+ */
+function slotValue(slot) {
+  return slot === 'above' ? 'above' : 'main';
+}
 
 /** Move item `from` → `to` in a copy of `list`. */
 function moved(list, from, to) {
@@ -137,6 +181,9 @@ export default function AdminPageEditor({ mode }) {
   // Set once a create has landed, so the form switches to editing that
   // document instead of trying to create it again.
   const [savedId, setSavedId] = useState(null);
+  // The individual layout variants, behind their own disclosure. Closed by
+  // default: the template above is the answer for almost every page.
+  const [layoutOpen, setLayoutOpen] = useState(false);
   // Set when a publish fails part-way: the queue row the retry must resume.
   const [resumeQueueId, setResumeQueueId] = useState(null);
   const errorRef = useRef(null);
@@ -372,28 +419,78 @@ export default function AdminPageEditor({ mode }) {
       </Panel>
 
       <Panel
-        title="Layout"
+        title="Page template"
         description={
           isSystemPage
-            ? 'How this page is shaped. The page keeps its built-in feature component; these controls change the shape around it.'
-            : 'How this page is shaped.'
+            ? 'What kind of page this is. The page keeps its built-in feature; the template shapes everything around it.'
+            : 'What kind of page this is.'
         }
       >
-        <div className="grid gap-sm sm:grid-cols-2">
-          {PAGE_LAYOUT_KEYS.map((key) => (
-            <SelectField
-              key={key}
-              label={LAYOUT_LABELS[key]}
-              value={page.layout?.[key] ?? PAGE_LAYOUT_DEFAULTS[key]}
-              options={PAGE_LAYOUT_VALUES[key].map((value) => ({
-                value,
-                label: LAYOUT_VALUE_LABELS[value] ?? value,
-              }))}
-              onChange={(value) => update({ layout: { ...page.layout, [key]: value } })}
-              error={errorFor(`layout.${key}`)}
-              hint={LAYOUT_HINTS[key]}
-            />
-          ))}
+        <SelectField
+          label="Template"
+          value={page.template ?? CUSTOM_TEMPLATE}
+          options={[
+            ...PAGE_TEMPLATE_IDS.map((id) => ({ value: id, label: PAGE_TEMPLATES[id].label })),
+            { value: CUSTOM_TEMPLATE, label: 'Custom — set by hand below' },
+          ]}
+          onChange={(value) => {
+            // Picking a task sets every value that task has an opinion
+            // about, in one move. Picking "Custom" changes no value at
+            // all — it only records that no task is claimed, so the page
+            // stops being described by a template it no longer matches.
+            const bundle = templateLayout(value);
+            update(
+              bundle
+                ? { template: value, layout: { ...page.layout, ...bundle } }
+                : { template: null },
+            );
+          }}
+          error={errorFor('template')}
+          hint={
+            page.template
+              ? PAGE_TEMPLATES[page.template].description
+              : 'This page sets its shape by hand. Pick a template to take the house’s answers instead.'
+          }
+        />
+        <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            aria-expanded={layoutOpen}
+            aria-controls="admin-page-layout-advanced"
+            onClick={() => setLayoutOpen((open) => !open)}
+          >
+            {layoutOpen ? 'Hide the individual settings' : 'Change the individual settings'}
+          </button>
+          <div id="admin-page-layout-advanced" hidden={!layoutOpen} className="mt-sm">
+            <p className="mb-sm max-w-[65ch] text-caption text-admin-ink-secondary">
+              The parts a template sets. Change one and the page stops following
+              its template — the template above reads “Custom” from then on, and
+              picking a template again sets all three back.
+            </p>
+            <div className="grid gap-sm sm:grid-cols-2">
+              {EDITABLE_LAYOUT_KEYS.map((key) => (
+                <SelectField
+                  key={key}
+                  label={LAYOUT_LABELS[key]}
+                  value={page.layout?.[key] ?? PAGE_LAYOUT_DEFAULTS[key]}
+                  options={PAGE_LAYOUT_VALUES[key].map((value) => ({
+                    value,
+                    label: LAYOUT_VALUE_LABELS[value] ?? value,
+                  }))}
+                  onChange={(value) =>
+                    update({ template: null, layout: { ...page.layout, [key]: value } })
+                  }
+                  error={errorFor(`layout.${key}`)}
+                  hint={LAYOUT_HINTS[key]}
+                />
+              ))}
+            </div>
+            <p className="mt-sm max-w-[65ch] text-caption text-admin-ink-secondary">
+              Where the navigation sits is not here: it is one setting for the
+              whole site, on the Branding tab.
+            </p>
+          </div>
         </div>
       </Panel>
 
@@ -506,14 +603,11 @@ export default function AdminPageEditor({ mode }) {
                     {isSystemPage ? (
                       <SelectField
                         label={`Section ${sectionIndex + 1} position`}
-                        value={section.slot}
-                        options={SECTION_SLOTS.map((slot) => ({
-                          value: slot,
-                          label: SLOT_LABELS[slot],
-                        }))}
+                        value={slotValue(section.slot)}
+                        options={SLOT_CHOICES}
                         onChange={(value) => updateSection(sectionIndex, { slot: value })}
                         error={errorFor(`${at}.slot`)}
-                        hint="Where this section renders around the page's built-in content."
+                        hint="Where this section is inserted, relative to the page's built-in feature."
                       />
                     ) : null}
                     <div className="sm:col-span-2">

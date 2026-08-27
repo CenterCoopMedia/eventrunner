@@ -15,15 +15,31 @@ Every `cmsPages` document (About, Travel, Conduct, and anything else seeded or a
 publish state visible in the list: **Never published** (draft only), **Unpublished changes** (a
 published page with a dirty draft), or fully published. Create, edit, and publish from here.
 
-Each page also sets its own **layout**: the header (full or compact nameplate — a page always has
-one), whether it arranges its items as a grid or a list, how much space sits between things, and
-whether navigation runs across the top or down the side. A page that has never been given a layout
-renders the defaults, so nothing changes until you change it.
+Each page picks a **template** — what kind of page it is:
 
-A **system page** — home, schedule, speakers, sponsors — keeps its built-in content and lets you
-put sections around it. Each section on one of those pages picks a position: above the main
-content, with it, or below it. Custom pages have no built-in content, so they have no position to
-pick.
+| Template | Use it for |
+|---|---|
+| Standard page | The ordinary page. Start here. |
+| Feature first | A page whose subject is the first thing to see. |
+| Directory with introduction | A few words, then entries in columns — speakers, sponsors. |
+| Long read | Mostly text, meant to be read straight through. |
+| Schedule | Dense and time-led, so a long day fits on one screen. |
+| Landing page | A front page or a section opener. |
+
+Picking one sets the header, the arrangement, and the spacing together. If a page genuinely needs
+to differ, **Change the individual settings** opens those three controls; changing one there means
+the page stops following its template, and the template reads "Custom" until you pick one again. A
+page that has never been given a template or a layout renders the defaults, so nothing changes
+until you change it.
+
+Where the navigation sits — across the top, or down the side on wide screens — is **not** a page
+setting. It is one choice for the whole site, on the Branding tab, because a navigation that moves
+between pages stops being the shell that tells a reader where they are.
+
+A **system page** — home, schedule, speakers, sponsors — keeps its built-in feature and lets you
+put sections around it. Each section on one of those pages picks where it is inserted: **before the
+main feature** or **after the main feature**. Custom pages have no built-in feature, so they have
+no insertion point to pick.
 
 ## Content (Pages → Content editor)
 

@@ -261,7 +261,18 @@ describe('page editor', () => {
 
     const { page } = bodyOf(0);
     expect(Object.keys(page).sort()).toEqual(
-      ['icon', 'id', 'label', 'layout', 'order', 'path', 'sections', 'systemPage', 'visible'].sort(),
+      [
+        'icon',
+        'id',
+        'label',
+        'layout',
+        'order',
+        'path',
+        'sections',
+        'systemPage',
+        'template',
+        'visible',
+      ].sort(),
     );
     expect(page).not.toHaveProperty('seeded');
     expect(page).not.toHaveProperty('status');
@@ -381,10 +392,81 @@ describe('page editor', () => {
   });
 
   // Layout variants and section slots (design brief §6.1, §6.2).
-  it('sends the layout the operator picked, and offers no headerless option', async () => {
+  // THE OPERATOR PICKS A TASK. The individual variants are still reachable,
+  // behind a disclosure, for the page that genuinely needs to differ.
+  function openIndividualSettings() {
+    fireEvent.click(screen.getByRole('button', { name: 'Change the individual settings' }));
+  }
+
+  it('names six tasks and no design-system parts in the main editor', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+
+    const template = screen.getByLabelText('Template');
+    expect(within(template).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Standard page',
+      'Feature first',
+      'Directory with introduction',
+      'Long read',
+      'Schedule',
+      'Landing page',
+      'Custom — set by hand below',
+    ]);
+    // The parts are not in the main editor: they are inside a collapsed
+    // disclosure, which is not in the accessibility tree until it opens.
+    expect(screen.queryByRole('combobox', { name: 'Header' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Arrangement' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Density' })).toBeNull();
+  });
+
+  it('sets the whole bundle from one template pick', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
+
+    fireEvent.change(screen.getByLabelText('Template'), { target: { value: 'long-read' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const { page } = bodyOf(0);
+    expect(page.template).toBe('long-read');
+    expect(page.layout).toEqual({
+      header: 'nameplate-compact',
+      arrangement: 'list',
+      density: 'loose',
+    });
+  });
+
+  it('stops claiming a template once a part is set by hand', async () => {
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, template: 'standard', layout: { density: 'comfortable' } }];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+    await renderAt('/admin/pages/scholarships');
+    expect(screen.getByLabelText('Template')).toHaveValue('standard');
+
+    openIndividualSettings();
+    fireEvent.change(screen.getByLabelText('Arrangement'), { target: { value: 'grid' } });
+    expect(screen.getByLabelText('Template')).toHaveValue('custom');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const { page } = bodyOf(0);
+    expect(page.template).toBeNull();
+    expect(page.layout).toEqual({ density: 'comfortable', arrangement: 'grid' });
+  });
+
+  it('claims no template for a page that never named one', async () => {
+    // Two of "Long read"'s three values, by coincidence. A page whose
+    // values happen to match a template has not chosen that template.
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, layout: { density: 'loose', arrangement: 'list' } }];
+    await renderAt('/admin/pages/scholarships');
+    expect(screen.getByLabelText('Template')).toHaveValue('custom');
+  });
+
+  it('sends the individual settings the operator picked, and offers no headerless option', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+    await renderAt('/admin/pages/scholarships');
+    openIndividualSettings();
 
     // Every public page keeps a nameplate: compact is the smallest header.
     const header = screen.getByLabelText('Header');
@@ -394,35 +476,74 @@ describe('page editor', () => {
     ]);
 
     fireEvent.change(screen.getByLabelText('Arrangement'), { target: { value: 'grid' } });
-    fireEvent.change(screen.getByLabelText('Navigation'), { target: { value: 'side' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    // The two controls the operator moved, and nothing else: a page that
+    // The one control the operator moved, and nothing else: a page that
     // never chose a density or a header keeps choosing neither, so it goes
     // on following the theme instead of being pinned by a save.
-    expect(bodyOf(0).page.layout).toEqual({ arrangement: 'grid', navPlacement: 'side' });
+    expect(bodyOf(0).page.layout).toEqual({ arrangement: 'grid' });
+  });
+
+  it('never offers a per-page navigation control again', async () => {
+    // Where the navigation sits is one setting for the whole site
+    // (config/theme.navPlacement), on the Branding tab.
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    openIndividualSettings();
+    expect(screen.queryByLabelText('Navigation')).toBeNull();
+    expect(screen.getByText(/one setting for the\s+whole site/)).toBeInTheDocument();
   });
 
   it('opens a stored layout on what the page says, not on the defaults', async () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, layout: { density: 'tight' } }];
     await renderAt('/admin/pages/scholarships');
+    openIndividualSettings();
     expect(screen.getByLabelText('Density')).toHaveValue('tight');
     expect(screen.getByLabelText('Arrangement')).toHaveValue('list');
   });
 
-  it('offers a section position on a system page only', async () => {
+  it('names the two insertion points in terms of the page, on a system page only', async () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'home', label: 'Home page', systemPage: true }];
     fetch.mockResolvedValueOnce(okResponse({ id: 'home', status: 'dirty' }));
     await renderAt('/admin/pages/home');
 
     // A section stored before this schema landed carries no slot; it reads
-    // as main, which is where it has always rendered.
+    // as main, which is where it has always rendered — and "after the main
+    // feature" is what that position IS, in the operator's words.
     const position = screen.getByLabelText('Section 1 position');
+    expect(within(position).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Before the main feature',
+      'After the main feature',
+    ]);
     expect(position).toHaveValue('main');
-    fireEvent.change(position, { target: { value: 'below' } });
+
+    fireEvent.change(position, { target: { value: 'above' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // The storage key is unchanged: only the words the operator reads are.
+    expect(bodyOf(0).page.sections[0].slot).toBe('above');
+  });
+
+  it('leaves a section already stored below the feature exactly where it is', async () => {
+    // `below` is a third stored position with no third name — it renders
+    // after the feature, which is what the control says about it. Touching
+    // nothing must not move it.
+    draftDocs = [
+      {
+        ...SCHOLARSHIPS_DRAFT,
+        id: 'home',
+        label: 'Home page',
+        systemPage: true,
+        sections: [{ ...SCHOLARSHIPS_DRAFT.sections[0], slot: 'below' }],
+      },
+    ];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'home', status: 'dirty' }));
+    await renderAt('/admin/pages/home');
+
+    expect(screen.getByLabelText('Section 1 position')).toHaveValue('main');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).page.sections[0].slot).toBe('below');
   });

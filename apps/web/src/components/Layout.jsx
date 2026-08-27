@@ -23,15 +23,28 @@
 //
 // Navigation is in the editorial register: text links, no pills, no tinted
 // ground. The active item is marked twice over (§8.1 — never color alone):
-// heavier weight plus a strong rule under the word. `layout.navPlacement`
-// moves the same list to the leading edge at wide viewports; at narrow
-// viewports, and to a screen reader, the two placements are the same nav in
-// the same place in the document.
+// heavier weight plus a strong rule under the word. `side` moves the same
+// list to the leading edge at wide viewports; at narrow viewports, and to a
+// screen reader, the two placements are the same nav in the same place in
+// the document.
+//
+// WHERE THE PLACEMENT COMES FROM, IN ORDER. It is a SITE setting now
+// (config/theme.navPlacement, shared/theme resolveNavPlacement): the
+// navigation is the part of the shell that tells a reader where they are,
+// and a shell that moves between pages is not a shell. One choice covers
+// every page, and the page editor no longer offers a per-page one.
+//
+// A page's own stored `layout.navPlacement` is still read, second, and only
+// where the site has said nothing. Deployments made before the move set it
+// per page; refusing to read it would silently restyle their pages on
+// upgrade, which is the one thing a layout change may not do. Nothing
+// writes a new one.
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
-import { PAGE_LAYOUT_DEFAULTS, statedPageLayout } from '../lib/pageLayout.js';
+import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
+import { statedPageLayout } from '../lib/pageLayout.js';
 import { brandingSrc } from '../lib/mediaSource.js';
 import Nameplate, { buildNameplate } from './editorial/Nameplate.jsx';
 import FeedbackModal from './FeedbackModal.jsx';
@@ -85,7 +98,7 @@ export default function Layout() {
   const layout = statedPageLayout(getPage(pathname));
   const compact = (layout.header ?? (isHome ? 'nameplate' : 'nameplate-compact')) ===
     'nameplate-compact';
-  const navPlacement = layout.navPlacement ?? PAGE_LAYOUT_DEFAULTS.navPlacement;
+  const navPlacement = resolveNavPlacement(theme) ?? layout.navPlacement ?? DEFAULT_NAV_PLACEMENT;
   const plate = buildNameplate(eventConfig, { compact });
 
   // One nav, placed two ways. The list, its labels, its landmark, and its

@@ -43,6 +43,7 @@ import {
   THEME_TEXTURES,
   THEME_PRESET_IDS,
   THEME_MOTIF_SET_IDS,
+  THEME_NAV_PLACEMENTS,
   DEFAULT_MODE_POLICY,
   DEFAULT_PRESET_ID,
   ADMIN_TOKEN_SET,
@@ -164,6 +165,9 @@ export const PRESET_IDS = Object.freeze([...THEME_PRESET_IDS]);
 export { DEFAULT_PRESET_ID };
 /** The motif sets data-motif-set switches between (brief §3.8). */
 export const MOTIF_SET_IDS = Object.freeze([...THEME_MOTIF_SET_IDS]);
+
+/** Where the site puts its navigation (shared/theme THEME_NAV_PLACEMENTS). */
+export const NAV_PLACEMENT_IDS = Object.freeze([...THEME_NAV_PLACEMENTS]);
 
 /**
  * Convert a hex color string (data from config/theme) to `[r, g, b]`.

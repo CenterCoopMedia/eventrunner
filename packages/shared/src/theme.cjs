@@ -77,6 +77,27 @@ const THEME_RADIUS_IDS = Object.freeze(['sharp', 'small', 'soft', 'round']);
 /** What a preset's `shape.density` may say (brief §4, §6.1). */
 const THEME_DENSITIES = Object.freeze(['tight', 'comfortable', 'loose']);
 
+/**
+ * Where the site puts its navigation (design brief §6.1, and this review).
+ *
+ * IT IS A SITE SETTING, NOT A PAGE ONE. The navigation is the part of the
+ * shell that tells a reader where they are and what else there is. A reader
+ * who meets a top nav on the home page and a side rail on the schedule has
+ * been handed two different sites; the nav stops being furniture they can
+ * stop noticing, which is the whole job of furniture.
+ *
+ * So it lives here, in `config/theme`, beside the rest of what the site is
+ * shaped like — the preset, the texture, the radius, the mode policy — and
+ * one choice covers every page. `layout.navPlacement` on a page document is
+ * still read as that page's own fallback (apps/web/src/components/
+ * Layout.jsx), so a deployment that set it per page before this moved keeps
+ * rendering exactly what it rendered; the page editor no longer offers it.
+ */
+const THEME_NAV_PLACEMENTS = Object.freeze(['top', 'side']);
+
+/** What a site with no stated navigation placement renders at. */
+const DEFAULT_NAV_PLACEMENT = 'top';
+
 /** The branding slots `config/theme.logos` may fill (spec §7.2). */
 const THEME_LOGO_SLOTS = Object.freeze(['primary', 'mark', 'footer', 'ogDefault', 'favicon']);
 
@@ -90,7 +111,7 @@ const THEME_LOGO_SLOTS = Object.freeze(['primary', 'mark', 'footer', 'ogDefault'
  */
 const THEME_DOC_KEYS = Object.freeze([
   'colors', 'fonts', 'texture', 'radius', 'mode', 'logos', 'placeholderLogos',
-  'preset', 'optionPicks', 'tokens', 'motifSet', 'adminAccent',
+  'preset', 'optionPicks', 'tokens', 'motifSet', 'adminAccent', 'navPlacement',
 ]);
 
 /**
@@ -601,6 +622,22 @@ function resolveShape(theme) {
 }
 
 /**
+ * Where the site puts its navigation.
+ *
+ * `null` is a real answer and a different one from `'top'`: it means the
+ * site has not chosen, which is what lets a page document's own stored
+ * `layout.navPlacement` still decide for that page (back-compat — see
+ * THEME_NAV_PLACEMENTS above). The shell falls back to DEFAULT_NAV_PLACEMENT
+ * only when neither has anything to say.
+ *
+ * @param {object} theme
+ * @returns {'top'|'side'|null}
+ */
+function resolveNavPlacement(theme) {
+  return THEME_NAV_PLACEMENTS.includes(theme?.navPlacement) ? theme.navPlacement : null;
+}
+
+/**
  * The motif set the root element switches to (brief §3.8). The client's
  * choice wins; otherwise the preset's default; otherwise `none`.
  *
@@ -839,6 +876,8 @@ module.exports = {
   THEME_DENSITIES,
   THEME_LOGO_SLOTS,
   THEME_DOC_KEYS,
+  THEME_NAV_PLACEMENTS,
+  DEFAULT_NAV_PLACEMENT,
   THEME_COLOR_KEYS,
   THEME_COLOR_KEY_ALIASES,
   THEME_COLOR_PROPERTIES,
@@ -859,6 +898,7 @@ module.exports = {
   resolveComponentFonts,
   resolvePresetTokens,
   resolveShape,
+  resolveNavPlacement,
   resolveMotifSet,
   resolveThemePalettes,
   resolveLegacyColors,

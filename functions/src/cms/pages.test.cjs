@@ -9,7 +9,9 @@ const {
   createDeletePageHandler,
   PAGE_LAYOUT_VALUES,
   SECTION_SLOTS,
+  PAGE_TEMPLATE_IDS,
 } = require('./pages.cjs');
+const { PAGE_TEMPLATE_LAYOUTS } = require('./pageTemplates.cjs');
 const { makeFakeDb } = require('./firestoreFake.cjs');
 
 // ---------------------------------------------------------------- fixtures
@@ -268,6 +270,47 @@ test('validatePageDoc rejects a layout that is not an object', () => {
   assert.equal(validatePageDoc(validPage({ layout: 'grid' })).ok, false);
   assert.equal(validatePageDoc(validPage({ layout: ['grid'] })).ok, false);
   assert.equal(validatePageDoc(validPage({ layout: null })).ok, false);
+});
+
+// ---------------------------------------------------------- page templates
+
+test('validatePageDoc accepts a page with no template, and null for none', () => {
+  const page = validPage();
+  assert.equal('template' in page, false);
+  assert.equal(validatePageDoc(page).ok, true);
+  assert.equal(validatePageDoc(validPage({ template: null })).ok, true);
+});
+
+test('validatePageDoc accepts every template the catalogue names', () => {
+  for (const id of PAGE_TEMPLATE_IDS) {
+    const { ok, errors } = validatePageDoc(validPage({ template: id }));
+    assert.equal(ok, true, `template ${id}: ${errors.join('; ')}`);
+  }
+});
+
+test('validatePageDoc rejects an unknown template BY NAME', () => {
+  const { ok, errors } = validatePageDoc(validPage({ template: 'poster' }));
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.startsWith('template:') && e.includes('"poster"')));
+});
+
+test('every template bundle states every layout variant, in accepted values', () => {
+  // A template's whole job is to answer the questions the operator would
+  // otherwise have to. One left unstated leaves the page half-following the
+  // preset, which is the state templates exist to prevent.
+  for (const id of PAGE_TEMPLATE_IDS) {
+    const bundle = PAGE_TEMPLATE_LAYOUTS[id];
+    assert.deepEqual(Object.keys(bundle).sort(), ['arrangement', 'density', 'header']);
+    const { ok, errors } = validatePageDoc(validPage({ template: id, layout: { ...bundle } }));
+    assert.equal(ok, true, `${id}: ${errors.join('; ')}`);
+  }
+});
+
+test('navPlacement stays accepted on a page, so pages written before it moved still save', () => {
+  // The page editor stopped offering it — where the navigation sits is a
+  // site setting now. A validator that started rejecting a value it once
+  // wrote would make untouched pages unsaveable.
+  assert.equal(validatePageDoc(validPage({ layout: { navPlacement: 'side' } })).ok, true);
 });
 
 // ------------------------------------------------------ section slots (§6.2)

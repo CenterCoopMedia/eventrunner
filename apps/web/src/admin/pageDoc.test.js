@@ -16,8 +16,11 @@ import {
   PAGE_LAYOUT_VALUES,
   SECTION_SLOTS,
 } from '../lib/pageLayout.js';
+import { PAGE_TEMPLATES, PAGE_TEMPLATE_IDS, templateLayout } from '../lib/pageTemplates.js';
+import * as templatesCjs from '../../../../functions/src/cms/pageTemplates.cjs';
 
 const backend = pagesCjs.default ?? pagesCjs;
+const templatesBackend = templatesCjs.default ?? templatesCjs;
 
 const STORED = {
   id: 'scholarships',
@@ -89,6 +92,60 @@ describe('cmsPages key parity with the server', () => {
     expect([...SECTION_SLOTS]).toEqual([...backend.SECTION_SLOTS]);
   });
 
+  // A template is a named bundle of layout values, and the two copies of
+  // the catalogue must not drift: the server rejects an unknown id by name,
+  // and the editor is what applies the bundle. Same contract-by-test rule
+  // the block registry and the layout enums follow.
+  it('mirrors the page templates the server accepts, ids and bundles alike', () => {
+    expect([...PAGE_TEMPLATE_IDS]).toEqual([...templatesBackend.PAGE_TEMPLATE_IDS]);
+    expect([...PAGE_TEMPLATE_IDS]).toEqual([...backend.PAGE_TEMPLATE_IDS]);
+    for (const id of PAGE_TEMPLATE_IDS) {
+      expect(templateLayout(id)).toEqual({ ...templatesBackend.PAGE_TEMPLATE_LAYOUTS[id] });
+    }
+  });
+
+  it('gives every template an answer for every variant the system has', () => {
+    // A template that left one unstated would leave the page half-following
+    // the preset, which is the state templates exist to prevent. Navigation
+    // is deliberately absent: it is a site setting, not a page one.
+    for (const id of PAGE_TEMPLATE_IDS) {
+      expect(Object.keys(PAGE_TEMPLATES[id].layout).sort()).toEqual([
+        'arrangement',
+        'density',
+        'header',
+      ]);
+      for (const [key, value] of Object.entries(PAGE_TEMPLATES[id].layout)) {
+        expect(PAGE_LAYOUT_VALUES[key]).toContain(value);
+      }
+      expect(PAGE_TEMPLATES[id].label).toBeTruthy();
+      expect(PAGE_TEMPLATES[id].description).toBeTruthy();
+    }
+  });
+
+  it('gives the six templates six distinct shapes', () => {
+    const shapes = PAGE_TEMPLATE_IDS.map((id) => JSON.stringify(PAGE_TEMPLATES[id].layout));
+    expect(new Set(shapes).size).toBe(PAGE_TEMPLATE_IDS.length);
+  });
+
+  it('accepts a page that names a template, and rejects one that names a stranger', () => {
+    const page = toEditablePage({ ...STORED, template: 'long-read' });
+    expect(page.template).toBe('long-read');
+    expect(backend.validatePageDoc(toPagePayload(page)).errors).toEqual([]);
+
+    const invented = { ...toPagePayload(page), template: 'poster' };
+    expect(backend.validatePageDoc(invented).errors).toEqual([
+      `template: must be one of ${PAGE_TEMPLATE_IDS.join(', ')}, got "poster"`,
+    ]);
+  });
+
+  it('reads no template where none was named, and never infers one', () => {
+    // These are "Long read"'s three values exactly. The page still has not
+    // chosen Long read; it has three values that coincide.
+    const coincidence = { ...STORED, layout: { ...PAGE_TEMPLATES['long-read'].layout } };
+    expect(toEditablePage(coincidence).template).toBeNull();
+    expect(toPagePayload(toEditablePage(coincidence)).template).toBeNull();
+  });
+
   it('sends a payload the server accepts, layout and slots included', () => {
     const page = toEditablePage(STORED);
     page.layout.arrangement = 'grid';
@@ -108,8 +165,18 @@ describe('layout and slot', () => {
   });
 
   it('keeps a stored layout and invents nothing around it', () => {
+    const page = toEditablePage({ ...STORED, layout: { arrangement: 'grid' } });
+    expect(page.layout).toEqual({ arrangement: 'grid' });
+  });
+
+  it('still reads a navPlacement a page stored before the setting moved', () => {
+    // The editor stopped offering it; the reader did not stop reading it.
+    // A deployment that set it per page keeps rendering what it rendered,
+    // and a save of that page does not drop the value on the floor.
     const page = toEditablePage({ ...STORED, layout: { navPlacement: 'side' } });
     expect(page.layout).toEqual({ navPlacement: 'side' });
+    expect(toPagePayload(page).layout).toEqual({ navPlacement: 'side' });
+    expect(backend.validatePageDoc(toPagePayload(page)).errors).toEqual([]);
   });
 
   it('drops a stored value the system does not recognize', () => {

@@ -127,14 +127,34 @@
           <p>Every <code>cmsPages</code> document (About, Travel, Conduct, and anything else seeded or added) has a
           publish state visible in the list: <strong>Never published</strong> (draft only), <strong>Unpublished changes</strong> (a
           published page with a dirty draft), or fully published. Create, edit, and publish from here.</p>
-          <p>Each page also sets its own <strong>layout</strong>: the header (full or compact nameplate — a page always has
-          one), whether it arranges its items as a grid or a list, how much space sits between things, and
-          whether navigation runs across the top or down the side. A page that has never been given a layout
-          renders the defaults, so nothing changes until you change it.</p>
-          <p>A <strong>system page</strong> — home, schedule, speakers, sponsors — keeps its built-in content and lets you
-          put sections around it. Each section on one of those pages picks a position: above the main
-          content, with it, or below it. Custom pages have no built-in content, so they have no position to
-          pick.</p>
+          <p>Each page picks a <strong>template</strong> — what kind of page it is:</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Template</th><th>Use it for</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Standard page</td><td>The ordinary page. Start here.</td></tr>
+          <tr><td>Feature first</td><td>A page whose subject is the first thing to see.</td></tr>
+          <tr><td>Directory with introduction</td><td>A few words, then entries in columns — speakers, sponsors.</td></tr>
+          <tr><td>Long read</td><td>Mostly text, meant to be read straight through.</td></tr>
+          <tr><td>Schedule</td><td>Dense and time-led, so a long day fits on one screen.</td></tr>
+          <tr><td>Landing page</td><td>A front page or a section opener.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Picking one sets the header, the arrangement, and the spacing together. If a page genuinely needs
+          to differ, <strong>Change the individual settings</strong> opens those three controls; changing one there means
+          the page stops following its template, and the template reads &quot;Custom&quot; until you pick one again. A
+          page that has never been given a template or a layout renders the defaults, so nothing changes
+          until you change it.</p>
+          <p>Where the navigation sits — across the top, or down the side on wide screens — is <strong>not</strong> a page
+          setting. It is one choice for the whole site, on the Branding tab, because a navigation that moves
+          between pages stops being the shell that tells a reader where they are.</p>
+          <p>A <strong>system page</strong> — home, schedule, speakers, sponsors — keeps its built-in feature and lets you
+          put sections around it. Each section on one of those pages picks where it is inserted: <strong>before the
+          main feature</strong> or <strong>after the main feature</strong>. Custom pages have no built-in feature, so they have
+          no insertion point to pick.</p>
           <h2 id="content-pages-content-editor">Content (Pages → Content editor)<a class="heading-anchor" href="#content-pages-content-editor" aria-label="Link to this section">#</a></h2>
           <p>Filling in what a page&#39;s blocks actually say is a separate step from shaping the page: pick a
           page, then a section, then the block inside it. A page&#39;s <em>structure</em> — its sections, which block

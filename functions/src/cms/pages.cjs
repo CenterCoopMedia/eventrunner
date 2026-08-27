@@ -29,6 +29,7 @@
  */
 
 const { isKnownBlockType } = require('./blockTypes.cjs');
+const { PAGE_TEMPLATE_IDS } = require('./pageTemplates.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isReservedPathSegment } = require('shared/routing');
@@ -43,7 +44,7 @@ const DOC_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const PATH_SEGMENT_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** Keys a cmsPages doc may carry — anything else is rejected by name. */
-const PAGE_KEYS = Object.freeze(['id', 'label', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout']);
+const PAGE_KEYS = Object.freeze(['id', 'label', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template']);
 const SECTION_KEYS = Object.freeze(['id', 'label', 'description', 'allowedBlocks', 'maxBlocks', 'reorderable', 'defaultBlocks', 'slot']);
 const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
 
@@ -55,6 +56,24 @@ const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
  * public renderer both read; pageDoc.test.js pins the two together.
  */
 const PAGE_LAYOUT_KEYS = Object.freeze(['header', 'arrangement', 'density', 'navPlacement']);
+
+/**
+ * `navPlacement` is STILL ACCEPTED AND NO LONGER OFFERED (this review).
+ *
+ * Where the navigation sits is a property of the site, not of one page: a
+ * reader who meets a top nav on the home page and a side rail on the
+ * schedule has lost the shell that told them where they are. The setting
+ * moved to config/theme, beside the rest of the site's structure, and the
+ * page editor stopped offering it.
+ *
+ * It stays in this list because documents written before the move carry
+ * it, and a validator that started rejecting a value it once wrote would
+ * make those pages unsaveable — the operator would meet
+ * "layout.navPlacement: unknown field" on a page they never touched. The
+ * renderer still reads a stored value as the page's own fallback
+ * (apps/web/src/components/Layout.jsx), so nothing changes shape on
+ * upgrade either.
+ */
 
 /**
  * What each variant may say. Every value is checked on write and an unknown
@@ -145,6 +164,19 @@ function validatePageDoc(doc) {
   }
   if (typeof doc.visible !== 'boolean') errors.push('visible: must be a boolean');
   if (typeof doc.systemPage !== 'boolean') errors.push('systemPage: must be a boolean');
+
+  // `template` is the task the operator picked, and it is optional twice
+  // over: a document written before templates existed carries none, and an
+  // operator may still set the variants by hand without naming a template.
+  // Null and absent both mean "no template", which is a fact about the
+  // page rather than a gap — nothing infers one from the layout values.
+  if (doc.template !== undefined && doc.template !== null) {
+    if (!PAGE_TEMPLATE_IDS.includes(doc.template)) {
+      errors.push(
+        `template: must be one of ${PAGE_TEMPLATE_IDS.join(', ')}, got ${JSON.stringify(doc.template)}`,
+      );
+    }
+  }
 
   // `layout` is optional: a document written before this schema landed
   // carries none, reads as the default layout, and keeps working with no
@@ -431,5 +463,6 @@ module.exports = {
   PAGE_LAYOUT_KEYS,
   PAGE_LAYOUT_VALUES,
   SECTION_SLOTS,
+  PAGE_TEMPLATE_IDS,
   internals: { writeAdminLog, DOC_ID_RE, PAGE_KEYS, SECTION_KEYS, DEFAULT_BLOCK_KEYS },
 };

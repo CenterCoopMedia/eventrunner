@@ -40,6 +40,7 @@ import {
   FONT_SET_IDS,
   MODE_POLICY_IDS,
   MOTIF_SET_IDS,
+  NAV_PLACEMENT_IDS,
   PRESET_IDS,
   RADIUS_IDS,
   THEME_COLOR_KEYS,
@@ -67,6 +68,21 @@ import ThemeProof, { PROOF_PAGES } from '../components/ThemeProof.jsx';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 
 const LOGO_SLOTS = ['primary', 'mark', 'footer', 'ogDefault', 'favicon'];
+
+/**
+ * Where the site's navigation sits, in words (this review).
+ *
+ * IT IS ONE SETTING FOR THE WHOLE SITE, and it is here rather than on each
+ * page for the reason the rest of this tab exists: the navigation is part
+ * of what the site IS, not part of what one page is about. A reader who
+ * meets a top nav on the home page and a side rail on the schedule has been
+ * handed two sites, and the nav stops being the furniture they can stop
+ * noticing.
+ */
+const NAV_PLACEMENT_LABELS = Object.freeze({
+  top: 'Across the top',
+  side: 'Down the side',
+});
 
 /** What each slot is FOR — a path field alone never says (spec §7.2). */
 const LOGO_SLOT_LABELS = {
@@ -156,6 +172,12 @@ function toForm(theme) {
     // A stored document that predates the mode policy has no `mode`, and
     // light is what it renders, so light is what the form starts on.
     mode: MODE_POLICY_IDS.includes(theme?.mode) ? theme.mode : DEFAULT_MODE_POLICY,
+    // Blank is a real answer: a site that has never chosen leaves the
+    // placement to whatever a page document already stored (back-compat,
+    // components/Layout.jsx) and then to the top. Defaulting the form to
+    // 'top' would take that fallback away on the next save of any other
+    // field on this tab.
+    navPlacement: NAV_PLACEMENT_IDS.includes(theme?.navPlacement) ? theme.navPlacement : '',
   };
 }
 
@@ -194,6 +216,7 @@ export function toThemeDoc(form) {
   }
   if (Object.keys(tokens).length > 0) doc.tokens = tokens;
   if (form.motifSet) doc.motifSet = form.motifSet;
+  if (form.navPlacement) doc.navPlacement = form.navPlacement;
   if (form.adminAccent.trim()) doc.adminAccent = form.adminAccent.trim();
   return doc;
 }
@@ -433,8 +456,22 @@ export default function AdminBranding() {
             </Panel>
           ) : null}
 
-          <Panel title="Motifs, mode, and the admin mark">
+          <Panel title="Motifs, navigation, mode, and the admin mark">
             <div className="flex flex-col gap-sm">
+              <SelectField
+                label="Where the navigation sits"
+                value={form.navPlacement}
+                options={[
+                  { value: '', label: 'Across the top (the default)' },
+                  ...NAV_PLACEMENT_IDS.map((id) => ({
+                    value: id,
+                    label: NAV_PLACEMENT_LABELS[id] ?? id,
+                  })),
+                ]}
+                onChange={(value) => setForm((c) => ({ ...c, navPlacement: value }))}
+                hint="One choice for every page. Down the side becomes a rail on wide screens; on a phone it is the same list across the top either way."
+                error={fieldErrors.get('theme.navPlacement')}
+              />
               <SelectField
                 label="Motif set"
                 value={form.motifSet}

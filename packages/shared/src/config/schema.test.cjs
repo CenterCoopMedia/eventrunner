@@ -206,6 +206,20 @@ test('validateTheme enforces hex colors', () => {
   assert.equal(validateTheme({}).ok, false);
 });
 
+test('validateTheme accepts a site navigation placement, and rejects a stranger', () => {
+  // Where the navigation sits is a SITE setting: a reader who meets a top
+  // nav on one page and a rail on the next has been handed two sites.
+  const base = { colors: {} };
+  assert.equal(validateTheme({ ...base, navPlacement: 'side' }).ok, true);
+  assert.equal(validateTheme({ ...base, navPlacement: 'top' }).ok, true);
+  // Absent is a real answer — it leaves the placement to whatever a page
+  // document already stored, and then to the top.
+  assert.equal(validateTheme(base).ok, true);
+  const { ok, errors } = validateTheme({ ...base, navPlacement: 'floating' });
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.startsWith('theme.navPlacement:') && e.includes('"floating"')));
+});
+
 test('validateBadgesConfig enforces unique ids and positive maxPicks', () => {
   const good = validateBadgesConfig({
     categories: [

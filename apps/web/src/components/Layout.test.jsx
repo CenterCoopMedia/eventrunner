@@ -41,8 +41,11 @@ const FIXTURE_EVENT = {
   legal: {},
 };
 
-function renderShell(logos, { path = '/', event = FIXTURE_EVENT, pageDoc = null } = {}) {
-  theme = { logos };
+function renderShell(
+  logos,
+  { path = '/', event = FIXTURE_EVENT, pageDoc = null, themeDoc = null } = {},
+) {
+  theme = { logos, ...themeDoc };
   eventConfig = event;
   page = pageDoc;
   return render(
@@ -191,7 +194,7 @@ describe('Layout variants (brief §6.1)', () => {
     const { container: top } = renderShell({}, { path: '/schedule' });
     const { container: side } = renderShell(
       {},
-      { path: '/schedule', pageDoc: { path: '/schedule', layout: { navPlacement: 'side' } } },
+      { path: '/schedule', themeDoc: { navPlacement: 'side' } },
     );
 
     // Same landmark, same items, same order — the rail is a placement, not
@@ -211,5 +214,36 @@ describe('Layout variants (brief §6.1)', () => {
     expect(nav.className).toContain('border-b-hairline');
     expect(nav.className).toContain('lg:border-e-hairline');
     expect(top.querySelector('nav').className).not.toContain('lg:');
+  });
+
+  // WHERE THE NAVIGATION SITS IS A SITE SETTING (this review). One choice
+  // covers every page: a reader who meets a top nav on the home page and a
+  // rail on the schedule has been handed two sites.
+  it('takes the placement from config/theme, whatever a page says', () => {
+    const { container } = renderShell(
+      {},
+      {
+        path: '/schedule',
+        themeDoc: { navPlacement: 'top' },
+        pageDoc: { path: '/schedule', layout: { navPlacement: 'side' } },
+      },
+    );
+    expect(container.querySelector('nav').className).not.toContain('lg:');
+  });
+
+  it('still honours a page that stored a placement before the setting moved', () => {
+    // Deployments made before the move set it per page. Refusing to read it
+    // would silently restyle their pages on upgrade, which is the one thing
+    // a layout change may not do.
+    const { container } = renderShell(
+      {},
+      { path: '/schedule', pageDoc: { path: '/schedule', layout: { navPlacement: 'side' } } },
+    );
+    expect(container.querySelector('nav').className).toContain('lg:border-e-hairline');
+  });
+
+  it('puts the nav across the top when neither the site nor the page says', () => {
+    const { container } = renderShell({}, { path: '/schedule' });
+    expect(container.querySelector('nav').className).not.toContain('lg:');
   });
 });
