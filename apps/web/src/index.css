@@ -207,9 +207,14 @@
      box-behind-box layering this system allows, and it is a printing
      artefact, not depth). The six tests it ships against:
 
-     1. FLAT. The layer is the block's own shape in one token colour. No
-        blur, no gradient, no grey — none of those three words appears in
-        these rules, and a reviewer can check that by reading them.
+     1. FLAT. The layer is the block's own shape in one token colour at one
+        token strength. No blur, no gradient, no grey — none of those three
+        words appears in these rules, and a reviewer can check that by
+        reading them. The strength is what keeps the layer a TINT of the
+        accent rather than the accent: Zine spends the accent at full
+        strength twice a page, and a stamp prints on every row, so full
+        strength here would both spend the rare accent twenty times and
+        turn the misregistration into the coloured card edge §2.4 rejects.
      2. A FIXED SMALL DISTANCE. The offset is --session-card-stamp-offset.
         It never scales with the pointer and never follows it: nothing here
         reads a pointer position at all.
@@ -249,7 +254,7 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background-color: rgb(var(--session-card-stamp-rgb));
+    background-color: rgb(var(--session-card-stamp-rgb) / var(--session-card-stamp-alpha));
     transform: translate(var(--session-card-stamp-offset), var(--session-card-stamp-offset));
   }
   /* The face is the first pass, and it prints its own ground ONLY where

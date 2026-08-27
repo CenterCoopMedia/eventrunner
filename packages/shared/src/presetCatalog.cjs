@@ -812,6 +812,7 @@ const PRESETS = Object.freeze({
             id: 'stamped-block',
             tokens: {
               '--session-card-stamp-offset': '4px',
+              '--session-card-stamp-alpha': '0.55',
               '--folio-rule-top-width': '0',
             },
           },

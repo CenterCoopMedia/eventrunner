@@ -148,8 +148,10 @@
           "id": "stamped-block",
           "label": "Stamped block",
           "why": "Misregistration is what a two-pass print looks like, which is the story’s whole production method. It ships under the brief §2.4 exception, Zine only.",
+          "$tint-note": "The layer is a tint of the accent, not the accent itself. Zine spends the accent at full strength twice a page; a stamp is on every row, so at full strength the page would carry twenty of them and the rare accent would stop meaning anything. It would also read as the coloured card edge §2.4 rejects rather than as the second print pass §2.4 allows. At this strength the hue is still plainly the accent and the layer still reads as ink that went down after the first pass.",
           "tokens": {
             "--session-card-stamp-offset": "4px",
+            "--session-card-stamp-alpha": "0.55",
             "--folio-rule-top-width": "0"
           }
         },

@@ -55,13 +55,31 @@ const noPreference = indexCss.match(
 
 describe('the Zine stamp', () => {
   it('1. is flat: no blur, no gradient, no grey', () => {
-    // The offset LAYER is the thing this test binds: one flat token colour,
-    // nothing else. (The face beside it paints its own ground with a
-    // two-stop same-colour gradient, which is a solid fill written as an
-    // image so it can be sized from the offset — see the last test here.)
+    // The offset LAYER is the thing this test binds: one flat token colour
+    // at one token strength, nothing else. (The face beside it paints its
+    // own ground with a two-stop same-colour gradient, which is a solid
+    // fill written as an image so it can be sized from the offset — see the
+    // last test here.)
     const layer = staticCss.match(/\.session-block::before \{[^}]*\}/)[0];
-    expect(layer).toContain('background-color: rgb(var(--session-card-stamp-rgb));');
+    expect(layer).toContain(
+      'background-color: rgb(var(--session-card-stamp-rgb) / var(--session-card-stamp-alpha));',
+    );
     expect(layer).not.toMatch(/blur|gradient|box-shadow|filter|grey|gray/);
+    // One colour at one strength is still flat, and the strength is what
+    // keeps the layer a TINT of the accent rather than the accent. Zine
+    // spends the accent at full strength twice a page (visual story, Zine)
+    // and a stamp prints on every row, so a full-strength layer would spend
+    // the rare accent twenty times over and read as the coloured card edge
+    // §2.4 rejects instead of the second print pass §2.4 allows.
+    const stamped = getPreset('zine').options.component.choices.find(
+      (choice) => choice.id === 'stamped-block',
+    );
+    const tint = Number(stamped.tokens['--session-card-stamp-alpha']);
+    expect(tint).toBeGreaterThan(0);
+    expect(tint).toBeLessThan(1);
+    // Full ink is the contract default, so only the choice that draws the
+    // layer ever asks for less than all of it.
+    expect(themeCss).toContain('--session-card-stamp-alpha: 1;');
   });
 
   it('2. is offset a fixed small distance, and never follows the pointer', () => {
@@ -85,6 +103,17 @@ describe('the Zine stamp', () => {
       for (const offset of offsets) {
         if (id === 'zine') continue;
         expect(offset, `${id} keeps the stamp off`).toBe('0');
+      }
+      // Nor may another preset reach the tint: the whole device, colour
+      // strength included, is Zine's.
+      if (id !== 'zine') {
+        const tints = [
+          preset.tokens?.['--session-card-stamp-alpha'],
+          ...Object.values(preset.options || {}).flatMap((group) =>
+            group.choices.map((choice) => choice.tokens?.['--session-card-stamp-alpha']),
+          ),
+        ].filter((value) => value !== undefined);
+        expect(tints, `${id} never tints the stamp`).toEqual([]);
       }
     }
     // Zine's stamped-block variant is the only place a non-zero offset is
@@ -122,7 +151,9 @@ describe('the Zine stamp', () => {
     // — not a shortened animation. The stamp itself is outside the query,
     // so it still prints.
     expect(staticCss).toContain('.session-block::before');
-    expect(staticCss).toContain('background-color: rgb(var(--session-card-stamp-rgb));');
+    expect(staticCss).toContain(
+      'background-color: rgb(var(--session-card-stamp-rgb) / var(--session-card-stamp-alpha));',
+    );
     expect(staticCss).not.toMatch(/\.session-block[^{]*\{[^}]*transition/);
     expect(staticCss).not.toContain(':has(:focus-visible)');
     expect(staticCss).not.toMatch(/\.session-block:hover/);

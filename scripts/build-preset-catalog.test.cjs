@@ -191,6 +191,15 @@ test('the stamp is Zine only, and Zine ships the flat-block variant beside it', 
   const stamped = PRESETS.zine.options.component.choices;
   assert.ok(stamped.some((choice) => choice.tokens['--session-card-stamp-offset'] !== '0'));
   assert.ok(stamped.some((choice) => choice.tokens['--session-card-stamp-offset'] === '0'));
+  // The choice that draws the layer tints it. Zine spends the accent at full
+  // strength twice a page (visual story, Zine), and a stamp prints on every
+  // row, so a full-strength layer would spend the rare accent twenty times
+  // and read as the coloured card edge §2.4 rejects.
+  const drawn = stamped.filter((choice) => choice.tokens['--session-card-stamp-offset'] !== '0');
+  for (const choice of drawn) {
+    const alpha = Number(choice.tokens['--session-card-stamp-alpha']);
+    assert.ok(alpha > 0 && alpha < 1, `${choice.id} tints the stamp rather than printing it at full ink`);
+  }
   for (const [id, preset] of Object.entries(PRESETS)) {
     if (id === 'zine') continue;
     const remaps = [
@@ -201,6 +210,11 @@ test('the stamp is Zine only, and Zine ships the flat-block variant beside it', 
     ];
     assert.equal(
       remaps.includes('--session-card-stamp-offset'),
+      false,
+      `${id} never touches the stamp`,
+    );
+    assert.equal(
+      remaps.includes('--session-card-stamp-alpha'),
       false,
       `${id} never touches the stamp`,
     );

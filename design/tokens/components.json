@@ -9,6 +9,8 @@
     "--session-card-stamp-rgb": "--color-accent-rgb",
     "--session-card-rule-width": "var(--rule-hairline-width)",
     "--session-card-stamp-offset": "0",
+    "$stamp-tint-note": "How much of that ink the second pass lays down. The brief calls the layer 'tinted with theme ink or the accent' and the Zine story spends the accent at full strength twice a page, never more — so a stamp on every row of a programme has to be a tint, not the full accent. Full ink is the contract default here because it is the neutral value; Zine's stamped block, the one choice that ever draws the layer, sets the tint it wants. Flat still means flat: a tint is one colour at one strength, with no blur and no gradient.",
+    "--session-card-stamp-alpha": "1",
     "--session-card-lead-scale": "1",
     "$gap-note": "The gutter between the listings column and the row's text at wide viewports. At narrow ones the row is a single column and the gutter is not drawn.",
     "--session-card-gap": "var(--space-md)",

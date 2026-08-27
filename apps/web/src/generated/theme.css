@@ -143,6 +143,7 @@
   /* Tier 3 — session-card contract (brief §3.1). */
   --session-card-rule-width: var(--rule-hairline-width);
   --session-card-stamp-offset: 0;
+  --session-card-stamp-alpha: 1;
   --session-card-lead-scale: 1;
   --session-card-gap: var(--space-md);
   --session-card-pad-block: var(--space-md);
