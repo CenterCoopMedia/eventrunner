@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin guide — Event Runner documentation</title>
+  <meta name="description" content="Every admin screen, in the order staff meet them.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/admin-guide/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Admin guide — Event Runner documentation">
+  <meta property="og:description" content="Every admin screen, in the order staff meet them.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/admin-guide/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Admin guide — Event Runner documentation">
+  <meta name="twitter:description" content="Every admin screen, in the order staff meet them.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
+        <span class="brand-text">
+          <strong>Event Runner</strong>
+          <span>Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Admin guide</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/" aria-current="page" class="is-current">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Admin guide</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#pages">Pages</a></li>
+              <li><a href="#content-pages-content-editor">Content (Pages → Content editor)</a></li>
+              <li><a href="#media">Media</a></li>
+              <li><a href="#speakers">Speakers</a></li>
+              <li><a href="#attendees">Attendees</a></li>
+              <li><a href="#ticketing">Ticketing</a></li>
+              <li><a href="#live-updates">Live updates</a></li>
+              <li><a href="#feedback">Feedback</a></li>
+              <li><a href="#materials">Materials</a></li>
+              <li><a href="#system-errors">System errors</a></li>
+              <li><a href="#settings">Settings</a></li>
+              <li><a href="#legal-pages-settings-or-wherever-the-review-banner-points">Legal pages (Settings, or wherever the review banner points)</a></li>
+            </ul>
+          </nav>
+          <p>Task-oriented reference to every tab in the admin CMS, for the staff who run a client&#39;s event day
+          to day. For the narrative, &quot;why does this work this way&quot; version, see
+          <a href="/eventrunner/docs/handbook/for-event-staff/"><code>docs/handbook/for-event-staff.md</code></a> — that page is the one to hand a
+          new staff member first; this one is what you come back to for a specific task.</p>
+          <p>Draft and live are separate almost everywhere below. Saving writes a draft; publishing copies it to
+          what attendees see. If a change isn&#39;t showing up on the public site, check that you published, not
+          only saved.</p>
+          <h2 id="pages">Pages<a class="heading-anchor" href="#pages" aria-label="Link to this section">#</a></h2>
+          <p>Every <code>cmsPages</code> document (About, Travel, Conduct, and anything else seeded or added) has a
+          publish state visible in the list: <strong>Never published</strong> (draft only), <strong>Unpublished changes</strong> (a
+          published page with a dirty draft), or fully published. Create, edit, and publish from here.</p>
+          <h2 id="content-pages-content-editor">Content (Pages → Content editor)<a class="heading-anchor" href="#content-pages-content-editor" aria-label="Link to this section">#</a></h2>
+          <p>Filling in what a page&#39;s blocks actually say is a separate step from shaping the page: pick a
+          page, then a section, then the block inside it. A page&#39;s <em>structure</em> — its sections, which block
+          types each allows, default blocks — is set in the page editor above; this tree of screens is for
+          the block <em>content</em> itself. Every one of the eight CMS block types is editable here.</p>
+          <h2 id="media">Media<a class="heading-anchor" href="#media" aria-label="Link to this section">#</a></h2>
+          <p>A browsable library, split by namespace because each answers a different question:</p>
+          <ul>
+          <li><strong><code>cms-images/</code></strong> — images used inside pages and posts. Client-writable through this tab.</li>
+          <li><strong><code>branding/</code></strong> — logo slots, backed by the same reusable image picker the Branding tab uses.</li>
+          <li><strong><code>speaker-photos/</code></strong> — set from the speaker editor, not uploaded loose here.</li>
+          </ul>
+          <p>Upload, edit alt text, and delete from the library. A delete warns you first if anything currently
+          on the site references the asset — don&#39;t dismiss that warning without checking what it names.</p>
+          <h2 id="speakers">Speakers<a class="heading-anchor" href="#speakers" aria-label="Link to this section">#</a></h2>
+          <p>The canonical <code>speakers/{speakerId}</code> list, with each record&#39;s pipeline status and the entry points
+          to create, edit, invite, and review pending edits. This list reads the real speaker records, not
+          the public-facing projection, on purpose — an admin needs to see speakers who aren&#39;t published yet:
+          drafts, outstanding invites, soft-deleted records.</p>
+          <p><strong>Pipeline states</strong>, top to bottom of what a speaker record moves through:</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Status</th><th>What it means</th><th>Action available</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Not invited (<code>draft</code>)</td><td>Speaker record exists, no invite sent</td><td>Invite</td></tr>
+          <tr><td>Invite sent (<code>invited</code>)</td><td>Emailed; not yet accepted</td><td>Resend</td></tr>
+          <tr><td>Accepted / published</td><td>Speaker signed in and (optionally) edited their own profile</td><td>—</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p><strong>Pending-edits review.</strong> A speaker can propose changes to their own profile after accepting an
+          invite; those land in <code>speaker.pendingEdits</code>, not directly on the live record, until an admin
+          approves them. Review and approve (or reject) from the speaker&#39;s row — the queued fields are named
+          right there, so you&#39;re never approving a change blind.</p>
+          <p><strong>Create/edit form.</strong> Every field except <code>uid</code> and <code>inviteToken</code> is editable here — those two move
+          together in a single server-side transaction as part of the invite/accept pipeline and are never
+          part of an admin payload, by design (a leaked value there is rejected by name on the server, not
+          silently accepted).</p>
+          <p>One speaker record is the source of truth. If a name is wrong in three places on the public site,
+          fix the speaker record — don&#39;t patch each place it appears.</p>
+          <h2 id="attendees">Attendees<a class="heading-anchor" href="#attendees" aria-label="Link to this section">#</a></h2>
+          <p>The full attendee list with registration status and a search/filter. What action is available
+          depends on the current status:</p>
+          <ul>
+          <li><strong>Pending / ticketed</strong> → Approve</li>
+          <li><strong>Approved</strong> → Revoke (approving again is available only when the original approval came from a
+          ticket — re-approving pins <code>approvalSource</code> to <code>admin</code> so a subsequent revoke behaves correctly)</li>
+          <li><strong>Revoked</strong> → Approve (the only way out of revoked)</li>
+          </ul>
+          <p>Approve/revoke always go through the server endpoints (<code>approveUser</code>/<code>revokeUser</code>) — every
+          registration field involved, including <code>approvalSource</code>, is server-owned and not editable directly,
+          even for the account&#39;s own owner.</p>
+          <h2 id="ticketing">Ticketing<a class="heading-anchor" href="#ticketing" aria-label="Link to this section">#</a></h2>
+          <p>Provider status, CSV import, and a searchable ticket list — what&#39;s here depends on the client&#39;s
+          provider choice (<code>docs/CLIENT_ONBOARDING.md</code> §3 item 5):</p>
+          <ul>
+          <li><strong>Eventbrite</strong>: provider status shows webhook registration state (from
+          <code>scripts/register-ticketing-webhook.cjs</code>) and recent sync activity.</li>
+          <li><strong>Manual / CSV import</strong>: upload a spreadsheet, map its columns to attendee fields, preview the
+          import as a dry run, then commit it. This is the whole ticketing story for a <code>manual</code> deployment
+          — there&#39;s no webhook tab content to speak of.</li>
+          <li><strong>None</strong>: nothing to configure.</li>
+          </ul>
+          <p>Ticket records themselves are server-only in Firestore (no direct client read/write); every list,
+          search, and import here goes through an admin-gated endpoint.</p>
+          <h2 id="live-updates">Live updates<a class="heading-anchor" href="#live-updates" aria-label="Link to this section">#</a></h2>
+          <p>Compose, edit, and delete entries in the live-updates feed shown on the public site. There is no
+          draft/publish step here, unlike the CMS content tabs — a save here is live immediately. This is an
+          admin-authored feed only; nothing ingests from Slack or any other external source.</p>
+          <h2 id="feedback">Feedback<a class="heading-anchor" href="#feedback" aria-label="Link to this section">#</a></h2>
+          <p>Every submission from the public feedback modal, newest first, with a mark-reviewed / archived
+          action. This reads the feedback collection directly (admins can read it under <code>firestore.rules</code>);
+          only the status change goes through the admin endpoint, because the rules deny every client write
+          to the collection outright.</p>
+          <h2 id="materials">Materials<a class="heading-anchor" href="#materials" aria-label="Link to this section">#</a></h2>
+          <p>Session materials review — upload or link files against a session, with an optional embargo that
+          holds the material until the session ends. Prefer a real label (&quot;Slides&quot;) over a bare URL as the
+          link text a viewer sees. This collection is fully server-only, even for an admin&#39;s direct Firestore
+          read, so every action here — upload, edit, delete — goes through Cloud Functions rather than a
+          client SDK call.</p>
+          <h2 id="system-errors">System errors<a class="heading-anchor" href="#system-errors" aria-label="Link to this section">#</a></h2>
+          <p>Unresolved <code>system_errors</code> rows — the operational surface for things like an invalid email-template
+          override falling back to its code default. Each row has a resolve action. This collection is
+          server-only in Firestore; the list and the resolve action both go through admin endpoints
+          (<code>functions/src/telemetry/systemErrors.cjs</code>). If you&#39;re chasing down why a template edit &quot;isn&#39;t
+          working,&quot; check here before assuming it&#39;s a bug — a rejected override logs here and silently keeps
+          serving the last-good copy rather than breaking the send.</p>
+          <h2 id="settings">Settings<a class="heading-anchor" href="#settings" aria-label="Link to this section">#</a></h2>
+          <h3 id="event-settings">Event settings<a class="heading-anchor" href="#event-settings" aria-label="Link to this section">#</a></h3>
+          <p>The <code>config/event</code> fields an admin owns: name, dates, timezone, venue, sender address, and the rest
+          of the event&#39;s identity fields. This is a merge-then-validate write — the form only needs to send
+          the keys it&#39;s actually changing; fields it doesn&#39;t touch (like the legal postal address or SEO
+          metadata) are left alone.</p>
+          <h3 id="features">Features<a class="heading-anchor" href="#features" aria-label="Link to this section">#</a></h3>
+          <p>Feature flags, wired to a <strong>whole-document replace</strong> — every known flag is always sent, and an
+          omitted flag means disabled. When a new flag is added to the platform, it appears here automatically
+          because the form&#39;s key list comes from the same shared schema the server validates against; there&#39;s
+          no separate &quot;add it to the admin UI&quot; step.</p>
+          <h3 id="badges">Badges<a class="heading-anchor" href="#badges" aria-label="Link to this section">#</a></h3>
+          <p>The badge catalog: categories, each with a max-picks cap and its list of badges, which attendees
+          self-select from on their profile. Also a whole-document replace — editing one badge sends the
+          complete set of categories back.</p>
+          <h3 id="branding">Branding<a class="heading-anchor" href="#branding" aria-label="Link to this section">#</a></h3>
+          <p>The palette (<code>config/theme.colors</code>), the three font roles (from the bundled open-license font
+          sets — no external font CDN), and the five logo slots, each backed by the same image picker the
+          Media tab uses. Changes here restyle the live public site with no separate deploy — this is a
+          config write, not a code change.</p>
+          <h2 id="legal-pages-settings-or-wherever-the-review-banner-points">Legal pages (Settings, or wherever the review banner points)<a class="heading-anchor" href="#legal-pages-settings-or-wherever-the-review-banner-points" aria-label="Link to this section">#</a></h2>
+          <p>Privacy policy and terms of service ship as CMS content pages seeded from provider-aware templates,
+          each clause needing review flagged <code>[Client legal review required]</code>. They stay flagged — a
+          persistent banner in the admin panel and a visible notice on the public page — until an admin clears
+          <code>config/event.legal.reviewRequired</code> after the client&#39;s counsel has actually reviewed the seeded
+          copy. See <code>docs/CLIENT_ONBOARDING.md</code>&#39;s legal review section for the full context. Do not publish
+          another organization&#39;s terms verbatim; the seeded text is a starting point, not a finished policy.</p>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/ADMIN_GUIDE.md"><code>docs/ADMIN_GUIDE.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/handbook/glossary/"><span>Previous</span>Glossary</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/client-onboarding/"><span>Next</span>Client onboarding</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

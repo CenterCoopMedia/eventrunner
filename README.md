@@ -7,6 +7,7 @@ A white-label event CMS for conferences and gatherings. Each client event gets i
 **Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2).
 
 Site: [centercoopmedia.github.io/eventrunner](https://centercoopmedia.github.io/eventrunner/)
+Documentation: [centercoopmedia.github.io/eventrunner/docs](https://centercoopmedia.github.io/eventrunner/docs/)
 Handbook: [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki)
 
 A public demo instance and README screenshots are pending the operator's deploy of that instance

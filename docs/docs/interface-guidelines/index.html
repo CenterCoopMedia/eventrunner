@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interface guidelines — Event Runner documentation</title>
+  <meta name="description" content="The interface rules the web app is held to.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/interface-guidelines/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Interface guidelines — Event Runner documentation">
+  <meta property="og:description" content="The interface rules the web app is held to.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/interface-guidelines/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Interface guidelines — Event Runner documentation">
+  <meta name="twitter:description" content="The interface rules the web app is held to.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
+        <span class="brand-text">
+          <strong>Event Runner</strong>
+          <span>Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Interface guidelines</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/" aria-current="page" class="is-current">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Interface guidelines</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#how-this-connects-to-the-rest-of-the-repo">How this connects to the rest of the repo</a></li>
+              <li><a href="#user-interface">User interface</a></li>
+              <li><a href="#animation">Animation</a></li>
+              <li><a href="#typography">Typography</a></li>
+              <li><a href="#colors">Colors</a></li>
+              <li><a href="#accessibility">Accessibility</a></li>
+              <li><a href="#layout">Layout</a></li>
+              <li><a href="#writing">Writing</a></li>
+            </ul>
+          </nav>
+          <p>Foundational rules for every <code>apps/web</code> surface — attendee pages, admin panel, speaker wizard. Adapted from <a href="https://interfaces.dev/cheat-sheet">interfaces.dev/cheat-sheet</a> and bound to this repo&#39;s own machinery where the two meet (theme tokens, the hex sweep, the a11y bar in CONTRIBUTING). PRs that touch UI are reviewed against this document.</p>
+          <h2 id="how-this-connects-to-the-rest-of-the-repo">How this connects to the rest of the repo<a class="heading-anchor" href="#how-this-connects-to-the-rest-of-the-repo" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li><strong>Colors are theme tokens, never literals.</strong> The ESLint hex sweep (spec §7.6) enforces the mechanical half; this document covers the design half. Every color you use must be a custom property from <code>config/theme</code> (spec §7) with a role-based name.</li>
+          <li><strong>Accessibility is a merge requirement, not a nicety.</strong> CONTRIBUTING already requires a keyboard path and visible focus for UI changes; the Accessibility section below is the working checklist behind that line.</li>
+          <li><strong>Event-neutrality applies to design too.</strong> No hardcoded brand color, font stack &quot;for this event,&quot; or copy that assumes one venue or city. If a design decision varies per client, it belongs in <code>config/theme</code> or CMS content.</li>
+          </ul>
+          <h2 id="user-interface">User interface<a class="heading-anchor" href="#user-interface" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>Apply concentric border radius across nested elements (inner radius = outer radius − padding).</li>
+          <li>Prioritize optical alignment over geometric alignment.</li>
+          <li>Add a <code>1px</code> outline to images, offset by <code>-1px</code>: black at 8% opacity in light mode, white at 8% in dark mode.</li>
+          </ul>
+          <h2 id="animation">Animation<a class="heading-anchor" href="#animation" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>Never <code>transition: all</code>; list the exact properties that change.</li>
+          <li>Scale pressed buttons to 0.95–0.98 with <code>transition: scale 200ms ease-out</code>.</li>
+          <li>Cross-fade swapped icons: entering scales 0.25→1 with opacity 0→1 and blur 4px→0; exiting reverses.</li>
+          <li>CSS transitions for interruptible interactions; keyframes for one-time sequences.</li>
+          <li>Disable transitions while switching between light and dark themes.</li>
+          <li><code>will-change</code> only on properties that actually change: <code>transform</code>, <code>opacity</code>, <code>filter</code>. Add <code>will-change: transform</code> to elements that jitter 1–2px mid-animation (iOS Safari especially).</li>
+          <li>Stagger entrance animations by group or element.</li>
+          <li>Don&#39;t animate frequent interactions (e.g. color changes on list hover).</li>
+          </ul>
+          <h2 id="typography">Typography<a class="heading-anchor" href="#typography" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>Ship only <code>.woff2</code> — never TTF or OTF on the web. Fonts are self-hosted in <code>apps/web/public/fonts/</code> (spec §7.4).</li>
+          <li><code>font-variant-numeric: tabular-nums</code> on all dynamic values: timers, counters, prices, schedule columns.</li>
+          <li>Long-form text: 60–75 characters per line.</li>
+          <li><code>text-wrap: balance</code> on headings, <code>text-wrap: pretty</code> on descriptions, neither on long-form.</li>
+          <li><code>overflow-wrap: break-word</code> wherever long words, links, or IDs might overflow; <code>white-space: nowrap</code> for labels and badges.</li>
+          <li>Set <code>-webkit-font-smoothing: antialiased</code> and <code>-moz-osx-font-smoothing: grayscale</code> once, on the root.</li>
+          <li>Store copy in natural case; control presentation with <code>text-transform</code>. (This matches the email rule in spec §6 — content and presentation stay separate.)</li>
+          <li>Smart punctuation: curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.</li>
+          <li><code>text-underline-position: from-font</code> with <code>text-decoration-skip-ink: auto</code>.</li>
+          <li>Truncated text stays fully accessible via tooltip or an expanded view.</li>
+          </ul>
+          <h2 id="colors">Colors<a class="heading-anchor" href="#colors" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>Every palette step must earn its place — no unused steps.</li>
+          <li>Use semantic tokens (<code>--color-text-secondary</code>), never primitives (<code>blue-500</code>). This is the same rule the hex sweep enforces in code: colors resolve through <code>config/theme</code> custom properties (spec §7.2).</li>
+          <li>Name tokens by role, never by appearance or first use. Reserve <code>accent</code> for the brand color so <code>primary</code> doesn&#39;t mean both brand and body text.</li>
+          <li>Don&#39;t borrow a token from another role; when a role changes color, mint a new token.</li>
+          <li>Measure contrast against the actual rendered background, not the page background.</li>
+          <li>Dark mode is its own palette, not light mode reversed.</li>
+          <li>One theme mechanism, used consistently. This repo&#39;s choice: the <code>config/theme</code>-driven custom-property chain (spec §7.2) — not ad-hoc <code>.dark</code> classes per component.</li>
+          <li>Define gradient interpolation: <code>in oklab</code> for even brightness, <code>in oklch</code> for vivid midtones.</li>
+          </ul>
+          <h2 id="accessibility">Accessibility<a class="heading-anchor" href="#accessibility" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>Semantically correct native elements: <code>button</code> for buttons, <code>a</code> for links.</li>
+          <li>Style <code>:focus-visible</code>; never remove outlines without replacing them.</li>
+          <li>Only <code>tabindex=&quot;0&quot;</code> and <code>tabindex=&quot;-1&quot;</code> — positive values break tab order.</li>
+          <li>Icon-only buttons get a descriptive <code>aria-label</code>; never <code>aria-hidden=&quot;true&quot;</code> on a focusable element.</li>
+          <li>Alt text describes purpose (&quot;Search&quot;, not &quot;magnifying glass&quot;); decorative images get <code>alt=&quot;&quot;</code>.</li>
+          <li>Every input has a real label, correct <code>type</code>, and <code>inputmode</code>. (The OTP input is the first test of this: <code>inputmode=&quot;numeric&quot;</code>, <code>autocomplete=&quot;one-time-code&quot;</code>.)</li>
+          <li>Never block paste — especially not on the OTP code field.</li>
+          <li>Tooltips on disabled controls don&#39;t open via keyboard or touch; use visible text or <code>aria-disabled=&quot;true&quot;</code>.</li>
+          <li>Keep submit buttons enabled until the request starts; validate on submit with <code>aria-invalid=&quot;true&quot;</code> and move focus to the error.</li>
+          <li>Hit areas: 24×24px minimum, 44×44px on touch, 40×40px desktop where possible.</li>
+          <li><code>pointer-events: none</code> on decorative elements (glows, texture overlays).</li>
+          <li>Wrap hover styles in <code>@media (hover: hover)</code>; wrap motion in <code>@media (prefers-reduced-motion: no-preference)</code>.</li>
+          <li><code>role=&quot;status&quot;</code> for routine updates, <code>role=&quot;alert&quot;</code> for urgent errors only.</li>
+          <li>Never color alone for a status — pair it with an icon, label, or underline.</li>
+          <li>Skip-to-content link is the first focusable element; anchored headings get <code>scroll-margin-top</code>.</li>
+          </ul>
+          <h2 id="layout">Layout<a class="heading-anchor" href="#layout" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>The gap between groups is at least twice the gap inside one: 8px within, 16px+ between.</li>
+          <li>Logical properties (<code>margin-inline-start</code>, <code>padding-inline-end</code>), not directional values.</li>
+          <li>No fixed widths or heights on text containers.</li>
+          </ul>
+          <h2 id="writing">Writing<a class="heading-anchor" href="#writing" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>Button labels start with verbs: &quot;Save draft&quot;, &quot;Delete project&quot;.</li>
+          <li>Confirmation buttons repeat the consequence: &quot;Delete project&quot; / &quot;Cancel&quot; — never &quot;Yes&quot; / &quot;No&quot;.</li>
+          <li>One term per flow: &quot;Continue&quot; or &quot;Next&quot;, not both.</li>
+          <li>Links describe their destination: &quot;Read the schedule&quot;, never &quot;Click here&quot;.</li>
+          <li>Consistent capitalization everywhere; sentence case is the default.</li>
+          <li>Toggles are labeled by their enabled state: &quot;Send read receipts&quot;, not &quot;Disable read receipts&quot;.</li>
+          <li>Empty states orient the reader and offer exactly one next action.</li>
+          <li>Address readers as &quot;you&quot;, not &quot;the user&quot;.</li>
+          </ul>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/interface-guidelines.md"><code>docs/interface-guidelines.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/contributing/"><span>Previous</span>Contributing</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/decisions/0001-event-platform-v1/"><span>Next</span>ADR 0001: Event platform v1</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

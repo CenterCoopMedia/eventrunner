@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contributing — Event Runner documentation</title>
+  <meta name="description" content="Setup, tests, sign-off, and the proportional CI tiers.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/contributing/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Contributing — Event Runner documentation">
+  <meta property="og:description" content="Setup, tests, sign-off, and the proportional CI tiers.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/contributing/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Contributing — Event Runner documentation">
+  <meta name="twitter:description" content="Setup, tests, sign-off, and the proportional CI tiers.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
+  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
+        <span class="brand-text">
+          <strong>Event Runner</strong>
+          <span>Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Contributing</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/" aria-current="page" class="is-current">Contributing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Contributing</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#where-to-start">Where to start</a></li>
+              <li><a href="#contribution-policy">Contribution policy</a></li>
+              <li><a href="#dev-setup">Dev setup</a></li>
+              <li><a href="#how-to-send-a-change">How to send a change</a></li>
+              <li><a href="#tests">Tests</a></li>
+              <li><a href="#releases">Releases</a></li>
+              <li><a href="#security">Security</a></li>
+              <li><a href="#questions">Questions</a></li>
+            </ul>
+          </nav>
+          <p>Thanks for wanting to help. This is the public platform repo. The live Collaborative Journalism Summit site stays in <code>jamditis/cjs2026</code> and is not the place to send platform PRs.</p>
+          <p>By participating you agree to the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md">Code of Conduct</a>. Reports go to info@eventrunner.org.</p>
+          <h2 id="where-to-start">Where to start<a class="heading-anchor" href="#where-to-start" aria-label="Link to this section">#</a></h2>
+          <p>Pick the path that matches what you are doing. If you are not changing code, you probably want <a href="https://github.com/CenterCoopMedia/eventrunner/discussions">Discussions</a> or the <a href="https://github.com/CenterCoopMedia/eventrunner/wiki">wiki</a>, not a pull request.</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>You are…</th><th>Do this</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>An attendee who cannot sign in, find a session, or open materials</td><td><a href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a">Q&amp;A</a></td></tr>
+          <tr><td>Event staff stuck in the CMS, schedule, or speaker tools</td><td><a href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a">Q&amp;A</a></td></tr>
+          <tr><td>An organization that wants CCM to run your event</td><td><a href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general">General</a> or email info@eventrunner.org</td></tr>
+          <tr><td>Reporting a bug in the shared product</td><td><a href="https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml">Bug form</a></td></tr>
+          <tr><td>Asking for a product change</td><td><a href="https://github.com/CenterCoopMedia/eventrunner/issues/new?template=feature.yml">Feature form</a></td></tr>
+          <tr><td>Sending code or docs</td><td>Open or link an issue, then a pull request</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>If CCM is operating the event site for you and the problem is access, content, or your specific deployment, email info@eventrunner.org. That is support, not a public ticket.</p>
+          <h2 id="contribution-policy">Contribution policy<a class="heading-anchor" href="#contribution-policy" aria-label="Link to this section">#</a></h2>
+          <p>We take:</p>
+          <ul>
+          <li>Bug fixes with a failing test when one can exist</li>
+          <li>Features that match the <a href="/eventrunner/docs/roadmap/">roadmap</a> or have a linked, accepted issue</li>
+          <li>Docs, wiki corrections, and accessibility fixes</li>
+          <li>Repro cases that do not include real attendee or client data</li>
+          </ul>
+          <p>We will bounce:</p>
+          <ul>
+          <li>Hardcoded event names, cities, hex colors, or domains</li>
+          <li>Personal infrastructure (hostnames, chat IDs, personal emails, private operator adapters)</li>
+          <li>Secrets, live-project credentials, or real PII in tests, fixtures, screenshots, or logs</li>
+          <li>A second queue. <code>ticket_sync_queue</code> is the only queue in the system</li>
+          <li>Features already cut from v1 (video generator, bulk broadcast, invoicing, social feeds, speaker chat) unless a linked issue reopens the case</li>
+          <li>Drive-by refactors with no product change</li>
+          </ul>
+          <p>The <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/GOVERNANCE.md">governance</a> note is the short version of who decides.</p>
+          <h2 id="dev-setup">Dev setup<a class="heading-anchor" href="#dev-setup" aria-label="Link to this section">#</a></h2>
+          <ol>
+          <li>Fork and clone this repository.</li>
+          <li>Use Node 22 (<code>node -v</code>) — the Cloud Functions runtime pins that major, so <code>functions/package.json</code> declares <code>&quot;node&quot;: &quot;22&quot;</code> and npm warns (<code>EBADENGINE</code>) on newer majors.</li>
+          <li>From the repo root:</li>
+          </ol>
+          <pre><code class="language-bash">npm run prepare:functions   # packs packages/shared into functions/vendor/ — required before install
+          npm install
+          npm run lint
+          npm test
+          npm run test:rules   # needs Java 21+ for the Firebase emulators
+          </code></pre>
+          <p>No <code>.env</code> and no cloud credentials are required for any of these — <code>test:rules</code> starts local Firestore and Storage emulators against a <code>demo-*</code> project id.</p>
+          <p><code>apps/web</code> has its own vitest suite (<code>npm run test -w apps/web</code>) and its own dev loop against the Functions/Firestore/Auth emulators — see <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/apps/web/README.md">apps/web/README.md</a> for the full commands, including the Playwright-driven sign-in smoke test (<code>scripts/dev/login-smoke.mjs</code>).</p>
+          <h2 id="how-to-send-a-change">How to send a change<a class="heading-anchor" href="#how-to-send-a-change" aria-label="Link to this section">#</a></h2>
+          <ol>
+          <li>Search issues and the <a href="https://github.com/orgs/CenterCoopMedia/projects/2">project board</a>. The <strong>What this is</strong> column is the plain-language version of each title.</li>
+          <li>Open an issue first if the change is more than a typo. Use the form that matches the work.</li>
+          <li>Branch from <code>main</code>. One logical change per branch.</li>
+          <li>Add or update tests next to the code (<code>*.test.cjs</code> beside the module).</li>
+          <li>Fill in the pull request template, including how you verified the change.</li>
+          <li>Sign off each commit (<code>git commit -s</code>) under the <a href="https://developercertificate.org/">Developer Certificate of Origin</a>.</li>
+          </ol>
+          <h3 id="sign-your-commits-dco">Sign your commits (DCO)<a class="heading-anchor" href="#sign-your-commits-dco" aria-label="Link to this section">#</a></h3>
+          <p>Every commit needs a <code>Signed-off-by</code> trailer:</p>
+          <pre><code>git commit -s -m &quot;Fix schedule timezone rollover&quot;
+          </code></pre>
+          <p>That adds a line to the commit message — <code>Signed-off-by: Your Name &lt;you@example.org&gt;</code> — using the name and email from your git config. It is not a CLA and nobody countersigns it; by adding it you are personally certifying the <a href="https://developercertificate.org/">Developer Certificate of Origin</a> (spec §1.5): that you wrote the change or otherwise have the right to submit it under this project&#39;s license, and that you understand it is public and permanently recorded with your contribution.</p>
+          <p>Forgot on a commit that is not pushed yet: <code>git commit --amend -s</code>. Forgot on several: <code>git rebase --signoff &lt;base-branch&gt;</code> rewrites every commit on your branch to add the trailer, then force-push your branch (never <code>main</code>).</p>
+          <p><strong>CI enforces this.</strong> The <code>dco</code> job in <code>.github/workflows/ci.yml</code> walks every non-merge commit in the pull request&#39;s range and fails if any is missing the trailer — <code>node scripts/check-dco.cjs &lt;base-sha&gt; &lt;head-sha&gt;</code>, credential-free, so it runs identically on a fork PR. A PR failing only the DCO check does not need new code: sign off the existing commits as above and push.</p>
+          <h3 id="shared-package">Shared package<a class="heading-anchor" href="#shared-package" aria-label="Link to this section">#</a></h3>
+          <p><code>packages/shared</code> is CommonJS first. Add a <code>.mjs</code> re-export shim next to every new <code>.cjs</code> module.</p>
+          <h3 id="there-is-exactly-one-queue">There is exactly one queue<a class="heading-anchor" href="#there-is-exactly-one-queue" aria-label="Link to this section">#</a></h3>
+          <p><code>ticket_sync_queue</code> is the only queue in this system, and it is not a precedent. It exists for one reason the code cannot work around: the ticketing provider&#39;s own read APIs are eventually consistent, so an order a webhook announces is often not readable yet. It is scoped to <code>functions/src/ticketing/</code>, capped at six attempts, and raises an operator alert when it gives up — nothing is ever dropped silently.</p>
+          <p>Everything else sends, writes, or fails in the request that asked for it. Email in particular has no queue: a managed provider owns retry and pacing (spec §3.1). A pull request that adds a second queue, a scheduled retry collection, a &quot;pending work&quot; document set, or a drain function needs an ADR first — say what makes the work impossible to do inline, and why a provider or a trigger cannot do it. See <a href="/eventrunner/docs/decisions/0001-event-platform-v1/">docs/adr/0001-event-platform-v1.md</a> §3.3 and §10 question 9.</p>
+          <h3 id="accessibility">Accessibility<a class="heading-anchor" href="#accessibility" aria-label="Link to this section">#</a></h3>
+          <p>UI changes need a keyboard path and visible focus. If you change a flow that attendees or staff use, say how you checked it (keyboard, zoom, or a screen reader). Do not rely on color alone.</p>
+          <p>The full interface bar — accessibility, typography, color tokens, motion, and microcopy — is <a href="/eventrunner/docs/interface-guidelines/">docs/interface-guidelines.md</a>. UI pull requests are reviewed against it.</p>
+          <h2 id="tests">Tests<a class="heading-anchor" href="#tests" aria-label="Link to this section">#</a></h2>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Command</th><th>What it covers</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>npm run lint</code></td><td>ESLint over every workspace, including the hex-literal ban (spec §7.6) and <code>react-hooks/rules-of-hooks</code></td></tr>
+          <tr><td><code>npm test</code></td><td><code>packages/shared</code> and <code>functions</code> unit tests (Node <code>--test</code>, fakes — no emulator)</td></tr>
+          <tr><td><code>npm run test:rules</code></td><td>Firestore and Storage security rules on the Firebase emulators</td></tr>
+          <tr><td><code>npm run test -w apps/web</code></td><td><code>apps/web</code> component/context/lib unit tests (vitest + Testing Library, jsdom — no emulator)</td></tr>
+          <tr><td><code>npm run build -w apps/web</code></td><td>Production build of <code>apps/web</code>; credential-free with dummy <code>VITE_FIREBASE_*</code> values</td></tr>
+          <tr><td><code>npm run test:e2e</code></td><td>Playwright end-to-end suite (OTP sign-in, CMS edit → publish → public, speaker invite → accept → wizard, ticket claim → approved → bookmark) against the full Firebase emulator suite, seeded from the synthetic demo fixture — see <a href="https://github.com/CenterCoopMedia/eventrunner/tree/main/e2e"><code>e2e/</code></a></td></tr>
+          <tr><td><code>./gitleaks detect --source .</code></td><td>Secret scan (<code>.gitleaks.toml</code>) — CI downloads and checksum-verifies the gitleaks CLI directly rather than a marketplace action, so it stays credential-free on a fork PR (an org-repo license secret is not something a fork PR could ever have)</td></tr>
+          <tr><td><code>node scripts/build-pages.cjs --check</code></td><td>The committed documentation site under <code>docs/docs/</code> matches a fresh render of the source Markdown — see <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/scripts/README.md">scripts/README.md</a></td></tr>
+          <tr><td><code>node scripts/check-dco.cjs &lt;base&gt; &lt;head&gt;</code></td><td>Every non-merge commit in the pull request&#39;s range carries a DCO <code>Signed-off-by</code> trailer — see <a href="#sign-your-commits-dco">Sign your commits</a></td></tr>
+          <tr><td><code>node scripts/dev/login-smoke.mjs</code></td><td>Live Playwright smoke test of the emailed-code sign-in flow against the Functions/Firestore/Auth emulators (dev tool, not run by CI)</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>CI runs the trust checks and selected tiers on every pull request, credential-free. Every push to <code>main</code> runs the full matrix. Fork PRs must be able to run every check without credentials.</p>
+          <h3 id="proportional-ci">Proportional CI<a class="heading-anchor" href="#proportional-ci" aria-label="Link to this section">#</a></h3>
+          <p>Pull requests run the trust checks (DCO and secret scanning) plus the smallest
+          path-selected tier. The repository-owned <code>scripts/ci/classify-changes.cjs</code>
+          classifier emits the selections; mixed changes take the union of their tiers.
+          The <code>CI gate</code> job is the stable aggregate check for branch protection. A job
+          that the classifier did not select is expected to be skipped. Pushes to <code>main</code>
+          fail open to the full matrix. All tiers remain credential-free so fork pull
+          requests can run them without secrets.</p>
+          <p>The documentation check validates local links and the Pages entrypoint&#39;s basic
+          metadata. Generated pages under <code>docs/docs/**</code> must also carry an SVG favicon,
+          canonical URL, and complete Open Graph and Twitter metadata. <code>docs/demo/**</code>
+          remains outside that generated-page metadata rule until the demo redesign in
+          #109; its metadata is owned there. Root-page social metadata is tracked in #105.</p>
+          <p><code>docs/docs/**</code> is generated output, not a place to edit. <code>scripts/build-pages.cjs</code>
+          renders it from the Markdown listed in <code>scripts/lib/pages-manifest.cjs</code>, and
+          <code>scripts/build-pages.test.cjs</code> fails the documentation tier when the committed
+          HTML has drifted from a fresh render — the same freshness rule
+          <code>apps/web/src/generated/**</code> lives under. Edit the Markdown, then run
+          <code>node scripts/build-pages.cjs</code> and commit both.</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Changed paths</th><th>Selected tier</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Markdown, <code>docs/**</code> except <code>docs/demo/**</code>, handbook files, and issue/discussion templates</td><td>Documentation checks: local links, generated Pages HTML markup, and <code>docs/docs/**</code> freshness</td></tr>
+          <tr><td>Documentation generators (<code>scripts/build-pages.cjs</code>, <code>scripts/build-pages.test.cjs</code>, <code>scripts/lib/pages-*.cjs</code>, <code>scripts/lib/markdown-pages.cjs</code>)</td><td>Documentation checks and lint</td></tr>
+          <tr><td><code>scripts/build-demo.cjs</code>, <code>scripts/build-demo.test.cjs</code>, or <code>docs/demo/**</code></td><td>Lint, demo generator tests, and committed-demo hygiene</td></tr>
+          <tr><td><code>apps/web/**</code></td><td>Lint, web unit tests, web build, generated-content hygiene, demo hygiene, and E2E</td></tr>
+          <tr><td><code>functions/**</code></td><td>Lint, shared/functions unit tests, rules emulators, and E2E</td></tr>
+          <tr><td><code>packages/shared/**</code></td><td>Lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E</td></tr>
+          <tr><td><code>firestore.rules</code> or <code>storage.rules</code></td><td>Rules emulators and E2E</td></tr>
+          <tr><td>Workflows, tool configuration, package manifests or locks, Firebase configuration, <code>e2e/**</code>, <code>publisher/**</code>, other scripts, or an unrecognized path</td><td>Full matrix: documentation checks, lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Changes that match more than one row run the union of the selected tiers. The
+          main branch protection rule should require <code>CI gate</code> after this workflow is
+          merged; the existing <code>Shared package tests</code> requirement remains unchanged
+          until that operator update is made.</p>
+          <p><code>npm run test:e2e</code> needs Java 21+ (the same Firestore/Storage emulators <code>test:rules</code> uses) and a Chromium build Playwright can find. It never runs <code>playwright install</code> itself: point <code>PLAYWRIGHT_BROWSERS_PATH</code> at an existing install, or run <code>npx playwright install --with-deps chromium</code> once yourself first — <code>.github/workflows/ci.yml</code>&#39;s <code>e2e</code> job does the latter, cached.</p>
+          <h2 id="releases">Releases<a class="heading-anchor" href="#releases" aria-label="Link to this section">#</a></h2>
+          <p>Tags, <code>CHANGELOG.md</code> hygiene, and what a release includes are in <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/RELEASING.md">RELEASING.md</a>.</p>
+          <p>One lint rule to know about before it bites you: hex color literals (<code>#336699</code>) are banned everywhere except <code>functions/src/email/templates/**</code>, <code>functions/src/schedule/pdf.cjs</code>, and <code>apps/web/src/generated/theme.css</code>. Colors come from theme tokens.</p>
+          <h2 id="security">Security<a class="heading-anchor" href="#security" aria-label="Link to this section">#</a></h2>
+          <p>Do not open a public issue for a vulnerability. Use <a href="https://github.com/CenterCoopMedia/eventrunner/security">private reporting</a> or see <a href="/eventrunner/docs/security/">SECURITY.md</a>.</p>
+          <h2 id="questions">Questions<a class="heading-anchor" href="#questions" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>Product and &quot;how do I&quot;: <a href="https://github.com/CenterCoopMedia/eventrunner/discussions">Discussions</a></li>
+          <li>Handbook for attendees, staff, and clients: <a href="https://github.com/CenterCoopMedia/eventrunner/wiki">wiki</a></li>
+          <li>Hosted-event support: info@eventrunner.org</li>
+          </ul>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CONTRIBUTING.md"><code>CONTRIBUTING.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/npm-name-claim/"><span>Previous</span>npm name claim</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/interface-guidelines/"><span>Next</span>Interface guidelines</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

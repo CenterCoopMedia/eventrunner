@@ -107,6 +107,7 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 | `npm run build -w apps/web` | Production build of `apps/web`; credential-free with dummy `VITE_FIREBASE_*` values |
 | `npm run test:e2e` | Playwright end-to-end suite (OTP sign-in, CMS edit → publish → public, speaker invite → accept → wizard, ticket claim → approved → bookmark) against the full Firebase emulator suite, seeded from the synthetic demo fixture — see [`e2e/`](e2e/) |
 | `./gitleaks detect --source .` | Secret scan (`.gitleaks.toml`) — CI downloads and checksum-verifies the gitleaks CLI directly rather than a marketplace action, so it stays credential-free on a fork PR (an org-repo license secret is not something a fork PR could ever have) |
+| `node scripts/build-pages.cjs --check` | The committed documentation site under `docs/docs/` matches a fresh render of the source Markdown — see [scripts/README.md](scripts/README.md) |
 | `node scripts/check-dco.cjs <base> <head>` | Every non-merge commit in the pull request's range carries a DCO `Signed-off-by` trailer — see [Sign your commits](#sign-your-commits-dco) |
 | `node scripts/dev/login-smoke.mjs` | Live Playwright smoke test of the emailed-code sign-in flow against the Functions/Firestore/Auth emulators (dev tool, not run by CI) |
 
@@ -128,9 +129,16 @@ canonical URL, and complete Open Graph and Twitter metadata. `docs/demo/**`
 remains outside that generated-page metadata rule until the demo redesign in
 #109; its metadata is owned there. Root-page social metadata is tracked in #105.
 
+`docs/docs/**` is generated output, not a place to edit. `scripts/build-pages.cjs`
+renders it from the Markdown listed in `scripts/lib/pages-manifest.cjs`, and
+`scripts/build-pages.test.cjs` fails the documentation tier when the committed
+HTML has drifted from a fresh render — the same freshness rule
+`apps/web/src/generated/**` lives under. Edit the Markdown, then run
+`node scripts/build-pages.cjs` and commit both.
+
 | Changed paths | Selected tier |
 |---|---|
-| Markdown, `docs/**` except `docs/demo/**`, handbook files, and issue/discussion templates | Documentation checks: local links and generated Pages HTML markup |
+| Markdown, `docs/**` except `docs/demo/**`, handbook files, and issue/discussion templates | Documentation checks: local links, generated Pages HTML markup, and `docs/docs/**` freshness |
 | Documentation generators (`scripts/build-pages.cjs`, `scripts/build-pages.test.cjs`, `scripts/lib/pages-*.cjs`, `scripts/lib/markdown-pages.cjs`) | Documentation checks and lint |
 | `scripts/build-demo.cjs`, `scripts/build-demo.test.cjs`, or `docs/demo/**` | Lint, demo generator tests, and committed-demo hygiene |
 | `apps/web/**` | Lint, web unit tests, web build, generated-content hygiene, demo hygiene, and E2E |
