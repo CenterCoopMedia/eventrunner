@@ -581,10 +581,16 @@
     mask-image: var(--motif-divider);
   }
   /* The empty-state drawing sits above the sentence and aligns with it, so
-     it reads as part of the same block rather than as a centred illustration. */
+     it reads as part of the same block rather than as a centred illustration.
+
+     8rem, not 5rem. This slot is the one place the site renders a whole
+     drawing rather than a mark, and the portrait sets — the botanical
+     frond is 320 by 420 — were being fitted into 80px of height, which
+     put the WHOLE drawing under a pixel a stroke and greyed it into a
+     smudge. A plate drawn at thumbnail size is not a plate. */
   .motif--empty-state {
     display: block;
-    block-size: 5rem;
+    block-size: 8rem;
     inline-size: 100%;
     -webkit-mask-position: left center;
     mask-position: left center;
