@@ -163,14 +163,14 @@ describe('content browsing', () => {
 
     await renderAt('/admin/content');
     expect(screen.getByRole('heading', { name: 'Content' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
 
     await renderAt('/admin/content/scholarships');
-    expect(screen.getByRole('link', { name: 'Intro' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Intro' })).toBeInTheDocument();
     expect(screen.getByText(/1 block/)).toBeInTheDocument();
 
     await renderAt('/admin/content/scholarships/intro');
-    expect(screen.getByRole('link', { name: 'body' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'body' })).toBeInTheDocument();
     expect(screen.getByText('Rich text')).toBeInTheDocument();
   });
 
@@ -180,17 +180,17 @@ describe('content browsing', () => {
     listenerError = new Error('permission denied');
 
     await renderAt('/admin/content/scholarships/intro');
-    expect(screen.getByRole('link', { name: 'body' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'body' })).toBeInTheDocument();
     expect(screen.getAllByRole('status').some((el) => /lost the connection/i.test(el.textContent))).toBe(true);
   });
 
   it('reports no such page/section cleanly instead of crashing', async () => {
     await renderAt('/admin/content/nope');
-    expect(screen.getByText('No such page')).toBeInTheDocument();
+    expect(await screen.findByText('No such page')).toBeInTheDocument();
 
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     await renderAt('/admin/content/scholarships/nope');
-    expect(screen.getByText('No such section')).toBeInTheDocument();
+    expect(await screen.findByText('No such section')).toBeInTheDocument();
   });
 
   it('does not adopt a live-only doc while the drafts listener is still silent', async () => {
@@ -220,7 +220,7 @@ describe('content browsing', () => {
 
     await renderAt('/admin/content/scholarships/intro/new');
 
-    expect(screen.getByLabelText(/^value/)).toHaveValue('<p>Scholarships open in spring.</p>');
+    expect(await screen.findByLabelText(/^value/)).toHaveValue('<p>Scholarships open in spring.</p>');
     expect(screen.getByLabelText('Field id')).toHaveAttribute('readonly');
     expect(screen.getByRole('button', { name: 'Delete this block' })).toBeInTheDocument();
   });
@@ -234,7 +234,7 @@ describe('creating and editing a block', () => {
     await renderAt('/admin/content/scholarships/intro/_new');
 
     fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'body' } });
-    fireEvent.change(screen.getByLabelText(/^value/), {
+    fireEvent.change(await screen.findByLabelText(/^value/), {
       target: { value: '<p>Hello</p>' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -257,13 +257,15 @@ describe('creating and editing a block', () => {
     await renderAt('/admin/content/scholarships/intro/_new');
 
     const picker = screen.getByLabelText('Block type');
-    expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'Rich text',
-      'Statistic',
-    ]);
+    await waitFor(() => {
+      expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual([
+        'Rich text',
+        'Statistic',
+      ]);
+    });
 
     // Switching the block type swaps the value fields the registry declares.
-    expect(screen.getByLabelText(/^value/)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^value/)).toBeInTheDocument();
     fireEvent.change(picker, { target: { value: 'stat' } });
     expect(screen.getByLabelText(/^label/)).toBeInTheDocument();
     expect(screen.getByLabelText(/^value/)).toBeInTheDocument();
@@ -281,7 +283,7 @@ describe('creating and editing a block', () => {
 
     await renderAt('/admin/content/scholarships/intro/body');
 
-    expect(screen.getByLabelText(/^value/)).toHaveValue('<p>Scholarships open in spring.</p>');
+    expect(await screen.findByLabelText(/^value/)).toHaveValue('<p>Scholarships open in spring.</p>');
     fireEvent.change(screen.getByLabelText(/^value/), {
       target: { value: '<p>Updated copy.</p>' },
     });
@@ -313,7 +315,7 @@ describe('creating and editing a block', () => {
       );
 
     await renderAt('/admin/content/scholarships/intro/body');
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(urlOf(0)).toMatch(/\/cmsUpdateContent$/);
@@ -347,7 +349,7 @@ describe('creating and editing a block', () => {
     fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__cta1', status: 'dirty' }));
 
     await renderAt('/admin/content/scholarships/intro/cta1');
-    fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'stat' } });
+    fireEvent.change(await screen.findByLabelText('Block type'), { target: { value: 'stat' } });
     fireEvent.change(screen.getByLabelText(/^value/), { target: { value: '42' } });
     fireEvent.change(screen.getByLabelText(/^label/), { target: { value: 'Scholarships awarded' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -373,7 +375,7 @@ describe('creating and editing a block', () => {
 
     await renderAt('/admin/content/scholarships/intro/body');
     // Moment 3: the first press states the cost, the second does the work.
-    fireEvent.click(screen.getByRole('button', { name: 'Delete this block' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete this block' }));
     expect(fetch).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Delete this block' }));
 
@@ -395,7 +397,7 @@ describe('server errors and publish skips', () => {
     // Fill the required value field so this reaches the network call at
     // all — an empty one is caught by client-side validation first, which
     // has its own test.
-    fireEvent.change(screen.getByLabelText(/^value/), { target: { value: '<p>Hi</p>' } });
+    fireEvent.change(await screen.findByLabelText(/^value/), { target: { value: '<p>Hi</p>' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
@@ -421,7 +423,7 @@ describe('server errors and publish skips', () => {
       );
 
     await renderAt('/admin/content/scholarships/intro/body');
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
     expect(
       (await screen.findAllByText(/intro__body was edited while publishing/i)).length,
@@ -451,7 +453,7 @@ describe('server errors and publish skips', () => {
       );
 
     await renderAt('/admin/content/scholarships/intro/body');
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
     const resume = await screen.findByRole('button', { name: 'Resume publish' });
 
     fireEvent.click(resume);
