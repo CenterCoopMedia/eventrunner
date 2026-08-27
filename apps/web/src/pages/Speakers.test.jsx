@@ -61,6 +61,26 @@ describe('Speakers', () => {
     expect(screen.getByText('Speakers have not been announced yet')).toBeInTheDocument();
   });
 
+  it('renders a ruled directory, not a profile-card grid', () => {
+    // Design brief §2.1: a rule replaces a card border, and the public
+    // directory is a hairline-separated list rather than a grid of boxes.
+    speakers = [PROJECTED];
+    const { container } = renderSpeakers();
+    const entry = container.querySelector('li');
+    expect(entry).toHaveClass('border-t-hairline', 'border-t-rule-hairline');
+    expect(entry.className).not.toContain('rounded-brand-lg');
+    expect(container.querySelector('ul').className).not.toContain('sm:grid-cols-2');
+  });
+
+  it('sets the name in the heading face and the affiliation in the data face', () => {
+    speakers = [PROJECTED];
+    renderSpeakers();
+    expect(screen.getByRole('heading', { level: 2, name: 'Rae Okonkwo' })).toHaveClass(
+      'font-heading',
+    );
+    expect(screen.getByText('Editor, [Demo] Cooperative')).toHaveClass('font-data');
+  });
+
   it('gates on the speakers feature flag', () => {
     speakers = [PROJECTED];
     features = { speakers: false };

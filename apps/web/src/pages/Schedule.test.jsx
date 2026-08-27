@@ -252,3 +252,32 @@ describe('SchedulePage', () => {
     expect(screen.getByRole('status', { name: 'Loading the schedule' })).toBeInTheDocument();
   });
 });
+
+// The schedule in the editorial register (design brief §2.1, §5.1). The
+// two-axis grid is PR3; what PR1 owns is the list presentation — hairline
+// rows, times in the mono face, and day heads as folios on rules.
+describe('SchedulePage editorial register', () => {
+  it('sets the day head as a folio on a rule, and keeps it a real h2', () => {
+    renderSchedule();
+    const dayHead = screen.getByRole('heading', { level: 2, name: 'Day one' });
+    expect(dayHead).toHaveClass('folio');
+    expect(dayHead.parentElement.querySelector('.folio__rule')).not.toBeNull();
+  });
+
+  it('marks the active day with weight and a rule, never a tinted pill', () => {
+    const { container } = renderSchedule();
+    const active = screen.getByRole('button', { name: 'Day one' });
+    expect(active).toHaveClass('font-semibold', 'border-b-rule-strong');
+    expect(active.className).not.toContain('bg-brand-primary/10');
+    expect([...container.querySelectorAll('*')].flatMap((n) => [...n.classList])).not.toContain(
+      'rounded-full',
+    );
+  });
+
+  it('separates sessions with rules instead of gaps between cards', () => {
+    const { container } = renderSchedule();
+    const list = container.querySelector('section ul');
+    expect(list.className).not.toContain('gap-3');
+    expect(list.querySelector('li')).toHaveClass('border-t-hairline');
+  });
+});

@@ -28,7 +28,7 @@ export default function Speakers() {
         action={
           <Link
             to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-brand-primary px-4 py-2 font-semibold text-brand-surface"
+            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
           >
             Go to the home page
           </Link>
@@ -39,16 +39,20 @@ export default function Speakers() {
 
   return (
     <article>
-      <h1 className="font-heading text-3xl font-semibold text-brand-ink">Speakers</h1>
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Speakers</h1>
       {speakers.length === 0 ? (
-        <div className="mt-6">
+        <div className="mt-lg">
           <EmptyState
             title="Speakers have not been announced yet"
             description="Speaker profiles appear here once they are published."
           />
         </div>
       ) : (
-        <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        // A ruled directory, not a card grid (design brief §2.1, §5.1): one
+        // hairline-separated entry per speaker, the name in the heading face
+        // and the affiliation in the data face beside it. A rule replaces
+        // the card border, so nothing here is boxed.
+        <ul className="mt-lg">
           {speakers.map((speaker) => {
             // jobTitle and organization are separate canonical fields, not
             // the one free-text "Role, Organization" string the old
@@ -60,22 +64,35 @@ export default function Speakers() {
             return (
               <li
                 key={speaker.id}
-                className="rounded-brand-lg border border-brand-ink/10 bg-brand-surface-alt p-5"
+                className="border-t-hairline border-t-rule-hairline py-md sm:grid sm:grid-cols-[1fr,2fr] sm:gap-md"
               >
-                <Link to={href} className="flex items-start gap-3 hover:underline">
-                  {speaker.headshotPath ? (
-                    <AssetImage
-                      path={speaker.headshotPath}
-                      alt=""
-                      className="h-12 w-12 shrink-0 rounded-full bg-brand-surface object-cover"
-                    />
+                <div>
+                  <Link to={href} className="flex items-baseline gap-xs hover:underline">
+                    {speaker.headshotPath ? (
+                      <AssetImage
+                        path={speaker.headshotPath}
+                        alt=""
+                        className="h-10 w-10 shrink-0 self-center rounded-brand bg-brand-surface object-cover"
+                      />
+                    ) : null}
+                    <h2 className="font-heading text-h3 font-semibold text-text-primary">
+                      {speaker.displayName}
+                    </h2>
+                  </Link>
+                  {affiliation ? (
+                    <p className="mt-2xs font-data text-caption text-text-secondary">
+                      {affiliation}
+                    </p>
                   ) : null}
-                  <h2 className="font-heading text-lg text-brand-ink">{speaker.displayName}</h2>
-                </Link>
-                {affiliation ? (
-                  <p className="mt-1 text-sm text-brand-ink-muted">{affiliation}</p>
+                </div>
+                {speaker.bio ? (
+                  <p
+                    className="mt-xs max-w-prose text-body text-text-secondary sm:mt-0"
+                    style={{ textWrap: 'pretty' }}
+                  >
+                    {speaker.bio}
+                  </p>
                 ) : null}
-                {speaker.bio ? <p className="mt-2 text-brand-ink-muted">{speaker.bio}</p> : null}
               </li>
             );
           })}
