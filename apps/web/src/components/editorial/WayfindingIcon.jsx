@@ -18,28 +18,38 @@
 // file serve both modes. An external <img> would carry its own colour and
 // fail in dark mode; a url() fill would do the same.
 
+/**
+ * Sign → the class that carries its drawing.
+ *
+ * Written out rather than built from the name: Tailwind tree-shakes
+ * anything in `@layer components` whose class name it cannot find as a
+ * literal string in the source it scans, and a class assembled from a
+ * template literal is not one. An icon whose mask was purged would paint as
+ * a solid square of ink.
+ */
+const ICON_CLASS = Object.freeze({
+  venue: 'wayfinding-icon--venue',
+  room: 'wayfinding-icon--room',
+  line: 'wayfinding-icon--line',
+  transit: 'wayfinding-icon--transit',
+  walk: 'wayfinding-icon--walk',
+  'step-free': 'wayfinding-icon--step-free',
+});
+
 /** The six signs, and the only six (public/icons/wayfinding/README.md). */
-export const WAYFINDING_ICONS = Object.freeze([
-  'venue',
-  'room',
-  'line',
-  'transit',
-  'walk',
-  'step-free',
-]);
+export const WAYFINDING_ICONS = Object.freeze(Object.keys(ICON_CLASS));
 
 /**
  * @param {{ name: string, className?: string }} props
  */
 export default function WayfindingIcon({ name, className = '' }) {
-  if (!WAYFINDING_ICONS.includes(name)) return null;
+  const iconClass = ICON_CLASS[name];
+  if (!iconClass) return null;
   return (
     <span
       aria-hidden="true"
       data-wayfinding-icon={name}
-      className={['wayfinding-icon', `wayfinding-icon--${name}`, className]
-        .filter(Boolean)
-        .join(' ')}
+      className={['wayfinding-icon', iconClass, className].filter(Boolean).join(' ')}
     />
   );
 }

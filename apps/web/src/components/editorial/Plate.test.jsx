@@ -117,7 +117,7 @@ describe('SpecimenLabel', () => {
     expect(container.innerHTML).not.toContain('rounded');
     expect(container.innerHTML).not.toContain('bg-');
     expect(indexCss).toMatch(
-      /\.specimen-label \{\s*border-block: var\(--specimen-label-rule-width\)/,
+      /\.specimen-label \{[^}]*border-block: var\(--specimen-label-rule-width\)/,
     );
     expect(themeCss).toContain('--specimen-label-rule-width: 0;');
     expect(themeCss).toContain('--specimen-label-key-display: none;');

@@ -108,29 +108,37 @@
     pointer-events: none;
     border: var(--nameplate-frame-width) solid rgb(var(--nameplate-frame-rgb));
   }
-  /* Coordinate marks at two corners: an L of hairlines that states a
-     position (brief §4.6). Zero width everywhere else, so the marks appear
-     only where a sheet is being located. */
+  /* Coordinate marks at two corners: a survey registration cross centred on
+     the corner of the title block (brief §4.6). A cross rather than an L,
+     because an L drawn at a corner the frame already turns is a corner
+     nobody can see.
+
+     The two bars are one background each, sized from the mark width, so a
+     zero width gives each bar a zero dimension and nothing is painted at
+     all. That is what keeps the mark out of every preset that is not
+     locating a sheet — a mark states a position, and it appears nowhere
+     else. */
   .nameplate__coordinate {
     position: absolute;
-    inline-size: var(--space-sm);
-    block-size: var(--space-sm);
+    inline-size: var(--space-md);
+    block-size: var(--space-md);
     pointer-events: none;
-    border-color: rgb(var(--nameplate-frame-rgb));
-    border-style: solid;
-    border-width: 0;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-image:
+      linear-gradient(rgb(var(--nameplate-frame-rgb)), rgb(var(--nameplate-frame-rgb))),
+      linear-gradient(rgb(var(--nameplate-frame-rgb)), rgb(var(--nameplate-frame-rgb)));
+    background-size:
+      100% var(--nameplate-corner-mark-width),
+      var(--nameplate-corner-mark-width) 100%;
   }
   .nameplate__coordinate--start {
-    inset-block-start: calc(-1 * var(--space-xs));
-    inset-inline-start: calc(-1 * var(--space-sm));
-    border-block-start-width: var(--nameplate-corner-mark-width);
-    border-inline-start-width: var(--nameplate-corner-mark-width);
+    inset-block-start: calc(-1 * (var(--space-xs) + var(--space-xs)));
+    inset-inline-start: calc(-1 * (var(--space-sm) + var(--space-xs)));
   }
   .nameplate__coordinate--end {
-    inset-block-end: calc(-1 * var(--space-xs));
-    inset-inline-end: calc(-1 * var(--space-sm));
-    border-block-end-width: var(--nameplate-corner-mark-width);
-    border-inline-end-width: var(--nameplate-corner-mark-width);
+    inset-block-end: calc(-1 * (var(--space-xs) + var(--space-xs)));
+    inset-inline-end: calc(-1 * (var(--space-sm) + var(--space-xs)));
   }
   .nameplate__name {
     font-size: var(--nameplate-size);
@@ -203,11 +211,23 @@
     background-color: rgb(var(--session-card-stamp-rgb));
     transform: translate(var(--session-card-stamp-offset), var(--session-card-stamp-offset));
   }
-  /* The face is the first pass. It is opaque, so at a zero offset it hides
-     the second pass completely and the block is the plain row it was. */
+  /* The face is the first pass, and it prints its own ground ONLY where
+     there is a second pass behind it to cover. The ground is a background
+     image sized from the offset, so a zero offset gives it a zero size and
+     the face stays transparent — which is what keeps every other preset
+     exactly as it was, paper texture and map grid still showing through the
+     row. Where the offset is real the ground is opaque and the second pass
+     shows only where it is misregistered. */
   .session-block__face {
     position: relative;
-    background-color: rgb(var(--session-card-surface-rgb));
+    background-image: linear-gradient(
+      rgb(var(--session-card-surface-rgb)),
+      rgb(var(--session-card-surface-rgb))
+    );
+    background-repeat: no-repeat;
+    background-size:
+      calc(var(--session-card-stamp-offset) * 1000)
+      calc(var(--session-card-stamp-offset) * 1000);
   }
   @media (prefers-reduced-motion: no-preference) {
     .session-block::before,
@@ -375,6 +395,8 @@
      At zero rule width and zero padding it IS the caption line it replaced,
      which is how five presets keep the page they already had. */
   .specimen-label {
+    inline-size: fit-content;
+    max-inline-size: 100%;
     border-block: var(--specimen-label-rule-width) solid rgb(var(--specimen-label-rule-rgb));
     padding-block: var(--specimen-label-pad);
   }
@@ -397,6 +419,8 @@
   .marginalia svg {
     display: block;
     inline-size: 100%;
+  }
+  .marginalia--pencil svg {
     block-size: 0.375rem;
   }
   .marginalia--squiggle svg {

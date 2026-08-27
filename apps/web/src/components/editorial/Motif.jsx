@@ -36,24 +36,37 @@
 // mark that carries meaning is an icon (see WayfindingIcon.jsx), not a
 // motif.
 
+/**
+ * Slot → the class that draws it.
+ *
+ * Written out rather than built from the slot name, and it has to be:
+ * Tailwind tree-shakes anything in `@layer components` whose class name it
+ * cannot find as a literal string in the source it scans. A class assembled
+ * from a template literal is not a literal string, so `motif--divider`
+ * would be purged from the stylesheet — and an unmasked `.motif` paints as
+ * a solid rectangle of ink, which is the worst possible way to fail.
+ */
+const SLOT_CLASS = Object.freeze({
+  'section-mark': 'motif--section-mark',
+  divider: 'motif--divider',
+  'nameplate-mark': 'motif--nameplate-mark',
+  'empty-state': 'motif--empty-state',
+});
+
 /** The launch slots (brief §3.8). Kept in step with design/tokens/motifs.json. */
-export const MOTIF_SLOTS = Object.freeze([
-  'section-mark',
-  'divider',
-  'nameplate-mark',
-  'empty-state',
-]);
+export const MOTIF_SLOTS = Object.freeze(Object.keys(SLOT_CLASS));
 
 /**
  * @param {{ slot: string, className?: string }} props
  */
 export default function Motif({ slot, className = '' }) {
-  if (!MOTIF_SLOTS.includes(slot)) return null;
+  const slotClass = SLOT_CLASS[slot];
+  if (!slotClass) return null;
   return (
     <span
       aria-hidden="true"
       data-motif-slot={slot}
-      className={['motif', `motif--${slot}`, className].filter(Boolean).join(' ')}
+      className={['motif', slotClass, className].filter(Boolean).join(' ')}
     />
   );
 }

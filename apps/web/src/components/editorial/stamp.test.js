@@ -55,8 +55,13 @@ const noPreference = indexCss.match(
 
 describe('the Zine stamp', () => {
   it('1. is flat: no blur, no gradient, no grey', () => {
-    expect(stampRules).toContain('background-color: rgb(var(--session-card-stamp-rgb));');
-    expect(stampRules).not.toMatch(/blur|gradient|box-shadow|filter/);
+    // The offset LAYER is the thing this test binds: one flat token colour,
+    // nothing else. (The face beside it paints its own ground with a
+    // two-stop same-colour gradient, which is a solid fill written as an
+    // image so it can be sized from the offset — see the last test here.)
+    const layer = staticCss.match(/\.session-block::before \{[^}]*\}/)[0];
+    expect(layer).toContain('background-color: rgb(var(--session-card-stamp-rgb));');
+    expect(layer).not.toMatch(/blur|gradient|box-shadow|filter|grey|gray/);
   });
 
   it('2. is offset a fixed small distance, and never follows the pointer', () => {
@@ -134,12 +139,21 @@ describe('the Zine stamp', () => {
   });
 
   it('leaves the block unchanged wherever the offset is zero', () => {
-    // A zero offset puts the second pass exactly under the first, and the
-    // face is opaque, so the flat-block variant and the other five presets
-    // need no second rule to turn the device off.
-    expect(indexCss).toMatch(
-      /\.session-block__face \{[^}]*background-color: rgb\(var\(--session-card-surface-rgb\)\);/,
+    // Turning the device off needs no second rule. The face prints its own
+    // ground as a background sized FROM the offset, so a zero offset gives
+    // that ground a zero size: the face stays transparent, the second pass
+    // sits exactly under the first with nothing to reveal it, and the row
+    // is the plain ruled row it always was — paper texture and map grid
+    // still showing through it.
+    const face = indexCss.match(/\.session-block__face \{[^}]*\}/)[0];
+    expect(face).toContain(
+      'linear-gradient(\n      rgb(var(--session-card-surface-rgb)),',
     );
+    expect(face).toContain('calc(var(--session-card-stamp-offset) * 1000)');
+    expect(face).not.toContain('background-color');
+    // Two stops, one colour: a solid fill, never a real gradient.
+    const stops = face.match(/rgb\(var\(--session-card-surface-rgb\)\)/g);
+    expect(stops).toHaveLength(2);
     expect(themeCss).toContain('--session-card-surface-rgb: var(--color-surface-rgb);');
   });
 });

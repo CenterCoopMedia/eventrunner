@@ -98,6 +98,20 @@ const MARKS = {
 };
 
 /**
+ * Mark → the class that sizes and places it.
+ *
+ * Written out rather than built from the mark name: Tailwind tree-shakes
+ * anything in `@layer components` whose class name it cannot find as a
+ * literal string in the source it scans, and a class assembled from a
+ * template literal is not one.
+ */
+const MARK_CLASS = Object.freeze({
+  pencil: 'marginalia--pencil',
+  squiggle: 'marginalia--squiggle',
+  circle: 'marginalia--circle',
+});
+
+/**
  * @param {{ mark?: keyof typeof MARKS, className?: string }} props
  */
 export default function Marginalia({ mark = 'pencil', className = '' }) {
@@ -107,7 +121,7 @@ export default function Marginalia({ mark = 'pencil', className = '' }) {
     <span
       aria-hidden="true"
       data-marginalia-mark={mark}
-      className={['marginalia', `marginalia--${mark}`, className].filter(Boolean).join(' ')}
+      className={['marginalia', MARK_CLASS[mark], className].filter(Boolean).join(' ')}
     >
       {drawing}
     </span>
