@@ -23,8 +23,13 @@
   <meta name="twitter:description" content="White-label event CMS. One Firebase project per event. Staff run the site. The Center for Cooperative Media operates it.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
   <meta name="twitter:image:alt" content="Event Runner: a white-label event CMS from the Center for Cooperative Media">
-  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+  <!-- The two grounds this site paints, and the only place the palette is
+       written as hex: a browser chrome color cannot read a custom property.
+       They are --brand-surface-rgb in each mode, from styles.css.
+       scripts/build-pages.cjs copies these two tags onto every generated
+       documentation page, so this is the one place they are maintained. -->
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#17191e" media="(prefers-color-scheme: dark)">
 
   <link rel="preload" href="fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -33,34 +38,13 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <svg class="svg-defs" aria-hidden="true" focusable="false">
-    <defs>
-      <symbol id="mark" viewBox="0 0 96 96">
-        <rect x="30" y="27" width="58" height="58" rx="12" fill="var(--color-mark-teal)"/>
-        <rect x="18" y="19" width="58" height="60" rx="12" fill="var(--color-mark-orange)"/>
-        <rect x="6" y="12" width="60" height="68" rx="12" fill="var(--color-mark-face)"/>
-        <path d="M18 12h36a12 12 0 0 1 12 12v12H6V24a12 12 0 0 1 12-12Z" fill="var(--color-mark-blue)"/>
-        <rect x="6" y="12" width="60" height="68" rx="12" fill="none" stroke="var(--color-mark-line)" stroke-width="5"/>
-        <rect x="20" y="4" width="7" height="17" rx="3.5" fill="var(--color-mark-line)"/>
-        <rect x="45" y="4" width="7" height="17" rx="3.5" fill="var(--color-mark-line)"/>
-        <circle cx="19" cy="46" r="3.5" fill="var(--color-mark-blue)"/>
-        <rect x="27" y="42.75" width="30" height="6.5" rx="3.25" fill="var(--color-mark-blue)"/>
-        <circle cx="19" cy="58" r="3.5" fill="var(--color-mark-orange)"/>
-        <rect x="27" y="54.75" width="22" height="6.5" rx="3.25" fill="var(--color-mark-orange)"/>
-        <circle cx="19" cy="70" r="3.5" fill="var(--color-mark-teal)"/>
-        <rect x="27" y="66.75" width="26" height="6.5" rx="3.25" fill="var(--color-mark-teal)"/>
-      </symbol>
-    </defs>
-  </svg>
-
   <div class="wrap">
+    <!-- The masthead: a rule-bounded title block, type and rules only. It
+         runs at the compact size so the headline below it leads the page. -->
     <header class="site-header">
       <a class="brand" href="./">
-        <svg class="brand-mark" viewBox="0 0 96 96" aria-hidden="true" focusable="false"><use href="#mark"/></svg>
-        <span class="brand-text">
-          <strong>Event Runner</strong>
-          <span>Event CMS for conferences &amp; gatherings</span>
-        </span>
+        <strong>Event Runner</strong>
+        <span>Event CMS for conferences &amp; gatherings</span>
       </a>
       <nav aria-label="Site">
         <a href="#hero">What it is</a>
@@ -74,16 +58,16 @@
     <main id="main">
       <section class="hero" id="hero">
         <div class="thesis">
-          <svg class="hero-mark" viewBox="0 0 96 96" role="img" aria-label="Event Runner calendar mark"><use href="#mark"/></svg>
           <h1>An event CMS your staff run without a developer in the room</h1>
           <p class="lede">Event Runner is a white-label event CMS. Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates it. Your staff run the site — schedule, speakers, pages, and registration — from the admin panel, without touching code.</p>
         </div>
 
         <aside class="status-panel" aria-label="Build status">
-          <header class="status-panel-head">
-            <span class="status-panel-title">Build status</span>
-            <span class="status-panel-meta">v1</span>
-          </header>
+          <p class="folio-row">
+            <span class="folio">Build status</span>
+            <span class="folio-row__rule" aria-hidden="true"></span>
+            <span class="folio">v1</span>
+          </p>
           <ul class="status-list" role="list">
             <li class="status-row">
               <span class="status-row-name">Email core &amp; adapters</span>
@@ -114,7 +98,10 @@
       </section>
 
       <section class="section" id="demo">
-        <h2>Open the demo</h2>
+        <div class="section-head">
+          <h2>Open the demo</h2>
+          <span class="section-head__rule" aria-hidden="true"></span>
+        </div>
         <p>The public site, rendered from a fictional event: schedule, speakers, pages, and registration, all clickable, with no sign-up. It's the attendee experience, read-only — not the admin panel.</p>
         <div class="actions">
           <a class="btn" href="./demo/">Open the demo</a>
@@ -124,17 +111,20 @@
       </section>
 
       <section class="section" id="capabilities">
-        <h2>What v1 includes</h2>
-        <div class="card-grid">
-          <article class="card">
+        <div class="section-head">
+          <h2>What v1 includes</h2>
+          <span class="section-head__rule" aria-hidden="true"></span>
+        </div>
+        <div class="feature-list">
+          <article class="feature">
             <h3>Schedule &amp; speakers</h3>
             <p>Sessions, bookmarks, and ICS calendar links. Speaker invite, accept, profile, and approval, plus an attendee directory.</p>
           </article>
-          <article class="card">
+          <article class="feature">
             <h3>Block CMS &amp; sign-in</h3>
             <p>A draft/publish block CMS for pages and content. Google sign-in and emailed 6-digit OTP codes for attendees.</p>
           </article>
-          <article class="card">
+          <article class="feature">
             <h3>Ticketing</h3>
             <p>Eventbrite and manual/CSV adapters on one provider-neutral registration state machine.</p>
           </article>
@@ -143,13 +133,19 @@
       </section>
 
       <section class="section" id="deployment">
-        <h2>How it's deployed</h2>
+        <div class="section-head">
+          <h2>How it's deployed</h2>
+          <span class="section-head__rule" aria-hidden="true"></span>
+        </div>
         <p>Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates it — your data, sender domain, and ticket provider stay inside your deployment. Client staff run the site from the admin panel; they never touch a repo or a server.</p>
         <p class="note">The code is Apache-2.0 and free to read, fork, or self-host. "Event Runner" as a product name is reserved to CCM: that's the part that stays exclusive, not the code.</p>
       </section>
 
       <section class="section" id="operators">
-        <h2>For operators</h2>
+        <div class="section-head">
+          <h2>For operators</h2>
+          <span class="section-head__rule" aria-hidden="true"></span>
+        </div>
         <p>Built for nonprofits, newsrooms, universities, and event producers who want a staff-run event site — schedule, speakers, registration, and materials — without hiring developers or running infrastructure.</p>
         <div class="actions">
           <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general">Start a conversation with CCM</a>
@@ -158,7 +154,10 @@
       </section>
 
       <section class="section" id="contribute">
-        <h2>For contributors</h2>
+        <div class="section-head">
+          <h2>For contributors</h2>
+          <span class="section-head__rule" aria-hidden="true"></span>
+        </div>
         <p>The reference implementation is the 2026 Collaborative Journalism Summit site. That repo stays the live event; this repo is the extract, and it's open for contribution under Apache-2.0.</p>
         <div class="actions">
           <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner">Open the repository</a>
@@ -169,7 +168,10 @@
       </section>
 
       <section class="section" id="status">
-        <h2>Project status</h2>
+        <div class="section-head">
+          <h2>Project status</h2>
+          <span class="section-head__rule" aria-hidden="true"></span>
+        </div>
         <p>v1 is five milestones. M1 through M4 are complete. M5 packaging is in progress — the public demo instance and Eventbrite sandbox verification are what's left before v1 ships.</p>
         <ol class="milestones" role="list">
           <li class="milestone">

@@ -568,65 +568,133 @@ test('no page on this site asks a font CDN for anything', () => {
 // ------------------------------------------------------------ token palette
 
 /**
- * WCAG 2.x relative luminance and contrast ratio, for `#rrggbb` literals.
+ * WCAG 2.x relative luminance and contrast ratio, for `r g b` channel triples.
  *
- * @param {string} first
- * @param {string} second
+ * The site stores colors in the same space-separated RGB-triple form the
+ * product ships (design brief §3.6), so this reads triples rather than hex.
+ *
+ * @param {number[]} first
+ * @param {number[]} second
  * @returns {number}
  */
 function contrastRatio(first, second) {
-  const luminance = (color) => {
-    const channels = color.slice(1).match(/.{2}/g).map((pair) => Number.parseInt(pair, 16) / 255);
-    const linear = channels.map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const luminance = (channels) => {
+    const linear = channels
+      .map((channel) => channel / 255)
+      .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
     return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
   };
   const [lighter, darker] = [luminance(first), luminance(second)].sort((a, b) => b - a);
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+/**
+ * The two mode palettes docs/styles.css declares, each resolved to channels.
+ *
+ * A palette block is any `:root { … }` that declares `--brand-surface-rgb`,
+ * which skips the scale block above them. Values are either a triple or a
+ * `var(--other-rgb)` alias, exactly as apps/web/src/generated/theme.css
+ * writes them, so aliases are followed until they reach channels.
+ *
+ * @param {string} css
+ * @returns {Array<Record<string, number[]>>} light first, then dark
+ */
 function paletteBlocks(css) {
-  // The light palette is the first `:root {…}`; the dark one is the `:root`
-  // nested in the prefers-color-scheme media query.
-  const blocks = [...css.matchAll(/:root\s*\{([^}]*)\}/g)].map((match) => match[1]);
-  return blocks.slice(0, 2).map((block) => Object.fromEntries(
-    [...block.matchAll(/(--color-[\w-]+):\s*(#[\da-f]{6})/gi)].map((match) => [match[1], match[2]]),
-  ));
+  const blocks = [...css.matchAll(/:root\s*\{([^}]*)\}/g)]
+    .map((match) => match[1])
+    .filter((block) => block.includes('--brand-surface-rgb'));
+  return blocks.map((block) => {
+    const declared = Object.fromEntries(
+      [...block.matchAll(/(--[\w-]+-rgb):\s*([^;]+);/g)].map((match) => [match[1], match[2].trim()]),
+    );
+    const resolve = (name, seen = new Set()) => {
+      const value = declared[name];
+      if (value === undefined || seen.has(name)) return null;
+      const alias = value.match(/^var\(\s*(--[\w-]+)\s*\)$/);
+      if (alias) return resolve(alias[1], new Set([...seen, name]));
+      const channels = value.split(/\s+/).map(Number);
+      return channels.length === 3 && channels.every(Number.isInteger) ? channels : null;
+    };
+    return Object.fromEntries(
+      Object.keys(declared).map((name) => [name, resolve(name)]).filter(([, value]) => value),
+    );
+  });
 }
+
+test('the two mode palettes declare exactly the same tokens', () => {
+  // Design brief §8.2: a half-applied dark mode is a bug, not a polish item.
+  // The static site has no runtime to write `data-mode`, so this comparison is
+  // what stands in for the product's dark-mode completeness test.
+  const css = fs.readFileSync(path.join(ROOT, 'docs', 'styles.css'), 'utf8');
+  const [light, dark] = paletteBlocks(css);
+  assert.ok(Object.keys(light).length > 10, 'the light palette did not parse');
+  assert.deepEqual(
+    Object.keys(dark).sort(),
+    Object.keys(light).sort(),
+    'the light and dark palettes are not token-for-token symmetrical',
+  );
+});
 
 test('the token palette clears the contrast ratios its roles promise', () => {
   const css = fs.readFileSync(path.join(ROOT, 'docs', 'styles.css'), 'utf8');
   const [light, dark] = paletteBlocks(css);
-  assert.ok(Object.keys(light).length > 10, 'the light palette did not parse');
 
-  const bodyText = [
-    ['--color-text', '--color-bg'],
-    ['--color-text', '--color-surface'],
-    ['--color-text-secondary', '--color-bg'],
-    ['--color-link', '--color-bg'],
-    ['--color-status-done-text', '--color-status-done-bg'],
-    ['--color-status-progress-text', '--color-status-progress-bg'],
-    ['--color-btn-text', '--color-btn-bg'],
+  // Every foreground/background pair this site actually renders. Text pairs
+  // clear 4.5:1; the control boundary and the strong rule are non-text UI and
+  // clear 3:1 (interface guidelines, Colors).
+  const text = [
+    ['--color-text-primary-rgb', '--color-surface-rgb'],
+    ['--color-text-primary-rgb', '--color-surface-alt-rgb'],
+    ['--color-text-secondary-rgb', '--color-surface-rgb'],
+    ['--color-text-secondary-rgb', '--color-surface-alt-rgb'],
+    ['--folio-text-rgb', '--color-surface-rgb'],
+    ['--color-accent-rgb', '--color-surface-rgb'],
+    ['--color-accent-rgb', '--color-surface-alt-rgb'],
+    ['--semantic-success-rgb', '--color-surface-rgb'],
+    ['--semantic-warning-rgb', '--color-surface-rgb'],
+    // The primary button inverts the page: surface ink on the ink ground.
+    ['--color-surface-rgb', '--color-text-primary-rgb'],
+    ['--color-surface-rgb', '--color-accent-rgb'],
   ];
-  // Dark redefines only some tokens; anything it leaves alone still resolves
-  // to the light value, which is what the browser does too.
-  for (const [name, palette] of [['light', light], ['dark', { ...light, ...dark }]]) {
-    for (const [foreground, background] of bodyText) {
+  const nonText = [
+    ['--color-border-control-rgb', '--color-surface-rgb'],
+    ['--color-border-control-rgb', '--color-surface-alt-rgb'],
+    ['--rule-strong-rgb', '--color-surface-rgb'],
+    ['--color-accent-rgb', '--color-surface-rgb'],
+  ];
+
+  for (const [mode, palette] of [['light', light], ['dark', dark]]) {
+    for (const [foreground, background] of text) {
       const ratio = contrastRatio(palette[foreground], palette[background]);
-      assert.ok(ratio >= 4.5, `${name}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
-      assert.ok(ratio <= 21, `${name}: ${foreground} on ${background} exceeds 21:1`);
+      assert.ok(ratio >= 4.5, `${mode}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
+      assert.ok(ratio <= 21, `${mode}: ${foreground} on ${background} exceeds 21:1`);
     }
-    // Borders and accents are non-text UI, held to the 3:1 rule.
-    const accent = contrastRatio(palette['--color-accent'], palette['--color-bg']);
-    assert.ok(accent >= 3, `${name}: --color-accent on --color-bg is ${accent.toFixed(2)}:1`);
+    for (const [foreground, background] of nonText) {
+      const ratio = contrastRatio(palette[foreground], palette[background]);
+      assert.ok(ratio >= 3, `${mode}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
+    }
+  }
+});
+
+test('every color the stylesheets use is declared by both palettes', () => {
+  // The other half of §8.2: a rule that reads a token no palette declares
+  // paints nothing in one mode and something in the other.
+  const css = ['styles.css', 'docs.css']
+    .map((name) => fs.readFileSync(path.join(ROOT, 'docs', name), 'utf8'))
+    .join('\n');
+  const [light, dark] = paletteBlocks(css);
+  const used = new Set([...css.matchAll(/rgb\(var\((--[\w-]+-rgb)\)\)/g)].map((match) => match[1]));
+  assert.ok(used.size > 5, 'no color usage parsed');
+  for (const name of used) {
+    assert.ok(name in light, `light palette does not declare ${name}`);
+    assert.ok(name in dark, `dark palette does not declare ${name}`);
   }
 });
 
 test('contrastRatio matches the values WCAG defines', () => {
-  // Built rather than written as literals: the hex-literal ban (spec §7.6)
-  // applies to this file, and these two are the endpoints of the scale, not
-  // colors the design uses.
-  const black = `#${'0'.repeat(6)}`;
-  const white = `#${'f'.repeat(6)}`;
+  // The endpoints of the scale, not colors the design uses.
+  const black = [0, 0, 0];
+  const white = [255, 255, 255];
   assert.equal(contrastRatio(black, white), 21);
   assert.equal(contrastRatio(white, white), 1);
 });

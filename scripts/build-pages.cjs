@@ -62,10 +62,11 @@ const EXTERNAL_SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
 /**
  * Copy the landing page's `theme-color` tags verbatim.
  *
- * The values live in docs/index.html, which is the page that defines the
- * palette. Reading them keeps the documentation shell in step with it and
- * keeps color literals out of this script, where the hex-literal lint ban
- * applies.
+ * A browser-chrome color cannot read a custom property, so the two grounds
+ * `docs/styles.css` paints are written out as hex once, in docs/index.html.
+ * Copying them from there keeps the documentation shell in step with the
+ * landing page and keeps color literals out of this script, where the
+ * hex-literal lint ban applies.
  *
  * @param {string} landingHtml
  * @returns {string[]} complete meta tags
@@ -184,13 +185,14 @@ function head({ title, description, canonical, themeTags, ogType }) {
     '  <a class="skip-link" href="#main">Skip to content</a>',
     '',
     '  <div class="wrap">',
+    // The masthead is the same device the landing page carries: a
+    // rule-bounded title block in type and rules only, at the compact size
+    // (design brief §2.1). The line under the name states which surface of
+    // the site the reader is on.
     '    <header class="site-header">',
     `      <a class="brand" href="${SITE_BASE}">`,
-    `        <img class="brand-mark" src="${SITE_BASE}favicon.svg" alt="" width="38" height="38">`,
-    '        <span class="brand-text">',
-    `          <strong>${PRODUCT}</strong>`,
-    '          <span>Documentation</span>',
-    '        </span>',
+    `        <strong>${PRODUCT}</strong>`,
+    '        <span>Documentation</span>',
     '      </a>',
     '      <nav aria-label="Site">',
     `        <a href="${SITE_BASE}">Home</a>`,
