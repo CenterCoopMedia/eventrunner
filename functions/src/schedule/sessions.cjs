@@ -14,10 +14,10 @@
  *             session. A session with no track runs on its own, and a
  *             letter no track defines is refused: see checkSessionTrack.
  *
- *   parentId  the id of a top-level session on the same day. A parent and
- *             its children read as a service and its calling points (brief
- *             §4.6): a workshop block and the workshops inside it, a
- *             plenary and its breakouts.
+ *   parentId  the id of a top-level session on the same day and the same
+ *             line. A parent and its children read as a service and its
+ *             calling points (brief §4.6): a workshop block and the
+ *             workshops inside it, a plenary and its breakouts.
  *
  * PARENTS ARE ONE LEVEL DEEP, and that is a rule, not a limitation of the
  * check. A schedule is a timetable, not a tree: a reader scanning a grid
@@ -25,6 +25,15 @@
  * the depth at one is also what makes a cycle impossible to construct —
  * see checkSessionParent, which refuses BOTH halves of every cycle it
  * could otherwise take two writes to build.
+ *
+ * A RELATIONSHIP IS GUARDED FROM BOTH ENDS AND AT EVERY EDGE. Checking the
+ * child's side alone left three ways to break the same rules without ever
+ * writing an invalid child: edit the PARENT out from under its children
+ * (checkSessionChildren), DELETE the parent (checkSessionDeletable), or
+ * PUBLISH a child while its parent is still a draft
+ * (checkSchedulePublishSet). Each one produced exactly the state the
+ * child-side check exists to prevent, so each has its own refusal, and
+ * each reads inside the transaction whose write it guards.
  *
  * WALKING MINUTES ARE NOT HERE. "Transfer to Line B · Hall 2 · 6 min walk"
  * (brief §4.6) is a fact about a pair of rooms in a building, not about a
