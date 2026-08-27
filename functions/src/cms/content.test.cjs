@@ -788,8 +788,25 @@ test('a session save rejects a parent that does not exist, naming the id', async
   assert.match(res.body.error.message, /no session exists with id "session-ghost"/);
 });
 
+test('a session save rejects a track the event does not define, naming the ones it does', async () => {
+  const db = makeFakeDb({
+    'config/event': { tracks: [{ letter: 'A', name: 'Practice' }] },
+  });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'session-1', fields: { dayId: 'day-1', track: 'B' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^track: "B" is not one of this event's tracks \(A\)/);
+  assert.equal(db.read('cmsSchedule_drafts', 'session-1'), undefined);
+});
+
 test('a session save accepts a track and a parent on the same day', async () => {
-  const db = makeFakeDb({ 'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop' } });
+  const db = makeFakeDb({
+    'config/event': { tracks: [{ letter: 'A', name: 'Practice' }, { letter: 'B', name: 'Sustainability' }] },
+    'cmsSchedule/session-parent': { dayId: 'day-2', title: 'Workshop', track: 'B' },
+  });
   const res = fakeRes();
   await createCmsCreateContentHandler(deps(db))(
     req({

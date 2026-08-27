@@ -11,7 +11,8 @@
  *   track     'A' … 'Z' — which concurrent line this session runs on. The
  *             LETTER only. The name lives once, in `config/event.tracks`,
  *             so renaming a line is one edit rather than a sweep of every
- *             session. A session with no track runs on its own.
+ *             session. A session with no track runs on its own, and a
+ *             letter no track defines is refused: see checkSessionTrack.
  *
  *   parentId  the id of a top-level session on the same day. A parent and
  *             its children read as a service and its calling points (brief
@@ -40,6 +41,15 @@ const SESSIONS_DRAFTS = 'cmsSchedule_drafts';
 
 /** A session document id: no slashes, no dots — a Firestore path segment. */
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** Where the event's track definitions live (shared/config validates them). */
+const CONFIG_COLLECTION = 'config';
+const CONFIG_EVENT_DOC = 'event';
+
+/** The letter a field states, or null for "this session names no track". */
+function statedTrack(value) {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
 
 /**
  * Shape-check the two structural fields without touching Firestore. Pure,
@@ -74,6 +84,74 @@ function validateSessionShape(fields, docId) {
     }
   }
   return { ok: errors.length === 0, errors };
+}
+
+/**
+ * The letters `config/event.tracks` defines, in the order the config states
+ * them (which is the order the schedule grid puts the columns in).
+ *
+ * READ FRESH, INSIDE THE CALLER'S TRANSACTION — deliberately NOT through
+ * core/config.cjs getEventConfig. That loader caches per container for five
+ * minutes, which is the right trade for a handler rendering a page and the
+ * wrong one for a validator: an operator who adds track C in event settings
+ * and immediately puts a session on it would be told, for up to five
+ * minutes, that C is not one of the event's tracks — and worse, a track
+ * DELETED in settings would keep accepting sessions for just as long, from
+ * whichever containers still hold the old copy. A transactional read of the
+ * document has neither problem, and it puts config/event in the write
+ * transaction's read set: a concurrent settings save that drops the track
+ * this session is claiming aborts the save rather than racing it.
+ */
+async function readTrackLetters({ db, tx }) {
+  const ref = db.collection(CONFIG_COLLECTION).doc(CONFIG_EVENT_DOC);
+  const snap = tx ? await tx.get(ref) : await ref.get();
+  const tracks = snap.exists ? snap.data()?.tracks : null;
+  if (!Array.isArray(tracks)) return [];
+  return tracks.map((t) => statedTrack(t?.letter)).filter((letter) => letter !== null);
+}
+
+/**
+ * The track letter, checked against the tracks the event actually defines.
+ *
+ * A LETTER WITH NO DEFINITION IS REFUSED, including when the event defines
+ * no tracks at all. A track is a line with a name (brief §4.6) — "Line B"
+ * on a badge, in the grid header, in a route mark — and a session pointing
+ * at a letter nothing names renders as a bare glyph the reader cannot
+ * resolve. Rejecting says so while the operator is still in the editor,
+ * with the letters that ARE defined in the message, rather than shipping a
+ * schedule column with no heading.
+ *
+ * Existing documents are untouched: this runs at the write, exactly like
+ * the stat contract, so a session stored before its track was removed keeps
+ * publishing and rendering until someone edits it.
+ *
+ * @param {{ db: object, tx?: object, fields: object }} args
+ * @returns {Promise<{ ok: boolean, errors: string[] }>}
+ */
+async function checkSessionTrack({ db, tx = null, fields }) {
+  const track = statedTrack(fields?.track);
+  if (track === null) return { ok: true, errors: [] };
+
+  const letters = await readTrackLetters({ db, tx });
+  if (letters.length === 0) {
+    return {
+      ok: false,
+      errors: [
+        `track: this event defines no tracks, so no session can run on track "${track}" — ` +
+        'add the track in event settings first, or leave this session with no track',
+      ],
+    };
+  }
+  if (!letters.includes(track)) {
+    return {
+      ok: false,
+      errors: [
+        `track: "${track}" is not one of this event's tracks (${letters.join(', ')}) — ` +
+        'add it in event settings first, or pick one of those',
+      ],
+    };
+  }
+  return { ok: true, errors: [] };
 }
 
 /** True when a stored session document names a parent. */
@@ -165,7 +243,9 @@ async function checkSessionParent({ db, tx = null, docId, fields }) {
 }
 
 /**
- * Both halves in one call, shape before reads.
+ * Every half in one call, shape before reads: a malformed payload costs no
+ * reads at all, and the checks that do read run together so one save reports
+ * everything wrong with it rather than one thing per round trip.
  *
  * @param {{ db: object, tx?: object, docId: string, fields: object }} args
  * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
@@ -173,14 +253,31 @@ async function checkSessionParent({ db, tx = null, docId, fields }) {
 async function validateSessionStructure({ db, tx = null, docId, fields }) {
   const shape = validateSessionShape(fields, docId);
   if (!shape.ok) return { ok: false, message: shape.errors.join('; ') };
-  const parent = await checkSessionParent({ db, tx, docId, fields });
-  if (!parent.ok) return { ok: false, message: parent.errors.join('; ') };
+
+  const errors = [];
+  for (const check of [
+    () => checkSessionTrack({ db, tx, fields }),
+    () => checkSessionParent({ db, tx, docId, fields }),
+  ]) {
+    const verdict = await check();
+    errors.push(...verdict.errors);
+  }
+  if (errors.length > 0) return { ok: false, message: errors.join('; ') };
   return { ok: true };
 }
 
 module.exports = {
   validateSessionShape,
+  checkSessionTrack,
   checkSessionParent,
   validateSessionStructure,
-  internals: { SESSIONS, SESSIONS_DRAFTS, SESSION_ID_RE, findChildIds, readSession },
+  internals: {
+    SESSIONS,
+    SESSIONS_DRAFTS,
+    SESSION_ID_RE,
+    findChildIds,
+    readSession,
+    readTrackLetters,
+    statedTrack,
+  },
 };

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   validateSessionShape,
+  checkSessionTrack,
   checkSessionParent,
   validateSessionStructure,
 } = require('./sessions.cjs');
@@ -12,6 +13,14 @@ const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 
 function session(overrides = {}) {
   return { dayId: 'day-2', title: 'Workshop', startTime: '13:30', ...overrides };
+}
+
+/** An event that defines the tracks named, plus whatever else is seeded. */
+function dbWithTracks(letters, seed = {}) {
+  return makeFakeDb({
+    'config/event': { tracks: letters.map((letter) => ({ letter, name: `Line ${letter}` })) },
+    ...seed,
+  });
 }
 
 // --- track (design brief §4.6) ----------------------------------------------
@@ -34,6 +43,54 @@ test('anything else is rejected, naming the field and the value', () => {
     assert.equal(ok, false, `accepted ${JSON.stringify(bad)}`);
     assert.match(errors[0], /^track: /);
   }
+});
+
+// --- track membership (design brief §4.6) -----------------------------------
+
+test('a track letter must name one of the event’s tracks', async () => {
+  const db = dbWithTracks(['A', 'B']);
+  assert.deepEqual(
+    await checkSessionTrack({ db, fields: session({ track: 'B' }) }),
+    { ok: true, errors: [] },
+  );
+});
+
+test('a letter no track defines is rejected, naming the letters that are', async () => {
+  const db = dbWithTracks(['A', 'B']);
+  const verdict = await checkSessionTrack({ db, fields: session({ track: 'C' }) });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.errors[0], /^track: "C" is not one of this event's tracks \(A, B\)/);
+});
+
+test('an event with no tracks configured accepts no track letter at all', async () => {
+  for (const db of [makeFakeDb(), makeFakeDb({ 'config/event': {} }), dbWithTracks([])]) {
+    const verdict = await checkSessionTrack({ db, fields: session({ track: 'A' }) });
+    assert.equal(verdict.ok, false);
+    assert.match(verdict.errors[0], /^track: this event defines no tracks/);
+  }
+});
+
+test('a session with no track never reads the config', async () => {
+  const db = makeFakeDb();
+  for (const track of [undefined, null, '']) {
+    assert.deepEqual(
+      await checkSessionTrack({ db, fields: session({ track }) }),
+      { ok: true, errors: [] },
+    );
+  }
+});
+
+test('the track is read fresh from config/event, not from a cached config', async () => {
+  // The staleness trap this check exists to avoid: an operator adds track C
+  // in event settings and puts a session on it in the next breath. A
+  // five-minute container cache would refuse the session; a document read
+  // sees the track that is actually there.
+  const db = dbWithTracks(['A']);
+  assert.equal((await checkSessionTrack({ db, fields: session({ track: 'C' }) })).ok, false);
+  await db.collection('config').doc('event').set({
+    tracks: [{ letter: 'A', name: 'Line A' }, { letter: 'C', name: 'Line C' }],
+  });
+  assert.equal((await checkSessionTrack({ db, fields: session({ track: 'C' }) })).ok, true);
 });
 
 // --- parentId ---------------------------------------------------------------
@@ -152,8 +209,8 @@ test('a session with no parent never reads anything', async () => {
   assert.deepEqual(verdict, { ok: true, errors: [] });
 });
 
-test('validateSessionStructure joins the two halves, shape first', async () => {
-  const db = makeFakeDb();
+test('validateSessionStructure joins the halves, shape first', async () => {
+  const db = dbWithTracks(['A']);
   const bad = await validateSessionStructure({
     db,
     docId: 'session-1',
@@ -171,4 +228,16 @@ test('validateSessionStructure joins the two halves, shape first', async () => {
     fields: session({ track: 'A' }),
   });
   assert.deepEqual(good, { ok: true });
+});
+
+test('one save reports everything wrong with it: track AND parent', async () => {
+  const db = dbWithTracks(['A']);
+  const verdict = await validateSessionStructure({
+    db,
+    docId: 'session-1',
+    fields: session({ track: 'Z', parentId: 'session-ghost' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /track: "Z" is not one of this event's tracks/);
+  assert.match(verdict.message, /no session exists with id "session-ghost"/);
 });
