@@ -1,28 +1,20 @@
-// SessionCard — the convergence point for every schedule feature (spec §9):
-// materials/reactions/bookmarks pills are feature-flag conditional, so a
-// deployment with those features off renders a plain session card and
-// nothing here assumes they exist.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+// SessionCard — one session as a ruled row in the programme.
+//
+// A ROW IS: the time, the title, the format, the room, the speakers, the
+// session's own words, its calling points, and one line of quiet controls.
+// The controls themselves live in components/session/ (SessionActions), and
+// which of them a row gets is that module's decision, not this one's — a
+// row and a detail page are different pages and get different sets.
+//
+// Everything below the title reads at the same weight, so the eye keeps
+// running down the time column instead of stopping at a shelf of boxes.
+import { useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
-import { useProfile } from '../contexts/ProfileContext.jsx';
-import { useToast } from '../contexts/ToastContext.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
-import { setSessionBookmarked } from '../lib/bookmarksSource.js';
-import { useSessionMaterialsCount } from '../hooks/useSessionMaterials.js';
-import { REACTION_KINDS, setSessionReaction } from '../lib/reactionsSource.js';
-import { useSessionReactions } from '../hooks/useSessionReactions.js';
-import {
-  buildGoogleCalendarUrl,
-  buildIcsCalendar,
-  buildOutlookCalendarUrl,
-  downloadIcs,
-  icsFileName,
-} from '../utils/calendar.js';
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';
-import WayfindingIcon from './editorial/WayfindingIcon.jsx';
-import Tag from './editorial/Tag.jsx';
+import SessionActions from './session/SessionActions.jsx';
+import SessionFormat from './session/SessionFormat.jsx';
 import CallingPoints from './CallingPoints.jsx';
 
 /**
@@ -99,337 +91,36 @@ export function SpeakerNames({
 }
 
 /**
- * The session type as a small ruled rectangle beside the title (issue #113).
+ * MOVEMENT IS NOT INFERRED (design brief §4.6; visual story, Atlas).
  *
- * The shape lives in editorial/Tag.jsx — one tag shape for the whole site,
- * so the directory, the updates feed, and the schedule cannot drift apart.
- * It is not a pill: the fully rounded shape is a rejected pattern (design
- * brief §2.4), and the radius is `--radius-base`, which the concentric
- * radius rule keeps in step with everything else the theme draws (interface
- * guidelines, User interface). Keynote emphasis is a flat tint plus the word
- * itself — never a colored edge, and never color alone (§8.1).
+ * The schedule used to compare one session's room string with the previous
+ * one's and, when they differed, print "Transfer to <room>". That was a
+ * guess wearing the voice of a fact. Two rooms with different names may be
+ * the same door; a reader who never sat in the earlier session is not
+ * transferring from anywhere; and the sentence claimed a movement the data
+ * never recorded.
+ *
+ * So movement facts — transfers, walking guidance, movement instructions —
+ * render ONLY from explicit data. A session carries a day, a time, a title,
+ * a room, a track, and its speakers. None of those is a movement, so the
+ * room renders plainly and the page says nothing more. When the schema
+ * gains a stated transfer, the statement comes back and reads from it.
+ *
+ * Track letters stay: a track IS explicit data (config/event.tracks, one
+ * letter and one name), which is why RouteMark still renders in the grid.
  */
-export function TypeBadge({ type }) {
-  if (typeof type !== 'string' || !type) return null;
-  // Session types are CMS vocabulary — presented, never interpreted, except
-  // the platform-level keynote emphasis token from config/theme (spec §7.2).
-  return <Tag tone={type === 'keynote' ? 'keynote' : 'default'}>{type}</Tag>;
-}
-
-// The feature-flag controls under a session. Rectangles on the theme radius,
-// not pills (brief §2.4): the same shape rule TypeBadge now follows.
-const actionClass =
-  'touch-target inline-flex items-center gap-2xs rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-brand-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
-
-/**
- * Bookmark toggle pill (spec §9 "Bookmarks"). Feature-gated by
- * config/features.sessionBookmarks; the click itself is gated by
- * ProfileContext's `attendeeAccess` (spec §3.4's hasAttendeeAccess predicate,
- * shared with the server) — signed-out visitors see a "sign in" prompt,
- * signed-in non-attendees see a disabled pill naming the requirement, and
- * approved attendees (or speakers, or admins) get a working toggle.
- */
-function BookmarkPill({ session, bookmarked }) {
-  const { user } = useAuth();
-  const { attendeeAccess } = useProfile();
-  const { showToast } = useToast();
-  const [pending, setPending] = useState(false);
-  // Optimistic local override so a click feels instant; cleared on a
-  // failed request (see onClick's catch) AND, below, once `bookmarked`
-  // itself changes — the owning subscription's next snapshot confirming
-  // OUR write, but just as importantly a DIFFERENT change arriving (a
-  // toggle from another tab, an admin action, or the signed-in identity
-  // switching). Without that second clear, `optimistic` would keep
-  // masking `bookmarked` forever after a successful write: the next click
-  // would compute `next = !isBookmarked` off the stale optimistic value
-  // instead of the server's real state, sending the inverse of what the
-  // user actually sees on screen.
-  const [optimistic, setOptimistic] = useState(null);
-  const isBookmarked = optimistic ?? bookmarked;
-
-  // Keyed on the session and the signed-in identity too: switching users
-  // (or the card being reused for a different session without a fresh
-  // mount) must not carry a stale optimistic value across the switch.
-  useEffect(() => {
-    setOptimistic(null);
-  }, [bookmarked, session.id, user?.uid]);
-
-  const onClick = useCallback(async () => {
-    if (!user) return; // rendered as a sign-in link instead, see below
-    const next = !isBookmarked;
-    setOptimistic(next);
-    setPending(true);
-    try {
-      await setSessionBookmarked({ user, sessionId: session.id, bookmarked: next });
-    } catch (err) {
-      setOptimistic(null);
-      showToast(err.message || 'The bookmark could not be saved.', { tone: 'error' });
-    } finally {
-      setPending(false);
-    }
-  }, [user, isBookmarked, session.id, showToast]);
-
-  if (!user) {
-    return (
-      <Link to="/signin" className={actionClass}>
-        <span aria-hidden="true">☆</span> Sign in to bookmark
-      </Link>
-    );
-  }
-
-  if (!attendeeAccess) {
-    return (
-      <span
-        className={actionClass}
-        aria-disabled="true"
-        title="Bookmarking is available to approved attendees."
-      >
-        <span aria-hidden="true">☆</span> Bookmark
-      </span>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      className={actionClass}
-      onClick={onClick}
-      disabled={pending}
-      aria-pressed={isBookmarked}
-    >
-      <span aria-hidden="true">{isBookmarked ? '★' : '☆'}</span>
-      {isBookmarked ? 'Bookmarked' : 'Bookmark'}
-    </button>
-  );
-}
-
-/** Add-to-calendar pill: ICS download plus Google/Outlook deep links (spec
- * §9 — the replacement for the removed direct Google Calendar OAuth sync). */
-function CalendarPill({ eventConfig, session }) {
-  const googleUrl = buildGoogleCalendarUrl(eventConfig, session);
-  const outlookUrl = buildOutlookCalendarUrl(eventConfig, session);
-  // The session's time could not be resolved (spec: fail soft) — nothing to
-  // add to a calendar.
-  if (!googleUrl && !outlookUrl) return null;
-
-  const onDownload = () => {
-    const ics = buildIcsCalendar(eventConfig, [session]);
-    downloadIcs(icsFileName(session.title), ics);
-  };
-
-  return (
-    <span className="inline-flex flex-wrap items-center gap-2xs font-data text-caption text-text-secondary">
-      <span aria-hidden="true">Add to calendar:</span>
-      <button type="button" className={actionClass} onClick={onDownload}>
-        .ics
-      </button>
-      {googleUrl ? (
-        <a href={googleUrl} target="_blank" rel="noreferrer" className={actionClass}>
-          Google
-        </a>
-      ) : null}
-      {outlookUrl ? (
-        <a href={outlookUrl} target="_blank" rel="noreferrer" className={actionClass}>
-          Outlook
-        </a>
-      ) : null}
-    </span>
-  );
-}
-
-function MaterialsPill({ session }) {
-  const count = useSessionMaterialsCount(session);
-  if (!count) return null;
-  return (
-    <span className={actionClass}>
-      <span aria-hidden="true">📎</span> {count} {count === 1 ? 'material' : 'materials'}
-    </span>
-  );
-}
-
-/**
- * Emoji reaction bar (spec §9 "Session reactions"). Feature-gated by
- * config/features.sessionReactions. The aggregate counts are public (rules:
- * public read of sessionReactions/{sessionId}) so every visitor — signed
- * out included — sees them; only the click itself is gated the same way
- * BookmarkPill's is, by ProfileContext's `attendeeAccess`.
- *
- * One reaction per caller per session (the server's dedup subcollection,
- * functions/src/schedule/reactions.cjs): clicking the emoji you already
- * left clears it, clicking a different one switches to it.
- */
-function ReactionsPill({ session }) {
-  const { user } = useAuth();
-  const { attendeeAccess } = useProfile();
-  const { showToast } = useToast();
-  const { counts, myReaction } = useSessionReactions(session.id);
-  const [pending, setPending] = useState(false);
-  // Same optimistic-override pattern as BookmarkPill above: instant visual
-  // feedback on click, cleared on failure AND once the live `myReaction`/
-  // `counts` themselves change — whether that change is the subscription
-  // confirming OUR write, a different tab's write, or the signed-in
-  // identity switching. Without the second clear the optimistic value would
-  // keep masking the live one forever after a successful write.
-  //
-  // `undefined` is a DISTINCT sentinel from `null` here: `undefined` means
-  // "no override in flight — trust the live value", while `null` means "the
-  // override IS an explicit clear". Collapsing them (e.g. via `?? `) would
-  // make "no override" indistinguishable from "optimistically cleared":
-  // an already-reacted user with no override would read as cleared (wrongly
-  // decrementing their own count and showing unselected), and a real
-  // optimistic clear would fall back through to the live reaction and stay
-  // wrongly selected.
-  const [optimistic, setOptimistic] = useState(undefined);
-  const hasOverride = optimistic !== undefined;
-  const myActiveReaction = hasOverride ? optimistic : myReaction;
-
-  useEffect(() => {
-    setOptimistic(undefined);
-  }, [myReaction, session.id, user?.uid]);
-
-  const onPick = useCallback(
-    async (emoji) => {
-      if (!user) return; // no interactive control rendered for a signed-out visitor
-      const next = myActiveReaction === emoji ? null : emoji;
-      setOptimistic(next);
-      setPending(true);
-      try {
-        await setSessionReaction({ user, sessionId: session.id, emoji: next });
-      } catch (err) {
-        setOptimistic(undefined);
-        showToast(err.message || 'The reaction could not be saved.', { tone: 'error' });
-      } finally {
-        setPending(false);
-      }
-    },
-    [user, myActiveReaction, session.id, showToast],
-  );
-
-  // Optimistically nudge the displayed counts so a click feels immediate
-  // even before the aggregate listener's next snapshot arrives. Only
-  // adjusts when an override is actually active — with no override, `counts`
-  // already reflects `myReaction` server-side, so nothing should move.
-  const displayCounts = { ...counts };
-  if (hasOverride) {
-    if (myReaction) displayCounts[myReaction] = Math.max(0, (displayCounts[myReaction] || 0) - 1);
-    if (optimistic) displayCounts[optimistic] = (displayCounts[optimistic] || 0) + 1;
-  }
-
-  const interactive = Boolean(user) && attendeeAccess;
-  const hasAnyCount = REACTION_KINDS.some((emoji) => (displayCounts[emoji] || 0) > 0);
-  if (!interactive && !hasAnyCount) return null;
-
-  return (
-    <span className="inline-flex flex-wrap items-center gap-2xs" role="group" aria-label="Session reactions">
-      {REACTION_KINDS.map((emoji) => {
-        const count = displayCounts[emoji] || 0;
-        const mine = myActiveReaction === emoji;
-        if (!interactive) {
-          // Signed out, or signed in without attendee access: read-only
-          // counts, nothing worth rendering when a reaction has zero.
-          if (count === 0) return null;
-          return (
-            <span key={emoji} className={actionClass} aria-hidden="false">
-              <span aria-hidden="true">{emoji}</span> {count}
-            </span>
-          );
-        }
-        return (
-          <button
-            key={emoji}
-            type="button"
-            className={actionClass}
-            onClick={() => onPick(emoji)}
-            disabled={pending}
-            aria-pressed={mine}
-            aria-label={`React with ${emoji}${count ? `, ${count}` : ''}`}
-          >
-            <span aria-hidden="true">{emoji}</span>
-            {count > 0 ? ` ${count}` : ''}
-          </button>
-        );
-      })}
-    </span>
-  );
-}
-
-/**
- * The feature-flag-conditional pill row on its own — SessionCard renders it
- * inline; SessionDetail.jsx renders it standalone so a session's detail
- * page doesn't have to re-render the whole card (title/time/description
- * again) just to get the bookmark/materials/reactions/calendar controls.
- *
- * @param {{ session: object, eventConfig: object, features?: object,
- *           bookmarked?: boolean }} props
- */
-export function SessionPills({
-  session,
-  eventConfig,
-  features = {},
-  bookmarked = false,
-  backIssue = false,
-}) {
-  // A back issue keeps every word and loses its live controls (brief §2.1).
-  // Bookmarking a session that has finished, reacting to it, or adding it
-  // to a calendar are all acts on an event that is not happening: the
-  // controls go out of the document rather than sitting there disabled.
-  // The materials a session left behind are content, so they stay.
-  const hasPills = backIssue
-    ? features.sessionMaterials
-    : features.sessionBookmarks ||
-      features.sessionMaterials ||
-      features.sessionReactions ||
-      features.icsExport;
-  if (!hasPills) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-xs">
-      {features.sessionBookmarks && !backIssue ? (
-        <BookmarkPill session={session} bookmarked={bookmarked} />
-      ) : null}
-      {features.sessionMaterials ? <MaterialsPill session={session} /> : null}
-      {features.sessionReactions && !backIssue ? <ReactionsPill session={session} /> : null}
-      {features.icsExport && !backIssue ? (
-        <CalendarPill eventConfig={eventConfig} session={session} />
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * The transfer line (design brief §4.6; visual story, Atlas, moment 2).
- *
- * "Moving between sessions is a transfer, and the site states it plainly in
- * signage voice: where you are, where it is, how long it takes." The
- * schedule passes `transferTo` when this session sits in a different room
- * from the one before it, so the statement is drawn from real data or it is
- * not made at all.
- *
- * WHAT IS MISSING, AND WHY THE LINE IS SHORTER THAN THE STORY'S. The story
- * writes "Transfer to Line B · Hall 2 · 6 min walk". The data model carries
- * no line letter and no walking minutes — a session has a day, a time, a
- * title, a room, and its speakers — so this states the room move and stops.
- * Inventing a walking time would be a made-up fact on a page whose whole
- * promise is accuracy. The line and the minutes land when the schema
- * carries them (PR3).
- *
- * The icon is labelled by the words beside it, which is the rule the whole
- * sign set follows.
- */
-function TransferLine({ to }) {
-  if (!to) return null;
-  return (
-    <p className="transfer-line mt-2xs font-data text-caption text-text-secondary">
-      <WayfindingIcon name="room" className="me-2xs" />
-      Transfer to {to}
-    </p>
-  );
-}
 
 /**
  * @param {{ session: object, eventConfig: object, features?: object,
  *           bookmarked?: boolean, linkToDetail?: boolean,
- *           transferTo?: string | null, callingPoints?: object[],
- *           backIssue?: boolean }} props
+ *           callingPoints?: object[], backIssue?: boolean,
+ *           position?: number | null, lead?: boolean }} props
+ *
+ * `position` is the session's real place in its day, counted from one. It
+ * renders only where the Schedule style numbers the programme, and it is
+ * sequence data rather than decoration — the same rule the plate number
+ * follows (brief §2.4). `lead` marks the first session of a day, which the
+ * lead-and-rest Schedule style sets larger than the rest.
  */
 export default function SessionCard({
   session,
@@ -437,9 +128,10 @@ export default function SessionCard({
   features = {},
   bookmarked = false,
   linkToDetail = true,
-  transferTo = null,
   callingPoints = [],
   backIssue = false,
+  position = null,
+  lead = false,
 }) {
   const speakerNames = useSessionSpeakerNames(session.speakerIds);
   const range = formatSessionTimeRange(eventConfig, session);
@@ -455,14 +147,43 @@ export default function SessionCard({
     // left-hand column with tabular figures, and the type is a word beside
     // the title. Issue #113: the colored left edge is gone, and nothing
     // replaces it — a rule does the dividing a card border used to.
-    <li className="session-block border-t-hairline border-t-rule-hairline">
+    // The literal modifier matters: Tailwind scans for class names as
+    // whole strings, so `session-block--lead` is written out rather than
+    // assembled (components/editorial/purge.test.js).
+    //
+    // The title comes first in the source and the time follows it. The time
+    // is a label beside a heading, so it must never stack above one: the
+    // eyebrow ban holds at every size (brief §2.4), and one column is what
+    // this row becomes below `sm`. Reading the title first is also the
+    // better order to hear. At `sm` and up the grid places the time back in
+    // its own left-hand column beside the title, which is where the eye
+    // wants it once there is room for a column.
+    //
+    // The time column carries row-span-2 so its own two rows of height
+    // (a time range that wraps, e.g. "10:30 AM–12:00 PM EDT") cannot inflate
+    // row 1 — the row the title/badge cell alone should size — and push the
+    // location/description cell in row 2 down with it.
+    <li className={lead ? 'session-block session-block--lead' : 'session-block'}>
       {/* The face is the first ink pass; the stamp behind it is the second,
           printed off register (brief §2.4, "Exception two", Zine only). At
           the zero offset every other preset holds, the face covers the
           stamp exactly and this is the plain ruled row it has always
           been. */}
-      <article className="session-block__face grid gap-2xs sm:grid-cols-[9.5rem,1fr] sm:gap-md">
-        <p className="font-mono text-caption text-text-secondary">
+      <article className="session-block__face grid sm:grid-cols-[9.5rem,1fr]">
+        <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs sm:col-start-2 sm:row-start-1">
+          <h3 className="session-block__title font-heading font-semibold text-text-primary">
+            {linkToDetail ? (
+              <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
+                {session.title}
+              </Link>
+            ) : (
+              session.title
+            )}
+          </h3>
+          <SessionFormat format={session.type} />
+        </div>
+        <p className="session-block__data mt-2xs font-mono text-text-secondary sm:col-start-1 sm:row-start-1 sm:row-span-2 sm:mt-0">
+          {position ? <span className="session-block__number">{position}</span> : null}
           {range ? (
             <>
               <time dateTime={range.startIso}>{range.startLabel}</time>
@@ -471,25 +192,13 @@ export default function SessionCard({
                   –<time dateTime={range.endIso}>{range.endLabel}</time>
                 </>
               ) : null}
-              {range.zone ? <span className="ms-1">{range.zone}</span> : null}
+              {range.zone ? <span className="ms-2xs">{range.zone}</span> : null}
             </>
           ) : (
             <span>Time to be announced</span>
           )}
         </p>
-        <div>
-          <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
-            <h3 className="font-heading text-h3 font-semibold text-text-primary">
-              {linkToDetail ? (
-                <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
-                  {session.title}
-                </Link>
-              ) : (
-                session.title
-              )}
-            </h3>
-            <TypeBadge type={session.type} />
-          </div>
+        <div className="sm:col-start-2 sm:row-start-2">
           {/* The room, as a specimen label (brief §4.5). Under five presets
               the label draws no rules and shows no field name, so this is
               the caption line it has always been; under Field Guide the same
@@ -498,12 +207,8 @@ export default function SessionCard({
             className="mt-2xs"
             fields={[{ key: 'Place', value: session.location }]}
           />
-          <TransferLine to={transferTo} />
           {session.description ? (
-            <p
-              className="mt-xs max-w-prose text-body text-text-secondary"
-              style={{ textWrap: 'pretty' }}
-            >
+            <p className="session-block__text mt-xs max-w-prose text-text-secondary text-pretty">
               {session.description}
             </p>
           ) : null}
@@ -517,7 +222,8 @@ export default function SessionCard({
             eventConfig={eventConfig}
           />
           <div className="mt-sm">
-            <SessionPills
+            <SessionActions
+              surface="row"
               session={session}
               eventConfig={eventConfig}
               features={features}

@@ -22,7 +22,11 @@ import {
 } from './EventConfigContext.jsx';
 import Layout from '../components/Layout.jsx';
 import ContentContext from './ContentContext.jsx';
-import { eventConfig as snapshotEventConfig } from '@generated/eventConfig.js';
+import {
+  eventConfig as snapshotEventConfig,
+  theme as snapshotTheme,
+} from '@generated/eventConfig.js';
+import { resolveShape } from 'shared/theme';
 
 // Compose hex test data at runtime — no hex color literals in source (§7.6).
 const hex = (digits) => `#${digits}`;
@@ -149,20 +153,26 @@ describe('EventConfigProvider', () => {
         <Probe />
       </EventConfigProvider>,
     );
-    // Snapshot default (generated/eventConfig.js theme.texture = 'flat').
-    expect(document.documentElement.dataset.texture).toBe('flat');
+    // Whatever the committed snapshot RESOLVES to, before any live write.
+    // Resolved, not raw: a snapshot that names a style and no texture of its
+    // own takes the style's, and that is what the page paints.
+    const snapshotTexture = resolveShape(snapshotTheme).texture;
+    expect(document.documentElement.dataset.texture).toBe(snapshotTexture);
 
+    // Then the other one, so the mirror is proved to follow the doc rather
+    // than to repeat the snapshot.
+    const other = snapshotTexture === 'paper' ? 'flat' : 'paper';
     act(() => {
-      subscriptions.get('theme')({ texture: 'paper' });
+      subscriptions.get('theme')({ texture: other });
     });
-    expect(document.documentElement.dataset.texture).toBe('paper');
+    expect(document.documentElement.dataset.texture).toBe(other);
   });
 
   it('writes the preset\'s texture when the document names no texture of its own', () => {
     // A preset states its own texture (brief §4); config/theme.texture only
-    // overrides it. Field Guide is paper. A document that names the preset
-    // and omits the field must still render paper — reading the raw field
-    // here left the attribute stale and the overlay never painted.
+    // overrides it. Every preset is flat by default now (owner review,
+    // 2026-08-27), so a document that names one and omits the field must
+    // render flat — reading the raw field here left the attribute stale.
     render(
       <EventConfigProvider>
         <Probe />
@@ -171,13 +181,13 @@ describe('EventConfigProvider', () => {
     act(() => {
       subscriptions.get('theme')({ preset: 'field-guide' });
     });
-    expect(document.documentElement.dataset.texture).toBe('paper');
+    expect(document.documentElement.dataset.texture).toBe('flat');
 
     // And the override still wins over the preset it overrides.
     act(() => {
-      subscriptions.get('theme')({ preset: 'field-guide', texture: 'flat' });
+      subscriptions.get('theme')({ preset: 'field-guide', texture: 'paper' });
     });
-    expect(document.documentElement.dataset.texture).toBe('flat');
+    expect(document.documentElement.dataset.texture).toBe('paper');
   });
 });
 
@@ -216,9 +226,9 @@ describe('Layout nav', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument();
   });
 
-  it('applies the bg-paper surface class on the shell', () => {
+  it('applies the page-surface class on the shell', () => {
     const { container } = renderShell();
-    expect(container.querySelector('.bg-paper')).not.toBeNull();
+    expect(container.querySelector('.page-surface')).not.toBeNull();
   });
 
   it('stays up under a malformed runtime config/event (fail-soft, §2.4)', () => {

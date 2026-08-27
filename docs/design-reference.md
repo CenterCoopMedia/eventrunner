@@ -279,7 +279,7 @@ The admin CMS is its own design surface and it does not restyle. It reads its ow
 - **Two faces, fixed.** Source Sans 3 for everything a person reads as language, IBM Plex Mono with tabular figures for everything the machine owns.
 - **Navigation is the docket**: A grouped standing list of words down the leading edge. No icon rail, no collapse to glyphs, no counts in bubbles.
 - **The active item carries four signals**, never colour alone: The marker, the weight, a ground shift, and the assistive-technology current-page state.
-- **The position marker is derived**, from the admin's own ink against the admin ground. It is not a client setting: There is no marker colour to choose, nothing to get wrong, and no failure state to explain.
+- **The position marker is the site's own brand colour**, not a second colour anyone picks. There is no marker colour field: The marker beside the section you are in and the mark on the page-header rule both take the resolved brand colour for the mode. A marker is non-text interface, so it holds 3:1 against the admin ground; below that both fall back to the admin's own ink and the editor says so. The site keeps painting the client's colour either way.
 - **Three state words, everywhere**: Draft, Live, and Live with unpublished changes.
 - **A destructive action stands still and states what it costs.** Nothing animates in a destructive moment.
 

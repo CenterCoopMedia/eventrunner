@@ -10,7 +10,7 @@ import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
-import Schedule, { transferTarget } from './Schedule.jsx';
+import Schedule from './Schedule.jsx';
 import { formatSessionTimeRange, zonedDateTime } from '../lib/eventTime.js';
 
 // Non-UTC zone on purpose: America/Chicago is UTC−5 (CDT) on the fixture
@@ -22,6 +22,24 @@ const fixtureConfig = {
     { id: 'fx-day-1', label: 'Day one', date: '2026-10-15' },
     { id: 'fx-day-2', label: 'Day two', date: '2026-10-16' },
   ],
+  // A SURVEYED venue, deliberately: the schedule list must state no
+  // transfer even when the walk between two consecutive rows is recorded
+  // and known, because the reader scanning a programme is not walking it.
+  venue: {
+    places: [
+      { id: 'fx-hall', name: '[Fixture] Main hall' },
+      { id: 'fx-lab', name: '[Fixture] Editing lab', floor: 'Second floor' },
+    ],
+    movements: [
+      { from: 'fx-hall', to: 'fx-lab', walkingMinutes: 6 },
+      {
+        from: 'fx-lab',
+        to: 'fx-hall',
+        walkingMinutes: 4,
+        accessibleRoute: '[Fixture] Lift by the cloakroom.',
+      },
+    ],
+  },
 };
 
 const fixtureSessions = [
@@ -35,6 +53,7 @@ const fixtureSessions = [
     title: '[Fixture] Afternoon editing lab',
     description: null,
     location: 'Room B',
+    placeId: 'fx-lab',
     type: 'workshop',
     speakerIds: [],
     visible: true,
@@ -48,6 +67,7 @@ const fixtureSessions = [
     title: '[Fixture] Morning kickoff',
     description: '[Fixture] What the day covers.',
     location: 'Main hall',
+    placeId: 'fx-hall',
     type: 'keynote',
     speakerIds: ['fx-speaker-1'],
     visible: true,
@@ -266,7 +286,7 @@ describe('SchedulePage', () => {
 
   it('shows the loading state while runtime content is loading', () => {
     renderSchedule({ loading: true });
-    expect(screen.getByRole('status', { name: 'Loading the schedule' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading the schedule…' })).toBeInTheDocument();
   });
 });
 
@@ -295,7 +315,8 @@ describe('SchedulePage editorial register', () => {
     const { container } = renderSchedule();
     const list = container.querySelector('section ul');
     expect(list.className).not.toContain('gap-3');
-    expect(list.querySelector('li')).toHaveClass('border-t-hairline');
+    // The rule is the --session-card-rule-* contract, drawn in index.css.
+    expect(list.querySelector('li')).toHaveClass('session-block');
   });
 
   it('sets the day head plate number from the day’s real position', () => {
@@ -309,31 +330,19 @@ describe('SchedulePage editorial register', () => {
     expect(screen.getByText(/Plate II \u00b7/)).toBeInTheDocument();
   });
 
-  it('states a transfer only where the room actually changes', () => {
-    // Visual story, Atlas, moment 2. The first session of a day is an
-    // arrival, not a transfer; two sessions in one room are not a move.
+  it('states the room and never draws a transfer between two rows', () => {
+    // The fixture venue RECORDS the walk from the hall to the lab, and
+    // these two rows are in that order. The list still says nothing, and
+    // that is the point: a recorded movement says what a move costs, not
+    // that this reader is making it. A reader scanning the programme
+    // skipped that session, or is following one track out of five.
     renderSchedule();
     const rows = [...document.querySelectorAll('section ul li')];
-    expect(rows[0].querySelector('.transfer-line')).toBeNull();
-    expect(rows[1].querySelector('.transfer-line').textContent).toBe('Transfer to Room B');
-  });
-});
-
-describe('transferTarget', () => {
-  const day = [
-    { location: 'Main hall' },
-    { location: 'Room B' },
-    { location: 'Room B' },
-    { location: '  ' },
-    { location: 42 },
-  ];
-
-  it('names the room a reader moves to, and nothing else', () => {
-    expect(transferTarget(day, 0)).toBeNull();
-    expect(transferTarget(day, 1)).toBe('Room B');
-    expect(transferTarget(day, 2)).toBeNull();
-    expect(transferTarget(day, 3)).toBeNull();
-    expect(transferTarget(day, 4)).toBeNull();
+    expect(rows[0].textContent).toContain('Main hall');
+    expect(rows[1].textContent).toContain('Room B');
+    expect(document.body.textContent).not.toMatch(/transfer/i);
+    expect(document.body.textContent).not.toMatch(/min walk/i);
+    expect(document.querySelector('.transfer-line')).toBeNull();
   });
 });
 
@@ -427,6 +436,51 @@ describe('the two views of a day', () => {
       });
       expect(points).toBeInTheDocument();
       expect(onScreen().getByText('[Fixture] Breakout clinic')).toBeInTheDocument();
+    });
+  });
+
+  // A CALLING POINT IS THE ONE SCHEDULE ROW THAT STATES A MOVE (brief §4.6;
+  // shared/venue.cjs). A child runs INSIDE its parent, so a reader at the
+  // calling point was in the parent's room a moment ago — the sequence is
+  // the data, not a guess about a reader's route.
+  describe('a calling point in another place', () => {
+    const parent = { ...fixtureSessions[1], placeId: 'fx-hall' };
+    const child = (overrides) => ({
+      id: 'fx-clinic',
+      dayId: 'fx-day-1',
+      startTime: '09:20',
+      endTime: '09:45',
+      title: '[Fixture] Breakout clinic',
+      parentId: 'fx-early',
+      speakerIds: [],
+      visible: true,
+      order: 1,
+      ...overrides,
+    });
+
+    it('states the recorded move from the parent’s place', () => {
+      withViewport(false, () => {
+        renderSchedule({ scheduleData: [parent, child({ placeId: 'fx-lab' })] });
+        expect(
+          screen.getByText(
+            /Transfer from \[Fixture\] Main hall to \[Fixture\] Editing lab, Second floor — 6 min walk/,
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('says nothing when the calling point is in the same place', () => {
+      withViewport(false, () => {
+        renderSchedule({ scheduleData: [parent, child({ placeId: 'fx-hall' })] });
+        expect(screen.queryByText(/Transfer from/)).toBeNull();
+      });
+    });
+
+    it('says nothing when the calling point names no place', () => {
+      withViewport(false, () => {
+        renderSchedule({ scheduleData: [parent, child({ location: 'Somewhere else' })] });
+        expect(screen.queryByText(/Transfer from/)).toBeNull();
+      });
     });
   });
 });

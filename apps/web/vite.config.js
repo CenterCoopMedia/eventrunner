@@ -34,6 +34,7 @@ export default defineConfig({
       'shared/speaker',
       'shared/theme',
       'shared/urlSafety',
+      'shared/venue',
     ],
   },
   resolve: {

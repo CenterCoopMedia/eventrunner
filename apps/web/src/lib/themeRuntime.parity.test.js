@@ -22,6 +22,7 @@ import {
   MODE_POLICY_IDS,
   MOTIF_SET_IDS,
   PRESET_IDS,
+  recommendedConfiguration,
   RADIUS_IDS,
   THEME_COLOR_KEYS,
   THEME_COLOR_PROPERTIES,
@@ -66,6 +67,30 @@ describe('theme vocabulary parity: browser against the shared schema', () => {
     expect(PRESET_IDS).toContain(DEFAULT_PRESET_ID);
     expect(DEFAULT_PRESET_ID).toBe(sharedTheme.DEFAULT_PRESET_ID);
     expect([...MOTIF_SET_IDS]).toEqual([...sharedTheme.THEME_MOTIF_SET_IDS]);
+  });
+
+  it('offers all six styles with no second tier, and leads with the default', () => {
+    // Owner calibration, 2026-08-27: every style is first-class. The picker
+    // shows one flat list in catalog order, and the style a fresh deployment
+    // starts on is the one it leads with.
+    expect(PRESET_IDS).toHaveLength(6);
+    expect(PRESET_IDS[0]).toBe(DEFAULT_PRESET_ID);
+    for (const id of PRESET_IDS) {
+      expect(sharedTheme.getPreset(id)).not.toHaveProperty('tier');
+    }
+  });
+
+  it('builds the same recommended configuration the server would', () => {
+    // Picking a style hands the operator a working document, not a blank
+    // one: the style id plus a pick in every option group it declares.
+    for (const id of PRESET_IDS) {
+      const configuration = recommendedConfiguration(id);
+      expect(configuration).toEqual(sharedTheme.recommendedConfiguration(id));
+      expect(configuration.preset).toBe(id);
+      expect(Object.keys(configuration.optionPicks).sort()).toEqual(
+        Object.keys(sharedTheme.getPreset(id).options).sort(),
+      );
+    }
   });
 });
 

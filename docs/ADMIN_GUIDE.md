@@ -11,7 +11,7 @@ This is the whole visual setup, start to finish. It takes about twenty minutes a
 1. **Pick a site style.** Settings → Branding, the first control. Six ship; three are the launch surface and three sit behind a disclosure until you have tried them on your own content. Picking one replaces every value you have not changed yourself, so do this first.
 2. **Add the identity assets.** Five slots: The primary logo and the square icon, then the footer logo, the social sharing image, and the favicon behind **More image slots**. Same picker the Media tab uses. A slot you leave empty falls back to the event name in type, which is a finished look and not a placeholder.
 3. **Set the Main brand colour.** One colour. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. You do not set them, and there is no second colour to set anywhere.
-4. **Preview representative pages.** The **Page preview** beside the controls renders *your* pages with the draft applied. Look at three: The home page, the schedule on its longest day, and one long text page. Check each light and dark.
+4. **Preview representative pages.** The **Page preview** beside the controls renders *your* pages with the draft applied. Look at three: The home page, the schedule on its longest day, and one session. Check each light and dark, and turn the **stress test** on once.
 5. **Resolve the warnings.** Anything the editor flags — a colour pair too close to read, a logo the wrong shape — is named with the pair, the mode, and the measurement. Fix what it names.
 6. **Publish.** The live public site restyles with no deploy. This is a config write, not a code change.
 
@@ -19,7 +19,9 @@ This is the whole visual setup, start to finish. It takes about twenty minutes a
 
 ## Settings → Branding
 
-One tab decides how the whole public site looks. Controls on one side, the **Page preview** on the other rendering your own pages with the draft applied. Pick which page to preview and whether to see it light or dark.
+One tab decides how the whole public site looks. Controls on one side, the **Page preview** on the other rendering your own pages with the draft applied — the client's real pages, not swatches.
+
+**What the preview can show you.** Pick the page — Home, Schedule, Session, Speakers, or Updates. Switch between **Desktop** and **Phone**, which render at real widths so the page's own breakpoints fire inside the frame. **Fit** the frame or see it at **Actual size**. Show it **Light**, **Dark**, or **Compare light and dark** side by side. And turn on the **stress test**: A made-up event name that wraps three times and a day packed with 28 sessions, so you meet a hard page here rather than after a client sends one. Nothing in the stress test is saved. If a colour or a font will not render as you asked, the preview says so.
 
 Work down the controls in this order.
 
@@ -29,17 +31,14 @@ Work down the controls in this order.
 
 **Main brand colour.** One colour, as a hex value. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. Leave it blank to keep the site style's own colour.
 
-**Header style.** How the site's identity appears at the top of every page. Each site style offers its own three — a letterhead, a masthead bar, a title page — and comes with the one that suits it. This is a site-wide choice on purpose: The header is furniture a reader should stop noticing, and it stops working the moment it differs page to page.
-
-**Schedule style.** How a session is set out on the schedule: A posted agenda, a hairline row, a departure board, and so on, depending on the style. Like the header style, it retunes the site style rather than inventing a value of its own, so you cannot make a combination the house has not looked at.
-
-**Navigation.** Whether the navigation runs across the top or down the leading edge. One choice, every page, for the same reason the header is site-wide.
+**Header and schedule.** One panel holding two choices. **Header style** is how the site's identity appears at the top of every page: Each site style offers its own three — a letterhead, a masthead bar, a title page — and comes with the one that suits it. It is a site-wide choice on purpose, because the header is furniture a reader should stop noticing and it stops working the moment it differs page to page. **Schedule style** is how a session is set out on the schedule: A posted agenda, a hairline row, a departure board, and so on, depending on the style. Both retune the site style rather than inventing a value of their own, so you cannot make a combination the house has not looked at.
 
 **Light or dark.** Always light, always dark, or follow the reader's own setting. Every site style defines both, so there is no wrong answer here.
 
 **Advanced.** Everything else the system can do, behind a disclosure, and none of it is needed for a finished site:
 
-- *Typography* — the heading face, picked from the alternates your style offers, and any of the four font roles named outright.
+- *Navigation* — **Where the navigation sits**: Across the top, or down the leading edge on wide screens. One choice, every page, for the same reason the header is site-wide. A single page can overrule it from the page editor.
+- *Typography* — the heading face, picked from the alternates your style offers, and any of the four font roles named outright from the 23-family library.
 - *Illustrations* — a set of small drawings that carry the style's vocabulary, or none. They take the site's own ink and never carry a colour of their own, so they cannot fight your palette.
 - *Surface and shape* — the surface texture, the corners, the spacing, and any extra control your style has of its own.
 - *Advanced colour settings* — any single colour by hand, per mode, with a light tab and a dark tab holding separate values.
@@ -65,9 +64,13 @@ Every page document (About, Travel, Conduct, and anything else seeded or added) 
 | Schedule | Dense and time-led, so a long day fits on one screen. |
 | Landing page | A front page or a section opener. |
 
-The individual settings behind that — header, arrangement, spacing — are still reachable under a disclosure, for the page that genuinely needs to differ. Changing one clears the template, because a page that no longer matches its template should not go on claiming it.
+The individual settings behind that — header, arrangement, spacing — are still reachable under **Change the individual settings**, for the page that genuinely needs to differ. Changing one there clears the template and the template reads **Custom** from then on, because a page that no longer matches its template should not go on claiming it. A page that has never been given a template or a layout renders the defaults, so nothing changes until you change it.
 
-**A system page** — home, schedule, speakers, sponsors — keeps its built-in content and lets you put sections around it. Each section picks where it goes relative to that content: **before the main feature** or **after the main feature**. Custom pages have no built-in content, so they have no position to pick.
+**Where the navigation sits is one choice for the whole site.** Across the top, or down the side on wide screens, set on the Branding tab under **Advanced → Navigation**, because a navigation that wanders between pages stops being the shell that tells a reader where they are. That is the default every page follows.
+
+One page can still differ. **Change the individual settings** also carries **Navigation on this page**: Leave it on *Follow the site setting* — which names what the site is currently set to — or overrule it for this page alone. Use it sparingly and on purpose: A rail beside one long directory is a decision; a rail on three pages out of nine is an accident. It is not part of a template, so setting it leaves the template alone.
+
+**A system page** — home, schedule, speakers, sponsors, attendees, updates — keeps its built-in feature and lets you put sections around it. Each section on one of those pages picks where it is inserted: **Before the main feature** or **After the main feature**. Custom pages have no built-in feature, so they have no insertion point to pick.
 
 ## Content (Pages → Content editor)
 

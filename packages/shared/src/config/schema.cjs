@@ -11,16 +11,25 @@
 
 const { MAX_TOTAL_BADGES } = require('../badges.cjs');
 const {
+  VENUE_PLACE_KEYS,
+  VENUE_MOVEMENT_KEYS,
+  PLACE_ID_RE,
+  MAX_WALKING_MINUTES,
+} = require('../venue.cjs');
+const {
   THEME_DOC_KEYS,
   THEME_COLOR_KEYS,
   THEME_FONT_ROLES,
   THEME_FONT_SET_IDS,
+  THEME_HEADERS,
   THEME_LOGO_SLOTS,
   THEME_MODE_POLICIES,
   THEME_RADIUS_IDS,
+  THEME_DENSITIES,
   THEME_TEXTURES,
   THEME_PRESET_IDS,
   THEME_MOTIF_SET_IDS,
+  THEME_NAV_PLACEMENTS,
   THEME_MODES,
   getPreset,
   canonicalColorKey,
@@ -196,6 +205,135 @@ function validateEventConfig(event) {
     }
   }
 
+  // THE MOVEMENT MODEL (design brief §4.6; shared/venue.cjs states the
+  // whole contract and why each rule is there). Two lists under `venue`,
+  // beside the address, because a route is a fact about a building rather
+  // than about a session:
+  //
+  //   places[]     the named rooms a session can point at by `placeId`
+  //   movements[]  one recorded move from one place to another, with the
+  //                walk in whole minutes and, optionally, the step-free way
+  //
+  // Both optional. A venue that has surveyed nothing records nothing, and
+  // the schedule then states no movement at all — which is exactly right,
+  // and is why this validator never fills anything in.
+  //
+  // A MOVEMENT NAMING AN UNDEFINED PLACE IS REFUSED BY NAME. It is the one
+  // error this shape actually invites: an operator renames a room, the
+  // place id changes, and the routes that pointed at it become sentences
+  // about a room that no longer exists. Refusing at the save is the only
+  // place that can be caught — a renderer meeting it has nothing to say and
+  // no way to say why.
+  const venue = event.venue;
+  if (venue != null) {
+    if (typeof venue !== 'object' || Array.isArray(venue)) {
+      errors.push('venue: must be an object or null');
+    } else {
+      const placeIds = new Set();
+      if (venue.places != null) {
+        if (!Array.isArray(venue.places)) {
+          errors.push('venue.places: must be an array');
+        } else {
+          venue.places.forEach((place, i) => {
+            const at = `venue.places[${i}]`;
+            if (!place || typeof place !== 'object' || Array.isArray(place)) {
+              errors.push(`${at}: must be an object`);
+              return;
+            }
+            for (const key of Object.keys(place)) {
+              if (!VENUE_PLACE_KEYS.includes(key)) errors.push(`${at}.${key}: unknown place field`);
+            }
+            if (typeof place.id !== 'string' || !PLACE_ID_RE.test(place.id)) {
+              errors.push(
+                `${at}.id: must be lowercase letters, digits and single hyphens, ` +
+                `got ${JSON.stringify(place.id)}`,
+              );
+            } else if (placeIds.has(place.id)) {
+              errors.push(`${at}.id: duplicate place id "${place.id}"`);
+            } else {
+              placeIds.add(place.id);
+            }
+            // A place a reader cannot be told the name of is not a place.
+            if (!isNonEmptyString(place.name)) {
+              errors.push(`${at}.name: must be a nonempty string`);
+            }
+            if (place.floor != null && !isNonEmptyString(place.floor)) {
+              errors.push(`${at}.floor: must be null or a nonempty string`);
+            }
+          });
+        }
+      }
+
+      if (venue.movements != null) {
+        if (!Array.isArray(venue.movements)) {
+          errors.push('venue.movements: must be an array');
+        } else {
+          const seenPairs = new Set();
+          venue.movements.forEach((movement, i) => {
+            const at = `venue.movements[${i}]`;
+            if (!movement || typeof movement !== 'object' || Array.isArray(movement)) {
+              errors.push(`${at}: must be an object`);
+              return;
+            }
+            for (const key of Object.keys(movement)) {
+              if (!VENUE_MOVEMENT_KEYS.includes(key)) {
+                errors.push(`${at}.${key}: unknown movement field`);
+              }
+            }
+            for (const end of ['from', 'to']) {
+              const id = movement[end];
+              if (typeof id !== 'string' || !PLACE_ID_RE.test(id)) {
+                errors.push(`${at}.${end}: must be a place id, got ${JSON.stringify(id)}`);
+              } else if (!placeIds.has(id)) {
+                errors.push(
+                  `${at}.${end}: "${id}" is not one of this venue's places — ` +
+                  'add it to venue.places, or correct the id',
+                );
+              }
+            }
+            // A move that starts and ends in the same place is not a move,
+            // and a reader told to transfer to the room they are in has
+            // been sent somewhere by a page that knows better.
+            if (typeof movement.from === 'string' && movement.from === movement.to) {
+              errors.push(`${at}: from and to name the same place ("${movement.from}")`);
+            }
+            // ONE-WAY, so the pair is ordered: A→B and B→A are two records
+            // and both are welcome. Two records of the SAME direction are
+            // two answers to one question, and the renderer would take
+            // whichever came first.
+            const pair = `${movement.from}\u0000${movement.to}`;
+            if (typeof movement.from === 'string' && typeof movement.to === 'string') {
+              if (seenPairs.has(pair)) {
+                errors.push(
+                  `${at}: a movement from "${movement.from}" to "${movement.to}" is already ` +
+                  'recorded — a movement is one-way, so each direction is stated once',
+                );
+              } else {
+                seenPairs.add(pair);
+              }
+            }
+            // Whole minutes, and zero is a real answer: some rooms are
+            // across the corridor. The upper bound catches the typo —
+            // a 600-minute walk between two rooms is a 6 that slipped.
+            const minutes = movement.walkingMinutes;
+            if (!Number.isInteger(minutes) || minutes < 0 || minutes > MAX_WALKING_MINUTES) {
+              errors.push(
+                `${at}.walkingMinutes: must be a whole number of minutes from 0 to ` +
+                `${MAX_WALKING_MINUTES}, got ${JSON.stringify(minutes)}`,
+              );
+            }
+            // Absent means the venue has not surveyed a step-free route,
+            // which the site states as silence. It must never be stored as
+            // an empty string, because an empty assurance renders as one.
+            if (movement.accessibleRoute != null && !isNonEmptyString(movement.accessibleRoute)) {
+              errors.push(`${at}.accessibleRoute: must be null or a nonempty string`);
+            }
+          });
+        }
+      }
+    }
+  }
+
   // sender is email/send.cjs's From-address source: a config/event without
   // a usable sender.email silently kills OTP delivery, so the shape is
   // required here, not left to the mail path to discover at send time.
@@ -329,7 +467,7 @@ function validateTheme(theme) {
         const spec = preset.options?.[group];
         if (!spec) {
           errors.push(
-            `theme.optionPicks.${group}: the ${preset.label} preset has no option group ` +
+            `theme.optionPicks.${group}: the ${preset.id} preset has no option group ` +
             `by that name (expected ${Object.keys(preset.options || {}).join(', ')})`,
           );
           continue;
@@ -390,22 +528,33 @@ function validateTheme(theme) {
     );
   }
 
-  // The one client-owned colour in the admin identity (admin story part 6f).
-  // Its legibility floor is applied at render time, not here: the value is
-  // never clamped, so a failing accent saves and the editor states what it
-  // fell back to.
-  if (theme.adminAccent != null
-    && (typeof theme.adminAccent !== 'string' || !HEX_COLOR_RE.test(theme.adminAccent))) {
+  // The client's main brand colour (owner review, 2026-08-27). It is the
+  // ONE colour decision the normal workflow asks for: the supporting brand
+  // steps are derived from it in both modes, contrast-safe by construction
+  // (shared/theme deriveBrandSteps), and the admin position marker takes the
+  // resolved value with its own legibility floor. There is no separate
+  // adminAccent field any more, so a document carrying one is rejected by
+  // name like any other unknown field.
+  if (theme.brandColor != null
+    && (typeof theme.brandColor !== 'string' || !HEX_COLOR_RE.test(theme.brandColor))) {
     errors.push(
-      'theme.adminAccent: must be a hex color (#RGB or #RRGGBB), ' +
-      `got ${JSON.stringify(theme.adminAccent)}`,
+      'theme.brandColor: must be a hex color (#RGB or #RRGGBB), ' +
+      `got ${JSON.stringify(theme.brandColor)}`,
     );
   }
 
   const enums = [
     ['texture', THEME_TEXTURES],
     ['radius', THEME_RADIUS_IDS],
+    ['density', THEME_DENSITIES],
     ['mode', THEME_MODE_POLICIES],
+    // Where the site puts its navigation. Site-level, because a shell that
+    // moves between pages stops being a shell (shared/theme
+    // THEME_NAV_PLACEMENTS). Optional: a document that says nothing leaves
+    // the placement to whatever a page document already stored, and then to
+    // the default.
+    ['navPlacement', THEME_NAV_PLACEMENTS],
+    ['header', THEME_HEADERS],
   ];
   for (const [field, allowed] of enums) {
     if (theme[field] == null) continue;

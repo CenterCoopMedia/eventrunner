@@ -65,7 +65,7 @@ node scripts/init-event.cjs --answers client-answers.json --admin <first-admin@c
 Repeat `--admin` for a second address if you already know it — item 5 below still applies if you
 don't yet.
 
-This seeds `config/*`, the ten default pages, placeholder CMS content, the two legal page
+This seeds `config/*`, the twelve default pages, placeholder CMS content, the two legal page
 templates (flagged `reviewRequired`, see item 4 below), the client-visible email template
 overrides, and the placeholder branding assets. It then prints the manual checklist below and the
 seven-row launch-readiness table as **warnings** — init itself never fails on an unmet item; only

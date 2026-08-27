@@ -69,9 +69,11 @@ function SlotSections({ sections, getSectionBlocks }) {
  */
 export default function SystemPage({ pageId, exclude = [], children, ...articleProps }) {
   const { getPage, getSectionBlocks } = useContent();
-  // A system page normally has a cmsPages document; two of them (attendees,
-  // updates) have no seeded page at all. `null` reads as the default layout
-  // and no sections, which is the page those routes already rendered.
+  // Every system route now seeds a cmsPages document (scripts/lib/seed.cjs,
+  // held by a test that reads every <SystemPage pageId="…"> in this app).
+  // A route can still find nothing — an operator deleted the page, or the
+  // content has not loaded yet — and `null` reads as the default layout and
+  // no sections, which is what the route rendered before layouts existed.
   const page = [pageId].flat().map((key) => getPage(key)).find(Boolean) ?? null;
   const layout = resolvePageLayout(page);
   const stated = statedPageLayout(page);

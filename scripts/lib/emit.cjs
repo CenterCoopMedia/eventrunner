@@ -125,6 +125,10 @@ function emitEventConfig({ event, features, theme }) {
     // <html>. Colors stay out of this projection — they go to theme.css as
     // RGB triples — but the motif set is an attribute, not a color.
     motifSet: theme.motifSet,
+    // The header the theme names for its public pages (design brief §2.1).
+    // A document from before the field existed has none, and the shell
+    // resolves that to the base header.
+    header: theme.header,
     logos: theme.logos,
   };
   return [
@@ -201,9 +205,11 @@ function emitPagesData(pages) {
       'Regenerate with:  node scripts/generate-content.cjs --demo',
       '',
       'Shape mirrors published cmsPages docs. systemPage: true marks pages with a',
-      'dedicated React route (home, schedule, speakers, sponsors); non-system',
-      'pages render at their own root-level `path` (e.g. /faq) through the',
-      'generic catch-all route (issue #52). Section ids are generic vocabulary',
+      'dedicated React route (home, schedule, speakers, sponsors, attendees,',
+      'updates); non-system pages render at their own root-level `path` (e.g.',
+      '/faq) through the generic catch-all route (issue #52). A system page may',
+      'carry no sections at all — the route IS the page, and the sections are',
+      'what an operator adds around it. Section ids are generic vocabulary',
       '(spec §5.3) and tie to cmsContent docs via each block `section` field;',
       'ids are unique across pages because cmsContent is keyed',
       '`<section>__<field>` globally, not per page.',

@@ -8,6 +8,7 @@
 // every edit of a seeded page would fail with "seeded: unknown field".
 import { recordStateOf } from './recordState.js';
 import { DEFAULT_SECTION_SLOT, slotOf, statedPageLayout } from '../lib/pageLayout.js';
+import { templateOf } from '../lib/pageTemplates.js';
 
 /** Keys a cmsPages doc may carry (mirrors PAGE_KEYS on the server). */
 export const PAGE_KEYS = Object.freeze([
@@ -20,6 +21,7 @@ export const PAGE_KEYS = Object.freeze([
   'systemPage',
   'sections',
   'layout',
+  'template',
 ]);
 
 export const SECTION_KEYS = Object.freeze([
@@ -79,6 +81,11 @@ export function toEditablePage(doc) {
     systemPage: base.systemPage === true,
     // What the document states, and only that — see above.
     layout: statedPageLayout(base),
+    // The task the operator picked, or `null` where none was. NEVER
+    // inferred from the layout values: a page whose three variants happen
+    // to match "Long read" has not chosen Long read, and an editor that
+    // showed one would be reporting a decision nobody made.
+    template: templateOf(base),
     sections: Array.isArray(base.sections)
       ? base.sections.map((section) => {
           const s = pick(section ?? {}, SECTION_KEYS);
@@ -152,6 +159,10 @@ export function toPagePayload(page) {
     // that states nothing, and sending the key makes "states nothing" an
     // answer rather than an omission.
     layout: statedPageLayout(page),
+    // Sent as null rather than omitted, for the same reason `layout` is
+    // always sent: "no template" is an answer the server accepts, and
+    // sending it makes clearing one possible at all.
+    template: templateOf(page),
     sections: (page.sections ?? []).map((section) => {
       const maxBlocks = Number(section.maxBlocks);
       return {

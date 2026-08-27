@@ -37,10 +37,13 @@ const { resolveLegacyColors } = require('shared/theme');
  *
  * The demo used to carry a hand-written blue-teal palette of its own. A
  * preset replaces it: the fixture is a media summit for cooperative
- * newsrooms, Newsroom modern is the story written for exactly that, and it
- * brings a designed dark palette the hand-written one never had. Running
- * the default preset also means the public demo shows what a client gets on
- * a fresh deployment rather than a look only the demo has.
+ * newsrooms, Newsroom is the story written for exactly that, and it brings
+ * a designed dark palette the hand-written one never had.
+ *
+ * The demo does NOT follow `DEFAULT_PRESET_ID`. A fresh deployment starts on
+ * Institutional (owner review, 2026-08-27); the demo stays on Newsroom
+ * because the demo's job is to show a real event dressed in the style that
+ * fits it, not to show the onboarding default twice.
  */
 const DEMO_PRESET_ID = 'newsroom';
 
@@ -95,6 +98,54 @@ const DEMO_ANSWERS = Object.freeze({
       postalCode: '58211',
       country: 'US',
       mapUrl: null,
+      // THE MOVEMENT MODEL, WITH REAL NUMBERS IN IT (shared/venue.cjs).
+      // The demo records places and the walks between them so an operator
+      // can see what a surveyed venue looks like before surveying their
+      // own — and so the transfer line has something true to render.
+      places: [
+        { id: 'main-hall', name: 'Main hall', floor: 'Ground floor' },
+        { id: 'room-a', name: 'Room A', floor: 'First floor' },
+        { id: 'room-b', name: 'Room B', floor: 'First floor' },
+      ],
+      // ONE-WAY, AND THE DEMO SHOWS WHY: the walk up to the first floor is
+      // longer than the walk back down, so the two directions are two
+      // records with two different numbers. Nothing reverses one for you.
+      //
+      // Note what is NOT here: no route to or from the unconference, which
+      // runs in both first-floor rooms at once and therefore states no
+      // single place. The schedule says nothing about that move, which is
+      // the whole point — silence is what an unrecorded route looks like.
+      movements: [
+        {
+          from: 'main-hall',
+          to: 'room-a',
+          walkingMinutes: 4,
+          accessibleRoute:
+            'Lift beside the north stair to the first floor, then left along the gallery. ' +
+            'Step-free the whole way.',
+        },
+        {
+          from: 'room-a',
+          to: 'main-hall',
+          walkingMinutes: 3,
+          accessibleRoute: 'The same lift back down, then straight ahead into the hall.',
+        },
+        {
+          from: 'main-hall',
+          to: 'room-b',
+          walkingMinutes: 5,
+          accessibleRoute:
+            'Lift beside the north stair to the first floor, then right to the end of the gallery.',
+        },
+        { from: 'room-b', to: 'main-hall', walkingMinutes: 4 },
+        {
+          from: 'room-a',
+          to: 'room-b',
+          walkingMinutes: 1,
+          accessibleRoute: 'Along the first-floor gallery. No steps between the two rooms.',
+        },
+        { from: 'room-b', to: 'room-a', walkingMinutes: 1 },
+      ],
     },
     sender: { email: 'summit@example.org', name: '[Demo] Harborlight Media Summit', replyTo: null },
     legal: {
@@ -110,11 +161,15 @@ const DEMO_ANSWERS = Object.freeze({
       organizerName: '[Demo] Harborlight Cooperative',
     },
   },
-  // Overlaid on `defaultTheme()` (spec §2.2, §7.2). The demo runs a named
-  // preset rather than a bespoke palette: Newsroom modern is the story
-  // written for a publication that publishes every day, which is what the
-  // fixture is. Its cool newsprint ground is not the warm tan canvas the
-  // anti-pattern checklist (#105) rejects.
+  // Overlaid on `defaultTheme()` (spec §2.2, §7.2). The product default is
+  // neutral; this fixture is not, and that is the point of the showcase —
+  // it is what a deployment looks like when a client takes the expressive
+  // choices the system offers (design brief §2.5.5).
+  //
+  // The demo runs a named preset rather than a bespoke palette: Newsroom is
+  // the story written for a publication that publishes every day, which is
+  // what the fixture is. Its cool newsprint ground is not the warm tan
+  // canvas the anti-pattern checklist (#105) rejects.
   theme: {
     preset: DEMO_PRESET_ID,
     // `colors` is an OUTPUT for a preset document (design brief §5.2): the
@@ -125,7 +180,10 @@ const DEMO_ANSWERS = Object.freeze({
     // The preset names the type map, the shape, and the motif default, so
     // the fixture states none of them. `mode` is light, so the demo renders
     // the same way it always has; the dark palette is generated beside it.
+    // The header is the one treatment the preset does not name, and the
+    // showcase takes the masthead.
     mode: 'light',
+    header: 'masthead',
   },
 });
 
@@ -245,6 +303,7 @@ const DEMO_SESSIONS = Object.freeze([
       'Coffee, badge pickup, and a short welcome from the organizing committee before the ' +
       'first sessions begin.',
     location: 'Main hall',
+    placeId: 'main-hall',
     type: 'keynote',
     speakerIds: ['speaker-placeholder-1'],
     visible: true,
@@ -256,11 +315,12 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-1',
     startTime: '10:30',
     endTime: '12:00',
-    title: 'Workshop: collaborative reporting basics',
+    title: 'Workshop: Collaborative reporting basics',
     description:
       'Setting up a cross-newsroom reporting partnership, from shared documents to shared ' +
       'bylines.',
     location: 'Room A',
+    placeId: 'room-a',
     type: 'workshop',
     track: 'A',
     speakerIds: ['speaker-placeholder-2'],
@@ -273,11 +333,12 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-2',
     startTime: '09:30',
     endTime: '10:45',
-    title: 'Panel: sustaining local partnerships',
+    title: 'Panel: Sustaining local partnerships',
     description:
       'Three newsroom leaders on what it actually takes to keep a shared-coverage partnership ' +
       'funded past year one.',
     location: 'Main hall',
+    placeId: 'main-hall',
     type: 'panel',
     speakerIds: ['speaker-placeholder-1', 'speaker-placeholder-3'],
     visible: true,
@@ -289,11 +350,12 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-2',
     startTime: '13:30',
     endTime: '15:00',
-    title: 'Workshop: audience research on a small budget',
+    title: 'Workshop: Audience research on a small budget',
     description:
       'Simple survey and interview methods for newsrooms with no research budget and no ' +
       'research team.',
     location: 'Room B',
+    placeId: 'room-b',
     type: 'workshop',
     track: 'B',
     speakerIds: ['speaker-placeholder-2'],
@@ -313,6 +375,7 @@ const DEMO_SESSIONS = Object.freeze([
       'Building a newsroom budget that bends instead of breaking when one grant does not ' +
       'renew.',
     location: 'Room A',
+    placeId: 'room-a',
     type: 'workshop',
     track: 'A',
     speakerIds: ['speaker-placeholder-1'],
@@ -322,16 +385,20 @@ const DEMO_SESSIONS = Object.freeze([
   },
   {
     // A child session: one calling point inside the workshop above. It
-    // inherits its parent's day, and it runs on its parent's line.
+    // inherits its parent's day, and it runs on its parent's line — and it
+    // sits in a DIFFERENT place from its parent, which is the one case
+    // where a schedule row genuinely states a move: a reader in the
+    // workshop is in Room B, and the clinic inside it is downstairs.
     id: 'session-workshop-b-clinic',
     dayId: 'day-2',
     startTime: '14:00',
     endTime: '15:00',
     title: 'Clinic: bring your survey questions',
     description:
-      'The second half of the audience workshop splits into small groups — bring a draft ' +
-      'survey and leave with it rewritten.',
-    location: 'Room B',
+      'The second half of the audience workshop moves down to the main hall and splits into ' +
+      'small groups — bring a draft survey and leave with it rewritten.',
+    location: 'Main hall',
+    placeId: 'main-hall',
     type: 'workshop',
     track: 'B',
     parentId: 'session-workshop-b',
@@ -349,6 +416,10 @@ const DEMO_SESSIONS = Object.freeze([
     description:
       'Participant-proposed sessions, posted on the board each morning — bring a topic or ' +
       'just show up.',
+    // NO `placeId`, on purpose: this one runs in both first-floor rooms at
+    // once, so there is no single place for it to be in. `location` says so
+    // in words, and the movement model says nothing about getting to it —
+    // which is right, because there is no one place to get to.
     location: 'Rooms A and B',
     type: 'workshop',
     speakerIds: [],
@@ -366,6 +437,7 @@ const DEMO_SESSIONS = Object.freeze([
       'A short conversation on what came out of the three days and where the network goes ' +
       'from here.',
     location: 'Main hall',
+    placeId: 'main-hall',
     type: 'plenary',
     speakerIds: ['speaker-placeholder-3'],
     visible: true,

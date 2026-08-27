@@ -1,10 +1,12 @@
 {
-  "$schema-note": "One theme preset (design brief 2026-08-27, §4.3). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
+  "$schema-note": "One theme preset (design brief 2026-08-27, §4.3). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
   "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 3.",
   "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin.",
+  "$first-class-note": "See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.",
   "id": "zine",
-  "label": "Zine / indie",
+  "label": "Zine",
   "summary": "Made by hand, at a copier, the week before. One loud display face, an even mono rhythm under it, and an accent spent twice a page.",
+  "bestFor": "Unconferences, community events, and student work.",
 
   "$palette-words-light": "bright flyer paper, toner black, one hot accent, xerox grey, paper grain, staple silver, cut-edge white, faded archive grey",
   "$palette-words-dark": "night toner black, paper-white ink, held-back hot accent, ghost grey, low-light grain, streetlight silver, matte rule black, sun-faded archive grey",
@@ -41,16 +43,17 @@
     }
   },
 
-  "$font-note": "Brief §9.1. Zine runs one mono across body, data, and values on purpose: the even typewriter rhythm is the story.",
+  "$font-note": "Brief §9.1, retuned by the owner review (2026-08-27). Zine ran one mono across body, data, and mono. A mono body is a poor face for long-form prose: A rich-text page or a session description set in Fragment Mono is slow to read at any length. Body moves to Source Sans 3, the bundled neutral. Data and mono stay Fragment Mono, so times, room codes, and identifiers keep the typewriter rhythm the story is built on — the mono is now the VALUE face rather than the whole page.",
   "fonts": {
     "heading": "karrik",
-    "body": "fragment-mono",
+    "body": "sans-humanist",
     "data": "fragment-mono",
     "mono": "fragment-mono"
   },
   "$component-fonts-note": "--callout-font is a component token, not a fifth semantic role (brief §3.1, §4.3). It carries the one handwritten callout a page may hold. A client may point it at var(--font-heading) and drop the script face.",
   "componentFonts": { "--callout-font": "script-casual" },
 
+  "$shape-note": "The copier grain is ON by default, as brief §4.3 allows (\"paper grain allowed at low opacity\"). An earlier pass turned it off in the name of flat surfaces; that confused two different fixes. The real fix was the CSS gate — the overlay now paints only under [data-texture='paper'], so an opt-in cannot leak onto a style that never asked for it (apps/web/src/index.css). Zine is the one style that DID ask: A page made at a copier has copier grain, and it is the cheapest, quietest way this style says so — a ground treatment, not a per-card artefact. The misregistered stamp stays the alternate, which is the right place for a printing artefact. A client who wants a clean sheet picks Flat under Advanced.",
   "shape": { "radius": "sharp", "texture": "paper", "density": "loose" },
   "motifSet": "none",
 
@@ -84,13 +87,13 @@
         {
           "id": "avara",
           "label": "Avara",
-          "why": "A transitional serif with the curves replaced by straight segments, so every bowl reads as a cut facet: a poster cut from flat stock rather than drawn.",
+          "why": "A transitional serif with the curves replaced by straight segments, so every bowl reads as a cut facet: A poster cut from flat stock rather than drawn.",
           "fonts": { "heading": "avara" }
         }
       ]
     },
     "nameplate": {
-      "label": "Nameplate treatment",
+      "label": "Header style",
       "prompt": "The flyer headline.",
       "default": "full-sheet",
       "choices": [
@@ -127,25 +130,28 @@
       ]
     },
     "component": {
-      "label": "Session block",
+      "label": "Schedule style",
       "prompt": "How a session block is printed.",
-      "default": "stamped-block",
+      "$default-note": "Flat is the default (owner review, 2026-08-27). The stamp is the theme's signature and it still ships under the brief §2.4 exception, but a printing artefact is a thing a client turns ON, not a thing they discover on their own schedule page.",
+      "default": "flat-block",
       "choices": [
-        {
-          "id": "stamped-block",
-          "label": "Stamped block",
-          "why": "Misregistration is what a two-pass print looks like, which is the story's whole production method. It ships under the brief §2.4 exception, Zine only.",
-          "tokens": {
-            "--session-card-stamp-offset": "4px",
-            "--folio-rule-top-width": "0"
-          }
-        },
         {
           "id": "flat-block",
           "label": "Flat block",
           "why": "The single-pass photocopy, so it stays in the story and gives a client an option that needs no exception to §2.1.",
           "tokens": {
             "--session-card-stamp-offset": "0",
+            "--folio-rule-top-width": "0"
+          }
+        },
+        {
+          "id": "stamped-block",
+          "label": "Stamped block",
+          "why": "Misregistration is what a two-pass print looks like, which is the story’s whole production method. It ships under the brief §2.4 exception, Zine only.",
+          "$tint-note": "The layer is a tint of the accent, not the accent itself. Zine spends the accent at full strength twice a page; a stamp is on every row, so at full strength the page would carry twenty of them and the rare accent would stop meaning anything. It would also read as the coloured card edge §2.4 rejects rather than as the second print pass §2.4 allows. At this strength the hue is still plainly the accent and the layer still reads as ink that went down after the first pass.",
+          "tokens": {
+            "--session-card-stamp-offset": "4px",
+            "--session-card-stamp-alpha": "0.55",
             "--folio-rule-top-width": "0"
           }
         },
@@ -162,7 +168,7 @@
       ]
     },
     "marginalia": {
-      "label": "Marginalia",
+      "label": "Pen marks",
       "prompt": "The pen that went over the page afterwards. Its own control, because a client may want the stamp without the pen.",
       "default": "off",
       "choices": [

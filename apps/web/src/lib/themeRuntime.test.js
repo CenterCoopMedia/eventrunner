@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRuntimeThemeCss,
+  fontSetFaces,
   hexToRgbTriple,
   rgbTripleToHex,
+  themeFallbackWarnings,
 } from './themeRuntime.js';
+import { recommendedConfiguration } from 'shared/theme';
 
 // Hex strings under test are composed at runtime so no hex color literal
 // appears in source (spec §7.6 — the ESLint sweep applies to tests too).
@@ -218,10 +221,11 @@ describe('buildRuntimeThemeCss print block', () => {
 
   it('leaves the admin token on screen', () => {
     // The admin is a screen tool; no print rule reads its tokens. Its own
-    // mode blocks still carry the accent.
+    // mode blocks still carry the marker colour, which is the site's own
+    // brand colour — there is no separate adminAccent field to set.
     const css = buildRuntimeThemeCss({
       colors: { surface: hex('F7F7F5'), ink: hex('16212C') },
-      adminAccent: hex('C84B31'),
+      brandColor: hex('C84B31'),
     });
     expect(css).toContain('--admin-client-accent-rgb:');
     expect(printBlockOf(css)).not.toContain('--admin-');
@@ -257,5 +261,74 @@ describe('rgbTripleToHex', () => {
     expect(rgbTripleToHex('42 157 256')).toBeNull();
     expect(rgbTripleToHex('42 157 abc')).toBeNull();
     expect(rgbTripleToHex(null)).toBeNull();
+  });
+});
+
+describe('themeFallbackWarnings', () => {
+  // What the candidate asks for that will NOT render as asked. Both kinds
+  // fall back silently otherwise, so the preview would show a page nobody
+  // chose and say nothing about it (owner review, 2026-08-27).
+  const everyFontLoaded = () => true;
+  const noFontLoaded = () => false;
+
+  it('says nothing about a document that renders exactly as asked', () => {
+    expect(
+      themeFallbackWarnings(recommendedConfiguration('civic'), { fontAvailable: everyFontLoaded }),
+    ).toEqual([]);
+    expect(themeFallbackWarnings(null)).toEqual([]);
+  });
+
+  it('names a brand colour it cannot read, and what shows instead', () => {
+    const [warning, ...rest] = themeFallbackWarnings(
+      { ...recommendedConfiguration('zine'), brandColor: 'brand blue' },
+      { fontAvailable: everyFontLoaded },
+    );
+    expect(rest).toEqual([]);
+    expect(warning.kind).toBe('color');
+    expect(warning.message).toContain('Main brand colour is not a colour this system can read');
+    expect(warning.message).toContain('brand blue');
+    expect(warning.message).toMatch(/showing instead/);
+  });
+
+  it('names an unreadable per-mode override, with the mode it is in', () => {
+    const warnings = themeFallbackWarnings(
+      {
+        ...recommendedConfiguration('newsroom'),
+        tokens: { dark: { ink: 'off-white' } },
+      },
+      { fontAvailable: everyFontLoaded },
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].field).toBe('ink (dark)');
+  });
+
+  it('accepts every hex spelling the schema accepts', () => {
+    for (const value of [hex('fff'), hex('FFF'), hex('a1b2c3'), `  ${hex('a1b2c3')}  `]) {
+      expect(
+        themeFallbackWarnings(
+          { ...recommendedConfiguration('civic'), brandColor: value },
+          { fontAvailable: everyFontLoaded },
+        ),
+      ).toEqual([]);
+    }
+  });
+
+  it('names a font that has not loaded, and the face showing in its place', () => {
+    const warnings = themeFallbackWarnings(recommendedConfiguration('atlas'), {
+      fontAvailable: noFontLoaded,
+    });
+    // Atlas runs Overpass for headings and Overpass Mono for both value
+    // roles, so three roles resolve to two families and the warning is per
+    // family, not per role.
+    expect(warnings).toHaveLength(3);
+    expect(warnings.every((warning) => warning.kind === 'font')).toBe(true);
+    expect(warnings[0].message).toContain('Overpass has not loaded');
+    expect(warnings[0].message).toMatch(/showing in .+/);
+  });
+
+  it('reads the bundled face and its fallbacks out of the one stack table', () => {
+    expect(fontSetFaces('plex-mono').family).toBe('IBM Plex Mono');
+    expect(fontSetFaces('plex-mono').fallback).toContain('monospace');
+    expect(fontSetFaces('not-a-set')).toBeNull();
   });
 });

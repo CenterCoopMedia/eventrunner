@@ -15,6 +15,7 @@
     "./speaker": { "require": "./src/speaker.cjs", "import": "./src/speaker.mjs" },
     "./theme": { "require": "./src/theme.cjs", "import": "./src/theme.mjs" },
     "./urlSafety": { "require": "./src/urlSafety.cjs", "import": "./src/urlSafety.mjs" },
-    "./routing": { "require": "./src/routing.cjs", "import": "./src/routing.mjs" }
+    "./routing": { "require": "./src/routing.cjs", "import": "./src/routing.mjs" },
+    "./venue": { "require": "./src/venue.cjs", "import": "./src/venue.mjs" }
   }
 }

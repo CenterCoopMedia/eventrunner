@@ -1,11 +1,13 @@
 {
-  "$schema-note": "One theme preset (design brief 2026-08-27, §4.6). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
+  "$schema-note": "One theme preset (design brief 2026-08-27, §4.6). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
   "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 6.",
   "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin.",
   "$safety-note": "Lines are told apart by their letter and their name first. A line colour, where a client sets one, is a second signal and never the only one (brief §8.1).",
+  "$first-class-note": "See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.",
   "id": "atlas",
   "label": "Atlas",
-  "summary": "A mapped city on its transit network. A survey sheet and a departure board at once: lines, stations, transfers.",
+  "summary": "A mapped city on its transit network. A survey sheet and a departure board at once: Lines, stations, transfers.",
+  "bestFor": "Multi-venue events, city festivals, and anything a visitor has to navigate.",
 
   "$palette-words-light": "surveyor's paper, india ink, route red, contour grey, graticule pale blue, key-box white, platform slate, benchmark silver",
   "$palette-words-dark": "deep slate ground, cool white ink, lit route marker, sunken contour grey, felt-grid blue, map-case grey, signal-white label, night platform blue",
@@ -42,7 +44,7 @@
     }
   },
 
-  "$font-note": "Brief §9.3. Atlas points both value roles at Overpass Mono on purpose: a timetable and a coordinate are the same kind of value.",
+  "$font-note": "Brief §9.3. Atlas points both value roles at Overpass Mono on purpose: A timetable and a coordinate are the same kind of value.",
   "fonts": {
     "heading": "overpass",
     "body": "libre-franklin",
@@ -57,7 +59,6 @@
   "tokens": {
     "--map-grid-size": "var(--space-xl)",
     "--schedule-trace-width": "var(--rule-strong-width)",
-    "--transfer-line-display": "block",
     "--route-mark-radius": "var(--radius-base)",
     "--session-card-pad-block": "var(--space-xs)",
     "--folio-font": "var(--font-data)",
@@ -67,7 +68,8 @@
   "options": {
     "headingFace": {
       "label": "Heading face",
-      "prompt": "The sign face. Body stays Libre Franklin and data stays Overpass Mono under every option. Every option must hold at nameplate size, at the h3 step, and inside a route mark.",
+      "$bar-note": "Every choice below has to hold at nameplate size, at the h3 step, and inside a route mark. That is the bar the set was curated against; it is not a decision an operator makes, so it does not sit in the prompt.",
+      "prompt": "The sign face. Body stays Libre Franklin and data stays Overpass Mono under every option.",
       "default": "overpass",
       "choices": [
         {
@@ -91,7 +93,7 @@
       ]
     },
     "nameplate": {
-      "label": "Nameplate treatment",
+      "label": "Header style",
       "prompt": "The title block.",
       "default": "corner-title-block",
       "choices": [
@@ -131,14 +133,14 @@
       ]
     },
     "component": {
-      "label": "Schedule presentation",
+      "label": "Schedule style",
       "prompt": "How the board is drawn.",
       "default": "departure-board",
       "choices": [
         {
           "id": "departure-board",
           "label": "Departure board",
-          "why": "Time down, lettered lines across, faint map grid behind, traced-line signature interaction. The theme's clearest idea.",
+          "why": "Times down the left column, the faint coordinate grid behind the programme. The concourse board, and the theme’s clearest idea.",
           "tokens": {
             "--map-grid-size": "var(--space-xl)",
             "--schedule-data-size": "var(--text-caption)"
@@ -147,7 +149,7 @@
         {
           "id": "line-diagram",
           "label": "Line diagram",
-          "why": "The strip map inside a carriage: one line at a time as a Beck-style vertical run, which serves a visitor following one track all day.",
+          "why": "The strip map inside a carriage: One run straight down the page. The grid behind the board comes off and the rows close up, so the day reads as one track to follow rather than as separate departures.",
           "tokens": {
             "--map-grid-size": "0",
             "--schedule-data-size": "var(--text-caption)",

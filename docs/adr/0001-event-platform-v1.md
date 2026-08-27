@@ -1671,7 +1671,7 @@ letting a client theme it is a support liability.
 ### 7.4 Fonts
 
 Font families are chosen from a **bundled allowlist** of self-hosted sets shipped as woff2 in
-`apps/web/public/fonts`, not from arbitrary remote URLs. Reasons: no third-party request on every
+`apps/web/public/fonts`, not from arbitrary remote URLs. Reasons: No third-party request on every
 page load (a real objection from institutional clients), no CSP exception, and no dependency on a
 font CDN's availability. `config/theme.fonts` names a set id, and a preset's type map names one for
 each of the four roles; `theme.css` emits the matching `@font-face` blocks and the

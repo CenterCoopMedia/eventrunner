@@ -23,8 +23,8 @@
   <meta name="twitter:description" content="The v1 architecture decision record. This is the contract.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta name="twitter:image:alt" content="Event Runner documentation">
-  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#17191e" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
   <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -1674,7 +1674,7 @@
           letting a client theme it is a support liability.</p>
           <h3 id="74-fonts">7.4 Fonts<a class="heading-anchor" href="#74-fonts" aria-label="Link to this section">#</a></h3>
           <p>Font families are chosen from a <strong>bundled allowlist</strong> of self-hosted sets shipped as woff2 in
-          <code>apps/web/public/fonts</code>, not from arbitrary remote URLs. Reasons: no third-party request on every
+          <code>apps/web/public/fonts</code>, not from arbitrary remote URLs. Reasons: No third-party request on every
           page load (a real objection from institutional clients), no CSP exception, and no dependency on a
           font CDN&#39;s availability. <code>config/theme.fonts</code> names a set id, and a preset&#39;s type map names one for
           each of the four roles; <code>theme.css</code> emits the matching <code>@font-face</code> blocks and the

@@ -55,7 +55,14 @@ export default function SchedulePrint({ days, sessionsByDay, columns, eventConfi
               {date ? <span className="schedule-print__date">{date}</span> : null}
             </h2>
             {entries.length === 0 ? (
-              <p className="schedule-print__row">No sessions are announced for this day.</p>
+              // A row is two columns — the time, then everything else. So
+              // the day's one line of prose takes the second column, where
+              // every session title sits, instead of being squeezed into
+              // the time column and wrapping over three lines.
+              <p className="schedule-print__row">
+                <span />
+                <span>No sessions are announced for this day.</span>
+              </p>
             ) : (
               <ul>
                 {entries.map((entry) => {

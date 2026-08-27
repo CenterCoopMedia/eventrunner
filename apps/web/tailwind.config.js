@@ -10,16 +10,31 @@
 // is what keeps opacity modifiers like bg-brand-primary/10 working.
 //
 // Everything below EXTENDS the Tailwind defaults rather than replacing them.
-// The restyle lands in a later pull request, so components still on default
-// Tailwind classes keep compiling and rendering while the token utilities
-// come into use beside them.
+// This branch restyles the public pages, the block renderers, the editorial
+// devices, and the toast onto the tier 2 role utilities, and moves the admin
+// onto its own admin-* identity. What is still on the brand-* names and the
+// default Tailwind sizes is the shared media widgets. Leaving the defaults in
+// place is what keeps those compiling and rendering until they move too.
 const fontStep = (step) => [
   `var(--text-${step})`,
   { lineHeight: `var(--text-${step}-leading)`, letterSpacing: `var(--text-${step}-tracking)` },
 ];
 
 export default {
-  content: ['./index.html', './src/**/*.{js,jsx}'],
+  // TESTS ARE NOT CONTENT, AND ONE OF THEM DEPENDS ON THAT.
+  //
+  // Tailwind tree-shakes anything in `@layer components` whose class name it
+  // cannot find in the files it scans, and `src/**/*.{js,jsx}` scanned the
+  // test files too. src/components/editorial/purge.test.js exists to catch
+  // exactly that tree-shaking — and it works by listing every device class
+  // as a literal string. Scanning it made every class on that list survive
+  // BECAUSE the test named it, so the test could not fail for anything it
+  // checked. A class no component used still shipped, and a class a
+  // component stopped using went on shipping.
+  //
+  // Excluding the tests makes the build reflect the app alone, which is
+  // what the test was written to measure.
+  content: ['./index.html', './src/**/*.{js,jsx}', '!./src/**/*.test.{js,jsx}'],
   theme: {
     extend: {
       colors: {
@@ -37,8 +52,8 @@ export default {
         danger: 'rgb(var(--semantic-danger-rgb) / <alpha-value>)',
         highlight: 'rgb(var(--semantic-highlight-rgb) / <alpha-value>)',
         keynote: 'rgb(var(--semantic-keynote-rgb) / <alpha-value>)',
-        // Tier 2 role names (brief §3.1). The restyle moves components onto
-        // these; the brand-* names above stay until it does.
+        // Tier 2 role names (brief §3.1). Every public surface reads these;
+        // the brand-* names above stay for the surfaces still to move.
         surface: 'rgb(var(--color-surface-rgb) / <alpha-value>)',
         'surface-alt': 'rgb(var(--color-surface-alt-rgb) / <alpha-value>)',
         'text-primary': 'rgb(var(--color-text-primary-rgb) / <alpha-value>)',
@@ -99,8 +114,8 @@ export default {
         // writable from config/theme.
         'admin-ui': 'var(--admin-font-ui)',
         'admin-data': 'var(--admin-font-data)',
-        // There is no `accent` face. PR2 removed the retired --font-accent
-        // alias (brief §3.2, §7). Zine's handwritten callout runs on the
+        // There is no `accent` face. The retired --font-accent alias is
+        // gone (brief §3.2, §7). Zine's handwritten callout runs on the
         // --callout-font component token, which the callout component reads
         // directly rather than through a utility.
       },

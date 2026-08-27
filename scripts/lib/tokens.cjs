@@ -48,6 +48,7 @@ const {
   THEME_MODES,
   THEME_MODE_POLICIES,
   THEME_PRESET_IDS,
+  THEME_DENSITY_STEPS,
   DEFAULT_MODE_POLICY,
   deriveRuleColors,
   getPreset,
@@ -407,7 +408,7 @@ function rootBlock(theme, tokens) {
     'Tier 2 — font roles (brief §3.2). The active preset\'s type map, then its ' +
     'picked heading-face option, then any role config/theme.fonts names ' +
     'outright — all resolved to a bundled set id (spec §7.4).' +
-    (preset ? ` Preset: ${preset.label}.` : ' No preset: config/theme.fonts only.'),
+    (preset ? ` Preset: ${preset.id}.` : ' No preset: config/theme.fonts only.'),
   );
   for (const role of THEME_FONT_ROLES) {
     if (stacks[role]) push(`--font-${role}`, stacks[role]);
@@ -428,16 +429,21 @@ function rootBlock(theme, tokens) {
   push('--radius-large', radius.large);
 
   group(
-    "Tier 2 — texture treatment: 'paper' | 'flat'. " +
-    'Components read this through the bg-paper utility layer in index.css.',
+    "Tier 2 — texture treatment: config/theme.texture = 'flat' | 'paper'. " +
+    'Flat is the base; a texture is a theme opt-in, painted by the ' +
+    '.page-surface layer in index.css.',
   );
   push('--texture', shape.texture);
 
   group(
     "Tier 2 — density: 'tight' | 'comfortable' | 'loose' (brief §4). The preset " +
-    'states its own; a page may still set its own layout density in PR3.',
+    'states its own; a page may still set its own layout density in PR3. ' +
+    '--density is the word, for anything that has to name the step; ' +
+    '--density-step is what it is worth, so the public devices in index.css ' +
+    'can multiply their own spacing by it. The admin never reads either.',
   );
   push('--density', shape.density);
+  push('--density-step', THEME_DENSITY_STEPS[shape.density] || THEME_DENSITY_STEPS.comfortable);
 
   group('Tier 2 — motion (brief §2.2). Functional 120–200ms; one signature under 600ms.');
   for (const [step, value] of tokenEntries(tokens.semantic.motion)) push(`--motion-${step}`, value);
@@ -462,7 +468,7 @@ function rootBlock(theme, tokens) {
   const presetTokens = resolvePresetTokens(theme);
   if (Object.keys(presetTokens).length > 0 || Object.keys(componentStacks).length > 0) {
     group(
-      `Preset remaps — ${preset ? preset.label : 'none'} and its picked options. ` +
+      `Preset remaps — ${preset ? preset.id : 'none'} and its picked options. ` +
       'An option remaps existing tier 2 and tier 3 tokens and never adds a ' +
       'property name (brief §3.4), so every name here is declared above.',
     );
@@ -562,22 +568,42 @@ function firstPaintDarkBlock(policy, names, dark, comment) {
 /**
  * The print palette: the light edition, whatever mode the screen is in.
  *
- * Every print rule reads the ink and rule tokens and nothing else, so
- * re-pointing those at the light values is the whole switch.
+ * Paper has no backlight and no dark mode. A reader who prints the schedule
+ * handout (`components/SchedulePrint.jsx`, the `@media print` block in
+ * `apps/web/src/index.css`) from a dark screen should get the light
+ * edition, not dark ink boxes on a white sheet. The print rules name the
+ * rule and ink tokens and nothing else, so re-pointing those tokens at the
+ * light values is the whole fix — no print rule has to know about modes.
  *
- * The selector list names every block that can be carrying dark values: the
- * attribute-free baseline, the first-paint block (only on the policies that
- * emit one), the dark mode block, and every (preset, mode) block. Each leads
- * with the `html` type selector, which is what puts this block above its
- * screen twin — document order could not, because the runtime <style> is
- * appended after this stylesheet.
+ * The selector list names every block that can be carrying dark values:
  *
- * These values are frozen at build time, so this is the no-JavaScript
- * FALLBACK. A running page's live palette is printed by the block
- * `buildRuntimeThemeCss` writes, which names this same list and wins on
- * document order.
+ *   html:root                                   the attribute-free baseline.
+ *   html:root:not([data-mode])                  the first-paint dark block,
+ *                                               named only on the policies
+ *                                               that emit one, so a light
+ *                                               deployment's stylesheet stays
+ *                                               free of the selector.
+ *   html:root[data-mode='dark']                 the generated mode block.
+ *   html:root[data-theme][data-mode='dark']     every generated (preset,
+ *                                               mode) block, and the same
+ *                                               selector buildRuntimeThemeCss
+ *                                               writes into
+ *                                               <style id="event-theme-runtime">.
  *
- * The admin set stays out: it is a screen tool and no print rule reads it.
+ * Each one leads with the `html` type selector, which is what puts this
+ * block above its screen twin. Document order could not do it: the runtime
+ * <style> element is appended AFTER the generated stylesheet, so at equal
+ * specificity the runtime's dark values would win even inside print media.
+ *
+ * That last point is also why this block is only the no-JavaScript FALLBACK.
+ * The values here are frozen at build time; a running page's live palette is
+ * printed by the `@media print` block `buildRuntimeThemeCss` writes, which
+ * names this same selector list and, being appended later, wins on document
+ * order.
+ *
+ * The admin set stays out. The admin is a screen tool, its own tokens are
+ * emitted once per mode (admin story part 6), and nothing in `@media print`
+ * reads them.
  *
  * @param {string} policy the mode policy (`light` | `dark` | `system`)
  * @param {string[]} names token order
@@ -699,7 +725,7 @@ function buildTokenCss(theme, { tokensDir } = {}) {
             scopedSelector(`[data-theme='${id}'][data-mode='${mode}']`),
             preset.names,
             preset.values[mode],
-            `${getPreset(id).label} — ${mode}` +
+            `${id} — ${mode}` +
             (id === activePreset ? ', the active preset, with this deployment\'s overrides.' : '.'),
           ),
         );

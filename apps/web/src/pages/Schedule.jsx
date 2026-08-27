@@ -29,11 +29,7 @@ import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
-
-// Page actions in the editorial register: a ruled rectangle on the theme
-// radius, never a pill (design brief §2.4).
-const ACTION_CLASS =
-  'touch-target inline-flex items-center rounded-brand border-hairline border-rule-hairline px-md py-2xs font-data text-caption font-medium text-text-primary hover:bg-brand-surface-alt';
+import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
 // One day of the programme. The active day is marked twice over — heavier
 // weight plus a strong rule under the word — because color alone never
@@ -47,34 +43,6 @@ function dayClass(isActive) {
       ? 'border-b-rule-strong font-semibold text-text-primary'
       : 'border-b-transparent text-text-secondary hover:text-text-primary',
   ].join(' ');
-}
-
-/**
- * The room a reader moves to, for the session at `index` of a sorted day
- * (design brief §4.6; visual story, Atlas, moment 2).
- *
- * A transfer is a real move: it exists only when this session sits in a
- * different room from the one before it, and only when both rooms are
- * stated. The first session of a day is an arrival, not a transfer, and two
- * sessions in the same room are not a move at all.
- *
- * Both are runtime CMS values, so a non-string room is treated as absent
- * rather than compared.
- *
- * @param {object[]} sessions the day's sessions, already sorted
- * @param {number} index
- * @returns {string|null}
- */
-export function transferTarget(sessions, index) {
-  const room = (session) =>
-    typeof session?.location === 'string' && session.location.trim()
-      ? session.location.trim()
-      : null;
-  if (index < 1) return null;
-  const here = room(sessions[index]);
-  const before = room(sessions[index - 1]);
-  if (!here || !before || here === before) return null;
-  return here;
 }
 
 /** Sort sessions the same way everywhere they're grouped by day (Schedule
@@ -139,10 +107,7 @@ export default function Schedule() {
         title="This event doesn’t have a public schedule"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -156,10 +121,6 @@ export default function Schedule() {
   // views render from this, so a child session appears under its parent in
   // the grid and in the list, and never as a row of its own.
   const entries = withCallingPoints(activeSessions);
-  // The top-level sessions in programme order. A transfer is a move between
-  // two of THESE: a calling point is inside its parent, not a room change
-  // after it.
-  const entrySessions = entries.map((entry) => entry.session);
   // The event's lines, in the client's own order (config/event.tracks). No
   // lines means no second axis, so there is nothing for a grid to be.
   const columns = resolveTracks(eventConfig);
@@ -193,7 +154,7 @@ export default function Schedule() {
             the print block). */}
         <div className="no-print flex flex-wrap items-center gap-xs">
           {features.sessionBookmarks && user && attendeeAccess ? (
-            <Link to="/schedule/mine" className={ACTION_CLASS}>
+            <Link to="/schedule/mine" className={quietActionClass}>
               My schedule
             </Link>
           ) : null}
@@ -203,7 +164,7 @@ export default function Schedule() {
               onClick={() => {
                 downloadIcs(icsFileName(eventConfig.shortName || eventConfig.name), buildIcsCalendar(eventConfig, visibleSessions));
               }}
-              className={ACTION_CLASS}
+              className={quietActionClass}
             >
               Download schedule (.ics)
             </button>
@@ -213,7 +174,7 @@ export default function Schedule() {
 
       {loading ? (
         <div className="mt-lg">
-          <LoadingState label="Loading the schedule" />
+          <LoadingState label="Loading the schedule…" />
         </div>
       ) : !hasAnySession || !activeDay ? (
         <div className="mt-lg">
@@ -251,10 +212,17 @@ export default function Schedule() {
               </div>
             ) : null}
 
+          {/* The sheet the programme is drawn on (brief §4.6): a faint
+              coordinate grid, below hairline contrast and inert to the
+              pointer. It lives HERE and not on the shell, because a
+              coordinate grid is a device for reading a timetable (owner
+              review, 2026-08-27). --map-grid-size is zero in every preset
+              but Atlas, and a zero-size background paints nothing, so the
+              sheet appears only where the story has one. */}
             <section
               key={activeDay.id}
               aria-labelledby={`day-${activeDay.id}`}
-              className={backIssue ? 'back-issue mt-xl' : 'mt-xl'}
+              className={backIssue ? 'back-issue map-grid mt-xl' : 'map-grid mt-xl'}
               {...(backIssue ? { 'data-back-issue': 'true' } : null)}
             >
               {/* The day head is a folio on a rule (brief §2.1): the standing
@@ -328,8 +296,15 @@ export default function Schedule() {
                       features={features}
                       bookmarked={bookmarkedIds.has(entry.session.id)}
                       backIssue={backIssue}
-                      transferTo={transferTarget(entrySessions, index)}
                       callingPoints={entry.children}
+                      // The session's real place in the day, counted from
+                      // one: the numbered-agenda Schedule style prints it,
+                      // and the lead-and-rest style sets the first row
+                      // larger. It counts ENTRIES, so a calling point does
+                      // not take a number of its own — it is a stop inside
+                      // its parent, not a row in the programme.
+                      position={index + 1}
+                      lead={index === 0}
                     />
                   ))}
                 </ul>

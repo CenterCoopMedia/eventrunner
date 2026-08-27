@@ -40,7 +40,7 @@ import {
   getOwnSpeakerProfile,
   updateOwnSpeakerProfile,
 } from '../lib/speakerProfileApi.js';
-import { inputClass, primaryButtonClass } from '../components/forms/publicForm.jsx';
+import { inputClass, primaryActionClass } from '../components/controlClasses.js';
 
 const STATUS_COPY = {
   draft: null,
@@ -178,7 +178,7 @@ export default function SpeakerProfile() {
     return (
       <article className="mx-auto max-w-md">
         <h1 className="font-heading text-h1 font-semibold text-text-primary">Sign in to continue</h1>
-        <p className="mt-xs max-w-prose text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+        <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
           Your speaker profile is part of your account, so it lives behind sign-in. Sign in below to pick
           up right where you left off.
         </p>
@@ -192,7 +192,7 @@ export default function SpeakerProfile() {
   if (accountStatus === 'pending-account') {
     return (
       <div className="mt-lg">
-        <LoadingState label="Setting up your account" />
+        <LoadingState label="Setting up your account…" />
       </div>
     );
   }
@@ -203,7 +203,7 @@ export default function SpeakerProfile() {
         title="This account is not linked to a speaker"
         description="If you were invited as a speaker, accept the invitation in that email first — it links this account to your speaker record."
         action={
-          <Link to="/profile" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+          <Link to="/profile" className={primaryActionClass}>
             Go to your account
           </Link>
         }
@@ -217,7 +217,7 @@ export default function SpeakerProfile() {
         title="Your speaker profile could not be loaded"
         description={load.error}
         action={
-          <button type="button" onClick={loadProfile} className={primaryButtonClass}>
+          <button type="button" onClick={loadProfile} className={primaryActionClass}>
             Try again
           </button>
         }
@@ -228,7 +228,7 @@ export default function SpeakerProfile() {
   if (load.status === 'loading' || form == null) {
     return (
       <div className="mt-lg">
-        <LoadingState label="Loading your speaker profile" />
+        <LoadingState label="Loading your speaker profile…" />
       </div>
     );
   }
@@ -460,7 +460,7 @@ export default function SpeakerProfile() {
           </button>
         </fieldset>
 
-        <button type="submit" className={primaryButtonClass} disabled={saving}>
+        <button type="submit" className={primaryActionClass} disabled={saving}>
           {saving ? 'Saving…' : 'Save speaker profile'}
         </button>
       </form>

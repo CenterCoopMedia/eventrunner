@@ -27,7 +27,10 @@
 //                   before, with the dark values derived from it.
 //   fonts           a role named outright, overriding the preset's type map.
 //   motifSet        which motif set data-motif-set switches to (brief §3.8).
-//   adminAccent     the one client-owned colour in the admin identity.
+//   brandColor      the client's main brand colour. The three brand steps
+//                   are DERIVED from it per mode, contrast-safe by
+//                   construction, and the admin's own position marker takes
+//                   the resolved value with its legibility floor applied.
 //
 // SPECIFICITY. The generated stylesheet now carries one block per
 // (preset, mode) pair, and `:root[data-theme='zine'][data-mode='dark']` is
@@ -41,8 +44,12 @@ import {
   THEME_MODE_POLICIES,
   THEME_FONT_ROLES,
   THEME_TEXTURES,
+  THEME_DENSITIES,
+  THEME_DENSITY_STEPS,
   THEME_PRESET_IDS,
+  recommendedConfiguration,
   THEME_MOTIF_SET_IDS,
+  THEME_NAV_PLACEMENTS,
   DEFAULT_MODE_POLICY,
   DEFAULT_PRESET_ID,
   ADMIN_TOKEN_SET,
@@ -154,16 +161,41 @@ export { THEME_FONT_ROLES };
 export const RADIUS_IDS = Object.freeze(Object.keys(RADIUS_SCALES));
 /** config/theme.texture values. */
 export const TEXTURE_IDS = Object.freeze([...THEME_TEXTURES]);
+/** config/theme.density values (brief §4, §6.1). */
+export const DENSITY_IDS = Object.freeze([...THEME_DENSITIES]);
 /** config/theme.mode values (brief §3.3). */
 export const MODE_POLICY_IDS = Object.freeze([...THEME_MODE_POLICIES]);
 /** The mode policy a document without a `mode` field renders as. */
 export { DEFAULT_MODE_POLICY };
-/** The six preset ids (brief §4). data-theme carries one of these. */
+/**
+ * The six style ids, in picker order (brief §4). `data-theme` carries one of
+ * these. All six are first-class: the order is a recommendation and there is
+ * no second tier (owner calibration, 2026-08-27).
+ */
 export const PRESET_IDS = Object.freeze([...THEME_PRESET_IDS]);
-/** The preset a new deployment starts on. */
+/** The `config/theme` a style produces the moment it is picked. */
+export { recommendedConfiguration };
+/** The style a new deployment starts on. */
 export { DEFAULT_PRESET_ID };
 /** The motif sets data-motif-set switches between (brief §3.8). */
 export const MOTIF_SET_IDS = Object.freeze([...THEME_MOTIF_SET_IDS]);
+
+/** Where the site puts its navigation (shared/theme THEME_NAV_PLACEMENTS). */
+export const NAV_PLACEMENT_IDS = Object.freeze([...THEME_NAV_PLACEMENTS]);
+
+/**
+ * What each placement is called, in an operator's words.
+ *
+ * ONE SET OF WORDS, because the setting is offered in two places — once for
+ * the site on the Branding tab, once as a per-page exception in the page
+ * editor — and an operator who sets it in one and then reads the other has
+ * to recognize their own choice. Two names for one value is two settings as
+ * far as they can tell.
+ */
+export const NAV_PLACEMENT_LABELS = Object.freeze({
+  top: 'Across the top',
+  side: 'Down the side',
+});
 
 /**
  * Convert a hex color string (data from config/theme) to `[r, g, b]`.
@@ -296,7 +328,13 @@ export function buildRuntimeThemeCss(themeDoc) {
   if (THEME_TEXTURES.includes(shape.texture)) {
     rootLines.push(`  --texture: ${shape.texture};`);
   }
-  if (presetId && shape.density) rootLines.push(`  --density: ${shape.density};`);
+  if (presetId && shape.density) {
+    rootLines.push(`  --density: ${shape.density};`);
+    // The same step the generator emits (scripts/lib/tokens.cjs). --density
+    // names the choice; --density-step is what the public devices multiply
+    // their spacing by, because CSS cannot measure a word.
+    rootLines.push(`  --density-step: ${THEME_DENSITY_STEPS[shape.density]};`);
+  }
 
   // The preset's own token remaps, then the picked options'. Every name is
   // a tier 2 or tier 3 token the generated stylesheet already declares: an
@@ -404,6 +442,112 @@ function printBlock(lines) {
 }
 
 /**
+ * The first family in a set's stack — the bundled face — and the rest, which
+ * is what a reader sees if that face has not arrived.
+ *
+ * @param {string} setId
+ * @returns {{ family: string, fallback: string }|null}
+ */
+export function fontSetFaces(setId) {
+  const stack = FONT_SETS[setId];
+  if (!stack) return null;
+  const families = stack.split(',').map((part) => part.trim().replace(/^['"]|['"]$/g, ''));
+  return { family: families[0], fallback: families.slice(1).join(', ') };
+}
+
+/**
+ * Whether a font family is available to render right now.
+ *
+ * `document.fonts.check` answers for the whole stack of loaded and system
+ * faces, which is exactly the question. Where the API is missing — jsdom, an
+ * old browser — the answer is "assume it is there": a preview must never
+ * invent a warning it cannot substantiate.
+ *
+ * @param {string} family
+ * @returns {boolean}
+ */
+export function isFontAvailable(family) {
+  const fonts = typeof document !== 'undefined' ? document.fonts : null;
+  if (!fonts || typeof fonts.check !== 'function') return true;
+  try {
+    return fonts.check(`16px "${family}"`);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * What this document asks for that will NOT render as asked, in plain words
+ * (owner review, 2026-08-27).
+ *
+ * The page preview shows the truth about a candidate, and two kinds of
+ * request fall back silently:
+ *
+ *   • A COLOUR the resolver cannot read. `config/theme` carries hex strings
+ *     as data, and anything that is not `#RGB` or `#RRGGBB` is skipped —
+ *     the style's own value renders instead, and nothing on screen says so.
+ *   • A FONT the browser does not have. A role resolves to a bundled family;
+ *     if that face has not loaded, the reader gets the next family in the
+ *     stack. Worth saying, because the preview then shows a page set in a
+ *     face the client never chose.
+ *
+ * @param {object} themeDoc
+ * @param {{ fontAvailable?: (family: string) => boolean }} [options]
+ * @returns {Array<{ kind: 'color'|'font', field: string, message: string }>}
+ */
+export function themeFallbackWarnings(themeDoc, { fontAvailable = isFontAvailable } = {}) {
+  const warnings = [];
+  if (!isPlainObject(themeDoc)) return warnings;
+
+  const colorWarning = (field, value, instead) => {
+    if (typeof value !== 'string' || !value.trim()) return;
+    if (hexToChannels(value) !== null) return;
+    warnings.push({
+      kind: 'color',
+      field,
+      message: `${field} is not a colour this system can read (${value.trim()}). ${instead}`,
+    });
+  };
+
+  colorWarning(
+    'Main brand colour',
+    themeDoc.brandColor,
+    'The style\u2019s own colour is showing instead.',
+  );
+  for (const mode of THEME_MODES) {
+    for (const [key, value] of Object.entries(themeDoc.tokens?.[mode] ?? {})) {
+      colorWarning(
+        `${key} (${mode})`,
+        value,
+        'The worked-out value is showing instead.',
+      );
+    }
+  }
+  if (!themePresetId(themeDoc)) {
+    for (const [key, value] of Object.entries(themeDoc.colors ?? {})) {
+      colorWarning(key, value, 'The value this deployment was built with is showing instead.');
+    }
+  }
+
+  const roles = resolveFontRoles(themeDoc);
+  const seen = new Set();
+  for (const role of THEME_FONT_ROLES) {
+    const faces = fontSetFaces(roles[role]);
+    if (!faces || seen.has(faces.family)) continue;
+    seen.add(faces.family);
+    if (fontAvailable(faces.family)) continue;
+    warnings.push({
+      kind: 'font',
+      field: role,
+      message:
+        `${faces.family} has not loaded, so the ${role} text is showing in ` +
+        `${faces.fallback || 'the browser\u2019s own face'}.`,
+    });
+  }
+  return warnings;
+}
+
+/**
  * The root-element attributes a document resolves to (brief §3.4, §3.8).
  * EventConfigProvider writes these; the mode attribute is modeRuntime's,
  * because it also follows a media query.
@@ -419,9 +563,11 @@ export function resolveRootAttributes(themeDoc) {
 }
 
 /**
- * Whether the client accent clears the admin ground in a mode, and what the
- * marker actually renders (admin story part 6f). The theme editor states
- * this in words; nothing clamps the stored value.
+ * Whether the resolved brand colour clears the admin ground in a mode, and
+ * what the marker actually renders (admin story part 6f, owner review
+ * 2026-08-27). There is no separate admin marker colour: the marker is the
+ * site's own brand colour, and the floor is the only thing that can move it.
+ * The theme editor states that in words; nothing is clamped.
  *
  * @param {object} themeDoc
  * @param {'light'|'dark'} mode

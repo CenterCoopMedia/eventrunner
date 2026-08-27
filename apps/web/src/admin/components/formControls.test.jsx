@@ -5,6 +5,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import {
   DestructiveConfirm,
+  FieldError,
   Panel,
   ServerErrorSummary,
   TextField,
@@ -69,6 +70,28 @@ describe('the copy bench', () => {
     const input = screen.getByLabelText('Title');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByText(/Title is required/)).toBeInTheDocument();
+  });
+
+  it('gives a hand-built field the same rejection the built ones get', () => {
+    // The room has fields this file does not build — an image slot, a file
+    // input, a group of checkboxes. They render FieldError rather than their
+    // own spelling of it, so a rejected field looks the same everywhere.
+    const built = render(
+      <TextField label="Title" value="" onChange={() => {}} error="Title is required" />,
+    );
+    const hand = render(<FieldError message="Title is required" />);
+    const paragraph = (view) => view.container.querySelector('p.text-admin-state-error');
+    expect(paragraph(hand)?.className).toBe(paragraph(built)?.className);
+  });
+
+  it('announces a rejection only where it is asked to', () => {
+    // A page with several fields announces once, through the server error
+    // summary; several alerts at once is noise. A surface with one thing to
+    // reject and no summary asks for the alert here.
+    const quiet = render(<FieldError message="No file chosen" />);
+    expect(quiet.container.querySelector('p')).not.toHaveAttribute('role');
+    const loud = render(<FieldError message="No file chosen" role="alert" />);
+    expect(loud.container.querySelector('p')).toHaveAttribute('role', 'alert');
   });
 });
 

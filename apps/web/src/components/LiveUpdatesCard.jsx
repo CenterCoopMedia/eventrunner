@@ -6,7 +6,7 @@
 // A ruled feed, not a card (design brief §2.1, §5.1): SectionHead opens the
 // boundary the way it does everywhere else on the site, each entry is a
 // hairline-separated row, and the posted-at timestamp sits in the mono
-// face. "Pinned" is the small ruled rectangle DirectoryTag/TypeBadge
+// face. "Pinned" is the small ruled rectangle DirectoryTag/SessionFormat
 // established (issue #113) — never a pill, never a colored badge — and it
 // sits beside the timestamp, never above it.
 import SectionHead from './editorial/SectionHead.jsx';

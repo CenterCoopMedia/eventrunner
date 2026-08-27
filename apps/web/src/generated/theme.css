@@ -103,7 +103,7 @@
   --rule-strong-width: var(--er-width-strong);
   --rule-nameplate-width: var(--er-width-nameplate);
 
-  /* Tier 2 — font roles (brief §3.2). The active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright — all resolved to a bundled set id (spec §7.4). Preset: Newsroom modern. */
+  /* Tier 2 — font roles (brief §3.2). The active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright — all resolved to a bundled set id (spec §7.4). Preset: newsroom. */
   --font-heading: 'Fraunces', 'Source Serif 4', Georgia, serif;
   --font-body: 'Newsreader', 'Source Serif 4', Georgia, serif;
   --font-data: 'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
@@ -113,11 +113,12 @@
   --radius-base: 2px;
   --radius-large: 4px;
 
-  /* Tier 2 — texture treatment: 'paper' | 'flat'. Components read this through the bg-paper utility layer in index.css. */
+  /* Tier 2 — texture treatment: config/theme.texture = 'flat' | 'paper'. Flat is the base; a texture is a theme opt-in, painted by the .page-surface layer in index.css. */
   --texture: flat;
 
-  /* Tier 2 — density: 'tight' | 'comfortable' | 'loose' (brief §4). The preset states its own; a page may still set its own layout density in PR3. */
+  /* Tier 2 — density: 'tight' | 'comfortable' | 'loose' (brief §4). The preset states its own; a page may still set its own layout density in PR3. --density is the word, for anything that has to name the step; --density-step is what it is worth, so the public devices in index.css can multiply their own spacing by it. The admin never reads either. */
   --density: comfortable;
+  --density-step: 1;
 
   /* Tier 2 — motion (brief §2.2). Functional 120–200ms; one signature under 600ms. */
   --motion-fast: var(--er-duration-fast);
@@ -142,8 +143,9 @@
   /* Tier 3 — session-card contract (brief §3.1). */
   --session-card-rule-width: var(--rule-hairline-width);
   --session-card-stamp-offset: 0;
+  --session-card-stamp-alpha: 1;
   --session-card-lead-scale: 1;
-  --session-card-gap: var(--space-xs);
+  --session-card-gap: var(--space-md);
   --session-card-pad-block: var(--space-md);
   --session-card-pad-inline: 0;
 
@@ -159,9 +161,13 @@
   --nameplate-tracking: var(--text-nameplate-tracking);
   --nameplate-gap: var(--space-sm);
 
+  /* Tier 3 — lead-image contract (brief §3.1). */
+  --lead-image-aspect: 3 / 2;
+  --lead-image-width: 22rem;
+
   /* Tier 3 — section-rule contract (brief §3.1). */
   --section-rule-width: var(--rule-strong-width);
-  --section-rule-gap: var(--space-lg);
+  --section-rule-gap: var(--space-sm);
 
   /* Tier 3 — page contract (brief §3.1). */
   --page-section-gap: var(--space-2xl);
@@ -201,9 +207,6 @@
   /* Tier 3 — route-mark contract (brief §3.1). */
   --route-mark-radius: 0;
 
-  /* Tier 3 — transfer-line contract (brief §3.1). */
-  --transfer-line-display: none;
-
   /* Tier 3 — callout contract (brief §3.1). */
   --callout-font: var(--font-heading);
   --callout-angle: 0deg;
@@ -212,7 +215,7 @@
   /* Tier 3 — marginalia contract (brief §3.1). */
   --marginalia-display: none;
 
-  /* Preset remaps — Newsroom modern and its picked options. An option remaps existing tier 2 and tier 3 tokens and never adds a property name (brief §3.4), so every name here is declared above. */
+  /* Preset remaps — newsroom and its picked options. An option remaps existing tier 2 and tier 3 tokens and never adds a property name (brief §3.4), so every name here is declared above. */
   --folio-font: var(--font-data);
   --section-rule-width: var(--rule-strong-width);
   --nameplate-align: start;
@@ -392,319 +395,7 @@
    properties: no block below introduces a property name the blocks
    above do not already carry. data-theme picks which one wins. */
 
-/* Broadsheet — light. */
-:root[data-theme='broadsheet'][data-mode='light'],
-[data-theme='broadsheet'][data-mode='light'] {
-  --brand-primary-rgb: 26 58 110;
-  --brand-primary-dark-rgb: 17 40 80;
-  --brand-primary-light-rgb: 126 150 192;
-  --brand-accent-rgb: 72 84 102;
-  --brand-surface-rgb: 247 244 238;
-  --brand-surface-alt-rgb: 239 235 227;
-  --brand-ink-rgb: 24 26 32;
-  --brand-ink-muted-rgb: 88 92 102;
-  --semantic-success-rgb: 26 94 60;
-  --semantic-warning-rgb: 138 84 12;
-  --semantic-danger-rgb: 162 34 42;
-  --semantic-highlight-rgb: 128 92 16;
-  --semantic-keynote-rgb: 78 52 130;
-  --color-surface-rgb: var(--brand-surface-rgb);
-  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
-  --color-text-primary-rgb: var(--brand-ink-rgb);
-  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
-  --color-accent-rgb: var(--brand-primary-rgb);
-  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
-  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
-  --color-accent-secondary-rgb: var(--brand-accent-rgb);
-  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 216 213 209;
-  --rule-strong-rgb: 124 124 125;
-  --rule-nameplate-rgb: 24 26 32;
-  --color-border-control-rgb: 131 131 131;
-  --session-card-rule-rgb: var(--rule-hairline-rgb);
-  --session-card-surface-rgb: var(--color-surface-rgb);
-  --session-card-stamp-rgb: var(--color-accent-rgb);
-  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
-  --nameplate-text-rgb: var(--color-text-primary-rgb);
-  --nameplate-frame-rgb: var(--rule-hairline-rgb);
-  --section-rule-rgb: var(--rule-strong-rgb);
-  --folio-rule-rgb: var(--rule-hairline-rgb);
-  --folio-text-rgb: var(--color-text-secondary-rgb);
-  --schedule-grid-rgb: var(--rule-hairline-rgb);
-  --schedule-forward-rgb: var(--color-surface-alt-rgb);
-  --schedule-trace-rgb: var(--color-accent-rgb);
-  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
-  --back-issue-rule-rgb: var(--rule-hairline-rgb);
-  --plate-frame-rgb: var(--rule-hairline-rgb);
-  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
-  --map-grid-rgb: var(--rule-hairline-rgb);
-  --route-mark-rgb: var(--color-accent-rgb);
-  --route-mark-ink-rgb: var(--color-surface-rgb);
-  --callout-rgb: var(--color-text-primary-rgb);
-  --marginalia-rgb: var(--color-ink-motif-rgb);
-}
-
-/* Broadsheet — dark. */
-:root[data-theme='broadsheet'][data-mode='dark'],
-[data-theme='broadsheet'][data-mode='dark'] {
-  --brand-primary-rgb: 130 170 226;
-  --brand-primary-dark-rgb: 172 200 240;
-  --brand-primary-light-rgb: 70 96 138;
-  --brand-accent-rgb: 154 166 184;
-  --brand-surface-rgb: 28 27 26;
-  --brand-surface-alt-rgb: 40 38 36;
-  --brand-ink-rgb: 237 232 222;
-  --brand-ink-muted-rgb: 170 165 155;
-  --semantic-success-rgb: 124 198 148;
-  --semantic-warning-rgb: 226 172 88;
-  --semantic-danger-rgb: 240 138 140;
-  --semantic-highlight-rgb: 220 186 106;
-  --semantic-keynote-rgb: 186 162 236;
-  --color-surface-rgb: var(--brand-surface-rgb);
-  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
-  --color-text-primary-rgb: var(--brand-ink-rgb);
-  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
-  --color-accent-rgb: var(--brand-primary-rgb);
-  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
-  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
-  --color-accent-secondary-rgb: var(--brand-accent-rgb);
-  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 57 56 53;
-  --rule-strong-rgb: 143 140 134;
-  --rule-nameplate-rgb: 237 232 222;
-  --color-border-control-rgb: 137 134 128;
-  --session-card-rule-rgb: var(--rule-hairline-rgb);
-  --session-card-surface-rgb: var(--color-surface-rgb);
-  --session-card-stamp-rgb: var(--color-accent-rgb);
-  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
-  --nameplate-text-rgb: var(--color-text-primary-rgb);
-  --nameplate-frame-rgb: var(--rule-hairline-rgb);
-  --section-rule-rgb: var(--rule-strong-rgb);
-  --folio-rule-rgb: var(--rule-hairline-rgb);
-  --folio-text-rgb: var(--color-text-secondary-rgb);
-  --schedule-grid-rgb: var(--rule-hairline-rgb);
-  --schedule-forward-rgb: var(--color-surface-alt-rgb);
-  --schedule-trace-rgb: var(--color-accent-rgb);
-  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
-  --back-issue-rule-rgb: var(--rule-hairline-rgb);
-  --plate-frame-rgb: var(--rule-hairline-rgb);
-  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
-  --map-grid-rgb: var(--rule-hairline-rgb);
-  --route-mark-rgb: var(--color-accent-rgb);
-  --route-mark-ink-rgb: var(--color-surface-rgb);
-  --callout-rgb: var(--color-text-primary-rgb);
-  --marginalia-rgb: var(--color-ink-motif-rgb);
-}
-
-/* Newsroom modern — light, the active preset, with this deployment's overrides. */
-:root[data-theme='newsroom'][data-mode='light'],
-[data-theme='newsroom'][data-mode='light'] {
-  --brand-primary-rgb: 178 30 50;
-  --brand-primary-dark-rgb: 140 20 38;
-  --brand-primary-light-rgb: 224 148 158;
-  --brand-accent-rgb: 46 84 126;
-  --brand-surface-rgb: 246 247 249;
-  --brand-surface-alt-rgb: 236 238 242;
-  --brand-ink-rgb: 22 24 29;
-  --brand-ink-muted-rgb: 88 95 108;
-  --semantic-success-rgb: 22 96 62;
-  --semantic-warning-rgb: 134 82 10;
-  --semantic-danger-rgb: 170 32 44;
-  --semantic-highlight-rgb: 124 90 14;
-  --semantic-keynote-rgb: 82 54 140;
-  --color-surface-rgb: var(--brand-surface-rgb);
-  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
-  --color-text-primary-rgb: var(--brand-ink-rgb);
-  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
-  --color-accent-rgb: var(--brand-primary-rgb);
-  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
-  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
-  --color-accent-secondary-rgb: var(--brand-accent-rgb);
-  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 215 216 218;
-  --rule-strong-rgb: 123 124 128;
-  --rule-nameplate-rgb: 22 24 29;
-  --color-border-control-rgb: 130 131 135;
-  --session-card-rule-rgb: var(--rule-hairline-rgb);
-  --session-card-surface-rgb: var(--color-surface-rgb);
-  --session-card-stamp-rgb: var(--color-accent-rgb);
-  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
-  --nameplate-text-rgb: var(--color-text-primary-rgb);
-  --nameplate-frame-rgb: var(--rule-hairline-rgb);
-  --section-rule-rgb: var(--rule-strong-rgb);
-  --folio-rule-rgb: var(--rule-hairline-rgb);
-  --folio-text-rgb: var(--color-text-secondary-rgb);
-  --schedule-grid-rgb: var(--rule-hairline-rgb);
-  --schedule-forward-rgb: var(--color-surface-alt-rgb);
-  --schedule-trace-rgb: var(--color-accent-rgb);
-  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
-  --back-issue-rule-rgb: var(--rule-hairline-rgb);
-  --plate-frame-rgb: var(--rule-hairline-rgb);
-  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
-  --map-grid-rgb: var(--rule-hairline-rgb);
-  --route-mark-rgb: var(--color-accent-rgb);
-  --route-mark-ink-rgb: var(--color-surface-rgb);
-  --callout-rgb: var(--color-text-primary-rgb);
-  --marginalia-rgb: var(--color-ink-motif-rgb);
-}
-
-/* Newsroom modern — dark, the active preset, with this deployment's overrides. */
-:root[data-theme='newsroom'][data-mode='dark'],
-[data-theme='newsroom'][data-mode='dark'] {
-  --brand-primary-rgb: 240 122 134;
-  --brand-primary-dark-rgb: 248 168 176;
-  --brand-primary-light-rgb: 118 56 66;
-  --brand-accent-rgb: 130 172 216;
-  --brand-surface-rgb: 23 25 30;
-  --brand-surface-alt-rgb: 34 37 44;
-  --brand-ink-rgb: 232 235 240;
-  --brand-ink-muted-rgb: 160 168 180;
-  --semantic-success-rgb: 116 200 150;
-  --semantic-warning-rgb: 228 174 88;
-  --semantic-danger-rgb: 242 136 142;
-  --semantic-highlight-rgb: 222 190 108;
-  --semantic-keynote-rgb: 186 164 240;
-  --color-surface-rgb: var(--brand-surface-rgb);
-  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
-  --color-text-primary-rgb: var(--brand-ink-rgb);
-  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
-  --color-accent-rgb: var(--brand-primary-rgb);
-  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
-  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
-  --color-accent-secondary-rgb: var(--brand-accent-rgb);
-  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 52 54 59;
-  --rule-strong-rgb: 138 141 146;
-  --rule-nameplate-rgb: 232 235 240;
-  --color-border-control-rgb: 132 134 139;
-  --session-card-rule-rgb: var(--rule-hairline-rgb);
-  --session-card-surface-rgb: var(--color-surface-rgb);
-  --session-card-stamp-rgb: var(--color-accent-rgb);
-  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
-  --nameplate-text-rgb: var(--color-text-primary-rgb);
-  --nameplate-frame-rgb: var(--rule-hairline-rgb);
-  --section-rule-rgb: var(--rule-strong-rgb);
-  --folio-rule-rgb: var(--rule-hairline-rgb);
-  --folio-text-rgb: var(--color-text-secondary-rgb);
-  --schedule-grid-rgb: var(--rule-hairline-rgb);
-  --schedule-forward-rgb: var(--color-surface-alt-rgb);
-  --schedule-trace-rgb: var(--color-accent-rgb);
-  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
-  --back-issue-rule-rgb: var(--rule-hairline-rgb);
-  --plate-frame-rgb: var(--rule-hairline-rgb);
-  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
-  --map-grid-rgb: var(--rule-hairline-rgb);
-  --route-mark-rgb: var(--color-accent-rgb);
-  --route-mark-ink-rgb: var(--color-surface-rgb);
-  --callout-rgb: var(--color-text-primary-rgb);
-  --marginalia-rgb: var(--color-ink-motif-rgb);
-}
-
-/* Zine / indie — light. */
-:root[data-theme='zine'][data-mode='light'],
-[data-theme='zine'][data-mode='light'] {
-  --brand-primary-rgb: 198 26 84;
-  --brand-primary-dark-rgb: 156 16 64;
-  --brand-primary-light-rgb: 240 148 182;
-  --brand-accent-rgb: 44 58 110;
-  --brand-surface-rgb: 250 249 244;
-  --brand-surface-alt-rgb: 240 238 230;
-  --brand-ink-rgb: 20 19 18;
-  --brand-ink-muted-rgb: 86 84 80;
-  --semantic-success-rgb: 24 92 58;
-  --semantic-warning-rgb: 136 80 8;
-  --semantic-danger-rgb: 176 28 40;
-  --semantic-highlight-rgb: 126 88 12;
-  --semantic-keynote-rgb: 88 48 142;
-  --color-surface-rgb: var(--brand-surface-rgb);
-  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
-  --color-text-primary-rgb: var(--brand-ink-rgb);
-  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
-  --color-accent-rgb: var(--brand-primary-rgb);
-  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
-  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
-  --color-accent-secondary-rgb: var(--brand-accent-rgb);
-  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 218 217 212;
-  --rule-strong-rgb: 123 122 120;
-  --rule-nameplate-rgb: 20 19 18;
-  --color-border-control-rgb: 130 129 126;
-  --session-card-rule-rgb: var(--rule-hairline-rgb);
-  --session-card-surface-rgb: var(--color-surface-rgb);
-  --session-card-stamp-rgb: var(--color-accent-rgb);
-  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
-  --nameplate-text-rgb: var(--color-text-primary-rgb);
-  --nameplate-frame-rgb: var(--rule-hairline-rgb);
-  --section-rule-rgb: var(--rule-strong-rgb);
-  --folio-rule-rgb: var(--rule-hairline-rgb);
-  --folio-text-rgb: var(--color-text-secondary-rgb);
-  --schedule-grid-rgb: var(--rule-hairline-rgb);
-  --schedule-forward-rgb: var(--color-surface-alt-rgb);
-  --schedule-trace-rgb: var(--color-accent-rgb);
-  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
-  --back-issue-rule-rgb: var(--rule-hairline-rgb);
-  --plate-frame-rgb: var(--rule-hairline-rgb);
-  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
-  --map-grid-rgb: var(--rule-hairline-rgb);
-  --route-mark-rgb: var(--color-accent-rgb);
-  --route-mark-ink-rgb: var(--color-surface-rgb);
-  --callout-rgb: var(--color-text-primary-rgb);
-  --marginalia-rgb: var(--color-ink-motif-rgb);
-}
-
-/* Zine / indie — dark. */
-:root[data-theme='zine'][data-mode='dark'],
-[data-theme='zine'][data-mode='dark'] {
-  --brand-primary-rgb: 244 124 166;
-  --brand-primary-dark-rgb: 250 170 198;
-  --brand-primary-light-rgb: 118 42 74;
-  --brand-accent-rgb: 144 160 226;
-  --brand-surface-rgb: 21 20 22;
-  --brand-surface-alt-rgb: 33 32 35;
-  --brand-ink-rgb: 242 240 236;
-  --brand-ink-muted-rgb: 168 164 160;
-  --semantic-success-rgb: 122 202 150;
-  --semantic-warning-rgb: 230 176 90;
-  --semantic-danger-rgb: 244 138 142;
-  --semantic-highlight-rgb: 224 192 110;
-  --semantic-keynote-rgb: 190 166 244;
-  --color-surface-rgb: var(--brand-surface-rgb);
-  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
-  --color-text-primary-rgb: var(--brand-ink-rgb);
-  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
-  --color-accent-rgb: var(--brand-primary-rgb);
-  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
-  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
-  --color-accent-secondary-rgb: var(--brand-accent-rgb);
-  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 52 51 52;
-  --rule-strong-rgb: 143 141 140;
-  --rule-nameplate-rgb: 242 240 236;
-  --color-border-control-rgb: 136 134 133;
-  --session-card-rule-rgb: var(--rule-hairline-rgb);
-  --session-card-surface-rgb: var(--color-surface-rgb);
-  --session-card-stamp-rgb: var(--color-accent-rgb);
-  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
-  --nameplate-text-rgb: var(--color-text-primary-rgb);
-  --nameplate-frame-rgb: var(--rule-hairline-rgb);
-  --section-rule-rgb: var(--rule-strong-rgb);
-  --folio-rule-rgb: var(--rule-hairline-rgb);
-  --folio-text-rgb: var(--color-text-secondary-rgb);
-  --schedule-grid-rgb: var(--rule-hairline-rgb);
-  --schedule-forward-rgb: var(--color-surface-alt-rgb);
-  --schedule-trace-rgb: var(--color-accent-rgb);
-  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
-  --back-issue-rule-rgb: var(--rule-hairline-rgb);
-  --plate-frame-rgb: var(--rule-hairline-rgb);
-  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
-  --map-grid-rgb: var(--rule-hairline-rgb);
-  --route-mark-rgb: var(--color-accent-rgb);
-  --route-mark-ink-rgb: var(--color-surface-rgb);
-  --callout-rgb: var(--color-text-primary-rgb);
-  --marginalia-rgb: var(--color-ink-motif-rgb);
-}
-
-/* Civic / institutional — light. */
+/* civic — light. */
 :root[data-theme='civic'][data-mode='light'],
 [data-theme='civic'][data-mode='light'] {
   --brand-primary-rgb: 26 82 150;
@@ -756,7 +447,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Civic / institutional — dark. */
+/* civic — dark. */
 :root[data-theme='civic'][data-mode='dark'],
 [data-theme='civic'][data-mode='dark'] {
   --brand-primary-rgb: 128 178 238;
@@ -808,22 +499,22 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Field Guide — light. */
-:root[data-theme='field-guide'][data-mode='light'],
-[data-theme='field-guide'][data-mode='light'] {
-  --brand-primary-rgb: 43 86 54;
-  --brand-primary-dark-rgb: 27 60 37;
-  --brand-primary-light-rgb: 140 172 136;
-  --brand-accent-rgb: 136 72 40;
-  --brand-surface-rgb: 247 243 234;
-  --brand-surface-alt-rgb: 240 235 223;
-  --brand-ink-rgb: 42 33 25;
-  --brand-ink-muted-rgb: 102 90 74;
-  --semantic-success-rgb: 34 88 52;
-  --semantic-warning-rgb: 140 86 12;
-  --semantic-danger-rgb: 158 44 36;
-  --semantic-highlight-rgb: 124 92 18;
-  --semantic-keynote-rgb: 86 60 124;
+/* newsroom — light, the active preset, with this deployment's overrides. */
+:root[data-theme='newsroom'][data-mode='light'],
+[data-theme='newsroom'][data-mode='light'] {
+  --brand-primary-rgb: 178 30 50;
+  --brand-primary-dark-rgb: 140 20 38;
+  --brand-primary-light-rgb: 224 148 158;
+  --brand-accent-rgb: 46 84 126;
+  --brand-surface-rgb: 246 247 249;
+  --brand-surface-alt-rgb: 236 238 242;
+  --brand-ink-rgb: 22 24 29;
+  --brand-ink-muted-rgb: 88 95 108;
+  --semantic-success-rgb: 22 96 62;
+  --semantic-warning-rgb: 134 82 10;
+  --semantic-danger-rgb: 170 32 44;
+  --semantic-highlight-rgb: 124 90 14;
+  --semantic-keynote-rgb: 82 54 140;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -833,10 +524,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 218 214 205;
-  --rule-strong-rgb: 134 127 119;
-  --rule-nameplate-rgb: 42 33 25;
-  --color-border-control-rgb: 140 134 125;
+  --rule-hairline-rgb: 215 216 218;
+  --rule-strong-rgb: 123 124 128;
+  --rule-nameplate-rgb: 22 24 29;
+  --color-border-control-rgb: 130 131 135;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -860,22 +551,22 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Field Guide — dark. */
-:root[data-theme='field-guide'][data-mode='dark'],
-[data-theme='field-guide'][data-mode='dark'] {
-  --brand-primary-rgb: 142 192 142;
-  --brand-primary-dark-rgb: 180 216 176;
-  --brand-primary-light-rgb: 64 94 64;
-  --brand-accent-rgb: 216 152 112;
-  --brand-surface-rgb: 26 30 26;
-  --brand-surface-alt-rgb: 38 43 37;
-  --brand-ink-rgb: 237 232 220;
-  --brand-ink-muted-rgb: 170 168 150;
-  --semantic-success-rgb: 130 200 144;
-  --semantic-warning-rgb: 228 178 96;
-  --semantic-danger-rgb: 238 142 128;
-  --semantic-highlight-rgb: 220 192 118;
-  --semantic-keynote-rgb: 186 168 232;
+/* newsroom — dark, the active preset, with this deployment's overrides. */
+:root[data-theme='newsroom'][data-mode='dark'],
+[data-theme='newsroom'][data-mode='dark'] {
+  --brand-primary-rgb: 240 122 134;
+  --brand-primary-dark-rgb: 248 168 176;
+  --brand-primary-light-rgb: 118 56 66;
+  --brand-accent-rgb: 130 172 216;
+  --brand-surface-rgb: 23 25 30;
+  --brand-surface-alt-rgb: 34 37 44;
+  --brand-ink-rgb: 232 235 240;
+  --brand-ink-muted-rgb: 160 168 180;
+  --semantic-success-rgb: 116 200 150;
+  --semantic-warning-rgb: 228 174 88;
+  --semantic-danger-rgb: 242 136 142;
+  --semantic-highlight-rgb: 222 190 108;
+  --semantic-keynote-rgb: 186 164 240;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -885,10 +576,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 56 58 53;
-  --rule-strong-rgb: 142 141 133;
-  --rule-nameplate-rgb: 237 232 220;
-  --color-border-control-rgb: 136 135 127;
+  --rule-hairline-rgb: 52 54 59;
+  --rule-strong-rgb: 138 141 146;
+  --rule-nameplate-rgb: 232 235 240;
+  --color-border-control-rgb: 132 134 139;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -912,7 +603,111 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Atlas — light. */
+/* broadsheet — light. */
+:root[data-theme='broadsheet'][data-mode='light'],
+[data-theme='broadsheet'][data-mode='light'] {
+  --brand-primary-rgb: 26 58 110;
+  --brand-primary-dark-rgb: 17 40 80;
+  --brand-primary-light-rgb: 126 150 192;
+  --brand-accent-rgb: 72 84 102;
+  --brand-surface-rgb: 247 244 238;
+  --brand-surface-alt-rgb: 239 235 227;
+  --brand-ink-rgb: 24 26 32;
+  --brand-ink-muted-rgb: 88 92 102;
+  --semantic-success-rgb: 26 94 60;
+  --semantic-warning-rgb: 138 84 12;
+  --semantic-danger-rgb: 162 34 42;
+  --semantic-highlight-rgb: 128 92 16;
+  --semantic-keynote-rgb: 78 52 130;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 216 213 209;
+  --rule-strong-rgb: 124 124 125;
+  --rule-nameplate-rgb: 24 26 32;
+  --color-border-control-rgb: 131 131 131;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --schedule-forward-rgb: var(--color-surface-alt-rgb);
+  --schedule-trace-rgb: var(--color-accent-rgb);
+  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
+  --back-issue-rule-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* broadsheet — dark. */
+:root[data-theme='broadsheet'][data-mode='dark'],
+[data-theme='broadsheet'][data-mode='dark'] {
+  --brand-primary-rgb: 130 170 226;
+  --brand-primary-dark-rgb: 172 200 240;
+  --brand-primary-light-rgb: 70 96 138;
+  --brand-accent-rgb: 154 166 184;
+  --brand-surface-rgb: 28 27 26;
+  --brand-surface-alt-rgb: 40 38 36;
+  --brand-ink-rgb: 237 232 222;
+  --brand-ink-muted-rgb: 170 165 155;
+  --semantic-success-rgb: 124 198 148;
+  --semantic-warning-rgb: 226 172 88;
+  --semantic-danger-rgb: 240 138 140;
+  --semantic-highlight-rgb: 220 186 106;
+  --semantic-keynote-rgb: 186 162 236;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 57 56 53;
+  --rule-strong-rgb: 143 140 134;
+  --rule-nameplate-rgb: 237 232 222;
+  --color-border-control-rgb: 137 134 128;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --schedule-forward-rgb: var(--color-surface-alt-rgb);
+  --schedule-trace-rgb: var(--color-accent-rgb);
+  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
+  --back-issue-rule-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* atlas — light. */
 :root[data-theme='atlas'][data-mode='light'],
 [data-theme='atlas'][data-mode='light'] {
   --brand-primary-rgb: 180 38 34;
@@ -964,7 +759,7 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Atlas — dark. */
+/* atlas — dark. */
 :root[data-theme='atlas'][data-mode='dark'],
 [data-theme='atlas'][data-mode='dark'] {
   --brand-primary-rgb: 244 122 112;
@@ -993,6 +788,214 @@
   --rule-strong-rgb: 137 143 148;
   --rule-nameplate-rgb: 231 238 242;
   --color-border-control-rgb: 131 137 141;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --schedule-forward-rgb: var(--color-surface-alt-rgb);
+  --schedule-trace-rgb: var(--color-accent-rgb);
+  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
+  --back-issue-rule-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* field-guide — light. */
+:root[data-theme='field-guide'][data-mode='light'],
+[data-theme='field-guide'][data-mode='light'] {
+  --brand-primary-rgb: 43 86 54;
+  --brand-primary-dark-rgb: 27 60 37;
+  --brand-primary-light-rgb: 140 172 136;
+  --brand-accent-rgb: 136 72 40;
+  --brand-surface-rgb: 248 247 244;
+  --brand-surface-alt-rgb: 241 240 236;
+  --brand-ink-rgb: 38 35 31;
+  --brand-ink-muted-rgb: 96 91 84;
+  --semantic-success-rgb: 34 88 52;
+  --semantic-warning-rgb: 140 86 12;
+  --semantic-danger-rgb: 158 44 36;
+  --semantic-highlight-rgb: 124 92 18;
+  --semantic-keynote-rgb: 86 60 124;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 219 217 214;
+  --rule-strong-rgb: 133 130 127;
+  --rule-nameplate-rgb: 38 35 31;
+  --color-border-control-rgb: 139 137 133;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --schedule-forward-rgb: var(--color-surface-alt-rgb);
+  --schedule-trace-rgb: var(--color-accent-rgb);
+  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
+  --back-issue-rule-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* field-guide — dark. */
+:root[data-theme='field-guide'][data-mode='dark'],
+[data-theme='field-guide'][data-mode='dark'] {
+  --brand-primary-rgb: 142 192 142;
+  --brand-primary-dark-rgb: 180 216 176;
+  --brand-primary-light-rgb: 64 94 64;
+  --brand-accent-rgb: 216 152 112;
+  --brand-surface-rgb: 28 28 27;
+  --brand-surface-alt-rgb: 40 40 38;
+  --brand-ink-rgb: 235 233 228;
+  --brand-ink-muted-rgb: 172 170 164;
+  --semantic-success-rgb: 130 200 144;
+  --semantic-warning-rgb: 228 178 96;
+  --semantic-danger-rgb: 238 142 128;
+  --semantic-highlight-rgb: 220 192 118;
+  --semantic-keynote-rgb: 186 168 232;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 57 57 55;
+  --rule-strong-rgb: 142 141 138;
+  --rule-nameplate-rgb: 235 233 228;
+  --color-border-control-rgb: 136 135 132;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --schedule-forward-rgb: var(--color-surface-alt-rgb);
+  --schedule-trace-rgb: var(--color-accent-rgb);
+  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
+  --back-issue-rule-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* zine — light. */
+:root[data-theme='zine'][data-mode='light'],
+[data-theme='zine'][data-mode='light'] {
+  --brand-primary-rgb: 198 26 84;
+  --brand-primary-dark-rgb: 156 16 64;
+  --brand-primary-light-rgb: 240 148 182;
+  --brand-accent-rgb: 44 58 110;
+  --brand-surface-rgb: 250 249 244;
+  --brand-surface-alt-rgb: 240 238 230;
+  --brand-ink-rgb: 20 19 18;
+  --brand-ink-muted-rgb: 86 84 80;
+  --semantic-success-rgb: 24 92 58;
+  --semantic-warning-rgb: 136 80 8;
+  --semantic-danger-rgb: 176 28 40;
+  --semantic-highlight-rgb: 126 88 12;
+  --semantic-keynote-rgb: 88 48 142;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 218 217 212;
+  --rule-strong-rgb: 123 122 120;
+  --rule-nameplate-rgb: 20 19 18;
+  --color-border-control-rgb: 130 129 126;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --schedule-forward-rgb: var(--color-surface-alt-rgb);
+  --schedule-trace-rgb: var(--color-accent-rgb);
+  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
+  --back-issue-rule-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+}
+
+/* zine — dark. */
+:root[data-theme='zine'][data-mode='dark'],
+[data-theme='zine'][data-mode='dark'] {
+  --brand-primary-rgb: 244 124 166;
+  --brand-primary-dark-rgb: 250 170 198;
+  --brand-primary-light-rgb: 118 42 74;
+  --brand-accent-rgb: 144 160 226;
+  --brand-surface-rgb: 21 20 22;
+  --brand-surface-alt-rgb: 33 32 35;
+  --brand-ink-rgb: 242 240 236;
+  --brand-ink-muted-rgb: 168 164 160;
+  --semantic-success-rgb: 122 202 150;
+  --semantic-warning-rgb: 230 176 90;
+  --semantic-danger-rgb: 244 138 142;
+  --semantic-highlight-rgb: 224 192 110;
+  --semantic-keynote-rgb: 190 166 244;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 52 51 52;
+  --rule-strong-rgb: 143 141 140;
+  --rule-nameplate-rgb: 242 240 236;
+  --color-border-control-rgb: 136 134 133;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -1099,7 +1102,7 @@
   --admin-state-ok-rgb: 24 88 56;
   --admin-focus-ring-rgb: 26 66 116;
   --admin-client-accent-ink-rgb: 246 244 240;
-  --admin-client-accent-rgb: var(--admin-ink-rgb);
+  --admin-client-accent-rgb: 178 30 50;
   --admin-nav-active-marker-rgb: var(--admin-client-accent-rgb);
   --admin-page-header-mark-rgb: var(--admin-client-accent-rgb);
 }
@@ -1128,7 +1131,7 @@
   --admin-state-ok-rgb: 122 198 148;
   --admin-focus-ring-rgb: 130 180 236;
   --admin-client-accent-ink-rgb: 24 23 22;
-  --admin-client-accent-rgb: var(--admin-ink-rgb);
+  --admin-client-accent-rgb: 240 122 134;
   --admin-nav-active-marker-rgb: var(--admin-client-accent-rgb);
   --admin-page-header-mark-rgb: var(--admin-client-accent-rgb);
 }

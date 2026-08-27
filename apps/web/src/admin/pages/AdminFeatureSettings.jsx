@@ -12,6 +12,7 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import {
   CheckboxField,
+  FieldError,
   Panel,
   SaveStatus,
   ServerErrorSummary,
@@ -116,14 +117,7 @@ export default function AdminFeatureSettings() {
                 hint={FEATURE_HINTS[key]}
                 onChange={(checked) => setForm((c) => ({ ...c, [key]: checked }))}
               />
-              {fieldErrors.get(`features.${key}`) ? (
-                <p className="text-folio text-admin-state-error">
-                  <span aria-hidden="true" className="font-semibold">
-                    !{' '}
-                  </span>
-                  {fieldErrors.get(`features.${key}`)}
-                </p>
-              ) : null}
+              <FieldError message={fieldErrors.get(`features.${key}`)} />
             </div>
           ))}
         </div>

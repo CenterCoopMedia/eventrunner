@@ -148,9 +148,9 @@ export function EventConfigProvider({ children }) {
     document.title = value.eventConfig.name;
   }, [value.eventConfig.name]);
 
-  // Mirror the RESOLVED texture onto the document element so the .bg-paper
-  // rule in index.css can gate on it — CSS custom properties can't be tested
-  // for equality in a selector (spec §7.2 texture treatment).
+  // Mirror the RESOLVED texture onto the document element so the
+  // .page-surface rule in index.css can gate on it — CSS custom properties
+  // can't be tested for equality in a selector (spec §7.2).
   //
   // Resolved, not raw: a preset states its own texture (brief §4), and
   // config/theme.texture only overrides it. A document that names a preset

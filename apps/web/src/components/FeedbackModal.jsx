@@ -17,22 +17,19 @@
 //
 // Editorial base restyle (design brief §2.1, §2.4): the dialog's elevation
 // is a tinted ink scrim (--color-text-primary at low alpha, no blur) behind
-// a strong-rule frame — never a shadow, never a rounded card. The controls
+// a strong-rule frame — never a shadow, never a rounded card. The fields
 // come from components/forms/publicForm.jsx, which reads the tier-2 tokens
 // this surface reads: this is a visitor-facing form, so it must never take
-// the admin identity's grounds and faces (design brief §3.1, §5.2). Every
-// form `<label>` in SelectField/TextAreaField/TextField stays above its
-// input — a control label is the one exemption the eyebrow ban names
-// (§2.4), never an eyebrow to "fix".
+// the admin identity's grounds and faces (design brief §3.1, §5.2). The
+// buttons are the shared action classes from controlClasses.js, sized by
+// their own content rather than stretched across the dialog. Every form
+// `<label>` in SelectField/TextAreaField/TextField stays above its input —
+// a control label is the one exemption the eyebrow ban names (§2.4), never
+// an eyebrow to "fix".
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
-import {
-  SelectField,
-  TextAreaField,
-  TextField,
-  primaryButtonClass as modalPrimaryButtonClass,
-  secondaryButtonClass as modalSecondaryButtonClass,
-} from './forms/publicForm.jsx';
+import { SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
+import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 
 const CATEGORY_OPTIONS = [
   { value: 'feedback', label: 'General feedback' },
@@ -118,10 +115,10 @@ export default function FeedbackModal({ onClose }) {
                   email was actually delivered — only that the message
                   itself was received. */}
               We got your feedback.
-              {email.trim() ? " If you left an email, we'll try to send a confirmation." : null}
+              {email.trim() ? ' If you left an email, we’ll try to send a confirmation.' : null}
             </p>
             <div>
-              <button type="button" className={modalPrimaryButtonClass} onClick={onClose}>
+              <button type="button" className={primaryActionClass} onClick={onClose}>
                 Close
               </button>
             </div>
@@ -156,7 +153,7 @@ export default function FeedbackModal({ onClose }) {
               type="email"
               value={email}
               onChange={setEmail}
-              hint="Leave your email if you'd like a reply."
+              hint="Leave your email if you’d like a reply."
             />
 
             {/* Honeypot: visually hidden, out of tab order, and never
@@ -174,10 +171,10 @@ export default function FeedbackModal({ onClose }) {
             </div>
 
             <div className="flex flex-wrap justify-end gap-xs">
-              <button type="button" className={modalSecondaryButtonClass} onClick={onClose}>
+              <button type="button" className={secondaryActionClass} onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className={modalPrimaryButtonClass} disabled={submitting}>
+              <button type="submit" className={primaryActionClass} disabled={submitting}>
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
             </div>

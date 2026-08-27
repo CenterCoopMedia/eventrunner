@@ -1,10 +1,12 @@
 {
-  "$schema-note": "One theme preset (design brief 2026-08-27, §4.1). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
+  "$schema-note": "One theme preset (design brief 2026-08-27, §4.1). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
   "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 1.",
   "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin.",
+  "$first-class-note": "See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.",
   "id": "broadsheet",
   "label": "Broadsheet",
   "summary": "The paper of record. The nameplate is the loudest thing on the page and rules do the dividing.",
+  "bestFor": "Formal programmes, anniversary editions, and events that want the paper-of-record voice.",
 
   "$palette-words-light": "newsprint white, press black, deep ink-blue, warm rule grey, gutter grey, agate grey, margin white, archive grey",
   "$palette-words-dark": "late-edition charcoal, warm bone type, lifted ink-blue, smoke-grey rule, banked ink, press-room grey, dim agate grey, muted archive grey",
@@ -41,7 +43,7 @@
     }
   },
 
-  "$font-note": "Brief §9.4 and §4.1. Broadsheet is the one preset that runs a serif in the mono role: a listings column in a paper is set in agate, not in a typewriter face.",
+  "$font-note": "Brief §9.4 and §4.1. Broadsheet is the one preset that runs a serif in the mono role: A listings column in a paper is set in agate, not in a typewriter face.",
   "fonts": {
     "heading": "caslon-display",
     "body": "caslon-text",
@@ -61,7 +63,7 @@
   "options": {
     "headingFace": {
       "label": "Heading face",
-      "prompt": "The paper's era.",
+      "prompt": "The paper’s era.",
       "default": "libre-caslon-display",
       "choices": [
         {
@@ -85,7 +87,7 @@
       ]
     },
     "nameplate": {
-      "label": "Nameplate treatment",
+      "label": "Header style",
       "prompt": "The masthead layout.",
       "default": "full-measure",
       "choices": [
@@ -123,7 +125,7 @@
       ]
     },
     "component": {
-      "label": "Schedule presentation",
+      "label": "Schedule style",
       "prompt": "How the programme is set.",
       "default": "ruled-programme",
       "choices": [

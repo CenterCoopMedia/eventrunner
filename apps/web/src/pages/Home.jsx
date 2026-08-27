@@ -5,24 +5,23 @@
 // links without a code change. All copy comes from the snapshot/runtime
 // content — nothing event-specific lives here.
 //
-// There is no hero banner (design brief §2.1, §5.1). The masthead nameplate
-// in the shell opens the page, and the lead headline follows it at
-// --text-h1, the way a lead story follows a paper's nameplate.
+// The page owns its own <h1>: the shell's header carries the running site
+// identity, not this page's subject. Nothing sits above that heading.
 //
-// The tagline sits BELOW the headline, never above it: the eyebrow ban is
-// absolute (brief §2.4), and supporting copy above a headline is exactly the
-// pattern it rejects.
+// The opening section may carry one lead image, beside the copy or below it.
+import { resolveHeader } from 'shared/theme';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import CtaBlock from '../components/blocks/CtaBlock.jsx';
+import LeadImage from '../components/LeadImage.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
 
 export default function Home() {
-  const { eventConfig, features } = useEventConfig();
+  const { eventConfig, features, theme } = useEventConfig();
   const { getPage, getSectionBlocks, getBlock, source } = useContent();
 
   const page = getPage('home') ?? getPage('/');
@@ -38,18 +37,31 @@ export default function Home() {
   }
 
   const subtitle = getBlock('hero', 'subtitle');
-  // The shell's masthead nameplate carries the event name as this page's
-  // <h1> (design brief §2.1). The stored hero title is the lead headline
-  // that follows it — unless an editor typed the event name into it, in
-  // which case the nameplate has already set those words at nameplate size
-  // and repeating them under it is just the same headline twice.
+  // The stored hero title is this page's heading. Where an editor has not
+  // written one, the event's own name stands in — the page states what the
+  // data says and never invents a headline of its own.
   const leadTitle =
-    typeof title?.value === 'string' && title.value !== eventConfig.name
+    typeof title?.value === 'string' && title.value.trim()
       ? title.value
+      : eventConfig.name;
+  // config/event is runtime data, so the tagline may arrive as an empty
+  // string. Test for content, not for the type: an empty string would
+  // otherwise render an empty paragraph and its margin as a stray gap.
+  const tagline =
+    typeof eventConfig.tagline === 'string' && eventConfig.tagline.trim()
+      ? eventConfig.tagline
       : null;
-  const heroCtas = getSectionBlocks('hero').filter(
-    (block) => block.blockType === 'cta',
-  );
+  const heroBlocks = getSectionBlocks('hero');
+  const heroCtas = heroBlocks.filter((block) => block.blockType === 'cta');
+  // One lead image at most. An editor who stores several images in the
+  // opening section gets the first one, never a gallery.
+  const lead = heroBlocks.find((block) => block.blockType === 'image') ?? null;
+  // The masthead sets the event name at display size, so a headline that
+  // only repeats it would print the same words twice down the page. The
+  // page keeps its <h1> either way — a reader on a screen reader still
+  // hears exactly one — and only the second printing goes.
+  const titleRepeatsMasthead =
+    resolveHeader(theme?.header) === 'masthead' && leadTitle === eventConfig.name;
 
   return (
     // data-content-source mirrors ContentContext's own `source` field
@@ -68,36 +80,47 @@ export default function Home() {
         className="pb-xl"
         {...(leadTitle ? { 'aria-labelledby': 'hero-title' } : { 'aria-label': 'Introduction' })}
       >
-        {leadTitle ? (
-          <h2 id="hero-title" className="font-heading text-h1 font-semibold text-text-primary">
-            {leadTitle}
-          </h2>
-        ) : null}
-        {typeof eventConfig.tagline === 'string' ? (
-          <p
-            className={[
-              'max-w-prose text-lead text-text-secondary',
-              leadTitle ? 'mt-sm' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            style={{ textWrap: 'pretty' }}
-          >
-            {eventConfig.tagline}
-          </p>
-        ) : null}
-        {subtitle ? (
-          <p className="mt-sm max-w-prose text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
-            {subtitle.value}
-          </p>
-        ) : null}
-        {heroCtas.length ? (
-          <div className="mt-lg flex flex-wrap gap-sm">
-            {heroCtas.map((block) => (
-              <CtaBlock key={`${block.section}__${block.field}`} block={block} />
-            ))}
+        <div className="flex flex-col gap-lg lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1">
+            {leadTitle ? (
+              <h1
+                id="hero-title"
+                className={
+                  titleRepeatsMasthead
+                    ? 'sr-only'
+                    : 'font-heading text-h1 font-semibold text-text-primary'
+                }
+              >
+                {leadTitle}
+              </h1>
+            ) : null}
+            {tagline ? (
+              <p
+                className={[
+                  'max-w-prose text-lead text-text-secondary text-pretty',
+                  leadTitle && !titleRepeatsMasthead ? 'mt-sm' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {tagline}
+              </p>
+            ) : null}
+            {subtitle ? (
+              <p className="mt-sm max-w-prose text-body text-text-secondary text-pretty">
+                {subtitle.value}
+              </p>
+            ) : null}
+            {heroCtas.length ? (
+              <div className="mt-lg flex flex-wrap gap-sm">
+                {heroCtas.map((block) => (
+                  <CtaBlock key={`${block.section}__${block.field}`} block={block} />
+                ))}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+          {lead ? <LeadImage block={lead} /> : null}
+        </div>
       </section>
 
       {features?.liveUpdates ? (
@@ -118,7 +141,9 @@ export default function Home() {
                 key={day.id}
                 className="flex flex-wrap items-baseline justify-between gap-x-md gap-y-3xs border-t-hairline border-t-rule-hairline py-sm"
               >
-                <h3 className="font-heading text-h3 text-text-primary">{day.label}</h3>
+                <h3 className="font-heading text-h3 font-semibold text-text-primary">
+                  {day.label}
+                </h3>
                 <p className="font-mono text-caption text-text-secondary">
                   <time dateTime={day.date}>
                     {formatDayDate(day, eventConfig.timezone) ?? day.date}

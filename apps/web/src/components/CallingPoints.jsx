@@ -10,6 +10,15 @@
 // relationship, such as 'Part of: Opening plenary'", so it survives a
 // screen reader).
 //
+// A CALLING POINT IS THE ONE ROW THAT CAN STATE A MOVE (brief §4.6;
+// shared/venue.cjs). Everywhere else on the schedule, a transfer between
+// two consecutive entries would be a guess: the reader skipped that
+// session, or is following one track out of five. Here the sequence is the
+// data — a child runs INSIDE its parent, so a reader at the calling point
+// was in the parent's room a moment ago. When the child sits in a different
+// place and somebody recorded that exact move, the site states it. When
+// nobody recorded it, the site says nothing.
+//
 // THE DISCLOSURE IS FUNCTIONAL MOTION, AND ONLY THAT (brief §2.2; visual
 // story, Newsroom, moment 3). The list opens by default, because a
 // programme that hides half of itself is not a programme. The control is a
@@ -19,6 +28,8 @@
 // schedule's one EXPRESSIVE moment is the grid's column, never this.
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { sessionMovement } from 'shared/venue';
+import TransferLine from './TransferLine.jsx';
 import { formatSessionStart } from '../lib/eventTime.js';
 
 /**
@@ -47,36 +58,53 @@ export default function CallingPoints({ parent, points, eventConfig, className =
         <span aria-hidden="true" className="calling-points__marker" />
         {points.length === 1 ? '1 calling point' : `${points.length} calling points`}
       </button>
-      {open ? (
-        <ul id={listId} aria-label={`Calling points of ${parent.title}`} className="mt-2xs">
-          {points.map((child) => {
-            const range = formatSessionStart(eventConfig, child);
-            return (
-              <li key={child.id} className="calling-points__item">
-                <p className="font-mono text-caption text-text-secondary">
-                  {range ? (
-                    <time dateTime={range.startIso}>{range.startLabel}</time>
-                  ) : (
-                    <span>Time to be announced</span>
-                  )}
-                </p>
-                <p className="text-body text-text-primary">
-                  <Link
-                    to={{ pathname: `/schedule/${child.id}`, search }}
-                    className="hover:underline"
-                  >
-                    {child.title}
-                  </Link>
-                  {/* The relationship, in words. The indent says it to a
-                      reader who can see it; this says it to everyone
-                      else. */}
-                  <span className="sr-only">{` — part of ${parent.title}`}</span>
-                </p>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+      {/* The list stays in the document and is hidden, rather than being
+          removed and put back. `aria-controls` on the button above has to
+          name an element that exists, or it is a reference to nothing — and
+          a disclosure that only points at its panel while the panel is
+          already open is pointing where nobody needs to be sent. `hidden`
+          takes it out of the layout, out of the accessibility tree, and out
+          of the tab order, which is what closed means here. Same shape the
+          page editor's Advanced disclosure uses (AdminPageEditor.jsx). */}
+      <ul
+        id={listId}
+        hidden={!open}
+        aria-label={`Calling points of ${parent.title}`}
+        className="mt-2xs"
+      >
+        {points.map((child) => {
+          const range = formatSessionStart(eventConfig, child);
+          // The move from the parent's place to this child's, if anyone
+          // recorded it. Null when either states no place, when both are
+          // in the same one, and when the pair has no record — which is
+          // most calling points, and renders as nothing at all.
+          const movement = sessionMovement(eventConfig, parent, child);
+          return (
+            <li key={child.id} className="calling-points__item">
+              <p className="font-mono text-caption text-text-secondary">
+                {range ? (
+                  <time dateTime={range.startIso}>{range.startLabel}</time>
+                ) : (
+                  <span>Time to be announced</span>
+                )}
+              </p>
+              <p className="text-body text-text-primary">
+                <Link
+                  to={{ pathname: `/schedule/${child.id}`, search }}
+                  className="hover:underline"
+                >
+                  {child.title}
+                </Link>
+                {/* The relationship, in words. The indent says it to a
+                    reader who can see it; this says it to everyone
+                    else. */}
+                <span className="sr-only">{` — part of ${parent.title}`}</span>
+              </p>
+              <TransferLine movement={movement} />
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

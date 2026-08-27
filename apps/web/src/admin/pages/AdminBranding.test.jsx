@@ -6,9 +6,11 @@
 //     frame carries data-theme/data-mode/data-motif-set for the draft, and
 //     the room around it never adopts any of them.
 //   • The frame renders the client's REAL page, not swatches.
-//   • Two depths: the curated pickers first, raw tokens behind a disclosure.
+//   • The workflow is six decisions in order: site style, logo and icon,
+//     main brand colour, header style, schedule style, light or dark. Every
+//     other control is behind the Advanced disclosure.
 //   • The whole-document replace really is whole — a save carries preset,
-//     optionPicks, tokens, motifSet, adminAccent, mode, fonts, and logos
+//     optionPicks, brandColor, tokens, motifSet, mode, fonts, and logos
 //     together. Dropping one would silently delete it.
 //   • A contrast failure is stated inline with the pair, the mode, and the
 //     ratio, and the frame keeps rendering.
@@ -49,10 +51,15 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+  // The stress fixture puts real session rows on the schedule, and a session
+  // row subscribes to its own reaction counts. Without this the frame's
+  // Schedule page throws inside the preview rather than rendering.
+  doc: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
 }));
 
 import App from '../../App.jsx';
-import { PREVIEW_SCOPE_ID, PREVIEW_STYLE_ID } from '../themePreview.js';
+import { PREVIEW_COMPARE_SCOPE_ID, PREVIEW_SCOPE_ID, PREVIEW_STYLE_ID } from '../themePreview.js';
 
 // Hex values are DATA here, never literals in source (spec §7.6 forbids hex
 // literals outside the allowlist — including in tests).
@@ -89,7 +96,7 @@ const PRESET_THEME = {
   optionPicks: { headingFace: 'libre-baskerville', nameplate: 'full-measure' },
   tokens: { light: { surface: hex('f7f4ee') } },
   motifSet: 'none',
-  adminAccent: hex('1a3a6e'),
+  brandColor: hex('1a3a6e'),
   colors: {},
   fonts: {},
   texture: 'flat',
@@ -126,7 +133,7 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
   // gate is still checking, which is a flake under load, not a bug.
   await waitFor(
     () => {
-      expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
     },
     // The frame renders the whole public app, so the first mount in this
@@ -140,9 +147,20 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
   return result;
 }
 
-/** Open the second depth. Raw token editing is never the first thing seen. */
+/** Open Advanced. Nothing behind it is needed for a finished site. */
 function openAdvanced() {
-  fireEvent.click(screen.getByRole('button', { name: 'Edit the raw tokens' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Show the advanced settings' }));
+}
+
+/** The panel titles the bench shows, in the order a staff member meets them. */
+function panelTitles() {
+  // The frame renders a whole public page, headings and all, so the bench's
+  // own panels are the level-2 headings OUTSIDE it.
+  const preview = document.getElementById(PREVIEW_SCOPE_ID);
+  return screen
+    .getAllByRole('heading', { level: 2 })
+    .filter((heading) => !preview?.contains(heading))
+    .map((heading) => heading.textContent);
 }
 
 beforeEach(() => {
@@ -175,17 +193,20 @@ describe('the proof', () => {
     // …and the room keeps the attributes the SAVED theme gave it. (The
     // provider writes those; the draft must not move them.)
     const room = { ...document.documentElement.dataset };
-    fireEvent.change(screen.getByLabelText('Preset'), { target: { value: 'zine' } });
+    fireEvent.change(screen.getByLabelText('Site style'), { target: { value: 'zine' } });
     await waitFor(() => expect(frame().dataset.theme).toBe('zine'));
     expect({ ...document.documentElement.dataset }).toEqual(room);
   });
 
-  it('states the page, the mode, and the draft below the frame', async () => {
+  it('states the page, the mode, the width, and the draft below the frame', async () => {
     await renderBranding();
-    expect(screen.getByText('Home · light · published theme')).toBeInTheDocument();
+    expect(screen.getByText('Home · light · 1440px · published theme')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Schedule' }));
-    expect(screen.getByText('Schedule · light · published theme')).toBeInTheDocument();
+    expect(screen.getByText('Schedule · light · 1440px · published theme')).toBeInTheDocument();
+    // And the FRAME really moved. `initialEntries` is read once, so the
+    // router has to remount or the line and the picture disagree.
+    expect(within(frame()).getByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
   });
 
   it('switches light and dark instantly, as two proofs of one forme', async () => {
@@ -193,10 +214,68 @@ describe('the proof', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dark' }));
 
     expect(frame().dataset.mode).toBe('dark');
-    expect(screen.getByText('Home · dark · published theme')).toBeInTheDocument();
+    expect(screen.getByText('Home · dark · 1440px · published theme')).toBeInTheDocument();
     // The room is not dragged into dark mode with it: the admin obeys the
     // mode the OPERATOR is working in, never the one being previewed.
     expect(document.documentElement.dataset.mode).not.toBe('dark');
+  });
+
+  it('renders a phone at a phone’s real width, so its own breakpoints fire', async () => {
+    await renderBranding();
+    fireEvent.click(screen.getByRole('button', { name: 'Phone (390px)' }));
+    expect(frame().style.width).toBe('390px');
+    // Twice on purpose: the visible identification line and the screen-reader
+    // description of the frame carry the same facts.
+    expect(screen.getAllByText(/Home · light · 390px/).length).toBeGreaterThan(0);
+  });
+
+  it('shows light and dark side by side, on one candidate', async () => {
+    // Dark mode is its own palette, and it is where a brand colour usually
+    // fails. Flipping a toggle and remembering is not the same as looking.
+    await renderBranding(PRESET_THEME);
+    fireEvent.click(screen.getByRole('button', { name: 'Compare light and dark' }));
+
+    const compared = document.getElementById(PREVIEW_COMPARE_SCOPE_ID);
+    expect(frame().dataset.mode).toBe('light');
+    expect(compared.dataset.mode).toBe('dark');
+    // One candidate, two frames: both carry the same style.
+    expect(compared.dataset.theme).toBe(frame().dataset.theme);
+    expect(previewCss()).toContain(`#${PREVIEW_COMPARE_SCOPE_ID}`);
+    expect(screen.getAllByText(/Home · dark · 1440px/).length).toBeGreaterThan(0);
+  });
+
+  it('swaps in a long title and a dense day on request, and says it is doing it', async () => {
+    await renderBranding(PRESET_THEME);
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stress test' }));
+
+    expect(screen.getByText(/Nothing here is saved or published/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Schedule · light · 1440px · stress test/).length)
+      .toBeGreaterThan(0);
+    // The frame is rendering the fixture, not the real programme.
+    expect(frame().textContent).toContain('Roundtable: Sustaining multi-newsroom');
+  });
+
+  it('previews the session page a shared link lands on', async () => {
+    // PROOF_PAGES covers the four routes a visitor navigates to. Session
+    // detail is the fifth, and it is the one page most visitors reach
+    // first — the page where a theme meets one session's own type, room,
+    // and speakers.
+    await renderBranding(PRESET_THEME);
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    await waitFor(() =>
+      expect(
+        within(frame()).getByRole('heading', { level: 1, name: 'Welcome and orientation' }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getAllByText(/Session · light · 1440px/).length).toBeGreaterThan(0);
+  });
+
+  it('names a colour it cannot read and says what is showing instead', async () => {
+    await renderBranding({ ...PRESET_THEME, brandColor: 'brand blue' });
+    expect(screen.getByText(/Main brand colour is not a colour this system can read/))
+      .toBeInTheDocument();
+    expect(screen.getByText(/style’s own colour is showing instead/)).toBeInTheDocument();
   });
 
   it('discards the preview when the tab is left', async () => {
@@ -207,61 +286,151 @@ describe('the proof', () => {
   });
 });
 
-describe('the curated depth', () => {
-  it('offers the preset first, and says plainly what picking one replaces', async () => {
+describe('the staff workflow', () => {
+  it('asks six questions, in order, and shows the page preview beside them', async () => {
+    // Owner calibration, 2026-08-27: "staff complete the normal workflow
+    // with a small set of clear decisions". This is that list, and the order
+    // is the workflow.
     await renderBranding(PRESET_THEME);
-    expect(screen.getByLabelText('Preset')).toHaveValue('broadsheet');
-    expect(
-      screen.getByText(/Picking a preset replaces every value you have not overridden yourself/),
-    ).toBeInTheDocument();
+    expect(panelTitles()).toEqual([
+      'Site style',
+      'Logo and icon',
+      'Main brand colour',
+      'Header and schedule',
+      'Light or dark',
+      'Advanced',
+      'Page preview',
+    ]);
   });
 
-  it('offers that preset’s own option groups, with the reason for each choice', async () => {
+  it('offers all six styles with no second tier, and says who each suits', async () => {
     await renderBranding(PRESET_THEME);
-    expect(screen.getByLabelText('Heading face')).toHaveValue('libre-baskerville');
-    expect(screen.getByLabelText('Nameplate treatment')).toHaveValue('full-measure');
+    const picker = screen.getByLabelText('Site style');
+    expect(picker).toHaveValue('broadsheet');
+    const offered = [...picker.options].map((option) => option.textContent);
+    expect(offered).toEqual([
+      'None — this deployment’s stored palette',
+      'Institutional',
+      'Newsroom',
+      'Broadsheet',
+      'Atlas',
+      'Field Guide',
+      'Zine',
+    ]);
+    // Nothing carries a warning label.
+    expect(offered.join(' ')).not.toMatch(/experimental|beta|unstable/i);
+    expect(screen.getByText(/Best for: Formal programmes/)).toBeInTheDocument();
+  });
+
+  it('asks for the header and the schedule, with the reason for each choice', async () => {
+    await renderBranding(PRESET_THEME);
+    expect(screen.getByLabelText('Header style')).toHaveValue('full-measure');
+    expect(screen.getByLabelText('Schedule style')).toHaveValue('ruled-programme');
     // The catalog's `why` is the hint, so a choice is never a bare name.
-    expect(screen.getByText(/The same paper, founded sixty years later/)).toBeInTheDocument();
+    expect(screen.getByText(/Hairline rows, times in the agate column/)).toBeInTheDocument();
   });
 
-  it('re-renders the frame on the picked preset', async () => {
+  it('re-renders the frame on the picked style, with that style’s own choices', async () => {
     await renderBranding(PRESET_THEME);
     expect(frame().dataset.theme).toBe('broadsheet');
 
-    fireEvent.change(screen.getByLabelText('Preset'), { target: { value: 'zine' } });
+    fireEvent.change(screen.getByLabelText('Site style'), { target: { value: 'zine' } });
     await waitFor(() => expect(frame().dataset.theme).toBe('zine'));
-    // The picks follow the preset that offers them, rather than carrying a
+    // The picks follow the style that offers them, rather than carrying a
     // stale group id the server would reject by name.
+    expect(screen.getByLabelText('Schedule style')).toHaveValue('flat-block');
+    openAdvanced();
     expect(screen.getByLabelText('Heading face')).toHaveValue('karrik');
   });
 
-  it('keeps raw token editing behind its own disclosure', async () => {
+  it('states the style’s recommended type pairing in the faces’ own names', async () => {
+    // The library is 23 families. These are the four a reader of THIS site
+    // gets, so the editor says them rather than leaving an operator to read
+    // them off four select boxes.
     await renderBranding(PRESET_THEME);
-    expect(screen.getByRole('button', { name: 'Edit the raw tokens' })).toHaveAttribute(
+    openAdvanced();
+    const pairing = document.querySelector('#admin-theme-advanced dl');
+    expect(pairing.textContent).toContain('Libre Baskerville');
+    expect(pairing.textContent).toContain('Libre Caslon Text');
+    expect(pairing.textContent).toContain('Source Serif 4');
+  });
+
+  it('keeps typography, illustrations, shape, and raw colours behind Advanced', async () => {
+    await renderBranding(PRESET_THEME);
+    expect(screen.getByRole('button', { name: 'Show the advanced settings' })).toHaveAttribute(
       'aria-expanded',
       'false',
     );
+    for (const label of ['Heading face', 'Illustration set', 'Surface', 'Corners', 'Spacing']) {
+      expect(screen.getByLabelText(label).closest('[hidden]'), label).not.toBeNull();
+    }
     expect(screen.getByLabelText('Surface — light').closest('[hidden]')).not.toBeNull();
 
     openAdvanced();
-    expect(screen.getByRole('button', { name: 'Hide the raw tokens' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Hide the advanced settings' })).toHaveAttribute(
       'aria-expanded',
       'true',
     );
+    for (const label of ['Heading face', 'Illustration set', 'Surface', 'Corners', 'Spacing']) {
+      expect(screen.getByLabelText(label).closest('[hidden]'), label).toBeNull();
+    }
     expect(screen.getByLabelText('Surface — light').closest('[hidden]')).toBeNull();
   });
 
-  it('states the accent’s legibility floor plainly when it falls back', async () => {
-    // A client picks this value, so it may be unreadable on an admin ground.
-    // The system never clamps it: it says what it fell back to.
-    await renderBranding({ ...PRESET_THEME, adminAccent: hex('eae8e3') });
+  it('leaves a shape field blank so a save cannot pin a style to a shape', async () => {
+    // Zine names the copier grain; the stored document names no texture. A
+    // form that seeded a concrete value here would write it on the next
+    // publish and quietly flatten the style.
+    await renderBranding({
+      preset: 'zine',
+      optionPicks: {},
+      colors: {},
+      mode: 'light',
+      // Explicit nulls: the provider overlays config/theme onto the
+      // committed snapshot shallowly, and the snapshot predates this rule.
+      texture: null,
+      radius: null,
+      density: null,
+    });
+    openAdvanced();
+    expect(screen.getByLabelText('Surface')).toHaveValue('');
+    expect(screen.getByLabelText('Corners')).toHaveValue('');
+    expect(screen.getByLabelText('Spacing')).toHaveValue('');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const { theme } = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(theme.texture).toBeUndefined();
+    expect(theme.radius).toBeUndefined();
+    expect(theme.density).toBeUndefined();
+  });
+
+  it('asks for one brand colour and derives the supporting shades from it', async () => {
+    // The operator picks the client's colour. The emphasis and soft steps
+    // are worked out for both modes, so there is nothing else to get wrong.
+    await renderBranding({ ...PRESET_THEME, brandColor: hex('7a1f3d') });
+    expect(screen.getByLabelText('Main brand colour')).toHaveValue(hex('7a1f3d'));
+    await waitFor(() => expect(previewCss()).toContain('--brand-primary-rgb: 122 31 61;'));
+    // The supporting steps are present and are not the style's own.
+    expect(previewCss()).toMatch(/--brand-primary-dark-rgb: \d+ \d+ \d+;/);
+    expect(previewCss()).toMatch(/--brand-primary-light-rgb: \d+ \d+ \d+;/);
+  });
+
+  it('states the admin marker’s legibility floor plainly when it falls back', async () => {
+    // The marker takes the site's own brand colour, so the only question is
+    // whether it can be seen on the admin ground. Nothing is clamped: the
+    // editor says what the marker fell back to, and the site is unaffected.
+    await renderBranding({
+      preset: null,
+      colors: { primary: hex('ebe8e3'), surface: hex('111111'), ink: hex('ffffff') },
+    });
     expect(screen.getByText(/below the 3:1 floor a position marker needs/)).toBeInTheDocument();
-    expect(screen.getByText(/falls back to its own ink/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Admin marker colour')).toHaveValue(hex('eae8e3'));
+    expect(screen.getByText(/falls back to the admin’s own ink/)).toBeInTheDocument();
   });
 });
 
-describe('the advanced depth', () => {
+describe('advanced colour settings', () => {
   it('edits per-mode overrides on a light tab and a dark tab', async () => {
     await renderBranding(PRESET_THEME);
     openAdvanced();
@@ -296,16 +465,17 @@ describe('the advanced depth', () => {
     openAdvanced();
     expect(screen.getByLabelText('Surface — light')).toHaveValue(hex('f7f4ee'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear the overrides for this mode' }));
-    expect(screen.getByText(/falls back to the preset's own palette/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear these overrides' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset the light colours' }));
+    expect(screen.getByText(/falls back to the shades worked out from the main brand colour/))
+      .toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset these colours' }));
 
     expect(screen.getByLabelText('Surface — light')).toHaveValue('');
   });
 });
 
 describe('publishing the theme', () => {
-  it('posts the WHOLE document: preset, picks, tokens, motif set, accent, mode', async () => {
+  it('posts the WHOLE document: preset, picks, brand colour, tokens, motif set, mode', async () => {
     // config/theme is a whole-doc replace, so a field this form forgets to
     // send is a field the save deletes. That is how the preset pipeline
     // would quietly disappear on the first logo edit.
@@ -324,7 +494,7 @@ describe('publishing the theme', () => {
     expect(theme.optionPicks).toMatchObject({ headingFace: 'libre-baskerville' });
     expect(theme.tokens).toEqual({ light: { surface: hex('f7f4ee') } });
     expect(theme.motifSet).toBe('none');
-    expect(theme.adminAccent).toBe(hex('1a3a6e'));
+    expect(theme.brandColor).toBe(hex('1a3a6e'));
     expect(theme.mode).toBe('light');
     expect(theme.texture).toBe('flat');
     expect(theme.radius).toBe('sharp');
@@ -381,16 +551,21 @@ describe('publishing the theme', () => {
     await renderBranding(PRESET_THEME);
     expect(screen.getByText('Live')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Preset'), { target: { value: 'zine' } });
+    fireEvent.change(screen.getByLabelText('Site style'), { target: { value: 'zine' } });
     expect(await screen.findByText('Live with unpublished changes')).toBeInTheDocument();
   });
 
   // Issue #24: each slot is an ImagePicker over the branding/ namespace. The
   // path stays editable by hand, because the four placeholders init seeds
   // have no library row.
-  it('keeps the logo slots and the media picker', async () => {
+  it('keeps every logo slot and the media picker, two of them in the workflow', async () => {
     await renderBranding();
     expect(screen.getByLabelText('Primary logo')).toHaveValue('branding/logo.svg');
+    expect(screen.getByLabelText('Square icon')).toHaveValue('branding/mark.svg');
+    // The other three are still here, one disclosure away.
+    expect(screen.getByLabelText('Favicon').closest('[hidden]')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More image slots' }));
+    expect(screen.getByLabelText('Favicon').closest('[hidden]')).toBeNull();
     expect(screen.getAllByRole('button', { name: 'Choose or upload…' }).length).toBe(5);
   });
 });

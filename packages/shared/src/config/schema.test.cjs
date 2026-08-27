@@ -148,6 +148,140 @@ test('validateEventConfig rejects a tracks value that is not an array', () => {
   assert.ok(result.errors.includes('tracks: must be an array'));
 });
 
+// The movement model: venue.places and venue.movements (shared/venue.cjs).
+
+test('validateEventConfig accepts a venue with no recorded movement at all', () => {
+  // The starting state of every deployment: a venue nobody has walked yet
+  // records nothing, and the schedule then states no movement. That is an
+  // honest venue, not an incomplete one.
+  assert.equal(validateEventConfig({ ...VALID_EVENT, venue: { name: 'Hall' } }).ok, true);
+  assert.equal(
+    validateEventConfig({ ...VALID_EVENT, venue: { places: [], movements: [] } }).ok,
+    true,
+  );
+});
+
+test('validateEventConfig accepts places and the one-way movements between them', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    venue: {
+      name: 'Hall',
+      places: [
+        { id: 'main-hall', name: 'Main hall', floor: 'Ground floor' },
+        { id: 'room-a', name: 'Room A' },
+      ],
+      movements: [
+        { from: 'main-hall', to: 'room-a', walkingMinutes: 4, accessibleRoute: 'Lift, then left.' },
+        // The same pair the other way round is a DIFFERENT record, and both
+        // are welcome: down two flights is not up two flights.
+        { from: 'room-a', to: 'main-hall', walkingMinutes: 3 },
+      ],
+    },
+  });
+  assert.deepEqual(result, { ok: true, errors: [] });
+});
+
+test('validateEventConfig names every problem with a place', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    venue: {
+      places: [
+        { id: 'Main Hall', name: 'Main hall' },
+        { id: 'room-a', name: '   ' },
+        { id: 'room-b', name: 'Room B', capacity: 90 },
+        { id: 'room-b', name: 'Room B again' },
+        { id: 'room-c', name: 'Room C', floor: '' },
+        'not an object',
+      ],
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.startsWith('venue.places[0].id:')));
+  assert.ok(result.errors.some((e) => e === 'venue.places[1].name: must be a nonempty string'));
+  assert.ok(result.errors.some((e) => e === 'venue.places[2].capacity: unknown place field'));
+  assert.ok(result.errors.some((e) => e.includes('duplicate place id "room-b"')));
+  assert.ok(
+    result.errors.some((e) => e === 'venue.places[4].floor: must be null or a nonempty string'),
+  );
+  assert.ok(result.errors.some((e) => e === 'venue.places[5]: must be an object'));
+});
+
+test('validateEventConfig refuses a movement naming a place the venue does not define', () => {
+  // The error this shape invites: a room is renamed, its id changes, and
+  // the routes pointing at it become sentences about a room that no longer
+  // exists. A renderer meeting that has nothing to say and no way to say
+  // why, so the save is where it has to be caught.
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    venue: {
+      places: [{ id: 'room-a', name: 'Room A' }],
+      movements: [{ from: 'room-a', to: 'room-z', walkingMinutes: 2 }],
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes('"room-z" is not one of this venue\'s places')));
+});
+
+test('validateEventConfig names every problem with a movement', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    venue: {
+      places: [
+        { id: 'room-a', name: 'Room A' },
+        { id: 'room-b', name: 'Room B' },
+      ],
+      movements: [
+        { from: 'room-a', to: 'room-a', walkingMinutes: 1 },
+        { from: 'room-a', to: 'room-b', walkingMinutes: 600 },
+        { from: 'room-a', to: 'room-b', walkingMinutes: 2 },
+        { from: 'room-b', to: 'room-a', walkingMinutes: 2.5 },
+        { from: 'room-b', to: 'room-a', walkingMinutes: 2, accessibleRoute: '  ' },
+        { from: 'room-a', to: 'room-b', walkingMinutes: 1, stairs: true },
+        'not an object',
+      ],
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes('from and to name the same place')));
+  assert.ok(result.errors.some((e) => e.startsWith('venue.movements[1].walkingMinutes:')));
+  // One direction stated twice is two answers to one question.
+  assert.ok(result.errors.some((e) => e.startsWith('venue.movements[2]: a movement from')));
+  assert.ok(result.errors.some((e) => e.startsWith('venue.movements[3].walkingMinutes:')));
+  assert.ok(
+    result.errors.some(
+      (e) => e === 'venue.movements[4].accessibleRoute: must be null or a nonempty string',
+    ),
+  );
+  assert.ok(result.errors.some((e) => e === 'venue.movements[5].stairs: unknown movement field'));
+  assert.ok(result.errors.some((e) => e === 'venue.movements[6]: must be an object'));
+});
+
+test('validateEventConfig accepts a zero-minute walk and refuses a negative one', () => {
+  const build = (walkingMinutes) => ({
+    ...VALID_EVENT,
+    venue: {
+      places: [
+        { id: 'room-a', name: 'Room A' },
+        { id: 'room-b', name: 'Room B' },
+      ],
+      movements: [{ from: 'room-a', to: 'room-b', walkingMinutes }],
+    },
+  });
+  // Some rooms are across the corridor, and "0 min walk" is a real answer.
+  assert.equal(validateEventConfig(build(0)).ok, true);
+  assert.equal(validateEventConfig(build(-1)).ok, false);
+});
+
+test('validateEventConfig rejects places or movements that are not arrays', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    venue: { places: { 'room-a': 'Room A' }, movements: 'none' },
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.includes('venue.places: must be an array'));
+  assert.ok(result.errors.includes('venue.movements: must be an array'));
+});
+
 test('validateEventConfig: tagline must be a string when present, but is optional', () => {
   assert.equal(validateEventConfig({ ...VALID_EVENT, tagline: 'A gathering' }).ok, true);
   assert.equal(validateEventConfig({ ...VALID_EVENT, tagline: undefined }).ok, true);
@@ -204,6 +338,34 @@ test('validateTheme enforces hex colors', () => {
   assert.ok(bad.errors.some((e) => e.includes('theme.colors.accent')));
   assert.equal(validateTheme(null).ok, false);
   assert.equal(validateTheme({}).ok, false);
+});
+
+test('validateTheme accepts a site navigation placement, and rejects a stranger', () => {
+  // Where the navigation sits is a SITE setting: a reader who meets a top
+  // nav on one page and a rail on the next has been handed two sites.
+  const base = { colors: {} };
+  assert.equal(validateTheme({ ...base, navPlacement: 'side' }).ok, true);
+  assert.equal(validateTheme({ ...base, navPlacement: 'top' }).ok, true);
+  // Absent is a real answer — it leaves the placement to whatever a page
+  // document already stored, and then to the top.
+  assert.equal(validateTheme(base).ok, true);
+  const { ok, errors } = validateTheme({ ...base, navPlacement: 'floating' });
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.startsWith('theme.navPlacement:') && e.includes('"floating"')));
+});
+
+test('validateTheme accepts the four headers and names an unknown one', () => {
+  /* eslint-disable no-restricted-syntax */
+  const colors = { primary: '#336699' };
+  /* eslint-enable no-restricted-syntax */
+  for (const header of ['standard', 'masthead', 'compact', 'minimal']) {
+    assert.equal(validateTheme({ colors, header }).ok, true, header);
+  }
+  // Absent is fine: a document from before the field existed still saves.
+  assert.equal(validateTheme({ colors }).ok, true);
+  const bad = validateTheme({ colors, header: 'letterpress' });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.startsWith('theme.header:')));
 });
 
 test('validateBadgesConfig enforces unique ids and positive maxPicks', () => {

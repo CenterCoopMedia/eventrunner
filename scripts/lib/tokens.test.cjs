@@ -324,6 +324,56 @@ test('every option a preset offers remaps a token the contracts already declare'
   }
 });
 
+test('the bundled library is 23 families, every one of them recorded', () => {
+  // Owner calibration, 2026-08-27: "Keep the full 23-family font library
+  // (licensing/loading/fallback/performance verified)". The library is the
+  // repo's, not the reader's — a deployed site loads two to four families —
+  // so the thing to hold is that every family is accounted for in writing.
+  const readme = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'apps', 'web', 'public', 'fonts', 'README.md'),
+    'utf8',
+  );
+  assert.equal(THEME_FONT_SET_IDS.length, 23, 'the library is 23 set ids');
+
+  // LICENSING. Every set has a row in the README table, and every row states
+  // a licence. Four faces are not on Google Fonts and carry their licence
+  // text beside the binary.
+  for (const setId of THEME_FONT_SET_IDS) {
+    const row = readme.split('\n').find((line) => line.includes(`\`${setId}\``));
+    assert.ok(row, `${setId} has a row in apps/web/public/fonts/README.md`);
+    assert.match(row, /SIL OFL 1\.1/, `${setId} states its licence`);
+  }
+  for (const file of ['karrik', 'bagnard', 'avara', 'fragment-mono']) {
+    assert.ok(
+      fs.existsSync(path.join(
+        __dirname, '..', '..', 'apps', 'web', 'public', 'fonts', 'licenses', `${file}-OFL.txt`,
+      )),
+      `${file} travels with its licence text`,
+    );
+  }
+
+  // LOADING. Every file in the directory is a family the system can reach,
+  // and every file is recorded. A file nobody names is dead weight in the
+  // repo; a set naming a file that is not there renders a fallback.
+  const dir = path.join(__dirname, '..', '..', 'apps', 'web', 'public', 'fonts');
+  const bundled = fs.readdirSync(dir).filter((name) => name.endsWith('.woff2'));
+  const named = new Set(
+    THEME_FONT_SET_IDS.flatMap((setId) => FONT_SETS[setId].faces.map((face) => `${face.file}.woff2`)),
+  );
+  for (const file of bundled) {
+    assert.ok(named.has(file), `${file} is named by a bundled set`);
+    assert.ok(readme.includes(file), `${file} has a README row`);
+  }
+  assert.equal(named.size, bundled.length, 'every named face has a file');
+
+  // FALLBACK. Every stack names more than one family, so a face that has not
+  // arrived degrades to something rather than to nothing.
+  for (const setId of THEME_FONT_SET_IDS) {
+    const families = FONT_SETS[setId].stack.split(',');
+    assert.ok(families.length > 1, `${setId} declares a fallback after its own family`);
+  }
+});
+
 test('every face a preset or an option names is a bundled set with a real file', () => {
   for (const id of THEME_PRESET_IDS) {
     const preset = getPreset(id);
@@ -419,15 +469,33 @@ test('the admin set is emitted once per mode and never inside a theme block', ()
   }
 });
 
-test('the client accent falls back to the admin ink when it cannot be read', () => {
-  // Admin story part 6f: never clamp, never render an invisible marker.
-  const unreadable = buildTokenCss({ ...THEME, adminAccent: `#${'ebe8e3'}` });
-  const light = unreadable.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
-  assert.match(light[1], /--admin-client-accent-rgb: 28 27 25;/);
-
-  const readable = buildTokenCss({ ...THEME, adminAccent: `#${'1a5296'}` });
+test('the admin marker takes the resolved brand colour, and falls back to admin ink when it cannot be read', () => {
+  // Owner review 2026-08-27: there is no separate admin marker colour to
+  // pick. The marker takes the brand colour the site itself paints. The
+  // legibility floor from admin story part 6f is unchanged and still does
+  // the work — never clamp, never render an invisible marker.
+  const readable = buildTokenCss(THEME);
   const ok = readable.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
-  assert.match(ok[1], /--admin-client-accent-rgb: 26 82 150;/);
+  assert.match(ok[1], /--admin-client-accent-rgb: 26 82 150;/, "the style's own primary");
+
+  // A client brand colour reaches the marker through the same path, derived
+  // to clear the site's own contrast bar first.
+  const branded = buildTokenCss({ ...THEME, brandColor: `#${'7a1f3d'}` });
+  const brandedLight = branded.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
+  assert.match(brandedLight[1], /--admin-client-accent-rgb: 122 31 61;/);
+
+  // The floor still fires where the resolved brand colour cannot sit on an
+  // admin ground: a pre-preset deployment on a dark ground resolves a
+  // near-white primary, and the LIGHT admin ground is light.
+  const unreadable = buildTokenCss({
+    colors: {
+      primary: `#${'ebe8e3'}`,
+      surface: `#${'111111'}`,
+      ink: `#${'ffffff'}`,
+    },
+  });
+  const light = unreadable.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
+  assert.match(light[1], /--admin-client-accent-rgb: 28 27 25;/, 'falls back to admin ink');
 });
 
 // ------------------------------------------------ the motif layer (brief §3.8)
@@ -462,4 +530,38 @@ test('a preset that ships a motif set on gets it as the baseline too', () => {
   assert.match(css, /--motif-nameplate-mark: url\('\/motifs\/botanical\/nameplate-mark\.svg'\);/);
   // A client may switch a set or turn motifs off (brief §3.8).
   assert.match(buildTokenCss({ preset: 'field-guide', motifSet: 'none' }), /--motif-set: none;/);
+});
+
+test('every component token has a rule that draws it', () => {
+  // design/tokens/components.json states the rule itself, in its scope note:
+  // "Every token here is read by a render path in apps/web/src/index.css — a
+  // token an option offers but nothing renders is a promise the interface
+  // does not keep, so a new contract lands with the rule that draws it."
+  //
+  // That sentence held for the schedule row and stopped holding for the
+  // masthead: eighteen Header styles were each setting a metadata placement
+  // and a double-rule width, and nothing read either one. An operator picked
+  // an option and the page did not move. This test is why that cannot come
+  // back — a name added to the contract file without a rule fails the build,
+  // by name, here.
+  const { components } = loadTokens();
+  // Comments are stripped first. A token named in a note explaining why it
+  // is not drawn yet would otherwise pass this test by being talked about.
+  const stylesheet = fs
+    .readFileSync(path.join(__dirname, '..', '..', 'apps', 'web', 'src', 'index.css'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const names = [];
+  const walk = (node) => {
+    for (const [key, value] of Object.entries(node)) {
+      if (key.startsWith('--')) names.push(key);
+      else if (value && typeof value === 'object') walk(value);
+    }
+  };
+  walk(components);
+  assert.ok(names.length > 40, 'the contract file was read');
+  for (const name of names) {
+    // A rule reads a token with var(), and a style query reads one by name.
+    const read = stylesheet.includes(`var(${name}`) || stylesheet.includes(`style(${name}`);
+    assert.ok(read, `${name} is declared in components.json but no rule draws it`);
+  }
 });

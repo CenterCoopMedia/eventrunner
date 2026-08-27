@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * The ten default pages and their placeholder content (spec §5.3, §5.4).
+ * The twelve default pages and their placeholder content (spec §5.3, §5.4).
  *
  * Pure. `defaultPages()` returns cmsPages documents in exactly the shape
  * `validatePageDoc` (functions/src/cms/pages.cjs) accepts — init runs that
@@ -42,10 +42,28 @@ function block(field, blockType, description) {
 }
 
 /**
- * The ten seeded pages (§5.3): home, schedule, speakers, sponsors (system
- * pages, each owning a dedicated React route), then travel, faq, conduct,
- * contact, privacy, terms as generic content pages at their own root-level
- * paths.
+ * The twelve seeded pages (§5.3): home, schedule, speakers, sponsors,
+ * attendees, updates (system pages, each owning a dedicated React route),
+ * then travel, faq, conduct, contact, privacy, terms as generic content
+ * pages at their own root-level paths.
+ *
+ * EVERY SYSTEM ROUTE GETS A DOCUMENT, INCLUDING THE TWO THAT SEED NO
+ * CONTENT. Attendees and Updates own dedicated routes (shared/routing
+ * reserves both segments) and both render through `SystemPage`, which reads
+ * the page's `template`, `layout`, and section slots. Without a document
+ * there is nothing in the admin Pages list to open, so those two pages were
+ * the only ones an operator could not shape. They seed the same way
+ * schedule, speakers, and sponsors do: a document with no sections, because
+ * the route's own component is the page and the sections are what an
+ * operator adds around it.
+ *
+ * THEY ARE APPENDED, NOT INSERTED. `order` only sorts the admin Pages list,
+ * and re-running init refreshes a seeded page that nobody has edited while
+ * leaving an edited one alone. Renumbering the ten pages that came before
+ * would therefore half-apply on a deployment where an operator had edited
+ * some of them, scrambling their list. New numbers at the end change no
+ * stored page at all, which is the same rule the layout schema follows:
+ * existing documents keep working, and no migration runs.
  *
  * @returns {object[]} cmsPages documents
  */
@@ -249,6 +267,26 @@ function defaultPages() {
         section('terms_liability', 'Disclaimers', 'Warranty, liability, governing law.', ['richtext'], 6),
         section('terms_contact', 'Contact', 'Where questions about the terms go.', ['richtext'], 4),
       ],
+    },
+    {
+      id: 'attendees',
+      label: 'Attendees',
+      path: '/attendees',
+      icon: null,
+      order: 10,
+      visible: true,
+      systemPage: true,
+      sections: [],
+    },
+    {
+      id: 'updates',
+      label: 'Updates',
+      path: '/updates',
+      icon: null,
+      order: 11,
+      visible: true,
+      systemPage: true,
+      sections: [],
     },
   ];
 }

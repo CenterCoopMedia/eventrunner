@@ -1,10 +1,12 @@
 {
-  "$schema-note": "One theme preset (design brief 2026-08-27, §4.2). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
+  "$schema-note": "One theme preset (design brief 2026-08-27, §4.2). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
   "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 2.",
   "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin.",
+  "$first-class-note": "See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.",
   "id": "newsroom",
-  "label": "Newsroom modern",
+  "label": "Newsroom",
   "summary": "A well-made news site on a good day. Named sections, one strong rule each, numbers that never borrow the headline face.",
+  "bestFor": "Publications, media summits, and newsrooms that put something out every day.",
 
   "$palette-words-light": "cool newsprint white, desk black, one saturated editorial accent, muted data slate, hairline silver, section-rule graphite, caption grey, archive fog",
   "$palette-words-dark": "charcoal desk, screen-lit soft white, night-retuned editorial accent, dimmed data slate, graphite rule, ash grey, low-lamp caption grey, archive slate",
@@ -61,7 +63,7 @@
   "options": {
     "headingFace": {
       "label": "Heading face",
-      "prompt": "The desk's headline voice.",
+      "prompt": "The desk’s headline voice.",
       "default": "fraunces",
       "choices": [
         {
@@ -85,7 +87,7 @@
       ]
     },
     "nameplate": {
-      "label": "Nameplate treatment",
+      "label": "Header style",
       "prompt": "The masthead bar.",
       "default": "rule-bounded-bar",
       "choices": [
@@ -124,7 +126,7 @@
       ]
     },
     "component": {
-      "label": "Session card",
+      "label": "Schedule style",
       "prompt": "How a session listing is set.",
       "default": "hairline-row",
       "choices": [
