@@ -59,7 +59,7 @@ Both classes: never trigger motion from scroll position, never run ambient anima
 
 - Ship only `.woff2` — never TTF or OTF on the web. Fonts are self-hosted in `apps/web/public/fonts/` (spec §7.4).
 - Set type from the eight-step fluid scale: `text-nameplate`, `text-h1`, `text-h2`, `text-h3`, `text-lead`, `text-body`, `text-caption`, `text-folio` (design brief §3.7). Each step carries its own line height and tracking. Never pick a default Tailwind size instead.
-- Name a font by its role, never by its family: `font-heading`, `font-body`, `font-data`, `font-mono` (design brief §3.2). `font-accent` is the retired role and is an alias of `font-heading` for one release.
+- Name a font by its role, never by its family: `font-heading`, `font-body`, `font-data`, `font-mono` (design brief §3.2). There is no `font-accent`: PR2 removed the retired role. Zine's handwritten callout runs on the `--callout-font` component token, which is a component contract and not a fifth role.
 - `font-variant-numeric: tabular-nums` on all dynamic values: timers, counters, prices, schedule columns.
 - Long-form text: 60–75 characters per line.
 - `text-wrap: balance` on headings, `text-wrap: pretty` on descriptions, neither on long-form.
@@ -79,6 +79,9 @@ Both classes: never trigger motion from scroll position, never run ambient anima
 - Measure contrast against the actual rendered background, not the page background.
 - Dark mode is its own palette, not light mode reversed. Every color token is defined under both `:root[data-mode='light']` and `:root[data-mode='dark']`, and a token missing from either block is a bug (design brief §8.2).
 - The mode comes from `data-mode` on the root element. `config/theme.mode` sets the policy — `light`, `dark`, or `system` — and `lib/modeRuntime.js` writes the attribute. Never add a `.dark` class of your own.
+- The preset comes from `data-theme` on the root element, and its values are the six preset ids (design brief §3.4). A theme remaps the same custom properties. It never introduces a property name and never introduces a class. `EventConfigProvider` writes the attribute from `config/theme.preset`.
+- The motif set comes from `data-motif-set` on the root element (design brief §3.8). A custom property cannot rewrite the asset a second custom property points at, so the set switch is an attribute for the same reason the mode and the theme are. Render a motif as a `mask-image` painted with `--color-ink-motif`, or inline it as an SVG symbol reading `currentColor` — never as an `<img>`, never as a `url()` fill.
+- The admin has its own fixed palette: the `admin-*` tokens (design brief §5.2). The admin obeys `data-mode` and ignores `data-theme`, so the `admin-*` blocks are emitted once per mode and never once per theme. `--admin-client-accent` appears in exactly two places, the active-docket marker and the page-header mark, and it falls back to `--admin-ink` when it cannot be read on the admin ground.
 - Use the rule tokens for rules: `--rule-hairline-*`, `--rule-strong-*`, `--rule-nameplate-*` (design brief §3.7). A rule never borrows an ink step and never carries brand color.
 - A form control's boundary (`input`, `select`, `textarea`) uses `--color-border-control`, never `--rule-hairline`. WCAG 1.4.11 needs 3:1 against the ground it renders on; a rule is tuned for low-contrast structure and falls well short of that bar.
 - One theme mechanism, used consistently. This repo's choice: the `config/theme`-driven custom-property chain (spec §7.2) — not ad-hoc `.dark` classes per component.

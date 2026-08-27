@@ -1641,9 +1641,14 @@
               ink: &#39;#2C3E50&#39;, inkMuted: &#39;#5C6B7A&#39;,
               success: &#39;#166534&#39;, warning: &#39;#D97706&#39;, danger: &#39;#CA3553&#39;, highlight: &#39;#D4A017&#39;
             },
-            fonts: { heading: &#39;serif-editorial&#39;, body: &#39;sans-humanist&#39;, accent: &#39;script-casual&#39; },
+            fonts: { heading: &#39;serif-editorial&#39;, body: &#39;sans-humanist&#39;, data: &#39;plex-sans&#39;, mono: &#39;plex-mono&#39; },
+            preset: &#39;broadsheet&#39; | &#39;newsroom&#39; | &#39;zine&#39; | &#39;civic&#39; | &#39;field-guide&#39; | &#39;atlas&#39;,
+            optionPicks: { headingFace: string, nameplate: string, component: string },
+            tokens: { light: { ink: &#39;#16181D&#39; }, dark: { ink: &#39;#E8EBF0&#39; } },
+            motifSet: &#39;none&#39; | &#39;botanical&#39; | &#39;fauna&#39; | &#39;cartographic&#39;,
+            adminAccent: &#39;#1A5296&#39;,              // the one client-owned colour in the admin identity
             texture: &#39;paper&#39; | &#39;flat&#39;,           // controls the bg-paper / bg-parchment treatments
-            radius: &#39;sharp&#39; | &#39;soft&#39; | &#39;round&#39;,
+            radius: &#39;sharp&#39; | &#39;small&#39; | &#39;soft&#39; | &#39;round&#39;,
             logos: {                             // Storage paths under branding/
               primary: string, mark: string, footer: string,
               ogDefault: string, favicon: string
@@ -1656,12 +1661,18 @@
           (<code>admin-*</code> tokens) stays fixed — it is operator/admin tooling, not client-facing surface, and
           letting a client theme it is a support liability.</p>
           <h3 id="74-fonts">7.4 Fonts<a class="heading-anchor" href="#74-fonts" aria-label="Link to this section">#</a></h3>
-          <p>Font families are chosen from a <strong>bundled allowlist</strong> of three-to-five self-hosted sets shipped as
-          woff2 in <code>apps/web/public/fonts</code>, not from arbitrary remote URLs. Reasons: no third-party request on
-          every page load (a real objection from institutional clients), no CSP exception, and no dependency on
-          a font CDN&#39;s availability. <code>config/theme.fonts</code> names a set id; <code>theme.css</code> emits the matching
-          <code>@font-face</code> block and <code>--font-heading</code> / <code>--font-body</code> / <code>--font-accent</code> properties. Adding a font
-          set is a PR — a deliberate, small, reviewable one.</p>
+          <p>Font families are chosen from a <strong>bundled allowlist</strong> of self-hosted sets shipped as woff2 in
+          <code>apps/web/public/fonts</code>, not from arbitrary remote URLs. Reasons: no third-party request on every
+          page load (a real objection from institutional clients), no CSP exception, and no dependency on a
+          font CDN&#39;s availability. <code>config/theme.fonts</code> names a set id, and a preset&#39;s type map names one for
+          each of the four roles; <code>theme.css</code> emits the matching <code>@font-face</code> blocks and the
+          <code>--font-heading</code> / <code>--font-body</code> / <code>--font-data</code> / <code>--font-mono</code> properties. Adding a font set is a
+          PR — a deliberate, small, reviewable one.</p>
+          <p>Design brief §4 grew the allowlist to the twenty-odd families the six presets and their curated
+          heading options need. <strong>The stylesheet declares only the faces the active preset and its picked
+          options use</strong>, plus the two fixed admin faces, so the repo carries the whole bundle and a reader
+          downloads two to four families. <code>apps/web/public/fonts/README.md</code> records every file, its weights,
+          its designer, its licence, and how it was subset.</p>
           <h3 id="75-what-stays-build-time">7.5 What stays build-time<a class="heading-anchor" href="#75-what-stays-build-time" aria-label="Link to this section">#</a></h3>
           <p>The Tailwind utility class set (Tailwind 3 generates from source scanning; a color that no source
           file references is not emitted, which is exactly why the palette must be custom properties rather
