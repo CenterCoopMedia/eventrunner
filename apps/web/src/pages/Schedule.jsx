@@ -21,11 +21,7 @@ import SessionCard from '../components/SessionCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
-
-// Page actions in the editorial register: a ruled rectangle on the theme
-// radius, never a pill (design brief §2.4).
-const ACTION_CLASS =
-  'touch-target inline-flex items-center rounded-brand border-hairline border-rule-hairline px-md py-2xs font-data text-caption font-medium text-text-primary hover:bg-surface-alt';
+import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
 // One day of the programme. The active day is marked twice over — heavier
 // weight plus a strong rule under the word — because color alone never
@@ -98,10 +94,7 @@ export default function Schedule() {
         title="This event doesn’t have a public schedule"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -132,7 +125,7 @@ export default function Schedule() {
         </div>
         <div className="flex flex-wrap items-center gap-xs">
           {features.sessionBookmarks && user && attendeeAccess ? (
-            <Link to="/schedule/mine" className={ACTION_CLASS}>
+            <Link to="/schedule/mine" className={quietActionClass}>
               My schedule
             </Link>
           ) : null}
@@ -142,7 +135,7 @@ export default function Schedule() {
               onClick={() => {
                 downloadIcs(icsFileName(eventConfig.shortName || eventConfig.name), buildIcsCalendar(eventConfig, visibleSessions));
               }}
-              className={ACTION_CLASS}
+              className={quietActionClass}
             >
               Download schedule (.ics)
             </button>

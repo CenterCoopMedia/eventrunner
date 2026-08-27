@@ -27,21 +27,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
 import { SelectField, TextAreaField, TextField } from '../admin/components/formControls.jsx';
+import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 
 const CATEGORY_OPTIONS = [
   { value: 'feedback', label: 'General feedback' },
   { value: 'bug', label: 'Something is broken' },
   { value: 'other', label: 'Other' },
 ];
-
-const modalPrimaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-accent px-md py-xs ' +
-  'font-data text-caption font-semibold text-surface hover:bg-accent-strong disabled:opacity-60';
-
-const modalSecondaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand border-hairline ' +
-  'border-rule-hairline bg-surface px-md py-xs font-data text-caption font-semibold ' +
-  'text-text-primary hover:bg-surface-alt';
 
 export default function FeedbackModal({ onClose }) {
   const titleId = useId();
@@ -124,7 +116,7 @@ export default function FeedbackModal({ onClose }) {
               {email.trim() ? " If you left an email, we'll try to send a confirmation." : null}
             </p>
             <div>
-              <button type="button" className={modalPrimaryButtonClass} onClick={onClose}>
+              <button type="button" className={primaryActionClass} onClick={onClose}>
                 Close
               </button>
             </div>
@@ -177,10 +169,10 @@ export default function FeedbackModal({ onClose }) {
             </div>
 
             <div className="flex flex-wrap justify-end gap-xs">
-              <button type="button" className={modalSecondaryButtonClass} onClick={onClose}>
+              <button type="button" className={secondaryActionClass} onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className={modalPrimaryButtonClass} disabled={submitting}>
+              <button type="submit" className={primaryActionClass} disabled={submitting}>
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
             </div>

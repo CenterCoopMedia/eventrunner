@@ -21,6 +21,7 @@ import ProfileSidebar from '../components/ProfileSidebar.jsx';
 import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import Tag from '../components/editorial/Tag.jsx';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 /**
  * Render only strings — the projection coerces these fields and the rules
@@ -58,7 +59,7 @@ export default function AttendeeProfile() {
         title="This event doesn’t have an attendee directory"
         description="Everything else about the event is on the home page."
         action={
-          <Link to="/" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }
@@ -74,7 +75,7 @@ export default function AttendeeProfile() {
         title="This profile isn’t available"
         description="It may be private, or the attendee may not have set one up."
         action={
-          <Link to="/attendees" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+          <Link to="/attendees" className={primaryActionClass}>
             Back to the directory
           </Link>
         }

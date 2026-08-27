@@ -31,6 +31,7 @@ import Rule from '../components/editorial/Rule.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 function text(value) {
   return typeof value === 'string' ? value : '';
@@ -42,10 +43,7 @@ function NotFoundState() {
       title="This speaker isn’t available"
       description="They may not have been announced yet, or the link may be out of date."
       action={
-        <Link
-          to="/speakers"
-          className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
-        >
+        <Link to="/speakers" className={primaryActionClass}>
           Back to speakers
         </Link>
       }
@@ -64,10 +62,7 @@ export default function SpeakerDetail() {
         title="This event doesn’t have a public speaker directory"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }

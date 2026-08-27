@@ -14,10 +14,8 @@
 // rounded card.
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import SignInPanel, {
-  primaryButtonClass,
-  secondaryButtonClass,
-} from '../components/SignInPanel.jsx';
+import SignInPanel from '../components/SignInPanel.jsx';
+import { primaryButtonClass, secondaryButtonClass } from '../components/controlClasses.js';
 import { IS_DEMO } from '../lib/demoMode.js';
 
 export default function Login() {

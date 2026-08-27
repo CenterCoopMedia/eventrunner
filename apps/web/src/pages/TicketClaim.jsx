@@ -25,18 +25,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { TicketClaimError, verifyTicketOrder } from '../lib/ticketClaim.js';
-
-const primaryButtonClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-accent ' +
-  'px-md py-xs font-data text-caption font-semibold text-surface hover:bg-accent-strong disabled:opacity-60';
-
-// The boundary is --color-border-control, not --rule-hairline (design brief
-// §8.1 polish, WCAG 1.4.11): a rule is tuned for low-contrast section
-// dividers, and a form control's boundary needs 3:1 against its ground.
-const inputClass =
-  'touch-target w-full rounded-brand border-hairline border-control bg-surface px-sm py-xs ' +
-  'font-body text-body text-text-primary placeholder:text-text-secondary ' +
-  'aria-[invalid=true]:border-danger';
+import { inputClass, primaryActionClass } from '../components/controlClasses.js';
 
 const Panel = ({ children }) => (
   <div className="mt-lg space-y-md border-hairline border-rule-hairline bg-surface-alt p-lg">
@@ -99,7 +88,7 @@ export default function TicketClaim() {
           title="Sign in to claim your ticket"
           description="Claiming a ticket links it to your account, so it lives behind sign-in."
           action={
-            <Link to="/signin" className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface">
+            <Link to="/signin" className={primaryActionClass}>
               Sign in
             </Link>
           }
@@ -118,7 +107,7 @@ export default function TicketClaim() {
               ? `${result.claimed} tickets on that order are now linked to your account.`
               : 'Your ticket is now linked to your account.'}
           </p>
-          <Link to="/" className={primaryButtonClass}>
+          <Link to="/" className={primaryActionClass}>
             Go to the event site
           </Link>
         </Panel>
@@ -164,7 +153,7 @@ export default function TicketClaim() {
               <span>{error.message}</span>
             </p>
           ) : null}
-          <button type="submit" disabled={submitting} className={`${primaryButtonClass} mt-md`}>
+          <button type="submit" disabled={submitting} className={`${primaryActionClass} mt-md`}>
             {submitting ? 'Checking…' : 'Claim ticket'}
           </button>
         </form>

@@ -32,6 +32,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { OtpRequestError, useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
+import {
+  inputClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from './controlClasses.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -55,24 +60,6 @@ function formatClock(totalSeconds) {
   const seconds = String(totalSeconds % 60).padStart(2, '0');
   return `${minutes}:${seconds}`;
 }
-
-// The boundary is --color-border-control, not --rule-hairline (design brief
-// §8.1 polish, WCAG 1.4.11): a rule is tuned for low-contrast section
-// dividers, and a form control's boundary needs 3:1 against its ground.
-const inputClass =
-  'touch-target w-full rounded-brand border-hairline border-control bg-surface px-sm py-xs ' +
-  'font-body text-body text-text-primary placeholder:text-text-secondary ' +
-  'aria-[invalid=true]:border-danger';
-
-export const primaryButtonClass =
-  'touch-target inline-flex w-full items-center justify-center rounded-brand ' +
-  'bg-accent px-md py-xs font-data text-caption font-semibold text-surface ' +
-  'hover:bg-accent-strong disabled:opacity-60';
-
-export const secondaryButtonClass =
-  'touch-target inline-flex w-full items-center justify-center rounded-brand ' +
-  'border-hairline border-rule-hairline bg-surface px-md py-xs font-data text-caption font-semibold ' +
-  'text-text-primary hover:bg-surface-alt disabled:opacity-60';
 
 const linkButtonClass =
   'touch-target inline-flex items-center rounded-brand px-2xs py-3xs font-data text-caption underline ' +

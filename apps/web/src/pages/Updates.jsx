@@ -18,6 +18,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import Tag from '../components/editorial/Tag.jsx';
 import { publishDateLabel, sortUpdates, toPublishDate } from '../lib/updateDates.js';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 /** First ~200 chars of the body, word-boundary trimmed, for the list card. */
 function excerpt(body, maxLen = 200) {
@@ -39,10 +40,7 @@ export default function Updates() {
         title="This event doesn’t have public updates"
         description="Everything else about the event is on the home page."
         action={
-          <Link
-            to="/"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-          >
+          <Link to="/" className={primaryActionClass}>
             Go to the home page
           </Link>
         }

@@ -21,6 +21,7 @@ import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
 import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
 import Tag from '../components/editorial/Tag.jsx';
+import { primaryActionClass } from '../components/controlClasses.js';
 
 /**
  * Render only strings. The rules type-check these fields and the projection
@@ -32,10 +33,7 @@ function text(value) {
 }
 
 const homeLink = (
-  <Link
-    to="/"
-    className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-  >
+  <Link to="/" className={primaryActionClass}>
     Go to the home page
   </Link>
 );
@@ -96,10 +94,7 @@ export default function Attendees() {
         title="Sign in to see who’s attending"
         description="The attendee directory is open to registered attendees and speakers."
         action={
-          <Link
-            to="/signin"
-            className="touch-target inline-flex items-center rounded-brand bg-accent px-md py-xs font-data text-caption font-semibold text-surface"
-          >
+          <Link to="/signin" className={primaryActionClass}>
             Go to sign in
           </Link>
         }
