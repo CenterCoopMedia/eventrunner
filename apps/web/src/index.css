@@ -234,6 +234,17 @@
     inset-block-start: 0;
     z-index: 1;
     background-color: rgb(var(--color-surface-rgb));
+    /* The ground has to be opaque: a name scrolls under this head while the
+       group is on screen and must not read through it. On the Atlas sheet an
+       opaque band would scrub the coordinate columns off the page as the
+       head travels down it, so the head reprints the columns it covers. The
+       size is the sheet's own token, which is zero in every preset but
+       Atlas, and a background sized zero is not painted — so this is off
+       everywhere else with no theme test. The sheet's rows are not reprinted:
+       the head moves against them, and a row it drew would be wrong the
+       moment the reader scrolled. */
+    background-image: var(--map-grid-columns);
+    background-size: var(--map-grid-size) var(--map-grid-size);
     padding-block-end: var(--space-3xs);
   }
   .attendee-index__entry {
@@ -612,18 +623,31 @@
      they paint above the grid rather than under it. */
   .map-grid {
     position: relative;
+    /* The sheet's column rules, named so that a section which has to lay an
+       opaque ground ON the sheet can reprint them and keep the columns
+       running through it. .attendee-index__letter is the one that does. */
+    --map-grid-columns: linear-gradient(
+      to right,
+      rgb(var(--map-grid-rgb) / 0.45) var(--rule-hairline-width),
+      transparent var(--rule-hairline-width)
+    );
   }
   .map-grid::before {
     content: '';
     position: absolute;
     inset: 0;
+    /* The sheet is drawn from the corner of the CONTENT column, not from the
+       corner of the page gutter, so anything sitting in that column lines
+       its own copy of the columns up at `0 0` with no arithmetic and no
+       knowledge of how wide the gutter happens to be. `inherit` takes the
+       gutter from the element this sheet belongs to, so the two layouts
+       Layout.jsx draws — the padded centre column and the flush rail — both
+       land on the same rule. */
+    padding-inline: inherit;
+    background-origin: content-box;
     pointer-events: none;
     background-image:
-      linear-gradient(
-        to right,
-        rgb(var(--map-grid-rgb) / 0.45) var(--rule-hairline-width),
-        transparent var(--rule-hairline-width)
-      ),
+      var(--map-grid-columns),
       linear-gradient(
         to bottom,
         rgb(var(--map-grid-rgb) / 0.45) var(--rule-hairline-width),
