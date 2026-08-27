@@ -231,9 +231,14 @@ export default function Attendees() {
                         key={profile.id}
                         className="attendee-index__entry flex flex-wrap items-baseline gap-x-sm gap-y-3xs"
                       >
+                        {/* The index's own size: one line per person, so
+                            a card-sized frame would set the row height and
+                            undo the compactness this page is for. */}
                         <ProfilePhoto
+                          size="sm"
                           photoPath={profile.photoPath}
                           displayName={profile.displayName}
+                          className="self-center"
                         />
                         <h3 className="font-heading text-body font-semibold text-text-primary">
                           <Link to={`/attendees/${profile.id}`} className="hover:underline">

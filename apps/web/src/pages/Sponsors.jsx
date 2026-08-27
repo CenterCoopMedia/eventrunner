@@ -145,7 +145,7 @@ export default function Sponsors() {
                   }}
                 >
                   {group.members.map((org) => (
-                    <li key={org.id} className="max-w-full">
+                    <li key={org.id}>
                       {/* Decorative: the organization's name is directly
                           under the mark and links to the same place, so
                           alt text here would say it twice. */}
@@ -154,7 +154,14 @@ export default function Sponsors() {
                           <AssetImage path={org.logoPath} alt="" className="" />
                         ) : null}
                       </div>
-                      <h3 className="mt-2xs font-heading text-h3 font-semibold text-text-primary">
+                      {/* The name is a caption under the mark, not a
+                          headline over a card: the wall's own weighting is
+                          what says how much of a supporter this is, so the
+                          name does not have to shout it a second time. */}
+                      <h3
+                        className="mt-2xs font-heading text-body font-semibold text-text-primary"
+                        style={{ textWrap: 'pretty' }}
+                      >
                         <SponsorName org={org} />
                       </h3>
                       {/* `arrangement` (brief §6.1) decides how much of a

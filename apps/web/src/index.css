@@ -262,6 +262,14 @@
     flex-wrap: wrap;
     gap: var(--space-md);
   }
+  /* A cell is as wide as its mark, with a little room for a long name to
+     breathe rather than run into the next cell. Both bounds come from the
+     tier's own token, so the whole wall rescales together and no name can
+     widen one cell out of the wall. */
+  .logo-wall > li {
+    min-inline-size: var(--logo-wall-mark-size);
+    max-inline-size: min(100%, calc(var(--logo-wall-mark-size) * 1.5));
+  }
   .logo-wall__mark {
     display: flex;
     align-items: center;
