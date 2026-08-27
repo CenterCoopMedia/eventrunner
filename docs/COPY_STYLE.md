@@ -88,4 +88,4 @@ npm run check:copy
 
 The check covers current hand-maintained UI, product, demo, email, print, setup, and operator copy. It does not scan tests, generated files, historical plans, architecture records, licenses, legal text, or issue history.
 
-The check blocks a small set of high-confidence promotional phrases, assistant process language, rhetorical frames, design metaphors, filler words, and long dashes. A passing check does not replace human editing.
+The check blocks a small set of high-confidence promotional phrases, assistant process language, rhetorical frames, design metaphors, and filler words. It parses JavaScript and JSX, ignores comments and code examples, and scans only the preset fields that users can read. Punctuation and sentence structure still require human review. A passing check does not replace editing.
