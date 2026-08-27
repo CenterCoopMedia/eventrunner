@@ -50,6 +50,45 @@ describe('AdminFeedback', () => {
     expect(callMock).toHaveBeenCalledWith('updateFeedbackStatus', { id: 'f1', status: 'reviewed' });
   });
 
+  it('states a failed status change on the row, not only in a toast', async () => {
+    // A toast leaves. When it does, a row whose write failed looks exactly
+    // like a row nobody touched — so the failure is stated in place, beside
+    // the control that caused it, and it stays (admin story part 5).
+    callMock.mockRejectedValueOnce(new Error('You are not signed in as an admin.'));
+    render(<AdminFeedback />);
+    pushRows([{ id: 'f1', message: 'Bug here', status: 'new', createdAt: new Date() }]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('This did not save.');
+    expect(alert.textContent).toContain('You are not signed in as an admin.');
+    expect(showToastMock).toHaveBeenCalledWith(
+      'You are not signed in as an admin.',
+      { tone: 'error' },
+    );
+  });
+
+  it('clears the failure when the next attempt starts', async () => {
+    callMock.mockRejectedValueOnce(new Error('Try again.'));
+    render(<AdminFeedback />);
+    pushRows([{ id: 'f1', message: 'Bug here', status: 'new', createdAt: new Date() }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    callMock.mockResolvedValueOnce({ id: 'f1', status: 'archived' });
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('archives a row via updateFeedbackStatus', async () => {
     callMock.mockResolvedValueOnce({ id: 'f1', status: 'archived' });
     render(<AdminFeedback />);

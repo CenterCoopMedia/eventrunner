@@ -12,7 +12,13 @@
 import { useMemo, useState } from 'react';
 import { formatBytes } from '../../../lib/mediaSource.js';
 import { AdminEmptyState, AdminLoadingState } from '../adminChrome.jsx';
-import { Notice, primaryButtonClass, secondaryButtonClass } from '../formControls.jsx';
+import {
+  Notice,
+  fieldLabelClass,
+  inputClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from '../formControls.jsx';
 import AssetImage from '../../../components/media/AssetImage.jsx';
 import { useMediaLibrary } from '../../../components/media/useMediaLibrary.js';
 import AssetModal from './AssetModal.jsx';
@@ -57,7 +63,11 @@ export default function MediaLibrary({
     <div className="flex flex-col gap-sm">
       <div className="flex flex-wrap items-end justify-between gap-sm">
         <div className="flex flex-1 flex-col gap-3xs">
-          <label htmlFor="media-search" className="text-caption font-semibold text-admin-ink">
+          {/* The label and the field read from formControls, so the search
+              box is the same control as every other field in the room —
+              a second copy of those class strings is a second answer to
+              "what does a field look like here". */}
+          <label htmlFor="media-search" className={fieldLabelClass}>
             Search the library
           </label>
           <input
@@ -66,7 +76,7 @@ export default function MediaLibrary({
             value={term}
             onChange={(event) => setTerm(event.target.value)}
             placeholder="File name, title, or description"
-            className="admin-target w-full rounded-admin border-admin-hairline border-admin-rule-strong bg-admin-ground-input px-sm py-2xs font-admin-ui text-caption text-admin-ink"
+            className={inputClass}
           />
         </div>
         <button type="button" className={primaryButtonClass} onClick={() => setUploading(true)}>

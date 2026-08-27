@@ -27,6 +27,11 @@
 //   • STRESS. Real content flatters a theme. "Stress test" swaps in an event
 //     name that wraps three times and a day with twenty-eight sessions, so
 //     a long title and a dense schedule are seen before a client sends one.
+//     The fixture is built either way — from the deployment's own sessions
+//     where there are any, from a written stand-in where there are none.
+//     A deployment with nothing entered yet is precisely who is choosing a
+//     style, and it used to be the one case where the stress test showed an
+//     empty page and called it stressed.
 //   • COMPARISON. "Compare light and dark" renders the same page twice, side
 //     by side, on both grounds. Dark mode is its own palette and it is where
 //     a brand colour usually fails; flipping a toggle and remembering is not
@@ -64,13 +69,44 @@ import { Notice, primaryButtonClass, secondaryButtonClass } from './formControls
 /**
  * The pages an operator can pull a preview of. Every one is a real route in
  * AppRoutes; the labels are the words the public navigation uses.
+ *
+ * Session detail is the odd one, and it is here because it is the page a
+ * visitor most often lands on from a shared link — the one page where a
+ * theme meets a single session's own type, room, and speakers. Its route
+ * carries an id, so `proofPath` resolves it against whatever the frame is
+ * showing rather than hard-coding one. When nothing resolves — a real
+ * deployment with no sessions yet — the page is not offered, because a
+ * preview of "this session is not available" is not a preview of a theme.
+ * The stress test always resolves, so the page is one toggle away.
  */
 export const PROOF_PAGES = Object.freeze([
-  { path: '/', label: 'Home' },
-  { path: '/schedule', label: 'Schedule' },
-  { path: '/speakers', label: 'Speakers' },
-  { path: '/updates', label: 'Updates' },
+  { id: 'home', path: '/', label: 'Home' },
+  { id: 'schedule', path: '/schedule', label: 'Schedule' },
+  { id: 'session', path: null, label: 'Session', needsSession: true },
+  { id: 'speakers', path: '/speakers', label: 'Speakers' },
+  { id: 'updates', path: '/updates', label: 'Updates' },
 ]);
+
+/** The first session the frame could open, or null when there is none. */
+export function firstPreviewSession(sessions) {
+  return (sessions ?? []).find(
+    (session) => session && session.visible !== false && typeof session.id === 'string' && session.id,
+  ) ?? null;
+}
+
+/**
+ * The route one preview page renders at, against the sessions the frame is
+ * showing.
+ *
+ * @param {{ path: string|null, needsSession?: boolean }} page
+ * @param {object[]} sessions
+ * @returns {string|null} null when the page has nothing to open
+ */
+export function proofPath(page, sessions) {
+  if (!page?.needsSession) return page?.path ?? null;
+  const session = firstPreviewSession(sessions);
+  return session ? `/schedule/${session.id}` : null;
+}
 
 /**
  * The two widths the responsive work is done against.
@@ -106,27 +142,57 @@ const STRESS_SESSION_TITLE =
   'state lines when the funding cycle and the election cycle disagree';
 
 /**
- * A day packed to a width no real programme reaches, built from whatever the
- * deployment already has so the fixture stays event-neutral.
+ * The session the fixture is built from when the deployment has none.
+ *
+ * Written here rather than drawn from the document, because the moment an
+ * operator most needs this preview is the moment they have entered nothing:
+ * a brand new deployment picking a style. The fixture used to fall back to
+ * the real schedule, which on an empty deployment meant the stress test
+ * quietly showed an empty schedule and said "stress test" under it.
+ *
+ * Event-neutral on purpose. No client is named, and nothing here reaches a
+ * published document — it exists only inside the frame while the stress
+ * test is on.
+ */
+const STRESS_BASE_SESSION = Object.freeze({
+  title: 'Panel: what a regional newsroom owes the county next door',
+  type: 'panel',
+  location: 'Hall 2',
+  description:
+    'A made-up session, shown so you can see a full row. Nothing here is saved and nothing here is published.',
+  speakerIds: [],
+  visible: true,
+});
+
+/** The day the fixture hangs on when the deployment has configured none. */
+export const STRESS_DAY = Object.freeze({ id: 'stress-day', label: 'Day one', date: '2026-03-14' });
+
+/**
+ * A day packed to a width no real programme reaches.
+ *
+ * It builds the same twenty-eight rows either way: from the deployment's own
+ * sessions where there are any, so the fixture reads as this event, and from
+ * the written stand-in where there are none. It never returns the real
+ * schedule unchanged, so "Stress test" always shows a stressed page.
  *
  * @param {object[]} sessions the real published schedule
- * @param {string|null} dayId the day to pack
+ * @param {string} dayId the day to pack
  * @returns {object[]}
  */
-function denseSchedule(sessions, dayId) {
-  const source = sessions.filter((session) => session.visible !== false);
-  if (source.length === 0 || !dayId) return sessions;
+export function denseSchedule(sessions, dayId) {
+  const source = (sessions ?? []).filter((session) => session && session.visible !== false);
+  const clock = (total) =>
+    `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
   const packed = [];
   for (let i = 0; i < STRESS_SESSION_COUNT; i += 1) {
-    const base = source[i % source.length];
+    const base = source.length > 0 ? source[i % source.length] : STRESS_BASE_SESSION;
     const minutes = 8 * 60 + i * 20;
-    const clock = (total) =>
-      `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
     packed.push({
       ...base,
       id: `stress-${i}`,
       dayId,
       order: i,
+      visible: true,
       startTime: clock(minutes),
       endTime: clock(minutes + 20),
       title: i === 0 ? STRESS_SESSION_TITLE : `${base.title} (${i + 1})`,
@@ -222,7 +288,7 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
   const frameRef = useRef(null);
   const compareRef = useRef(null);
   const columnRef = useRef(null);
-  const [path, setPath] = useState(PROOF_PAGES[0].path);
+  const [pageId, setPageId] = useState(PROOF_PAGES[0].id);
   const [viewportId, setViewportId] = useState(PREVIEW_VIEWPORTS[0].id);
   const [fit, setFit] = useState(true);
   const [stress, setStress] = useState(false);
@@ -275,19 +341,27 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
   // document, the listeners, or the saved theme.
   const realConfig = useEventConfig();
   const realContent = useContent();
+  // The fixture needs a day to hang its sessions on. A deployment that has
+  // configured none still gets one, because a brand new deployment is
+  // exactly who this preview is for.
+  const stressDay = realConfig.eventConfig?.days?.[0]?.id ? null : STRESS_DAY;
   const stressConfig = useMemo(
     () => ({
       ...realConfig,
-      eventConfig: { ...realConfig.eventConfig, name: STRESS_EVENT_NAME },
+      eventConfig: {
+        ...realConfig.eventConfig,
+        name: STRESS_EVENT_NAME,
+        ...(stressDay ? { days: [STRESS_DAY] } : null),
+      },
     }),
-    [realConfig],
+    [realConfig, stressDay],
   );
   const stressContent = useMemo(
     () => ({
       ...realContent,
       scheduleData: denseSchedule(
         realContent.scheduleData ?? [],
-        realConfig.eventConfig?.days?.[0]?.id ?? null,
+        realConfig.eventConfig?.days?.[0]?.id ?? STRESS_DAY.id,
       ),
     }),
     [realContent, realConfig],
@@ -295,12 +369,19 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
 
   const warnings = useMemo(() => themeFallbackWarnings(themeDoc), [themeDoc]);
 
-  const pageLabel = PROOF_PAGES.find((page) => page.path === path)?.label ?? path;
+  // Which pages can be offered depends on what the frame is showing: session
+  // detail needs a session to open. The frame follows the same content, so
+  // the list and the picture always agree.
+  const shownSessions = stress ? stressContent.scheduleData : realContent.scheduleData;
+  const offeredPages = PROOF_PAGES.filter((page) => proofPath(page, shownSessions));
+  const page = offeredPages.find((entry) => entry.id === pageId) ?? offeredPages[0];
+  const path = proofPath(page, shownSessions);
+
   const draftLabel = isDirty ? 'unpublished draft' : 'published theme';
   const sizeLabel = `${viewport.width}px${scale === 1 ? '' : ` at ${Math.round(scale * 100)}%`}`;
   const stressLabel = stress ? ' · stress test' : '';
   const identification = (frameMode) =>
-    `${pageLabel} · ${frameMode} · ${sizeLabel}${stressLabel} · ${draftLabel}`;
+    `${page.label} · ${frameMode} · ${sizeLabel}${stressLabel} · ${draftLabel}`;
 
   const frames = (
     <div className={compare ? 'grid grid-cols-2 gap-xs' : ''}>
@@ -331,9 +412,9 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
         <h2 className="font-admin-ui text-lead font-semibold text-admin-ink">Page preview</h2>
         <ControlGroup
           label="Page to preview"
-          value={path}
-          onChange={setPath}
-          options={PROOF_PAGES.map((page) => ({ value: page.path, label: page.label }))}
+          value={page.id}
+          onChange={setPageId}
+          options={offeredPages.map((entry) => ({ value: entry.id, label: entry.label }))}
         />
       </div>
 

@@ -20,6 +20,7 @@ import {
 import {
   TextAreaField,
   TextField,
+  fieldLabelClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../formControls.jsx';
@@ -66,7 +67,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
     >
       <form className="flex flex-col gap-sm" onSubmit={submit}>
         <div className="flex flex-col gap-3xs">
-          <label htmlFor="media-upload-file" className="text-caption font-semibold text-admin-ink">
+          <label htmlFor="media-upload-file" className={fieldLabelClass}>
             File
           </label>
           <input

@@ -17,7 +17,7 @@
 // to click, and a picker that could not express them would be a downgrade
 // from the plain field it replaces.
 import { useId, useState } from 'react';
-import { secondaryButtonClass } from '../formControls.jsx';
+import { fieldLabelClass, secondaryButtonClass } from '../formControls.jsx';
 import AssetImage from '../../../components/media/AssetImage.jsx';
 import ModalShell from './ModalShell.jsx';
 import MediaLibrary from './MediaLibrary.jsx';
@@ -35,7 +35,7 @@ export default function ImagePicker({
 
   return (
     <div className="flex flex-col gap-2xs">
-      <label htmlFor={id} className="text-caption font-semibold text-admin-ink">
+      <label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label>
       {hint ? (

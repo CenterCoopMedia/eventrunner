@@ -29,6 +29,7 @@ import {
   ServerErrorSummary,
   TextAreaField,
   TextField,
+  fieldLabelClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -342,7 +343,7 @@ export default function AdminSpeakerEditor({ mode }) {
             // this speaker stands and leaves the state alone. Editing any
             // other field on this page no longer disturbs it.
             <div className="flex flex-col gap-3xs">
-              <span className="text-caption font-semibold text-admin-ink">Status</span>
+              <span className={fieldLabelClass}>Status</span>
               <p className="text-caption text-admin-ink-secondary">
                 {PIPELINE_STATUS_LABELS[form.status] ?? form.status}
               </p>

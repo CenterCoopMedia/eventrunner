@@ -253,8 +253,22 @@ describe('the proof', () => {
     expect(screen.getAllByText(/Schedule · light · 1440px · stress test/).length)
       .toBeGreaterThan(0);
     // The frame is rendering the fixture, not the real programme.
-    // The frame is rendering the fixture, not the real programme.
     expect(frame().textContent).toContain('Roundtable: sustaining multi-newsroom');
+  });
+
+  it('previews the session page a shared link lands on', async () => {
+    // PROOF_PAGES covers the four routes a visitor navigates to. Session
+    // detail is the fifth, and it is the one page most visitors reach
+    // first — the page where a theme meets one session's own type, room,
+    // and speakers.
+    await renderBranding(PRESET_THEME);
+    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    await waitFor(() =>
+      expect(
+        within(frame()).getByRole('heading', { level: 1, name: 'Welcome and orientation' }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getAllByText(/Session · light · 1440px/).length).toBeGreaterThan(0);
   });
 
   it('names a colour it cannot read and says what is showing instead', async () => {

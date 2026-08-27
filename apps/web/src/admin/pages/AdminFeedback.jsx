@@ -69,6 +69,13 @@ export default function AdminFeedback() {
   const [listError, setListError] = useState(null);
   const [filter, setFilter] = useState('open');
   const [updatingId, setUpdatingId] = useState(null);
+  // A failed status change used to be a toast and nothing else. A toast
+  // leaves, and when it does there is no record that the write failed —
+  // the row simply still says what it said before, which reads as "nothing
+  // happened" rather than "this did not save" (admin story part 5: a
+  // result is stated in place, beside the control that caused it, and it
+  // stays). The toast still fires; it is no longer the only record.
+  const [statusError, setStatusError] = useState(null);
 
   useEffect(() => {
     return subscribeAdminCollection(
@@ -90,10 +97,12 @@ export default function AdminFeedback() {
 
   async function setStatus(id, status) {
     setUpdatingId(id);
+    setStatusError(null);
     try {
       await call('updateFeedbackStatus', { id, status });
       showToast('Feedback updated.');
     } catch (err) {
+      setStatusError({ id, message: err.message });
       showToast(err.message, { tone: 'error' });
     } finally {
       setUpdatingId(null);
@@ -155,40 +164,47 @@ export default function AdminFeedback() {
                       </a>
                     ) : null}
                   </div>
-                  <div className="flex shrink-0 flex-wrap gap-xs">
-                    {/* Only a `new` row offers "Mark reviewed" — showing it on
-                        an archived row would silently unarchive on click
-                        (status would jump straight to reviewed with no
-                        intermediate state to undo it from). */}
-                    {row.status === 'new' ? (
-                      <button
-                        type="button"
-                        className={secondaryButtonClass}
-                        onClick={() => setStatus(row.id, 'reviewed')}
-                        disabled={updatingId === row.id}
-                      >
-                        Mark reviewed
-                      </button>
+                  <div className="flex shrink-0 flex-col items-end gap-2xs">
+                    {/* The failure stays beside the buttons that caused it,
+                        on the row it belongs to, until the next attempt. */}
+                    {statusError?.id === row.id ? (
+                      <Notice tone="error" message={`This did not save. ${statusError.message}`} />
                     ) : null}
-                    {row.status !== 'archived' ? (
-                      <button
-                        type="button"
-                        className={secondaryButtonClass}
-                        onClick={() => setStatus(row.id, 'archived')}
-                        disabled={updatingId === row.id}
-                      >
-                        Archive
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className={secondaryButtonClass}
-                        onClick={() => setStatus(row.id, 'new')}
-                        disabled={updatingId === row.id}
-                      >
-                        Restore
-                      </button>
-                    )}
+                    <div className="flex flex-wrap gap-xs">
+                      {/* Only a `new` row offers "Mark reviewed" — showing it on
+                          an archived row would silently unarchive on click
+                          (status would jump straight to reviewed with no
+                          intermediate state to undo it from). */}
+                      {row.status === 'new' ? (
+                        <button
+                          type="button"
+                          className={secondaryButtonClass}
+                          onClick={() => setStatus(row.id, 'reviewed')}
+                          disabled={updatingId === row.id}
+                        >
+                          Mark reviewed
+                        </button>
+                      ) : null}
+                      {row.status !== 'archived' ? (
+                        <button
+                          type="button"
+                          className={secondaryButtonClass}
+                          onClick={() => setStatus(row.id, 'archived')}
+                          disabled={updatingId === row.id}
+                        >
+                          Archive
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className={secondaryButtonClass}
+                          onClick={() => setStatus(row.id, 'new')}
+                          disabled={updatingId === row.id}
+                        >
+                          Restore
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </li>
