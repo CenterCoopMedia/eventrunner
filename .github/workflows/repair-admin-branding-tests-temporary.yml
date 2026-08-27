@@ -1,0 +1,49 @@
+name: Temporary AdminBranding test repair
+
+on:
+  push:
+    branches:
+      - agent/plain-language-copy
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    name: Update stale copy assertions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/plain-language-copy
+          fetch-depth: 0
+      - name: Update the assertions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/src/admin/pages/AdminBranding.test.jsx')
+          text = path.read_text()
+          replacements = {
+              "expect(screen.getByText(/Best for: Formal programmes/)).toBeInTheDocument();":
+                  "expect(screen.getByText(/Best for: Use this style for formal programmes/)).toBeInTheDocument();",
+              "expect(screen.getByText(/Hairline rows, times in the agate column/)).toBeInTheDocument();":
+                  "expect(screen.getByText(/Uses hairline rows and a separate time column/)).toBeInTheDocument();",
+          }
+          for old, new in replacements.items():
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected one occurrence of {old!r}; found {count}.')
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
+      - name: Commit the test update
+        run: |
+          set -euo pipefail
+          git config user.name "Joe Amditis"
+          git config user.email "6799804+jamditis@users.noreply.github.com"
+          git add apps/web/src/admin/pages/AdminBranding.test.jsx
+          git commit -m "test: update branding copy assertions" \
+            -m "Match the direct preset descriptions now shown in the staff workflow." \
+            -m "Signed-off-by: Joe Amditis <6799804+jamditis@users.noreply.github.com>"
+          git push origin HEAD:agent/plain-language-copy
