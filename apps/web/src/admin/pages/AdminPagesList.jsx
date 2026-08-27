@@ -13,8 +13,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
-import EmptyState from '../../components/EmptyState.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { summarizePublish } from '../publishResult.js';
@@ -24,7 +22,12 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
-import AdminPageHeader, { RecordState, proofRowClass } from '../components/adminChrome.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  RecordState,
+  proofRowClass,
+} from '../components/adminChrome.jsx';
 
 export default function AdminPagesList() {
   const { rows, loading, error } = useAdminPages();
@@ -137,9 +140,9 @@ export default function AdminPagesList() {
       ) : null}
 
       {loading ? (
-        <LoadingState label="Loading pages…" />
+        <AdminLoadingState label="Loading pages…" />
       ) : rows.length === 0 ? (
-        <EmptyState
+        <AdminEmptyState
           title="No pages yet"
           description="Create the first page — a title, a path, and the sections its content lives in."
           action={

@@ -95,10 +95,16 @@ async function renderAt(path) {
   // gate holds on (AdminGate renders "Checking your access…" until it
   // answers). Waiting only for the chunk lets an assertion run while the
   // gate is still checking, which is a flake under load, not a bug.
-  await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
-  });
+  await waitFor(
+    () => {
+      expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    },
+    // The admin chunk now pulls the whole public app in with it (the theme
+    // editor's frame renders real pages), so the first mount in a file can
+    // outrun the default budget on a loaded machine.
+    { timeout: 5000 },
+  );
   return result;
 }
 
@@ -120,7 +126,7 @@ describe('speakers list', () => {
     ];
     await renderAt('/admin/speakers');
 
-    expect(screen.getByRole('link', { name: 'Rae Okonkwo' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Rae Okonkwo' })).toBeInTheDocument();
     // Two axes, two words: the record's state in the admin's three-word
     // vocabulary (brief §5.2), and where the speaker is in the invitation
     // pipeline, which is a different question.

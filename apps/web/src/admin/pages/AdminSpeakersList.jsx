@@ -35,8 +35,6 @@
 // that will never arrive.
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import EmptyState from '../../components/EmptyState.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import { useAdminApi } from '../adminApi.js';
 import {
@@ -46,7 +44,12 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
-import AdminPageHeader, { RecordState, proofRowClass } from '../components/adminChrome.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  RecordState,
+  proofRowClass,
+} from '../components/adminChrome.jsx';
 import { deadMatter, state } from '../recordState.js';
 
 /**
@@ -190,9 +193,9 @@ export default function AdminSpeakersList() {
       ) : null}
 
       {loading ? (
-        <LoadingState label="Loading speakers…" />
+        <AdminLoadingState label="Loading speakers…" />
       ) : speakers.length === 0 ? (
-        <EmptyState
+        <AdminEmptyState
           title="No speakers yet"
           description="Add the first speaker — a name is all that's required; the rest can follow."
           action={

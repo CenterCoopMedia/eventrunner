@@ -7,8 +7,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
-import EmptyState from '../../components/EmptyState.jsx';
-import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
@@ -21,7 +19,12 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
-import AdminPageHeader, { RecordState, proofRowClass } from '../components/adminChrome.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  RecordState,
+  proofRowClass,
+} from '../components/adminChrome.jsx';
 
 export default function AdminContentSection() {
   const { pageId, sectionId } = useParams();
@@ -49,11 +52,11 @@ export default function AdminContentSection() {
   const atMax = contentLoading || blocks.length >= maxBlocks;
 
   if ((pagesLoading || contentLoading) && !section) {
-    return <LoadingState label="Loading section…" />;
+    return <AdminLoadingState label="Loading section…" />;
   }
   if (!pagesLoading && (!page || !section)) {
     return (
-      <EmptyState
+      <AdminEmptyState
         title="No such section"
         description="That section doesn’t exist on this page (any more)."
         action={
@@ -148,7 +151,7 @@ export default function AdminContentSection() {
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 
       {blocks.length === 0 ? (
-        <EmptyState
+        <AdminEmptyState
           title="No blocks yet"
           description="Add the first content block for this section."
           action={addBlockButton}

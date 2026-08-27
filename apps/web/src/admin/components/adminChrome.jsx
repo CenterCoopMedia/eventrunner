@@ -61,6 +61,41 @@ export function proofRowClass(stateId, resolved = false) {
 }
 
 /**
+ * The room's own empty state. Same device as the public EmptyState — a rule,
+ * one plain sentence, and exactly one next action — set in admin ink on the
+ * admin ground, because a client's preset never reaches this surface.
+ *
+ * @param {{ title: string, description?: string, action?: React.ReactNode }} props
+ */
+export function AdminEmptyState({ title, description, action = null }) {
+  return (
+    <div className="py-lg">
+      <div className="border-admin-rule-hairline border-t-admin-hairline" />
+      <h2 className="mt-md font-admin-ui text-lead font-semibold text-admin-ink">{title}</h2>
+      {description ? (
+        <p className="mt-2xs max-w-[65ch] text-caption text-admin-ink-secondary">{description}</p>
+      ) : null}
+      {action ? <div className="mt-sm">{action}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * Loading is a stated line, not a loop (brief §2.2): no spinner, no
+ * skeleton, no shimmer. Ambient animation is banned outright, and the room
+ * does not perform.
+ *
+ * @param {{ label: string }} props
+ */
+export function AdminLoadingState({ label }) {
+  return (
+    <p role="status" aria-label={label} className="py-md font-admin-data text-caption text-admin-ink-secondary">
+      {label}
+    </p>
+  );
+}
+
+/**
  * The job line.
  *
  * @param {object} props
