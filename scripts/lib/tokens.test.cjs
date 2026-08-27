@@ -159,6 +159,42 @@ test("a light deployment gets no first-paint override; dark and system do", () =
   assert.match(system, /:root:not\(\[data-mode\]\) \{/);
 });
 
+test('the admin set gets the first-paint block too, on the same policy', () => {
+  // The admin renders on the same page and paints the same first frame. Its
+  // only attribute-free baseline is the LIGHT one, so without this block a
+  // dark or system deployment flashed the light room before React wrote
+  // data-mode — the public palette had the fix and the admin did not.
+  const { names, values } = resolveAdminTokens(THEME, loadTokens());
+  const marker = names[0];
+  const firstPaint = (css) =>
+    [...css.matchAll(/:root:not\(\[data-mode\]\) \{([^}]*)\}/g)].map((m) => m[1]);
+
+  // Light: no first-paint block at all, admin or palette.
+  assert.deepEqual(firstPaint(buildTokenCss({ ...THEME, mode: 'light' })), []);
+
+  for (const mode of ['dark', 'system']) {
+    const blocks = firstPaint(buildTokenCss({ ...THEME, mode }));
+    const adminBlock = blocks.find((block) => block.includes(`${marker}:`));
+    assert.ok(adminBlock, `the ${mode} policy gives the admin set a first-paint block`);
+    for (const name of names) {
+      assert.match(
+        adminBlock,
+        new RegExp(`${name}: ${values.dark[name].replace(/[()]/g, '\\$&')};`),
+        `${name} paints its DARK value before data-mode lands`,
+      );
+    }
+    // The palette keeps its own block: two sets, two blocks, one policy.
+    assert.equal(blocks.length, 2, `${mode} emits one first-paint block per token set`);
+  }
+
+  // Under 'system' both blocks sit inside the media query, so a reader whose
+  // setting is light never sees either of them.
+  const system = buildTokenCss({ ...THEME, mode: 'system' });
+  const queries = [...system.matchAll(/@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\n\}/g)];
+  assert.equal(queries.length, 2);
+  assert.ok(queries.some((q) => q[1].includes(`${marker}:`)), 'the admin block is inside the query');
+});
+
 
 // ------------------------------------------------------- presets (brief §4)
 
@@ -318,6 +354,10 @@ test('a picked heading option changes the face the heading role resolves to', ()
 // ------------------------------------------------- the admin set (brief §8.2)
 
 test('the admin set is emitted once per mode and never inside a theme block', () => {
+  // THEME is the light default, so the two occurrences are exactly the two
+  // modes. A dark or system deployment repeats the dark values once more
+  // under :root:not([data-mode]) — the first-paint block above — and that
+  // repeat is per POLICY, still never per theme.
   const css = buildTokenCss(THEME);
   const { names } = resolveAdminTokens(THEME, loadTokens());
   assert.ok(names.length > 20, 'the admin set is not nearly empty');

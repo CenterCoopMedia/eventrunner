@@ -548,6 +548,45 @@ function colorBlock(selector, names, values, comment) {
 }
 
 /**
+ * The first-paint dark block a non-light deployment needs, for one token set.
+ *
+ * The attribute-free baseline carries the LIGHT values, because that is what
+ * a light deployment renders and what an unstyled page should fall back to.
+ * On a dark or system deployment that baseline is wrong for the moment
+ * between first paint and the runtime writing `data-mode`, and the reader
+ * sees a flash of the other mode. So the dark values are repeated under
+ * `:root:not([data-mode])`, which stops matching the instant the attribute
+ * lands.
+ *
+ * Every token set that has a light baseline needs this — the palette and the
+ * admin set alike. The admin ships on the same page as the public tokens and
+ * paints the same first frame; leaving it out meant an admin on a dark
+ * deployment flashed the light room before React mounted.
+ *
+ * @param {string} policy the mode policy (`light` | `dark` | `system`)
+ * @param {string[]} names token order
+ * @param {Record<string, string>} dark the dark values
+ * @param {string} comment
+ * @returns {string[]} CSS lines, empty under the `light` policy
+ */
+function firstPaintDarkBlock(policy, names, dark, comment) {
+  if (policy === 'dark') {
+    return ['', ...colorBlock(':root:not([data-mode])', names, dark, comment)];
+  }
+  if (policy === 'system') {
+    return [
+      '',
+      `/* ${comment} */`,
+      '@media (prefers-color-scheme: dark) {',
+      ...colorBlock(':root:not([data-mode])', names, dark, 'Dark until data-mode lands.')
+        .map((line) => `  ${line}`),
+      '}',
+    ];
+  }
+  return [];
+}
+
+/**
  * Every custom property `config/theme` resolves to, as CSS text.
  *
  * The color blocks follow brief §3.3 with one addition: an attribute-free
@@ -612,26 +651,16 @@ function buildTokenCss(theme, { tokensDir } = {}) {
       ),
     );
 
-    if (policy === 'dark') {
-      lines.push('');
-      lines.push(
-        ...colorBlock(
-          ':root:not([data-mode])',
-          names,
-          values.dark,
-          "config/theme.mode is 'dark', so first paint is dark too.",
-        ),
-      );
-    } else if (policy === 'system') {
-      lines.push('');
-      lines.push("/* config/theme.mode is 'system': first paint follows the reader's setting. */");
-      lines.push('@media (prefers-color-scheme: dark) {');
-      lines.push(
-        ...colorBlock(':root:not([data-mode])', names, values.dark, 'Dark until data-mode lands.')
-          .map((line) => `  ${line}`),
-      );
-      lines.push('}');
-    }
+    lines.push(
+      ...firstPaintDarkBlock(
+        policy,
+        names,
+        values.dark,
+        policy === 'dark'
+          ? "config/theme.mode is 'dark', so first paint is dark too."
+          : "config/theme.mode is 'system': first paint follows the reader's setting.",
+      ),
+    );
 
     // One block per (preset, mode) pair (brief §3.4). The ACTIVE preset's
     // pair carries this deployment's resolved palette — its stored colors
@@ -661,9 +690,11 @@ function buildTokenCss(theme, { tokensDir } = {}) {
     }
   }
 
-  // The admin set, emitted ONCE PER MODE. It never appears inside a
-  // [data-theme] block, and that is the testable form of "the admin ignores
-  // data-theme" (admin story part 6, brief §8.2).
+  // The admin set, emitted ONCE PER MODE — plus the same first-paint block
+  // the palette gets, because the admin renders on the same page and paints
+  // the same first frame. It never appears inside a [data-theme] block, and
+  // that is the testable form of "the admin ignores data-theme" (admin story
+  // part 6, brief §8.2).
   const adminTokens = resolveAdminTokens(theme, tokens);
   if (adminTokens.names.length > 0) {
     lines.push('');
@@ -683,6 +714,18 @@ function buildTokenCss(theme, { tokensDir } = {}) {
         adminTokens.names,
         adminTokens.values.dark,
         'Admin identity — dark, the night side. Authored value by value.',
+      ),
+    );
+    lines.push(
+      ...firstPaintDarkBlock(
+        policy,
+        adminTokens.names,
+        adminTokens.values.dark,
+        policy === 'dark'
+          ? "Admin identity — first paint. config/theme.mode is 'dark', so the room " +
+            'is dark before React writes data-mode.'
+          : "Admin identity — first paint. config/theme.mode is 'system', so the room " +
+            "follows the reader's setting until data-mode lands.",
       ),
     );
   }
