@@ -99,6 +99,22 @@
   text-decoration: none;
 }
 
+/* Dense is not cramped. A mouse gets the docket's own rhythm above — a
+   caption line and 4px, entries flush against each other so there is no
+   dead space between two words. A finger gets the 44px bar instead
+   (interface guidelines, Accessibility). The word does not move on its
+   line and neither the size nor the leading changes: only the air around
+   the word grows, so the docket still reads as a list of words rather
+   than a stack of buttons. A caption line at this leading is under 21px,
+   so 12px each side carries most of the bar and the floor carries the
+   rest at the smallest caption size. */
+@media (pointer: coarse) {
+  .docs-nav li a {
+    padding-block: var(--space-sm);
+    min-block-size: 44px;
+  }
+}
+
 /* The current item thickens the rail it already sits on. Four signals, never
    colour alone: the marker, the weight, the ink step, and aria-current. */
 .docs-nav li a.is-current {
