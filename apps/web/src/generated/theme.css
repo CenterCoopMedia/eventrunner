@@ -972,7 +972,7 @@
   --admin-state-ok-rgb: 24 88 56;
   --admin-focus-ring-rgb: 26 66 116;
   --admin-client-accent-ink-rgb: 246 244 240;
-  --admin-client-accent-rgb: var(--admin-ink-rgb);
+  --admin-client-accent-rgb: 178 30 50;
   --admin-nav-active-marker-rgb: var(--admin-client-accent-rgb);
   --admin-page-header-mark-rgb: var(--admin-client-accent-rgb);
 }
@@ -1001,7 +1001,7 @@
   --admin-state-ok-rgb: 122 198 148;
   --admin-focus-ring-rgb: 130 180 236;
   --admin-client-accent-ink-rgb: 24 23 22;
-  --admin-client-accent-rgb: var(--admin-ink-rgb);
+  --admin-client-accent-rgb: 240 122 134;
   --admin-nav-active-marker-rgb: var(--admin-client-accent-rgb);
   --admin-page-header-mark-rgb: var(--admin-client-accent-rgb);
 }

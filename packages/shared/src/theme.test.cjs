@@ -15,8 +15,13 @@ const {
   DARK_MIN_CONTRAST_UI,
   THEME_CONTRAST_PAIRS,
   THEME_PRESET_IDS,
+  THEME_DOC_KEYS,
+  ADMIN_TOKEN_SET,
   DEFAULT_PRESET_ID,
   recommendedConfiguration,
+  deriveBrandSteps,
+  resolveAdminAccent,
+  resolveThemePalettes,
   findThemeContrastFailures,
   getPreset,
   resolveComponentFonts,
@@ -377,4 +382,157 @@ test('both spellings of a palette key normalize to the same role', () => {
   for (const role of Object.values(THEME_COLOR_KEY_ALIASES)) {
     assert.ok(THEME_COLOR_KEYS.includes(role), `${role} is a known role`);
   }
+});
+
+/* -------------------------------------------------------------------------
+ * The brand colour and the steps derived from it (owner review, 2026-08-27).
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Brand colours chosen to be hostile, not representative. Every one of them
+ * is something a client has actually handed an operator: a logo colour that
+ * is nearly white, one that is nearly black, a fluorescent, a mid grey with
+ * no useful contrast anywhere, and a saturated blue that is fine in light
+ * and invisible in dark. Written as channels, because the repo lint bans hex
+ * literals in this file.
+ */
+const HOSTILE_BRAND_RGB = Object.freeze([
+  [255, 255, 255],
+  [0, 0, 0],
+  [255, 240, 0],
+  [128, 128, 128],
+  [10, 20, 200],
+  [255, 0, 128],
+  [0, 255, 200],
+  [120, 90, 60],
+]);
+
+test('a brand colour that already reads is used exactly as the client gave it', () => {
+  // Nothing is "corrected" for its own sake. The derivation only moves a
+  // value that would otherwise fail, so a client who picked well sees their
+  // own colour on the page.
+  const ground = getPreset('civic').palette.light.surface;
+  const brand = getPreset('civic').palette.light.primary;
+  assert.ok(contrastRatio(brand, ground) >= 4.5, 'the fixture is already legible');
+  assert.deepEqual(deriveBrandSteps(brand, ground).primary, [...brand]);
+});
+
+test('the derived steps are ordered, and each one clears the bar written for it', () => {
+  for (const brand of HOSTILE_BRAND_RGB) {
+    for (const id of THEME_PRESET_IDS) {
+      for (const mode of ['light', 'dark']) {
+        const ground = getPreset(id).palette[mode].surface;
+        const steps = deriveBrandSteps(brand, ground);
+
+        // The two text-carrying steps hold the 4.5:1 bar; the soft step
+        // carries no text and holds the 3:1 non-text bar.
+        assert.ok(
+          contrastRatio(steps.primary, ground) >= 4.5,
+          `${id}/${mode}: primary from ${brand.join(',')}`,
+        );
+        assert.ok(
+          contrastRatio(steps.primaryDark, ground) >= 4.5,
+          `${id}/${mode}: primaryDark from ${brand.join(',')}`,
+        );
+        assert.ok(
+          contrastRatio(steps.primaryLight, ground) >= 3,
+          `${id}/${mode}: primaryLight from ${brand.join(',')}`,
+        );
+
+        // The ladder points the right way on both grounds: emphasis is
+        // FURTHER from the ground than primary, and the soft step is nearer.
+        // "Darker" on a light ground and "brighter" on a dark one are the
+        // same instruction stated as contrast.
+        assert.ok(
+          contrastRatio(steps.primaryDark, ground) >= contrastRatio(steps.primary, ground),
+          `${id}/${mode}: emphasis reads stronger`,
+        );
+        assert.ok(
+          contrastRatio(steps.primaryLight, ground) <= contrastRatio(steps.primary, ground) + 0.01,
+          `${id}/${mode}: the soft step reads softer`,
+        );
+      }
+    }
+  }
+});
+
+test('a brand colour publishes clean on every style, in both modes', () => {
+  // THE CONTRAST PROOF. `findThemeContrastFailures` is what `updateTheme`
+  // rejects a publish on. A client brand colour must never be able to
+  // produce a document that fails it, because the whole point of deriving
+  // the supporting steps is that the client stops being asked to get colour
+  // science right. Eight hostile brand colours across six styles and two
+  // modes is 96 published documents.
+  for (const brand of HOSTILE_BRAND_RGB) {
+    for (const id of THEME_PRESET_IDS) {
+      const theme = { ...recommendedConfiguration(id), brandColor: rgbToHex(brand) };
+      assert.deepEqual(
+        findThemeContrastFailures(theme),
+        [],
+        `${id} with brand ${rgbToHex(brand)}`,
+      );
+    }
+  }
+});
+
+test('the brand colour moves the brand steps and leaves the style alone', () => {
+  // Deriving the accent and the semantics from a client's brand would make
+  // the six styles one style in six hues. The ground, the ink, the style's
+  // own accent, and the five semantic roles are untouched.
+  const base = resolveThemePalettes(recommendedConfiguration('field-guide'));
+  const branded = resolveThemePalettes({
+    ...recommendedConfiguration('field-guide'),
+    brandColor: rgbToHex([10, 20, 200]),
+  });
+  for (const mode of ['light', 'dark']) {
+    for (const role of ['primary', 'primaryDark', 'primaryLight']) {
+      assert.notDeepEqual(branded[mode][role], base[mode][role], `${mode}.${role} moved`);
+    }
+    for (const role of ['surface', 'surfaceAlt', 'ink', 'inkMuted', 'accent',
+      'success', 'warning', 'danger', 'highlight', 'keynote']) {
+      assert.deepEqual(branded[mode][role], base[mode][role], `${mode}.${role} held`);
+    }
+  }
+});
+
+test('an expert per-token override still wins over the derived value', () => {
+  // The derivation is the default, not a cage. The Advanced path keeps the
+  // last word — and a failing override is still a publish error, which is
+  // what the live contrast check in the editor is there to catch first.
+  const chosen = rgbToHex([26, 82, 150]);
+  const theme = {
+    ...recommendedConfiguration('newsroom'),
+    brandColor: rgbToHex([255, 0, 128]),
+    tokens: { light: { primary: chosen } },
+  };
+  const palettes = resolveThemePalettes(theme);
+  assert.equal(rgbToHex(palettes.light.primary), chosen);
+  // The mode the override does not name keeps the derived value.
+  assert.notEqual(rgbToHex(palettes.dark.primary), chosen);
+});
+
+test('the admin marker takes the resolved brand colour, with its floor intact', () => {
+  // There is no adminAccent field any more: the marker is the site's own
+  // brand colour, and the only question left is whether it can be seen on
+  // the admin ground.
+  assert.ok(!THEME_DOC_KEYS.includes('adminAccent'));
+  assert.ok(THEME_DOC_KEYS.includes('brandColor'));
+
+  const theme = { ...recommendedConfiguration('civic'), brandColor: rgbToHex([122, 31, 61]) };
+  const marker = resolveAdminAccent(theme, 'light');
+  assert.deepEqual(marker.rgb, [122, 31, 61]);
+  assert.equal(marker.fellBack, false);
+
+  // A resolved primary that cannot sit on the admin ground steps aside for
+  // the admin's own ink rather than rendering as nothing.
+  const onDarkGround = resolveAdminAccent(
+    { colors: { primary: rgbToHex([235, 232, 227]), surface: rgbToHex([17, 17, 17]), ink: rgbToHex([255, 255, 255]) } },
+    'light',
+  );
+  assert.equal(onDarkGround.fellBack, true);
+  assert.deepEqual(onDarkGround.rgb, [...ADMIN_TOKEN_SET.colors['--admin-ink-rgb'].light]);
+
+  // A document that resolves no palette at all leaves the token on its
+  // declared default.
+  assert.deepEqual(resolveAdminAccent({}, 'light'), { rgb: null, ratio: null, fellBack: false });
 });

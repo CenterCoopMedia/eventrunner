@@ -22,9 +22,9 @@
 // write and states the same three facts (functions/src/admin/config.cjs).
 //
 // WHAT IS SAVED. config/theme is a WHOLE-DOC replace, so the payload always
-// carries every field together: preset, optionPicks, tokens, motifSet,
-// adminAccent, mode, fonts, texture, radius, logos, and colors. Dropping one
-// on a save would silently delete it — which is exactly what would happen to
+// carries every field together: preset, optionPicks, brandColor, tokens,
+// motifSet, mode, fonts, texture, radius, logos, and colors. Dropping one on
+// a save would silently delete it — which is exactly what would happen to
 // `preset` if this form still sent the pre-preset shape.
 //
 // Logo/asset slots are unchanged: config/theme.logos holds PATHS into the
@@ -150,7 +150,7 @@ function toForm(theme) {
     fonts,
     logos,
     motifSet: MOTIF_SET_IDS.includes(theme?.motifSet) ? theme.motifSet : '',
-    adminAccent: typeof theme?.adminAccent === 'string' ? theme.adminAccent : '',
+    brandColor: typeof theme?.brandColor === 'string' ? theme.brandColor : '',
     texture: TEXTURE_IDS.includes(theme?.texture) ? theme.texture : TEXTURE_IDS[0],
     radius: RADIUS_IDS.includes(theme?.radius) ? theme.radius : RADIUS_IDS[1] ?? RADIUS_IDS[0],
     // A stored document that predates the mode policy has no `mode`, and
@@ -194,7 +194,7 @@ export function toThemeDoc(form) {
   }
   if (Object.keys(tokens).length > 0) doc.tokens = tokens;
   if (form.motifSet) doc.motifSet = form.motifSet;
-  if (form.adminAccent.trim()) doc.adminAccent = form.adminAccent.trim();
+  if (form.brandColor.trim()) doc.brandColor = form.brandColor.trim();
   return doc;
 }
 
@@ -433,7 +433,7 @@ export default function AdminBranding() {
             </Panel>
           ) : null}
 
-          <Panel title="Motifs, mode, and the admin mark">
+          <Panel title="Motifs, mode, and the brand colour">
             <div className="flex flex-col gap-sm">
               <SelectField
                 label="Motif set"
@@ -460,18 +460,19 @@ export default function AdminBranding() {
                 error={fieldErrors.get('theme.mode')}
               />
               <TextField
-                label="Admin marker colour"
-                value={form.adminAccent}
-                onChange={(value) => setForm((c) => ({ ...c, adminAccent: value }))}
-                hint="A hex colour. The admin uses it in exactly two places: the marker beside the section you are in, and the mark on the page-header rule. Leave it blank for the admin's own ink."
-                error={fieldErrors.get('theme.adminAccent')}
+                label="Main brand colour"
+                value={form.brandColor}
+                onChange={(value) => setForm((c) => ({ ...c, brandColor: value }))}
+                hint="A hex colour — the client's own. The supporting shades are worked out from it for light and dark, so they always stay readable. Leave it blank to keep the style's own colour."
+                error={fieldErrors.get('theme.brandColor')}
               />
-              {/* The legibility floor, stated plainly. The value is never
-                  clamped: the admin says what it fell back to instead. */}
+              {/* The admin marker's legibility floor, stated plainly. The
+                  site keeps painting the client's colour; only the admin
+                  marker steps aside, and it says so. */}
               {accent.fellBack ? (
                 <Notice
                   tone="caution"
-                  message={`That colour reads at ${accent.ratio.toFixed(2)}:1 against the ${proofMode} admin ground, below the ${accent.floor}:1 floor a position marker needs. The admin marker falls back to its own ink. Your value is stored exactly as you typed it.`}
+                  message={`This colour reads at ${accent.ratio.toFixed(2)}:1 against the ${proofMode} admin ground, below the ${accent.floor}:1 floor a position marker needs. The marker beside the section you are in falls back to the admin's own ink. The site itself is unaffected.`}
                 />
               ) : null}
             </div>

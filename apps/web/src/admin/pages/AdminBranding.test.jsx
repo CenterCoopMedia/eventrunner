@@ -8,7 +8,7 @@
 //   • The frame renders the client's REAL page, not swatches.
 //   • Two depths: the curated pickers first, raw tokens behind a disclosure.
 //   • The whole-document replace really is whole — a save carries preset,
-//     optionPicks, tokens, motifSet, adminAccent, mode, fonts, and logos
+//     optionPicks, brandColor, tokens, motifSet, mode, fonts, and logos
 //     together. Dropping one would silently delete it.
 //   • A contrast failure is stated inline with the pair, the mode, and the
 //     ratio, and the frame keeps rendering.
@@ -89,7 +89,7 @@ const PRESET_THEME = {
   optionPicks: { headingFace: 'libre-baskerville', nameplate: 'full-measure' },
   tokens: { light: { surface: hex('f7f4ee') } },
   motifSet: 'none',
-  adminAccent: hex('1a3a6e'),
+  brandColor: hex('1a3a6e'),
   colors: {},
   fonts: {},
   texture: 'flat',
@@ -251,13 +251,27 @@ describe('the curated depth', () => {
     expect(screen.getByLabelText('Surface — light').closest('[hidden]')).toBeNull();
   });
 
-  it('states the accent’s legibility floor plainly when it falls back', async () => {
-    // A client picks this value, so it may be unreadable on an admin ground.
-    // The system never clamps it: it says what it fell back to.
-    await renderBranding({ ...PRESET_THEME, adminAccent: hex('eae8e3') });
+  it('asks for one brand colour and derives the supporting shades from it', async () => {
+    // The operator picks the client's colour. The emphasis and soft steps
+    // are worked out for both modes, so there is nothing else to get wrong.
+    await renderBranding({ ...PRESET_THEME, brandColor: hex('7a1f3d') });
+    expect(screen.getByLabelText('Main brand colour')).toHaveValue(hex('7a1f3d'));
+    await waitFor(() => expect(previewCss()).toContain('--brand-primary-rgb: 122 31 61;'));
+    // The supporting steps are present and are not the style's own.
+    expect(previewCss()).toMatch(/--brand-primary-dark-rgb: \d+ \d+ \d+;/);
+    expect(previewCss()).toMatch(/--brand-primary-light-rgb: \d+ \d+ \d+;/);
+  });
+
+  it('states the admin marker’s legibility floor plainly when it falls back', async () => {
+    // The marker takes the site's own brand colour, so the only question is
+    // whether it can be seen on the admin ground. Nothing is clamped: the
+    // editor says what the marker fell back to, and the site is unaffected.
+    await renderBranding({
+      preset: null,
+      colors: { primary: hex('ebe8e3'), surface: hex('111111'), ink: hex('ffffff') },
+    });
     expect(screen.getByText(/below the 3:1 floor a position marker needs/)).toBeInTheDocument();
-    expect(screen.getByText(/falls back to its own ink/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Admin marker colour')).toHaveValue(hex('eae8e3'));
+    expect(screen.getByText(/falls back to the admin's own ink/)).toBeInTheDocument();
   });
 });
 
@@ -305,7 +319,7 @@ describe('the advanced depth', () => {
 });
 
 describe('publishing the theme', () => {
-  it('posts the WHOLE document: preset, picks, tokens, motif set, accent, mode', async () => {
+  it('posts the WHOLE document: preset, picks, brand colour, tokens, motif set, mode', async () => {
     // config/theme is a whole-doc replace, so a field this form forgets to
     // send is a field the save deletes. That is how the preset pipeline
     // would quietly disappear on the first logo edit.
@@ -324,7 +338,7 @@ describe('publishing the theme', () => {
     expect(theme.optionPicks).toMatchObject({ headingFace: 'libre-baskerville' });
     expect(theme.tokens).toEqual({ light: { surface: hex('f7f4ee') } });
     expect(theme.motifSet).toBe('none');
-    expect(theme.adminAccent).toBe(hex('1a3a6e'));
+    expect(theme.brandColor).toBe(hex('1a3a6e'));
     expect(theme.mode).toBe('light');
     expect(theme.texture).toBe('flat');
     expect(theme.radius).toBe('sharp');

@@ -371,15 +371,33 @@ test('the admin set is emitted once per mode and never inside a theme block', ()
   }
 });
 
-test('the client accent falls back to the admin ink when it cannot be read', () => {
-  // Admin story part 6f: never clamp, never render an invisible marker.
-  const unreadable = buildTokenCss({ ...THEME, adminAccent: `#${'ebe8e3'}` });
-  const light = unreadable.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
-  assert.match(light[1], /--admin-client-accent-rgb: 28 27 25;/);
-
-  const readable = buildTokenCss({ ...THEME, adminAccent: `#${'1a5296'}` });
+test('the admin marker takes the resolved brand colour, and falls back to admin ink when it cannot be read', () => {
+  // Owner review 2026-08-27: there is no separate admin marker colour to
+  // pick. The marker takes the brand colour the site itself paints. The
+  // legibility floor from admin story part 6f is unchanged and still does
+  // the work — never clamp, never render an invisible marker.
+  const readable = buildTokenCss(THEME);
   const ok = readable.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
-  assert.match(ok[1], /--admin-client-accent-rgb: 26 82 150;/);
+  assert.match(ok[1], /--admin-client-accent-rgb: 26 82 150;/, "the style's own primary");
+
+  // A client brand colour reaches the marker through the same path, derived
+  // to clear the site's own contrast bar first.
+  const branded = buildTokenCss({ ...THEME, brandColor: `#${'7a1f3d'}` });
+  const brandedLight = branded.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
+  assert.match(brandedLight[1], /--admin-client-accent-rgb: 122 31 61;/);
+
+  // The floor still fires where the resolved brand colour cannot sit on an
+  // admin ground: a pre-preset deployment on a dark ground resolves a
+  // near-white primary, and the LIGHT admin ground is light.
+  const unreadable = buildTokenCss({
+    colors: {
+      primary: `#${'ebe8e3'}`,
+      surface: `#${'111111'}`,
+      ink: `#${'ffffff'}`,
+    },
+  });
+  const light = unreadable.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
+  assert.match(light[1], /--admin-client-accent-rgb: 28 27 25;/, 'falls back to admin ink');
 });
 
 // ------------------------------------------------ the motif layer (brief §3.8)

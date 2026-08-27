@@ -27,7 +27,10 @@
 //                   before, with the dark values derived from it.
 //   fonts           a role named outright, overriding the preset's type map.
 //   motifSet        which motif set data-motif-set switches to (brief §3.8).
-//   adminAccent     the one client-owned colour in the admin identity.
+//   brandColor      the client's main brand colour. The three brand steps
+//                   are DERIVED from it per mode, contrast-safe by
+//                   construction, and the admin's own position marker takes
+//                   the resolved value with its legibility floor applied.
 //
 // SPECIFICITY. The generated stylesheet now carries one block per
 // (preset, mode) pair, and `:root[data-theme='zine'][data-mode='dark']` is
@@ -371,9 +374,11 @@ export function resolveRootAttributes(themeDoc) {
 }
 
 /**
- * Whether the client accent clears the admin ground in a mode, and what the
- * marker actually renders (admin story part 6f). The theme editor states
- * this in words; nothing clamps the stored value.
+ * Whether the resolved brand colour clears the admin ground in a mode, and
+ * what the marker actually renders (admin story part 6f, owner review
+ * 2026-08-27). There is no separate admin marker colour: the marker is the
+ * site's own brand colour, and the floor is the only thing that can move it.
+ * The theme editor states that in words; nothing is clamped.
  *
  * @param {object} themeDoc
  * @param {'light'|'dark'} mode
