@@ -116,4 +116,15 @@ describe('Updates', () => {
     expect(heads[1]).toBe('October 2026');
     expect(heads[2]).toBe('September 2026');
   });
+
+  it('puts the title before the date, so the date never stacks above the heading', () => {
+    // The eyebrow ban is absolute and holds at every size (design brief
+    // §2.4). An entry on the spine is one column at every width, so the
+    // title has to come first in the source. SessionCard.jsx carries the
+    // same rule for the schedule.
+    const { container } = renderUpdates({ updates: [NEWER] });
+    const heading = container.querySelector('.update-feed__entry h3');
+    const time = container.querySelector('.update-feed__entry time');
+    expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

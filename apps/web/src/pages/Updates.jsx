@@ -98,17 +98,12 @@ export default function Updates() {
                   const body = excerpt(update.body);
                   return (
                     <li key={update.id} className="update-feed__entry">
-                      {/* The day, in the mono face with tabular figures —
-                          the run's head already carries the month, so the
-                          entry says the day and does not repeat it. */}
-                      <p className="font-mono text-caption text-text-secondary">
-                        {dateLabel ? (
-                          <time dateTime={publishDate.toISOString()}>{dateLabel}</time>
-                        ) : (
-                          <span>Undated</span>
-                        )}
-                      </p>
-                      <div className="mt-3xs flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
+                      {/* Title first, day second. An entry on the spine is
+                          one column at every width, so a date set above the
+                          heading would be an eyebrow, and the ban holds at
+                          every size (brief §2.4). SessionCard.jsx carries
+                          the same order for the same reason. */}
+                      <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
                         <h3 className="font-heading text-h3 font-semibold text-text-primary">
                           <Link to={`/updates/${update.id}`} className="hover:underline">
                             {update.title}
@@ -116,6 +111,16 @@ export default function Updates() {
                         </h3>
                         {update.pinned ? <Tag>Pinned</Tag> : null}
                       </div>
+                      {/* The day, in the mono face with tabular figures —
+                          the run's head already carries the month, so the
+                          entry says the day and does not repeat it. */}
+                      <p className="mt-3xs font-mono text-caption text-text-secondary">
+                        {dateLabel ? (
+                          <time dateTime={publishDate.toISOString()}>{dateLabel}</time>
+                        ) : (
+                          <span>Undated</span>
+                        )}
+                      </p>
                       {body ? (
                         <p
                           className="mt-xs max-w-prose text-body text-text-secondary"

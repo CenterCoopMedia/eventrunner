@@ -242,4 +242,28 @@ describe('the row keeps its shape rules', () => {
     const { container } = renderCard();
     expect(container.querySelector('time').closest('p').className).toContain('font-mono');
   });
+
+  it('puts the title before the time, so the time never stacks above the heading', () => {
+    // The eyebrow ban is absolute and holds at every size (design brief
+    // §2.4). This row is one column below `sm`, so the title has to come
+    // first in the source; the grid moves the time back into its own
+    // left-hand column once there is room for one.
+    const { container } = renderCard();
+    const heading = container.querySelector('h3');
+    const time = container.querySelector('time');
+    expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('sends the time back to the left-hand column at `sm`, so the wide row is unchanged', () => {
+    // Title first in the source is a narrow-screen rule; it must not cost
+    // the wide row its time column. These are the placements that put the
+    // time back beside the title once there is room.
+    const { container } = renderCard();
+    const time = container.querySelector('time').closest('p');
+    expect(time.className).toContain('sm:col-start-1');
+    expect(time.className).toContain('sm:row-start-1');
+    const heading = container.querySelector('h3');
+    expect(heading.parentElement.className).toContain('sm:col-start-2');
+    expect(heading.parentElement.className).toContain('sm:row-start-1');
+  });
 });

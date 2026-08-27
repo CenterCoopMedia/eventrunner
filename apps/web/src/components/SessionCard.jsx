@@ -144,8 +144,32 @@ export default function SessionCard({
           the zero offset every other preset holds, the face covers the
           stamp exactly and this is the plain ruled row it has always
           been. */}
-      <article className="session-block__face grid gap-2xs sm:grid-cols-[9.5rem,1fr] sm:gap-md">
-        <p className="font-mono text-caption text-text-secondary">
+      {/* The title comes first in the source and the time follows it. Below
+          `sm` this row is one column, and a time set directly above a
+          heading is an eyebrow — the ban holds at every size (brief §2.4).
+          Reading the title first is also the better order to hear. At `sm`
+          and up the grid puts the time back in its own left-hand column
+          beside the title, which is where the eye wants it once there is
+          room for a column, so the wide row is unchanged to the pixel. */}
+      <article className="session-block__face grid sm:grid-cols-[9.5rem,1fr] sm:gap-x-md">
+        <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs sm:col-start-2 sm:row-start-1">
+          <h3 className="font-heading text-h3 font-semibold text-text-primary">
+            {linkToDetail ? (
+              <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
+                {session.title}
+              </Link>
+            ) : (
+              session.title
+            )}
+          </h3>
+          <SessionFormat format={session.type} />
+        </div>
+        {/* The time spans both rows of the wide layout, which is the single
+            cell it had when the title and everything under it were one
+            element: a two-line time then sizes itself against the whole
+            entry, not against the title alone, and cannot push the room and
+            the description down a line. */}
+        <p className="mt-2xs font-mono text-caption text-text-secondary sm:col-start-1 sm:row-span-2 sm:row-start-1 sm:mt-0">
           {range ? (
             <>
               <time dateTime={range.startIso}>{range.startLabel}</time>
@@ -160,19 +184,7 @@ export default function SessionCard({
             <span>Time to be announced</span>
           )}
         </p>
-        <div>
-          <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
-            <h3 className="font-heading text-h3 font-semibold text-text-primary">
-              {linkToDetail ? (
-                <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
-                  {session.title}
-                </Link>
-              ) : (
-                session.title
-              )}
-            </h3>
-            <SessionFormat format={session.type} />
-          </div>
+        <div className="sm:col-start-2 sm:row-start-2">
           {/* The room, as a specimen label (brief §4.5). Under five presets
               the label draws no rules and shows no field name, so this is
               the caption line it has always been; under Field Guide the same
