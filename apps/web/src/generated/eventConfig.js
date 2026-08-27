@@ -10,7 +10,7 @@
 export const eventConfig = {
   name: '[Demo] Harborlight Media Summit',
   shortName: 'DEMO-SUMMIT',
-  tagline: 'A three-day gathering for the people who keep community media working.',
+  tagline: 'A three-day event for people who operate local and cooperative newsrooms.',
   timezone: 'America/New_York',
   days: [
     {
@@ -134,7 +134,7 @@ export const eventConfig = {
   announcedAt: '2026-05-01T12:00:00',
   archivedAt: null,
   seo: {
-    description: 'Three days of sessions, workshops, and hallway conversation for people who run local and cooperative newsrooms — schedule, speakers, and travel details for the [Demo] Harborlight Media Summit.',
+    description: 'Schedule, speaker, workshop, and travel information for the fictional [Demo] Harborlight Media Summit.',
     defaultOgImagePath: 'branding/og-default.svg',
     organizerName: '[Demo] Harborlight Cooperative',
     organizerUrl: 'https://example.org',
