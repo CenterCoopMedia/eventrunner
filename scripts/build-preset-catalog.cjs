@@ -206,19 +206,17 @@ function buildPresetDoc(sources) {
     '     Regenerate: node scripts/build-preset-catalog.cjs',
     '     scripts/build-preset-catalog.test.cjs fails when this is stale. -->',
     '',
-    'Every style Event Runner ships, what it is for, and what each of its curated',
-    'choices does. This is the prose half of the catalog: The values that render live',
-    'in `packages/shared/src/presetCatalog.cjs`, and the words the theme editor puts',
-    'on screen live in `apps/web/src/admin/presetCopy.js`. All three come from the',
-    'same JSON, so none of them can quietly disagree.',
+    'This catalog lists each site style, its default configuration, and the options',
+    'staff can select. Runtime values are in `packages/shared/src/presetCatalog.cjs`.',
+    'Admin labels and explanations are in `apps/web/src/admin/presetCopy.js`.',
+    'All three outputs are generated from the same JSON source files.',
     '',
-    'All six styles are first-class. The order below is the order the style picker',
-    'offers them, which is a recommendation and not a ranking: A fresh deployment',
-    'starts on the first one, and every style ships one recommended configuration —',
-    'the choices marked *recommended* here — that works the moment it is picked.',
+    'The picker uses the order shown below. A new deployment starts with Institutional.',
+    'Each style includes one default configuration. Options marked *default* are selected',
+    'when staff choose the style.',
     '',
-    'The narrative behind each style is `docs/plans/2026-08-27-preset-visual-stories.md`.',
-    'The binding rules are `docs/plans/2026-08-27-design-system-overhaul.md`.',
+    'Design rationale is in `docs/plans/2026-08-27-preset-visual-stories.md`.',
+    'Implementation requirements are in `docs/plans/2026-08-27-design-system-overhaul.md`.',
     '',
   ];
 
@@ -227,7 +225,7 @@ function buildPresetDoc(sources) {
     lines.push(`## ${preset.label}`, '');
     lines.push(`\`data-theme="${preset.id}"\``, '');
     lines.push(preset.summary, '');
-    if (preset.bestFor) lines.push(`**Best for.** ${preset.bestFor}`, '');
+    if (preset.bestFor) lines.push(preset.bestFor, '');
 
     lines.push(
       '| | |',
@@ -248,14 +246,14 @@ function buildPresetDoc(sources) {
     }
 
     for (const [group, spec] of Object.entries(preset.options || {})) {
-      lines.push(`### ${spec.label} — \`${group}\``, '');
+      lines.push(`### ${spec.label}: \`${group}\``, '');
       if (spec.prompt) lines.push(spec.prompt, '');
       for (const [name, note] of notesOf(spec)) {
         lines.push(`**${name}.** ${note}`, '');
       }
       for (const choice of spec.choices || []) {
-        const mark = choice.id === spec.default ? ' *(recommended)*' : '';
-        lines.push(`- **${choice.label}**${mark} — ${choice.why}`);
+        const mark = choice.id === spec.default ? ' *(default)*' : '';
+        lines.push(`- **${choice.label}**${mark}: ${choice.why}`);
       }
       lines.push('');
     }

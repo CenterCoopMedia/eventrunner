@@ -1,12 +1,12 @@
 {
-  "$schema-note": "One theme preset (design brief 2026-08-27, §4.3). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
-  "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 3.",
-  "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin.",
-  "$first-class-note": "See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.",
+  "$schema-note": "Defines one complete site style. The file supplies two color palettes, four font roles, shape, texture, density, a default illustration set, and curated options.",
+  "$story": "Design rationale source: docs/plans/2026-08-27-preset-visual-stories.md, page 3.",
+  "$palette-note": "Color channels use [r, g, b] numbers. The generator writes RGB triples. The dark palette is authored separately.",
+  "$first-class-note": "All six styles are complete and supported. Each has one default configuration.",
   "id": "zine",
   "label": "Zine",
-  "summary": "Made by hand, at a copier, the week before. One loud display face, an even mono rhythm under it, and an accent spent twice a page.",
-  "bestFor": "Unconferences, community events, and student work.",
+  "summary": "A high-contrast layout with bold display type, monospaced data, paper grain, and limited accent color.",
+  "bestFor": "Use this style for unconferences, community events, and student programs.",
 
   "$palette-words-light": "bright flyer paper, toner black, one hot accent, xerox grey, paper grain, staple silver, cut-edge white, faded archive grey",
   "$palette-words-dark": "night toner black, paper-white ink, held-back hot accent, ghost grey, low-light grain, streetlight silver, matte rule black, sun-faded archive grey",
@@ -43,21 +43,21 @@
     }
   },
 
-  "$font-note": "Brief §9.1, retuned by the owner review (2026-08-27). Zine ran one mono across body, data, and mono. A mono body is a poor face for long-form prose: A rich-text page or a session description set in Fragment Mono is slow to read at any length. Body moves to Source Sans 3, the bundled neutral. Data and mono stay Fragment Mono, so times, room codes, and identifiers keep the typewriter rhythm the story is built on — the mono is now the VALUE face rather than the whole page.",
+  "$font-note": "Uses Karrik for headings, Source Sans 3 for body text, and Fragment Mono for data and identifiers. The sans-serif body face improves long-form reading while data keeps the monospaced treatment.",
   "fonts": {
     "heading": "karrik",
     "body": "sans-humanist",
     "data": "fragment-mono",
     "mono": "fragment-mono"
   },
-  "$component-fonts-note": "--callout-font is a component token, not a fifth semantic role (brief §3.1, §4.3). It carries the one handwritten callout a page may hold. A client may point it at var(--font-heading) and drop the script face.",
+  "$component-fonts-note": "The callout font is a component token, not a fifth semantic font role. A client can point it at the heading font to remove the script face.",
   "componentFonts": { "--callout-font": "script-casual" },
 
-  "$shape-note": "The copier grain is ON by default, as brief §4.3 allows (\"paper grain allowed at low opacity\"). An earlier pass turned it off in the name of flat surfaces; that confused two different fixes. The real fix was the CSS gate — the overlay now paints only under [data-texture='paper'], so an opt-in cannot leak onto a style that never asked for it (apps/web/src/index.css). Zine is the one style that DID ask: A page made at a copier has copier grain, and it is the cheapest, quietest way this style says so — a ground treatment, not a per-card artefact. The misregistered stamp stays the alternate, which is the right place for a printing artefact. A client who wants a clean sheet picks Flat under Advanced.",
+  "$shape-note": "Paper grain is enabled by default and appears only when data-texture is paper. A client can select Flat in the advanced settings. The optional stamped schedule remains off by default.",
   "shape": { "radius": "sharp", "texture": "paper", "density": "loose" },
   "motifSet": "none",
 
-  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). Zine uses the strong rule where the others use hairlines, so the page reads as cut-and-pasted blocks.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses strong rules, the monospaced font for folio text, a small callout angle, and no marginalia by default.",
   "tokens": {
     "--session-card-rule-width": "var(--rule-strong-width)",
     "--folio-rule-width": "var(--rule-strong-width)",
@@ -69,38 +69,38 @@
   "options": {
     "headingFace": {
       "label": "Heading face",
-      "prompt": "The hand-cut poster lettering.",
+      "prompt": "Choose the poster typeface.",
       "default": "karrik",
       "choices": [
         {
           "id": "karrik",
           "label": "Karrik",
-          "why": "Its deliberately mismatched shapes come from found and copied lettering, which is exactly the made-at-a-copier voice the story needs.",
+          "why": "Uses irregular letter shapes for a cut-and-copy poster effect.",
           "fonts": { "heading": "karrik" }
         },
         {
           "id": "bagnard",
           "label": "Bagnard",
-          "why": "The same hand-cut origin with more weight and menace, for a louder, rougher event.",
+          "why": "Uses a heavier display face for shorter and louder headings.",
           "fonts": { "heading": "bagnard" }
         },
         {
           "id": "avara",
           "label": "Avara",
-          "why": "A transitional serif with the curves replaced by straight segments, so every bowl reads as a cut facet: A poster cut from flat stock rather than drawn.",
+          "why": "Uses angular serif shapes for a cut-paper effect.",
           "fonts": { "heading": "avara" }
         }
       ]
     },
     "nameplate": {
       "label": "Header style",
-      "prompt": "The flyer headline.",
+      "prompt": "Choose the poster header.",
       "default": "full-sheet",
       "choices": [
         {
           "id": "full-sheet",
           "label": "Full sheet",
-          "why": "Name at the nameplate step across the full measure, wrapping to two or three lines, on a strong rule. The stapled poster.",
+          "why": "Runs the event name across the full width and allows it to wrap to several lines. A strong rule closes the header.",
           "tokens": {
             "--nameplate-align": "start",
             "--nameplate-rule-width": "var(--rule-nameplate-width)",
@@ -110,7 +110,7 @@
         {
           "id": "stacked-block",
           "label": "Stacked block",
-          "why": "This is how hand-lettering fills a sheet, so it stays hand-made without any rotation or collage.",
+          "why": "Uses tighter line spacing so a long event name fills a compact block.",
           "tokens": {
             "--nameplate-align": "start",
             "--nameplate-leading": "0.86",
@@ -120,7 +120,7 @@
         {
           "id": "boxed-bill",
           "label": "Boxed bill",
-          "why": "The show bill pinned to a noticeboard; a box drawn in strong rules is a printing device here, not a card.",
+          "why": "Places the event name and details inside a strong rectangular rule.",
           "tokens": {
             "--nameplate-align": "start",
             "--nameplate-frame-width": "var(--rule-strong-width)",
@@ -131,14 +131,14 @@
     },
     "component": {
       "label": "Schedule style",
-      "prompt": "How a session block is printed.",
-      "$default-note": "Flat is the default (owner review, 2026-08-27). The stamp is the theme's signature and it still ships under the brief §2.4 exception, but a printing artefact is a thing a client turns ON, not a thing they discover on their own schedule page.",
+      "prompt": "Choose the session-block treatment.",
+      "$default-note": "Flat is the default. The stamped option is available for clients that want a visible second-print effect.",
       "default": "flat-block",
       "choices": [
         {
           "id": "flat-block",
           "label": "Flat block",
-          "why": "The single-pass photocopy, so it stays in the story and gives a client an option that needs no exception to §2.1.",
+          "why": "Uses flat session blocks with strong rules and no print offset.",
           "tokens": {
             "--session-card-stamp-offset": "0",
             "--folio-rule-top-width": "0"
@@ -147,8 +147,8 @@
         {
           "id": "stamped-block",
           "label": "Stamped block",
-          "why": "Misregistration is what a two-pass print looks like, which is the story’s whole production method. It ships under the brief §2.4 exception, Zine only.",
-          "$tint-note": "The layer is a tint of the accent, not the accent itself. Zine spends the accent at full strength twice a page; a stamp is on every row, so at full strength the page would carry twenty of them and the rare accent would stop meaning anything. It would also read as the coloured card edge §2.4 rejects rather than as the second print pass §2.4 allows. At this strength the hue is still plainly the accent and the layer still reads as ink that went down after the first pass.",
+          "why": "Adds a small offset accent layer behind each session block to simulate a second print pass.",
+          "$tint-note": "The offset layer uses a translucent accent tint. Full-strength accent color on every row would reduce the contrast between ordinary rows and primary actions.",
           "tokens": {
             "--session-card-stamp-offset": "4px",
             "--session-card-stamp-alpha": "0.55",
@@ -158,7 +158,7 @@
         {
           "id": "struck-folio",
           "label": "Struck folio",
-          "why": "The typewriter section break of a photocopied programme; plain text plus rules, no chip or badge.",
+          "why": "Uses monospaced section labels and strong rules. It does not add a background layer.",
           "tokens": {
             "--session-card-stamp-offset": "0",
             "--folio-rule-top-width": "var(--rule-strong-width)",
@@ -169,19 +169,19 @@
     },
     "marginalia": {
       "label": "Pen marks",
-      "prompt": "The pen that went over the page afterwards. Its own control, because a client may want the stamp without the pen.",
+      "prompt": "Show or hide the optional pen marks.",
       "default": "off",
       "choices": [
         {
           "id": "off",
           "label": "Off",
-          "why": "The page as printed, with no pen marks. This is the default so marginalia stays a deliberate choice.",
+          "why": "Does not show pen marks.",
           "tokens": { "--marginalia-display": "none" }
         },
         {
           "id": "on",
           "label": "On",
-          "why": "Two drawn marks per page and one callout, never on a headline word, which keeps the theme clear of the banned headline-underline trick.",
+          "why": "Shows up to two small marks and one callout on a page. It does not mark headline words.",
           "tokens": { "--marginalia-display": "inline" }
         }
       ]

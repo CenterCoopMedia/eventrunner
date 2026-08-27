@@ -319,7 +319,7 @@ describe('the staff workflow', () => {
     ]);
     // Nothing carries a warning label.
     expect(offered.join(' ')).not.toMatch(/experimental|beta|unstable/i);
-    expect(screen.getByText(/Best for: Formal programmes/)).toBeInTheDocument();
+    expect(screen.getByText(/Best for: Use this style for formal programmes/)).toBeInTheDocument();
   });
 
   it('asks for the header and the schedule, with the reason for each choice', async () => {
@@ -327,7 +327,7 @@ describe('the staff workflow', () => {
     expect(screen.getByLabelText('Header style')).toHaveValue('full-measure');
     expect(screen.getByLabelText('Schedule style')).toHaveValue('ruled-programme');
     // The catalog's `why` is the hint, so a choice is never a bare name.
-    expect(screen.getByText(/Hairline rows, times in the agate column/)).toBeInTheDocument();
+    expect(screen.getByText(/Uses hairline rows and a separate time column/)).toBeInTheDocument();
   });
 
   it('re-renders the frame on the picked style, with that style’s own choices', async () => {

@@ -70,7 +70,7 @@ const DEMO_ANSWERS = Object.freeze({
   event: {
     name: '[Demo] Harborlight Media Summit',
     shortName: 'DEMO-SUMMIT',
-    tagline: 'A three-day gathering for the people who keep community media working.',
+    tagline: 'A three-day event for people who operate local and cooperative newsrooms.',
     timezone: 'America/New_York',
     days: [
       { id: 'day-1', label: 'Day one', date: '2026-10-14', startTime: '09:00', endTime: '17:00' },
@@ -156,8 +156,7 @@ const DEMO_ANSWERS = Object.freeze({
     },
     seo: {
       description:
-        'Three days of sessions, workshops, and hallway conversation for people who run local ' +
-        'and cooperative newsrooms — schedule, speakers, and travel details for the [Demo] Harborlight Media Summit.',
+        'Schedule, speaker, workshop, and travel information for the fictional [Demo] Harborlight Media Summit.',
       organizerName: '[Demo] Harborlight Cooperative',
     },
   },
@@ -210,19 +209,17 @@ const DEMO_EVENT_OVERRIDES = Object.freeze({ announcedAt: '2026-05-01T12:00:00' 
 const DEMO_CONTENT = Object.freeze({
   hero__subtitle: {
     value:
-      'Sessions, workshops, and time to compare notes with people running newsrooms and ' +
-      'stations like yours.',
+      'Sessions and workshops for people who operate local and cooperative newsrooms.',
   },
   hero__register_cta: { label: 'Register for the summit' },
   details__intro: {
     value:
-      '<p>Three days, one track of shared sessions and two of workshops. Day one is welcome and ' +
-      'orientation. Day two is panels and small-group workshops. Day three is unconference ' +
-      'blocks — participants propose the sessions — and a closing conversation about what to ' +
-      'carry home.</p>',
+      '<p>The summit has shared sessions and two workshop tracks. Day one includes registration ' +
+      'and orientation. Day two includes panels and workshops. Day three includes ' +
+      'participant-proposed sessions and a closing plenary.</p>',
   },
   highlights__first: {
-    text: 'Small workshop rooms, capped at thirty seats, so there is time for real questions.',
+    text: 'Workshop rooms have 30 seats so participants have time for questions.',
   },
   // Both stats carry the four-part contract (design brief §2.1.1): the
   // finding in words, what the number counts, where it came from, and what
@@ -251,9 +248,8 @@ const DEMO_CONTENT = Object.freeze({
   faq_items__what_is_this: {
     question: 'What is the Harborlight Media Summit?',
     answer:
-      '<p>A three-day gathering for people who report, edit, and run local and cooperative ' +
-      'newsrooms. It mixes shared sessions with hands-on workshops, and leaves room for the ' +
-      'hallway conversations that usually matter as much as the agenda.</p>',
+      '<p>A three-day event for people who report, edit, and operate local and cooperative ' +
+      'newsrooms. The schedule includes shared sessions and practical workshops.</p>',
   },
   travel_header__page_title: { value: 'Getting to Harborlight Hall' },
   travel_header__page_subtitle: {
@@ -267,16 +263,16 @@ const DEMO_CONTENT = Object.freeze({
   travel_help__help_title: { value: 'Travel questions' },
   travel_help__help_description: {
     value:
-      '<p>Email <a href="mailto:support@example.org">support@example.org</a> and a member of ' +
-      'the Harborlight team will get back to you within one business day.</p>',
+      '<p>Email <a href="mailto:support@example.org">support@example.org</a>. A member of ' +
+      'the Harborlight team will reply within one business day.</p>',
   },
   faq_intro__summary: {
-    value: '<p>Answers to the questions we hear most before the summit.</p>',
+    value: '<p>Answers to common questions about the summit.</p>',
   },
   conduct_intro__summary: {
     value:
-      '<p>This code of conduct applies to everyone at the Harborlight Media Summit — attendees, ' +
-      'speakers, volunteers, and staff, in every session, workshop, and social space.</p>',
+      '<p>This code of conduct applies to attendees, speakers, volunteers, and staff at the ' +
+      'Harborlight Media Summit. It applies in every session, workshop, and social space.</p>',
   },
   conduct_expectations__first: {
     text: 'Treat other attendees, speakers, and staff with respect, on the record and off it.',
@@ -287,7 +283,7 @@ const DEMO_CONTENT = Object.freeze({
       'badge. Reports are reviewed by the organizing committee within one business day.</p>',
   },
   contact_intro__summary: {
-    value: '<p>Questions before the summit? Here is how to reach the organizing team.</p>',
+    value: '<p>Contact the organizing team before the summit.</p>',
   },
 });
 
@@ -335,8 +331,8 @@ const DEMO_SESSIONS = Object.freeze([
     endTime: '10:45',
     title: 'Panel: Sustaining local partnerships',
     description:
-      'Three newsroom leaders on what it actually takes to keep a shared-coverage partnership ' +
-      'funded past year one.',
+      'Three newsroom leaders explain how they fund a shared-coverage partnership after its ' +
+      'first year.',
     location: 'Main hall',
     placeId: 'main-hall',
     type: 'panel',
@@ -372,8 +368,7 @@ const DEMO_SESSIONS = Object.freeze([
     endTime: '15:00',
     title: 'Workshop: budgets that survive a thin year',
     description:
-      'Building a newsroom budget that bends instead of breaking when one grant does not ' +
-      'renew.',
+      'Build a newsroom budget that can absorb the loss of one grant.',
     location: 'Room A',
     placeId: 'room-a',
     type: 'workshop',
@@ -395,8 +390,8 @@ const DEMO_SESSIONS = Object.freeze([
     endTime: '15:00',
     title: 'Clinic: bring your survey questions',
     description:
-      'The second half of the audience workshop moves down to the main hall and splits into ' +
-      'small groups — bring a draft survey and leave with it rewritten.',
+      'The second half of the audience workshop moves to the main hall for small-group review. ' +
+      'Bring a draft survey. The group will revise it with you.',
     location: 'Main hall',
     placeId: 'main-hall',
     type: 'workshop',
@@ -414,8 +409,8 @@ const DEMO_SESSIONS = Object.freeze([
     endTime: '11:30',
     title: 'Unconference blocks',
     description:
-      'Participant-proposed sessions, posted on the board each morning — bring a topic or ' +
-      'just show up.',
+      'Participant-proposed sessions are posted each morning. Propose a topic or join a ' +
+      'posted session.',
     // NO `placeId`, on purpose: this one runs in both first-floor rooms at
     // once, so there is no single place for it to be in. `location` says so
     // in words, and the movement model says nothing about getting to it —
@@ -434,8 +429,7 @@ const DEMO_SESSIONS = Object.freeze([
     endTime: '16:00',
     title: 'Closing conversation',
     description:
-      'A short conversation on what came out of the three days and where the network goes ' +
-      'from here.',
+      'Review the decisions from the three days and identify the next network actions.',
     location: 'Main hall',
     placeId: 'main-hall',
     type: 'plenary',

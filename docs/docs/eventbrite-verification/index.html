@@ -137,8 +137,8 @@
           <h2 id="per-assumption-capture-and-diff-plan">Per-assumption capture and diff plan<a class="heading-anchor" href="#per-assumption-capture-and-diff-plan" aria-label="Link to this section">#</a></h2>
           <p>For each of the six numbered assumptions, capture the specific real artifact named below, sanitize
           it (strip every real identifier — attendee/organizer names, emails, the sandbox account&#39;s org name
-          and id, real order/ticket numeric ids, phone numbers, free-text fields — and replace with obviously
-          fake placeholders in the same shape, never <code>[REDACTED]</code> blocks, since preserving field shape is the
+          and id, real order/ticket numeric ids, phone numbers, and free-text fields. Replace them with clearly
+          synthetic placeholders in the same shape. Do not use <code>[REDACTED]</code> blocks because preserving field shape is the
           whole point), and diff it against the named fixture file.</p>
           <h3 id="1-webhook-signing">1. Webhook signing<a class="heading-anchor" href="#1-webhook-signing" aria-label="Link to this section">#</a></h3>
           <ul>

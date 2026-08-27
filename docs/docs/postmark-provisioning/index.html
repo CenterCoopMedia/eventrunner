@@ -172,8 +172,8 @@
           It stays in operator-controlled storage only (§3) — no deployed function binds it, so it never
           goes into a client&#39;s GitHub Environment or Secret Manager.</li>
           <li>Set up billing for the account&#39;s plan and confirm it covers the expected number of Servers —
-          each client is a Server, so the plan needs to scale with the client count, not just message
-          volume.</li>
+          each client is a Server, so the plan must cover both the client count and the expected
+          message volume.</li>
           </ol>
           <h2 id="2-per-deployment-create-the-server">2. Per deployment: create the Server<a class="heading-anchor" href="#2-per-deployment-create-the-server" aria-label="Link to this section">#</a></h2>
           <ol>
@@ -187,8 +187,8 @@
           <li>Open the new Server → <strong>API Tokens</strong> tab → copy the Server Token. This is
           <code>EMAIL_PROVIDER_API_KEY</code> for this deployment&#39;s environment.</li>
           <li>(Optional) Rename the Server&#39;s default <code>Outbound</code> stream, or add a custom Transactional stream,
-          if you want the stream name in Postmark&#39;s UI to read as the deployment&#39;s rather than the generic
-          default. Whether the code actually sends on that stream depends on <code>config/providers.email.
+          if you want the stream name in Postmark&#39;s UI to match the deployment name instead of the
+          generic default. Whether the code actually sends on that stream depends on <code>config/providers.email.
           messageStream</code> (Tier B, <code>functions/src/email/send.cjs</code>): every send falls back to that config
           value when the call site doesn&#39;t pass its own <code>messageStream</code>, and <code>createPostmarkProvider</code> (in
           <code>postmark.cjs</code>) only omits <code>MessageStream</code> from the API payload — letting Postmark use the
@@ -230,7 +230,7 @@
           it would let that deployment&#39;s functions reach Postmark&#39;s account-wide domains API, far beyond
           what any of them need.</p>
           <p>Without <code>EMAIL_ACCOUNT_API_KEY</code> set when the script runs, <code>verifySenderDomain()</code> reports every
-          check <code>unknown</code> rather than failing, so a missing key reads as &quot;can&#39;t tell&quot; in
+          check <code>unknown</code> rather than failing, so a missing key appears as &quot;can&#39;t tell&quot; in
           <code>scripts/verify-sender-domain.cjs</code>&#39;s output, not as an error. Have it ready before §4c.</p>
           <h2 id="4-verify-the-sender-domain">4. Verify the sender domain<a class="heading-anchor" href="#4-verify-the-sender-domain" aria-label="Link to this section">#</a></h2>
           <p>This is <code>docs/CLIENT_ONBOARDING.md</code> §3 item 4, reproduced here with the Postmark-side and (for
@@ -359,8 +359,8 @@
           <strong>not</strong> a GitHub Environment secret or Secret Manager entry on this (or any) client project,
           since no deployed function binds it.</li>
           <li class="task-item"><input type="checkbox" disabled> <code>node scripts/verify-sender-domain.cjs</code> exits <code>0</code> for this deployment&#39;s sender domain
-          (<code>eventrunner.org</code> for the dev/demo deployment) — not just &quot;unknown&quot;; unknown means one of the
-          two keys above is missing or wrong, not that the domain is fine.</li>
+          (<code>eventrunner.org</code> for the dev/demo deployment) and reports a pass. An <code>unknown</code> result means
+          one of the two keys above is missing or wrong. It does not mean that the domain is ready.</li>
           <li class="task-item"><input type="checkbox" disabled> The DKIM TXT and Return-Path CNAME are visible in the DNS host (Cloudflare, for
           <code>eventrunner.org</code>) exactly as Postmark&#39;s UI showed them, and the Return-Path CNAME&#39;s proxy
           status is &quot;DNS only&quot; (grey cloud), not &quot;Proxied&quot;.</li>
@@ -370,8 +370,8 @@
           <li class="task-item"><input type="checkbox" disabled> A test send (<code>init-event.cjs</code>&#39;s welcome mail, or an OTP sign-in) shows up in this
           deployment&#39;s Server <strong>Activity</strong> tab, not some other deployment&#39;s.</li>
           <li class="task-item"><input type="checkbox" disabled> A test bounce (send to a Postmark-provided bounce test address, or an intentionally invalid
-          recipient) produces a <code>sent_emails</code> row with <code>deliveryStatus</code> patched — confirms the webhook
-          round-trip end to end, not just that it&#39;s registered.</li>
+          recipient) produces a <code>sent_emails</code> row with <code>deliveryStatus</code> patched. This confirms the
+          complete webhook round trip, including the Firestore update.</li>
           </ul>
           <h2 id="7-addendum-cutting-a-deployment-over-after-account-approval">7. Addendum: cutting a deployment over after account approval<a class="heading-anchor" href="#7-addendum-cutting-a-deployment-over-after-account-approval" aria-label="Link to this section">#</a></h2>
           <p>This section is a <strong>continuation</strong> of §1–6, to run once Postmark approves the CCM account for live
@@ -494,8 +494,8 @@
           <li>Send (or trigger) a message to an intentionally invalid recipient, or use a Postmark bounce-test
           address, to produce a bounce.</li>
           <li>Confirm the bounce event lands on the registered webhook and <strong>patches</strong> the matching
-          <code>sent_emails</code> row&#39;s <code>deliveryStatus</code> — this is the actual round-trip proof, not just &quot;the webhook
-          is registered.&quot; Check via the Firebase console (Firestore → <code>sent_emails</code>) or <code>gcloud firestore</code>
+          <code>sent_emails</code> row&#39;s <code>deliveryStatus</code>. This update proves the round trip. Webhook registration
+          alone is not sufficient. Check via the Firebase console (Firestore → <code>sent_emails</code>) or <code>gcloud firestore</code>
           read, comparing the row before and after the bounce event arrives.</li>
           </ol>
           <p><strong>Success check (mirrors issue #91&#39;s scope):</strong> the account is approved, the demo sends through the

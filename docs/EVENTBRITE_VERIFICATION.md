@@ -31,8 +31,8 @@ tooling, if offered): place an order, refund one, cancel one.
 
 For each of the six numbered assumptions, capture the specific real artifact named below, sanitize
 it (strip every real identifier — attendee/organizer names, emails, the sandbox account's org name
-and id, real order/ticket numeric ids, phone numbers, free-text fields — and replace with obviously
-fake placeholders in the same shape, never `[REDACTED]` blocks, since preserving field shape is the
+and id, real order/ticket numeric ids, phone numbers, and free-text fields. Replace them with clearly
+synthetic placeholders in the same shape. Do not use `[REDACTED]` blocks because preserving field shape is the
 whole point), and diff it against the named fixture file.
 
 ### 1. Webhook signing

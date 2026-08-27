@@ -20,6 +20,7 @@ import {
   theme as snapshotTheme,
 } from '@generated/eventConfig.js';
 import { subscribeConfigDoc } from '../lib/configSource.js';
+import { IS_DEMO } from '../lib/demoMode.js';
 import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeRuntime.js';
 import { startModeSync } from '../lib/modeRuntime.js';
 import { resolveShape } from 'shared/theme';
@@ -46,7 +47,7 @@ function ensureRuntimeStyleElement() {
   return styleEl;
 }
 
-export function EventConfigProvider({ children }) {
+export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   // One overlay slot per config doc; null = no runtime doc received yet, so
   // the committed snapshot value stands (spec §2.4 fail-soft first paint).
   const [overlay, setOverlay] = useState({
@@ -55,6 +56,11 @@ export function EventConfigProvider({ children }) {
     theme: null,
     badges: null,
   });
+
+  // The static demo can replace only the presentation fields. It still uses
+  // the committed synthetic event data, feature flags, logos, and header.
+  // A client build never enables this state or exposes its setter.
+  const [demoTheme, setDemoTheme] = useState(null);
 
   useEffect(() => {
     const unsubscribers = CONFIG_DOC_IDS.map((docId) =>
@@ -68,6 +74,14 @@ export function EventConfigProvider({ children }) {
       }
     };
   }, []);
+
+  const effectiveDemoTheme = useMemo(
+    () =>
+      demoMode && demoTheme
+        ? { ...snapshotTheme, ...demoTheme }
+        : null,
+    [demoMode, demoTheme],
+  );
 
   const value = useMemo(() => {
     const live =
@@ -93,9 +107,11 @@ export function EventConfigProvider({ children }) {
       features: overlay.features
         ? { ...FEATURE_DEFAULTS, ...overlay.features }
         : snapshotFeatures,
-      theme: overlay.theme
-        ? { ...snapshotTheme, ...overlay.theme }
-        : snapshotTheme,
+      theme: effectiveDemoTheme
+        ? effectiveDemoTheme
+        : overlay.theme
+          ? { ...snapshotTheme, ...overlay.theme }
+          : snapshotTheme,
       // config/badges has no synthetic snapshot counterpart (badges are a
       // live-only feature, gated off by features.badges in M2) — overlay-only
       // by design, so this is null until a runtime doc lands; consumers must
@@ -116,8 +132,11 @@ export function EventConfigProvider({ children }) {
         theme: overlay.theme ? 'live' : 'snapshot',
         badges: overlay.badges ? 'live' : 'snapshot',
       },
+      // DemoBanner uses this setter to compare the shipped presets without a
+      // Firestore write. It is null in every client build.
+      setDemoTheme: demoMode ? setDemoTheme : null,
     };
-  }, [overlay]);
+  }, [demoMode, effectiveDemoTheme, overlay]);
 
   // THE document the rendering of the theme resolves from.
   //
@@ -130,7 +149,11 @@ export function EventConfigProvider({ children }) {
   // makes the attribute and the custom property disagree. A live document
   // naming a preset and nothing else would then get `--texture: paper` from
   // the preset and `data-texture="flat"` left over from the build.
-  const themeDoc = overlay.theme || snapshotTheme;
+  //
+  // The demo is different on purpose: it changes only the style and mode, so
+  // it keeps the snapshot's header and logo fields while it compares presets.
+  const themeDoc = effectiveDemoTheme || overlay.theme || snapshotTheme;
+  const runtimeThemeDoc = effectiveDemoTheme || overlay.theme;
 
   // Runtime theme override (spec §7.2). The element exists from mount so the
   // ownership contract holds even before config/theme arrives; its content is
@@ -138,10 +161,10 @@ export function EventConfigProvider({ children }) {
   // keeps the build-time value from generated/theme.css.
   useEffect(() => {
     const styleEl = ensureRuntimeStyleElement();
-    styleEl.textContent = overlay.theme
-      ? buildRuntimeThemeCss(overlay.theme)
+    styleEl.textContent = runtimeThemeDoc
+      ? buildRuntimeThemeCss(runtimeThemeDoc)
       : '';
-  }, [overlay.theme]);
+  }, [runtimeThemeDoc]);
 
   // Event-neutral shell title: snapshot name first, runtime name when it lands.
   useEffect(() => {

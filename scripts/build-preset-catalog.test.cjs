@@ -66,18 +66,18 @@ test('the runtime catalog carries rendering values and no prose', () => {
   }
 });
 
-test('the documentation catalog names every style and marks the recommended choice', () => {
+test('the documentation catalog names every style and marks the default choice', () => {
   const doc = fs.readFileSync(DOC_TARGET, 'utf8');
   assert.match(doc, /GENERATED FILE/);
   for (const id of PRESET_ORDER) {
     assert.ok(doc.includes(`\`data-theme="${id}"\``), `${id} is documented`);
   }
-  // One "(recommended)" marker per option group across the whole catalog.
+  // One "(default)" marker per option group across the whole catalog.
   const groups = Object.values(PRESETS).reduce(
     (total, preset) => total + Object.keys(preset.options).length,
     0,
   );
-  assert.equal(doc.match(/\*\(recommended\)\*/g).length, groups);
+  assert.equal((doc.match(/\*\(default\)\*/g) ?? []).length, groups);
 });
 
 test('the mirror carries every preset, and carries no note key', () => {

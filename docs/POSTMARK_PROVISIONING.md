@@ -62,8 +62,8 @@ end. Roughly:
    It stays in operator-controlled storage only (§3) — no deployed function binds it, so it never
    goes into a client's GitHub Environment or Secret Manager.
 3. Set up billing for the account's plan and confirm it covers the expected number of Servers —
-   each client is a Server, so the plan needs to scale with the client count, not just message
-   volume.
+   each client is a Server, so the plan must cover both the client count and the expected
+   message volume.
 
 ## 2. Per deployment: create the Server
 
@@ -77,8 +77,8 @@ end. Roughly:
 3. Open the new Server → **API Tokens** tab → copy the Server Token. This is
    `EMAIL_PROVIDER_API_KEY` for this deployment's environment.
 4. (Optional) Rename the Server's default `Outbound` stream, or add a custom Transactional stream,
-   if you want the stream name in Postmark's UI to read as the deployment's rather than the generic
-   default. Whether the code actually sends on that stream depends on `config/providers.email.
+   if you want the stream name in Postmark's UI to match the deployment name instead of the
+   generic default. Whether the code actually sends on that stream depends on `config/providers.email.
    messageStream` (Tier B, `functions/src/email/send.cjs`): every send falls back to that config
    value when the call site doesn't pass its own `messageStream`, and `createPostmarkProvider` (in
    `postmark.cjs`) only omits `MessageStream` from the API payload — letting Postmark use the
@@ -126,7 +126,7 @@ it would let that deployment's functions reach Postmark's account-wide domains A
 what any of them need.
 
 Without `EMAIL_ACCOUNT_API_KEY` set when the script runs, `verifySenderDomain()` reports every
-check `unknown` rather than failing, so a missing key reads as "can't tell" in
+check `unknown` rather than failing, so a missing key appears as "can't tell" in
 `scripts/verify-sender-domain.cjs`'s output, not as an error. Have it ready before §4c.
 
 ## 4. Verify the sender domain
@@ -267,8 +267,8 @@ Before calling a deployment's Postmark setup done:
       **not** a GitHub Environment secret or Secret Manager entry on this (or any) client project,
       since no deployed function binds it.
 - [ ] `node scripts/verify-sender-domain.cjs` exits `0` for this deployment's sender domain
-      (`eventrunner.org` for the dev/demo deployment) — not just "unknown"; unknown means one of the
-      two keys above is missing or wrong, not that the domain is fine.
+      (`eventrunner.org` for the dev/demo deployment) and reports a pass. An `unknown` result means
+      one of the two keys above is missing or wrong. It does not mean that the domain is ready.
 - [ ] The DKIM TXT and Return-Path CNAME are visible in the DNS host (Cloudflare, for
       `eventrunner.org`) exactly as Postmark's UI showed them, and the Return-Path CNAME's proxy
       status is "DNS only" (grey cloud), not "Proxied".
@@ -278,8 +278,8 @@ Before calling a deployment's Postmark setup done:
 - [ ] A test send (`init-event.cjs`'s welcome mail, or an OTP sign-in) shows up in this
       deployment's Server **Activity** tab, not some other deployment's.
 - [ ] A test bounce (send to a Postmark-provided bounce test address, or an intentionally invalid
-      recipient) produces a `sent_emails` row with `deliveryStatus` patched — confirms the webhook
-      round-trip end to end, not just that it's registered.
+      recipient) produces a `sent_emails` row with `deliveryStatus` patched. This confirms the
+      complete webhook round trip, including the Firestore update.
 
 ## 7. Addendum: cutting a deployment over after account approval
 
@@ -435,8 +435,8 @@ gcloud secrets list --project=eventrunner-demo   # should NOT list EMAIL_ACCOUNT
 2. Send (or trigger) a message to an intentionally invalid recipient, or use a Postmark bounce-test
    address, to produce a bounce.
 3. Confirm the bounce event lands on the registered webhook and **patches** the matching
-   `sent_emails` row's `deliveryStatus` — this is the actual round-trip proof, not just "the webhook
-   is registered." Check via the Firebase console (Firestore → `sent_emails`) or `gcloud firestore`
+   `sent_emails` row's `deliveryStatus`. This update proves the round trip. Webhook registration
+   alone is not sufficient. Check via the Firebase console (Firestore → `sent_emails`) or `gcloud firestore`
    read, comparing the row before and after the bounce event arrives.
 
 **Success check (mirrors issue #91's scope):** the account is approved, the demo sends through the

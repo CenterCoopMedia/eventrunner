@@ -14,56 +14,56 @@
 export const PRESET_COPY = Object.freeze({
   civic: {
     label: 'Institutional',
-    summary: 'The public record of a public event. Plain, patient, unambiguous, with nothing between the reader and the information.',
-    bestFor: 'Universities, government partners, and any client with a formal accessibility policy.',
+    summary: 'A formal, accessible layout with clear hierarchy, restrained decoration, and large control targets.',
+    bestFor: 'Use this style for universities, public agencies, and organizations with formal accessibility requirements.',
     options: {
       headingFace: {
         label: 'Heading face',
-        prompt: 'The institution’s register.',
+        prompt: 'Choose the heading typeface.',
         choices: {
           merriweather: {
             label: 'Merriweather',
-            why: 'Weight without drama. It is the USWDS pairing and it reads as a body that has existed for a while.',
+            why: 'Uses the standard USWDS serif and sans pairing. It gives headings more weight while Public Sans keeps body text and controls clear.',
           },
           'source-serif-4': {
             label: 'Source Serif 4',
-            why: 'The same document, lighter on its feet: A university or a cultural institution rather than an agency, and the repo already bundles it for Broadsheet.',
+            why: 'Uses a lighter serif for headings. It suits universities and cultural organizations that need a less formal tone.',
           },
           'public-sans-bold': {
             label: 'Public Sans bold',
-            why: 'The all-sans document. One face for headings, labels, and data is the plainest possible public notice, which is the story taken to its logical end.',
+            why: 'Uses one sans-serif family for headings, body text, labels, and data. This is the simplest type hierarchy.',
           },
         },
       },
       nameplate: {
         label: 'Header style',
-        prompt: 'The letterhead.',
+        prompt: 'Choose the site header layout.',
         choices: {
           'institutional-letterhead': {
             label: 'Institutional letterhead',
-            why: 'The top of an official document. The organisation line sits below the name, never above it.',
+            why: 'Places the event name first and the organization line below it. Use it for a formal single-organization event.',
           },
           'two-part-lockup': {
             label: 'Two-part lockup',
-            why: 'The co-signed notice of a partnership, which is the common Civic case: Logo slot left, event name and dates right, divided by a vertical hairline.',
+            why: 'Places the logo at the left and the event details at the right. A vertical rule separates the two parts.',
           },
           'compact-standing-head': {
             label: 'Compact standing head',
-            why: 'For inner pages, where the reader wants the content and not the letterhead again.',
+            why: 'Reduces the header size on content-heavy pages so the page title appears sooner.',
           },
         },
       },
       component: {
         label: 'Schedule style',
-        prompt: 'How the agenda is posted.',
+        prompt: 'Choose the schedule layout.',
         choices: {
           'posted-agenda': {
             label: 'Posted agenda',
-            why: 'Hairline rows, fixed column order, tabular figures. The list is first-class at every width.',
+            why: 'Uses fixed columns, hairline row rules, and tabular figures. It keeps the same order at each screen width.',
           },
           'numbered-agenda': {
             label: 'Numbered agenda',
-            why: 'The numbers are content, not decoration, and they are never zero-padded, so this matches how a formal programme is published.',
+            why: 'Adds plain sequence numbers to the schedule. The numbers are not zero-padded.',
           },
         },
       },
@@ -71,56 +71,56 @@ export const PRESET_COPY = Object.freeze({
   },
   newsroom: {
     label: 'Newsroom',
-    summary: 'A well-made news site on a good day. Named sections, one strong rule each, numbers that never borrow the headline face.',
-    bestFor: 'Publications, media summits, and newsrooms that put something out every day.',
+    summary: 'A modern editorial layout with strong section rules, compact data, and restrained color.',
+    bestFor: 'Use this style for publications, media conferences, and newsroom events.',
     options: {
       headingFace: {
         label: 'Heading face',
-        prompt: 'The desk’s headline voice.',
+        prompt: 'Choose the headline typeface.',
         choices: {
           fraunces: {
             label: 'Fraunces',
-            why: 'The designed headline. Its soft-serif wonk is what makes the site read as edited rather than generated.',
+            why: 'Uses a distinctive soft-serif heading face. It separates headlines from Newsreader body text and Plex data text.',
           },
           'newsreader-display': {
             label: 'Newsreader at display weights',
-            why: 'The wire-service desk. Running the body face up to headline size gives a quieter, more traditional publication that still belongs to the same newsroom.',
+            why: 'Uses Newsreader for both headings and body text. This creates a quieter and more traditional publication style.',
           },
           'archivo-condensed': {
             label: 'Archivo bold condensed',
-            why: 'Grotesque headlines are a real newsroom tradition, and they keep the story while letting a client trade warmth for punch.',
+            why: 'Uses condensed sans-serif headlines. It fits longer titles in less vertical space and increases visual contrast.',
           },
         },
       },
       nameplate: {
         label: 'Header style',
-        prompt: 'The masthead bar.',
+        prompt: 'Choose the masthead layout.',
         choices: {
           'rule-bounded-bar': {
             label: 'Rule-bounded bar',
-            why: 'Name left, dates right, the strong rule under the whole bar. The standing masthead of a site that publishes every day.',
+            why: 'Places the event name at the left and dates at the right. A strong rule closes the header.',
           },
           'stacked-with-deck': {
             label: 'Stacked with a deck',
-            why: 'The deck is a newsroom device, not marketing copy, so it must state a fact about the event.',
+            why: 'Places the event name above a short factual description. A hairline rule closes the header.',
           },
           'section-aware-bar': {
             label: 'Section-aware bar',
-            why: 'The running head of a news site; it reinforces the table-of-contents idea the section rules set up.',
+            why: 'Uses a smaller running header for inner pages and keeps the active section visible.',
           },
         },
       },
       component: {
         label: 'Schedule style',
-        prompt: 'How a session listing is set.',
+        prompt: 'Choose the schedule row style.',
         choices: {
           'hairline-row': {
             label: 'Hairline row',
-            why: 'A hairline-separated row with title, time, track, speaker. The listing of a publication.',
+            why: 'Uses one row for the title, time, track, and speaker. Hairline rules separate the rows.',
           },
           'lead-and-rest': {
             label: 'Lead and rest',
-            why: 'The lead story and the digest under it, which is how a news page ranks things without cards, shadows, or colored edges.',
+            why: 'Makes the first session larger than the remaining sessions. Use it when one session must lead the list.',
           },
         },
       },
@@ -128,56 +128,56 @@ export const PRESET_COPY = Object.freeze({
   },
   broadsheet: {
     label: 'Broadsheet',
-    summary: 'The paper of record. The nameplate is the loudest thing on the page and rules do the dividing.',
-    bestFor: 'Formal programmes, anniversary editions, and events that want the paper-of-record voice.',
+    summary: 'A newspaper layout with large serif headings, strong rules, and dense programme listings.',
+    bestFor: 'Use this style for formal programmes, anniversary editions, and events that need a traditional newspaper layout.',
     options: {
       headingFace: {
         label: 'Heading face',
-        prompt: 'The paper’s era.',
+        prompt: 'Choose the masthead typeface.',
         choices: {
           'libre-caslon-display': {
             label: 'Libre Caslon Display',
-            why: 'The paper of record founded in the 1820s. It is the canonical masthead voice and the reason the story reads as authority.',
+            why: 'Uses a high-contrast display serif for the most traditional masthead.',
           },
           'libre-baskerville': {
             label: 'Libre Baskerville',
-            why: 'The same paper, founded sixty years later. Its more even colour and open counters keep the authority while reading a shade less antique.',
+            why: 'Uses a more open serif with even letter shapes. It keeps a formal tone and improves clarity at smaller sizes.',
           },
           spectral: {
             label: 'Spectral semibold',
-            why: 'The paper of record that redesigned in this century. It holds the serious register while giving a modern client a masthead that does not look inherited.',
+            why: 'Uses a contemporary serif with strong screen rendering. It keeps the formal hierarchy without an antique appearance.',
           },
         },
       },
       nameplate: {
         label: 'Header style',
-        prompt: 'The masthead layout.',
+        prompt: 'Choose the masthead layout.',
         choices: {
           'full-measure': {
             label: 'Full measure',
-            why: 'Name across the full column width, the nameplate rule under it, edition slug below. The front page of a broadsheet, exactly.',
+            why: 'Runs the event name across the full content width. The edition line appears below the nameplate rule.',
           },
           'centred-double-rule': {
             label: 'Centred with a double rule',
-            why: 'The ceremonial masthead a paper uses on an anniversary edition, so it stays inside the story while reading more formal.',
+            why: 'Centers the event name between two rules. Use it for a formal or commemorative edition.',
           },
           'compact-standing-edition': {
             label: 'Compact left with a standing edition line',
-            why: 'The running head on an inside page, which is why it fits inner pages and the nameplate-compact header variant.',
+            why: 'Uses a smaller left-aligned masthead and places the edition line beside it. Use it on inner pages.',
           },
         },
       },
       component: {
         label: 'Schedule style',
-        prompt: 'How the programme is set.',
+        prompt: 'Choose the programme density.',
         choices: {
           'ruled-programme': {
             label: 'Ruled programme',
-            why: 'Hairline rows, times in the agate column. The printed programme page.',
+            why: 'Uses hairline rows and a separate time column at the standard body leading.',
           },
           'agate-block': {
             label: 'Agate block',
-            why: 'The classified and listings page of the same paper, so the density reads as another part of the document rather than a different design.',
+            why: 'Reduces type size, row leading, and vertical padding to fit more sessions on one page.',
           },
         },
       },
@@ -185,60 +185,60 @@ export const PRESET_COPY = Object.freeze({
   },
   atlas: {
     label: 'Atlas',
-    summary: 'A mapped city on its transit network. A survey sheet and a departure board at once: Lines, stations, transfers.',
-    bestFor: 'Multi-venue events, city festivals, and anything a visitor has to navigate.',
+    summary: 'A navigation-focused layout with map grids, route marks, and compact schedule data.',
+    bestFor: 'Use this style for multi-venue events, city festivals, and events where visitors move between locations.',
     options: {
       headingFace: {
         label: 'Heading face',
-        prompt: 'The sign face. Body stays Libre Franklin and data stays Overpass Mono under every option.',
+        prompt: 'Choose the sign typeface. Body text stays Libre Franklin. Data stays Overpass Mono.',
         choices: {
           overpass: {
             label: 'Overpass',
-            why: 'The highway sign. It is drawn from road lettering, so route marks, station names, and transfer lines all speak in the voice the story needs.',
+            why: 'Uses a road-sign typeface for headings, route marks, and location names.',
           },
           'libre-franklin-extrabold': {
             label: 'Libre Franklin extrabold',
-            why: 'Franklin Gothic set American transit and news signage for a century, so running the body face up to heading size keeps the system whole and costs nothing extra.',
+            why: 'Uses the body typeface at a heavier weight for headings. This reduces the number of type families in the layout.',
           },
           'archivo-condensed': {
             label: 'Archivo Condensed',
-            why: 'Sheet space is scarce on a real map, and condensed headings pull the page toward the drawn sheet, which suits a dense multi-venue programme.',
+            why: 'Uses condensed headings to fit long location and route names in limited space.',
           },
         },
       },
       nameplate: {
         label: 'Header style',
-        prompt: 'The title block.',
+        prompt: 'Choose the title-block layout.',
         choices: {
           'corner-title-block': {
             label: 'Corner title block',
-            why: 'Hairline frame, coordinate marks at two corners, city and date range below, schematic line-diagram divider under it. The corner of a survey sheet that carries a network.',
+            why: 'Places the event name, city, and dates in a framed corner block with coordinate marks.',
           },
           'sheet-header-scale-line': {
             label: 'Sheet header with a scale line',
-            why: 'A scale bar states an extent, which is what a date span is, so the device stays honest.',
+            why: 'Uses an unframed header with a scale-line rule and puts the date range on the same line.',
           },
           'departure-board-header': {
             label: 'Departure board header',
-            why: 'The concourse board rather than the sheet, for events whose story is movement more than geography. The line updates on load and on user action only.',
+            why: 'Uses a strong header rule and stacked event details. Use it when schedule movement matters more than map detail.',
           },
         },
       },
       component: {
         label: 'Schedule style',
-        prompt: 'How the board is drawn.',
+        prompt: 'Choose the schedule map.',
         choices: {
           'departure-board': {
             label: 'Departure board',
-            why: 'Times down the left column, the faint coordinate grid behind the programme. The concourse board, and the theme’s clearest idea.',
+            why: 'Places times in the left column and keeps the coordinate grid behind the schedule.',
           },
           'line-diagram': {
             label: 'Line diagram',
-            why: 'The strip map inside a carriage: One run straight down the page. The grid behind the board comes off and the rows close up, so the day reads as one track to follow rather than as separate departures.',
+            why: 'Removes the grid and links the day as one vertical route. Rows use more line spacing.',
           },
           'gazetteer-list': {
             label: 'Gazetteer list',
-            why: 'A gazetteer indexes a map by place, which serves a visitor choosing where to stand rather than where to go.',
+            why: 'Removes the grid and uses a compact place index. Use it when visitors choose a location before a time.',
           },
         },
       },
@@ -246,70 +246,70 @@ export const PRESET_COPY = Object.freeze({
   },
   'field-guide': {
     label: 'Field Guide',
-    summary: 'A naturalist’s expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.',
-    bestFor: 'Environmental events, science communication, and regional gatherings.',
+    summary: 'A natural-history layout with serif type, line drawings, specimen labels, and optional paper texture.',
+    bestFor: 'Use this style for environmental events, science programs, and regional gatherings.',
     options: {
       headingFace: {
         label: 'Heading face',
-        prompt: 'The plate caption. Body stays Vollkorn and data stays IBM Plex Mono under every option.',
+        prompt: 'Choose the plate-caption typeface. Body text stays Vollkorn. Data stays IBM Plex Mono.',
         choices: {
           besley: {
             label: 'Besley',
-            why: 'The printed plate caption. Its Clarendon weight holds a title page and still sits calmly under a drawing, which is the core Field Guide relationship.',
+            why: 'Uses a heavy slab serif for headings and plate captions. It remains clear beside line drawings.',
           },
           'vollkorn-display': {
             label: 'Vollkorn bold at display size',
-            why: 'The one-face volume: A pocket handbook rather than a plate book, quieter and closer to the reading, and it adds nothing to the font budget.',
+            why: 'Uses Vollkorn for both headings and body text. This reduces the number of type families and gives the layout a quieter tone.',
           },
           spectral: {
             label: 'Spectral semibold',
-            why: 'The collector’s volume. Its finer, sharper serifs read as the frontispiece of a formal edition, so the story gains a more scholarly opening.',
+            why: 'Uses a finer serif for headings. It suits research, museum, and academic events.',
           },
         },
       },
       nameplate: {
         label: 'Header style',
-        prompt: 'The title page.',
+        prompt: 'Choose the title-page layout.',
         choices: {
           'framed-title-page': {
             label: 'Framed title page',
-            why: 'Name and dates inside a hairline frame with the nameplate-mark motif above the name. The opening plate of the handbook.',
+            why: 'Centers the event name and dates inside a hairline frame. The selected illustration appears above the name.',
           },
           'ruled-title-no-frame': {
             label: 'Ruled title, no frame',
-            why: 'The title page of a cheaper printing of the same book; quieter, and better for text-heavy events.',
+            why: 'Left-aligns the event name and removes the frame. Use it for text-heavy pages.',
           },
           'plate-and-label': {
             label: 'Plate and label',
-            why: 'It states the book’s subject the way a frontispiece plate does, and the plate stays drawn linework, never a photo.',
+            why: 'Pairs the title with a line drawing and a compact metadata row.',
           },
         },
       },
       component: {
         label: 'Schedule style',
-        prompt: 'How a session is labelled.',
+        prompt: 'Choose the session-label layout.',
         choices: {
           'specimen-label': {
             label: 'Specimen label',
-            why: 'A small ruled block: Name, date, place. The collection tag.',
+            why: 'Uses a ruled block for the session name, date, and location.',
           },
           'field-notes-column': {
             label: 'Field notes column',
-            why: 'The observation notebook rather than the mounted collection; it suits a single-track event where the day reads as one sitting.',
+            why: 'Uses tighter rows and more line spacing. Use it for a single-track schedule.',
           },
         },
       },
       marginalia: {
         label: 'Pencil line',
-        prompt: 'The one piece of marginalia this theme allows. Its own control, so a client can keep the plates clean.',
+        prompt: 'Show or hide the optional pencil mark.',
         choices: {
           off: {
             label: 'Off',
-            why: 'The plates stay clean. This is the default, because a field notebook is written by someone being careful.',
+            why: 'Does not show pencil marks.',
           },
           on: {
             label: 'On',
-            why: 'A thin hand-drawn underline under a specimen label or a note line: A pencil mark in a notebook, never a highlighter.',
+            why: 'Shows one thin underline or note mark. It does not underline headings.',
           },
         },
       },
@@ -317,74 +317,74 @@ export const PRESET_COPY = Object.freeze({
   },
   zine: {
     label: 'Zine',
-    summary: 'Made by hand, at a copier, the week before. One loud display face, an even mono rhythm under it, and an accent spent twice a page.',
-    bestFor: 'Unconferences, community events, and student work.',
+    summary: 'A high-contrast layout with bold display type, monospaced data, paper grain, and limited accent color.',
+    bestFor: 'Use this style for unconferences, community events, and student programs.',
     options: {
       headingFace: {
         label: 'Heading face',
-        prompt: 'The hand-cut poster lettering.',
+        prompt: 'Choose the poster typeface.',
         choices: {
           karrik: {
             label: 'Karrik',
-            why: 'Its deliberately mismatched shapes come from found and copied lettering, which is exactly the made-at-a-copier voice the story needs.',
+            why: 'Uses irregular letter shapes for a cut-and-copy poster effect.',
           },
           bagnard: {
             label: 'Bagnard',
-            why: 'The same hand-cut origin with more weight and menace, for a louder, rougher event.',
+            why: 'Uses a heavier display face for shorter and louder headings.',
           },
           avara: {
             label: 'Avara',
-            why: 'A transitional serif with the curves replaced by straight segments, so every bowl reads as a cut facet: A poster cut from flat stock rather than drawn.',
+            why: 'Uses angular serif shapes for a cut-paper effect.',
           },
         },
       },
       nameplate: {
         label: 'Header style',
-        prompt: 'The flyer headline.',
+        prompt: 'Choose the poster header.',
         choices: {
           'full-sheet': {
             label: 'Full sheet',
-            why: 'Name at the nameplate step across the full measure, wrapping to two or three lines, on a strong rule. The stapled poster.',
+            why: 'Runs the event name across the full width and allows it to wrap to several lines. A strong rule closes the header.',
           },
           'stacked-block': {
             label: 'Stacked block',
-            why: 'This is how hand-lettering fills a sheet, so it stays hand-made without any rotation or collage.',
+            why: 'Uses tighter line spacing so a long event name fills a compact block.',
           },
           'boxed-bill': {
             label: 'Boxed bill',
-            why: 'The show bill pinned to a noticeboard; a box drawn in strong rules is a printing device here, not a card.',
+            why: 'Places the event name and details inside a strong rectangular rule.',
           },
         },
       },
       component: {
         label: 'Schedule style',
-        prompt: 'How a session block is printed.',
+        prompt: 'Choose the session-block treatment.',
         choices: {
           'flat-block': {
             label: 'Flat block',
-            why: 'The single-pass photocopy, so it stays in the story and gives a client an option that needs no exception to §2.1.',
+            why: 'Uses flat session blocks with strong rules and no print offset.',
           },
           'stamped-block': {
             label: 'Stamped block',
-            why: 'Misregistration is what a two-pass print looks like, which is the story’s whole production method. It ships under the brief §2.4 exception, Zine only.',
+            why: 'Adds a small offset accent layer behind each session block to simulate a second print pass.',
           },
           'struck-folio': {
             label: 'Struck folio',
-            why: 'The typewriter section break of a photocopied programme; plain text plus rules, no chip or badge.',
+            why: 'Uses monospaced section labels and strong rules. It does not add a background layer.',
           },
         },
       },
       marginalia: {
         label: 'Pen marks',
-        prompt: 'The pen that went over the page afterwards. Its own control, because a client may want the stamp without the pen.',
+        prompt: 'Show or hide the optional pen marks.',
         choices: {
           off: {
             label: 'Off',
-            why: 'The page as printed, with no pen marks. This is the default so marginalia stays a deliberate choice.',
+            why: 'Does not show pen marks.',
           },
           on: {
             label: 'On',
-            why: 'Two drawn marks per page and one callout, never on a headline word, which keeps the theme clear of the banned headline-underline trick.',
+            why: 'Shows up to two small marks and one callout on a page. It does not mark headline words.',
           },
         },
       },

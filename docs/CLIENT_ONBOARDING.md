@@ -143,9 +143,8 @@ complaint weeks into the event, not a clean failure during setup.
 
 ### 5. Ticketing (capability-gated)
 
-What to do here depends entirely on the provider this client chose — item 5 is written to be
-satisfiable by every choice, not just Eventbrite, on purpose (a checklist entry a CSV deployment
-can never complete is a checklist entry operators learn to ignore):
+Complete the step for the provider this client selected. The checklist supports Eventbrite,
+manual CSV import, and deployments with no ticketing provider:
 
 | Provider | Step |
 |---|---|

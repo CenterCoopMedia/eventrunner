@@ -27,6 +27,16 @@ const DOCS_GENERATOR_PATHS = new Set([
   'scripts/lib/markdown-pages.cjs',
 ]);
 
+const COPY_CHECKED_DOC_FILES = new Set([
+  'README.md',
+  'docs/index.html',
+  'docs/ADMIN_GUIDE.md',
+  'docs/CLIENT_ONBOARDING.md',
+  'docs/DEPLOY_RUNBOOK.md',
+  'docs/POSTMARK_PROVISIONING.md',
+  'docs/EVENTBRITE_VERIFICATION.md',
+]);
+
 const ALWAYS_FULL_PATHS = new Set([
   '.env.example',
   'eslint.config.mjs',
@@ -71,6 +81,10 @@ function isDocsPath(path) {
     path === 'NOTICE';
 }
 
+function isCopyCheckedDocsPath(path) {
+  return COPY_CHECKED_DOC_FILES.has(path) || path.startsWith('docs/handbook/');
+}
+
 function isAppPath(path) {
   return path.startsWith('apps/web/') && !isMarkdownPath(path);
 }
@@ -113,6 +127,7 @@ function allJobs() {
 function resultForPaths(paths, mode, categories) {
   const {
     docs,
+    copyDocs,
     demo,
     demoGenerator,
     docsGenerator,
@@ -125,10 +140,11 @@ function resultForPaths(paths, mode, categories) {
   const jobs = {
     docs: docs || full,
     demo: demo || app || shared || full,
-    lint: demoGenerator || docsGenerator || app || backend || shared || full,
+    // Scanned documentation selects this tier so the copy gate cannot be
+    // bypassed by a documentation-only pull request.
+    lint: copyDocs || demoGenerator || docsGenerator || app || backend || shared || full,
     // The audit policy reads package.json/package-lock.json across the
-    // workspace, so it runs on the same footprint as lint (any dependency
-    // manifest change already routes through isFullPath below).
+    // workspace. Documentation copy does not change that dependency surface.
     audit: demoGenerator || docsGenerator || app || backend || shared || full,
     unit: backend || shared || full,
     unitWeb: app || shared || full,
@@ -148,6 +164,7 @@ function classifyPaths(input) {
 
   const categories = {
     docs: paths.some(isDocsPath),
+    copyDocs: paths.some(isCopyCheckedDocsPath),
     demo: paths.some(isDemoPath),
     demoGenerator: paths.some((path) => DEMO_GENERATOR_PATHS.has(path)),
     docsGenerator: paths.some(isDocsGeneratorPath),
