@@ -22,6 +22,7 @@ import {
 import { subscribeConfigDoc } from '../lib/configSource.js';
 import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeRuntime.js';
 import { startModeSync } from '../lib/modeRuntime.js';
+import { resolveShape } from 'shared/theme';
 
 const EventConfigContext = createContext(null);
 
@@ -118,6 +119,19 @@ export function EventConfigProvider({ children }) {
     };
   }, [overlay]);
 
+  // THE document the rendering of the theme resolves from.
+  //
+  // Not `value.theme`. That one is the shallow overlay, and the shallow
+  // overlay is right for the CONSUMERS of the context — a live doc that
+  // omits `logos` should keep showing the snapshot's logos. It is wrong for
+  // the four DOM writes below, because they have to agree with each other:
+  // the runtime stylesheet has always been built from the live doc alone,
+  // and resolving the attributes from a doc that still carries snapshot keys
+  // makes the attribute and the custom property disagree. A live document
+  // naming a preset and nothing else would then get `--texture: paper` from
+  // the preset and `data-texture="flat"` left over from the build.
+  const themeDoc = overlay.theme || snapshotTheme;
+
   // Runtime theme override (spec §7.2). The element exists from mount so the
   // ownership contract holds even before config/theme arrives; its content is
   // only the properties the runtime doc validly overrides — everything else
@@ -134,12 +148,23 @@ export function EventConfigProvider({ children }) {
     document.title = value.eventConfig.name;
   }, [value.eventConfig.name]);
 
-  // Mirror the resolved texture onto the document element so the .bg-paper
+  // Mirror the RESOLVED texture onto the document element so the .bg-paper
   // rule in index.css can gate on it — CSS custom properties can't be tested
   // for equality in a selector (spec §7.2 texture treatment).
+  //
+  // Resolved, not raw: a preset states its own texture (brief §4), and
+  // config/theme.texture only overrides it. A document that names a preset
+  // and omits the field has no `texture` to read, so the raw value left the
+  // attribute holding whatever the build shipped — Field Guide's paper
+  // rendered flat. resolveShape is the path the generator writes --texture
+  // through, the path buildRuntimeThemeCss writes it through, and the path
+  // the admin preview writes the attribute through, so all four agree by
+  // construction.
+  const texture = resolveShape(themeDoc).texture;
   useEffect(() => {
-    document.documentElement.dataset.texture = value.theme.texture;
-  }, [value.theme.texture]);
+    if (texture) document.documentElement.dataset.texture = texture;
+    else delete document.documentElement.dataset.texture;
+  }, [texture]);
 
   // Which preset, and which motif set (design brief §3.4, §3.8).
   //
@@ -154,18 +179,18 @@ export function EventConfigProvider({ children }) {
   // it rendered before presets existed.
   useEffect(() => {
     const root = document.documentElement;
-    const { theme, motifSet } = resolveRootAttributes(value.theme);
+    const { theme, motifSet } = resolveRootAttributes(themeDoc);
     if (theme) root.dataset.theme = theme;
     else delete root.dataset.theme;
     root.dataset.motifSet = motifSet;
-  }, [value.theme]);
+  }, [themeDoc]);
 
   // Light or dark (design brief §3.3). config/theme.mode states the policy;
   // this writes data-mode on <html>, which is what picks between the two
   // color blocks in the generated stylesheet. Under the 'system' policy the
   // subscription stays open, so the page follows the reader's setting when
   // it changes. A document with no `mode` renders light.
-  useEffect(() => startModeSync(value.theme.mode), [value.theme.mode]);
+  useEffect(() => startModeSync(themeDoc.mode), [themeDoc.mode]);
 
   return (
     <EventConfigContext.Provider value={value}>
