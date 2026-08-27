@@ -294,6 +294,21 @@ test('validatePageDoc rejects an unknown template BY NAME', () => {
   assert.ok(errors.some((e) => e.startsWith('template:') && e.includes('"poster"')));
 });
 
+test('validatePageDoc rejects a template that is not a string at all', () => {
+  // A request body carries whatever the client sent. `null` is the stated
+  // way to say "no template"; anything else that is not one of the six ids
+  // is a value the renderer would have no answer for, and it is refused
+  // here rather than stored and met later.
+  for (const template of [7, true, ['standard'], { id: 'standard' }]) {
+    const { ok, errors } = validatePageDoc(validPage({ template }));
+    assert.equal(ok, false, `template ${JSON.stringify(template)} was accepted`);
+    assert.ok(
+      errors.some((e) => e.startsWith('template:')),
+      `template ${JSON.stringify(template)}: ${errors.join('; ')}`,
+    );
+  }
+});
+
 test('every template bundle states every layout variant, in accepted values', () => {
   // A template's whole job is to answer the questions the operator would
   // otherwise have to. One left unstated leaves the page half-following the

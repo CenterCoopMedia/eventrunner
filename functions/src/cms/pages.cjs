@@ -29,7 +29,7 @@
  */
 
 const { isKnownBlockType } = require('./blockTypes.cjs');
-const { PAGE_TEMPLATE_IDS } = require('./pageTemplates.cjs');
+const { PAGE_TEMPLATE_IDS, isKnownPageTemplate } = require('./pageTemplates.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isReservedPathSegment } = require('shared/routing');
@@ -175,7 +175,7 @@ function validatePageDoc(doc) {
   // Null and absent both mean "no template", which is a fact about the
   // page rather than a gap — nothing infers one from the layout values.
   if (doc.template !== undefined && doc.template !== null) {
-    if (!PAGE_TEMPLATE_IDS.includes(doc.template)) {
+    if (!isKnownPageTemplate(doc.template)) {
       errors.push(
         `template: must be one of ${PAGE_TEMPLATE_IDS.join(', ')}, got ${JSON.stringify(doc.template)}`,
       );

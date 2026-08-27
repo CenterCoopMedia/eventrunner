@@ -73,7 +73,16 @@ const PAGE_TEMPLATE_LAYOUTS = Object.freeze({
   }),
 });
 
-/** @param {unknown} id @returns {boolean} */
+/**
+ * Whether `id` names a template this system has.
+ *
+ * The type check is the point: `validatePageDoc` meets whatever arrives in
+ * a request body, and `PAGE_TEMPLATE_IDS.includes(id)` on its own answers
+ * "no" for a number and for an object without saying why it is safe to.
+ *
+ * @param {unknown} id
+ * @returns {boolean}
+ */
 function isKnownPageTemplate(id) {
   return typeof id === 'string' && PAGE_TEMPLATE_IDS.includes(id);
 }

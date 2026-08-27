@@ -145,8 +145,3 @@ export function templateLayout(id) {
 export function templateOf(doc) {
   return isKnownTemplate(doc?.template) ? doc.template : null;
 }
-
-/** The words for one template, for a control that has to name it. */
-export function templateLabel(id) {
-  return isKnownTemplate(id) ? PAGE_TEMPLATES[id].label : id;
-}
