@@ -138,9 +138,11 @@ describe('page list', () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages');
 
-    expect(screen.getByText('Published')).toBeInTheDocument();
-    expect(screen.getByText('Never published')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Published')).toBeInTheDocument();
+      expect(screen.getByText('Never published')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+    });
   });
 
   it('fails soft when a listener errors: rows stay, with a non-blocking notice', async () => {
@@ -148,15 +150,17 @@ describe('page list', () => {
     listenerError = new Error('permission denied');
     await renderAt('/admin/pages');
 
-    expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/lost the connection/i);
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent(/lost the connection/i);
+    });
   });
 
   it('marks a live page with a dirty draft as having unpublished changes', async () => {
     liveDocs = [{ ...SCHOLARSHIPS_DRAFT, status: undefined, revision: 2 }];
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages');
-    expect(screen.getByText('Unpublished changes')).toBeInTheDocument();
+    expect(await screen.findByText('Unpublished changes')).toBeInTheDocument();
   });
 
   it('publishes only the pages that have something to publish', async () => {
@@ -168,7 +172,7 @@ describe('page list', () => {
     fetch.mockResolvedValueOnce(okResponse({ queueId: 'q1', status: 'done' }));
     await renderAt('/admin/pages');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish all (1)' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsPublish$/);
@@ -232,7 +236,7 @@ describe('page editor', () => {
       .mockResolvedValueOnce(okResponse({ queueId: 'q1', status: 'done' }));
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(urlOf(0)).toMatch(/\/cmsSavePage$/);
@@ -245,7 +249,7 @@ describe('page editor', () => {
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
 
     const { page } = bodyOf(0);
@@ -268,7 +272,7 @@ describe('page editor', () => {
     );
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.change(screen.getByLabelText('Path'), { target: { value: 'scholarships' } });
+    fireEvent.change(await screen.findByLabelText('Path'), { target: { value: 'scholarships' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
@@ -290,7 +294,7 @@ describe('page editor', () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
 
-    const hint = screen.getByLabelText('Path').getAttribute('aria-describedby');
+    const hint = (await screen.findByLabelText('Path')).getAttribute('aria-describedby');
     const hintText = document.getElementById(hint.split(' ')[0]).textContent;
     for (const segment of RESERVED_PATH_SEGMENTS) {
       expect(hintText).toContain(segment);
@@ -309,7 +313,7 @@ describe('page editor', () => {
     );
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/schedule' } });
+    fireEvent.change(await screen.findByLabelText('Path'), { target: { value: '/schedule' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -322,8 +326,8 @@ describe('page editor', () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'home', label: 'Home page', systemPage: true }];
     await renderAt('/admin/pages/home');
 
+    expect(await screen.findByText(/cannot be deleted/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete page' })).toBeDisabled();
-    expect(screen.getByText(/cannot be deleted/i)).toBeInTheDocument();
   });
 
   it('deletes a regular page through cmsDeletePage', async () => {
@@ -331,7 +335,7 @@ describe('page editor', () => {
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', deleted: true }));
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete page' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete page' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsDeletePage$/);
     expect(bodyOf(0)).toEqual({ id: 'scholarships' });
@@ -342,7 +346,7 @@ describe('page editor', () => {
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add block to section 1' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add block to section 1' }));
     fireEvent.change(screen.getByLabelText('Block 2 field — section 1'), {
       target: { value: 'closing' },
     });
@@ -363,7 +367,7 @@ describe('page editor', () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
 
-    const picker = screen.getByLabelText('Block 1 type — section 1');
+    const picker = await screen.findByLabelText('Block 1 type — section 1');
     expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual(['Rich text']);
 
     // Widening the palette widens the picker — the registry drives both.
@@ -397,8 +401,10 @@ describe('publish results and recovery', () => {
     listenerError = new Error('permission denied');
     await renderAt('/admin/pages');
 
-    expect(screen.queryByRole('status', { name: 'Loading pages…' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('status', { name: 'Loading pages…' })).toBeNull();
+      expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
+    });
   });
 
   it('does not claim success when cmsPublish skipped the page', async () => {
@@ -419,7 +425,7 @@ describe('publish results and recovery', () => {
       );
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
     // Both the inline status and the toast carry the verdict.
     expect(
@@ -449,7 +455,7 @@ describe('publish results and recovery', () => {
       );
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
     const resume = await screen.findByRole('button', { name: 'Resume publish' });
 
     fireEvent.click(resume);
@@ -499,7 +505,7 @@ describe('publish results and recovery', () => {
     );
     await renderAt('/admin/pages');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish all (1)' }));
     const alerts = await screen.findAllByRole('alert');
     expect(
       alerts.some((el) => /scholarships has no draft to publish/i.test(el.textContent)),
