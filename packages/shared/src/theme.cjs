@@ -55,8 +55,15 @@ const LEGACY_FONT_ROLE = 'accent';
  */
 const THEME_FONT_SET_IDS = Object.freeze(['serif-editorial', 'sans-humanist', 'script-casual']);
 
-/** What `config/theme.texture` may say (spec §7.2). */
-const THEME_TEXTURES = Object.freeze(['paper', 'flat']);
+/**
+ * What `config/theme.texture` may say (spec §7.2). `flat` is first because
+ * it is the base default: a texture is a theme opt-in, never a base
+ * treatment (design brief §2.5).
+ */
+const THEME_TEXTURES = Object.freeze(['flat', 'paper']);
+
+/** The texture a theme document without a `texture` field renders. */
+const DEFAULT_TEXTURE = 'flat';
 
 /** What `config/theme.radius` may say (spec §7.2). */
 const THEME_RADIUS_IDS = Object.freeze(['sharp', 'soft', 'round']);
@@ -345,6 +352,7 @@ module.exports = {
   LEGACY_FONT_ROLE,
   THEME_FONT_SET_IDS,
   THEME_TEXTURES,
+  DEFAULT_TEXTURE,
   THEME_RADIUS_IDS,
   THEME_LOGO_SLOTS,
   THEME_DOC_KEYS,

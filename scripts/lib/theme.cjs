@@ -16,7 +16,7 @@
  * deployment and an operator replaces it from the admin Settings UI.
  */
 
-const { DEFAULT_MODE_POLICY } = require('shared/theme');
+const { DEFAULT_MODE_POLICY, DEFAULT_TEXTURE } = require('shared/theme');
 
 /** Brand + semantic slots as [r, g, b]. Order is the emitted CSS order. */
 const NEUTRAL_PALETTE_RGB = Object.freeze({
@@ -119,17 +119,12 @@ function defaultTheme() {
   for (const [key, rgb] of Object.entries(NEUTRAL_PALETTE_RGB)) colors[key] = rgbToHex(rgb);
   return {
     colors,
-    // Font ROLES, never family names (design brief §3.2). `data` carries
-    // tabular figures, captions, and timestamps; it takes the editorial
-    // serif until PR2 bundles a mono. The retired `accent` role is gone
-    // from the seed — `--font-accent` stays for one release as an alias of
-    // `--font-heading`, which the generator emits.
-    fonts: { heading: 'serif-editorial', body: 'sans-humanist', data: 'serif-editorial' },
-    texture: 'paper',
+    // Font ROLES, never family names (design brief §3.2). One neutral
+    // humanist sans carries every role: the base picks no register, and a
+    // theme brings the pairing that gives a deployment its character.
+    fonts: { heading: 'sans-humanist', body: 'sans-humanist', data: 'sans-humanist' },
+    texture: DEFAULT_TEXTURE,
     radius: 'soft',
-    // Mode policy (design brief §3.3): 'light' | 'dark' | 'system'. A fresh
-    // deployment starts light, which is what every deployment made before
-    // the field existed also renders.
     mode: DEFAULT_MODE_POLICY,
     logos: { ...PLACEHOLDER_LOGOS },
     placeholderLogos: Object.keys(PLACEHOLDER_LOGOS),

@@ -70,7 +70,7 @@ export default function Layout() {
   const plate = buildNameplate(eventConfig, { compact: !isHome });
 
   return (
-    <div className="bg-paper flex min-h-screen flex-col">
+    <div className="page-surface flex min-h-screen flex-col">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>

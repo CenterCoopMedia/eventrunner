@@ -187,9 +187,9 @@ describe('Layout nav', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument();
   });
 
-  it('applies the bg-paper surface class on the shell', () => {
+  it('applies the page-surface class on the shell', () => {
     const { container } = renderShell();
-    expect(container.querySelector('.bg-paper')).not.toBeNull();
+    expect(container.querySelector('.page-surface')).not.toBeNull();
   });
 
   it('stays up under a malformed runtime config/event (fail-soft, §2.4)', () => {

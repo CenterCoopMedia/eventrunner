@@ -52,18 +52,16 @@
       focus:rounded-brand focus:bg-brand-primary focus:px-4 focus:py-3 focus:text-brand-surface;
   }
 
-  /* Texture treatment driven by config/theme.texture (spec §7.2). CSS custom
-     properties can't be tested for equality in a selector, so
+  /* The page ground. Flat is the base: the plain class paints no texture at
+     all, and a texture arrives only when config/theme.texture opts into one.
      EventConfigProvider mirrors the resolved texture onto
-     documentElement.dataset.texture (snapshot value at first paint, runtime
-     value once config/theme lands) and this rule gates the overlay on that
-     attribute: 'paper' (the default — matches generated/theme.css) paints
-     the dot pattern, 'flat' suppresses it. The overlay is decorative, so it
-     must never intercept the pointer. */
-  .bg-paper {
+     documentElement.dataset.texture because a custom property cannot be
+     compared for equality in a selector. The overlay is decorative, so it
+     never intercepts the pointer. */
+  .page-surface {
     @apply relative bg-brand-surface;
   }
-  .bg-paper::before {
+  :root[data-texture='paper'] .page-surface::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -73,9 +71,6 @@
       transparent 1px
     );
     background-size: 24px 24px;
-  }
-  :root[data-texture='flat'] .bg-paper::before {
-    content: none;
   }
 
   /* Editorial devices (design brief §2.1). Each class is the rendered form

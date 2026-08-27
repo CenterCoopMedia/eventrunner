@@ -134,9 +134,9 @@ export function EventConfigProvider({ children }) {
     document.title = value.eventConfig.name;
   }, [value.eventConfig.name]);
 
-  // Mirror the resolved texture onto the document element so the .bg-paper
-  // rule in index.css can gate on it — CSS custom properties can't be tested
-  // for equality in a selector (spec §7.2 texture treatment).
+  // Mirror the resolved texture onto the document element so the
+  // .page-surface rule in index.css can gate on it — CSS custom properties
+  // can't be tested for equality in a selector (spec §7.2).
   useEffect(() => {
     document.documentElement.dataset.texture = value.theme.texture;
   }, [value.theme.texture]);

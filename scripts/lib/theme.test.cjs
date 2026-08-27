@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const { defaultTheme, rgbToHex, hexToRgb, NEUTRAL_PALETTE_RGB, PLACEHOLDER_LOGOS } = require('./theme.cjs');
 const { validateTheme } = require('shared/config');
+const { DEFAULT_TEXTURE, THEME_TEXTURES } = require('shared/theme');
 
 test('the default theme passes the real config/theme validator', () => {
   const verdict = validateTheme(defaultTheme());
@@ -26,6 +27,23 @@ test('every logo slot starts as a placeholder the readiness branding row can see
   for (const slot of theme.placeholderLogos) {
     assert.match(theme.logos[slot], /^branding\//);
   }
+});
+
+test('a fresh deployment seeds a flat surface: a texture is a theme opt-in', () => {
+  assert.equal(defaultTheme().texture, DEFAULT_TEXTURE);
+  assert.equal(DEFAULT_TEXTURE, 'flat');
+  assert.equal(THEME_TEXTURES[0], DEFAULT_TEXTURE, 'the default is the first offered value');
+});
+
+test('a fresh deployment seeds one neutral face for every role', () => {
+  // The base picks no typographic register. A theme brings the pairing that
+  // gives a deployment its character.
+  const { fonts } = defaultTheme();
+  assert.deepEqual(fonts, {
+    heading: 'sans-humanist',
+    body: 'sans-humanist',
+    data: 'sans-humanist',
+  });
 });
 
 test('the seeded palette is event-neutral: no per-client color arrives from a script default', () => {
