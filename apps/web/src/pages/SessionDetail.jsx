@@ -9,7 +9,9 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
-import { SessionPills, SpeakerNames, TypeBadge, useSessionSpeakerNames } from '../components/SessionCard.jsx';
+import { SpeakerNames, useSessionSpeakerNames } from '../components/SessionCard.jsx';
+import SessionActions from '../components/session/SessionActions.jsx';
+import SessionFormat from '../components/session/SessionFormat.jsx';
 import SessionMaterialsList from '../components/SessionMaterialsList.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 
@@ -92,7 +94,7 @@ export default function SessionDetail() {
       <header>
         <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
           <h1 className="font-heading text-h1 font-semibold text-text-primary">{session.title}</h1>
-          <TypeBadge type={session.type} />
+          <SessionFormat format={session.type} />
         </div>
         <p className="mt-2xs font-data text-caption text-text-secondary">
           {day ? <span>{day.label}</span> : null}
@@ -123,8 +125,13 @@ export default function SessionDetail() {
         </p>
       ) : null}
 
+      {/* Every control this session has, on the page the session owns —
+          the reactions among them (components/session/SessionActions.jsx).
+          A schedule row carries none of this beyond a bookmark and a way
+          in. */}
       <div className="mt-lg">
-        <SessionPills
+        <SessionActions
+          surface="detail"
           session={session}
           eventConfig={eventConfig}
           features={features}

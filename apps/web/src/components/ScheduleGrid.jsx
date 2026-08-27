@@ -39,7 +39,7 @@ import { Link, useLocation } from 'react-router-dom';
 import RouteMark from './editorial/RouteMark.jsx';
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';
 import CallingPoints from './CallingPoints.jsx';
-import { TypeBadge } from './SessionCard.jsx';
+import SessionFormat from './session/SessionFormat.jsx';
 import { buildGridRows } from '../lib/scheduleGrid.js';
 import { formatSessionStart, formatSessionTimeRange } from '../lib/eventTime.js';
 
@@ -58,7 +58,7 @@ function GridEntry({ entry, eventConfig }) {
             {entry.session.title}
           </Link>
         </h3>
-        <TypeBadge type={entry.session.type} />
+        <SessionFormat format={entry.session.type} />
       </div>
       {range?.endLabel ? (
         <p className="mt-3xs font-mono text-caption text-text-secondary">

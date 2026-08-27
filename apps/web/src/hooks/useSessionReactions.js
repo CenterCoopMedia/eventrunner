@@ -1,6 +1,6 @@
 // One session's reaction counts, plus the signed-in caller's own reaction
 // (issue #25, spec §9 "Session reactions"). One listener pair per mounted
-// ReactionsPill — a session card only needs its own session's counts, unlike
+// ReactionGroup — one session's detail page only needs its own counts, unlike
 // useMyBookmarks.js which fans one subscription out to every card via a
 // shared "my schedule" set.
 import { useEffect, useState } from 'react';
@@ -25,7 +25,7 @@ export function useSessionReactions(sessionId) {
     // rendering the PREVIOUS session's counts — indefinitely, if the new
     // listener's first attempt errors, since the fail-soft contract
     // (reactionsSource.js) is "leave last-known values in place" and
-    // ReactionsPill does not gate its render on `loading`.
+    // ReactionGroup does not gate its render on `loading`.
     setCounts(null);
     setLoading(true);
     const unsubscribeCounts = subscribeSessionReactions(

@@ -179,9 +179,18 @@ describe('SessionDetail', () => {
     expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
   });
 
-  it('renders the bookmark pill when features.sessionBookmarks is on', () => {
+  it('offers a signed-out visitor the sign-in path when features.sessionBookmarks is on', () => {
     renderDetail('fx-early', { features: { schedule: true, sessionBookmarks: true } });
-    expect(screen.getByRole('link', { name: /sign in to bookmark/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sign in to save sessions' })).toBeInTheDocument();
+  });
+
+  it('puts the reactions on the session\u2019s own page, where a row never had them', () => {
+    renderDetail('fx-early', {
+      features: { schedule: true, sessionReactions: true },
+      auth: { user: { uid: 'u1' } },
+      profile: { attendeeAccess: true },
+    });
+    expect(screen.getByRole('group', { name: /session reactions/i })).toBeInTheDocument();
   });
 
   it('renders no materials section when the session has no approved materials', () => {
@@ -190,7 +199,7 @@ describe('SessionDetail', () => {
   });
 
   it('lists approved materials from session_materials_public when features.sessionMaterials is on', () => {
-    // Two hooks subscribe independently here (MaterialsPill's count and the
+    // Two hooks subscribe independently here (MaterialsLink's count and the
     // list itself), so this stubs every call, not just the first.
     subscribeSessionMaterialsMock.mockImplementation((sessionId, onNext) => {
       onNext([

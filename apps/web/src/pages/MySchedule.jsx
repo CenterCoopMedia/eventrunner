@@ -3,7 +3,7 @@
 // set Schedule.jsx renders down to the signed-in user's bookmarks, grouped
 // and sorted the same way. Requires config/features.{schedule,
 // sessionBookmarks} AND a signed-in user — bookmarking itself is further
-// gated to approved attendees (BookmarkPill in SessionCard.jsx), but a
+// gated to approved attendees (session/BookmarkAction.jsx), but a
 // signed-out visitor sees a sign-in prompt here rather than an empty list
 // that looks like "you have no bookmarks".
 //

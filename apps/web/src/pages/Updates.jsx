@@ -10,7 +10,7 @@
 // left-hand column with tabular figures — the same shape SessionCard.jsx
 // gives the schedule — and the title carries the heading face. A rule
 // replaces the card border, so nothing here is boxed. "Pinned" is the small
-// ruled rectangle DirectoryTag/TypeBadge established (issue #113): never a
+// ruled rectangle DirectoryTag/SessionFormat established (issue #113): never a
 // pill, never a colored badge, and it sits beside the title, never above it.
 import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';

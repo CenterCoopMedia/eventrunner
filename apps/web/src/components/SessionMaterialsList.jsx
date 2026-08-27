@@ -1,6 +1,7 @@
 // The approved-materials list on a session's detail page (issue #23, spec
 // §4.4). Feature-gated by config/features.sessionMaterials, same as
-// MaterialsPill (SessionCard.jsx). Rows come from the anonymously-readable
+// session/MaterialsLink.jsx, which links here by the section id below.
+// Rows come from the anonymously-readable
 // `session_materials_public` projection — filename and type only, never a
 // URL. Clicking a row resolves the real target via getSessionMaterialUrl,
 // which applies the embargo gate server-side; a pre-embargo click (a
@@ -78,7 +79,7 @@ export default function SessionMaterialsList({ session, features = {} }) {
   if (!features.sessionMaterials || materials.length === 0) return null;
 
   return (
-    <section className="mt-6">
+    <section id="session-materials" className="mt-6">
       <h2 className="font-heading text-lg font-semibold text-brand-ink">Materials</h2>
       <ul className="mt-2 flex flex-col gap-2">
         {materials.map((material) => (
