@@ -57,12 +57,48 @@ export default {
         // against its ground (WCAG 1.4.11) — the hairline share falls well
         // short of that, so control borders get their own token.
         control: 'rgb(var(--color-border-control-rgb) / <alpha-value>)',
+        // The admin identity (admin story part 6). A separate family on
+        // purpose: the admin obeys data-mode and ignores data-theme, so an
+        // admin utility must never resolve to a client's brand token. The
+        // client accent itself is NOT mapped here — only the two component
+        // tokens that are allowed to carry it, which is what makes "the
+        // accent appears in exactly two places" greppable.
+        'admin-ground': 'rgb(var(--admin-ground-rgb) / <alpha-value>)',
+        'admin-ground-raised': 'rgb(var(--admin-ground-raised-rgb) / <alpha-value>)',
+        'admin-ground-proof': 'rgb(var(--admin-ground-proof-rgb) / <alpha-value>)',
+        'admin-ground-input': 'rgb(var(--admin-ground-input-rgb) / <alpha-value>)',
+        'admin-ground-alarm': 'rgb(var(--admin-ground-alarm-rgb) / <alpha-value>)',
+        'admin-ink': 'rgb(var(--admin-ink-rgb) / <alpha-value>)',
+        'admin-ink-secondary': 'rgb(var(--admin-ink-secondary-rgb) / <alpha-value>)',
+        'admin-ink-data': 'rgb(var(--admin-ink-data-rgb) / <alpha-value>)',
+        'admin-ink-inverse': 'rgb(var(--admin-ink-inverse-rgb) / <alpha-value>)',
+        'admin-ink-disabled': 'rgb(var(--admin-ink-disabled-rgb) / <alpha-value>)',
+        'admin-ink-link': 'rgb(var(--admin-ink-link-rgb) / <alpha-value>)',
+        'admin-rule-hairline': 'rgb(var(--admin-rule-hairline-rgb) / <alpha-value>)',
+        'admin-rule-strong': 'rgb(var(--admin-rule-strong-rgb) / <alpha-value>)',
+        'admin-rule-header': 'rgb(var(--admin-rule-header-rgb) / <alpha-value>)',
+        'admin-rule-alarm': 'rgb(var(--admin-rule-alarm-rgb) / <alpha-value>)',
+        'admin-state-live': 'rgb(var(--admin-state-live-rgb) / <alpha-value>)',
+        'admin-state-draft': 'rgb(var(--admin-state-draft-rgb) / <alpha-value>)',
+        'admin-state-error': 'rgb(var(--admin-state-error-rgb) / <alpha-value>)',
+        'admin-state-caution': 'rgb(var(--admin-state-caution-rgb) / <alpha-value>)',
+        'admin-state-ok': 'rgb(var(--admin-state-ok-rgb) / <alpha-value>)',
+        'admin-focus-ring': 'rgb(var(--admin-focus-ring-rgb) / <alpha-value>)',
+        // The two client-accent slots, and the only two (admin story part 6f).
+        'admin-nav-active-marker': 'rgb(var(--admin-nav-active-marker-rgb) / <alpha-value>)',
+        'admin-page-header-mark': 'rgb(var(--admin-page-header-mark-rgb) / <alpha-value>)',
       },
       fontFamily: {
         heading: 'var(--font-heading)',
         body: 'var(--font-body)',
         data: 'var(--font-data)',
         mono: 'var(--font-mono)',
+        // The admin runs two faces where a preset runs four (admin story
+        // part 6g): the UI face carries everything a person reads as
+        // language, the data face everything the machine owns. Neither is
+        // writable from config/theme.
+        'admin-ui': 'var(--admin-font-ui)',
+        'admin-data': 'var(--admin-font-data)',
         // There is no `accent` face. PR2 removed the retired --font-accent
         // alias (brief §3.2, §7). Zine's handwritten callout runs on the
         // --callout-font component token, which the callout component reads
@@ -103,11 +139,20 @@ export default {
         hairline: 'var(--rule-hairline-width)',
         strong: 'var(--rule-strong-width)',
         nameplate: 'var(--rule-nameplate-width)',
+        // Each admin rule ships as a colour plus a width pair (brief §3.7).
+        'admin-hairline': 'var(--admin-rule-hairline-width)',
+        'admin-strong': 'var(--admin-rule-strong-width)',
+        'admin-header': 'var(--admin-rule-header-width)',
+        'admin-alarm': 'var(--admin-rule-alarm-width)',
+        'admin-marker': 'var(--admin-nav-active-marker-width)',
       },
       borderRadius: {
         // config/theme.radius ('sharp' | 'soft' | 'round') sets --radius-base.
         brand: 'var(--radius-base)',
         'brand-lg': 'var(--radius-large)',
+        // One radius for the whole room, and there is no second one: this is
+        // what stops a pill arriving in the admin (admin story part 6g).
+        admin: 'var(--admin-radius)',
       },
       transitionDuration: {
         fast: 'var(--motion-fast)',

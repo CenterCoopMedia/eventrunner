@@ -123,7 +123,7 @@ export default function AdminApp() {
             element={
               <EmptyState
                 title="Admin page not found"
-                description="That admin screen doesn’t exist. Use the tabs above."
+                description="That admin screen doesn’t exist. Pick a section from the docket."
               />
             }
           />

@@ -134,9 +134,9 @@ describe('event settings', () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);
     // The listener echo of a save landing from another surface updates the
-    // rendered config (here: the shell's short name).
+    // rendered config (here: the job mark's short name in the docket).
     await pushConfig('event', { ...LIVE_EVENT, shortName: 'SUMMIT27' });
-    expect(screen.getByText('Admin · SUMMIT27')).toBeInTheDocument();
+    expect(screen.getByText('SUMMIT27')).toBeInTheDocument();
   });
 
   it('shows the sender-domain verification state without offering to edit it', async () => {

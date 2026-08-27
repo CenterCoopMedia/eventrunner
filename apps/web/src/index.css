@@ -199,10 +199,86 @@
   }
 }
 
+@layer components {
+  /* The composing room (docs/plans/2026-08-27-admin-identity-story.md).
+     The admin is the seventh surface and it is not a preset: it reads the
+     admin-* tokens only, obeys data-mode, and ignores data-theme. These
+     rules carry the two things a utility class cannot: the one focus ring,
+     and moment 1's publish resolve. */
+
+  /* The room's own skip link. Same behaviour as .skip-link, in admin ink on
+     an admin ground: the shell must not paint a client's brand colour. */
+  .skip-link--admin {
+    @apply focus:border-admin-hairline focus:border-admin-rule-strong focus:bg-admin-ground-raised
+      focus:font-admin-ui focus:text-admin-ink;
+  }
+
+  /* A folio in the room: a small-caps plain-text label on a hairline at a
+     group boundary. Same device as the public .folio, in admin ink — never
+     a chip, never a pill, and never directly above a heading. */
+  .admin-folio {
+    @apply text-folio uppercase text-admin-ink-secondary;
+  }
+
+  /* Part 6e: ONE ring, clearing both --admin-ground and
+     --admin-ground-input in both modes, offset so it never collides with a
+     hairline. It replaces the public ring inside the room rather than
+     removing it. */
+  .admin-room :focus-visible {
+    outline: var(--er-width-strong) solid rgb(var(--admin-focus-ring-rgb));
+    outline-offset: var(--admin-focus-offset);
+  }
+
+  /* Moment 1: a record with unpublished changes sits on the proof ground —
+     the rough stock a proof is pulled on. The tint is a LAYER, so a
+     successful publish resolves it to the base ground on `opacity` alone,
+     over --motion-base (160ms). The word is always present beside it; the
+     tint is the second signal, never the first. */
+  .admin-proof-row {
+    position: relative;
+  }
+  .admin-proof-row::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-color: rgb(var(--admin-ground-proof-rgb));
+  }
+  .admin-proof-row > * {
+    position: relative;
+  }
+  /* Published in this session: the same row, its proof tint resolved away. */
+  .admin-proof-row--resolved::before {
+    opacity: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .admin-proof-row::before {
+      transition: opacity var(--motion-base) var(--motion-ease);
+    }
+  }
+}
+
 @layer utilities {
   /* 44px minimum touch targets (interface guidelines: Accessibility). */
   .touch-target {
     @apply min-h-11 min-w-11;
+  }
+
+  /* Dense is not cramped (admin story part 5): a control may drop to the
+     24×24px minimum on a pointer surface, and holds 44×44px on touch. */
+  .admin-target {
+    @apply min-h-6 min-w-6;
+  }
+  @media (pointer: coarse) {
+    .admin-target {
+      @apply min-h-11 min-w-11;
+    }
+  }
+
+  /* The data face carries everything the machine owns, and every value it
+     carries can change, so it sets tabular figures (admin story part 6g). */
+  .font-admin-data {
+    font-variant-numeric: tabular-nums;
   }
 
   /* The data and mono roles carry changing values — figures, timestamps,
