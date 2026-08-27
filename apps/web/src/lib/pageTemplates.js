@@ -21,11 +21,17 @@
 // which is not a gap — it is the fact that nobody chose one, and
 // `templateOf` reports it honestly as `null` rather than guessing.
 //
-// NAVIGATION IS NOT HERE. Where the navigation sits is a property of the
-// SITE, not of one page: a reader who meets a top nav on the home page and
-// a side rail on the schedule has lost the shell that told them where they
-// are. It moved to config/theme (shared/theme resolveNavPlacement), which
-// is where the rest of the site's structural choices live.
+// NAVIGATION IS NOT IN A TEMPLATE. Where the navigation sits is normally a
+// property of the SITE, not of one page: a reader who meets a top nav on
+// the home page and a side rail on the schedule has lost the shell that
+// told them where they are. The site's answer lives in config/theme
+// (shared/theme resolveNavPlacement), where the rest of the site's
+// structural choices live, and covers every page.
+//
+// A page may still overrule it — the page editor offers that in Advanced,
+// and the shell reads the page's value first. But it is not one of the
+// three values a template bundles, and picking a template neither sets it
+// nor clears it: a Long read with a rail beside it is still a Long read.
 
 /** The six tasks, in the order the editor offers them. */
 export const PAGE_TEMPLATE_IDS = Object.freeze([

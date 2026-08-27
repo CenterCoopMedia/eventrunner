@@ -28,6 +28,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
+import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
@@ -96,10 +98,21 @@ function InlineFieldError({ message }) {
 // is. Picking one sets the whole bundle at once (lib/pageTemplates.js). The
 // individual variants moved behind the Advanced disclosure below, where a
 // page that genuinely needs to differ from its template can still say so —
-// the same place AdminBranding.jsx keeps its raw token overrides.
+// the same place AdminBranding.jsx keeps its raw token overrides. Nothing
+// was taken away: every value the system has is still settable here, one at
+// a time, by an operator who knows which one they want.
 //
-// Navigation left entirely: it is a site setting now, on the Branding tab
-// (config/theme.navPlacement).
+// NAVIGATION IS THE SITE'S ANSWER, WITH A PAGE-LEVEL EXCEPTION. Where the
+// nav sits is set once for the whole site on the Branding tab
+// (config/theme.navPlacement), because a shell that moves between pages
+// stops being a shell. That is the default this control shows, by name, so
+// an operator can see what the site says without leaving the page.
+//
+// A page may still overrule it, and it sits in Advanced because that is
+// what it is: a deliberate exception for the one page that needs it, not a
+// question every page has to answer. Setting it does NOT clear the
+// template — nav is not one of the three values a template bundles, so a
+// Long read with a rail beside it is still a Long read.
 
 /** The value the template select shows for a page that named no task. */
 const CUSTOM_TEMPLATE = 'custom';
@@ -117,8 +130,23 @@ const LAYOUT_HINTS = Object.freeze({
   density: 'How much space sits between things on this page.',
 });
 
-/** The variants the editor still offers, in editor order. */
+/** The three variants a template bundles, in editor order. */
 const EDITABLE_LAYOUT_KEYS = Object.freeze(['header', 'arrangement', 'density']);
+
+/**
+ * The value the navigation control shows for a page that states none: it
+ * takes whatever the site is set to. Empty string rather than a word,
+ * because "follow the site" is the ABSENCE of a page-level value, and the
+ * change handler deletes the key rather than writing a fourth enum member
+ * the validator would have to learn.
+ */
+const SITE_NAV_PLACEMENT = '';
+
+/** What each navigation placement is called, in an operator's words. */
+const NAV_PLACEMENT_LABELS = Object.freeze({
+  top: 'A row across the top',
+  side: 'A rail down the leading edge',
+});
 
 /** One word per enum value, so a select never reads like a field name. */
 const LAYOUT_VALUE_LABELS = Object.freeze({
@@ -173,6 +201,11 @@ export default function AdminPageEditor({ mode }) {
   const call = useAdminApi();
   const { showToast } = useToast();
   const { rows, loading, findRow } = useAdminPages();
+  // What the site is set to, so the "follow the site" option can say what
+  // following it means instead of sending the operator to another tab to
+  // find out.
+  const { theme } = useEventConfig();
+  const siteNavPlacement = resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
 
   const [page, setPage] = useState(() => blankPage());
   const [error, setError] = useState(null);
@@ -486,10 +519,35 @@ export default function AdminPageEditor({ mode }) {
                 />
               ))}
             </div>
-            <p className="mt-sm max-w-[65ch] text-caption text-admin-ink-secondary">
-              Where the navigation sits is not here: it is one setting for the
-              whole site, on the Branding tab.
-            </p>
+            <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
+              <SelectField
+                label="Navigation on this page"
+                value={page.layout?.navPlacement ?? SITE_NAV_PLACEMENT}
+                options={[
+                  {
+                    value: SITE_NAV_PLACEMENT,
+                    label: `Follow the site setting — ${NAV_PLACEMENT_LABELS[siteNavPlacement]}`,
+                  },
+                  ...PAGE_LAYOUT_VALUES.navPlacement.map((value) => ({
+                    value,
+                    label: `Only this page: ${NAV_PLACEMENT_LABELS[value]}`,
+                  })),
+                ]}
+                onChange={(value) => {
+                  // "Follow the site" is the absence of a page-level value,
+                  // so it DELETES the key rather than storing a word
+                  // meaning "nothing". A page that says nothing and a page
+                  // that says "top" are different facts, and only the
+                  // second survives a later change to the site setting.
+                  const { navPlacement: _dropped, ...rest } = page.layout ?? {};
+                  update({
+                    layout: value === SITE_NAV_PLACEMENT ? rest : { ...rest, navPlacement: value },
+                  });
+                }}
+                error={errorFor('layout.navPlacement')}
+                hint="The site sets this once for every page, on the Branding tab. Change it here only for a page that genuinely needs to differ — the template above is unaffected either way."
+              />
+            </div>
           </div>
         </div>
       </Panel>

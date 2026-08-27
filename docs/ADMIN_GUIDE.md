@@ -32,9 +32,15 @@ the page stops following its template, and the template reads "Custom" until you
 page that has never been given a template or a layout renders the defaults, so nothing changes
 until you change it.
 
-Where the navigation sits — across the top, or down the side on wide screens — is **not** a page
-setting. It is one choice for the whole site, on the Branding tab, because a navigation that moves
-between pages stops being the shell that tells a reader where they are.
+Where the navigation sits — across the top, or down the side on wide screens — is normally one
+choice for the whole site, on the Branding tab, because a navigation that wanders between pages
+stops being the shell that tells a reader where they are. That is the default every page follows.
+
+One page can still differ. **Change the individual settings** also carries **Navigation on this
+page**: leave it on "Follow the site setting" (which names what the site is currently set to) or
+overrule it for this page alone. Use it sparingly and on purpose — a rail beside one long
+directory is a decision; a rail on three pages out of nine is an accident. It is not part of a
+template, so setting it leaves the template alone.
 
 A **system page** — home, schedule, speakers, sponsors — keeps its built-in feature and lets you
 put sections around it. Each section on one of those pages picks where it is inserted: **before the

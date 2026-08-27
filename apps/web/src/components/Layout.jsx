@@ -28,17 +28,25 @@
 // screen reader, the two placements are the same nav in the same place in
 // the document.
 //
-// WHERE THE PLACEMENT COMES FROM, IN ORDER. It is a SITE setting now
-// (config/theme.navPlacement, shared/theme resolveNavPlacement): the
-// navigation is the part of the shell that tells a reader where they are,
-// and a shell that moves between pages is not a shell. One choice covers
-// every page, and the page editor no longer offers a per-page one.
+// WHERE THE PLACEMENT COMES FROM, IN ORDER — THE PAGE, THEN THE SITE.
 //
-// A page's own stored `layout.navPlacement` is still read, second, and only
-// where the site has said nothing. Deployments made before the move set it
-// per page; refusing to read it would silently restyle their pages on
-// upgrade, which is the one thing a layout change may not do. Nothing
-// writes a new one.
+// The navigation is the part of the shell that tells a reader where they
+// are, so ONE choice is meant to cover the whole site: config/theme
+// .navPlacement, set once on the Branding tab, is the answer for every page
+// that does not say otherwise. That is the normal case and the default.
+//
+// A page may still say otherwise, and when it does it WINS. A stated
+// `layout.navPlacement` is an exception an operator made on purpose — the
+// one long directory that wants a rail beside it, the one landing page that
+// wants nothing but a top row — and an exception that the site setting
+// could overrule would not be an exception at all; it would be a value the
+// editor accepts and the shell ignores. Reading the page first is also what
+// keeps deployments that set it per page before the site setting existed
+// rendering exactly what they rendered.
+//
+// So: what the page states, then what the site states, then the default.
+// Each step is "did anyone actually say", never "is this the default value"
+// — statedPageLayout and resolveNavPlacement both report absence as absence.
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
@@ -98,7 +106,7 @@ export default function Layout() {
   const layout = statedPageLayout(getPage(pathname));
   const compact = (layout.header ?? (isHome ? 'nameplate' : 'nameplate-compact')) ===
     'nameplate-compact';
-  const navPlacement = resolveNavPlacement(theme) ?? layout.navPlacement ?? DEFAULT_NAV_PLACEMENT;
+  const navPlacement = layout.navPlacement ?? resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
   const plate = buildNameplate(eventConfig, { compact });
 
   // One nav, placed two ways. The list, its labels, its landmark, and its

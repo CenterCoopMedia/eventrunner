@@ -216,11 +216,24 @@ describe('Layout variants (brief §6.1)', () => {
     expect(top.querySelector('nav').className).not.toContain('lg:');
   });
 
-  // WHERE THE NAVIGATION SITS IS A SITE SETTING (this review). One choice
-  // covers every page: a reader who meets a top nav on the home page and a
-  // rail on the schedule has been handed two sites.
-  it('takes the placement from config/theme, whatever a page says', () => {
+  // THE SITE SETS IT FOR EVERY PAGE THAT DOES NOT SAY OTHERWISE (this
+  // review). One choice is the normal case: a reader who meets a top nav on
+  // the home page and a rail on the schedule by accident has been handed
+  // two sites.
+  it('takes the placement from config/theme on a page that states none', () => {
     const { container } = renderShell(
+      {},
+      { path: '/schedule', themeDoc: { navPlacement: 'side' } },
+    );
+    expect(container.querySelector('nav').className).toContain('lg:border-e-hairline');
+  });
+
+  // AND A PAGE MAY OVERRULE IT ON PURPOSE. The page-level value is an
+  // exception an operator made in the editor's Advanced disclosure, and an
+  // exception the site setting could overrule would not be an exception —
+  // it would be a value the editor accepts and the shell ignores.
+  it('lets a page overrule the site setting in either direction', () => {
+    const { container: railed } = renderShell(
       {},
       {
         path: '/schedule',
@@ -228,13 +241,23 @@ describe('Layout variants (brief §6.1)', () => {
         pageDoc: { path: '/schedule', layout: { navPlacement: 'side' } },
       },
     );
-    expect(container.querySelector('nav').className).not.toContain('lg:');
+    expect(railed.querySelector('nav').className).toContain('lg:border-e-hairline');
+
+    const { container: topped } = renderShell(
+      {},
+      {
+        path: '/schedule',
+        themeDoc: { navPlacement: 'side' },
+        pageDoc: { path: '/schedule', layout: { navPlacement: 'top' } },
+      },
+    );
+    expect(topped.querySelector('nav').className).not.toContain('lg:');
   });
 
-  it('still honours a page that stored a placement before the setting moved', () => {
-    // Deployments made before the move set it per page. Refusing to read it
-    // would silently restyle their pages on upgrade, which is the one thing
-    // a layout change may not do.
+  it('still honours a page that stored a placement before the setting existed', () => {
+    // Deployments made before the site setting landed set it per page.
+    // Refusing to read it would silently restyle their pages on upgrade,
+    // which is the one thing a layout change may not do.
     const { container } = renderShell(
       {},
       { path: '/schedule', pageDoc: { path: '/schedule', layout: { navPlacement: 'side' } } },

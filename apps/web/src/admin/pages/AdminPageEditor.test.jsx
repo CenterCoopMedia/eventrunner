@@ -485,14 +485,60 @@ describe('page editor', () => {
     expect(bodyOf(0).page.layout).toEqual({ arrangement: 'grid' });
   });
 
-  it('never offers a per-page navigation control again', async () => {
-    // Where the navigation sits is one setting for the whole site
-    // (config/theme.navPlacement), on the Branding tab.
+  // NAVIGATION: THE SITE'S ANSWER, WITH A PAGE-LEVEL EXCEPTION (this
+  // review). It is not one of the three values a template bundles, so it
+  // sits in Advanced and picking a template neither sets it nor clears it.
+  it('offers the site setting by name, and a page-level exception beside it', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
     openIndividualSettings();
-    expect(screen.queryByLabelText('Navigation')).toBeNull();
-    expect(screen.getByText(/one setting for the\s+whole site/)).toBeInTheDocument();
+
+    const nav = screen.getByLabelText('Navigation on this page');
+    // A page that states nothing follows the site, and the option says what
+    // following it means rather than sending the operator to another tab.
+    expect(nav).toHaveValue('');
+    expect(within(nav).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Follow the site setting — A row across the top',
+      'Only this page: A row across the top',
+      'Only this page: A rail down the leading edge',
+    ]);
+  });
+
+  it('stores a page-level navigation exception without disturbing the template', async () => {
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, template: 'long-read', layout: { density: 'loose' } }];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+    await renderAt('/admin/pages/scholarships');
+    openIndividualSettings();
+
+    fireEvent.change(screen.getByLabelText('Navigation on this page'), {
+      target: { value: 'side' },
+    });
+    // Nav is not one of the three values a template bundles, so a Long read
+    // with a rail beside it is still a Long read.
+    expect(screen.getByLabelText('Template')).toHaveValue('long-read');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const { page } = bodyOf(0);
+    expect(page.template).toBe('long-read');
+    expect(page.layout).toEqual({ density: 'loose', navPlacement: 'side' });
+  });
+
+  it('clears the exception back to absence, not to a word meaning nothing', async () => {
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, layout: { navPlacement: 'side' } }];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+    await renderAt('/admin/pages/scholarships');
+    openIndividualSettings();
+    expect(screen.getByLabelText('Navigation on this page')).toHaveValue('side');
+
+    fireEvent.change(screen.getByLabelText('Navigation on this page'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // The key is GONE, not set to 'top'. A page that says nothing follows
+    // the site setting wherever it goes next; a page pinned to 'top' would
+    // silently stop following it.
+    expect(bodyOf(0).page.layout).toEqual({});
   });
 
   it('opens a stored layout on what the page says, not on the defaults', async () => {

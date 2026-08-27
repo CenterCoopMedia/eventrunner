@@ -58,21 +58,25 @@ const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
 const PAGE_LAYOUT_KEYS = Object.freeze(['header', 'arrangement', 'density', 'navPlacement']);
 
 /**
- * `navPlacement` is STILL ACCEPTED AND NO LONGER OFFERED (this review).
+ * `navPlacement` IS THE PAGE-LEVEL EXCEPTION TO A SITE-LEVEL SETTING.
  *
- * Where the navigation sits is a property of the site, not of one page: a
- * reader who meets a top nav on the home page and a side rail on the
- * schedule has lost the shell that told them where they are. The setting
- * moved to config/theme, beside the rest of the site's structure, and the
- * page editor stopped offering it.
+ * Where the navigation sits is normally a property of the site, not of one
+ * page: a reader who meets a top nav on the home page and a side rail on
+ * the schedule has lost the shell that told them where they are. So the
+ * ordinary answer lives in config/theme.navPlacement, beside the rest of
+ * the site's structure, and covers every page.
  *
- * It stays in this list because documents written before the move carry
- * it, and a validator that started rejecting a value it once wrote would
- * make those pages unsaveable — the operator would meet
- * "layout.navPlacement: unknown field" on a page they never touched. The
- * renderer still reads a stored value as the page's own fallback
- * (apps/web/src/components/Layout.jsx), so nothing changes shape on
- * upgrade either.
+ * A page may still overrule it, which is why this key is accepted here and
+ * offered in the page editor's Advanced disclosure. The exception is real
+ * work — one directory that wants a rail beside it, one landing page that
+ * wants only a top row — and the renderer reads the page's value FIRST
+ * (apps/web/src/components/Layout.jsx), then the site's, then the default.
+ * A stated exception the site setting could overrule would not be an
+ * exception; it would be a value the editor accepts and the shell ignores.
+ *
+ * Reading the page first is also what keeps deployments that set it per
+ * page, before the site setting existed, rendering exactly what they
+ * rendered.
  */
 
 /**

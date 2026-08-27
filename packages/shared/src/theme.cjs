@@ -86,12 +86,17 @@ const THEME_DENSITIES = Object.freeze(['tight', 'comfortable', 'loose']);
  * been handed two different sites; the nav stops being furniture they can
  * stop noticing, which is the whole job of furniture.
  *
- * So it lives here, in `config/theme`, beside the rest of what the site is
- * shaped like — the preset, the texture, the radius, the mode policy — and
- * one choice covers every page. `layout.navPlacement` on a page document is
- * still read as that page's own fallback (apps/web/src/components/
- * Layout.jsx), so a deployment that set it per page before this moved keeps
- * rendering exactly what it rendered; the page editor no longer offers it.
+ * So the site's answer lives here, in `config/theme`, beside the rest of
+ * what the site is shaped like — the preset, the texture, the radius, the
+ * mode policy — and one choice covers every page that does not say
+ * otherwise.
+ *
+ * A PAGE MAY SAY OTHERWISE, and when it does it wins. `layout.navPlacement`
+ * on a page document is read FIRST by the shell (apps/web/src/components/
+ * Layout.jsx), and the page editor offers it in Advanced: the exception is
+ * deliberate work an operator does for one page, not a question every page
+ * has to answer. Reading it first is also what keeps a deployment that set
+ * it per page, before this setting existed, rendering what it rendered.
  */
 const THEME_NAV_PLACEMENTS = Object.freeze(['top', 'side']);
 
@@ -625,10 +630,10 @@ function resolveShape(theme) {
  * Where the site puts its navigation.
  *
  * `null` is a real answer and a different one from `'top'`: it means the
- * site has not chosen, which is what lets a page document's own stored
- * `layout.navPlacement` still decide for that page (back-compat — see
- * THEME_NAV_PLACEMENTS above). The shell falls back to DEFAULT_NAV_PLACEMENT
- * only when neither has anything to say.
+ * site has not chosen. The shell asks the page first, this second, and
+ * DEFAULT_NAV_PLACEMENT only when neither has anything to say — so
+ * reporting "not chosen" as `'top'` here would turn a site that never
+ * decided into a site that decided against every page's rail.
  *
  * @param {object} theme
  * @returns {'top'|'side'|null}
