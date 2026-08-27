@@ -6,13 +6,13 @@
      scripts/build-preset-catalog.test.cjs fails when this is stale. -->
 
 Every style Event Runner ships, what it is for, and what each of its curated
-choices does. This is the prose half of the catalog: the values that render live
+choices does. This is the prose half of the catalog: The values that render live
 in `packages/shared/src/presetCatalog.cjs`, and the words the theme editor puts
 on screen live in `apps/web/src/admin/presetCopy.js`. All three come from the
 same JSON, so none of them can quietly disagree.
 
 All six styles are first-class. The order below is the order the style picker
-offers them, which is a recommendation and not a ranking: a fresh deployment
+offers them, which is a recommendation and not a ranking: A fresh deployment
 starts on the first one, and every style ships one recommended configuration —
 the choices marked *recommended* here — that works the moment it is picked.
 
@@ -38,15 +38,15 @@ The public record of a public event. Plain, patient, unambiguous, with nothing b
 | Density | comfortable |
 | Illustrations | none |
 
-**schema-note.** One theme preset (design brief 2026-08-27, §4.4). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
+**schema-note.** One theme preset (design brief 2026-08-27, §4.4). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
 
 **story.** docs/plans/2026-08-27-preset-visual-stories.md, page 4.
 
 **palette-note.** Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin. Civic targets the highest contrast bar of the six presets and never trades contrast for mood.
 
-**first-class-note.** Every one of the six styles is first-class (owner calibration, 2026-08-27). There is no stability tier and no experimental group: each style is complete, and each ships one recommended configuration — the option defaults below — that works the moment it is picked. The picker's ORDER is the only ranking, and it lives in scripts/build-preset-catalog.cjs.
+**first-class-note.** Every one of the six styles is first-class (owner calibration, 2026-08-27). There is no stability tier and no experimental group: Each style is complete, and each ships one recommended configuration — the option defaults below — that works the moment it is picked. The picker's ORDER is the only ranking, and it lives in scripts/build-preset-catalog.cjs.
 
-**default-note.** Institutional is what a fresh deployment starts on: it is the plainest of the six, it targets the highest accessibility bar, and it is the look a client is least likely to have to undo. That is an onboarding decision, not a verdict on the other five.
+**default-note.** Institutional is what a fresh deployment starts on: It is the plainest of the six, it targets the highest accessibility bar, and it is the look a client is least likely to have to undo. That is an onboarding decision, not a verdict on the other five.
 
 **palette-words-light.** document off-white, statute near-black, restrained civic blue, form-grey rule, hearing-room slate, plain caution amber, plain confirm green, record grey
 
@@ -61,7 +61,7 @@ The public record of a public event. Plain, patient, unambiguous, with nothing b
 The institution’s register.
 
 - **Merriweather** *(recommended)* — Weight without drama. It is the USWDS pairing and it reads as a body that has existed for a while.
-- **Source Serif 4** — The same document, lighter on its feet: a university or a cultural institution rather than an agency, and the repo already bundles it for Broadsheet.
+- **Source Serif 4** — The same document, lighter on its feet: A university or a cultural institution rather than an agency, and the repo already bundles it for Broadsheet.
 - **Public Sans bold** — The all-sans document. One face for headings, labels, and data is the plainest possible public notice, which is the story taken to its logical end.
 
 ### Header style — `nameplate`
@@ -69,7 +69,7 @@ The institution’s register.
 The letterhead.
 
 - **Institutional letterhead** *(recommended)* — The top of an official document. The organisation line sits below the name, never above it.
-- **Two-part lockup** — The co-signed notice of a partnership, which is the common Civic case: logo slot left, event name and dates right, divided by a vertical hairline.
+- **Two-part lockup** — The co-signed notice of a partnership, which is the common Civic case: Logo slot left, event name and dates right, divided by a vertical hairline.
 - **Compact standing head** — For inner pages, where the reader wants the content and not the letterhead again.
 
 ### Schedule style — `component`
@@ -98,13 +98,13 @@ A well-made news site on a good day. Named sections, one strong rule each, numbe
 | Density | comfortable |
 | Illustrations | none |
 
-**schema-note.** One theme preset (design brief 2026-08-27, §4.2). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
+**schema-note.** One theme preset (design brief 2026-08-27, §4.2). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
 
 **story.** docs/plans/2026-08-27-preset-visual-stories.md, page 2.
 
 **palette-note.** Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin.
 
-**first-class-note.** See design/tokens/presets/civic.json: all six styles are first-class, each with one recommended configuration.
+**first-class-note.** See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.
 
 **palette-words-light.** cool newsprint white, desk black, one saturated editorial accent, muted data slate, hairline silver, section-rule graphite, caption grey, archive fog
 
@@ -156,19 +156,19 @@ The paper of record. The nameplate is the loudest thing on the page and rules do
 | Density | tight |
 | Illustrations | none |
 
-**schema-note.** One theme preset (design brief 2026-08-27, §4.1). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
+**schema-note.** One theme preset (design brief 2026-08-27, §4.1). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
 
 **story.** docs/plans/2026-08-27-preset-visual-stories.md, page 1.
 
 **palette-note.** Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin.
 
-**first-class-note.** See design/tokens/presets/civic.json: all six styles are first-class, each with one recommended configuration.
+**first-class-note.** See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.
 
 **palette-words-light.** newsprint white, press black, deep ink-blue, warm rule grey, gutter grey, agate grey, margin white, archive grey
 
 **palette-words-dark.** late-edition charcoal, warm bone type, lifted ink-blue, smoke-grey rule, banked ink, press-room grey, dim agate grey, muted archive grey
 
-**font-note.** Brief §9.4 and §4.1. Broadsheet is the one preset that runs a serif in the mono role: a listings column in a paper is set in agate, not in a typewriter face.
+**font-note.** Brief §9.4 and §4.1. Broadsheet is the one preset that runs a serif in the mono role: A listings column in a paper is set in agate, not in a typewriter face.
 
 **tokens-note.** Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4).
 
@@ -199,7 +199,7 @@ How the programme is set.
 
 `data-theme="atlas"`
 
-A mapped city on its transit network. A survey sheet and a departure board at once: lines, stations, transfers.
+A mapped city on its transit network. A survey sheet and a departure board at once: Lines, stations, transfers.
 
 **Best for.** Multi-venue events, city festivals, and anything a visitor has to navigate.
 
@@ -214,7 +214,7 @@ A mapped city on its transit network. A survey sheet and a departure board at on
 | Density | tight |
 | Illustrations | cartographic |
 
-**schema-note.** One theme preset (design brief 2026-08-27, §4.6). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
+**schema-note.** One theme preset (design brief 2026-08-27, §4.6). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
 
 **story.** docs/plans/2026-08-27-preset-visual-stories.md, page 6.
 
@@ -222,13 +222,13 @@ A mapped city on its transit network. A survey sheet and a departure board at on
 
 **safety-note.** Lines are told apart by their letter and their name first. A line colour, where a client sets one, is a second signal and never the only one (brief §8.1).
 
-**first-class-note.** See design/tokens/presets/civic.json: all six styles are first-class, each with one recommended configuration.
+**first-class-note.** See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.
 
 **palette-words-light.** surveyor's paper, india ink, route red, contour grey, graticule pale blue, key-box white, platform slate, benchmark silver
 
 **palette-words-dark.** deep slate ground, cool white ink, lit route marker, sunken contour grey, felt-grid blue, map-case grey, signal-white label, night platform blue
 
-**font-note.** Brief §9.3. Atlas points both value roles at Overpass Mono on purpose: a timetable and a coordinate are the same kind of value.
+**font-note.** Brief §9.3. Atlas points both value roles at Overpass Mono on purpose: A timetable and a coordinate are the same kind of value.
 
 **tokens-note.** Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The map grid is held below hairline contrast and never becomes an image.
 
@@ -252,8 +252,8 @@ The title block.
 
 How the board is drawn.
 
-- **Departure board** *(recommended)* — Time down, lettered lines across, faint map grid behind, traced-line signature interaction. The theme’s clearest idea.
-- **Line diagram** — The strip map inside a carriage: one line at a time as a Beck-style vertical run, which serves a visitor following one track all day.
+- **Departure board** *(recommended)* — Times down the left column, the faint coordinate grid behind the programme. The concourse board, and the theme’s clearest idea.
+- **Line diagram** — The strip map inside a carriage: One run straight down the page. The grid behind the board comes off and the rows close up, so the day reads as one track to follow rather than as separate departures.
 - **Gazetteer list** — A gazetteer indexes a map by place, which serves a visitor choosing where to stand rather than where to go.
 
 ## Field Guide
@@ -275,34 +275,34 @@ A naturalist’s expedition handbook. Plates, specimen labels, and observation n
 | Density | comfortable |
 | Illustrations | botanical |
 
-**schema-note.** One theme preset (design brief 2026-08-27, §4.5). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
+**schema-note.** One theme preset (design brief 2026-08-27, §4.5). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
 
 **story.** docs/plans/2026-08-27-preset-visual-stories.md, page 5.
 
 **palette-note.** Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin. The palette stays quiet and earthy so the linework carries the character.
 
-**first-class-note.** See design/tokens/presets/civic.json: all six styles are first-class, each with one recommended configuration.
+**first-class-note.** See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.
 
 **palette-words-light.** near-neutral plate stock with a trace of warmth, soft bark ink, deep leaf green, muted clay, lichen-grey rule, herbarium cream, pressed archive, pencil grey
 
 **palette-words-dark.** near-neutral night ground with a trace of warmth, bone-white text, lifted moss green, lifted clay, moth-grey rule, lantern warmth, nocturne slate, faded field-note grey
 
-**ground-note.** Owner review, 2026-08-27: the ground was too warm. A tan canvas paired with earthy ink reads as the look #109 rejected, and it fought every client logo that was not itself brown. Surface, alt surface, and both inks move most of the way to neutral. Warmth is kept as a trace — a few channels of red over blue, no more — so the story is still a paper handbook and not a spreadsheet. The leaf-green primary and the clay accent are untouched: they are the theme's colour, and the ground is what had to get out of their way.
+**ground-note.** Owner review, 2026-08-27: The ground was too warm. A tan canvas paired with earthy ink reads as the look #109 rejected, and it fought every client logo that was not itself brown. Surface, alt surface, and both inks move most of the way to neutral. Warmth is kept as a trace — a few channels of red over blue, no more — so the story is still a paper handbook and not a spreadsheet. The leaf-green primary and the clay accent are untouched: They are the theme's colour, and the ground is what had to get out of their way.
 
-**font-note.** Brief §9.2. Field Guide points both value roles at IBM Plex Mono on purpose: a label in this world is a tag, and a tag is set in the exact hand.
+**font-note.** Brief §9.2. Field Guide points both value roles at IBM Plex Mono on purpose: A label in this world is a tag, and a tag is set in the exact hand.
 
 **shape-note.** Texture is flat by default (owner review, 2026-08-27). Brief §4.5 already called it "flat with an optional light paper tone"; the optional tone was on. Flat surfaces are the shared default everywhere, and the tone is one advanced setting away.
 
 **motif-note.** Botanical illustrations are ON by default, as brief §3.8 binds. An earlier pass turned them off on the grounds that drawings appear "on every page"; that was wrong about the wiring. The site renders a motif in three places only — the masthead mark, the masthead's closing divider, and the public empty state — and the masthead mark yields to a client logo whenever one is set. Two small drawings on a page is the observational vocabulary this style is FOR, not decoration on top of it, and brief §2.3 caps the page at three. A client who wants none picks `none` in Illustrations; `fauna` is the supported alternate.
 
-**tokens-note.** Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The plate frame is a hairline; the double rule is the plate device's own doubling. The specimen label is the one preset that turns its rules and its field names on: a label in this world is a tag, and a tag states what each field is.
+**tokens-note.** Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The plate frame is a hairline; the double rule is the plate device's own doubling. The specimen label is the one preset that turns its rules and its field names on: A label in this world is a tag, and a tag states what each field is.
 
 ### Heading face — `headingFace`
 
 The plate caption. Body stays Vollkorn and data stays IBM Plex Mono under every option.
 
 - **Besley** *(recommended)* — The printed plate caption. Its Clarendon weight holds a title page and still sits calmly under a drawing, which is the core Field Guide relationship.
-- **Vollkorn bold at display size** — The one-face volume: a pocket handbook rather than a plate book, quieter and closer to the reading, and it adds nothing to the font budget.
+- **Vollkorn bold at display size** — The one-face volume: A pocket handbook rather than a plate book, quieter and closer to the reading, and it adds nothing to the font budget.
 - **Spectral semibold** — The collector’s volume. Its finer, sharper serifs read as the frontispiece of a formal edition, so the story gains a more scholarly opening.
 
 ### Header style — `nameplate`
@@ -319,7 +319,7 @@ The title page.
 
 How a session is labelled.
 
-- **Specimen label** *(recommended)* — A small ruled block: name, date, place. The collection tag.
+- **Specimen label** *(recommended)* — A small ruled block: Name, date, place. The collection tag.
 - **Field notes column** — The observation notebook rather than the mounted collection; it suits a single-track event where the day reads as one sitting.
 
 ### Pencil line — `marginalia`
@@ -327,7 +327,7 @@ How a session is labelled.
 The one piece of marginalia this theme allows. Its own control, so a client can keep the plates clean.
 
 - **Off** *(recommended)* — The plates stay clean. This is the default, because a field notebook is written by someone being careful.
-- **On** — A thin hand-drawn underline under a specimen label or a note line: a pencil mark in a notebook, never a highlighter.
+- **On** — A thin hand-drawn underline under a specimen label or a note line: A pencil mark in a notebook, never a highlighter.
 
 ## Zine
 
@@ -348,23 +348,23 @@ Made by hand, at a copier, the week before. One loud display face, an even mono 
 | Density | loose |
 | Illustrations | none |
 
-**schema-note.** One theme preset (design brief 2026-08-27, §4.3). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
+**schema-note.** One theme preset (design brief 2026-08-27, §4.3). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.
 
 **story.** docs/plans/2026-08-27-preset-visual-stories.md, page 3.
 
 **palette-note.** Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin.
 
-**first-class-note.** See design/tokens/presets/civic.json: all six styles are first-class, each with one recommended configuration.
+**first-class-note.** See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.
 
 **palette-words-light.** bright flyer paper, toner black, one hot accent, xerox grey, paper grain, staple silver, cut-edge white, faded archive grey
 
 **palette-words-dark.** night toner black, paper-white ink, held-back hot accent, ghost grey, low-light grain, streetlight silver, matte rule black, sun-faded archive grey
 
-**font-note.** Brief §9.1, retuned by the owner review (2026-08-27). Zine ran one mono across body, data, and mono. A mono body is a poor face for long-form prose: a rich-text page or a session description set in Fragment Mono is slow to read at any length. Body moves to Source Sans 3, the bundled neutral. Data and mono stay Fragment Mono, so times, room codes, and identifiers keep the typewriter rhythm the story is built on — the mono is now the VALUE face rather than the whole page.
+**font-note.** Brief §9.1, retuned by the owner review (2026-08-27). Zine ran one mono across body, data, and mono. A mono body is a poor face for long-form prose: A rich-text page or a session description set in Fragment Mono is slow to read at any length. Body moves to Source Sans 3, the bundled neutral. Data and mono stay Fragment Mono, so times, room codes, and identifiers keep the typewriter rhythm the story is built on — the mono is now the VALUE face rather than the whole page.
 
 **component-fonts-note.** --callout-font is a component token, not a fifth semantic role (brief §3.1, §4.3). It carries the one handwritten callout a page may hold. A client may point it at var(--font-heading) and drop the script face.
 
-**shape-note.** The copier grain is ON by default, as brief §4.3 allows ("paper grain allowed at low opacity"). An earlier pass turned it off in the name of flat surfaces; that confused two different fixes. The real fix was the CSS gate — the overlay now paints only under [data-texture='paper'], so an opt-in cannot leak onto a style that never asked for it (apps/web/src/index.css). Zine is the one style that DID ask: a page made at a copier has copier grain, and it is the cheapest, quietest way this style says so — a ground treatment, not a per-card artefact. The misregistered stamp stays the alternate, which is the right place for a printing artefact. A client who wants a clean sheet picks Flat under Advanced.
+**shape-note.** The copier grain is ON by default, as brief §4.3 allows ("paper grain allowed at low opacity"). An earlier pass turned it off in the name of flat surfaces; that confused two different fixes. The real fix was the CSS gate — the overlay now paints only under [data-texture='paper'], so an opt-in cannot leak onto a style that never asked for it (apps/web/src/index.css). Zine is the one style that DID ask: A page made at a copier has copier grain, and it is the cheapest, quietest way this style says so — a ground treatment, not a per-card artefact. The misregistered stamp stays the alternate, which is the right place for a printing artefact. A client who wants a clean sheet picks Flat under Advanced.
 
 **tokens-note.** Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). Zine uses the strong rule where the others use hairlines, so the page reads as cut-and-pasted blocks.
 
@@ -374,7 +374,7 @@ The hand-cut poster lettering.
 
 - **Karrik** *(recommended)* — Its deliberately mismatched shapes come from found and copied lettering, which is exactly the made-at-a-copier voice the story needs.
 - **Bagnard** — The same hand-cut origin with more weight and menace, for a louder, rougher event.
-- **Avara** — A transitional serif with the curves replaced by straight segments, so every bowl reads as a cut facet: a poster cut from flat stock rather than drawn.
+- **Avara** — A transitional serif with the curves replaced by straight segments, so every bowl reads as a cut facet: A poster cut from flat stock rather than drawn.
 
 ### Header style — `nameplate`
 

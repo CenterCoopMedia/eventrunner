@@ -253,7 +253,7 @@ describe('the proof', () => {
     expect(screen.getAllByText(/Schedule · light · 1440px · stress test/).length)
       .toBeGreaterThan(0);
     // The frame is rendering the fixture, not the real programme.
-    expect(frame().textContent).toContain('Roundtable: sustaining multi-newsroom');
+    expect(frame().textContent).toContain('Roundtable: Sustaining multi-newsroom');
   });
 
   it('previews the session page a shared link lands on', async () => {

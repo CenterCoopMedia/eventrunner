@@ -147,7 +147,7 @@ const STRESS_EVENT_NAME =
   'Reporting and Community Information Needs';
 
 const STRESS_SESSION_TITLE =
-  'Roundtable: sustaining multi-newsroom investigative partnerships across ' +
+  'Roundtable: Sustaining multi-newsroom investigative partnerships across ' +
   'state lines when the funding cycle and the election cycle disagree';
 
 /**
@@ -164,7 +164,7 @@ const STRESS_SESSION_TITLE =
  * test is on.
  */
 const STRESS_BASE_SESSION = Object.freeze({
-  title: 'Panel: what a regional newsroom owes the county next door',
+  title: 'Panel: What a regional newsroom owes the county next door',
   type: 'panel',
   location: 'Hall 2',
   description:

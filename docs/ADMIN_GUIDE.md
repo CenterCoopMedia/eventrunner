@@ -147,7 +147,7 @@ complete set of categories back.
 Six decisions make a finished site, and the tab asks them in that order:
 
 1. **Site style.** Six complete styles — Institutional, Newsroom, Broadsheet, Atlas, Field Guide,
-   Zine. Each one states who it suits, and each arrives set up and ready: you can publish it as it
+   Zine. Each one states who it suits, and each arrives set up and ready: You can publish it as it
    stands. A fresh deployment starts on Institutional.
 2. **Logo and icon.** The header logo and a square icon, both backed by the same image picker the
    Media tab uses. Footer logo, social sharing image, and favicon are behind **More image slots**.
@@ -158,13 +158,13 @@ Six decisions make a finished site, and the tab asks them in that order:
 5. **Schedule style.** How the style sets the programme.
 6. **Light or dark.** Always light, always dark, or follow each reader's own setting.
 
-Beside them sits the **Page preview**: the client's real pages, not swatches. Switch the page,
+Beside them sits the **Page preview**: The client's real pages, not swatches. Switch the page,
 switch between desktop and phone, fit the frame or see it at actual size, compare light and dark
 side by side, or turn on the **stress test** — a made-up event name that wraps three times and a day
 packed with 28 sessions, so you meet a hard page before a client sends one. Nothing in the stress
 test is saved. If a colour or a font will not render as you asked, the preview says so.
 
-**Advanced** holds everything else: typography and the 23-family font library, Illustrations,
+**Advanced** holds everything else: Typography and the 23-family font library, Illustrations,
 surface, corners, spacing, and per-mode colour settings for anyone who wants to set a value by
 hand. Colour pairs are measured as you type; publishing a failing pair is refused, and the message
 names the pair, the mode, and the measured ratio.

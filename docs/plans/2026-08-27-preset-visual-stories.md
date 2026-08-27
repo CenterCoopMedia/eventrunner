@@ -7,7 +7,7 @@ brief disagree, the brief wins.
 **Amended:** 2026-08-27 by the owner's design and operator-workflow review, and again by the
 owner's calibration of it the same day. The review retuned Zine, Field Guide, and Atlas. The
 calibration holds the retune where it improved a default and reverses it where it cost a style its
-conviction: all six styles ship first-class, complete and visibly distinct, with the expressive
+conviction: All six styles ship first-class, complete and visibly distinct, with the expressive
 treatments kept as fully-developed alternates. Where the calibration, the review, and either
 document disagree, the calibration wins, then the review.
 **Companion:** `docs/plans/2026-08-27-admin-identity-story.md`, the fixed admin identity.
@@ -553,11 +553,11 @@ of someone who sat still long enough to see something.
 ### 2. The vocabulary
 
 - **Nameplate** — the title page of the handbook. Event name, dates, and edition line on a ruled
-  head. **The frame is the alternate, not the default** (owner review): an event name and a date
+  head. **The frame is the alternate, not the default** (owner review): An event name and a date
   range are not a botanical plate, and framing them reads as costume. A client who wants the framed
   title page picks it under Header style.
 - **Botanical plate** — a framed drawing with a double rule at the frame and a plate number in the
-  folio style. **Reserved for content that supports it**: the empty state, which really is a blank
+  folio style. **Reserved for content that supports it**: The empty state, which really is a blank
   sheet, and a section a client opens with a drawing. It is never a hero image and never carries a
   photo, and it is never a wrapper around ordinary copy.
 - **Specimen label** — a small ruled block stating a name, a date, and a place. It carries session
@@ -696,7 +696,7 @@ travel with.
   the survey mark.
 - **Map grid** — the faint coordinate grid behind a section. Held below hairline contrast,
   `pointer-events: none`. It is the sheet the network is drawn on. **It renders in schedule
-  contexts only** (owner review): the schedule page and the personal schedule, on the surface that
+  contexts only** (owner review): The schedule page and the personal schedule, on the surface that
   holds the programme. A grid is a device for reading a timetable; behind an about page, a speaker
   bio, or a policy page it is texture for its own sake, and ordinary content pages get a flat
   surface. Route marks follow the same rule — they name lines, and lines only exist where the

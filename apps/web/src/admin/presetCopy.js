@@ -27,7 +27,7 @@ export const PRESET_COPY = Object.freeze({
           },
           'source-serif-4': {
             label: 'Source Serif 4',
-            why: 'The same document, lighter on its feet: a university or a cultural institution rather than an agency, and the repo already bundles it for Broadsheet.',
+            why: 'The same document, lighter on its feet: A university or a cultural institution rather than an agency, and the repo already bundles it for Broadsheet.',
           },
           'public-sans-bold': {
             label: 'Public Sans bold',
@@ -45,7 +45,7 @@ export const PRESET_COPY = Object.freeze({
           },
           'two-part-lockup': {
             label: 'Two-part lockup',
-            why: 'The co-signed notice of a partnership, which is the common Civic case: logo slot left, event name and dates right, divided by a vertical hairline.',
+            why: 'The co-signed notice of a partnership, which is the common Civic case: Logo slot left, event name and dates right, divided by a vertical hairline.',
           },
           'compact-standing-head': {
             label: 'Compact standing head',
@@ -185,7 +185,7 @@ export const PRESET_COPY = Object.freeze({
   },
   atlas: {
     label: 'Atlas',
-    summary: 'A mapped city on its transit network. A survey sheet and a departure board at once: lines, stations, transfers.',
+    summary: 'A mapped city on its transit network. A survey sheet and a departure board at once: Lines, stations, transfers.',
     bestFor: 'Multi-venue events, city festivals, and anything a visitor has to navigate.',
     options: {
       headingFace: {
@@ -230,11 +230,11 @@ export const PRESET_COPY = Object.freeze({
         choices: {
           'departure-board': {
             label: 'Departure board',
-            why: 'Time down, lettered lines across, faint map grid behind, traced-line signature interaction. The theme’s clearest idea.',
+            why: 'Times down the left column, the faint coordinate grid behind the programme. The concourse board, and the theme’s clearest idea.',
           },
           'line-diagram': {
             label: 'Line diagram',
-            why: 'The strip map inside a carriage: one line at a time as a Beck-style vertical run, which serves a visitor following one track all day.',
+            why: 'The strip map inside a carriage: One run straight down the page. The grid behind the board comes off and the rows close up, so the day reads as one track to follow rather than as separate departures.',
           },
           'gazetteer-list': {
             label: 'Gazetteer list',
@@ -259,7 +259,7 @@ export const PRESET_COPY = Object.freeze({
           },
           'vollkorn-display': {
             label: 'Vollkorn bold at display size',
-            why: 'The one-face volume: a pocket handbook rather than a plate book, quieter and closer to the reading, and it adds nothing to the font budget.',
+            why: 'The one-face volume: A pocket handbook rather than a plate book, quieter and closer to the reading, and it adds nothing to the font budget.',
           },
           spectral: {
             label: 'Spectral semibold',
@@ -291,7 +291,7 @@ export const PRESET_COPY = Object.freeze({
         choices: {
           'specimen-label': {
             label: 'Specimen label',
-            why: 'A small ruled block: name, date, place. The collection tag.',
+            why: 'A small ruled block: Name, date, place. The collection tag.',
           },
           'field-notes-column': {
             label: 'Field notes column',
@@ -309,7 +309,7 @@ export const PRESET_COPY = Object.freeze({
           },
           on: {
             label: 'On',
-            why: 'A thin hand-drawn underline under a specimen label or a note line: a pencil mark in a notebook, never a highlighter.',
+            why: 'A thin hand-drawn underline under a specimen label or a note line: A pencil mark in a notebook, never a highlighter.',
           },
         },
       },
@@ -334,7 +334,7 @@ export const PRESET_COPY = Object.freeze({
           },
           avara: {
             label: 'Avara',
-            why: 'A transitional serif with the curves replaced by straight segments, so every bowl reads as a cut facet: a poster cut from flat stock rather than drawn.',
+            why: 'A transitional serif with the curves replaced by straight segments, so every bowl reads as a cut facet: A poster cut from flat stock rather than drawn.',
           },
         },
       },

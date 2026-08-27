@@ -25,7 +25,7 @@ describe('the stress fixture', () => {
     expect(packed.length).toBe(28);
     expect(packed.every((session) => session.dayId === STRESS_DAY.id)).toBe(true);
     expect(packed.every((session) => session.visible === true)).toBe(true);
-    expect(packed[0].title).toMatch(/^Roundtable: sustaining multi-newsroom/);
+    expect(packed[0].title).toMatch(/^Roundtable: Sustaining multi-newsroom/);
     expect(packed[1].title).toMatch(/regional newsroom owes the county next door/);
   });
 

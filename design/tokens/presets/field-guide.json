@@ -1,8 +1,8 @@
 {
-  "$schema-note": "One theme preset (design brief 2026-08-27, §4.5). A preset is a complete designed look: two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
+  "$schema-note": "One theme preset (design brief 2026-08-27, §4.5). A preset is a complete designed look: Two authored palettes, a type map for all four roles, shape and texture and density, a motif default, and the curated option sets from the visual story.",
   "$story": "docs/plans/2026-08-27-preset-visual-stories.md, page 5.",
   "$palette-note": "Channels are [r, g, b] numbers, never hex strings — the generator writes the RGB triples (brief §3.6). The dark palette is authored value by value; no dark value is derived from its light twin. The palette stays quiet and earthy so the linework carries the character.",
-  "$first-class-note": "See design/tokens/presets/civic.json: all six styles are first-class, each with one recommended configuration.",
+  "$first-class-note": "See design/tokens/presets/civic.json: All six styles are first-class, each with one recommended configuration.",
   "id": "field-guide",
   "label": "Field Guide",
   "summary": "A naturalist’s expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.",
@@ -10,7 +10,7 @@
 
   "$palette-words-light": "near-neutral plate stock with a trace of warmth, soft bark ink, deep leaf green, muted clay, lichen-grey rule, herbarium cream, pressed archive, pencil grey",
   "$palette-words-dark": "near-neutral night ground with a trace of warmth, bone-white text, lifted moss green, lifted clay, moth-grey rule, lantern warmth, nocturne slate, faded field-note grey",
-  "$ground-note": "Owner review, 2026-08-27: the ground was too warm. A tan canvas paired with earthy ink reads as the look #109 rejected, and it fought every client logo that was not itself brown. Surface, alt surface, and both inks move most of the way to neutral. Warmth is kept as a trace — a few channels of red over blue, no more — so the story is still a paper handbook and not a spreadsheet. The leaf-green primary and the clay accent are untouched: they are the theme's colour, and the ground is what had to get out of their way.",
+  "$ground-note": "Owner review, 2026-08-27: The ground was too warm. A tan canvas paired with earthy ink reads as the look #109 rejected, and it fought every client logo that was not itself brown. Surface, alt surface, and both inks move most of the way to neutral. Warmth is kept as a trace — a few channels of red over blue, no more — so the story is still a paper handbook and not a spreadsheet. The leaf-green primary and the clay accent are untouched: They are the theme's colour, and the ground is what had to get out of their way.",
   "palette": {
     "light": {
       "surface": [248, 247, 244],
@@ -44,7 +44,7 @@
     }
   },
 
-  "$font-note": "Brief §9.2. Field Guide points both value roles at IBM Plex Mono on purpose: a label in this world is a tag, and a tag is set in the exact hand.",
+  "$font-note": "Brief §9.2. Field Guide points both value roles at IBM Plex Mono on purpose: A label in this world is a tag, and a tag is set in the exact hand.",
   "fonts": {
     "heading": "besley",
     "body": "vollkorn",
@@ -57,7 +57,7 @@
   "$motif-note": "Botanical illustrations are ON by default, as brief §3.8 binds. An earlier pass turned them off on the grounds that drawings appear \"on every page\"; that was wrong about the wiring. The site renders a motif in three places only — the masthead mark, the masthead's closing divider, and the public empty state — and the masthead mark yields to a client logo whenever one is set. Two small drawings on a page is the observational vocabulary this style is FOR, not decoration on top of it, and brief §2.3 caps the page at three. A client who wants none picks `none` in Illustrations; `fauna` is the supported alternate.",
   "motifSet": "botanical",
 
-  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The plate frame is a hairline; the double rule is the plate device's own doubling. The specimen label is the one preset that turns its rules and its field names on: a label in this world is a tag, and a tag states what each field is.",
+  "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The plate frame is a hairline; the double rule is the plate device's own doubling. The specimen label is the one preset that turns its rules and its field names on: A label in this world is a tag, and a tag states what each field is.",
   "tokens": {
     "--plate-frame-width": "var(--rule-hairline-width)",
     "--plate-pad": "var(--space-md)",
@@ -84,7 +84,7 @@
         {
           "id": "vollkorn-display",
           "label": "Vollkorn bold at display size",
-          "why": "The one-face volume: a pocket handbook rather than a plate book, quieter and closer to the reading, and it adds nothing to the font budget.",
+          "why": "The one-face volume: A pocket handbook rather than a plate book, quieter and closer to the reading, and it adds nothing to the font budget.",
           "fonts": { "heading": "vollkorn" }
         },
         {
@@ -143,7 +143,7 @@
         {
           "id": "specimen-label",
           "label": "Specimen label",
-          "why": "A small ruled block: name, date, place. The collection tag.",
+          "why": "A small ruled block: Name, date, place. The collection tag.",
           "tokens": {
             "--session-card-rule-width": "var(--rule-hairline-width)",
             "--session-card-pad-block": "var(--space-sm)"
@@ -175,7 +175,7 @@
         {
           "id": "on",
           "label": "On",
-          "why": "A thin hand-drawn underline under a specimen label or a note line: a pencil mark in a notebook, never a highlighter.",
+          "why": "A thin hand-drawn underline under a specimen label or a note line: A pencil mark in a notebook, never a highlighter.",
           "tokens": { "--marginalia-display": "inline" }
         }
       ]

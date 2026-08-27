@@ -44,7 +44,7 @@ configuration, and picking the style hands an operator a document that is publis
 both modes.
 
 **Progressive disclosure replaces breadth at first contact.** The normal workflow is six decisions
-in order: site style, logo and icon, main brand colour, header style, schedule style, and light or
+in order: Site style, logo and icon, main brand colour, header style, schedule style, and light or
 dark. Typography, Illustrations, density, texture, corners, the remaining component variants, and
 the expert colour controls live behind one Advanced disclosure. Nothing is removed to get there.
 This supersedes the "two depths" wording in §5.2 — the second depth is now the whole of Advanced,

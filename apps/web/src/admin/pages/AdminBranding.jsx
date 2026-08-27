@@ -423,7 +423,7 @@ export default function AdminBranding() {
         title="Branding"
         state={<RecordState state={isDirty ? state('dirty') : state('live')} />}
         identifiers="config/theme"
-        description="Six decisions make a finished site: the style, the logo, the brand colour, the header, the schedule, and light or dark. The page preview beside them renders the client’s real pages with the draft applied; nothing reaches the public site until you publish."
+        description="Six decisions make a finished site: The style, the logo, the brand colour, the header, the schedule, and light or dark. The page preview beside them renders the client’s real pages with the draft applied; nothing reaches the public site until you publish."
         actions={
           <>
             <button type="submit" className={primaryButtonClass} disabled={saving}>
