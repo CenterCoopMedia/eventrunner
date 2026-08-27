@@ -53,6 +53,28 @@ describe('Marginalia', () => {
     expect(block).not.toMatch(/animation|transition|@keyframes/);
   });
 
+  it('draws the two Zine marks in the hand-drawn register, and only two', () => {
+    // Visual story, Zine, part 5: "two drawn marks per page, one callout".
+    // The squiggle underlines a line; the ring goes around a whole label.
+    for (const mark of ['squiggle', 'circle']) {
+      const { container } = render(<Marginalia mark={mark} />);
+      const svg = container.querySelector('svg');
+      expect(svg.getAttribute('stroke')).toBe('currentColor');
+      expect(svg.getAttribute('fill')).toBe('none');
+      // Drawn with overshoot and uneven pressure rather than as geometry:
+      // a hand mark is a path, never a <circle> or a <rect>.
+      expect(container.querySelector('circle, rect, ellipse')).toBeNull();
+    }
+  });
+
+  it('lays the ring over its own wrapper, never over a headline word', () => {
+    // Brief §2.4 bans the underlined word inside a headline. The ring is
+    // absolutely positioned inside .marginalia-ring, which wraps a WHOLE
+    // label — so it cannot land on part of one.
+    expect(indexCss).toMatch(/\.marginalia--circle \{\s*position: absolute;/);
+    expect(indexCss).toMatch(/\.marginalia-ring \{\s*position: relative;/);
+  });
+
   it('renders nothing for a mark it does not draw', () => {
     const { container } = render(<Marginalia mark="not-a-mark" />);
     expect(container.firstChild).toBeNull();

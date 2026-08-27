@@ -166,6 +166,83 @@
     border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
   }
 
+  /* The Zine stamp: a session block printed twice, the way a two-pass job
+     prints off register (brief §2.4, "Exception two" — the ONE piece of
+     box-behind-box layering this system allows, and it is a printing
+     artefact, not depth). The six tests it ships against:
+
+     1. FLAT. The layer is the block's own shape in one token colour. No
+        blur, no gradient, no grey — none of those three words appears in
+        these rules, and a reviewer can check that by reading them.
+     2. A FIXED SMALL DISTANCE. The offset is --session-card-stamp-offset.
+        It never scales with the pointer and never follows it: nothing here
+        reads a pointer position at all.
+     3. ZINE ONLY. The offset is zero in every other preset, and a zero
+        offset puts the layer exactly under the block's own face, which
+        paints over it completely. That is also the flat-block variant, so
+        turning the stamp off needs no second rule.
+     4. 150ms ON transform AND opacity, ease-out, FROM A USER ACTION. The
+        peek runs on transform alone at --motion-base, the token step
+        nearest the story's 150ms and inside §2.2's 120-200ms functional
+        band; the scale has no 150ms step and a device may not mint a raw
+        duration. Hover and :focus-visible get the same treatment.
+     5. TRULY STATIC UNDER prefers-reduced-motion. Both the transition AND
+        the hover/focus rules sit inside the no-preference query, so a
+        reader who asked for less motion gets a stamp that renders and does
+        not move — not a shortened animation.
+     6. NEVER THE ONLY AFFORDANCE. The block's title is a link. The stamp
+        adds nothing to what tells a reader the block is interactive. */
+  .session-block {
+    position: relative;
+  }
+  .session-block::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-color: rgb(var(--session-card-stamp-rgb));
+    transform: translate(var(--session-card-stamp-offset), var(--session-card-stamp-offset));
+  }
+  /* The face is the first pass. It is opaque, so at a zero offset it hides
+     the second pass completely and the block is the plain row it was. */
+  .session-block__face {
+    position: relative;
+    background-color: rgb(var(--session-card-surface-rgb));
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .session-block::before,
+    .session-block__face {
+      transition: transform var(--motion-base) var(--motion-ease);
+    }
+    .session-block:hover::before,
+    .session-block:has(:focus-visible)::before {
+      transform: translate(
+        calc(var(--session-card-stamp-offset) * 2.25),
+        calc(var(--session-card-stamp-offset) * 2.25)
+      );
+    }
+    .session-block:hover .session-block__face,
+    .session-block:has(:focus-visible) .session-block__face {
+      transform: translate(
+        calc(var(--session-card-stamp-offset) * -0.25),
+        calc(var(--session-card-stamp-offset) * -0.25)
+      );
+    }
+  }
+
+  /* The handwritten callout (brief §4.3): real copy, one per page, at one
+     fixed angle. Every preset but Zine holds a zero angle and the heading
+     face, so the same element is simply a lead line there. */
+  .callout {
+    display: inline-block;
+    max-inline-size: 34ch;
+    font-family: var(--callout-font);
+    font-size: var(--callout-size);
+    color: rgb(var(--callout-rgb));
+    transform: rotate(var(--callout-angle));
+    transform-origin: left center;
+  }
+
   /* Map grid: the faint coordinate grid a section is drawn on (brief §4.6).
      Held BELOW hairline contrast — it is felt rather than seen — and inert
      to the pointer. The grid is the sheet, so it never moves and never
@@ -321,6 +398,24 @@
     display: block;
     inline-size: 100%;
     block-size: 0.375rem;
+  }
+  .marginalia--squiggle svg {
+    block-size: 0.5rem;
+  }
+  /* The ring goes AROUND a label, so it is laid over its own wrapper rather
+     than stacked under it. It never lands on a word inside a headline —
+     that is the banned headline-underline trick (brief §2.4) — which is
+     held by where it is wired: a whole label, never part of one. */
+  .marginalia-ring {
+    position: relative;
+    display: inline-flex;
+  }
+  .marginalia--circle {
+    position: absolute;
+    inset: -0.3em -0.55em;
+  }
+  .marginalia--circle svg {
+    block-size: 100%;
   }
 
   /* Motif slot (brief §2.3, §3.8; components/editorial/Motif.jsx).

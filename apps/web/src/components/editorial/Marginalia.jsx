@@ -34,6 +34,17 @@
  *
  * `pencil` is Field Guide's: thin, quiet, and nearly straight, the line
  * someone rules under a note while being careful.
+ *
+ * `squiggle` and `circle` are Zine's, and they are the whole marginalia
+ * budget: "two drawn marks per page, one callout, and no mark on a headline
+ * word" (visual story, Zine, part 5). The squiggle underlines a folio or a
+ * callout line; the circle goes around one label. Both are drawn with the
+ * overshoot and the uneven pressure of a pen going over a photocopy — the
+ * hand-drawn register brief §2.3 assigns Zine — rather than as tidy
+ * geometry, which would read as an icon instead of a mark.
+ *
+ * These three were drawn for this repository rather than shipped as motif
+ * assets, because a pen mark is not one of the four motif slots.
  */
 const MARKS = {
   pencil: (
@@ -48,6 +59,40 @@ const MARKS = {
       focusable="false"
     >
       <path d="M1,4 C22,2.6 44,3.4 66,2.8 C86,2.3 104,3.1 119,2.4" vectorEffect="non-scaling-stroke" />
+    </svg>
+  ),
+  squiggle: (
+    <svg
+      viewBox="0 0 120 8"
+      preserveAspectRatio="none"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      focusable="false"
+    >
+      <path
+        d="M2,5.6 C14,2 26,7.6 38,4.4 C50,1.4 62,7.4 74,4.2 C86,1.4 99,7 118,3.2"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  ),
+  circle: (
+    <svg
+      viewBox="0 0 120 40"
+      preserveAspectRatio="none"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      focusable="false"
+    >
+      {/* One stroke that goes round and overshoots where it started, the
+          way a pen does when someone rings a word without lifting it. */}
+      <path
+        d="M97,8 C78,2 40,1 20,7 C5,11.5 3,23 13,30 C25,38 63,39 87,34.5 C105,31 115,23.5 110,14.5 C107,9.5 99,6 90,4.5"
+        vectorEffect="non-scaling-stroke"
+      />
     </svg>
   ),
 };

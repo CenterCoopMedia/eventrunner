@@ -432,8 +432,13 @@ export default function SessionCard({
     // left-hand column with tabular figures, and the type is a word beside
     // the title. Issue #113: the colored left edge is gone, and nothing
     // replaces it — a rule does the dividing a card border used to.
-    <li className="border-t-hairline border-t-rule-hairline">
-      <article className="grid gap-2xs py-md sm:grid-cols-[9.5rem,1fr] sm:gap-md">
+    <li className="session-block border-t-hairline border-t-rule-hairline">
+      {/* The face is the first ink pass; the stamp behind it is the second,
+          printed off register (brief §2.4, "Exception two", Zine only). At
+          the zero offset every other preset holds, the face covers the
+          stamp exactly and this is the plain ruled row it has always
+          been. */}
+      <article className="session-block__face grid gap-2xs py-md sm:grid-cols-[9.5rem,1fr] sm:gap-md">
         <p className="font-mono text-caption text-text-secondary">
           {range ? (
             <>

@@ -20,6 +20,7 @@ import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { PlateNumber } from '../components/editorial/Plate.jsx';
+import Marginalia from '../components/editorial/Marginalia.jsx';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 
@@ -241,6 +242,12 @@ export default function Schedule() {
                 ) : null
               }
             />
+            {/* The pen mark under the day head (visual story, Zine, moment
+                3): "a squiggle underline under a folio". It is one of the
+                two drawn marks a page may carry, it never lands on a word
+                inside a headline, and it is off until a client turns
+                marginalia on. */}
+            <Marginalia mark="squiggle" className="mt-3xs" />
             {activeSessions.length === 0 ? (
               <p className="mt-md max-w-prose text-body text-text-secondary">
                 No sessions are announced for {activeDay.label} yet.

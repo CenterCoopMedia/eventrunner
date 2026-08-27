@@ -10,6 +10,7 @@
 // established (issue #113) — never a pill, never a colored badge — and it
 // sits beside the timestamp, never above it.
 import SectionHead from './editorial/SectionHead.jsx';
+import Marginalia from './editorial/Marginalia.jsx';
 import Tag from './editorial/Tag.jsx';
 import { useLiveUpdates } from '../hooks/useLiveUpdates.js';
 
@@ -54,7 +55,15 @@ export default function LiveUpdatesCard() {
             <li key={update.id} className="border-t-hairline border-t-rule-hairline py-sm">
               <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
                 {update.pinned ? (
-                  <Tag>Pinned</Tag>
+                  // The pen rings ONE label per page (visual story, Zine,
+                  // moment 3), so only the first pinned entry carries the
+                  // mark. It goes around the whole label, never around a
+                  // word inside a headline, and it is off until a client
+                  // turns marginalia on.
+                  <span className="marginalia-ring">
+                    <Tag>Pinned</Tag>
+                    {update.id === ordered[0]?.id ? <Marginalia mark="circle" /> : null}
+                  </span>
                 ) : null}
                 {posted ? (
                   <time
