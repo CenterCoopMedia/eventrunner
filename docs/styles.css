@@ -2,21 +2,11 @@
    and every generated documentation page (docs/docs/**, via
    scripts/build-pages.cjs). docs/docs.css adds only the docs shell on top.
 
-   This site uses the product's design language, not one of its own: the
-   editorial base of the design brief (docs/plans/2026-08-27-design-system-
-   overhaul.md). Typography carries the design. Rules and folios give the
-   structure. Color decorates very little and shadow decorates nothing. There
-   are no cards anywhere below — a rule does the job a card border was doing.
-   The site is Event Runner's own identity, so it keeps a masthead; the
-   masthead is type and rules, and it stays quieter than the headline under
-   it. */
+   The rules this file is held to are in docs/interface-guidelines.md, "The
+   project site" — including why the devices below take the shapes they do. */
 
-/* Self-hosted fonts (fonts/, latin subsets only), same rule the app follows
-   in apps/web/public/fonts: no font-CDN request from any page this site
-   serves. This stylesheet is loaded by the landing page and by every
-   generated documentation page, so these faces cover the whole Pages surface.
-   Weights match what the stylesheets below actually ask for — nothing here is
-   downloaded "just in case". */
+/* Self-hosted, latin subsets, no font-CDN request from any page this site
+   serves. Each weight below is one a rule in this file asks for. */
 
 @font-face {
   font-family: "Bricolage Grotesque";
@@ -183,15 +173,13 @@ a {
   margin-inline: auto;
 }
 
-/* ---------- Editorial devices (brief §2.1) ----------
+/* ---------- Editorial devices ----------
 
    Rules are drawn with `border-block-*` rather than a height, so the width
    token is the property it was written for and a hairline stays a hairline
    on a fractional-pixel display. This mirrors apps/web/src/index.css. */
 
-/* Folio: a small-caps plain-text label that sits ON a rule. Never a chip,
-   never a pill, never a colored badge — and never directly above a heading
-   (brief §2.4, the eyebrow ban is absolute). */
+/* Folio: a small-caps plain-text label that sits ON a rule. */
 .folio {
   font-family: var(--folio-font);
   font-size: var(--folio-size);
@@ -202,8 +190,7 @@ a {
   color: rgb(var(--folio-text-rgb));
 }
 
-/* The label, then the rule it sits on, running out to the trailing edge.
-   Same composition as the product's Folio component. */
+/* The label, then the rule it sits on, running out to the trailing edge. */
 .folio-row {
   display: flex;
   align-items: center;
@@ -211,8 +198,7 @@ a {
   margin: 0;
 }
 
-/* The rule runs from the label out to the trailing edge. It carries no
-   meaning, so it never reaches the accessibility tree. */
+/* Decorative, so the markup keeps it out of the accessibility tree. */
 .folio-row__rule {
   flex: 1;
   align-self: center;
@@ -223,14 +209,11 @@ a {
   white-space: nowrap;
 }
 
-/* Section boundary. Same shape as the product's SectionHead, which is what
-   makes stacking a label above the heading impossible here.
+/* Section boundary. Same shape as the product's SectionHead.
 
-   ONE RULE PER BOUNDARY, and the boundary states its own weight. A major
-   one opens on the strong rule; a secondary one is this heading with a
-   hairline running out beside it and the space above it. Both devices are
-   in use. What is not is both at once — a strong rule with a second rule
-   two lines under it is what turns a page of boundaries into ruling. */
+   ONE RULE PER BOUNDARY, and the boundary states its own weight: a major one
+   opens on the strong rule, a secondary one on this heading and the hairline
+   beside it. Never both at once. */
 .section-head {
   display: flex;
   flex-wrap: wrap;
@@ -259,11 +242,9 @@ a {
 
 /* ---------- Masthead ----------
 
-   The rule-bounded title block that names the site. Type and rules only:
-   never a banner, never an image behind the name (brief §2.1). It runs at the
-   compact size, because the headline below it is what the reader came for.
-   The line under the name is masthead metadata, which the eyebrow ban
-   explicitly does not reach — and it sits below the name regardless. */
+   The rule-bounded title block that names the site, at the compact size so
+   the headline below it leads. The line under the name is masthead metadata,
+   which the eyebrow ban does not reach — and it sits below the name. */
 
 .site-header {
   display: flex;
@@ -284,9 +265,8 @@ a {
   text-decoration: none;
 }
 
-/* The mark: a stem and the three rule weights the system ships, at mark size.
-   It takes the masthead's ink and carries no color of its own. It sits BESIDE
-   the name, never behind it. */
+/* The mark: a stem and the system's three rule weights, at mark size. It
+   takes the masthead's ink, and it sits beside the name, never behind it. */
 .brand-mark {
   flex: none;
   width: calc(var(--text-h3) * 1.3);
@@ -384,8 +364,7 @@ a {
   margin-block-start: var(--space-lg);
 }
 
-/* A button is a flat block on a near-square corner: a ground, a hairline, and
-   a word. No pill, no shadow, no colored edge. */
+/* A ground, a hairline, and a word, on a near-square corner. */
 .btn {
   display: inline-block;
   padding: var(--space-sm) var(--space-md);
@@ -407,8 +386,8 @@ a {
   color: rgb(var(--color-text-primary-rgb));
 }
 
-/* The one motion rule on this site, and it is wrapped: under
-   `prefers-reduced-motion: reduce` the button is truly static, not faster. */
+/* The only motion on this site. Under `prefers-reduced-motion: reduce` the
+   button is truly static, not faster. */
 @media (prefers-reduced-motion: no-preference) {
   .btn {
     transition: scale var(--motion-slow) var(--motion-ease);
@@ -435,8 +414,7 @@ a {
 
 /* ---------- Build status ----------
 
-   A ruled block, not a panel: a folio on a hairline names it, and hairlines
-   separate the rows underneath. */
+   A folio on a hairline names it; hairlines separate the rows under it. */
 
 .status-panel {
   margin: 0;
@@ -466,9 +444,8 @@ a {
 
 /* ---------- Status labels ----------
 
-   The word is the status. Color is the second signal and never the only one
-   (interface guidelines, Accessibility), so these are plain small-caps text —
-   no ground, no border, no radius, no pill. */
+   The word is the status and the colour is the second signal, so these are
+   plain small-caps text (interface guidelines, Accessibility). */
 
 .status-label {
   flex: none;
@@ -561,8 +538,8 @@ a {
 
 /* ---------- Milestones ----------
 
-   Ruled rows. The milestone number is a folio in the margin beside the
-   heading — never stacked above it, at any viewport (brief §2.4). */
+   Ruled rows. The number is a folio in the margin BESIDE the heading, never
+   stacked above it — at any viewport. */
 
 .milestones {
   list-style: none;
@@ -631,7 +608,7 @@ a {
 /* ---------- Responsive ----------
 
    One column below 56rem, which is also where a 200% zoom on a 1440px screen
-   lands. Nothing below reintroduces a device the wide layout does not have. */
+   lands. */
 
 @media (max-width: 56rem) {
   .hero {

@@ -32,39 +32,12 @@
  *      the ONE resolver (brief §5.2), shared with the browser runtime and
  *      the publish path.
  *
- * WHICH FONTS SHIP. Brief §4: "A deployed site loads only the faces its
- * active preset and its picked options use. The bundle lives in the repo. It
- * never lands on a reader in full." That is a statement about DOWNLOADS, and
- * a downloaded face is not the same thing as a declared one.
- *
- * An `@font-face` block is lazy by specification: the browser fetches the
- * file only once a rendered element resolves to that family. Declaring a
- * family nothing renders costs the CSS bytes of the block and not one
- * request. So the declarations here cover EVERY bundled set — the whole of
- * `FONT_SETS` — plus the two fixed admin faces, which every deployment ships
- * because the admin identity is not configurable (admin story part 6g).
- *
- * The reason it has to be every set is that the type map is LIVE. A stored
- * `config/theme` is not the only thing that picks faces:
- *
- *   - `config/theme` arrives over `onSnapshot`, so an operator publishing a
- *     new preset restyles an open page without a rebuild;
- *   - a picked heading-face option remaps `--font-heading` the same way;
- *   - `config/theme.fonts` may name ANY id in `THEME_FONT_SET_IDS` outright;
- *   - the admin's theme preview renders a candidate document inside a frame.
- *
- * All four run through `buildRuntimeThemeCss`, which writes a `--font-*`
- * stack — and a stack naming a family with no `@font-face` block renders the
- * fallback. Emitting only the build-time preset's faces meant every one of
- * those switches silently degraded to Georgia. `themeRuntime.js` says it
- * outright: "the runtime override only swaps which family a role resolves
- * to, it never introduces a remote font" — which holds only if the families
- * it can swap to are all declared here.
- *
- * Switching `data-theme` at runtime swaps the PALETTE, which is what the
- * dark-mode completeness test walks; the type map, the shape, and the faces
- * follow the resolved document through this generator and through
- * `buildRuntimeThemeCss`.
+ * WHICH FONTS SHIP: every bundled set, plus the two fixed admin faces. An
+ * `@font-face` block is lazy, so declaring a family nothing renders costs
+ * bytes and not a request — and the type map is live, so any set can become
+ * the one a page renders without a rebuild. Declaring less means a live
+ * switch silently falls back. The reasoning is in
+ * `docs/interface-guidelines.md`, Typography.
  */
 
 const fs = require('node:fs');
@@ -589,36 +562,22 @@ function firstPaintDarkBlock(policy, names, dark, comment) {
 /**
  * The print palette: the light edition, whatever mode the screen is in.
  *
- * Paper has no backlight and no dark mode. A reader who prints the schedule
- * handout (`components/SchedulePrint.jsx`, the `@media print` block in
- * `apps/web/src/index.css`) from a dark screen should get the light
- * edition, not dark ink boxes on a white sheet. The print rules name the
- * rule and ink tokens and nothing else, so re-pointing those tokens at the
- * light values is the whole fix — no print rule has to know about modes.
+ * Every print rule reads the ink and rule tokens and nothing else, so
+ * re-pointing those at the light values is the whole switch.
  *
- * The selector list names every block that can be carrying dark values:
+ * The selector list names every block that can be carrying dark values: the
+ * attribute-free baseline, the first-paint block (only on the policies that
+ * emit one), the dark mode block, and every (preset, mode) block. Each leads
+ * with the `html` type selector, which is what puts this block above its
+ * screen twin — document order could not, because the runtime <style> is
+ * appended after this stylesheet.
  *
- *   html:root                                   the attribute-free baseline.
- *   html:root:not([data-mode])                  the first-paint dark block,
- *                                               named only on the policies
- *                                               that emit one, so a light
- *                                               deployment's stylesheet stays
- *                                               free of the selector.
- *   html:root[data-mode='dark']                 the generated mode block.
- *   html:root[data-theme][data-mode='dark']     every generated (preset,
- *                                               mode) block, and the same
- *                                               selector buildRuntimeThemeCss
- *                                               writes into
- *                                               <style id="event-theme-runtime">.
+ * These values are frozen at build time, so this is the no-JavaScript
+ * FALLBACK. A running page's live palette is printed by the block
+ * `buildRuntimeThemeCss` writes, which names this same list and wins on
+ * document order.
  *
- * Each one leads with the `html` type selector, which is what puts this
- * block above its screen twin. Document order could not do it: the runtime
- * <style> element is appended AFTER the generated stylesheet, so at equal
- * specificity the runtime's dark values would win even inside print media.
- *
- * The admin set stays out. The admin is a screen tool, its own tokens are
- * emitted once per mode (admin story part 6), and nothing in `@media print`
- * reads them.
+ * The admin set stays out: it is a screen tool and no print rule reads it.
  *
  * @param {string} policy the mode policy (`light` | `dark` | `system`)
  * @param {string[]} names token order

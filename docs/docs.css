@@ -1,15 +1,11 @@
 /* Event Runner — documentation site (issue #108).
 
-   This file adds only what the docs shell needs on top of styles.css: the
-   two-column layout, the prose measure, and code/table styles. Every token —
-   color, type step, spacing step, rule weight — is declared in styles.css and
-   carries the name the product ships, so this file mints nothing and the
-   landing page, the docs, and the app stay one visual system (design brief
-   §5.3).
+   Only what the docs shell needs on top of styles.css: the two-column
+   layout, the prose measure, and code and table styles. It mints no token;
+   every name it reads is declared in docs/tokens.css or docs/styles.css.
 
-   The same editorial rules apply here as everywhere: rules and folios give
-   the structure, no cards, no gradients, no shadows, no blur, and no motion
-   beyond what styles.css already allows. */
+   The rules it is held to are in docs/interface-guidelines.md, "The project
+   site". */
 
 /* ---------- Breadcrumbs ---------- */
 
@@ -62,8 +58,8 @@
 
 /* ---------- Section navigation ----------
 
-   The docket shape the admin uses (brief §5.2): a standing list of words down
-   the leading edge, grouped, with each group head a folio on a hairline. */
+   The docket the admin uses: a standing grouped list of words down the
+   leading edge, each group head a folio on a hairline. */
 
 .docs-nav {
   position: sticky;
@@ -103,10 +99,8 @@
   text-decoration: none;
 }
 
-/* The current item thickens the nav rail it already sits on. This is the
-   docket's active marker — one of four signals, never colour alone: the
-   marker, the semibold weight, the ink step, and aria-current. It is not a
-   decorative colored edge on a card (brief §2.4); there is no card. */
+/* The current item thickens the rail it already sits on. Four signals, never
+   colour alone: the marker, the weight, the ink step, and aria-current. */
 .docs-nav li a.is-current {
   color: rgb(var(--color-text-primary-rgb));
   font-weight: var(--weight-semibold);
@@ -137,8 +131,7 @@
   letter-spacing: var(--text-h1-tracking);
 }
 
-/* A section boundary opens on its rule, the way SectionHead does on the
-   product: the strong rule sits ABOVE the heading, never under it. */
+/* The strong rule sits ABOVE the heading, never under it. */
 .prose h2 {
   margin: var(--space-xl) 0 var(--space-sm);
   padding-block-start: var(--space-sm);
@@ -220,8 +213,7 @@
   border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
-/* A quotation is set off by the rule beside it, in the ink the aside deserves.
-   The rule is structure, so it takes a rule token and never brand color. */
+/* The rule is structure, so it takes a rule token and never brand color. */
 .prose blockquote {
   margin: 0 0 var(--space-md);
   padding: 0 0 0 var(--space-md);
@@ -236,10 +228,8 @@
   border-radius: var(--radius-base);
 }
 
-/* The anchor duplicates a link the reader can already get from the address
-   bar, so it stays out of the way until it is wanted. It is a real link
-   throughout: keyboard focus reveals it, and it keeps its label for
-   assistive technology. */
+/* Out of the way until it is wanted, and a real link throughout: keyboard
+   focus reveals it, and it keeps its label for assistive technology. */
 .heading-anchor {
   margin-inline-start: var(--space-2xs);
   color: rgb(var(--color-accent-rgb));
@@ -259,9 +249,8 @@ h6:hover > .heading-anchor {
 
 /* ---------- Code ----------
 
-   Code is the value a reader copies, so it is set in the mono role. Elevation
-   is tint, never shadow: a code block is the alternate ground inside a
-   hairline. */
+   The value a reader copies, in the mono role, on the alternate ground
+   inside a hairline. Elevation is tint, never shadow. */
 
 .prose code {
   font-family: var(--font-mono);
@@ -294,7 +283,7 @@ h6:hover > .heading-anchor {
 /* ---------- Tables ----------
 
    Hairlines separate the rows; nothing boxes the table in. The scroller keeps
-   a wide table inside its own column instead of widening the page. */
+   a wide table inside its column instead of widening the page. */
 
 .table-scroll {
   margin-block-end: var(--space-md);
@@ -331,9 +320,8 @@ h6:hover > .heading-anchor {
 
 /* ---------- On this page ----------
 
-   A folio on a hairline names it. It is a contents list, not a panel, so it
-   has no ground and no border of its own — and no closing rule either: the
-   strong rule on the first h2 below it is already the line that ends it. */
+   A contents list, not a panel: no ground, no border, and no closing rule —
+   the strong rule on the first h2 below it already ends it. */
 
 .contents {
   margin-block-end: var(--space-xl);
