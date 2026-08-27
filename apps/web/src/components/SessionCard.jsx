@@ -406,9 +406,29 @@ export default function SessionCard({
     // left-hand column with tabular figures, and the type is a word beside
     // the title. Issue #113: the colored left edge is gone, and nothing
     // replaces it — a rule does the dividing a card border used to.
+    //
+    // The title comes first in the source and the time follows it. The time
+    // is a label beside a heading, so it must never stack above one: the
+    // eyebrow ban holds at every size (brief §2.4), and one column is what
+    // this row becomes below `sm`. Reading the title first is also the
+    // better order to hear. At `sm` and up the grid places the time back in
+    // its own left-hand column beside the title, which is where the eye
+    // wants it once there is room for a column.
     <li className="border-t-hairline border-t-rule-hairline">
-      <article className="grid gap-2xs py-md sm:grid-cols-[9.5rem,1fr] sm:gap-md">
-        <p className="font-mono text-caption text-text-secondary">
+      <article className="grid py-md sm:grid-cols-[9.5rem,1fr] sm:gap-x-md">
+        <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs sm:col-start-2 sm:row-start-1">
+          <h3 className="font-heading text-h3 font-semibold text-text-primary">
+            {linkToDetail ? (
+              <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
+                {session.title}
+              </Link>
+            ) : (
+              session.title
+            )}
+          </h3>
+          <TypeBadge type={session.type} />
+        </div>
+        <p className="mt-2xs font-mono text-caption text-text-secondary sm:col-start-1 sm:row-start-1 sm:mt-0">
           {range ? (
             <>
               <time dateTime={range.startIso}>{range.startLabel}</time>
@@ -423,19 +443,7 @@ export default function SessionCard({
             <span>Time to be announced</span>
           )}
         </p>
-        <div>
-          <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
-            <h3 className="font-heading text-h3 font-semibold text-text-primary">
-              {linkToDetail ? (
-                <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
-                  {session.title}
-                </Link>
-              ) : (
-                session.title
-              )}
-            </h3>
-            <TypeBadge type={session.type} />
-          </div>
+        <div className="sm:col-start-2 sm:row-start-2">
           {session.location ? (
             <p className="mt-2xs font-data text-caption text-text-secondary">{session.location}</p>
           ) : null}

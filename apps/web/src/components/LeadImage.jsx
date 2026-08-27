@@ -42,7 +42,7 @@ export default function LeadImage({ block, className = '' }) {
         src={block.url}
         alt={alt}
         loading="lazy"
-        className="lead-image rounded-brand outline outline-1 -outline-offset-1 outline-brand-ink/[0.08]"
+        className="lead-image rounded-brand outline outline-1 -outline-offset-1 outline-text-primary/[0.08]"
         style={{ objectPosition: focalPosition(block) }}
       />
       {caption ? (

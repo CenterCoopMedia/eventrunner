@@ -93,4 +93,16 @@ describe('Updates', () => {
     expect(screen.getByText('Undated')).toBeInTheDocument();
     expect(screen.getByText(NEWER.title)).toBeInTheDocument();
   });
+
+  it('puts the title before the date, so the date never stacks above the heading', () => {
+    // The eyebrow ban is absolute and holds at every size (design brief
+    // §2.4). Each row is one column below `sm`, so the title has to come
+    // first in the source; the grid moves the date back into its own
+    // left-hand column once there is room for one. SessionCard.jsx carries
+    // the same rule for the schedule.
+    const { container } = renderUpdates({ updates: [NEWER] });
+    const heading = container.querySelector('h2');
+    const time = container.querySelector('time');
+    expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

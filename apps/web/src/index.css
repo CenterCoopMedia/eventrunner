@@ -14,7 +14,7 @@
   }
 
   body {
-    @apply bg-brand-surface font-body text-brand-ink;
+    @apply bg-surface font-body text-text-primary;
   }
 
   h1,
@@ -31,7 +31,7 @@
 
   /* Never remove outlines without replacing them (interface guidelines). */
   :focus-visible {
-    @apply outline outline-2 outline-offset-2 outline-brand-primary;
+    @apply outline outline-2 outline-offset-2 outline-accent;
   }
 
   [id] {
@@ -48,8 +48,8 @@
 @layer components {
   /* Skip link: first focusable element on every page (Layout.jsx). */
   .skip-link {
-    @apply sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-50
-      focus:rounded-brand focus:bg-brand-primary focus:px-4 focus:py-3 focus:text-brand-surface;
+    @apply sr-only focus:not-sr-only focus:absolute focus:start-md focus:top-md focus:z-50
+      focus:rounded-brand focus:bg-accent focus:px-md focus:py-sm focus:text-surface;
   }
 
   /* The page ground. Flat is the base; a texture arrives only when
@@ -60,7 +60,7 @@
      property cannot be compared for equality in a selector. The overlay is
      decorative, so it never intercepts the pointer. */
   .page-surface {
-    @apply relative bg-brand-surface;
+    @apply relative bg-surface;
   }
   :root[data-texture='paper'] .page-surface::before {
     content: '';
@@ -68,7 +68,7 @@
     inset: 0;
     pointer-events: none;
     background-image: radial-gradient(
-      rgb(var(--brand-ink-rgb) / 0.04) 1px,
+      rgb(var(--color-text-primary-rgb) / 0.04) 1px,
       transparent 1px
     );
     background-size: 24px 24px;
