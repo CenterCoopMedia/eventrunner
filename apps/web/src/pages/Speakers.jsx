@@ -84,10 +84,7 @@ export default function Speakers() {
                   ) : null}
                 </div>
                 {speaker.bio ? (
-                  <p
-                    className="mt-xs max-w-prose text-body text-text-secondary sm:mt-0"
-                    style={{ textWrap: 'pretty' }}
-                  >
+                  <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty sm:mt-0">
                     {speaker.bio}
                   </p>
                 ) : null}

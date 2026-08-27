@@ -448,10 +448,7 @@ export default function SessionCard({
             <p className="mt-2xs font-data text-caption text-text-secondary">{session.location}</p>
           ) : null}
           {session.description ? (
-            <p
-              className="mt-xs max-w-prose text-body text-text-secondary"
-              style={{ textWrap: 'pretty' }}
-            >
+            <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
               {session.description}
             </p>
           ) : null}

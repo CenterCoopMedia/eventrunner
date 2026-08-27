@@ -91,7 +91,7 @@ Both classes: Never trigger motion from scroll position, never run ambient anima
 - Name a font by its role, never by its family: `font-heading`, `font-body`, `font-data`, `font-mono` (design brief §3.2). `font-accent` is the retired role and is an alias of `font-heading` for one release.
 - `font-variant-numeric: tabular-nums` on all dynamic values: Timers, counters, prices, schedule columns.
 - Long-form text: 60–75 characters per line.
-- `text-wrap: balance` on headings, `text-wrap: pretty` on descriptions, neither on long-form.
+- `text-wrap: balance` on headings, `text-wrap: pretty` on descriptions, neither on long-form. Reach for the `text-balance` and `text-pretty` utilities, never an inline `style` — a class is what the scanner, the reviewer, and a preset can all see.
 - `overflow-wrap: break-word` wherever long words, links, or IDs might overflow; `white-space: nowrap` for labels and badges.
 - Set `-webkit-font-smoothing: antialiased` and `-moz-osx-font-smoothing: grayscale` once, on the root.
 - Store copy in natural case; control presentation with `text-transform`. (This matches the email rule in spec §6 — content and presentation stay separate.)

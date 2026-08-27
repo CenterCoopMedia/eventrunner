@@ -178,7 +178,7 @@ export default function SpeakerProfile() {
     return (
       <article className="mx-auto max-w-md">
         <h1 className="font-heading text-h1 font-semibold text-text-primary">Sign in to continue</h1>
-        <p className="mt-xs max-w-prose text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+        <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
           Your speaker profile is part of your account, so it lives behind sign-in. Sign in below to pick
           up right where you left off.
         </p>

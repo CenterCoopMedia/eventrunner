@@ -71,7 +71,7 @@ export default function UpdateDetail() {
         ) : null}
       </header>
       {update.body ? (
-        <p className="mt-lg max-w-prose whitespace-pre-wrap text-body text-text-secondary" style={{ textWrap: 'pretty' }}>
+        <p className="mt-lg max-w-prose whitespace-pre-wrap text-body text-text-secondary text-pretty">
           {update.body}
         </p>
       ) : null}

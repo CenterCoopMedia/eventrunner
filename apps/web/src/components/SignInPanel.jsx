@@ -304,7 +304,7 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
         </form>
       ) : (
         <form onSubmit={submitCode} noValidate className="space-y-sm">
-          <p id="signin-code-hint" className="text-text-primary" style={{ textWrap: 'pretty' }}>
+          <p id="signin-code-hint" className="text-text-primary text-pretty">
             We emailed a six-digit code to <strong>{email}</strong>. Enter it
             here within {expiresInMinutes} minutes.
           </p>
@@ -429,7 +429,7 @@ function DemoSignInNotice() {
       <p className="font-heading text-h3 font-semibold text-text-primary">
         Sign-in is disabled in this demo
       </p>
-      <p className="text-text-secondary" style={{ textWrap: 'pretty' }}>
+      <p className="text-text-secondary text-pretty">
         This is a read-only tour of a fictional event. Accounts, bookmarks,
         the attendee directory, and the admin CMS all work on a real
         deployment — ask us for a walkthrough.

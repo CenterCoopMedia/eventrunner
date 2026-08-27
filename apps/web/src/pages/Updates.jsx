@@ -93,10 +93,7 @@ export default function Updates() {
                     )}
                   </p>
                   {body ? (
-                    <p
-                      className="mt-xs max-w-prose text-body text-text-secondary sm:col-start-2 sm:row-start-2"
-                      style={{ textWrap: 'pretty' }}
-                    >
+                    <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty sm:col-start-2 sm:row-start-2">
                       {body}
                     </p>
                   ) : null}

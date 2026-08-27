@@ -146,10 +146,7 @@ export default function SpeakerDetail() {
       <Rule weight="hairline" />
 
       {text(speaker.bio) ? (
-        <p
-          className="mt-md max-w-prose whitespace-pre-line text-lead text-text-secondary"
-          style={{ textWrap: 'pretty' }}
-        >
+        <p className="mt-md max-w-prose whitespace-pre-line text-lead text-text-secondary text-pretty">
           {text(speaker.bio)}
         </p>
       ) : null}

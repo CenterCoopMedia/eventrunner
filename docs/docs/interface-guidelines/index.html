@@ -211,7 +211,7 @@
           <li>Name a font by its role, never by its family: <code>font-heading</code>, <code>font-body</code>, <code>font-data</code>, <code>font-mono</code> (design brief §3.2). <code>font-accent</code> is the retired role and is an alias of <code>font-heading</code> for one release.</li>
           <li><code>font-variant-numeric: tabular-nums</code> on all dynamic values: Timers, counters, prices, schedule columns.</li>
           <li>Long-form text: 60–75 characters per line.</li>
-          <li><code>text-wrap: balance</code> on headings, <code>text-wrap: pretty</code> on descriptions, neither on long-form.</li>
+          <li><code>text-wrap: balance</code> on headings, <code>text-wrap: pretty</code> on descriptions, neither on long-form. Reach for the <code>text-balance</code> and <code>text-pretty</code> utilities, never an inline <code>style</code> — a class is what the scanner, the reviewer, and a preset can all see.</li>
           <li><code>overflow-wrap: break-word</code> wherever long words, links, or IDs might overflow; <code>white-space: nowrap</code> for labels and badges.</li>
           <li>Set <code>-webkit-font-smoothing: antialiased</code> and <code>-moz-osx-font-smoothing: grayscale</code> once, on the root.</li>
           <li>Store copy in natural case; control presentation with <code>text-transform</code>. (This matches the email rule in spec §6 — content and presentation stay separate.)</li>
