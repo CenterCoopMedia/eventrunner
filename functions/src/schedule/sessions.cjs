@@ -413,6 +413,66 @@ async function checkSessionDeletable({ db, tx = null, docId }) {
   };
 }
 
+/** getAll in fixed batches, so a 2000-id publish is not one giant read. */
+const READ_CHUNK = 100;
+async function getAllChunked(db, refs) {
+  const snaps = [];
+  for (let i = 0; i < refs.length; i += READ_CHUNK) {
+    snaps.push(...(await db.getAll(...refs.slice(i, i + READ_CHUNK))));
+  }
+  return snaps;
+}
+
+/**
+ * The publish set, checked for children that would go live ahead of their
+ * parents (spec §8.4 step 3, brief §4.6).
+ *
+ * Publishing is where the draft world and the live world meet, and the
+ * parent rules were only ever enforced in the draft world. A child saved
+ * against a parent that exists only as a draft is a legitimate draft — that
+ * is the point of readSession reading the draft revision. Publishing THAT
+ * CHILD ALONE put a live session on the public schedule whose parentId
+ * names nothing live: the same orphan a delete would have made, arriving
+ * through the one path that had no check at all.
+ *
+ * Two ways to satisfy it, and the message says both: the parent is already
+ * live, or the parent is in this same publish set (its draft goes live in
+ * the same run, so the pair lands together). `{ all: true }` — the ordinary
+ * "publish everything" — satisfies it by construction.
+ *
+ * A docId with no draft publishes nothing (publishDocs reports it as
+ * `no-draft`), so it neither needs a parent nor counts as one.
+ *
+ * @param {{ db: object, docIds: string[] }} args
+ * @returns {Promise<{ ok: boolean, errors: string[] }>}
+ */
+async function checkSchedulePublishSet({ db, docIds }) {
+  const ids = [...new Set((docIds || []).filter((id) => typeof id === 'string' && id.length > 0))];
+  if (ids.length === 0) return { ok: true, errors: [] };
+
+  const draftSnaps = await getAllChunked(db, ids.map((id) => db.collection(SESSIONS_DRAFTS).doc(id)));
+  const publishing = new Set();
+  const parentOf = new Map();
+  ids.forEach((id, i) => {
+    if (!draftSnaps[i].exists) return;
+    publishing.add(id);
+    const parentId = draftSnaps[i].data()?.parentId;
+    if (typeof parentId === 'string' && parentId.trim().length > 0) parentOf.set(id, parentId);
+  });
+
+  const elsewhere = [...new Set([...parentOf.values()].filter((id) => !publishing.has(id)))];
+  if (elsewhere.length === 0) return { ok: true, errors: [] };
+
+  const liveSnaps = await getAllChunked(db, elsewhere.map((id) => db.collection(SESSIONS).doc(id)));
+  const unpublished = new Set(elsewhere.filter((_, i) => !liveSnaps[i].exists));
+  const errors = [...parentOf.entries()]
+    .filter(([, parentId]) => unpublished.has(parentId))
+    .map(([childId, parentId]) =>
+      `${childId}: this session runs inside "${parentId}", which is not published — ` +
+      'publish them together, or publish the parent first');
+  return { ok: errors.length === 0, errors };
+}
+
 /**
  * Every half in one call, shape before reads: a malformed payload costs no
  * reads at all, and the checks that do read run together so one save reports
@@ -449,6 +509,7 @@ module.exports = {
   checkSessionParent,
   checkSessionChildren,
   checkSessionDeletable,
+  checkSchedulePublishSet,
   validateSessionStructure,
   resolveSessionTrack,
   internals: {

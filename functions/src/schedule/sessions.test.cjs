@@ -8,6 +8,7 @@ const {
   checkSessionTrack,
   checkSessionParent,
   checkSessionChildren,
+  checkSchedulePublishSet,
   validateSessionStructure,
   resolveSessionTrack,
 } = require('./sessions.cjs');
@@ -404,6 +405,49 @@ test('a parent that changes neither day nor line keeps its children', async () =
     }),
     { ok: true, errors: [] },
   );
+});
+
+// --- the publish set (spec §8.4 step 3) -------------------------------------
+
+test('a child in the publish set needs its parent live or published with it', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule_drafts/parent': { dayId: 'day-2', status: 'dirty' },
+    'cmsSchedule_drafts/child': { dayId: 'day-2', parentId: 'parent', status: 'dirty' },
+  });
+  const alone = await checkSchedulePublishSet({ db, docIds: ['child'] });
+  assert.equal(alone.ok, false);
+  assert.match(alone.errors[0], /^child: this session runs inside "parent", which is not published/);
+
+  assert.deepEqual(
+    await checkSchedulePublishSet({ db, docIds: ['child', 'parent'] }),
+    { ok: true, errors: [] },
+  );
+});
+
+test('a parent in the set but with no draft of its own does not count as published', async () => {
+  // Naming an id that has nothing to publish cannot satisfy the rule:
+  // publishDocs would report it `no-draft` and the child would still land
+  // alone.
+  const db = makeFakeDb({
+    'cmsSchedule_drafts/child': { dayId: 'day-2', parentId: 'parent', status: 'dirty' },
+  });
+  const verdict = await checkSchedulePublishSet({ db, docIds: ['child', 'parent'] });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.errors[0], /which is not published/);
+});
+
+test('every stranded child is named, not just the first', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule_drafts/a': { dayId: 'day-2', parentId: 'parent', status: 'dirty' },
+    'cmsSchedule_drafts/b': { dayId: 'day-2', parentId: 'parent', status: 'dirty' },
+  });
+  const verdict = await checkSchedulePublishSet({ db, docIds: ['a', 'b'] });
+  assert.equal(verdict.errors.length, 2);
+});
+
+test('an empty publish set reads nothing', async () => {
+  const db = makeFakeDb();
+  assert.deepEqual(await checkSchedulePublishSet({ db, docIds: [] }), { ok: true, errors: [] });
 });
 
 test('validateSessionStructure joins the halves, shape first', async () => {
