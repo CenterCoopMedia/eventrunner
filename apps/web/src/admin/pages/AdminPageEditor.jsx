@@ -43,6 +43,7 @@ import { blankPage, blankSection, toEditablePage, toPagePayload } from '../pageD
 import { summarizePublish } from '../publishResult.js';
 import {
   CheckboxField,
+  DestructiveConfirm,
   Panel,
   SaveStatus,
   SelectField,
@@ -618,17 +619,24 @@ export default function AdminPageEditor({ mode }) {
           </button>
         ) : null}
         {isExisting ? (
-          <button
-            type="button"
-            className={dangerButtonClass}
-            disabled={busy !== null || isSystemPage}
-            title={
-              isSystemPage ? 'System pages cannot be deleted.' : undefined
-            }
-            onClick={remove}
-          >
-            {busy === 'delete' ? 'Deleting…' : 'Delete page'}
-          </button>
+          // A system page has no delete at all: the server refuses it, and
+          // the Page panel already states why in words. Offering a control
+          // the server will reject is worse than offering none.
+          isSystemPage ? null : (
+            <DestructiveConfirm
+              trigger="Delete this page"
+              title={`Delete ${page.label || page.id}`}
+              confirmLabel="Delete this page"
+              busyLabel="Deleting…"
+              busy={busy === 'delete'}
+              disabled={busy !== null}
+              consequence={`The live page and its draft both go, and ${
+                page.path || 'its path'
+              } stops resolving on the public site. The content blocks inside it are not deleted.`}
+              permanence="This cannot be undone."
+              onConfirm={remove}
+            />
+          )
         ) : null}
       </div>
     </form>

@@ -23,7 +23,13 @@ import EmptyState from '../../components/EmptyState.jsx';
 import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
-import { Panel, SelectField, TextField, secondaryButtonClass } from '../components/formControls.jsx';
+import {
+  DestructiveConfirm,
+  Panel,
+  SelectField,
+  TextField,
+  secondaryButtonClass,
+} from '../components/formControls.jsx';
 
 const STATUS_FILTERS = [
   { value: 'all', label: 'All' },
@@ -179,14 +185,16 @@ export default function AdminAttendees() {
                     </button>
                   ) : null}
                   {canRevoke(row) ? (
-                    <button
-                      type="button"
-                      className={secondaryButtonClass}
-                      onClick={() => act('revokeUser', row.id)}
+                    <DestructiveConfirm
+                      trigger="Revoke access"
+                      title={`Revoke access for ${row.displayName || row.email}`}
+                      confirmLabel="Revoke this person’s access"
+                      busyLabel="Revoking…"
+                      busy={busyUid === row.id}
                       disabled={busyUid === row.id}
-                    >
-                      Revoke
-                    </button>
+                      consequence="They lose access to the attendee-only pages at once, and their bookmarks and profile stay on the record. Approving them again restores it."
+                      onConfirm={() => act('revokeUser', row.id)}
+                    />
                   ) : null}
                 </div>
               </li>

@@ -124,8 +124,13 @@ async function renderAt(path) {
     await Promise.resolve();
     await Promise.resolve();
   });
+  // Two waits, not one: the lazy admin chunk, and then the admin probe the
+  // gate holds on (AdminGate renders "Checking your access…" until it
+  // answers). Waiting only for the chunk lets an assertion run while the
+  // gate is still checking, which is a flake under load, not a bug.
   await waitFor(() => {
     expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
   });
   return result;
 }
@@ -211,7 +216,7 @@ describe('content browsing', () => {
 
     expect(screen.getByLabelText(/^value/)).toHaveValue('<p>Scholarships open in spring.</p>');
     expect(screen.getByLabelText('Field id')).toHaveAttribute('readonly');
-    expect(screen.getByRole('button', { name: 'Delete block' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete this block' })).toBeInTheDocument();
   });
 });
 
@@ -361,7 +366,10 @@ describe('creating and editing a block', () => {
     fetch.mockResolvedValueOnce(okResponse({ deleted: ['cmsContent/intro__body', 'cmsContent_drafts/intro__body'] }));
 
     await renderAt('/admin/content/scholarships/intro/body');
-    fireEvent.click(screen.getByRole('button', { name: 'Delete block' }));
+    // Moment 3: the first press states the cost, the second does the work.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this block' }));
+    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this block' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsDeleteContent$/);

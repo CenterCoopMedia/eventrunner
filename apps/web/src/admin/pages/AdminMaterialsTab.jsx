@@ -21,7 +21,7 @@ import {
   ServerErrorSummary,
   SelectField,
   TextField,
-  dangerButtonClass,
+  DestructiveConfirm,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -123,9 +123,16 @@ function MaterialRow({ material, onChanged }) {
             Reject
           </button>
         ) : null}
-        <button type="button" className={dangerButtonClass} disabled={busy} onClick={remove}>
-          Delete
-        </button>
+        <DestructiveConfirm
+          trigger="Delete"
+          title={`Delete ${material.filename}`}
+          confirmLabel="Delete this material"
+          busy={busy}
+          disabled={busy}
+          consequence="The file is removed from the session's materials list, and anyone holding its link gets nothing."
+          permanence="This cannot be undone."
+          onConfirm={remove}
+        />
       </div>
     </li>
   );

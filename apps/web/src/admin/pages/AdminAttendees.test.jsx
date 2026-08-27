@@ -59,7 +59,9 @@ describe('AdminAttendees', () => {
     render(<AdminAttendees />);
     pushRows([row({ registrationStatus: 'approved', approvalSource: 'admin' })]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+    // Moment 3: revoking access states what the person loses first.
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke access' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke this person’s access' }));
     await act(async () => { await Promise.resolve(); });
 
     expect(callMock).toHaveBeenCalledWith('revokeUser', { uid: 'uid-ada' });
@@ -71,12 +73,12 @@ describe('AdminAttendees', () => {
     // pending: approve only — there is no pending → revoked edge.
     pushRows([row()]);
     expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Revoke' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Revoke access' })).toBeNull();
 
     // admin-approved: revoke only — approving again would change nothing.
     pushRows([row({ registrationStatus: 'approved', approvalSource: 'admin' })]);
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Revoke' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Revoke access' })).toBeInTheDocument();
 
     // ticket-approved: approve is still offered, because it re-pins the
     // grant to 'admin' so a later refund cannot reverse it.
@@ -86,7 +88,7 @@ describe('AdminAttendees', () => {
     // revoked: re-approval is the only way out.
     pushRows([row({ registrationStatus: 'revoked' })]);
     expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Revoke' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Revoke access' })).toBeNull();
   });
 
   it('filters by status and searches by name or email', () => {
@@ -111,7 +113,9 @@ describe('AdminAttendees', () => {
     render(<AdminAttendees />);
     pushRows([row({ registrationStatus: 'ticketed' })]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+    // Moment 3: revoking access states what the person loses first.
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke access' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke this person’s access' }));
     await act(async () => { await Promise.resolve(); });
 
     expect(showToastMock).toHaveBeenCalledWith(

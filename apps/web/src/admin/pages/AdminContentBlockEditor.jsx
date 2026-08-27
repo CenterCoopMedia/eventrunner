@@ -36,13 +36,13 @@ import { summarizePublish } from '../publishResult.js';
 import ImagePicker from '../../components/media/ImagePicker.jsx';
 import {
   CheckboxField,
+  DestructiveConfirm,
   Panel,
   SaveStatus,
   SelectField,
   ServerErrorSummary,
   TextAreaField,
   TextField,
-  dangerButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -501,14 +501,17 @@ export default function AdminContentBlockEditor({ mode }) {
           </button>
         ) : null}
         {isExisting ? (
-          <button
-            type="button"
-            className={dangerButtonClass}
+          <DestructiveConfirm
+            trigger="Delete this block"
+            title={`Delete ${currentFieldId}`}
+            confirmLabel="Delete this block"
+            busyLabel="Deleting…"
+            busy={busy === 'delete'}
             disabled={busy !== null}
-            onClick={remove}
-          >
-            {busy === 'delete' ? 'Deleting…' : 'Delete block'}
-          </button>
+            consequence={`The live revision of ${currentFieldId} and its draft both go, and the section renders without it.`}
+            permanence="This cannot be undone."
+            onConfirm={remove}
+          />
         ) : null}
       </div>
     </form>

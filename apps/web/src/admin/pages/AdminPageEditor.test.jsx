@@ -109,8 +109,13 @@ async function renderAt(path) {
     await Promise.resolve();
     await Promise.resolve();
   });
+  // Two waits, not one: the lazy admin chunk, and then the admin probe the
+  // gate holds on (AdminGate renders "Checking your access…" until it
+  // answers). Waiting only for the chunk lets an assertion run while the
+  // gate is still checking, which is a flake under load, not a bug.
   await waitFor(() => {
     expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
   });
   return result;
 }
@@ -322,16 +327,26 @@ describe('page editor', () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'home', label: 'Home page', systemPage: true }];
     await renderAt('/admin/pages/home');
 
-    expect(screen.getByRole('button', { name: 'Delete page' })).toBeDisabled();
+    // The server refuses this delete, so the room states the refusal in
+    // words instead of offering a control that will be rejected.
+    expect(screen.queryByRole('button', { name: 'Delete this page' })).toBeNull();
     expect(screen.getByText(/cannot be deleted/i)).toBeInTheDocument();
   });
 
-  it('deletes a regular page through cmsDeletePage', async () => {
+  it('deletes a regular page through cmsDeletePage, after stating what is lost', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', deleted: true }));
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete page' }));
+    // Moment 3: the first press opens a still surface that names the cost;
+    // the confirm button repeats the consequence rather than saying
+    // "Confirm", and nothing is sent until it is pressed.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this page' }));
+    expect(screen.getByText(/The live page and its draft both go/)).toBeInTheDocument();
+    expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this page' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsDeletePage$/);
     expect(bodyOf(0)).toEqual({ id: 'scholarships' });
@@ -482,7 +497,7 @@ describe('publish results and recovery', () => {
     // The draft landed, so the id must stop being editable: retrying under a
     // different id would create a second document and orphan this draft.
     expect(screen.getByLabelText('Page id')).toHaveAttribute('readonly');
-    expect(screen.getByRole('button', { name: 'Delete page' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete this page' })).toBeInTheDocument();
   });
 
   it('publish all reports skipped pages instead of a blanket success', async () => {

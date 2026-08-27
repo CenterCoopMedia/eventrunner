@@ -24,20 +24,20 @@ import LoadingState from '../../components/LoadingState.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import {
+  DestructiveConfirm,
   Panel,
   SaveStatus,
   SelectField,
   ServerErrorSummary,
   TextAreaField,
   TextField,
-  dangerButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 
 const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Not invited — hidden from the public site' },
-  { value: 'approved', label: 'Published — visible in the public directory' },
+  { value: 'draft', label: 'Draft — hidden from the public site' },
+  { value: 'approved', label: 'Live — visible in the public directory' },
   { value: 'removed', label: 'Removed — hidden everywhere, record kept' },
 ];
 
@@ -339,32 +339,36 @@ export default function AdminSpeakerEditor({ mode }) {
           Cancel
         </button>
         {mode === 'edit' ? (
-          <button
-            type="button"
-            className={`${dangerButtonClass} ms-auto`}
-            disabled={saving}
-            onClick={() => remove(false)}
-          >
-            Delete speaker
-          </button>
+          <DestructiveConfirm
+            className="ms-auto"
+            trigger="Delete this speaker"
+            title={`Delete ${form.firstName} ${form.lastName}`.trim()}
+            confirmLabel="Delete this speaker"
+            busyLabel="Deleting…"
+            busy={saving}
+            consequence="The speaker record goes, and every session that references them is unlinked. Their profile disappears from the public directory."
+            permanence="This cannot be undone. To keep the record and only hide it, mark the speaker removed instead."
+            onConfirm={() => remove(false)}
+          />
         ) : null}
       </div>
 
       {deleteBlocked ? (
         <Panel title="Delete could not remove every reference">
-          <p className="text-sm text-brand-ink-muted">
+          <p className="max-w-[65ch] text-caption text-admin-ink">
             Nothing was changed. Marking the speaker removed hides them from the
             public directory and every public surface, and leaves the sessions
             that reference them untouched.
           </p>
-          <button
-            type="button"
-            className={`${dangerButtonClass} mt-3`}
-            disabled={saving}
-            onClick={() => remove(true)}
-          >
-            Mark removed instead
-          </button>
+          <DestructiveConfirm
+            className="mt-sm"
+            trigger="Mark this speaker removed"
+            confirmLabel="Mark this speaker removed"
+            busyLabel="Marking…"
+            busy={saving}
+            consequence="The record stays and keeps every field. The speaker disappears from the public directory and from every public surface, and the sessions that reference them are left alone."
+            onConfirm={() => remove(true)}
+          />
         </Panel>
       ) : null}
     </form>

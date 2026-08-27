@@ -10,9 +10,9 @@
 import { useEffect, useState } from 'react';
 import { formatBytes } from '../../lib/mediaSource.js';
 import {
+  DestructiveConfirm,
   TextAreaField,
   TextField,
-  dangerButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../../admin/components/formControls.jsx';
@@ -150,25 +150,35 @@ export default function AssetModal({ asset, onClose, onChanged, scanUsage, updat
         <div className="mt-2">
           <UsageList references={references} />
         </div>
+        {/* Moment 3: the delete states what it costs before it runs, and
+            the in-use case says how many live documents lose their file. */}
         <div className="mt-4 flex flex-wrap gap-3">
           {confirming || (references?.length ?? 0) > 0 ? (
-            <button
-              type="button"
-              className={dangerButtonClass}
-              disabled={busy}
-              onClick={() => destroy(true)}
-            >
-              Delete anyway
-            </button>
+            <DestructiveConfirm
+              trigger="Delete this file anyway"
+              title="Delete a file that is in use"
+              confirmLabel="Delete this file anyway"
+              busyLabel="Deleting…"
+              busy={busy}
+              consequence={`The object is removed from storage, and the ${
+                references?.length ?? 0
+              } document${
+                (references?.length ?? 0) === 1 ? '' : 's'
+              } listed above render a missing file until you point them at another one.`}
+              permanence="This cannot be undone."
+              onConfirm={() => destroy(true)}
+            />
           ) : (
-            <button
-              type="button"
-              className={dangerButtonClass}
-              disabled={busy}
-              onClick={() => destroy(false)}
-            >
-              Delete file
-            </button>
+            <DestructiveConfirm
+              trigger="Delete this file"
+              title="Delete this file"
+              confirmLabel="Delete this file"
+              busyLabel="Deleting…"
+              busy={busy}
+              consequence="The object is removed from storage. Its library row goes with it."
+              permanence="This cannot be undone."
+              onConfirm={() => destroy(false)}
+            />
           )}
         </div>
       </section>

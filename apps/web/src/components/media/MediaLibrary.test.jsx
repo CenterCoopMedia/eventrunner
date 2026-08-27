@@ -142,9 +142,14 @@ describe('the delete-with-usage-warning flow', () => {
     expect(await screen.findByText('cmsPages/home')).toBeInTheDocument();
     expect(screen.getByText(/Used by 1 document/)).toBeInTheDocument();
 
-    // The plain "Delete file" button is not offered for an asset in use.
-    expect(screen.queryByRole('button', { name: 'Delete file' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Delete anyway' }));
+    // The plain "Delete this file" button is not offered for an asset in use.
+    expect(screen.queryByRole('button', { name: 'Delete this file' })).not.toBeInTheDocument();
+    // Moment 3: the first press states the cost — how many live documents
+    // lose their file — and sends nothing.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this file anyway' }));
+    expect(screen.getByText(/render a missing file/)).toBeInTheDocument();
+    expect(call).not.toHaveBeenCalledWith('mediaDelete', expect.anything());
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this file anyway' }));
     await waitFor(() =>
       expect(call).toHaveBeenCalledWith('mediaDelete', {
         assetId: HERO.id,
@@ -161,7 +166,8 @@ describe('the delete-with-usage-warning flow', () => {
     render(<MediaLibrary folder="cms-images" />);
     fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
     expect(await screen.findByText(/Deleting it is safe/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Delete file' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
     await waitFor(() =>
       expect(call).toHaveBeenCalledWith('mediaDelete', { assetId: HERO.id, force: false }),
     );
@@ -180,10 +186,13 @@ describe('the delete-with-usage-warning flow', () => {
     render(<MediaLibrary folder="cms-images" />);
     fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
     await screen.findByText(/Deleting it is safe/);
-    fireEvent.click(screen.getByRole('button', { name: 'Delete file' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
 
     expect(await screen.findByText('cmsContent/home-hero')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete anyway' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete this file anyway' }),
+    ).toBeInTheDocument();
   });
 
   it('saves alt text through mediaUpdateMetadata', async () => {

@@ -15,7 +15,7 @@ import {
   CheckboxField,
   ServerErrorSummary,
   TextAreaField,
-  dangerButtonClass,
+  DestructiveConfirm,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -179,14 +179,17 @@ export default function AdminLiveUpdates() {
                   <button type="button" className={secondaryButtonClass} onClick={() => startEdit(row)}>
                     Edit
                   </button>
-                  <button
-                    type="button"
-                    className={dangerButtonClass}
-                    onClick={() => remove(row.id)}
+                  <DestructiveConfirm
+                    trigger="Remove"
+                    title="Remove this update"
+                    confirmLabel="Remove this update"
+                    busyLabel="Removing…"
+                    busy={deletingId === row.id}
                     disabled={deletingId === row.id}
-                  >
-                    {deletingId === row.id ? 'Removing…' : 'Remove'}
-                  </button>
+                    consequence="The update disappears from the public updates feed and from its own page."
+                    permanence="This cannot be undone."
+                    onConfirm={() => remove(row.id)}
+                  />
                 </div>
               </li>
             ))}
