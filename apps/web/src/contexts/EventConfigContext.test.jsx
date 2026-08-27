@@ -21,7 +21,10 @@ import {
   useFeatures,
 } from './EventConfigContext.jsx';
 import Layout from '../components/Layout.jsx';
-import { eventConfig as snapshotEventConfig } from '@generated/eventConfig.js';
+import {
+  eventConfig as snapshotEventConfig,
+  theme as snapshotTheme,
+} from '@generated/eventConfig.js';
 
 // Compose hex test data at runtime — no hex color literals in source (§7.6).
 const hex = (digits) => `#${digits}`;
@@ -148,13 +151,16 @@ describe('EventConfigProvider', () => {
         <Probe />
       </EventConfigProvider>,
     );
-    // Snapshot default (generated/eventConfig.js theme.texture = 'flat').
-    expect(document.documentElement.dataset.texture).toBe('flat');
+    // Whatever the committed snapshot names, before any live write.
+    expect(document.documentElement.dataset.texture).toBe(snapshotTheme.texture);
 
+    // Then the other one, so the mirror is proved to follow the doc rather
+    // than to repeat the snapshot.
+    const other = snapshotTheme.texture === 'paper' ? 'flat' : 'paper';
     act(() => {
-      subscriptions.get('theme')({ texture: 'paper' });
+      subscriptions.get('theme')({ texture: other });
     });
-    expect(document.documentElement.dataset.texture).toBe('paper');
+    expect(document.documentElement.dataset.texture).toBe(other);
   });
 });
 

@@ -126,21 +126,23 @@ const DEMO_ANSWERS = Object.freeze({
       organizerName: '[Demo] Harborlight Cooperative',
     },
   },
-  // Overlaid on `defaultTheme()` (spec §2.2, §7.2) — the demo event's own
-  // theme, distinct from the neutral product default every fresh
-  // deployment starts from. An editorial, single-family look: one
-  // workhorse sans (Source Sans 3) carries the heading, body, and data
-  // roles alike, a flat/sharp surface (no paper texture, no rounded-card
-  // treatment), and a palette built around an ink-blue brand color on a
-  // cool neutral surface — not the warm tan canvas the anti-pattern
-  // checklist (#105) rejects. `mode` is light, so the demo renders the
-  // same way it always has; the dark palette is still generated beside it.
+  // Overlaid on `defaultTheme()` (spec §2.2, §7.2). The product default is
+  // neutral; this theme is not, and that is the point of the showcase — it
+  // is what a deployment looks like when a theme takes every expressive
+  // choice the system offers (design brief §2.5.5).
+  //
+  // The masthead nameplate heads every page. A serif carries the headings
+  // against a humanist sans for reading. The paper texture is on. Corners
+  // are sharp, and the palette is an ink-blue on a cool off-white — not the
+  // warm tan canvas the anti-pattern checklist (#105) rejects. `mode` is
+  // light; the dark palette is generated beside it.
   theme: {
     colors: demoThemeColors(),
-    fonts: { heading: 'sans-humanist', body: 'sans-humanist', data: 'sans-humanist' },
-    texture: 'flat',
+    fonts: { heading: 'serif-editorial', body: 'sans-humanist', data: 'sans-humanist' },
+    texture: 'paper',
     radius: 'sharp',
     mode: 'light',
+    header: 'masthead',
   },
 });
 

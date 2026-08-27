@@ -104,14 +104,14 @@ export const features = {
 
 export const theme = {
   fonts: {
-    heading: 'sans-humanist',
+    heading: 'serif-editorial',
     body: 'sans-humanist',
     data: 'sans-humanist',
   },
-  texture: 'flat',
+  texture: 'paper',
   radius: 'sharp',
   mode: 'light',
-  header: 'standard',
+  header: 'masthead',
   logos: {
     primary: 'branding/logo.svg',
     mark: 'branding/mark.svg',
