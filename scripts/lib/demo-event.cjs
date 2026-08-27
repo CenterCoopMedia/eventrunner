@@ -251,7 +251,7 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-1',
     startTime: '10:30',
     endTime: '12:00',
-    title: 'Workshop: collaborative reporting basics',
+    title: 'Workshop: Collaborative reporting basics',
     description:
       'Setting up a cross-newsroom reporting partnership, from shared documents to shared ' +
       'bylines.',
@@ -267,7 +267,7 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-2',
     startTime: '09:30',
     endTime: '10:45',
-    title: 'Panel: sustaining local partnerships',
+    title: 'Panel: Sustaining local partnerships',
     description:
       'Three newsroom leaders on what it actually takes to keep a shared-coverage partnership ' +
       'funded past year one.',
@@ -283,7 +283,7 @@ const DEMO_SESSIONS = Object.freeze([
     dayId: 'day-2',
     startTime: '13:30',
     endTime: '15:00',
-    title: 'Workshop: audience research on a small budget',
+    title: 'Workshop: Audience research on a small budget',
     description:
       'Simple survey and interview methods for newsrooms with no research budget and no ' +
       'research team.',

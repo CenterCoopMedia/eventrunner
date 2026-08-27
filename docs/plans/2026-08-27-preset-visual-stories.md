@@ -8,7 +8,7 @@ brief disagree, the brief wins.
 
 ## How to read this document
 
-Each preset gets one page. Each page has six parts: the story, the vocabulary, three signature
+Each preset gets one page. Each page has six parts: The story, the vocabulary, three signature
 moments, palette words, what the story refuses, and the options.
 
 A story is creative direction. It tells the builder why a device is there. It never grants an
@@ -26,7 +26,7 @@ Four rules apply to every page below, so they are stated once here:
   rule has no exceptions. A folio lives beside a rule at a section boundary, in a margin, or in a
   running header. If a label needs to be near a title, put it below the title or beside it. Two
   things are not eyebrows. Metadata inside the rule-bounded nameplate block is part of the nameplate
-  device, wherever it sits inside it: the dates and the edition line are the nameplate. A form
+  device, wherever it sits inside it: The dates and the edition line are the nameplate. A form
   `<label>` above its own input is a control label, and a builder must never "fix" it. Brief §2.4
   carries the full rule.
 - **Dark mode is a place, not a filter.** Each story names what dark mode *is* in its world. The
@@ -45,8 +45,8 @@ they are stated once.
   theme's hue. Pure `#000` never appears.
 - **Elevation is tint, not shadow.** Where a surface must sit above another, it shifts tone with a
   low-opacity overlay of the theme's ink or accent. Grey drop shadows are not used. This follows
-  §2.1: shadow decorates nothing.
-- **The schedule has a real data model.** Sessions nest: a parent session can hold child items.
+  §2.1: Shadow decorates nothing.
+- **The schedule has a real data model.** Sessions nest: A parent session can hold child items.
   Concurrent tracks are lettered A, B, C. A print-optimised view exists. Every story below assigns
   those three facts a role rather than treating them as plumbing.
 
@@ -63,7 +63,7 @@ These rules bind every option:
 - Every option must keep the story coherent. Each one below states in one sentence why it still
   belongs. An option that needs a different story is a different preset.
 - Every heading-face option must be a bundled, self-hosted, Latin-subset `woff2` under an SIL Open
-  Font Licence or equivalent, and must pass the four §9 tests. Weight budget is real: prefer a face
+  Font Licence or equivalent, and must pass the four §9 tests. Weight budget is real: Prefer a face
   the repo already bundles where the story allows it.
 - Every option must define both modes and must pass the §8.1 contrast bar in both.
 - An option never unlocks a banned pattern. The §2.4 list applies to every combination.
@@ -76,7 +76,7 @@ These rules bind every option:
 
 You are holding the paper of record for this event. The nameplate runs across the top the way a
 daily paper's does, and it is the loudest thing on the page because the paper's name is the paper's
-authority. Everything under it behaves like a document that will be kept: tight columns, rules
+authority. Everything under it behaves like a document that will be kept: Tight columns, rules
 instead of boxes, a schedule that reads as a printed programme rather than a feed. Nothing is
 staged, nothing is sold to you — the type simply sets one thing above another and you know where you
 are. This preset promises a long record, and it keeps the promise by looking like something worth
@@ -96,7 +96,7 @@ filing.
 - **Print view** — the edition itself. Print is not an afterthought here; a Broadsheet schedule
   printed on paper should look like the page it was always imitating.
 - **Type roles** — heading is the masthead and the deck (Libre Caslon Display). Body is the news
-  column (Libre Caslon Text). Data and mono are both the agate (Source Serif 4): captions and
+  column (Libre Caslon Text). Data and mono are both the agate (Source Serif 4): Captions and
   metadata in the data role, times, room numbers, and counts in the mono role with tabular figures.
   Broadsheet is the one preset that runs a serif in the mono role, because a listings column in a
   paper is set in agate, not in a typewriter face.
@@ -116,7 +116,7 @@ filing.
    not cards. Times sit in the mono role — the same agate serif — with tabular figures, so the left
    edge stays a true column.
    Track letters head the columns; child sessions indent under their parent on a shared hairline.
-   The grid's signature interaction is the one expressive moment in the theme: a track column comes
+   The grid's signature interaction is the one expressive moment in the theme: A track column comes
    forward on a user action, under 600ms, readable at every frame, and truly static under
    `prefers-reduced-motion`. The print view drops the grid to a ruled two-column programme that a
    registration desk can hand out.
@@ -201,8 +201,8 @@ picks when they want the site to look edited.
 - **Print view** — the printable programme a desk still publishes as a PDF. Grid becomes a clean
   ruled list, filters and controls drop out, source lines stay.
 - **Type roles** — heading is the designed headline (Fraunces). Body is the calm read (Newsreader).
-  Data is the desk furniture: captions, labels, and support lines (IBM Plex Sans). Mono is the
-  figure column: timestamps, counts, and figures (IBM Plex Mono, tabular). Numbers never borrow the
+  Data is the desk furniture: Captions, labels, and support lines (IBM Plex Sans). Mono is the
+  figure column: Timestamps, counts, and figures (IBM Plex Mono, tabular). Numbers never borrow the
   headline face.
 - **Motifs** — off by default. If enabled, restrained flat marks act as small desk marks at section
   heads and at the end of a long read. Ink only.
@@ -237,7 +237,7 @@ picks when they want the site to look edited.
 
 - **Refuses product framing.** No SaaS subheads, no self-justifying blurbs, no feature grid, no
   eyebrow above a headline. The site publishes an event; it does not pitch a platform.
-- **Refuses accent inflation.** Two accents exist: one editorial, one for data. They never spread to
+- **Refuses accent inflation.** Two accents exist: One editorial, one for data. They never spread to
   rules, card edges, or backgrounds.
 - **Refuses the trend tell.** No default-typeface look, no gradient, no glass, no pill. "Current"
   here means well-set, not fashionable.
@@ -305,8 +305,8 @@ object that pretends not to be.
   folds; the stamp layer, the grain, and the marginalia all drop out so the toner does not smear.
 - **Stamp** — the second ink pass, printed just off register. A hard, unblurred offset layer sits
   behind a session block in ink or accent tint, with no blur and no gradient. It is a printing
-  artefact, not depth. Provenance: the CJS2026 production site.
-- **Marginalia** — the pen that went over the page afterwards. Three marks only: a squiggle
+  artefact, not depth. Provenance: The CJS2026 production site.
+- **Marginalia** — the pen that went over the page afterwards. Three marks only: A squiggle
   underline, a sketch-circle around a label, and one tilted handwritten callout. The squiggle and
   the circle are hand-drawn motif assets; the callout is real copy, so it is text, not a drawing.
 - **The rare accent** — spent twice per page at full strength, never more. Because it is rare, it
@@ -315,12 +315,12 @@ object that pretends not to be.
   plain line under it: "No sessions posted yet."
 - **Type roles** — heading is the hand-cut poster lettering (Karrik by default; see part 6). Body is
   the typewriter (Fragment Mono). Data and mono are the same typewriter, holding captions, times,
-  and room numbers with tabular figures. Zine runs one mono across all three roles on purpose: the
+  and room numbers with tabular figures. Zine runs one mono across all three roles on purpose: The
   even rhythm is the story. The handwritten callout runs on a component token, `--callout-font`,
   which defaults to the bundled script face Caveat; a client may point it at `--font-heading`
   instead. A component token is not a semantic role, so this adds no fifth role (§3.1, §3.2).
 - **Motifs** — off by default. If enabled, hand-drawn linework acts as the marker doodle in the
-  margin: one `divider` between long sections, one `empty-state` drawing, nothing more.
+  margin: One `divider` between long sections, one `empty-state` drawing, nothing more.
 - **Texture** — paper grain at low opacity is allowed here and only here, with
   `pointer-events: none`. It is the copier, not a filter.
 - **Back issue** — last year's flyer, still up on the wall, sun-faded to the archive tokens.
@@ -331,22 +331,22 @@ object that pretends not to be.
 
 1. **The nameplate fills the sheet.** On the home page the event name runs at `--text-nameplate`
    across the full measure, breaking across two or three lines, over a `--rule-nameplate` at strong
-   width. Below it: date, place, one line. Nothing else above the fold.
+   width. Below it: Date, place, one line. Nothing else above the fold.
 2. **The session block is stamped, and it peeks.** Each session block carries a hard offset layer
-   behind it: same shape, no blur, no gradient, tinted with ink or the accent, offset by a fixed
+   behind it: Same shape, no blur, no gradient, tinted with ink or the accent, offset by a fixed
    small amount. On hover and on `:focus-visible` the block lifts and the offset layer slides
    further out, like a sticker peeling or a second sheet sliding from under the first. Bind it:
    `transform` and `opacity` only, 150ms, `ease-out`, started by a user action, no state where the
    text is unreadable, and completely static under `prefers-reduced-motion`. The link is the
    affordance; the stamp is never the only signal that a block is interactive. **The brief grants
    this moment a written exception.** §2.1 says shadow decorates nothing and §2.4 rejects
-   box-behind-box layering; §2.4 "Exception two: the Zine stamp" names it as a flat, unblurred ink
+   box-behind-box layering; §2.4 "Exception two: The Zine stamp" names it as a flat, unblurred ink
    layer, permits it in Zine only, and keeps both rules intact everywhere else. Build it against the
    six tests listed there.
-3. **The pen has marked two things.** One page carries at most two marginalia marks: a squiggle
+3. **The pen has marked two things.** One page carries at most two marginalia marks: A squiggle
    underline under a folio or a callout line, and a sketch-circle around one label such as the
    live-now marker. One tilted handwritten callout may appear per page, at a single fixed angle, set
-   in the callout font, carrying real copy a visitor needs. Bind it: drawn marks are motif assets, so
+   in the callout font, carrying real copy a visitor needs. Bind it: Drawn marks are motif assets, so
    they are `aria-hidden`, `pointer-events: none`, and inherit ink; no mark ever lands on a single
    word inside a headline, which keeps the theme clear of the banned headline-underline trick; the
    marks are static, with no draw-on animation of any kind.
@@ -385,7 +385,7 @@ object that pretends not to be.
    blunter, funnier register — a poster cut from flat stock rather than drawn — without softening
    it.
 
-All three ship bundled, so a client picks one from the theme editor. Bind: whichever face is picked,
+All three ship bundled, so a client picks one from the theme editor. Bind: Whichever face is picked,
 it stays the only loud element. The body mono, the accent count, and the rule weight do not change
 with the pick. The handwritten callout runs on `--callout-font`, which defaults to Caveat; it is
 used for callouts only, one per page, and Caveat clears the same four tests in brief §9. A client
@@ -411,7 +411,7 @@ who wants no script face points `--callout-font` at `--font-heading`.
 3. **Struck folio** — the folio set in the mono face between a strong rule above and below. The
    typewriter section break of a photocopied programme; plain text plus rules, no chip or badge.
 
-Bind: the marginalia set is its own on/off control, independent of the block variant, because a
+Bind: The marginalia set is its own on/off control, independent of the block variant, because a
 client may want the stamp without the pen.
 
 ---
@@ -420,7 +420,7 @@ client may want the stamp without the pen.
 
 ### 1. The story
 
-This is the public record of a public event. The page behaves like a well-run agency notice: plain,
+This is the public record of a public event. The page behaves like a well-run agency notice: Plain,
 patient, and unambiguous, with nothing between you and the information. Headings carry weight
 without drama, labels say exactly what they label, and every control is large enough to hit on the
 first try. Nothing here is trying to have a mood — the design's ambition is that a person on a slow
@@ -439,7 +439,7 @@ character is the confidence of a document that does not need to persuade you.
   children are marked as such in words, not by indent alone, so the relationship survives a screen
   reader.
 - **Print view** — the handout. Civic events post paper agendas, so the print view is a first-class
-  page: full contrast, no controls, every session and child listed, tracks named by letter.
+  page: Full contrast, no controls, every session and child listed, tracks named by letter.
 - **Type roles** — heading is the document heading (Merriweather). Body is the running text of the
   notice (Public Sans). Data is the label and the table heading (Public Sans). Mono is the value:
   times, room codes, counts, and identifiers (IBM Plex Mono, tabular).
@@ -449,12 +449,12 @@ character is the confidence of a document that does not need to persuade you.
   a word and, where useful, a shape.
 - **Back issue** — the closed record. Archive tokens, "Back issue" folio, controls removed, every
   word still readable and still linkable.
-- **Dark mode** — the same document under a different lamp. An evening reading room: dark neutral
+- **Dark mode** — the same document under a different lamp. An evening reading room: Dark neutral
   ground, high-contrast text, the same restrained accent retuned. Contrast never drops for mood.
 
 ### 3. Three signature moments
 
-1. **The agenda list is first-class.** The narrow-viewport list is designed, not degraded: each
+1. **The agenda list is first-class.** The narrow-viewport list is designed, not degraded: Each
    session is a hairline-separated row with time, title, track letter, and room in fixed order and
    fixed positions, tabular figures aligned down the left. Child sessions carry a stated
    relationship, such as "Part of: Opening plenary". A visitor who never sees the grid loses nothing,
@@ -465,7 +465,7 @@ character is the confidence of a document that does not need to persuade you.
    exists behind it.
 3. **The contrast check is part of the identity.** In the admin theme editor, a Civic override that
    fails contrast on a defined foreground and background pair is a publish-time error, not a
-   warning (§5.2): the editor states the pair, the mode, and the measured ratio, and `updateTheme`
+   warning (§5.2): The editor states the pair, the mode, and the measured ratio, and `updateTheme`
    refuses the write. A client who overrides a Civic token into failure has broken the preset's
    promise. The preset's story includes refusing its own misuse.
 
@@ -508,7 +508,7 @@ character is the confidence of a document that does not need to persuade you.
    official document. The organisation line sits below the name, never above it.
 2. **Two-part lockup** — the client logo slot left, the event name and dates right, divided by a
    vertical hairline. This is the co-signed notice of a partnership, which is the common Civic case.
-3. **Compact standing head** — one line: event name, then dates in the data face, hairline under.
+3. **Compact standing head** — one line: Event name, then dates in the data face, hairline under.
    For inner pages, where the reader wants the content and not the letterhead again.
 
 **(c) Component variant — the schedule presentation.**
@@ -526,7 +526,7 @@ character is the confidence of a document that does not need to persuade you.
 ### 1. The story
 
 You are reading a naturalist's expedition handbook for this event. You arrive at a plate — a framed
-drawing with a hairline border and its own plate number — and then you read the labels: name, date,
+drawing with a hairline border and its own plate number — and then you read the labels: Name, date,
 place, set in a small ruled block the way a specimen is tagged in a collection. The schedule reads as
 observation notes taken in the field, patient and dated, and the speaker page reads as the index at
 the back of the book. The palette stays quiet and earthy so the linework carries the character, the
@@ -548,7 +548,7 @@ sat still long enough to see something.
   lettered tracks A, B, C across the head as the sites observed. A parent session and its children
   read as one specimen with its parts labelled under it, the way a plate numbers the parts of a
   single organism.
-- **Print view** — the pressed page. The schedule prints as a dated observation sheet: plate number,
+- **Print view** — the pressed page. The schedule prints as a dated observation sheet: Plate number,
   collection date, ruled entries, no controls.
 - **Pencil line** — the one piece of marginalia this theme allows. A thin hand-drawn underline, in
   the observation-notes register, sitting under a specimen label or a note line. It is a pencil mark
@@ -571,7 +571,7 @@ sat still long enough to see something.
    reading `PLATE III · SATURDAY 14 MARCH`, set on a hairline, with the plate number drawn from the
    day's real position in the programme. Numbers are never zero-padded and never decorative — they
    count real days, which is what keeps this out of the banned `01 / 02 / 03` pattern.
-2. **The speaker page is a specimen index.** Each speaker renders as a specimen label: name in the
+2. **The speaker page is a specimen index.** Each speaker renders as a specimen label: Name in the
    heading face, then role, organisation, and location in the data face on a ruled block, hairline
    separated, alphabetised. One pencil line may sit under a single field where a note belongs — at
    most one per page, drawn from the motif layer, `aria-hidden`, static. The result reads as the
@@ -612,7 +612,7 @@ around it.**
 1. **Besley** *(default)* — the printed plate caption. Its Clarendon weight holds a title page and
    still sits calmly under a drawing, which is the core Field Guide relationship.
 2. **Vollkorn (bold at display size)** — the one-face volume. Running the body serif up to heading
-   size gives a pocket handbook rather than a plate book: quieter, closer to the reading, and it adds
+   size gives a pocket handbook rather than a plate book: Quieter, closer to the reading, and it adds
    nothing to the font budget.
 3. **Spectral (semibold)** — the collector's volume. Its finer, sharper serifs read as the
    frontispiece of a formal edition, so the story gains a more scholarly opening without leaving the
@@ -633,13 +633,13 @@ Body stays Vollkorn and data stays IBM Plex Mono under every option. Only the he
 
 **(c) Component variant — the session presentation.**
 
-1. **Specimen label** *(default)* — a small ruled block: name, date, place. The collection tag.
+1. **Specimen label** *(default)* — a small ruled block: Name, date, place. The collection tag.
 2. **Field notes column** — sessions run as a continuous dated column with hanging times in the data
    face and hairlines between entries, with the pencil line available under a note. This is the
    observation notebook rather than the mounted collection, and it suits a single-track event where
    the day reads as one sitting.
 
-Bind: the pencil line is its own on/off control and ships off by default, so a client can keep the
+Bind: The pencil line is its own on/off control and ships off by default, so a client can keep the
 plates clean.
 
 ---
@@ -649,11 +649,11 @@ plates clean.
 ### 1. The story
 
 You are moving through a mapped city on its transit network. Two things are true at once here, and
-they are the same system: the sheet, with its survey grid, its contour marks, and its title block;
+they are the same system: The sheet, with its survey grid, its contour marks, and its title block;
 and the network drawn on top of it, with lettered lines, stations, and a board that tells you what
 leaves next. Rooms are stations. Concurrent tracks are lines — Line A, Line B, Line C — each with its
 own route mark. Going from one session to the next is a transfer, and the site tells you so in the
-plain voice of station signage: where you are, where it is, how long it takes. For an event spread
+plain voice of station signage: Where you are, where it is, how long it takes. For an event spread
 across a city, this is not a description of the place; it is the map and the timetable you actually
 travel with.
 
@@ -667,19 +667,19 @@ travel with.
 - **Contour and coordinate marks** — thin survey marks at section corners. They state position. They
   never appear where nothing is being located.
 - **Lines** — the concurrent tracks, lettered A, B, C. A line is a route through the day. Each line
-  carries a route mark: the letter in the sign face inside a simple survey-drawn shape, always with
+  carries a route mark: The letter in the sign face inside a simple survey-drawn shape, always with
   the line's name beside it.
 - **Stations** — the rooms and venues. A station has a name, a symbol, and a place on the sheet.
 - **Departure board** — the schedule. Time down the left as departures, lines across the head, each
   cell a service. A parent session and its children read as a service and its calling points.
 - **Transfer** — moving between sessions. Where two sessions sit on different lines or in different
   venues, the site states the transfer plainly: "Transfer to Line B · Hall 2 · 6 min walk."
-- **Wayfinding icons** — the sign set: venue, room, line, transit, step-free access. These carry
+- **Wayfinding icons** — the sign set: Venue, room, line, transit, step-free access. These carry
   meaning, so they are labelled icons, never motifs and never decorative pills.
 - **Folios** — the map key headings: LINES, STATIONS, DAY ONE, GETTING AROUND. Small caps on a
   hairline.
 - **Rules** — the graticule. Hairlines throughout, one strong rule per section as the sheet edge.
-- **Print view** — the folded pocket map. The board prints as a timetable: lines by letter, stations
+- **Print view** — the folded pocket map. The board prints as a timetable: Lines by letter, stations
   named in full, transfers listed, no controls.
 - **Type roles** — heading is the sign face: **Overpass**, drawn from highway sign lettering, which
   is the exact voice a network uses to tell you where to go. Body is the guide text a transit
@@ -712,7 +712,7 @@ travel with.
    transfer line states the line, the station, and the walking minutes. Every icon is labelled;
    nothing signals status by colour alone.
 3. **Tracing a line is the signature interaction.** The departure board is Atlas's one expressive
-   moment: on a user action, one line's column reads as a traced route — its cells come forward and
+   moment: On a user action, one line's column reads as a traced route — its cells come forward and
    its route marks connect down the column while the map grid behind stays put. It starts from a user
    action, finishes under 600ms, animates `transform` and `opacity` only, is readable at every frame,
    and is fully static under `prefers-reduced-motion`. No scroll trigger, no ambient loop, no
@@ -725,7 +725,7 @@ travel with.
 - **Dark:** deep slate ground, cool white ink, lit route marker, sunken contour grey, felt-grid blue,
   map-case grey, signal-white label, night platform blue.
 
-Bind: lines are told apart by their letter and their name first. A line colour, where a client sets
+Bind: Lines are told apart by their letter and their name first. A line colour, where a client sets
 one, is a second signal and never the only one (§8.1).
 
 ### 5. What this story refuses
@@ -777,7 +777,7 @@ glance.
 
 1. **Departure board** *(default)* — time down, lettered lines across, faint map grid behind,
    traced-line signature interaction. The theme's clearest idea.
-2. **Line diagram** — one line at a time, drawn as a Beck-style vertical run: stations down the
+2. **Line diagram** — one line at a time, drawn as a Beck-style vertical run: Stations down the
    column, times in the data face beside them, transfers marked where a track meets another. It is
    the strip map inside a carriage, so it stays in the system and serves a visitor following one
    track all day.
@@ -819,7 +819,7 @@ records each one. Nothing here waits on the user.
    Atlas is Overpass, Libre Franklin, and Overpass Mono. The earlier FT88 / Bagnard / Trickster
    audition list is superseded. Verify each licence and each Latin-subset size against the four
    tests in §9 when the faces are bundled in PR2.
-2. **The Zine stamp has its written exception.** Brief §2.4, "Exception two: the Zine stamp",
+2. **The Zine stamp has its written exception.** Brief §2.4, "Exception two: The Zine stamp",
    permits a flat, unblurred, ink-tinted offset layer in Zine only, and lists the six tests it must
    pass. "Shadow decorates nothing" and "no box-behind-box layering" stay intact everywhere else.
    The flat-block variant stays available for a client who wants neither.

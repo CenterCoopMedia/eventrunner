@@ -41,7 +41,7 @@ const BLOCK_TYPES = Object.freeze({
   text: blockType({
     id: 'text',
     label: 'Text',
-    description: 'A single plain-text value: headings, labels, short copy.',
+    description: 'A single plain-text value: Headings, labels, short copy.',
     fields: [field('value', 'string', true)],
   }),
   richtext: blockType({
@@ -68,7 +68,7 @@ const BLOCK_TYPES = Object.freeze({
   cta: blockType({
     id: 'cta',
     label: 'Call to action',
-    description: 'A button or prominent link: label plus destination.',
+    description: 'A button or prominent link: Label plus destination.',
     fields: [
       field('label', 'string', true),
       field('url', 'url', true),
