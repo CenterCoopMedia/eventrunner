@@ -92,9 +92,45 @@
      name, the dates, and the edition line. Type and rules only — never a
      hero banner, never a photo behind the name. */
   .nameplate {
+    position: relative;
     border-block-start: var(--nameplate-rule-width) solid rgb(var(--nameplate-rule-rgb));
     border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
     padding-block: var(--nameplate-gap);
+    text-align: var(--nameplate-align);
+  }
+  /* The frame of a title page (Field Guide) or a title block (Atlas). It is
+     drawn OUTSIDE the flow, so a preset that leaves --nameplate-frame-width
+     at zero renders the same block it always did — no border, no reflow. */
+  .nameplate::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--space-xs)) calc(-1 * var(--space-sm));
+    pointer-events: none;
+    border: var(--nameplate-frame-width) solid rgb(var(--nameplate-frame-rgb));
+  }
+  /* Coordinate marks at two corners: an L of hairlines that states a
+     position (brief §4.6). Zero width everywhere else, so the marks appear
+     only where a sheet is being located. */
+  .nameplate__coordinate {
+    position: absolute;
+    inline-size: var(--space-sm);
+    block-size: var(--space-sm);
+    pointer-events: none;
+    border-color: rgb(var(--nameplate-frame-rgb));
+    border-style: solid;
+    border-width: 0;
+  }
+  .nameplate__coordinate--start {
+    inset-block-start: calc(-1 * var(--space-xs));
+    inset-inline-start: calc(-1 * var(--space-sm));
+    border-block-start-width: var(--nameplate-corner-mark-width);
+    border-inline-start-width: var(--nameplate-corner-mark-width);
+  }
+  .nameplate__coordinate--end {
+    inset-block-end: calc(-1 * var(--space-xs));
+    inset-inline-end: calc(-1 * var(--space-sm));
+    border-block-end-width: var(--nameplate-corner-mark-width);
+    border-inline-end-width: var(--nameplate-corner-mark-width);
   }
   .nameplate__name {
     font-size: var(--nameplate-size);
@@ -128,6 +164,64 @@
   /* Section rule: the one strong rule that opens a section (brief §2.1). */
   .section-rule {
     border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
+  }
+
+  /* Motif slot (brief §2.3, §3.8; components/editorial/Motif.jsx).
+     ONE of the two render forms the brief allows: the slot token is a
+     mask-image and the paint is --color-ink-motif, so a drawing inherits
+     theme ink in both modes. Never an <img>, never a url() fill — neither
+     can inherit ink, so neither can meet the rule at all.
+
+     Which asset a slot resolves to is `data-motif-set`'s job, not this
+     file's: theme.css emits one block per set. Under the `none` set every
+     slot token is `none`, and an unmasked box would paint as a solid
+     rectangle of ink — so the `none` set takes the element out of the
+     layout. The selector is attribute-scoped rather than :root-only,
+     because the admin's live-preview frame carries its own set. */
+  .motif {
+    display: inline-block;
+    pointer-events: none;
+    background-color: rgb(var(--color-ink-motif-rgb));
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
+  [data-motif-set='none'] .motif {
+    display: none;
+  }
+  .motif--section-mark {
+    block-size: 1.25em;
+    inline-size: 1.25em;
+    -webkit-mask-image: var(--motif-section-mark);
+    mask-image: var(--motif-section-mark);
+  }
+  .motif--nameplate-mark {
+    -webkit-mask-image: var(--motif-nameplate-mark);
+    mask-image: var(--motif-nameplate-mark);
+  }
+  /* A divider closes the block it sits in and runs its full measure, so the
+     drawing is centred on the rule the way a printer would set an ornament —
+     and, in Atlas, the way a schematic line diagram closes a title block. */
+  .motif--divider {
+    display: block;
+    block-size: 2rem;
+    inline-size: 100%;
+    -webkit-mask-image: var(--motif-divider);
+    mask-image: var(--motif-divider);
+  }
+  /* The empty-state drawing sits above the sentence and aligns with it, so
+     it reads as part of the same block rather than as a centred illustration. */
+  .motif--empty-state {
+    display: block;
+    block-size: 5rem;
+    inline-size: 100%;
+    -webkit-mask-position: left center;
+    mask-position: left center;
+    -webkit-mask-image: var(--motif-empty-state);
+    mask-image: var(--motif-empty-state);
   }
 
   /* Typography for the sanitized richtext subset (RichTextBlock,

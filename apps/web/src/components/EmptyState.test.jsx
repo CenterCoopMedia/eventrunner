@@ -45,6 +45,19 @@ describe('EmptyState', () => {
     expect(screen.getByRole('link', { name: 'Go to the schedule' })).toBeInTheDocument();
   });
 
+  it('carries the empty-state motif above the sentence', () => {
+    // Brief §3.8's fourth slot, and the third and last place the public
+    // site renders a motif. It renders nothing under the `none` set, which
+    // is four of the six presets (index.css holds that gate).
+    const { container } = render(<EmptyState title="No sessions yet" />);
+    const motif = container.querySelector('[data-motif-slot="empty-state"]');
+    expect(motif).not.toBeNull();
+    expect(motif).toHaveAttribute('aria-hidden', 'true');
+    expect(motif.compareDocumentPosition(container.querySelector('h2'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
   it('keeps document order rule, then heading, then description, then action', () => {
     const { container } = render(
       <EmptyState

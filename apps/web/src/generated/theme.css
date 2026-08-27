@@ -151,6 +151,7 @@
   --nameplate-rule-width: var(--rule-nameplate-width);
   --nameplate-rule-top-width: 0;
   --nameplate-frame-width: 0;
+  --nameplate-corner-mark-width: 0;
   --nameplate-align: start;
   --nameplate-meta-placement: block;
   --nameplate-size: var(--text-nameplate);

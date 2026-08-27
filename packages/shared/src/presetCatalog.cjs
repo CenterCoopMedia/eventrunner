@@ -923,6 +923,7 @@ const PRESETS = Object.freeze({
             tokens: {
               '--nameplate-align': 'start',
               '--nameplate-frame-width': 'var(--rule-hairline-width)',
+              '--nameplate-corner-mark-width': 'var(--rule-hairline-width)',
               '--nameplate-meta-placement': 'block',
             },
           },

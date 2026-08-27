@@ -116,4 +116,37 @@ describe('Nameplate', () => {
     const { container } = renderPlate({ name: 'X' });
     expect(container.querySelectorAll('.nameplate p')).toHaveLength(1);
   });
+
+  it('holds the mark slot for the motif, and yields it to a client mark', () => {
+    // Brief §3.8: the nameplate-mark slot. A client's own branding mark
+    // wins — a paper prints its own flag, not the printer's ornament — and
+    // the slot renders nothing at all under the `none` set (index.css).
+    const { container, rerender } = renderPlate({ name: 'X' });
+    expect(container.querySelector('[data-motif-slot="nameplate-mark"]')).not.toBeNull();
+
+    rerender(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Nameplate name="X" mark={<img src="/branding/mark.svg" alt="" />} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('[data-motif-slot="nameplate-mark"]')).toBeNull();
+    expect(container.querySelector('img')).not.toBeNull();
+  });
+
+  it('closes the full treatment with the divider slot, and the running head without it', () => {
+    // Atlas moment 1: a schematic line diagram closes the title block. A
+    // running header is not a title block, so it carries no divider.
+    const { container } = renderPlate({ name: 'X' });
+    expect(container.querySelector('[data-motif-slot="divider"]')).not.toBeNull();
+
+    const compact = renderPlate({ name: 'X', variant: 'compact' });
+    expect(compact.container.querySelector('[data-motif-slot="divider"]')).toBeNull();
+  });
+
+  it('carries two coordinate marks, decorative and drawn at a token width', () => {
+    const { container } = renderPlate({ name: 'X' });
+    const marks = container.querySelectorAll('.nameplate__coordinate');
+    expect(marks).toHaveLength(2);
+    for (const mark of marks) expect(mark).toHaveAttribute('aria-hidden', 'true');
+  });
 });

@@ -23,8 +23,17 @@
 // own front-page moment sets the nameplate first and the lead headline after
 // it — so the shell passes `nameAs="h1"` there. Either way a page carries
 // exactly one <h1> (§8.1, semantic heading order).
+//
+// Two motif slots land inside the block (brief §3.8, §2.3): the
+// `nameplate-mark` beside the name, and the `divider` closing the full
+// treatment. Both render only where the active set carries them, so a
+// preset on the `none` set gets exactly the block it had before. The mark
+// yields to a client's own branding mark — a paper prints its own flag, not
+// the printer's ornament — and the divider is Atlas's schematic
+// line-diagram moment (visual story, Atlas, moment 1).
 import { Link } from 'react-router-dom';
 import { formatEventDateRange } from '../../lib/eventTime.js';
+import Motif from './Motif.jsx';
 
 /**
  * Derive the nameplate's three lines from config/event.
@@ -78,7 +87,12 @@ export default function Nameplate({
   const compact = variant === 'compact';
   const nameBody = (
     <span className="inline-flex items-center gap-xs">
-      {mark}
+      {mark ?? (
+        <Motif
+          slot="nameplate-mark"
+          className={compact ? 'h-6 w-6 shrink-0' : 'h-10 w-10 shrink-0'}
+        />
+      )}
       {name}
     </span>
   );
@@ -120,6 +134,13 @@ export default function Nameplate({
         </NameTag>
         {dateline}
       </div>
+      {compact ? null : <Motif slot="divider" className="mt-sm" />}
+      {/* Coordinate marks: two corners of a survey sheet's title block
+          (brief §4.6). They draw at --nameplate-corner-mark-width, which is
+          zero in every preset that is not locating something on a sheet, so
+          a mark never appears where nothing is being located. */}
+      <span aria-hidden="true" className="nameplate__coordinate nameplate__coordinate--start" />
+      <span aria-hidden="true" className="nameplate__coordinate nameplate__coordinate--end" />
     </div>
   );
 }

@@ -22,6 +22,8 @@
     "$treatment-note": "The three nameplate treatments each preset ships (brief §4) move these four. The rule above the name is the double-rule treatment; the frame is the boxed and framed treatments; the alignment and the metadata placement are the layout. Metadata inside the rule-bounded nameplate block is part of the nameplate device, never an eyebrow (brief §2.4).",
     "--nameplate-rule-top-width": "0",
     "--nameplate-frame-width": "0",
+    "$corner-mark-note": "Atlas draws coordinate marks at two corners of the title block (brief §4.6). A mark states a position, so it appears only where something is being located: every other preset holds zero width and renders no mark at all.",
+    "--nameplate-corner-mark-width": "0",
     "--nameplate-align": "start",
     "--nameplate-meta-placement": "block",
     "--nameplate-size": "var(--text-nameplate)",
