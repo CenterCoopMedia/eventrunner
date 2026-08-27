@@ -156,6 +156,10 @@ export default function Schedule() {
   // views render from this, so a child session appears under its parent in
   // the grid and in the list, and never as a row of its own.
   const entries = withCallingPoints(activeSessions);
+  // The top-level sessions in programme order. A transfer is a move between
+  // two of THESE: a calling point is inside its parent, not a room change
+  // after it.
+  const entrySessions = entries.map((entry) => entry.session);
   // The event's lines, in the client's own order (config/event.tracks). No
   // lines means no second axis, so there is nothing for a grid to be.
   const columns = resolveTracks(eventConfig);
@@ -324,10 +328,7 @@ export default function Schedule() {
                       features={features}
                       bookmarked={bookmarkedIds.has(entry.session.id)}
                       backIssue={backIssue}
-                      transferTo={transferTarget(
-                        entries.map((one) => one.session),
-                        index,
-                      )}
+                      transferTo={transferTarget(entrySessions, index)}
                       callingPoints={entry.children}
                     />
                   ))}
