@@ -35,7 +35,7 @@ test('demo generator and committed Pages output select demo checks without emula
   const output = classifyPaths(['docs/demo/index.html']);
 
   assert.equal(generator.mode, 'demo');
-  assert.deepEqual(selected(generator), ['demo', 'lint']);
+  assert.deepEqual(selected(generator), ['demo', 'lint', 'audit']);
   assert.equal(generator.jobs.rules, false);
   assert.equal(generator.jobs.e2e, false);
 
@@ -52,7 +52,7 @@ test('Pages generator paths select documentation checks and lint', () => {
   ]) {
     const result = classifyPaths([path]);
     assert.equal(result.mode, 'docs', path);
-    assert.deepEqual(selected(result), ['docs', 'lint'], path);
+    assert.deepEqual(selected(result), ['docs', 'lint', 'audit'], path);
   }
 
   assert.deepEqual(selected(classifyPaths(['docs/docs/index.html'])), ['docs']);
@@ -64,12 +64,12 @@ test('application and backend changes select their relevant suites', () => {
   const shared = classifyPaths(['packages/shared/src/registration.cjs']);
 
   assert.equal(app.mode, 'app');
-  assert.deepEqual(selected(app), ['demo', 'lint', 'unitWeb', 'build', 'hygiene', 'e2e']);
+  assert.deepEqual(selected(app), ['demo', 'lint', 'audit', 'unitWeb', 'build', 'hygiene', 'e2e']);
   assert.equal(app.jobs.unit, false);
   assert.equal(app.jobs.rules, false);
 
   assert.equal(backend.mode, 'backend');
-  assert.deepEqual(selected(backend), ['lint', 'unit', 'rules', 'e2e']);
+  assert.deepEqual(selected(backend), ['lint', 'audit', 'unit', 'rules', 'e2e']);
   assert.equal(backend.jobs.unitWeb, false);
   assert.equal(backend.jobs.build, false);
 
@@ -77,6 +77,7 @@ test('application and backend changes select their relevant suites', () => {
   assert.deepEqual(selected(shared), [
     'demo',
     'lint',
+    'audit',
     'unit',
     'unitWeb',
     'build',
@@ -98,6 +99,7 @@ test('PR change collection uses the merge base and retains both sides of renames
     'docs',
     'demo',
     'lint',
+    'audit',
     'unitWeb',
     'build',
     'hygiene',
@@ -152,6 +154,7 @@ test('mixed changes take the union of their tiers', () => {
     'docs',
     'demo',
     'lint',
+    'audit',
     'unitWeb',
     'build',
     'hygiene',

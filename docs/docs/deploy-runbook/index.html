@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deploy runbook — Event Runner documentation</title>
+  <meta name="description" content="Standing up a client Firebase project and shipping to it.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/deploy-runbook/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Deploy runbook — Event Runner documentation">
+  <meta property="og:description" content="Standing up a client Firebase project and shipping to it.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/deploy-runbook/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Deploy runbook — Event Runner documentation">
+  <meta name="twitter:description" content="Standing up a client Firebase project and shipping to it.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
+        <span class="brand-text">
+          <strong>Event Runner</strong>
+          <span>Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Deploy runbook</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/" aria-current="page" class="is-current">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Deploy runbook</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#0-naming">0. Naming</a></li>
+              <li><a href="#1-workload-identity-federation">1. Workload Identity Federation</a></li>
+              <li><a href="#2-per-client-service-account">2. Per-client service account</a></li>
+              <li><a href="#3-github-environment">3. GitHub Environment</a></li>
+              <li><a href="#4-auto_deploy_environments-push-auto-deploy">4. AUTO_DEPLOY_ENVIRONMENTS (push auto-deploy)</a></li>
+              <li><a href="#5-first-deploy-provisioning-a-fresh-project">5. First deploy (provisioning a fresh project)</a></li>
+              <li><a href="#6-verifying-the-setup">6. Verifying the setup</a></li>
+              <li><a href="#7-rotating-access">7. Rotating access</a></li>
+              <li><a href="#8-rolling-back-a-bad-deploy">8. Rolling back a bad deploy</a></li>
+              <li><a href="#9-site-publisher-optional-per-client">9. Site publisher (optional, per client)</a></li>
+            </ul>
+          </nav>
+          <p>One-time setup an operator does per client deployment, before the first <code>workflow_dispatch</code> run of
+          <code>deploy.yml</code>. Everything here is provisioned once; <code>deploy-client.yml</code> (spec
+          <code>docs/adr/0001-event-platform-v1.md</code> §8.1) then runs unattended. There is no service-account key
+          anywhere in this flow — auth is Workload Identity Federation (WIF), so nothing here is a secret an
+          operator has to store, rotate manually, or worry about leaking from a runner log.</p>
+          <p>Replace every <code>&lt;...&gt;</code> placeholder below. Nothing here is a value you leave as written.</p>
+          <h2 id="0-naming">0. Naming<a class="heading-anchor" href="#0-naming" aria-label="Link to this section">#</a></h2>
+          <p>Pick, once:</p>
+          <ul>
+          <li><code>&lt;GCP_PROJECT_ID&gt;</code> — the Firebase/GCP project for this client (create it first —
+          §2 below covers Firebase-specific prerequisites).</li>
+          <li><code>&lt;GH_ORG&gt;/&lt;GH_REPO&gt;</code> — this repository, e.g. <code>your-org/run-of-show</code>.</li>
+          <li><code>&lt;CLIENT_ENV&gt;</code> — the GitHub Environment name for this client, e.g. <code>cjs2027</code>. This is the
+          value operators pass as <code>client</code> to <code>workflow_dispatch</code>, and it must exactly match the
+          <code>AUTO_DEPLOY_ENVIRONMENTS</code> entry if this client also auto-deploys on push (§4).</li>
+          <li><code>&lt;DEPLOY_SA&gt;</code> — the deploy service account&#39;s short name, e.g. <code>deploy-cjs2027</code>.</li>
+          </ul>
+          <h2 id="1-workload-identity-federation">1. Workload Identity Federation<a class="heading-anchor" href="#1-workload-identity-federation" aria-label="Link to this section">#</a></h2>
+          <p>One pool can be shared across every client deployment in this GCP project (or organization); create
+          it once, then add one provider (or reuse the existing one) and one service account per client.</p>
+          <pre><code class="language-sh">gcloud config set project &lt;GCP_PROJECT_ID&gt;
+
+          # One-time per GCP project — skip if it already exists.
+          gcloud iam workload-identity-pools create &quot;github-actions&quot; \
+            --location=&quot;global&quot; \
+            --display-name=&quot;GitHub Actions&quot;
+
+          gcloud iam workload-identity-pools providers create-oidc &quot;github&quot; \
+            --location=&quot;global&quot; \
+            --workload-identity-pool=&quot;github-actions&quot; \
+            --display-name=&quot;GitHub OIDC&quot; \
+            --attribute-mapping=&quot;google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref,attribute.repository_and_ref=assertion.repository + &#39;#&#39; + assertion.ref&quot; \
+            --attribute-condition=&quot;assertion.repository_owner == &#39;&lt;GH_ORG&gt;&#39;&quot; \
+            --issuer-uri=&quot;https://token.actions.githubusercontent.com&quot;
+          </code></pre>
+          <p><code>--attribute-condition</code> is the guardrail: without it, any GitHub Actions workflow from any repo that
+          can forge a matching subject claim could request a token. Scoping it to <code>repository_owner</code> is enough
+          at the <em>pool</em> level because the per-client principal binding below (§2) does the real narrowing —
+          down to one repository <strong>and</strong> one ref (<code>refs/heads/main</code>) together. <code>attribute.repository_and_ref</code>
+          is a mapped custom attribute for exactly that: IAM <code>principalSet</code> bindings match on a single
+          attribute value, and a repository-only or ref-only binding cannot be combined with a second one
+          (multiple <code>principalSet</code> members on a role binding are OR&#39;d, not AND&#39;d) — so a repository+ref
+          compound value is the only way to express &quot;this repo, this branch, nothing else&quot; as one condition.</p>
+          <p><strong>This closes a real gap, not a theoretical one.</strong> Binding only on <code>attribute.repository</code> (an
+          earlier draft of this runbook did exactly that) lets <em>any</em> workflow run in this repository —
+          including one dispatched by a collaborator against a feature branch via
+          <code>gh workflow run deploy.yml --ref &lt;branch&gt; -f client=&lt;env&gt;</code> — impersonate the deploy service
+          account and ship that branch&#39;s code with the client&#39;s real credentials. An in-workflow ref check
+          (<code>deploy-client.yml</code>&#39;s <code>guard</code> job) is necessary but not sufficient on its own: it runs as
+          code <em>from the ref being deployed</em>, so a workflow-modifying commit on that same branch could remove
+          or bypass the check before GCP is ever asked. The <code>principalSet</code> condition is enforced by Google&#39;s
+          IAM outside the runner and outside the repository&#39;s control entirely, which is why it is the primary
+          control and the in-workflow check is defense-in-depth only.</p>
+          <p>Capture the full provider resource name — every client&#39;s <code>WIF_PROVIDER</code> environment variable (§3)
+          is the same value:</p>
+          <pre><code class="language-sh">gcloud iam workload-identity-pools providers describe &quot;github&quot; \
+            --location=&quot;global&quot; \
+            --workload-identity-pool=&quot;github-actions&quot; \
+            --format=&quot;value(name)&quot;
+          # projects/&lt;PROJECT_NUMBER&gt;/locations/global/workloadIdentityPools/github-actions/providers/github
+          </code></pre>
+          <h2 id="2-per-client-service-account">2. Per-client service account<a class="heading-anchor" href="#2-per-client-service-account" aria-label="Link to this section">#</a></h2>
+          <p>Firebase project prerequisites, first (once per client GCP project):</p>
+          <pre><code class="language-sh">gcloud services enable \
+            firebase.googleapis.com \
+            cloudfunctions.googleapis.com \
+            cloudbuild.googleapis.com \
+            run.googleapis.com \
+            firestore.googleapis.com \
+            secretmanager.googleapis.com \
+            cloudscheduler.googleapis.com \
+            --project=&lt;GCP_PROJECT_ID&gt;
+
+          # If the project has never had Firebase added:
+          #   https://console.firebase.google.com/ → Add project → select &lt;GCP_PROJECT_ID&gt;
+          # Then, in the console: enable Firestore (Native mode), enable Storage, add a
+          # Hosting site (or use the default one — its ID is EVENT_HOSTING_SITE, §3).
+          </code></pre>
+          <p>Now the deploy principal:</p>
+          <pre><code class="language-sh">gcloud iam service-accounts create &quot;&lt;DEPLOY_SA&gt;&quot; \
+            --project=&lt;GCP_PROJECT_ID&gt; \
+            --display-name=&quot;Event Runner deploy (&lt;CLIENT_ENV&gt;)&quot;
+
+          DEPLOY_SA_EMAIL=&quot;&lt;DEPLOY_SA&gt;@&lt;GCP_PROJECT_ID&gt;.iam.gserviceaccount.com&quot;
+
+          for role in \
+            roles/firebasehosting.admin \
+            roles/firebaserules.admin \
+            roles/datastore.indexAdmin \
+            roles/storage.admin \
+            roles/cloudfunctions.developer \
+            roles/run.developer \
+            roles/iam.serviceAccountUser \
+            roles/secretmanager.secretAccessor \
+            roles/cloudbuild.builds.editor \
+            roles/artifactregistry.writer \
+            roles/serviceusage.serviceUsageConsumer \
+            roles/datastore.user \
+            roles/cloudscheduler.admin
+          do
+            gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
+              --member=&quot;serviceAccount:${DEPLOY_SA_EMAIL}&quot; \
+              --role=&quot;${role}&quot; \
+              --condition=None
+          done
+          </code></pre>
+          <p>Notes on that list: <code>cloudfunctions.developer</code> + <code>run.developer</code> + <code>iam.serviceAccountUser</code> +
+          <code>cloudbuild.builds.editor</code> + <code>artifactregistry.writer</code> are what <code>firebase deploy --only functions</code>
+          needs end to end (Cloud Functions v2 builds through Cloud Build and Artifact Registry, and the
+          deploying principal must be allowed to act as the runtime service account).
+          <code>secretmanager.secretAccessor</code> is required only once the environment actually uses a secret
+          (<code>EMAIL_PROVIDER_API_KEY</code> etc., spec §2.1) — grant it up front so onboarding a provider later is a
+          config change, not an IAM change. <strong>This binding is only what the <em>deploying</em> identity needs to
+          reference a secret while wiring up <code>defineSecret</code> at deploy time — it does NOT cover the deployed
+          function actually reading the secret&#39;s value at runtime. That is a separate binding, on the
+          project&#39;s default compute service account, done per secret in §2&#39;s Secret Manager step below; skip
+          it and every <code>defineSecret</code>-backed function fails at cold start or at read, not at deploy.</strong>
+          <code>datastore.user</code> is what <code>generate-content.cjs</code> needs to read Firestore at deploy time (spec §8.6);
+          <code>datastore.indexAdmin</code> is separate and is what deploys <code>firestore.indexes.json</code>.
+          <code>cloudscheduler.admin</code> is what <code>firebase deploy --only functions</code> needs to create/update the Cloud
+          Scheduler job behind <code>cleanupExpiredAuthChallenges</code> (an <code>onSchedule</code> v2 function,
+          <code>functions/src/auth/otp.cjs</code>) — every deployment has at least this one scheduled function, so the
+          role is not conditional the way <code>secretmanager.secretAccessor</code> is.</p>
+          <p>Bind the deploy service account so <strong>only</strong> this repository, on <code>refs/heads/main</code>, may impersonate
+          it — both conditions in one <code>principalSet</code>, via the combined attribute mapped in §1:</p>
+          <pre><code class="language-sh">gcloud iam service-accounts add-iam-policy-binding &quot;${DEPLOY_SA_EMAIL}&quot; \
+            --project=&lt;GCP_PROJECT_ID&gt; \
+            --role=&quot;roles/iam.workloadIdentityUser&quot; \
+            --member=&quot;principalSet://iam.googleapis.com/projects/&lt;PROJECT_NUMBER&gt;/locations/global/workloadIdentityPools/github-actions/attribute.repository_and_ref/&lt;GH_ORG&gt;/&lt;GH_REPO&gt;#refs/heads/main&quot;
+          </code></pre>
+          <p>Verify it — the policy should show exactly one member, and it must end in <code>#refs/heads/main</code>:</p>
+          <pre><code class="language-sh">gcloud iam service-accounts get-iam-policy &quot;${DEPLOY_SA_EMAIL}&quot; --project=&lt;GCP_PROJECT_ID&gt; \
+            --format=&quot;json(bindings)&quot;
+          </code></pre>
+          <p>This is the actual enforcement. It holds regardless of what any workflow file in the repository
+          says, because Google&#39;s OIDC token exchange evaluates the <code>ref</code> claim GitHub put in the token — not
+          anything the workflow run controls — before minting a credential. A <code>workflow_dispatch</code> run against
+          a feature branch (<code>--ref some-branch</code>) presents a token whose <code>repository_and_ref</code> attribute does
+          not match <code>&lt;GH_ORG&gt;/&lt;GH_REPO&gt;#refs/heads/main</code>, so <code>google-github-actions/auth</code> fails at the token
+          exchange with <code>permission_denied</code> — before <code>deploy-client.yml</code> runs a single deploy step, and even
+          if that workflow&#39;s own <code>guard</code> job ref check had been edited or removed on that branch.
+          <code>workflow_dispatch</code> from <code>main</code> itself is unaffected: its ref is <code>refs/heads/main</code>, which matches.</p>
+          <p><strong>Second layer: a GitHub-side deployment branch rule.</strong> Belt-and-suspenders, and cheap to set up —
+          repo Settings → Environments → <code>&lt;CLIENT_ENV&gt;</code> → Deployment branches and tags → <strong>Selected branches
+          and tags</strong> → add <code>main</code> only. This makes GitHub itself refuse to start any job whose <code>environment:</code>
+          is <code>&lt;CLIENT_ENV&gt;</code> unless the run&#39;s ref is <code>main</code>, independent of both the WIF condition and the
+          in-workflow check. Combine it with <strong>Required reviewers</strong> on the same screen for any client where a
+          human should see a dispatch before it runs.</p>
+          <h2 id="3-github-environment">3. GitHub Environment<a class="heading-anchor" href="#3-github-environment" aria-label="Link to this section">#</a></h2>
+          <p>Create the environment (repo Settings → Environments → New environment → name it exactly
+          <code>&lt;CLIENT_ENV&gt;</code>), then set its variables and secrets. <strong>Every value below is a GitHub Environment
+          variable (<code>vars.*</code>), not a secret</strong> — none of it is a credential; the credential-shaped value
+          (the WIF provider resource name, the service account email) is a Google-side ACL check, not a
+          bearer token, and none of the Tier A values are confidential either.</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Variable</th><th>Value</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>WIF_PROVIDER</code></td><td>the provider resource name from §1&#39;s <code>describe</code> output</td></tr>
+          <tr><td><code>WIF_SERVICE_ACCOUNT</code></td><td><code>&lt;DEPLOY_SA&gt;@&lt;GCP_PROJECT_ID&gt;.iam.gserviceaccount.com</code></td></tr>
+          <tr><td><code>EVENT_SLUG</code></td><td>lowercase identifier, e.g. <code>cjs2027</code></td></tr>
+          <tr><td><code>EVENT_FIREBASE_PROJECT_ID</code></td><td><code>&lt;GCP_PROJECT_ID&gt;</code></td></tr>
+          <tr><td><code>EVENT_FIREBASE_REGION</code></td><td><code>us-central1</code> unless the project&#39;s functions live elsewhere</td></tr>
+          <tr><td><code>EVENT_HOSTING_SITE</code></td><td>the Firebase Hosting site ID (Console → Hosting)</td></tr>
+          <tr><td><code>EVENT_PUBLIC_URL</code></td><td>canonical origin, e.g. <code>https://summit.example.org</code></td></tr>
+          <tr><td><code>EVENT_STORAGE_BUCKET</code></td><td>the project&#39;s default Storage bucket</td></tr>
+          <tr><td><code>EVENT_ALLOWED_ORIGINS</code></td><td>comma-separated CORS origins</td></tr>
+          <tr><td><code>EVENT_EMAIL_PROVIDER</code></td><td><code>postmark</code> | <code>webhook</code> | <code>console</code></td></tr>
+          <tr><td><code>EVENT_TICKETING_PROVIDER</code></td><td><code>eventbrite</code> | <code>manual</code> | <code>none</code></td></tr>
+          <tr><td><code>EVENT_TICKETING_EVENT_ID</code></td><td>required only when the ticketing provider is <code>eventbrite</code></td></tr>
+          <tr><td><code>EVENT_OPERATOR_NOTIFIER</code></td><td><code>webhook</code> | <code>email</code> | <code>none</code></td></tr>
+          <tr><td><code>EVENT_APP_CHECK_ENFORCED</code></td><td><code>false</code> by default; set the App Check site key before changing this to <code>true</code></td></tr>
+          <tr><td><code>EVENT_OTP_SEND_CEILING_PER_HOUR</code></td><td>positive integer; defaults to <code>500</code></td></tr>
+          <tr><td><code>VITE_FIREBASE_API_KEY</code>, <code>VITE_FIREBASE_AUTH_DOMAIN</code>, <code>VITE_FIREBASE_PROJECT_ID</code>, <code>VITE_FIREBASE_STORAGE_BUCKET</code>, <code>VITE_FIREBASE_MESSAGING_SENDER_ID</code>, <code>VITE_FIREBASE_APP_ID</code></td><td>from Firebase Console → Project settings → your web app&#39;s SDK config</td></tr>
+          <tr><td><code>VITE_FIREBASE_MEASUREMENT_ID</code></td><td>optional; Firebase omits it when Google Analytics is disabled, and Eventrunner does not use it</td></tr>
+          <tr><td><code>VITE_FIREBASE_APP_CHECK_SITE_KEY</code></td><td>reCAPTCHA v3 site key; set this before enabling App Check enforcement</td></tr>
+          <tr><td><code>EVENT_SITE_PUBLISHER_ENABLED</code></td><td><code>false</code> by default. <code>true</code> provisions the site-publisher Cloud Run job — do §9 first</td></tr>
+          <tr><td><code>EVENT_PUBLISHER_SERVICE_ACCOUNT</code></td><td>required when the publisher is enabled; the job&#39;s own runtime identity (§9)</td></tr>
+          <tr><td><code>EVENT_FUNCTIONS_SERVICE_ACCOUNT</code></td><td>optional; overrides the default compute service account that receives <code>run.invoker</code> (§9)</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>App Check activation requires two successful deploys. First set
+          <code>VITE_FIREBASE_APP_CHECK_SITE_KEY</code> and wait for that deploy to finish. Then set
+          <code>EVENT_APP_CHECK_ENFORCED=true</code> and deploy again. Do not enable both settings in
+          the first deploy because Functions deploys before the new web bundle.</p>
+          <p>Full list, with descriptions: <code>.env.example</code>.</p>
+          <p>The <strong>only</strong> secrets <code>deploy-client.yml</code> reads are the provider-specific ones from spec §2.1/§8.2 —
+          set them here too, as environment <strong>secrets</strong> (Settings → Environments → <code>&lt;CLIENT_ENV&gt;</code> → Secrets),
+          only the rows that apply to the providers selected above:</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Secret</th><th>Required when</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>EMAIL_PROVIDER_API_KEY</code></td><td><code>EVENT_EMAIL_PROVIDER = postmark</code> (server token)</td></tr>
+          <tr><td><code>EMAIL_WEBHOOK_BASIC_AUTH</code></td><td><code>EVENT_EMAIL_PROVIDER = postmark</code> and delivery-event ingest is enabled</td></tr>
+          <tr><td><code>EMAIL_WEBHOOK_URL</code>, <code>EMAIL_WEBHOOK_SECRET</code></td><td><code>EVENT_EMAIL_PROVIDER = webhook</code></td></tr>
+          <tr><td><code>TICKETING_API_TOKEN</code></td><td><code>EVENT_TICKETING_PROVIDER != none</code></td></tr>
+          <tr><td><code>TICKETING_WEBHOOK_SECRET</code></td><td>ticketing provider implements <code>registerWebhook</code> (<code>eventbrite</code> — never <code>manual</code>)</td></tr>
+          <tr><td><code>OPERATOR_WEBHOOK_URL</code>, <code>OPERATOR_WEBHOOK_SECRET</code></td><td><code>EVENT_OPERATOR_NOTIFIER = webhook</code></td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>There is deliberately no <code>FIREBASE_SERVICE_ACCOUNT</code> secret in this list — WIF (§1–2) replaces the
+          service-account-key deploy credential entirely.</p>
+          <p>There is also deliberately no <code>EMAIL_ACCOUNT_API_KEY</code> here: it&#39;s the Postmark <strong>account</strong> token,
+          consumed only by the operator-run <code>scripts/verify-sender-domain.cjs</code>, not by any deployed function
+          — none of the <code>defineSecret</code> lists below bind it. It stays in operator-controlled storage and is
+          never provisioned into a client&#39;s GitHub Environment or Secret Manager; see
+          <code>docs/POSTMARK_PROVISIONING.md</code> §3.</p>
+          <p>These provider secrets are consumed by the deployed Cloud Functions through <code>defineSecret</code> (Secret
+          Manager), not baked into the functions env file the <code>functions</code> job writes — create them in Secret
+          Manager once, before the first functions deploy for this client:</p>
+          <pre><code class="language-sh">echo -n &quot;&lt;the actual API key&gt;&quot; | gcloud secrets create EMAIL_PROVIDER_API_KEY \
+            --project=&lt;GCP_PROJECT_ID&gt; --data-file=- --replication-policy=automatic
+          # repeat per secret this client&#39;s provider selection actually needs
+          </code></pre>
+          <p><strong>Then bind <code>secretAccessor</code> on each secret to the function&#39;s RUNTIME service account — not the
+          deploy service account.</strong> These are two different identities with two different jobs: <code>${DEPLOY_SA_EMAIL}</code>
+          (§2, above) only needs to <em>reference</em> the secret while deploying; the function&#39;s runtime identity is
+          what actually reads the secret&#39;s value on every invocation, and it is a separate principal that
+          <code>${DEPLOY_SA_EMAIL}</code>&#39;s own <code>secretmanager.secretAccessor</code> grant does not cover. Cloud Functions v2
+          runs as the project&#39;s default compute service account unless a function explicitly sets
+          <code>serviceAccount</code> (this repo&#39;s functions do not), so:</p>
+          <pre><code class="language-sh">PROJECT_NUMBER=$(gcloud projects describe &lt;GCP_PROJECT_ID&gt; --format=&quot;value(projectNumber)&quot;)
+          RUNTIME_SA_EMAIL=&quot;${PROJECT_NUMBER}-compute@developer.gserviceaccount.com&quot;
+
+          for secret in EMAIL_PROVIDER_API_KEY; do   # repeat the list for every secret this client uses
+            gcloud secrets add-iam-policy-binding &quot;${secret}&quot; \
+              --project=&lt;GCP_PROJECT_ID&gt; \
+              --member=&quot;serviceAccount:${RUNTIME_SA_EMAIL}&quot; \
+              --role=&quot;roles/secretmanager.secretAccessor&quot;
+          done
+          </code></pre>
+          <p>Skipping this step is a deploy-succeeds-runtime-fails trap: <code>firebase deploy --only functions</code> does
+          not read the secret&#39;s value, so the deploy itself can succeed with this binding missing, and the
+          function then fails at cold start (or at the first read, depending on <code>defineSecret</code> vs. lazy access)
+          with a Secret Manager permission error — which surfaces as a broken client feature, not a red CI run.</p>
+          <p>(Optional) restrict who can approve deploys to this environment: Settings → Environments →
+          <code>&lt;CLIENT_ENV&gt;</code> → Deployment protection rules → Required reviewers.</p>
+          <h2 id="4-auto_deploy_environments-push-auto-deploy">4. AUTO_DEPLOY_ENVIRONMENTS (push auto-deploy)<a class="heading-anchor" href="#4-auto_deploy_environments-push-auto-deploy" aria-label="Link to this section">#</a></h2>
+          <p>Repository-level, not per-environment (repo Settings → Secrets and variables → Actions →
+          Variables → New repository variable):</p>
+          <pre><code>Name:  AUTO_DEPLOY_ENVIRONMENTS
+          Value: cjs2027,summit2026
+          </code></pre>
+          <p>A comma-separated list of <code>&lt;CLIENT_ENV&gt;</code> names. Every push to <code>main</code> fans out to each one (spec
+          §8.1) — <code>deploy.yml</code>&#39;s <code>resolve</code> job parses this (<code>scripts/lib/deploy-matrix.cjs</code>), and a client
+          absent from the list only ever deploys via <code>workflow_dispatch</code>. Leave it unset (or empty) while a
+          client is new and you want every deploy to be a manual, watched dispatch; add it once the client is
+          comfortable auto-deploying on merge.</p>
+          <h2 id="5-first-deploy-provisioning-a-fresh-project">5. First deploy (provisioning a fresh project)<a class="heading-anchor" href="#5-first-deploy-provisioning-a-fresh-project" aria-label="Link to this section">#</a></h2>
+          <p>A brand-new project has no <code>config/event</code> Firestore document yet — <code>generate-content.cjs</code> (the
+          <code>content</code> job) throws &quot;run scripts/init-event.cjs first&quot; against one, on purpose (spec §8.6). The
+          <code>content</code> job runs before any operator has ever had the chance to run <code>init-event.cjs</code>, so the first
+          dispatch against a fresh project has to skip it. Two dispatches, in order:</p>
+          <p><strong>Step 1 — bootstrap dispatch.</strong> Deploys only rules/indexes/storage (<code>provision</code>) and <code>functions</code>;
+          skips <code>content</code>/<code>build</code>/<code>hosting</code>/<code>post</code>/<code>smoke</code> entirely.</p>
+          <pre><code>Actions tab → Deploy → Run workflow
+            client: &lt;CLIENT_ENV&gt;
+            provision: true
+            bootstrap: true
+          </code></pre>
+          <p><code>deploy-client.yml</code>&#39;s <code>provision</code> job deploys <code>firestore:rules</code>, <code>firestore:indexes</code>, and <code>storage</code>
+          on <strong>every</strong> run regardless of the <code>provision</code> input (spec §8.1) — that input exists for operator
+          intent and log clarity, not as a gate. <code>bootstrap: true</code> is the actual gate: it is what skips
+          <code>content</code> (and, transitively, <code>build</code>/<code>hosting</code>/<code>post</code>/<code>smoke</code>) on this run. A dispatch run always deploys
+          functions regardless of <code>bootstrap</code>, because a fresh project has none yet and gating that on a paths
+          filter would provision an empty, broken deployment (spec §8.1).</p>
+          <p><strong>Step 2 — seed content</strong>, from an operator&#39;s machine, once the bootstrap dispatch succeeds:</p>
+          <pre><code class="language-sh">export FIRESTORE_EMULATOR_HOST=  # unset — this targets the real project
+          export EVENT_FIREBASE_PROJECT_ID=&lt;GCP_PROJECT_ID&gt;
+          export GOOGLE_APPLICATION_CREDENTIALS=&lt;path to your own gcloud ADC, for this one-time step&gt;
+          node scripts/init-event.cjs --answers client-answers.json --admin ops@example.org
+          node scripts/init-event.cjs --check
+          </code></pre>
+          <p><code>init-event.cjs</code> runs from an operator&#39;s machine (or a follow-up dispatch of a future
+          provisioning workflow), not from <code>deploy-client.yml</code> — it is the one-time content bootstrap, not a
+          repeatable deploy step. See <code>scripts/README.md</code>.</p>
+          <p><strong>Step 3 — normal dispatch</strong>, now that <code>config/event</code> exists:</p>
+          <pre><code>Actions tab → Deploy → Run workflow
+            client: &lt;CLIENT_ENV&gt;
+            provision: false
+            bootstrap: false   (the default — leave it unchecked)
+          </code></pre>
+          <p>This run&#39;s <code>content</code> job succeeds, and <code>build</code>/<code>hosting</code>/<code>post</code>/<code>smoke</code> deploy the live site. From here on,
+          either dispatch this way again for any change, or add <code>&lt;CLIENT_ENV&gt;</code> to <code>AUTO_DEPLOY_ENVIRONMENTS</code>
+          (§4) so a push to <code>main</code> deploys it automatically — <code>bootstrap</code> is never <code>true</code> on a push run, so a
+          client already past step 3 never needs it again.</p>
+          <h2 id="6-verifying-the-setup">6. Verifying the setup<a class="heading-anchor" href="#6-verifying-the-setup" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li><code>gcloud iam service-accounts get-iam-policy &quot;${DEPLOY_SA_EMAIL}&quot; --project=&lt;GCP_PROJECT_ID&gt;
+          --format=&quot;json(bindings)&quot;</code> shows the <code>workloadIdentityUser</code> binding from §2, and its member ends
+          in <code>.../attribute.repository_and_ref/&lt;GH_ORG&gt;/&lt;GH_REPO&gt;#refs/heads/main</code> — not
+          <code>attribute.repository/&lt;GH_ORG&gt;/&lt;GH_REPO&gt;</code> alone. A repository-only binding is the gap this runbook
+          now closes: it lets any dispatched run on any branch of this repository impersonate the deploy
+          service account.</li>
+          <li>Confirm the negative case, not just the positive one: <code>gh workflow run deploy.yml --ref
+          &lt;some-non-main-branch&gt; -f client=&lt;CLIENT_ENV&gt;</code> must fail at the <code>google-github-actions/auth</code> step
+          with a token-exchange <code>permission_denied</code> — that is the WIF condition doing its job. It should
+          also fail earlier, at &quot;Waiting for review&quot; or immediately, if the deployment branch rule (§2) is
+          set, since GitHub itself won&#39;t start a job against <code>&lt;CLIENT_ENV&gt;</code> from that ref.</li>
+          <li>A <code>workflow_dispatch</code> run of <code>deploy.yml</code> with <code>client: &lt;CLIENT_ENV&gt;</code> <strong>from <code>main</code></strong> should reach
+          the <code>smoke</code> job and pass — it OPTIONS-preflights every endpoint in <code>.github/smoke-endpoints.json</code>
+          against <code>https://&lt;EVENT_FIREBASE_REGION&gt;-&lt;EVENT_FIREBASE_PROJECT_ID&gt;.cloudfunctions.net</code> and GETs
+          <code>EVENT_PUBLIC_URL</code>.</li>
+          <li>Between <code>hosting</code> and <code>smoke</code>, the <code>post</code> job redeploys <code>updatesMeta</code> (<code>functions/src/public/og.cjs</code>)
+          alone. That function self-fetches the deployed hosting <code>index.html</code> as its SSR OG-tag template and
+          caches it per container (issue #27) — a container that cold-started before THIS run&#39;s hosting
+          deploy would otherwise keep serving crawlers the previous build&#39;s asset references until its cache
+          TTL or a natural recycle. Forcing a redeploy here forces a fresh cold start immediately after the
+          new template exists. This was the ADR&#39;s <code>post</code> step (§8.1), deferred at the M2 deploy PR pending
+          <code>functions/src/public/og.cjs</code> landing (this issue) — <code>smoke</code>&#39;s OPTIONS-preflight of <code>updatesMeta</code>
+          now runs against the freshly-redeployed instance, not the one from the <code>functions</code> job earlier in
+          the same run.</li>
+          <li><code>firebase.json</code>&#39;s <code>/updates/**</code> hosting rewrite names <code>updatesMeta</code>&#39;s Cloud Functions <strong>region</strong> in
+          object form (<code>&quot;function&quot;: { &quot;functionId&quot;: &quot;updatesMeta&quot;, &quot;region&quot;: &quot;...&quot; }</code>) — the shorthand string
+          form (<code>&quot;function&quot;: &quot;updatesMeta&quot;</code>) silently defaults to <code>us-central1</code>, which would route every
+          non-default-region client&#39;s <code>/updates/**</code> requests at a backend that does not exist there (a 404
+          from Hosting, not from the function). Region is per-client (<code>EVENT_FIREBASE_REGION</code>), while
+          <code>firebase.json</code> is one file shared by every client&#39;s deploy — the same shape of problem
+          <code>EVENT_HOSTING_SITE</code> is (target names, not literal site ids), and the same fix: the <code>hosting</code> job&#39;s
+          &quot;Set the updatesMeta rewrite region for this project&quot; step patches the <strong>working copy</strong> of
+          <code>firebase.json</code> with <code>jq</code> immediately before <code>firebase deploy --only hosting:site</code> reads it,
+          defaulting to <code>us-central1</code> when <code>EVENT_FIREBASE_REGION</code> is unset (matching every other region
+          default in this pipeline). Nothing is committed back — the committed file keeps <code>us-central1</code> as
+          its placeholder, correct for that value and every client that doesn&#39;t override the region.</li>
+          <li>If <code>google-github-actions/auth</code> fails with <code>permission_denied</code> on a run you expected to succeed
+          (dispatched from <code>main</code>), the attribute condition (§1) or the repository+ref binding (§2) is the
+          first thing to re-check — copy the exact <code>repository</code> and <code>ref</code> claims GitHub sent from the failed
+          run&#39;s log against what the binding names.</li>
+          </ul>
+          <h2 id="7-rotating-access">7. Rotating access<a class="heading-anchor" href="#7-rotating-access" aria-label="Link to this section">#</a></h2>
+          <p>There is no key to rotate. To revoke a client&#39;s deploy access, remove the IAM policy binding from
+          §2 (<code>gcloud iam service-accounts remove-iam-policy-binding</code>) or delete the GitHub Environment; both
+          take effect on the next run, immediately.</p>
+          <h2 id="8-rolling-back-a-bad-deploy">8. Rolling back a bad deploy<a class="heading-anchor" href="#8-rolling-back-a-bad-deploy" aria-label="Link to this section">#</a></h2>
+          <p><code>deploy-client.yml</code> deploys hosting, functions, rules/indexes, and content on every run — a bad
+          deploy is rarely just one of those. Roll back the piece that&#39;s actually broken; rolling back
+          everything when only one component regressed reintroduces whatever the other components&#39; good
+          deploys fixed.</p>
+          <h3 id="hosting">Hosting<a class="heading-anchor" href="#hosting" aria-label="Link to this section">#</a></h3>
+          <p>Firebase Hosting keeps prior releases. Fastest path is the Firebase Console — Hosting → the site →
+          release history → <strong>Rollback</strong> on the last-known-good release; it&#39;s a Console action against
+          <code>EVENT_HOSTING_SITE</code>, not a re-run of CI. From the CLI, with the same credentials an operator uses
+          for one-off scripts (not the deploy service account — this is a manual, watched action):</p>
+          <pre><code class="language-sh">firebase hosting:clone &lt;SITE_ID&gt;:&lt;GOOD_RELEASE_ID&gt; &lt;SITE_ID&gt;:live --project &lt;GCP_PROJECT_ID&gt;
+          </code></pre>
+          <p>Find <code>&lt;GOOD_RELEASE_ID&gt;</code> from <code>firebase hosting:releases:list</code> or the Console&#39;s release history.
+          This affects the served static bundle only — it does not touch functions, rules, or content.</p>
+          <h3 id="functions">Functions<a class="heading-anchor" href="#functions" aria-label="Link to this section">#</a></h3>
+          <p>There is no one-click functions rollback the way Hosting has one; the fix is to redeploy the prior
+          good ref. Dispatch <code>deploy.yml</code> (<code>workflow_dispatch</code>, <code>client: &lt;CLIENT_ENV&gt;</code>) <strong>from <code>main</code> at the
+          last-known-good commit</strong> — either revert forward on <code>main</code> and dispatch normally, or, if you need
+          the exact prior artifact right now, <code>git checkout &lt;good-sha&gt;</code> and dispatch the deploy workflow with
+          that ref (<code>gh workflow run deploy.yml --ref &lt;good-sha&gt; -f client=&lt;CLIENT_ENV&gt;</code>). Recall §1–2: the
+          WIF binding only authorizes <code>refs/heads/main</code>, so a dispatch against an arbitrary SHA or tag that
+          isn&#39;t reachable from <code>main</code>&#39;s current HEAD, or isn&#39;t itself on <code>refs/heads/main</code>, fails at the
+          token-exchange step — this is a control, not a bug, and it means the practical rollback path is
+          &quot;revert on <code>main</code>,&quot; not &quot;dispatch an old tag directly.&quot; Read §5&#39;s step ordering again if this is a
+          fresh-enough project that <code>bootstrap</code> semantics could matter.</p>
+          <h3 id="firestore-rules-and-indexes">Firestore rules and indexes<a class="heading-anchor" href="#firestore-rules-and-indexes" aria-label="Link to this section">#</a></h3>
+          <p><code>provision</code> deploys <code>firestore:rules</code>, <code>firestore:indexes</code>, and <code>storage</code> on every run (§5) — a
+          rules regression rolls back the same way functions do: revert on <code>main</code>, redeploy. Two things that
+          don&#39;t roll back cleanly:</p>
+          <ul>
+          <li><strong>A tightened rule that already blocked a write nobody needed</strong> rolls back fine — nothing was
+          lost by the tightening.</li>
+          <li><strong>An index removed or narrowed</strong> takes real time to rebuild once restored — Firestore composite
+          index builds are not instant, and any query depending on the removed index fails (not degrades)
+          until the rebuild finishes. Budget for that gap; it is not the same shape of &quot;instant&quot; as a
+          Hosting rollback.</li>
+          </ul>
+          <h3 id="content-snapshot-implications">Content snapshot implications<a class="heading-anchor" href="#content-snapshot-implications" aria-label="Link to this section">#</a></h3>
+          <p><code>content</code> (<code>generate-content.cjs</code>) regenerates <code>apps/web/src/generated/*</code> from live Firestore at
+          deploy time — rolling back <strong>hosting</strong> alone serves the <em>previous build&#39;s</em> generated snapshot,
+          which was correct for the config/content at that previous deploy&#39;s time, not for whatever&#39;s in
+          Firestore now. If a client has edited and published content since the bad deploy, a hosting-only
+          rollback can visibly regress their content even though nothing about their content itself broke.
+          When content has moved since the deploy you&#39;re rolling back from, prefer rolling forward (fix and
+          redeploy) over rolling back, or expect to re-publish the affected pages after the rollback.</p>
+          <p><strong>If this client has the site publisher enabled (§9), a hosting-only rollback does not hold.</strong> The
+          next CMS publish invokes the <code>site-publisher</code> Cloud Run job, which rebuilds from its own image — the
+          one the last deploy pushed, i.e. the code you just rolled hosting back <em>from</em> — and redeploys
+          hosting over the rollback. So &quot;re-publish the affected pages after the rollback&quot;, above, is the one
+          thing that will silently undo it. To hold a hosting rollback on a publisher-enabled client, either
+          set <code>EVENT_SITE_PUBLISHER_ENABLED=false</code> and deploy before rolling back, or roll the code back
+          properly (revert on <code>main</code>, deploy) so the rebuilt image carries the good code. §9.3 has the detail.</p>
+          <h3 id="when-not-to-roll-back">When NOT to roll back<a class="heading-anchor" href="#when-not-to-roll-back" aria-label="Link to this section">#</a></h3>
+          <p><strong>Schema-forward migrations.</strong> A deploy that changed the <em>shape</em> of a <code>config/*</code> document, added a
+          required field a running function now depends on, or changed what a Firestore trigger writes is not
+          safely undone by redeploying old function code against the new data shape (or vice versa) — the two
+          can disagree about what a document should look like, and that disagreement is a worse failure mode
+          than the original bug. If the deploy you want to roll back included a migration, roll <strong>forward</strong>
+          with a fix instead: write the small forward-fixing change, dispatch it, and treat the rollback
+          tooling above as being for deploys that were <em>behaviorally</em> wrong, not ones that changed a data
+          contract other code now depends on.</p>
+          <h3 id="custom-domain-and-readiness-notes">Custom domain and readiness notes<a class="heading-anchor" href="#custom-domain-and-readiness-notes" aria-label="Link to this section">#</a></h3>
+          <p>A custom-domain rollback (attaching a different Hosting site, or reverting a
+          <code>EVENT_PUBLIC_URL</code>/authorized-domains change) does not take effect immediately even after the
+          Hosting/Auth Console steps are redone — DNS propagation and certificate issuance/reissuance can take
+          from minutes to about a day (§0–3, and <code>docs/CLIENT_ONBOARDING.md</code> §3 item 3). Re-run
+          <code>node scripts/init-event.cjs --check</code> after a domain change of any kind rather than assuming the
+          readiness table is still accurate; the sender-domain and Auth rows in particular are
+          operator-attested and do not re-verify themselves on a timer. See issue #66 for the fuller
+          per-client-subdomain (<code>client.eventrunner.org</code>) provisioning flow this repo will eventually build on
+          top of this same Hosting custom-domain mechanism — the wildcard-vs-per-client CNAME strategy is out
+          of scope here and tracked there, not in this runbook. The Cloud Run site-publisher has since landed
+          (#36) and is documented in §9; it is orthogonal to per-client subdomains, reaching the job as
+          ordinary per-client environment with no domain coupling, so nothing in §9 waits on #66.</p>
+          <h2 id="9-site-publisher-optional-per-client">9. Site publisher (optional, per client)<a class="heading-anchor" href="#9-site-publisher-optional-per-client" aria-label="Link to this section">#</a></h2>
+          <p><strong>What it does.</strong> The frontend reads CMS content from Firestore at runtime, so a publish is already
+          live for human visitors the moment <code>cmsPublish</code> commits (spec §2.4, §8.4). What lags is the static
+          snapshot in the deployed bundle — the first paint, and the only thing a crawler that does not run
+          JavaScript ever sees. The <code>site-publisher</code> Cloud Run job closes that gap on demand: after a
+          successful publish, <code>cmsPublish</code> starts one execution, which runs <code>generate-content.cjs</code> against
+          this project&#39;s <strong>published</strong> collections, rebuilds the bundle with this client&#39;s <code>VITE_*</code> values,
+          and runs <code>firebase deploy --only hosting</code>. Entirely inside the client&#39;s own project, under the
+          job&#39;s own service account — no GitHub token, no <code>repository_dispatch</code>, no cross-project credential
+          (spec §8.4 phase 5; the container is <code>publisher/Dockerfile</code>, the logic is
+          <code>scripts/publish-site.cjs</code>).</p>
+          <p><strong>It is optional.</strong> With <code>EVENT_SITE_PUBLISHER_ENABLED</code> unset or <code>false</code>, nothing below exists, the
+          <code>publisher</code> deploy job is skipped, <code>EVENT_SITE_PUBLISHER_JOB</code> is never written into the functions
+          env, and <code>cmsPublish</code> skips the invoke without writing anything. That is the phase 2–4 behavior:
+          publishes work, and the crawler snapshot refreshes at the next deploy.</p>
+          <h3 id="91-one-time-setup-per-client">9.1 One-time setup per client<a class="heading-anchor" href="#91-one-time-setup-per-client" aria-label="Link to this section">#</a></h3>
+          <p>Enable the two APIs the job needs (<code>run.googleapis.com</code> is already in §2&#39;s list):</p>
+          <pre><code class="language-sh">gcloud services enable \
+            run.googleapis.com \
+            artifactregistry.googleapis.com \
+            --project=&lt;GCP_PROJECT_ID&gt;
+          </code></pre>
+          <p>Create the job&#39;s runtime service account. <strong>This is a different identity from the deploy service
+          account (§2) and from the functions runtime account (§3).</strong> It is the account the job runs as, and
+          its grants are the entire blast radius of a compromised publisher image:</p>
+          <pre><code class="language-sh">gcloud iam service-accounts create site-publisher \
+            --project=&lt;GCP_PROJECT_ID&gt; \
+            --display-name=&quot;Event Runner site publisher (&lt;CLIENT_ENV&gt;)&quot;
+
+          PUBLISHER_SA_EMAIL=&quot;site-publisher@&lt;GCP_PROJECT_ID&gt;.iam.gserviceaccount.com&quot;
+
+          for role in \
+            roles/datastore.user \
+            roles/firebasehosting.admin \
+            roles/storage.objectViewer \
+            roles/serviceusage.serviceUsageConsumer
+          do
+            gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
+              --member=&quot;serviceAccount:${PUBLISHER_SA_EMAIL}&quot; \
+              --role=&quot;${role}&quot; \
+              --condition=None
+          done
+          </code></pre>
+          <p>Why exactly those four, and nothing more:</p>
+          <ul>
+          <li><code>datastore.user</code> — <code>generate-content.cjs</code> reads <code>config/*</code> and the published CMS collections, and
+          <code>publish-site.cjs</code> writes its terminal status back to the <code>cmsPublishQueue</code> row. Read-only
+          (<code>datastore.viewer</code>) is not enough for that status write.</li>
+          <li><code>firebasehosting.admin</code> — the one thing the job exists to do. It cannot deploy functions, rules,
+          or indexes: <code>publish-site.cjs</code> only ever runs <code>firebase deploy --only hosting:site</code>, and no role
+          here would let it do otherwise.</li>
+          <li><code>storage.objectViewer</code> — branding assets under <code>EVENT_STORAGE_BUCKET</code> that the snapshot
+          references. <strong>Viewer, not admin</strong>: the job never writes to Storage.</li>
+          <li><code>serviceUsageConsumer</code> — required for the Firebase CLI&#39;s API calls to bill against this project.</li>
+          </ul>
+          <p>Notably absent: no <code>run.admin</code> (the job does not manage itself), no <code>artifactregistry</code> role (it does
+          not push images; the deploy service account does that), no <code>iam.serviceAccountUser</code>, and no
+          <code>secretmanager.secretAccessor</code> — the job needs no secrets.</p>
+          <p>The deploy service account (§2) already carries <code>artifactregistry.writer</code> and <code>run.developer</code>, which
+          is what the <code>publisher</code> job needs to push the image and create the Cloud Run job. It also needs
+          <code>iam.serviceAccountUser</code> <strong>on the publisher account</strong> in order to deploy a job that runs as it —
+          §2&#39;s project-level <code>iam.serviceAccountUser</code> covers this, but the narrower binding is better:</p>
+          <pre><code class="language-sh">gcloud iam service-accounts add-iam-policy-binding &quot;${PUBLISHER_SA_EMAIL}&quot; \
+            --project=&lt;GCP_PROJECT_ID&gt; \
+            --member=&quot;serviceAccount:${DEPLOY_SA_EMAIL}&quot; \
+            --role=&quot;roles/iam.serviceAccountUser&quot;
+          </code></pre>
+          <p>Then set the two GitHub Environment variables from §3:</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Variable</th><th>Value</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>EVENT_SITE_PUBLISHER_ENABLED</code></td><td><code>true</code></td></tr>
+          <tr><td><code>EVENT_PUBLISHER_SERVICE_ACCOUNT</code></td><td><code>site-publisher@&lt;GCP_PROJECT_ID&gt;.iam.gserviceaccount.com</code></td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p><code>validateDeployEnv</code> fails the deploy if the flag is <code>true</code> and the account is unset — there is
+          deliberately no default, because a blank would hand the job whatever identity Cloud Run picks.</p>
+          <p>The next deploy from <code>main</code> provisions everything else automatically: the <code>run-of-show</code> Artifact
+          Registry repository in this project, the image (tagged with the commit SHA), the <code>site-publisher</code>
+          Cloud Run job with this client&#39;s environment, and <code>roles/run.invoker</code> for the functions runtime
+          account <strong>on that one job</strong>. Nothing is granted project-wide.</p>
+          <p><strong>Ordering on the first enable.</strong> The <code>publisher</code> job and the <code>functions</code> job run independently in
+          the same workflow run, so for a short window the deployed <code>cmsPublish</code> may know the job&#39;s name
+          before the job exists. A publish in that window still succeeds — the invoke fails soft, records
+          <code>publisher.invoke.status: &#39;failed&#39;</code> on the queue row, and raises an operator alert. Re-publish
+          after the run completes.</p>
+          <h3 id="92-verifying-it">9.2 Verifying it<a class="heading-anchor" href="#92-verifying-it" aria-label="Link to this section">#</a></h3>
+          <pre><code class="language-sh"># The job exists, runs as the right identity, and carries this client&#39;s env.
+          gcloud run jobs describe site-publisher \
+            --region=&lt;EVENT_FIREBASE_REGION&gt; --project=&lt;GCP_PROJECT_ID&gt; \
+            --format=&quot;yaml(spec.template.template.serviceAccountName, spec.template.template.containers[0].image)&quot;
+
+          # run.invoker is bound on THE JOB, to the functions runtime account only.
+          gcloud run jobs get-iam-policy site-publisher \
+            --region=&lt;EVENT_FIREBASE_REGION&gt; --project=&lt;GCP_PROJECT_ID&gt; --format=&quot;json(bindings)&quot;
+
+          # End to end, without going through the CMS: start one execution by hand.
+          gcloud run jobs execute site-publisher --wait \
+            --region=&lt;EVENT_FIREBASE_REGION&gt; --project=&lt;GCP_PROJECT_ID&gt;
+          </code></pre>
+          <p>A hand-started execution takes no <code>PUBLISH_QUEUE_ID</code>, so it publishes the site and writes no status
+          row — which makes it the safe way to test the container itself.</p>
+          <p>Then the real path: make a trivial CMS edit, publish it, and check that
+          <code>cmsGetPublishQueue</code> shows the row with <code>publisher.invoke.status: &#39;invoked&#39;</code> followed by
+          <code>publisher.status: &#39;done&#39;</code>, and that the deployed HTML source (not the rendered page —
+          <code>curl -s &lt;EVENT_PUBLIC_URL&gt; | grep</code>) carries the new content.</p>
+          <p>The exit code names the stage, so triage rarely needs the log:</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Exit</th><th>Meaning</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>0</code></td><td>published</td></tr>
+          <tr><td><code>2</code></td><td>the job&#39;s environment is invalid — nothing ran; compare <code>gcloud run jobs describe</code> against §3</td></tr>
+          <tr><td><code>3</code></td><td><code>generate-content.cjs</code> failed — usually <code>datastore.user</code> missing, or <code>config/event</code> absent</td></tr>
+          <tr><td><code>4</code></td><td>the vite build failed — a missing <code>VITE_*</code> value, or the task ran out of memory</td></tr>
+          <tr><td><code>5</code></td><td><code>firebase deploy --only hosting</code> failed — usually <code>firebasehosting.admin</code> missing</td></tr>
+          <tr><td><code>1</code></td><td>an unexpected error in the entrypoint itself</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Common failures on the invoke side, from the queue row&#39;s <code>publisher.invoke.error</code>:</p>
+          <ul>
+          <li><code>Cloud Run responded 403</code> — the <code>run.invoker</code> grant is missing or was applied to the wrong
+          identity. Re-check the runtime account against §3&#39;s <code>RUNTIME_SA_EMAIL</code>.</li>
+          <li><code>Cloud Run responded 404</code> — the job does not exist in that region. Check
+          <code>EVENT_FIREBASE_REGION</code> matches where the deploy created it.</li>
+          </ul>
+          <h3 id="93-interaction-with-rollback">9.3 Interaction with rollback<a class="heading-anchor" href="#93-interaction-with-rollback" aria-label="Link to this section">#</a></h3>
+          <p>§8 is the rollback procedure; this is only what changes once a client has a publisher. The publisher
+          deploys hosting from <strong>whatever commit built its image</strong>, not from the currently deployed bundle,
+          which turns §8&#39;s &quot;Hosting&quot; rollback from a durable action into a temporary one. Two consequences
+          worth knowing before an incident:</p>
+          <ul>
+          <li><strong>Rolling back hosting alone does not stick.</strong> A Firebase Hosting rollback in the console is
+          undone by the next CMS publish, because the job rebuilds from its image and redeploys. To hold a
+          rollback, either disable the publisher (<code>EVENT_SITE_PUBLISHER_ENABLED=false</code>, then deploy) or roll
+          the code back properly — revert on <code>main</code> and let the deploy rebuild the image.</li>
+          <li><strong>Rolling back the code is a deploy.</strong> Reverting on <code>main</code> rebuilds and repushes the image under
+          the new commit SHA and updates the job, so the next publish uses the rolled-back code. The old
+          image stays in Artifact Registry under its own SHA tag; nothing is overwritten.</li>
+          </ul>
+          <p>Stranded rows are not an incident. If neither <code>cmsPublish</code> nor the job reports a result, the
+          <code>cleanupStrandedPublishRows</code> sweep (<code>functions/src/maintenance/cleanup.cjs</code>, every 30 minutes) marks
+          the row failed after 90 minutes and alerts once — a failed publish row is resumable from the CMS,
+          and a failed publisher row just means the snapshot is stale until the next publish or deploy.</p>
+          <h3 id="94-cost">9.4 Cost<a class="heading-anchor" href="#94-cost" aria-label="Link to this section">#</a></h3>
+          <p>The job runs on demand — once per CMS publish, plus whatever an operator starts by hand. There is
+          no idle cost: a Cloud Run job bills only while an execution is running, and it has no minimum
+          instances and no request-serving footprint between executions. One execution is a few minutes of 2
+          vCPU / 4 GiB, so a normal editing day costs cents. What accumulates instead is Artifact Registry
+          storage, one image per deployed commit — prune old tags if a client&#39;s project has years of them:</p>
+          <pre><code class="language-sh">gcloud artifacts docker images list \
+            &quot;&lt;EVENT_FIREBASE_REGION&gt;-docker.pkg.dev/&lt;GCP_PROJECT_ID&gt;/run-of-show/site-publisher&quot; \
+            --project=&lt;GCP_PROJECT_ID&gt;
+          </code></pre>
+          <p>The alternative — putting the snapshot refresh on a nightly schedule — is what phases 2–4 specified
+          and costs a build a day whether or not anything changed (spec §8.4, §10 Q7). Nothing in this repo
+          implements it: the refresh went straight from &quot;next deploy&quot; to this on-demand job.</p>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/DEPLOY_RUNBOOK.md"><code>docs/DEPLOY_RUNBOOK.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/client-onboarding/"><span>Previous</span>Client onboarding</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/postmark-provisioning/"><span>Next</span>Postmark provisioning</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

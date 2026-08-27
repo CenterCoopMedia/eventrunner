@@ -1,0 +1,53 @@
+{
+  "adminEmails": ["demo-admin@centercoopmedia.org"],
+  "event": {
+    "name": "[Demo] Harborlight Media Summit",
+    "shortName": "DEMO-SUMMIT",
+    "tagline": "[Replace] A three-day gathering for people who make community media work.",
+    "timezone": "America/New_York",
+    "days": [
+      { "id": "day-1", "label": "Day one", "date": "2026-10-14", "startTime": "09:00", "endTime": "17:00" },
+      { "id": "day-2", "label": "Day two", "date": "2026-10-15", "startTime": "09:00", "endTime": "17:00" },
+      { "id": "day-3", "label": "Day three", "date": "2026-10-16", "startTime": "09:00", "endTime": "16:00" }
+    ],
+    "registration": {
+      "opensAt": "2026-06-01T09:00:00",
+      "closesAt": "2026-10-09T23:59:00",
+      "externalUrl": "https://eventrunner-demo.web.app/register"
+    },
+    "venue": {
+      "name": "[Demo] Harborlight Hall",
+      "addressLine1": "1 Placeholder Plaza",
+      "addressLine2": null,
+      "city": "Demoville",
+      "region": "ST",
+      "postalCode": "00000",
+      "country": "US",
+      "mapUrl": null
+    },
+    "sender": {
+      "email": "demo@eventrunner-demo.web.app",
+      "name": "[Demo] Harborlight Media Summit",
+      "replyTo": null
+    },
+    "legal": {
+      "operatorName": "[Demo] Harborlight Cooperative",
+      "postalAddressHtml": "[Replace] Operator postal address for the email footer.",
+      "supportEmail": "support@example.org",
+      "conductEmail": "conduct@example.org"
+    },
+    "social": {
+      "hashtag": null,
+      "handles": []
+    },
+    "seo": {
+      "description": "[Replace] One-sentence description of the event for search and social cards.",
+      "defaultOgImagePath": "branding/og-default.svg",
+      "organizerName": "[Demo] Harborlight Cooperative",
+      "organizerUrl": "https://eventrunner-demo.web.app"
+    }
+  },
+  "features": {},
+  "theme": {},
+  "badges": { "categories": [] }
+}

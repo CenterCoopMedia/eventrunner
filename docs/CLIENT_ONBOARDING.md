@@ -51,9 +51,10 @@ again by mistake is safe, not silent data loss.
 
 Build a `client-answers.json` from the client's intake (see `scripts/lib/answers.cjs` for the
 prompt list and validation this file goes through — the same file interactive mode would produce
-answering the same questions one at a time). At minimum it needs the event name, dates, timezone,
-venue, the public URL, the ticketing provider choice (and its event ID if `eventbrite`), the email
-provider choice, and the sender address.
+answering the same questions one at a time, and
+[`docs/examples/demo-answers.json`](examples/demo-answers.json) for a filled-in example). At
+minimum it needs the event name, dates, timezone, venue, the public URL, the ticketing provider
+choice (and its event ID if `eventbrite`), the email provider choice, and the sender address.
 
 ```sh
 export GOOGLE_APPLICATION_CREDENTIALS=<path to your own gcloud ADC, for this one-time step>
@@ -105,7 +106,7 @@ path (client edits are still never overwritten). This is what clears the Auth ro
 Firebase Hosting → add the custom domain, complete DNS verification (a TXT record), and wait for
 certificate issuance before announcing the site. Both steps can take anywhere from minutes to about
 a day; re-check readiness (§6) rather than assuming it finished. If this client's domain is a
-`*.runofshow.net` subdomain rather than their own domain, see the wildcard-vs-per-client DNS note
+`*.eventrunner.org` subdomain rather than their own domain, see the wildcard-vs-per-client DNS note
 in `docs/DEPLOY_RUNBOOK.md` (issue #66) — the attach mechanics are the same Hosting custom-domain
 flow either way.
 

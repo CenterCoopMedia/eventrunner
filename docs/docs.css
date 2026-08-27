@@ -1,0 +1,439 @@
+/* Event Runner — documentation site (issue #108).
+
+   This file adds only what the docs shell needs on top of styles.css:
+   the two-column layout, the prose measure, and code/table styles. Every
+   color comes from the tokens defined in styles.css, so the landing page,
+   the docs, and the demo stay one visual system. No gradients, no
+   shadows, no blur, no motion beyond what styles.css already allows. */
+
+/* ---------- Header, breadcrumbs ---------- */
+
+.brand-mark {
+  display: block;
+}
+
+.breadcrumbs {
+  padding-block: 1.25rem 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.breadcrumbs li + li::before {
+  content: "/";
+  margin-inline-end: 0.6rem;
+  color: var(--color-border);
+}
+
+.breadcrumbs a {
+  color: var(--color-text-secondary);
+}
+
+@media (hover: hover) {
+  .breadcrumbs a:hover {
+    color: var(--color-text);
+  }
+}
+
+/* ---------- Layout ---------- */
+
+.docs-layout {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 3rem;
+  align-items: start;
+  padding-block: 1.75rem 3.5rem;
+}
+
+.docs-main {
+  min-width: 0;
+}
+
+/* ---------- Section navigation ---------- */
+
+.docs-nav {
+  position: sticky;
+  top: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.docs-nav-section {
+  margin: 1.5rem 0 0.5rem;
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.docs-nav-section:first-child {
+  margin-block-start: 0;
+}
+
+.docs-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-inline-start: 1px solid var(--color-border);
+}
+
+.docs-nav li a {
+  display: block;
+  padding: 0.3rem 0 0.3rem 0.75rem;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+/* The current item thickens the nav rail it already sits on. This is a
+   state indicator paired with aria-current and a weight change, not a
+   decorative left edge. */
+.docs-nav li a.is-current {
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: none;
+  border-inline-start: 2px solid var(--color-accent);
+  margin-inline-start: -1px;
+  padding-inline-start: calc(0.75rem - 1px);
+}
+
+@media (hover: hover) {
+  .docs-nav li a:hover {
+    color: var(--color-text);
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+}
+
+/* ---------- Prose ---------- */
+
+.prose {
+  max-width: 44rem;
+}
+
+.prose h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.prose h2 {
+  margin: 2.75rem 0 0.85rem;
+  padding-block-end: 0.4rem;
+  border-block-end: 1px solid var(--color-border);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.prose h3 {
+  margin: 2rem 0 0.6rem;
+  font-size: 1.18rem;
+  font-weight: 700;
+}
+
+.prose h4 {
+  margin: 1.6rem 0 0.5rem;
+  font-family: "Bricolage Grotesque", "Arial Black", "Avenir Next Condensed", sans-serif;
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+/* styles.css sizes the landing hero's lede for a two-column layout; in a
+   single prose column it should run the full measure. */
+.prose .lede {
+  max-width: none;
+  margin-block-end: 1rem;
+  font-size: 1.12rem;
+}
+
+.prose p,
+.prose li {
+  text-wrap: pretty;
+}
+
+.prose p {
+  margin: 0 0 1rem;
+}
+
+.prose > ul,
+.prose > ol {
+  margin: 0 0 1rem;
+  padding-inline-start: 1.35rem;
+}
+
+.prose li {
+  margin-block-end: 0.35rem;
+}
+
+.prose li > ul,
+.prose li > ol {
+  margin-block: 0.35rem;
+  padding-inline-start: 1.2rem;
+}
+
+.prose li.task-item {
+  list-style: none;
+  margin-inline-start: -1.35rem;
+}
+
+.prose li.task-item input {
+  margin-inline-end: 0.45rem;
+  accent-color: var(--color-accent);
+}
+
+.prose hr {
+  margin-block: 2.5rem;
+  border: 0;
+  border-block-start: 1px solid var(--color-border);
+}
+
+.prose blockquote {
+  margin: 0 0 1rem;
+  padding: 0.1rem 0 0.1rem 1rem;
+  border-inline-start: 2px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+
+/* The anchor duplicates a link the reader can already get from the address
+   bar, so it stays out of the way until it is wanted. It is a real link
+   throughout: keyboard focus reveals it, and it keeps its label for
+   assistive technology. */
+.heading-anchor {
+  margin-inline-start: 0.4rem;
+  color: var(--color-accent-text);
+  text-decoration: none;
+  font-weight: 400;
+  opacity: 0;
+}
+
+.heading-anchor:focus-visible,
+h2:hover > .heading-anchor,
+h3:hover > .heading-anchor,
+h4:hover > .heading-anchor,
+h5:hover > .heading-anchor,
+h6:hover > .heading-anchor {
+  opacity: 1;
+}
+
+/* ---------- Code ---------- */
+
+.prose code {
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.88em;
+  overflow-wrap: break-word;
+}
+
+.prose :not(pre) > code {
+  padding: 0.1em 0.32em;
+  border: 1px solid var(--color-border);
+  border-radius: 0.3rem;
+  background: var(--color-surface-tint);
+}
+
+.prose pre {
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  background: var(--color-surface-tint);
+  overflow-x: auto;
+}
+
+.prose pre code {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+/* ---------- Tables ---------- */
+
+.table-scroll {
+  margin-block-end: 1.25rem;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.prose th,
+.prose td {
+  padding: 0.55rem 0.85rem;
+  text-align: start;
+  vertical-align: top;
+  border-block-start: 1px solid var(--color-border);
+}
+
+.prose thead th {
+  border-block-start: 0;
+  background: var(--color-surface-tint);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---------- On this page ---------- */
+
+.contents {
+  margin-block-end: 2rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.7rem;
+  background: var(--color-surface);
+  font-size: 0.95rem;
+}
+
+.contents-title {
+  margin: 0 0 0.5rem;
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.contents ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  columns: 2;
+  column-gap: 1.5rem;
+}
+
+.contents li {
+  margin-block-end: 0.25rem;
+  break-inside: avoid;
+}
+
+/* ---------- Documentation home ---------- */
+
+.docs-section {
+  margin-block-start: 2.5rem;
+}
+
+.docs-index-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 0.7rem;
+  background: var(--color-surface);
+}
+
+.docs-index-list li {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-block-start: 1px solid var(--color-border);
+}
+
+.docs-index-list li:first-child {
+  border-block-start: 0;
+}
+
+.docs-index-list a {
+  font-weight: 600;
+}
+
+.docs-index-list span {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+/* ---------- Source note and pagination ---------- */
+
+.source-note {
+  max-width: 44rem;
+  margin: 2.5rem 0 0;
+  padding-block-start: 1.25rem;
+  border-block-start: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+}
+
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-block-start: 1.5rem;
+}
+
+.page-nav-link {
+  flex: 1 1 14rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.page-nav-next {
+  text-align: end;
+}
+
+.page-nav-link span {
+  display: block;
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+@media (hover: hover) {
+  .page-nav-link:hover {
+    border-color: var(--color-accent);
+  }
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 56rem) {
+  .docs-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.5rem;
+  }
+
+  /* On a narrow screen the full index below the article is more useful
+     than a wall of links above it; breadcrumbs and the previous/next
+     links carry navigation at the top. */
+  .docs-nav {
+    position: static;
+    order: 2;
+    padding-block-start: 1.5rem;
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  .docs-main {
+    order: 1;
+  }
+
+  .contents ul {
+    columns: 1;
+  }
+}

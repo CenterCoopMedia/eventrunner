@@ -191,6 +191,27 @@ test('speakers are read from speakers_public, never from the canonical store', a
   assert.equal('speakerId' in snapshot.speakers[0], false);
 });
 
+// A CRLF checkout (the Windows git default, core.autocrlf=true) rewrites
+// every LF this script wrote to CRLF on disk. The generated content on
+// disk is then byte-different from what emitAll() produces in memory even
+// though nothing meaningful changed, so --check must compare on content,
+// not line endings (issue #102).
+test('--demo --check is not fooled by CRLF line endings on disk', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gen-content-crlf-'));
+  await quietly(() => main(['--demo', '--out', tmp]));
+
+  // Simulate a CRLF checkout: rewrite every generated file's line endings.
+  for (const name of fs.readdirSync(tmp)) {
+    const file = path.join(tmp, name);
+    const original = fs.readFileSync(file, 'utf8');
+    fs.writeFileSync(file, original.replace(/\n/g, '\r\n'));
+  }
+
+  const { value, output } = await quietly(() => main(['--demo', '--out', tmp, '--check']));
+
+  assert.equal(value, 0, `expected --check to pass on a CRLF checkout, got:\n${output}`);
+});
+
 test('--demo --check flags an unexpected extra file, not just content differences', async () => {
   // A byte-for-byte match on the expected six files is not the whole
   // hygiene gate — it says nothing about an EXTRA file sitting in the

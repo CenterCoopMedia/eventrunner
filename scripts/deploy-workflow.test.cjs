@@ -5,10 +5,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const workflow = fs.readFileSync(
-  path.join(__dirname, '..', '.github', 'workflows', 'deploy-client.yml'),
-  'utf8',
-);
+// Normalized to LF: every marker and pattern below matches on literal
+// `\n`, and a CRLF checkout (the Windows git default) would otherwise
+// leave a stray `\r` right before each `\n`, making every indexOf/regex
+// match here miss (issue #102).
+// Normalized to LF: every marker and pattern below matches on literal
+// `\n`, and a CRLF checkout (the Windows git default) would otherwise
+// leave a stray `\r` right before each `\n`, making every indexOf/regex
+// match here miss (issue #102).
+const workflow = fs
+  .readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'deploy-client.yml'), 'utf8')
+  .replace(/\r\n/g, '\n');
 
 function step(name) {
   const marker = `      - name: ${name}\n`;
@@ -27,6 +34,24 @@ function job(name) {
   const next = after.search(/\n {2}[a-z0-9-]+:\n/);
   return next === -1 ? after : after.slice(0, next);
 }
+
+// A CRLF checkout of this repo (the Windows git default, core.autocrlf=true)
+// puts `\r\n` at the end of every line in deploy-client.yml. Every marker
+// and pattern above matches literal `\n` only, so without normalizing the
+// file first, `step()` and `job()` would fail to find anything on such a
+// checkout (issue #102). Simulate that here without depending on the
+// checkout's actual line endings.
+test('workflow lookups tolerate a CRLF checkout', () => {
+  const crlfWorkflow = workflow.replace(/\n/g, '\r\n');
+  const normalized = crlfWorkflow.replace(/\r\n/g, '\n');
+  assert.equal(normalized, workflow);
+
+  const marker = '      - name: Validate Tier A environment (spec §2.1) before touching GCP\n';
+  assert.notEqual(normalized.indexOf(marker), -1);
+  // Proof the bug is real: the same lookup against the un-normalized CRLF
+  // text does not find the marker.
+  assert.equal(crlfWorkflow.indexOf(marker), -1);
+});
 
 test('deploy validation receives the OTP abuse-control variables', () => {
   const validation = step('Validate Tier A environment (spec §2.1) before touching GCP');

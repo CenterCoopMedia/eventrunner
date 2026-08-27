@@ -21,6 +21,7 @@ jobs:
       docs: ${{ steps.classify.outputs.docs }}
       demo: ${{ steps.classify.outputs.demo }}
       lint: ${{ steps.classify.outputs.lint }}
+      audit: ${{ steps.classify.outputs.audit }}
       unit: ${{ steps.classify.outputs.unit }}
       unitWeb: ${{ steps.classify.outputs.unitWeb }}
       build: ${{ steps.classify.outputs.build }}
@@ -127,6 +128,32 @@ jobs:
         run: npm ci
       - name: Run ESLint
         run: npm run lint
+
+  audit:
+    name: Dependency audit policy
+    needs: changes
+    if: needs.changes.outputs.audit == 'true'
+    runs-on: ubuntu-latest
+    # Credential-free (spec §8.1): `npm audit` reads the committed lockfiles
+    # against the public npm advisory database, no token or project needed,
+    # so this runs the same on a fork PR as every other job. Policy (issue
+    # #103): fail only on high/critical findings in production dependencies
+    # (`npm audit --omit=dev`) that are not listed in
+    # scripts/ci/audit-exceptions.json. Dev-tooling findings (firebase-tools,
+    # vite, and their transitive tar/uuid findings) are tracked in that same
+    # file but can never fail this job.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Check the audit policy
+        run: node scripts/ci/audit-policy.cjs
 
   unit:
     name: Shared package tests
@@ -342,7 +369,7 @@ jobs:
   gate:
     name: CI gate
     if: always()
-    needs: [changes, dco, secrets, docs, demo, lint, unit, unit-web, build, hygiene, rules, e2e]
+    needs: [changes, dco, secrets, docs, demo, lint, audit, unit, unit-web, build, hygiene, rules, e2e]
     runs-on: ubuntu-latest
     # Keep this job's name stable and require it in branch protection. The
     # selected jobs must pass; skipped jobs are acceptable only when the
@@ -362,6 +389,8 @@ jobs:
           DEMO_RESULT: ${{ needs.demo.result }}
           LINT_SELECTED: ${{ needs.changes.outputs.lint }}
           LINT_RESULT: ${{ needs.lint.result }}
+          AUDIT_SELECTED: ${{ needs.changes.outputs.audit }}
+          AUDIT_RESULT: ${{ needs.audit.result }}
           UNIT_SELECTED: ${{ needs.changes.outputs.unit }}
           UNIT_RESULT: ${{ needs.unit.result }}
           UNIT_WEB_SELECTED: ${{ needs.changes.outputs.unitWeb }}

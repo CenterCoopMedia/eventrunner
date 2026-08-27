@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Postmark provisioning — Event Runner documentation</title>
+  <meta name="description" content="Sender domain, message streams, and webhook cutover.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/postmark-provisioning/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Postmark provisioning — Event Runner documentation">
+  <meta property="og:description" content="Sender domain, message streams, and webhook cutover.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/postmark-provisioning/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Postmark provisioning — Event Runner documentation">
+  <meta name="twitter:description" content="Sender domain, message streams, and webhook cutover.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
+        <span class="brand-text">
+          <strong>Event Runner</strong>
+          <span>Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Postmark provisioning</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/" aria-current="page" class="is-current">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Postmark provisioning</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#0-postmarks-object-model-in-the-terms-this-repo-uses">0. Postmark&#39;s object model, in the terms this repo uses</a></li>
+              <li><a href="#1-one-time-the-ccm-account">1. One-time: the CCM account</a></li>
+              <li><a href="#2-per-deployment-create-the-server">2. Per deployment: create the Server</a></li>
+              <li><a href="#3-store-the-tokens-for-this-environment">3. Store the tokens for this environment</a></li>
+              <li><a href="#4-verify-the-sender-domain">4. Verify the sender domain</a></li>
+              <li><a href="#5-register-the-delivery-webhook">5. Register the delivery webhook</a></li>
+              <li><a href="#6-verification-checklist">6. Verification checklist</a></li>
+              <li><a href="#7-addendum-cutting-a-deployment-over-after-account-approval">7. Addendum: cutting a deployment over after account approval</a></li>
+              <li><a href="#follow-up-manual-account-creation">Follow-up: manual account creation</a></li>
+            </ul>
+          </nav>
+          <p>Operator runbook for standing up the shared CCM Postmark account and bringing a new client onto
+          it. Written to be followed end to end by whoever is doing the provisioning — an operator at a
+          keyboard, or an agent in a separate session working through it step by step — without needing the
+          rest of this repo&#39;s docs open at the same time; where a step leans on another doc it says so and
+          summarizes what&#39;s there.</p>
+          <p>This is infrastructure that gets set up once (the account, §1) and once per deployment (a Server,
+          sender domain, and webhook — §2–5). The per-client steps a deploy cannot automate are also listed
+          in <a href="/eventrunner/docs/client-onboarding/"><code>docs/CLIENT_ONBOARDING.md</code></a> §3 item 4; this document is the fuller
+          Postmark-side version that page points at.</p>
+          <p>Decided model (<code>docs/adr/0001-event-platform-v1.md</code> §3.1, Q3): <strong>one CCM-owned Postmark account</strong>,
+          not one account per client. Sender domains are verified per client. The API key that
+          <code>EMAIL_PROVIDER_API_KEY</code> holds is per <strong>deployment environment</strong>, never shared across clients.</p>
+          <p><strong>CCM&#39;s own domain, <code>eventrunner.org</code>, is the first (dev/demo) deployment this runbook stands up</strong> —
+          sender address <code>info@eventrunner.org</code> — so §2–6 below use it as the worked example throughout, with
+          its actual DNS steps (CCM&#39;s DNS is in Cloudflare). A real client&#39;s sender domain and DNS host will
+          differ; where that matters, the step says so and gives the general form alongside the concrete one.</p>
+          <p>Two DNS-vs-Postmark distinctions worth keeping straight throughout this document: <strong>outbound</strong>
+          authentication (DKIM, Return-Path, DMARC — §4) is entirely Postmark-side sending configuration,
+          verified against records published in Cloudflare; <strong>inbound</strong> mail (anyone replying to or emailing
+          the sender address) is a separate, optional Cloudflare Email Routing setup that Postmark has no part
+          in — Postmark never receives mail for a domain, only sends it. For <code>eventrunner.org</code>, Cloudflare
+          Email Routing forwards <code>info@eventrunner.org</code> to the maintainer&#39;s real inbox; that rule lives
+          entirely in Cloudflare&#39;s <strong>Email</strong> → <strong>Email Routing</strong> tab for the zone, not in Postmark.</p>
+          <p><strong>Account creation itself is manual operator work and is out of scope here</strong> — it is split into a
+          follow-up issue (see the note at the end of this document). What follows is everything after the
+          account exists: per-deployment servers, sender domains, tokens, and webhooks.</p>
+          <h2 id="0-postmarks-object-model-in-the-terms-this-repo-uses">0. Postmark&#39;s object model, in the terms this repo uses<a class="heading-anchor" href="#0-postmarks-object-model-in-the-terms-this-repo-uses" aria-label="Link to this section">#</a></h2>
+          <p>Postmark&#39;s hierarchy is <strong>Account → Server → Message Stream</strong>. A Server Token
+          (<code>X-Postmark-Server-Token</code>) is scoped to one Server; an Account Token
+          (<code>X-Postmark-Account-Token</code>) is scoped to the whole account and is the only credential the
+          Domains API accepts. Message Streams live <em>inside</em> a Server (a Server can hold up to 10, including
+          its two defaults) and do not carry their own token — sending and webhook registration for a stream
+          both authenticate with that stream&#39;s Server&#39;s token.</p>
+          <p>Because <code>EMAIL_PROVIDER_API_KEY</code> is one secret <strong>per deployment environment</strong> (§2.1), and a Server
+          Token is the only credential scoped tightly enough to hand one client, <strong>each client gets its own
+          Server</strong> inside the shared account, using that Server&#39;s default <code>Outbound</code> transactional stream (or
+          a client-named custom stream if you want a friendlier name than the default). One client cannot
+          read another&#39;s server token, sending logs, or bounce history, and revoking a client&#39;s access is
+          deleting one Server — the same isolation &quot;one account per client&quot; would have given, without a
+          separate Postmark account (and its own billing) per client. This is the practical reading of &quot;one
+          account, per-client message streams&quot;: the <em>stream</em> is the sending surface, the <em>Server</em> is the unit
+          that actually carries a distinct token, so provisioning happens at the Server level.</p>
+          <h2 id="1-one-time-the-ccm-account">1. One-time: the CCM account<a class="heading-anchor" href="#1-one-time-the-ccm-account" aria-label="Link to this section">#</a></h2>
+          <p>Manual, done once, ahead of the first client. Split into a follow-up issue — see the note at the
+          end. Roughly:</p>
+          <ol>
+          <li>Sign up for the Postmark account under an org-owned CCM email (not a personal address).</li>
+          <li>Note the account&#39;s Account Token (Account → API Tokens) — this is <code>EMAIL_ACCOUNT_API_KEY</code>,
+          shared across every client deployment (it is account-scoped by design; there is only one).
+          It stays in operator-controlled storage only (§3) — no deployed function binds it, so it never
+          goes into a client&#39;s GitHub Environment or Secret Manager.</li>
+          <li>Set up billing for the account&#39;s plan and confirm it covers the expected number of Servers —
+          each client is a Server, so the plan needs to scale with the client count, not just message
+          volume.</li>
+          </ol>
+          <h2 id="2-per-deployment-create-the-server">2. Per deployment: create the Server<a class="heading-anchor" href="#2-per-deployment-create-the-server" aria-label="Link to this section">#</a></h2>
+          <ol>
+          <li>Postmark → <strong>Servers</strong> → <strong>Add server</strong>. Name it after the deployment
+          (<code>&lt;EVENT_SLUG&gt;</code> from <code>.env.example</code>) so the server list stays legible as deployments accumulate.
+          For the first, dev/demo deployment this section provisions: the CCM account&#39;s Server is named
+          <code>Event Runner</code> (or whatever <code>EVENT_SLUG</code> that environment actually uses — check
+          <code>.env.example</code>/the environment&#39;s GitHub Environment variables rather than assuming).</li>
+          <li>Server type: <strong>Live</strong>, not the default demo/test server — even for the dev deployment, so its
+          sending behavior (rate limits, bounce handling) matches what a real client server will do.</li>
+          <li>Open the new Server → <strong>API Tokens</strong> tab → copy the Server Token. This is
+          <code>EMAIL_PROVIDER_API_KEY</code> for this deployment&#39;s environment.</li>
+          <li>(Optional) Rename the Server&#39;s default <code>Outbound</code> stream, or add a custom Transactional stream,
+          if you want the stream name in Postmark&#39;s UI to read as the deployment&#39;s rather than the generic
+          default. Whether the code actually sends on that stream depends on <code>config/providers.email.
+          messageStream</code> (Tier B, <code>functions/src/email/send.cjs</code>): every send falls back to that config
+          value when the call site doesn&#39;t pass its own <code>messageStream</code>, and <code>createPostmarkProvider</code> (in
+          <code>postmark.cjs</code>) only omits <code>MessageStream</code> from the API payload — letting Postmark use the
+          Server&#39;s default stream — when that value is unset. Note whatever you name or rename the stream
+          to here; §5 needs it to register the webhook on the stream sends actually land on.</li>
+          </ol>
+          <h2 id="3-store-the-tokens-for-this-environment">3. Store the tokens for this environment<a class="heading-anchor" href="#3-store-the-tokens-for-this-environment" aria-label="Link to this section">#</a></h2>
+          <p>These two tokens are stored differently — only one of them is a deployment secret.</p>
+          <p><code>EMAIL_PROVIDER_API_KEY</code> (the send path, <code>functions/src/email/providers/postmark.cjs</code>) is a
+          per-deployment GitHub Environment <strong>secret</strong> (not variable) on the client&#39;s <code>&lt;CLIENT_ENV&gt;</code>
+          environment, per <code>docs/DEPLOY_RUNBOOK.md</code> §3, then mirrored into Secret Manager for the deployed
+          <code>emailDeliveryWebhook</code> function to read via <code>defineSecret</code>:</p>
+          <pre><code class="language-sh"># GitHub Environment secret (Settings → Environments → &lt;CLIENT_ENV&gt; → Secrets):
+          #   EMAIL_PROVIDER_API_KEY  = the Server Token from step 2.3 (per-client)
+
+          # Secret Manager, once per client project (docs/DEPLOY_RUNBOOK.md §3):
+          echo -n &quot;&lt;server token&gt;&quot; | gcloud secrets create EMAIL_PROVIDER_API_KEY \
+            --project=&lt;GCP_PROJECT_ID&gt; --data-file=- --replication-policy=automatic
+
+          # Then bind secretAccessor to the function&#39;s runtime service account
+          # (docs/DEPLOY_RUNBOOK.md §3 — the deploy SA and the runtime SA are different principals):
+          PROJECT_NUMBER=$(gcloud projects describe &lt;GCP_PROJECT_ID&gt; --format=&quot;value(projectNumber)&quot;)
+          RUNTIME_SA_EMAIL=&quot;${PROJECT_NUMBER}-compute@developer.gserviceaccount.com&quot;
+          gcloud secrets add-iam-policy-binding EMAIL_PROVIDER_API_KEY \
+            --project=&lt;GCP_PROJECT_ID&gt; \
+            --member=&quot;serviceAccount:${RUNTIME_SA_EMAIL}&quot; \
+            --role=&quot;roles/secretmanager.secretAccessor&quot;
+          </code></pre>
+          <p><code>EMAIL_ACCOUNT_API_KEY</code> (the sender-domain check, <code>verifySenderDomain()</code> in the same provider file)
+          is <strong>not</strong> a deployment secret — no deployed function binds it via <code>defineSecret</code> (grep
+          <code>functions/src/email/send.cjs</code>&#39;s <code>SEND_SECRETS_BY_PROVIDER</code>/<code>INGEST_SECRETS_BY_PROVIDER</code>: it isn&#39;t
+          in either list). Its only consumer is the operator-run <code>scripts/verify-sender-domain.cjs</code>. Keep it
+          in operator-controlled storage (the team password manager, or wherever this account&#39;s other
+          credentials already live) and inject it only as a local environment variable when running that
+          script (§4c) — do <strong>not</strong> create it as a GitHub Environment secret, do <strong>not</strong> mirror it into a
+          client&#39;s Secret Manager, and do <strong>not</strong> grant any runtime service account access to it. It is the
+          one account-scoped credential shared across every client deployment, which is exactly why it does
+          not belong inside a per-client project&#39;s trust boundary: granting a client&#39;s runtime SA access to
+          it would let that deployment&#39;s functions reach Postmark&#39;s account-wide domains API, far beyond
+          what any of them need.</p>
+          <p>Without <code>EMAIL_ACCOUNT_API_KEY</code> set when the script runs, <code>verifySenderDomain()</code> reports every
+          check <code>unknown</code> rather than failing, so a missing key reads as &quot;can&#39;t tell&quot; in
+          <code>scripts/verify-sender-domain.cjs</code>&#39;s output, not as an error. Have it ready before §4c.</p>
+          <h2 id="4-verify-the-sender-domain">4. Verify the sender domain<a class="heading-anchor" href="#4-verify-the-sender-domain" aria-label="Link to this section">#</a></h2>
+          <p>This is <code>docs/CLIENT_ONBOARDING.md</code> §3 item 4, reproduced here with the Postmark-side and (for
+          <code>eventrunner.org</code>) Cloudflare-side detail. General shape: get whoever controls DNS for the sender
+          domain to publish two Postmark-issued records plus one DMARC policy; Postmark shows the exact
+          values once the domain is added to the Server. <strong>Do not invent the record values below</strong> — they are
+          per-account and Postmark generates them when you add the domain; treat the ones shown here as
+          illustrative of the <em>shape</em>, and copy the real values from Postmark&#39;s UI.</p>
+          <h3 id="4a-add-the-domain-in-postmark">4a. Add the domain in Postmark<a class="heading-anchor" href="#4a-add-the-domain-in-postmark" aria-label="Link to this section">#</a></h3>
+          <p>Client&#39;s Server → <strong>Sender Signatures</strong> (or the Server&#39;s <strong>Domains</strong> tab) → <strong>Add Domain</strong> →
+          enter the sender domain (<code>eventrunner.org</code> for the dev/demo deployment; a real client&#39;s own domain
+          otherwise — never a <code>*.eventrunner.org</code> subdomain unless that client specifically doesn&#39;t have their
+          own). Postmark then displays:</p>
+          <ul>
+          <li>a <strong>DKIM</strong> TXT record: host something like <code>pm._domainkey.eventrunner.org</code>, value a long
+          <code>k=rsa; p=...</code> string,</li>
+          <li>a <strong>Return-Path</strong> CNAME: host <code>pm-bounces.eventrunner.org</code> (the verified Return-Path host for
+          this account), value something like <code>pm.mtasv.net</code>.</li>
+          </ul>
+          <p>Copy both exactly as shown — Postmark&#39;s UI is the source of truth for the actual host/value pair,
+          not this document.</p>
+          <h3 id="4b-publish-the-records-cloudflare-eventrunnerorg">4b. Publish the records — Cloudflare (eventrunner.org)<a class="heading-anchor" href="#4b-publish-the-records-cloudflare-eventrunnerorg" aria-label="Link to this section">#</a></h3>
+          <p>CCM&#39;s DNS for <code>eventrunner.org</code> is managed in Cloudflare. In the Cloudflare dashboard for the zone →
+          <strong>DNS</strong> → <strong>Records</strong> → <strong>Add record</strong>, twice:</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Field</th><th>DKIM record</th><th>Return-Path record</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Type</td><td><code>TXT</code></td><td><code>CNAME</code></td></tr>
+          <tr><td>Name</td><td>the host Postmark gave (e.g. <code>pm._domainkey</code>) — Cloudflare appends the zone automatically, so enter just the subdomain part, not the full <code>....eventrunner.org</code></td><td>the host Postmark gave (e.g. <code>pm-bounces</code>)</td></tr>
+          <tr><td>Content / Target</td><td>the <code>p=...</code> value Postmark gave, exactly, quotes and all if Cloudflare&#39;s editor asks for a quoted TXT</td><td>the target Postmark gave (e.g. <code>pm.mtasv.net</code>)</td></tr>
+          <tr><td>Proxy status</td><td>n/a (TXT records aren&#39;t proxied)</td><td><strong>must be &quot;DNS only&quot; (grey cloud), not &quot;Proxied&quot; (orange cloud)</strong></td></tr>
+          <tr><td>TTL</td><td>Auto</td><td>Auto</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p><strong>The Return-Path CNAME&#39;s proxy status is the one step that silently breaks this if missed.</strong>
+          Cloudflare&#39;s default for a new CNAME is &quot;Proxied&quot; (orange cloud) — that&#39;s correct for a web host
+          record, but for a mail-related CNAME like this one it routes the name through Cloudflare&#39;s HTTP
+          proxy instead of leaving it as a plain DNS answer, so bounce handling (and Postmark&#39;s verification
+          check) never resolves correctly. Click the cloud icon to toggle it to grey before saving.</p>
+          <p>Then, separately, publish DMARC — not a Postmark record, the domain owner&#39;s own policy:</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Type</td><td><code>TXT</code></td></tr>
+          <tr><td>Name</td><td><code>_dmarc</code></td></tr>
+          <tr><td>Content</td><td><code>v=DMARC1; p=none; rua=mailto:info@eventrunner.org</code> for a first pass (a <code>p=none</code> &quot;report only&quot; policy — tighten to <code>quarantine</code>/<code>reject</code> later once DMARC reports look clean; a real client&#39;s <code>rua</code> address is theirs, not CCM&#39;s)</td></tr>
+          <tr><td>Proxy status</td><td>n/a</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>For a real client, replace &quot;Cloudflare dashboard for <code>eventrunner.org</code>&quot; above with wherever <em>their</em>
+          DNS is hosted — the record shapes (TXT for DKIM and DMARC, CNAME for Return-Path, CNAME never
+          proxied through anything that isn&#39;t plain DNS) are the same regardless of host; only the UI for
+          adding them differs.</p>
+          <h3 id="4c-confirm-with-the-script">4c. Confirm with the script<a class="heading-anchor" href="#4c-confirm-with-the-script" aria-label="Link to this section">#</a></h3>
+          <p>From an operator (or provisioning-agent) machine, with this deployment&#39;s <code>EMAIL_PROVIDER_API_KEY</code>
+          loaded and the account token from operator storage (§3) — not from the client&#39;s GitHub Environment
+          or Secret Manager, since it doesn&#39;t live there:</p>
+          <pre><code class="language-sh">EVENT_EMAIL_PROVIDER=postmark \
+          EMAIL_PROVIDER_API_KEY=&lt;server token from §2.3&gt; \
+          EMAIL_ACCOUNT_API_KEY=&lt;account token from §1.2, operator storage&gt; \
+          EVENT_FIREBASE_PROJECT_ID=&lt;GCP_PROJECT_ID for this deployment&gt; \
+            node scripts/verify-sender-domain.cjs --domain eventrunner.org
+          </code></pre>
+          <p>(Omit <code>--domain</code> once <code>config/event.sender.email</code> is seeded — e.g. after <code>init-event.cjs</code> has run
+          with <code>info@eventrunner.org</code> as the sender address — and the script reads the domain from there
+          instead.)</p>
+          <p>On a pass this is the only writer of <code>config/event.sender.domainVerified</code> / <code>domainVerifiedAt</code> —
+          what clears the sender row in <code>init-event.cjs --check</code>. Re-run it after DNS propagates; DKIM can
+          take up to ~48 hours to show verified in Postmark even after the record is correctly published,
+          though Cloudflare itself typically propagates within minutes. <code>--no-write</code> reports without
+          stamping, useful for a first look before write access to <code>config/event</code> is wired up for this
+          environment.</p>
+          <h2 id="5-register-the-delivery-webhook">5. Register the delivery webhook<a class="heading-anchor" href="#5-register-the-delivery-webhook" aria-label="Link to this section">#</a></h2>
+          <p>Per the ADR (§3.1): Postmark does not sign delivery/bounce/complaint webhooks, so authentication is
+          HTTP Basic credentials embedded in the webhook URL itself, checked against
+          <code>EMAIL_WEBHOOK_BASIC_AUTH</code> by <code>verifyDeliveryWebhook()</code>.</p>
+          <ol>
+          <li><p>Generate a random <code>user:pass</code> pair for this deployment — never reused across deployments
+          (rotating it means re-registering the URL below). For example:</p>
+          <pre><code class="language-sh">printf &#39;eventrunner-demo:%s\n&#39; &quot;$(openssl rand -hex 20)&quot;
+          # → eventrunner-demo:9f2c...   (use the whole &quot;user:pass&quot; string as EMAIL_WEBHOOK_BASIC_AUTH)
+          </code></pre></li>
+          </ol>
+          <ol start="2">
+          <li><p>Store it as the <code>EMAIL_WEBHOOK_BASIC_AUTH</code> GitHub Environment secret for <code>&lt;CLIENT_ENV&gt;</code>
+          (<code>docs/DEPLOY_RUNBOOK.md</code> §3), then in Secret Manager the same way as step 3 above.</p></li>
+          <li><p>Before registering anything, confirm which stream sends actually use: check this deployment&#39;s
+          <code>config/providers.email.messageStream</code> (Tier B) — if it&#39;s unset, sends use the Server&#39;s default
+          <code>Outbound</code> stream; if it&#39;s set, they use that named stream instead (§2.4). Register the webhook
+          on <strong>that</strong> stream, not on whichever one happens to be open, or delivery events will never reach
+          <code>emailDeliveryWebhook</code>.</p>
+          <p>In this deployment&#39;s Postmark <strong>Server</strong> → the stream identified above → <strong>Webhooks</strong> → add
+          webhook:</p>
+          <pre><code>https://&lt;user&gt;:&lt;pass&gt;@&lt;EVENT_FIREBASE_REGION&gt;-&lt;EVENT_FIREBASE_PROJECT_ID&gt;.cloudfunctions.net/emailDeliveryWebhook
+          </code></pre>
+          <p>For the <code>eventrunner-demo</code> example: <code>https://eventrunner-demo:9f2c...@us-central1-&lt;GCP_PROJECT_ID&gt;.cloudfunctions.net/emailDeliveryWebhook</code>,
+          using the region and project id that deployment&#39;s GitHub Environment variables actually name
+          (<code>EVENT_FIREBASE_REGION</code>, <code>EVENT_FIREBASE_PROJECT_ID</code>) — copy those from the environment rather
+          than guessing.</p>
+          <p>Enable the <strong>Delivery</strong>, <strong>Bounce</strong>, and <strong>SpamComplaint</strong> triggers only. Leave <strong>Open</strong>, <strong>Click</strong>,
+          and <strong>SubscriptionChange</strong> off: <code>parseDeliveryEvent()</code> in <code>functions/src/email/providers/
+          postmark.cjs</code> returns <code>null</code> for a <code>SubscriptionChange</code> record unless <code>SuppressSending</code> is
+          exactly <code>true</code>, and <code>emailDeliveryWebhook</code> treats a <code>null</code> parse as a bad request (<code>400</code>) — an
+          info-only <code>SubscriptionChange</code> payload (<code>SuppressSending: false</code>, sent for e.g. a manual
+          resubscribe) would 400 what is otherwise a legitimate webhook call. Nothing in this repo
+          consumes <code>Open</code>/<code>Click</code> either.</p></li>
+          <li><p>This webhook registration is scoped to the Server (and, within it, the stream you attached it
+          to) — it does not need repeating for other deployments&#39; Servers, and other deployments&#39; webhooks
+          do not need repeating here.</p></li>
+          </ol>
+          <h2 id="6-verification-checklist">6. Verification checklist<a class="heading-anchor" href="#6-verification-checklist" aria-label="Link to this section">#</a></h2>
+          <p>Before calling a deployment&#39;s Postmark setup done:</p>
+          <ul>
+          <li class="task-item"><input type="checkbox" disabled> The deployment has its own Server under the shared CCM account, named after <code>EVENT_SLUG</code>.</li>
+          <li class="task-item"><input type="checkbox" disabled> <code>EMAIL_PROVIDER_API_KEY</code> (this Server&#39;s token) is set as a GitHub Environment secret on
+          <code>&lt;CLIENT_ENV&gt;</code> and mirrored to Secret Manager, with <code>secretAccessor</code> bound to the runtime SA.</li>
+          <li class="task-item"><input type="checkbox" disabled> <code>EMAIL_ACCOUNT_API_KEY</code> (the one shared account token) is available in operator storage —
+          <strong>not</strong> a GitHub Environment secret or Secret Manager entry on this (or any) client project,
+          since no deployed function binds it.</li>
+          <li class="task-item"><input type="checkbox" disabled> <code>node scripts/verify-sender-domain.cjs</code> exits <code>0</code> for this deployment&#39;s sender domain
+          (<code>eventrunner.org</code> for the dev/demo deployment) — not just &quot;unknown&quot;; unknown means one of the
+          two keys above is missing or wrong, not that the domain is fine.</li>
+          <li class="task-item"><input type="checkbox" disabled> The DKIM TXT and Return-Path CNAME are visible in the DNS host (Cloudflare, for
+          <code>eventrunner.org</code>) exactly as Postmark&#39;s UI showed them, and the Return-Path CNAME&#39;s proxy
+          status is &quot;DNS only&quot; (grey cloud), not &quot;Proxied&quot;.</li>
+          <li class="task-item"><input type="checkbox" disabled> <code>EMAIL_WEBHOOK_BASIC_AUTH</code> is set (GitHub Environment secret + Secret Manager) and the
+          matching <code>user:pass</code> is embedded in the webhook URL registered in Postmark, on the Delivery,
+          Bounce, and SpamComplaint triggers.</li>
+          <li class="task-item"><input type="checkbox" disabled> A test send (<code>init-event.cjs</code>&#39;s welcome mail, or an OTP sign-in) shows up in this
+          deployment&#39;s Server <strong>Activity</strong> tab, not some other deployment&#39;s.</li>
+          <li class="task-item"><input type="checkbox" disabled> A test bounce (send to a Postmark-provided bounce test address, or an intentionally invalid
+          recipient) produces a <code>sent_emails</code> row with <code>deliveryStatus</code> patched — confirms the webhook
+          round-trip end to end, not just that it&#39;s registered.</li>
+          </ul>
+          <h2 id="7-addendum-cutting-a-deployment-over-after-account-approval">7. Addendum: cutting a deployment over after account approval<a class="heading-anchor" href="#7-addendum-cutting-a-deployment-over-after-account-approval" aria-label="Link to this section">#</a></h2>
+          <p>This section is a <strong>continuation</strong> of §1–6, to run once Postmark approves the CCM account for live
+          sending (see issue #91). It assumes the account exists, <code>eventrunner.org</code>&#39;s DKIM/Return-Path/DMARC
+          are verified, and Cloudflare Email Routing is already forwarding <code>info@eventrunner.org</code> to the
+          maintainer&#39;s real inbox (§4, and the operator handoff plan&#39;s results section).</p>
+          <h3 id="70-prerequisite-check">7.0. Prerequisite check<a class="heading-anchor" href="#70-prerequisite-check" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li class="task-item"><input type="checkbox" disabled> Postmark has approved the account for live sending (an email/dashboard notice from Postmark —
+          not something a script can check).</li>
+          <li class="task-item"><input type="checkbox" disabled> Confirm the approved plan&#39;s Server capacity supports the &quot;one Server per client&quot; model (§0,
+          §1 item 3). Check Postmark&#39;s plan page or support: how many Servers does the approved tier
+          allow, and does that cover the demo Server plus the expected near-term client count? Record
+          the answer in the operator handoff doc&#39;s results section (plan name / Server limit), not
+          here.</li>
+          </ul>
+          <h3 id="71-create-the-event-runner-server-for-the-demo-deployment-or-confirm-it-exists">7.1. Create the <code>Event Runner</code> Server for the demo deployment (or confirm it exists)<a class="heading-anchor" href="#71-create-the-event-runner-server-for-the-demo-deployment-or-confirm-it-exists" aria-label="Link to this section">#</a></h3>
+          <p>Per §2, issue #91 already shows the <code>Event Runner</code> Server created and its tokens stored in operator
+          storage — so this step is likely already done. Confirm:</p>
+          <ul>
+          <li>Postmark → Servers → <code>Event Runner</code> exists, type <strong>Live</strong>.</li>
+          <li>Server → API Tokens tab has a Server Token already noted in operator storage.</li>
+          </ul>
+          <p>If it does not exist yet, create it now following §2 exactly.</p>
+          <h3 id="72-store-the-server-token-in-the-demo-deployment">7.2. Store the Server token in the demo deployment<a class="heading-anchor" href="#72-store-the-server-token-in-the-demo-deployment" aria-label="Link to this section">#</a></h3>
+          <p>The Server token is <code>EMAIL_PROVIDER_API_KEY</code> for the <code>eventrunner-demo</code> deployment specifically —
+          <strong>not</strong> the Postmark Account Token, which stays operator-only (§7.7).</p>
+          <pre><code class="language-sh"># GitHub Environment secret (Settings → Environments → demo → Secrets):
+          #   EMAIL_PROVIDER_API_KEY = the &quot;Event Runner&quot; Server Token
+
+          # Secret Manager mirror, once for the eventrunner-demo project:
+          echo -n &quot;&lt;server token&gt;&quot; | gcloud secrets create EMAIL_PROVIDER_API_KEY \
+            --project=eventrunner-demo --data-file=- --replication-policy=automatic
+
+          PROJECT_NUMBER=$(gcloud projects describe eventrunner-demo --format=&quot;value(projectNumber)&quot;)
+          RUNTIME_SA_EMAIL=&quot;${PROJECT_NUMBER}-compute@developer.gserviceaccount.com&quot;
+          gcloud secrets add-iam-policy-binding EMAIL_PROVIDER_API_KEY \
+            --project=eventrunner-demo \
+            --member=&quot;serviceAccount:${RUNTIME_SA_EMAIL}&quot; \
+            --role=&quot;roles/secretmanager.secretAccessor&quot;
+          </code></pre>
+          <p><strong>Success check:</strong> <code>gh secret list --env demo</code> (or the GitHub UI) lists <code>EMAIL_PROVIDER_API_KEY</code>;
+          <code>gcloud secrets list --project=eventrunner-demo</code> lists it too; <code>gcloud secrets get-iam-policy
+          EMAIL_PROVIDER_API_KEY --project=eventrunner-demo</code> shows the runtime SA with
+          <code>roles/secretmanager.secretAccessor</code>.</p>
+          <h3 id="73-generate-email_webhook_basic_auth-only-once-the-function-url-exists">7.3. Generate <code>EMAIL_WEBHOOK_BASIC_AUTH</code> — only once the function URL exists<a class="heading-anchor" href="#73-generate-email_webhook_basic_auth-only-once-the-function-url-exists" aria-label="Link to this section">#</a></h3>
+          <p>This needs the deployed <code>emailDeliveryWebhook</code> function&#39;s real region/project (Tier A
+          <code>EVENT_FIREBASE_REGION</code> / <code>EVENT_FIREBASE_PROJECT_ID</code> for the <code>demo</code> environment), so it can only
+          happen after a functions deploy has landed for <code>eventrunner-demo</code>.</p>
+          <pre><code class="language-sh">printf &#39;eventrunner-demo:%s\n&#39; &quot;$(openssl rand -hex 20)&quot;
+          # → eventrunner-demo:9f2c...   (use the whole &quot;user:pass&quot; string as EMAIL_WEBHOOK_BASIC_AUTH)
+          </code></pre>
+          <p>Store the whole string as the <code>EMAIL_WEBHOOK_BASIC_AUTH</code> GitHub Environment secret for <code>demo</code>, and
+          mirror it into Secret Manager the same way as §7.2 above (same commands, different secret name).</p>
+          <h3 id="74-move-the-demo-sender-onto-the-verified-domain-do-this-before-the-switch">7.4. Move the demo sender onto the verified domain — do this before the switch<a class="heading-anchor" href="#74-move-the-demo-sender-onto-the-verified-domain-do-this-before-the-switch" aria-label="Link to this section">#</a></h3>
+          <p>The demo&#39;s seeded sender is <code>summit@example.org</code> (<code>scripts/lib/demo-event.cjs</code>). That is a
+          placeholder on a domain nobody here owns, and Postmark refuses to send from an unverified sender
+          domain — so flipping the provider to <code>postmark</code> while that address is still in <code>config/event</code> turns
+          every demo sign-in email into a rejected send. Fix the sender first:</p>
+          <ol>
+          <li><p>Set the demo&#39;s sender address to <code>info@eventrunner.org</code> — the address on the domain §4 already
+          verified. Either edit it in the admin panel (Settings → sender) for the running deployment, or
+          re-run the seed against the demo project with the refreshed value:</p>
+          <pre><code class="language-sh">EVENT_FIREBASE_PROJECT_ID=eventrunner-demo node scripts/seed-demo-event.cjs --force
+          </code></pre>
+          <p>(<code>--force</code> is required: <code>writeConfigDocs</code> skips a <code>config/*</code> document that already exists.)</p></li>
+          </ol>
+          <ol start="2">
+          <li><p>Re-run the verification script so <code>config/event.sender.domainVerified</code> is stamped for the
+          address the demo will actually send from:</p>
+          <pre><code class="language-sh">EVENT_EMAIL_PROVIDER=postmark \
+          EMAIL_PROVIDER_API_KEY=&lt;server token from §7.2&gt; \
+          EMAIL_ACCOUNT_API_KEY=&lt;account token from §1.2, operator storage&gt; \
+          EVENT_FIREBASE_PROJECT_ID=eventrunner-demo \
+            node scripts/verify-sender-domain.cjs
+          </code></pre>
+          <p>No <code>--domain</code> flag: the script reads the domain from <code>config/event.sender.email</code>, which is the
+          point of doing this after step 1. It must exit 0 before you go on.</p></li>
+          </ol>
+          <p><strong>Success check:</strong> <code>config/event.sender.email</code> reads <code>info@eventrunner.org</code> and
+          <code>config/event.sender.domainVerified</code> is <code>true</code>.</p>
+          <h3 id="75-switch-the-provider-from-console-to-postmark">7.5. Switch the provider from <code>console</code> to <code>postmark</code><a class="heading-anchor" href="#75-switch-the-provider-from-console-to-postmark" aria-label="Link to this section">#</a></h3>
+          <p>The demo deployed with <code>EVENT_EMAIL_PROVIDER=console</code> (Postmark wasn&#39;t approved yet at the time).
+          Now that §7.4 has put a verified sender in place:</p>
+          <ul>
+          <li>Update the <code>demo</code> GitHub Environment variable <code>EVENT_EMAIL_PROVIDER</code> from <code>console</code> to
+          <code>postmark</code>.</li>
+          <li>Re-run the deploy dispatch (<code>deploy-client.yml</code> against <code>demo</code>) so the functions redeploy reading
+          the new provider and the two secrets from §7.2–7.3.</li>
+          </ul>
+          <h3 id="76-register-the-delivery-webhook">7.6. Register the delivery webhook<a class="heading-anchor" href="#76-register-the-delivery-webhook" aria-label="Link to this section">#</a></h3>
+          <p>Before registering, confirm which stream sends actually use: check <code>config/providers.email.
+          messageStream</code> for the demo deployment (unset → the Server&#39;s default <code>Outbound</code> stream). Register
+          on that stream, in Postmark: <code>Event Runner</code> Server → the identified stream → <strong>Webhooks</strong> → add
+          webhook:</p>
+          <pre><code>https://&lt;user&gt;:&lt;pass&gt;@&lt;EVENT_FIREBASE_REGION&gt;-eventrunner-demo.cloudfunctions.net/emailDeliveryWebhook
+          </code></pre>
+          <p>using the <code>user:pass</code> from §7.3 and this deployment&#39;s actual <code>EVENT_FIREBASE_REGION</code> GitHub
+          Environment variable (do not guess the region).</p>
+          <p>Enable only the <strong>Delivery</strong>, <strong>Bounce</strong>, and <strong>SpamComplaint</strong> triggers. Leave <strong>Open</strong>, <strong>Click</strong>,
+          and <strong>SubscriptionChange</strong> off — <code>parseDeliveryEvent()</code> 400s an info-only <code>SubscriptionChange</code>
+          payload whose <code>SuppressSending</code> isn&#39;t exactly <code>true</code>, and nothing in this repo consumes
+          Open/Click.</p>
+          <p><strong>Success check:</strong> the webhook shows registered in Postmark&#39;s Server → Webhooks list, on the
+          correct stream, with exactly those three triggers enabled.</p>
+          <h3 id="77-keep-the-account-token-out-of-the-deployment-always">7.7. Keep the Account Token out of the deployment, always<a class="heading-anchor" href="#77-keep-the-account-token-out-of-the-deployment-always" aria-label="Link to this section">#</a></h3>
+          <p><code>EMAIL_ACCOUNT_API_KEY</code> (the Postmark Account Token) stays in operator storage only — it is never a
+          GitHub Environment secret or Secret Manager entry for <code>eventrunner-demo</code> (or any client project).
+          It&#39;s only used locally, as an environment variable, when running <code>scripts/verify-sender-domain.cjs</code>
+          by hand. Confirm this is still true after this addendum&#39;s changes:</p>
+          <pre><code class="language-sh">gh secret list --env demo        # should NOT list EMAIL_ACCOUNT_API_KEY
+          gcloud secrets list --project=eventrunner-demo   # should NOT list EMAIL_ACCOUNT_API_KEY
+          </code></pre>
+          <h3 id="78-verification-round-trip-real-otp-send-bounce-checked-against-sent_emails">7.8. Verification round-trip: real OTP send + bounce, checked against <code>sent_emails</code><a class="heading-anchor" href="#78-verification-round-trip-real-otp-send-bounce-checked-against-sent_emails" aria-label="Link to this section">#</a></h3>
+          <ol>
+          <li>Trigger a real OTP sign-in against the <code>eventrunner-demo</code> deployment (sign in with an email
+          address you control) — confirm the message shows up in Postmark&#39;s <code>Event Runner</code> Server →
+          Activity tab, and that a corresponding row appears in the <code>sent_emails</code> Firestore collection for
+          this project with <code>deliveryStatus</code> reflecting the send.</li>
+          <li>Send (or trigger) a message to an intentionally invalid recipient, or use a Postmark bounce-test
+          address, to produce a bounce.</li>
+          <li>Confirm the bounce event lands on the registered webhook and <strong>patches</strong> the matching
+          <code>sent_emails</code> row&#39;s <code>deliveryStatus</code> — this is the actual round-trip proof, not just &quot;the webhook
+          is registered.&quot; Check via the Firebase console (Firestore → <code>sent_emails</code>) or <code>gcloud firestore</code>
+          read, comparing the row before and after the bounce event arrives.</li>
+          </ol>
+          <p><strong>Success check (mirrors issue #91&#39;s scope):</strong> the account is approved, the demo sends through the
+          <code>Event Runner</code> Server, the delivery webhook is authenticated and registered on the correct stream,
+          and both a successful delivery and a bounce event visibly update the matching <code>sent_emails</code> row in
+          Firestore.</p>
+          <h3 id="79-update-the-operator-handoff-docs-results-section">7.9. Update the operator handoff doc&#39;s results section<a class="heading-anchor" href="#79-update-the-operator-handoff-docs-results-section" aria-label="Link to this section">#</a></h3>
+          <p>Once done, update <code>docs/plans/2026-08-26-operator-handoff.md</code>&#39;s results section (Workstream C
+          checklist items — webhook registered, round-trip confirmed). Do not paste any token or secret
+          value, only where it&#39;s stored.</p>
+          <h2 id="follow-up-manual-account-creation">Follow-up: manual account creation<a class="heading-anchor" href="#follow-up-manual-account-creation" aria-label="Link to this section">#</a></h2>
+          <p>The CCM account itself (§1 above: sign-up, org-email ownership, Account Token custody, billing
+          plan sized for per-client Servers) is manual operator work with no code path to verify against, and
+          is tracked as its own follow-up issue rather than folded into #4&#39;s automatable scope.</p>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/POSTMARK_PROVISIONING.md"><code>docs/POSTMARK_PROVISIONING.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/deploy-runbook/"><span>Previous</span>Deploy runbook</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/eventbrite-verification/"><span>Next</span>Eventbrite verification</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

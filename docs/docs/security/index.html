@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security — Event Runner documentation</title>
+  <meta name="description" content="Reporting a vulnerability privately.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/security/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Security — Event Runner documentation">
+  <meta property="og:description" content="Reporting a vulnerability privately.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/security/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Security — Event Runner documentation">
+  <meta name="twitter:description" content="Reporting a vulnerability privately.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
+        <span class="brand-text">
+          <strong>Event Runner</strong>
+          <span>Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Security</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/" aria-current="page" class="is-current">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Security policy</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#supported-versions">Supported versions</a></li>
+              <li><a href="#reporting-a-vulnerability">Reporting a vulnerability</a></li>
+              <li><a href="#what-to-expect">What to expect</a></li>
+              <li><a href="#scope">Scope</a></li>
+              <li><a href="#dependency-audit-policy">Dependency audit policy</a></li>
+              <li><a href="#no-bounty-program">No bounty program</a></li>
+            </ul>
+          </nav>
+          <h2 id="supported-versions">Supported versions<a class="heading-anchor" href="#supported-versions" aria-label="Link to this section">#</a></h2>
+          <p>Only the <strong>latest tagged release</strong> receives security fixes. Older releases are
+          not patched; upgrade to the current release before reporting an issue against
+          older code.</p>
+          <h2 id="reporting-a-vulnerability">Reporting a vulnerability<a class="heading-anchor" href="#reporting-a-vulnerability" aria-label="Link to this section">#</a></h2>
+          <p>Please do <strong>not</strong> open a public GitHub issue for security problems.</p>
+          <p><strong>Primary channel:</strong> use GitHub&#39;s private vulnerability reporting — the
+          &quot;Report a vulnerability&quot; button on the
+          <a href="https://github.com/CenterCoopMedia/eventrunner/security">Security tab</a> of this
+          repository. Reports filed there are visible only to maintainers.</p>
+          <p><strong>Fallback:</strong> if you cannot use GitHub&#39;s reporting flow, email
+          info@eventrunner.org with a description of the issue, steps to
+          reproduce, and the affected version or commit.</p>
+          <h2 id="what-to-expect">What to expect<a class="heading-anchor" href="#what-to-expect" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li><strong>Acknowledgement within 3 business days</strong> of receiving your report.</li>
+          <li>We will work with you to confirm the issue, assess impact, and develop a fix.</li>
+          <li><strong>Coordinated disclosure, 90-day default:</strong> we ask that you keep the report
+          private for up to 90 days from acknowledgement, or until a fix is released,
+          whichever comes first. We are open to adjusting the timeline in either
+          direction by mutual agreement.</li>
+          <li>We will credit reporters in release notes unless you prefer otherwise.</li>
+          </ul>
+          <h2 id="scope">Scope<a class="heading-anchor" href="#scope" aria-label="Link to this section">#</a></h2>
+          <p>This policy covers the code in this repository.</p>
+          <p><strong>Operator-run client deployments are out of scope for public reports.</strong> If
+          you find an issue specific to a hosted deployment of this platform (its
+          configuration, data, or infrastructure), report it privately to the operator
+          of that deployment — not through this repository. Issues in the shared
+          codebase discovered via a deployment may be reported here through the private
+          channels above, but do not include client data in the report.</p>
+          <h2 id="dependency-audit-policy">Dependency audit policy<a class="heading-anchor" href="#dependency-audit-policy" aria-label="Link to this section">#</a></h2>
+          <p>CI runs <code>npm audit --omit=dev</code> on every pull request and fails the build on
+          any high or critical finding in a production dependency. A finding only
+          passes when a maintainer has logged it, with a reason, in
+          <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/scripts/ci/audit-exceptions.json"><code>scripts/ci/audit-exceptions.json</code></a>. That
+          file is the running record of every known vulnerability we have chosen not to
+          fix yet — package, advisory link, severity, exposure, why it is unfixed, and
+          the date we last reviewed it. Findings in build tools or local dev tooling
+          (for example the Firebase CLI or Vite) are tracked there too, but they never
+          fail CI on their own.</p>
+          <h2 id="no-bounty-program">No bounty program<a class="heading-anchor" href="#no-bounty-program" aria-label="Link to this section">#</a></h2>
+          <p>We do not operate a bug bounty and cannot offer monetary rewards for reports.</p>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/SECURITY.md"><code>SECURITY.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/support/"><span>Previous</span>Support</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

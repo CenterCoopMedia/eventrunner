@@ -30,8 +30,20 @@ const BASE_PAGE_METADATA = [
   ['language', /<html\b[^>]*\blang=['"][^'"]+['"]/i],
   ['viewport', /<meta\b[^>]*name=['"]viewport['"]/i],
   ['title', /<title>[^<]+<\/title>/i],
-  ['description', /<meta\b[^>]*name=['"]description['"]/i],
+  // A description tag with an empty `content` is the same as no description
+  // to every crawler that reads it, so the check requires the content too.
+  ['description', /<meta\b(?=[^>]*\bname=['"]description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['favicon', /<link\b(?=[^>]*\brel=['"]icon['"])(?=[^>]*\btype=['"]image\/svg\+xml['"])(?=[^>]*\bhref=['"][^'"]+\.svg(?:[?#][^'"]*)?['"])[^>]*>/i],
+];
+
+// A social card renders before the image is fetched, so the declared type and
+// dimensions are what most previews lay out against; the alt text is what a
+// reader using a screen reader gets instead of the card.
+const SOCIAL_IMAGE_METADATA = [
+  ['og:image:type', /<meta\b(?=[^>]*\bproperty=['"]og:image:type['"])(?=[^>]*\bcontent=['"]image\/png['"])[^>]*>/i],
+  ['og:image:width', /<meta\b(?=[^>]*\bproperty=['"]og:image:width['"])(?=[^>]*\bcontent=['"]1200['"])[^>]*>/i],
+  ['og:image:height', /<meta\b(?=[^>]*\bproperty=['"]og:image:height['"])(?=[^>]*\bcontent=['"]630['"])[^>]*>/i],
+  ['og:image:alt', /<meta\b(?=[^>]*\bproperty=['"]og:image:alt['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
 ];
 
 const GENERATED_PAGE_METADATA = [
@@ -41,10 +53,31 @@ const GENERATED_PAGE_METADATA = [
   ['og:type', /<meta\b(?=[^>]*\bproperty=['"]og:type['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['og:url', /<meta\b(?=[^>]*\bproperty=['"]og:url['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['og:image', /<meta\b(?=[^>]*\bproperty=['"]og:image['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ...SOCIAL_IMAGE_METADATA,
   ['twitter:card', /<meta\b(?=[^>]*\bname=['"]twitter:card['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['twitter:title', /<meta\b(?=[^>]*\bname=['"]twitter:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['twitter:description', /<meta\b(?=[^>]*\bname=['"]twitter:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
   ['twitter:image', /<meta\b(?=[^>]*\bname=['"]twitter:image['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:image:alt', /<meta\b(?=[^>]*\bname=['"]twitter:image:alt['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+];
+
+// The landing page is hand-written, so nothing regenerates its head for it.
+// These are the tags a shared link actually needs and the one link that has
+// to reach the documentation site — the two things easiest to lose in an edit.
+const LANDING_PAGE_METADATA = [
+  ['canonical', /<link\b(?=[^>]*\brel=['"]canonical['"])(?=[^>]*\bhref=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/['"])[^>]*>/i],
+  ['og:title', /<meta\b(?=[^>]*\bproperty=['"]og:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['og:description', /<meta\b(?=[^>]*\bproperty=['"]og:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['og:type', /<meta\b(?=[^>]*\bproperty=['"]og:type['"])(?=[^>]*\bcontent=['"]website['"])[^>]*>/i],
+  ['og:url', /<meta\b(?=[^>]*\bproperty=['"]og:url['"])(?=[^>]*\bcontent=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/['"])[^>]*>/i],
+  ['og:image', /<meta\b(?=[^>]*\bproperty=['"]og:image['"])(?=[^>]*\bcontent=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/[^'"]+\.png['"])[^>]*>/i],
+  ...SOCIAL_IMAGE_METADATA,
+  ['twitter:card', /<meta\b(?=[^>]*\bname=['"]twitter:card['"])(?=[^>]*\bcontent=['"]summary_large_image['"])[^>]*>/i],
+  ['twitter:title', /<meta\b(?=[^>]*\bname=['"]twitter:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:description', /<meta\b(?=[^>]*\bname=['"]twitter:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['twitter:image', /<meta\b(?=[^>]*\bname=['"]twitter:image['"])(?=[^>]*\bcontent=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/[^'"]+\.png['"])[^>]*>/i],
+  ['twitter:image:alt', /<meta\b(?=[^>]*\bname=['"]twitter:image:alt['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+  ['documentation entry point', /<a\b[^>]*\bhref=['"](?:\.\/|\/eventrunner\/)docs\/['"][^>]*>/i],
 ];
 
 function listFiles(root, predicate, relativeRoot = root) {
@@ -175,6 +208,7 @@ function checkPages(root) {
   });
   const text = fs.readFileSync(pagePath, 'utf8');
   const errors = BASE_PAGE_METADATA
+    .concat(LANDING_PAGE_METADATA)
     .filter(([, expression]) => !expression.test(text))
     .map(([name]) => `docs/index.html: missing ${name}`);
   for (const relativePath of pagePaths) {

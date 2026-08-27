@@ -608,17 +608,24 @@ token, password, or API key value into this document — name only *where* it wa
 - [ ] Counsel engaged: yes/no, date, and (once available) their finding on 3a/3b
 
 ### Workstream B
-- [ ] DKIM TXT record added and visible in Cloudflare: yes/no
-- [ ] Return-Path CNAME added, confirmed "DNS only" (not proxied): yes/no
-- [ ] DMARC TXT record added: yes/no
-- [ ] Inbound forwarding for events@runofshow.net set up (optional): yes/no
+- [x] Domain is `eventrunner.org` (superseding `runofshow.net` above — see issue #98's verified
+      source of truth). DKIM TXT record added and visible in Cloudflare: yes
+- [x] Return-Path CNAME added, confirmed "DNS only" (not proxied): yes — `pm-bounces.eventrunner.org`
+- [x] DMARC TXT record added: yes
+- [x] Inbound forwarding for `info@eventrunner.org` set up: yes, via Cloudflare Email Routing,
+      forwarding to the maintainer's real inbox (`amditisj@montclair.edu`) — this is the inbound
+      side, entirely separate from Postmark's outbound-only sending; see issue #91 for the
+      live-sending cutover once Postmark approves the account.
 
 ### Workstream C
-- [ ] Postmark account created; plan tier and Server capacity confirmed: (plan name / Server limit)
-- [ ] Server `runofshow-dev` created; `EMAIL_PROVIDER_API_KEY` stored as a GitHub Environment
-      secret at: (name the environment, not the value) and mirrored to Secret Manager at project:
-      (project id). `EMAIL_ACCOUNT_API_KEY` confirmed in operator storage only (not this project's
-      GitHub Environment or Secret Manager): yes/no
+- [x] Postmark Server `Event Runner` created for the `eventrunner.org` sender domain (issue #98's
+      verified source of truth). Plan tier and Server capacity: not yet recorded here — see issue #91.
+- [ ] `EMAIL_PROVIDER_API_KEY` stored as a GitHub Environment secret at: (name the environment, not
+      the value) and mirrored to Secret Manager at project: (project id) — pending, see issue #91.
+      `EMAIL_ACCOUNT_API_KEY` (the Postmark account token) confirmed in operator storage only, never
+      a deployment's GitHub Environment or Secret Manager: yes, per issue #98's verified source of
+      truth ("Postmark account token remains operator-only"; "application deployments receive only
+      their Server token").
 - [ ] `verify-sender-domain.cjs` output: (paste exit code and summary line, not any secret)
 - [ ] SPF line in that output (informational only — any value is fine when DKIM and Return-Path
       pass; no SPF record to publish): (paste the SPF verdict)
@@ -637,13 +644,76 @@ token, password, or API key value into this document — name only *where* it wa
 - [ ] PR #90 still open and attached at the new repo URL: yes/no
 
 ### Workstream E
-- [ ] Demo GCP/Firebase project created with a delimited `demo` project id; billing enabled: yes/no
-      (project id, or where it's recorded)
-- [ ] Demo configured as a client (GitHub Environment name, providers used —
-      console/none/Postmark stream, ticketing none/manual, notifier none): (fill in)
-- [ ] Bootstrap dispatch green: yes/no
-- [ ] `init-event.cjs` + `seed-demo-event.cjs` run against the demo project: yes/no
-- [ ] `generate-content.cjs --demo --check` exits 0 (committed snapshot matches seed output): yes/no
+- [x] Demo GCP/Firebase project created with a delimited `demo` project id; billing enabled: yes —
+      `eventrunner-demo`, same billing account as CCM, Firebase added.
+- [x] Demo configured as a client (GitHub Environment name, providers used —
+      console/none/Postmark stream, ticketing none/manual, notifier none): GitHub Environment
+      `demo`; `EVENT_EMAIL_PROVIDER=console`, `EVENT_TICKETING_PROVIDER=none`,
+      `EVENT_OPERATOR_NOTIFIER=none`, site publisher off for the first deployment; restricted to
+      deployments from `main`.
+- [ ] Bootstrap dispatch green: not yet run — see "Remaining steps for issue #35" below.
+- [ ] `init-event.cjs` + `seed-demo-event.cjs` run against the demo project: not yet run.
+- [ ] `generate-content.cjs --demo --check` exits 0 (committed snapshot matches seed output): not
+      yet run (both scripts read the same `scripts/lib/demo-event.cjs` fixture by construction, so
+      this should already hold once step above runs — this only confirms it).
+
+**Remaining steps for issue #35** (issue #35 stays open on GitHub; this is a progress note, not a
+closing record):
+
+Already done, per the 2026-08-26 progress comment on issue #35: the `eventrunner-demo` project,
+Firestore/Hosting/Storage/web-app registration, Google sign-in with support email
+`info@eventrunner.org`, authorized Auth domains, and 19 non-secret `demo` environment variables.
+
+Two things unblocked since that comment: issue #101 (the config validator wrongly required
+`measurementId` when Analytics is off — confirm it's merged before the bootstrap dispatch below,
+or the functions deploy may fail validation) and the WIF binding (intentionally deferred until the
+repo rename landed — #97 has since merged as `CenterCoopMedia/eventrunner`, so the trust condition
+can now target `repo:CenterCoopMedia/eventrunner:ref:refs/heads/main`).
+
+What's left, in order:
+
+1. Configure WIF and the per-client deploy service account (`docs/DEPLOY_RUNBOOK.md` §1–§2),
+   trust condition `assertion.repository == 'CenterCoopMedia/eventrunner'`, `--project=eventrunner-demo`.
+2. Run the bootstrap dispatch of `deploy-client.yml` against `demo` (provision + functions only);
+   confirm green.
+3. Seed content with [`docs/examples/demo-answers.json`](../examples/demo-answers.json) as the
+   `--answers` file:
+   ```sh
+   export GOOGLE_APPLICATION_CREDENTIALS=<operator ADC, one-time>
+   export EVENT_FIREBASE_PROJECT_ID=eventrunner-demo
+   node scripts/init-event.cjs --answers docs/examples/demo-answers.json --admin <operator-admin@ccm-domain>
+   node scripts/seed-demo-event.cjs --force
+   ```
+   Pass the real first-admin address as `--admin` — it wins over the template's placeholder
+   `adminEmails` entry.
+
+   `--force` on the seed is load-bearing, not optional. `init-event.cjs` has just created every
+   `config/*` document from the answers file, which still carries `[Replace]` placeholders (the
+   tagline, the SEO description, the operator postal address). Without `--force`,
+   `writeConfigDocs` takes the `decideConfigWrite` "exists (re-run with `--force` to refresh)"
+   branch for every non-bootstrap config document and skips it, so the live config keeps those
+   placeholders instead of the demo content in `scripts/lib/demo-event.cjs` — and
+   `generate-content.cjs --demo --check` in step 4 is checking the generated snapshot, not the
+   deployment, so it would not catch the drift. `config/bootstrap` is unaffected either way: admin
+   emails merge additively, so the `--admin` address from the line above survives the refresh.
+4. Confirm `node scripts/generate-content.cjs --demo --check` exits 0 (should already hold by
+   construction; this step confirms it, not fixes a drift).
+5. Readiness gate: attest Google sign-in (`init-event.cjs --attest-auth`) and the sender domain
+   (`verify-sender-domain.cjs --attest`, since `console` has no domain API to check), skim and clear
+   `legal.reviewRequired`, grant a second admin, then re-run `init-event.cjs --check` until it
+   exits 0.
+6. Go live: run the normal dispatch (`deploy-client.yml` against `demo`) and confirm `smoke` passes.
+7. Confirm the demo URL loads from a machine with no special access, then open a normal PR adding
+   the demo URL and screenshots to `README.md`. Optionally add `demo` to
+   `AUTO_DEPLOY_ENVIRONMENTS` (`docs/DEPLOY_RUNBOOK.md` §4).
+8. Issue #35 itself is closed by whoever files that PR, once the demo URL is publicly browsable and
+   `generate-content.cjs --demo --check` passes — not by this document.
+
+Postmark upgrade path (optional, not blocking issue #35): per issues #91/#100, the demo stays on
+`EVENT_EMAIL_PROVIDER=console` until Postmark approves live sending. Once approved,
+[`docs/POSTMARK_PROVISIONING.md`](../POSTMARK_PROVISIONING.md) §7 covers switching the demo to a
+real Postmark stream so a prospect can see a real OTP email — an upgrade, not a requirement for
+closing #35.
 - [ ] Readiness gate (`init-event.cjs --check`) exits 0: yes/no
 - [ ] Normal dispatch succeeded, smoke passed: yes/no
 - [ ] Demo URL confirmed publicly browsable from an unauthenticated path: yes/no (URL)

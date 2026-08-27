@@ -1,6 +1,6 @@
-# Run of Show handbook
+# Event Runner handbook
 
-Run of Show is the event site the Center for Cooperative Media operates for conferences and gatherings. Staff run it from an admin. Attendees sign in with Google or an emailed code. You do not need a developer to use it.
+Event Runner is the event site the Center for Cooperative Media operates for conferences and gatherings. Staff run it from an admin. Attendees sign in with Google or an emailed code. You do not need a developer to use it.
 
 This wiki is for **people using a site**, not for people changing the code.
 

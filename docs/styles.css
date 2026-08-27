@@ -1,5 +1,52 @@
-/* Run of Show — product site.
+/* Event Runner — product site.
    Tokens are role-named; dark mode is its own palette, not inverted light. */
+
+/* Self-hosted fonts (fonts/, latin subsets only), same rule the app follows
+   in apps/web/public/fonts: no font-CDN request from any page this site
+   serves. This stylesheet is loaded by the landing page and by every
+   generated documentation page, so these faces cover the whole Pages surface.
+   Weights match what the stylesheets below actually ask for — nothing here is
+   downloaded "just in case". */
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  font-style: normal;
+  font-weight: 700 800;
+  font-display: swap;
+  src: url("fonts/bricolage-grotesque-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("fonts/source-sans-3-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("fonts/source-sans-3-italic-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/ibm-plex-mono-400-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/ibm-plex-mono-500-latin.woff2") format("woff2");
+}
 
 :root {
   color-scheme: light;
@@ -21,19 +68,11 @@
   --color-btn-hover-bg: #245fb0;
   --color-btn-hover-text: #ffffff;
 
-  /* Status chips — text always accompanies the color. */
-  --color-status-go-text: #0b6e63;
-  --color-status-go-bg: #d8f1ec;
-  --color-status-live-text: #82550a;
-  --color-status-live-bg: #fcecc9;
-  --color-status-standby-text: #545f7c;
-  --color-status-standby-bg: #ebe7dc;
+  /* Status labels — text always accompanies the color. */
   --color-status-done-text: #0b6e63;
   --color-status-done-bg: #d8f1ec;
-
-  /* Lamp: rehearsal = amber, always paired with its label. */
-  --color-lamp: #d98e0b;
-  --color-lamp-halo: rgba(217, 142, 11, 0.2);
+  --color-status-progress-text: #82550a;
+  --color-status-progress-bg: #fcecc9;
 
   /* Calendar mark. */
   --color-mark-line: #1e2a44;
@@ -41,10 +80,6 @@
   --color-mark-blue: #2f80e4;
   --color-mark-orange: #f5a524;
   --color-mark-teal: #14b8a6;
-
-  /* Echo cards behind the cue sheet (decorative, from the mark). */
-  --color-echo-orange: #f5a524;
-  --color-echo-teal: #14b8a6;
 
   --max: 68rem;
 }
@@ -68,17 +103,10 @@
     --color-btn-hover-bg: #5a9cee;
     --color-btn-hover-text: #0e1526;
 
-    --color-status-go-text: #47d8c4;
-    --color-status-go-bg: #123a35;
-    --color-status-live-text: #f4b64a;
-    --color-status-live-bg: #3a2c11;
-    --color-status-standby-text: #a4afca;
-    --color-status-standby-bg: #232e4c;
     --color-status-done-text: #47d8c4;
     --color-status-done-bg: #123a35;
-
-    --color-lamp: #f4b64a;
-    --color-lamp-halo: rgba(244, 182, 74, 0.2);
+    --color-status-progress-text: #f4b64a;
+    --color-status-progress-bg: #3a2c11;
 
     --color-mark-line: #7d92c4;
   }
@@ -209,38 +237,6 @@ a {
   white-space: nowrap;
 }
 
-.lamp {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
-.lamp i {
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  background: var(--color-lamp);
-  box-shadow: 0 0 0 3px var(--color-lamp-halo);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .lamp i {
-    animation: lamp-pulse 2.6s ease-in-out infinite;
-  }
-
-  @keyframes lamp-pulse {
-    50% {
-      opacity: 0.55;
-    }
-  }
-}
-
 .site-header nav {
   display: flex;
   flex-wrap: wrap;
@@ -288,7 +284,7 @@ a {
 }
 
 .lede {
-  margin: 0 0 1.8rem;
+  margin: 0;
   max-width: 34rem;
   font-size: 1.15rem;
   color: var(--color-text-secondary);
@@ -299,6 +295,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  margin-block-start: 1.5rem;
 }
 
 .btn {
@@ -344,21 +341,16 @@ a {
   }
 }
 
-/* ---------- Cue sheet ---------- */
+/* ---------- Build status panel ---------- */
 
-.cuesheet {
+.status-panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 1rem;
   padding: 0.5rem;
-
-  /* Echo cards behind the panel, quoting the mark. */
-  box-shadow:
-    9px 9px 0 var(--color-echo-orange),
-    18px 18px 0 var(--color-echo-teal);
 }
 
-.cuesheet-head {
+.status-panel-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -370,64 +362,44 @@ a {
   text-transform: uppercase;
 }
 
-.cuesheet-title {
+.status-panel-title {
   color: var(--color-text);
   font-weight: 500;
 }
 
-.cuesheet-meta {
+.status-panel-meta {
   color: var(--color-text-secondary);
 }
 
-.cues {
+.status-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 2px;
 }
 
-.cue {
-  display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) auto;
+.status-row {
+  display: flex;
   align-items: center;
-  gap: 0.6rem;
+  justify-content: space-between;
+  gap: 0.75rem;
   padding: 0.6rem 0.75rem;
   border-block-start: 1px solid var(--color-border);
-  border-radius: 0.5rem; /* concentric: panel 1rem − 0.5rem padding */
   font-size: 0.95rem;
 }
 
-.cue-num {
-  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.8rem;
-  color: var(--color-text-secondary);
+.status-row:first-child {
+  border-block-start: 0;
 }
 
-.cue-name {
+.status-row-name {
   font-weight: 600;
   overflow-wrap: break-word;
 }
 
-.cue-current {
-  background: var(--color-accent-wash);
-  border-block-start-color: transparent;
-  box-shadow: inset 3px 0 0 var(--color-accent);
-}
+/* ---------- Status labels ---------- */
 
-.cue-current + .cue {
-  border-block-start-color: transparent;
-}
-
-.cue-current .cue-num {
-  color: var(--color-accent-text);
-  font-weight: 500;
-}
-
-/* ---------- Chips ---------- */
-
-.chip {
+.status-label {
+  flex: none;
   font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   font-size: 0.68rem;
   font-weight: 500;
@@ -435,33 +407,24 @@ a {
   text-transform: uppercase;
   white-space: nowrap;
   padding: 0.22rem 0.55rem;
-  border-radius: 999px;
+  border-radius: 0.35rem;
 }
 
-.chip-go {
-  color: var(--color-status-go-text);
-  background: var(--color-status-go-bg);
-}
-
-.chip-live {
-  color: var(--color-status-live-text);
-  background: var(--color-status-live-bg);
-}
-
-.chip-standby {
-  color: var(--color-status-standby-text);
-  background: var(--color-status-standby-bg);
-}
-
-.chip-done {
+.status-label-done {
   color: var(--color-status-done-text);
   background: var(--color-status-done-bg);
+}
+
+.status-label-progress {
+  color: var(--color-status-progress-text);
+  background: var(--color-status-progress-bg);
 }
 
 /* ---------- Sections ---------- */
 
 .section {
   padding-block: 0 4rem;
+  scroll-margin-block-start: 1.5rem;
 }
 
 .section h2 {
@@ -469,16 +432,10 @@ a {
   font-size: clamp(1.5rem, 3vw, 1.9rem);
   font-weight: 800;
   letter-spacing: -0.01em;
-  scroll-margin-block-start: 1.5rem;
 }
 
 .section h3 {
   font-weight: 700;
-}
-
-#what,
-#progress {
-  scroll-margin-block-start: 1.5rem;
 }
 
 .card-grid {
@@ -528,7 +485,7 @@ a {
 
 .milestone {
   display: grid;
-  grid-template-columns: 3.2rem minmax(0, 1fr) auto;
+  grid-template-columns: 6.5rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 1rem;
   padding: 1rem 1.25rem;
@@ -541,9 +498,8 @@ a {
 
 .milestone-id {
   font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.82rem;
-  color: var(--color-accent-text);
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
 }
 
 .milestone-body h3 {
@@ -556,33 +512,6 @@ a {
   color: var(--color-text-secondary);
   font-size: 0.95rem;
   text-wrap: pretty;
-}
-
-/* ---------- Program notes ---------- */
-
-.program-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.9rem;
-  margin: 0 0 4rem;
-  padding: 0.85rem 1.1rem;
-  background: var(--color-surface-tint);
-  border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
-  font-size: 0.95rem;
-  color: var(--color-text-secondary);
-  text-wrap: pretty;
-}
-
-.program-note strong {
-  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-weight: 500;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-text);
-  white-space: nowrap;
 }
 
 /* ---------- Footer ---------- */
@@ -608,41 +537,6 @@ a {
   }
 }
 
-/* ---------- Entrance motion ---------- */
-
-@media (prefers-reduced-motion: no-preference) {
-  .thesis,
-  .cuesheet {
-    animation: rise 600ms ease-out both;
-  }
-
-  .cuesheet {
-    animation-delay: 120ms;
-  }
-
-  .cue {
-    animation: rise 500ms ease-out both;
-  }
-
-  .cue:nth-child(1) { animation-delay: 220ms; }
-  .cue:nth-child(2) { animation-delay: 290ms; }
-  .cue:nth-child(3) { animation-delay: 360ms; }
-  .cue:nth-child(4) { animation-delay: 430ms; }
-  .cue:nth-child(5) { animation-delay: 500ms; }
-
-  @keyframes rise {
-    from {
-      opacity: 0;
-      translate: 0 10px;
-    }
-
-    to {
-      opacity: 1;
-      translate: 0 0;
-    }
-  }
-}
-
 /* ---------- Responsive ---------- */
 
 @media (max-width: 56rem) {
@@ -652,7 +546,7 @@ a {
     padding-block: 2.75rem 3.5rem;
   }
 
-  .cuesheet {
+  .status-panel {
     max-width: 28rem;
   }
 
@@ -667,12 +561,15 @@ a {
   }
 
   .milestone {
-    grid-template-columns: 2.4rem minmax(0, 1fr);
-    row-gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.4rem;
   }
 
-  .milestone .chip {
-    grid-column: 2;
+  .milestone-id {
+    order: -1;
+  }
+
+  .milestone .status-label {
     justify-self: start;
   }
 }

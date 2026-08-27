@@ -130,7 +130,7 @@ describe('app shell', () => {
   it('renders the schedule from the snapshot with sessions grouped by day', () => {
     renderAt('/schedule');
     expect(screen.getByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument();
-    expect(screen.getByText('[Demo] Welcome and orientation')).toBeInTheDocument();
+    expect(screen.getByText('Welcome and orientation')).toBeInTheDocument();
   });
 
   it('renders a designed empty state on unknown routes', () => {

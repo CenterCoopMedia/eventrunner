@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>npm name claim — Event Runner documentation</title>
+  <meta name="description" content="Claiming and holding the package name.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/npm-name-claim/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="npm name claim — Event Runner documentation">
+  <meta property="og:description" content="Claiming and holding the package name.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/npm-name-claim/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="npm name claim — Event Runner documentation">
+  <meta name="twitter:description" content="Claiming and holding the package name.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
+        <span class="brand-text">
+          <strong>Event Runner</strong>
+          <span>Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">npm name claim</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/" aria-current="page" class="is-current">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>npm name claim</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#0-before-you-start">0. Before you start</a></li>
+              <li><a href="#1-check-availability-do-this-first-and-again-in-step-4-immediately-before-publishing">1. Check availability (do this first, and again in step 4 immediately before publishing)</a></li>
+              <li><a href="#2-create-the-placeholder-packages-scratch-directory-outside-this-repo">2. Create the placeholder packages (scratch directory, outside this repo)</a></li>
+              <li><a href="#3-confirm-npm-login-and-2fa-before-publishing">3. Confirm npm login and 2FA before publishing</a></li>
+              <li><a href="#4-safety-stop-recheck-immediately-before-publication">4. Safety stop: recheck immediately before publication</a></li>
+              <li><a href="#5-safety-stop-explicit-final-go-ahead">5. Safety stop: explicit final go-ahead</a></li>
+              <li><a href="#6-publish-the-placeholders">6. Publish the placeholders</a></li>
+              <li><a href="#7-create-the-two-npm-organizationsscopes">7. Create the two npm organizations/scopes</a></li>
+              <li><a href="#8-verify">8. Verify</a></li>
+              <li><a href="#9-record-ownership-operator-storage-only-never-this-repo">9. Record ownership — operator storage only, never this repo</a></li>
+              <li><a href="#done-when">Done when</a></li>
+            </ul>
+          </nav>
+          <p>Operator runbook for claiming the <code>eventrunner</code> / <code>event-runner</code> npm package names and the
+          matching <code>@eventrunner</code> / <code>@event-runner</code> scopes, before anyone else can take them. See issue #99
+          for the full scope and safety boundaries this runbook implements.</p>
+          <p><strong>Who runs this:</strong> a human operator with an authenticated, 2FA-protected npm account for the
+          Center for Cooperative Media (CCM) organization. Nothing here should be delegated to an unattended
+          session — steps 4 and 5 are explicit safety stops that need a human&#39;s go-ahead in the moment, and
+          they come <em>before</em> the first publish command in step 6.</p>
+          <h2 id="0-before-you-start">0. Before you start<a class="heading-anchor" href="#0-before-you-start" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>Confirm you&#39;re logged into the <strong>organization&#39;s</strong> npm account, not a personal one: <code>npm whoami</code>
+          should print the CCM org account name, not your personal handle.</li>
+          <li>Confirm that account has 2FA and organization-controlled recovery information configured (npm
+          website → Account → Two-Factor Authentication, and Account → Profile for the recovery email).
+          This is a one-time console check, not a command.</li>
+          </ul>
+          <h2 id="1-check-availability-do-this-first-and-again-in-step-4-immediately-before-publishing">1. Check availability (do this first, and again in step 4 immediately before publishing)<a class="heading-anchor" href="#1-check-availability-do-this-first-and-again-in-step-4-immediately-before-publishing" aria-label="Link to this section">#</a></h2>
+          <p>Package names and scopes are two different registry objects and need two different checks.</p>
+          <p><strong>The two package names</strong> — <code>npm view</code> is the right tool here:</p>
+          <pre><code class="language-sh">npm view eventrunner
+          npm view event-runner
+          </code></pre>
+          <p>Expected result for both: <code>npm error code E404</code> / <code>404 Not Found</code> (the npm CLI&#39;s &quot;not found&quot;
+          message). Anything that prints real package metadata means the name is taken.</p>
+          <p><strong>The two scopes</strong> — <code>npm view @eventrunner</code> does <em>not</em> work: npm parses the part after <code>@</code> as a
+          version or dist-tag, so a bare scope fails with <code>EINVALIDTAGNAME</code> (&quot;Tags may not have any
+          characters that encodeURIComponent encodes&quot;) no matter whether the scope is free or taken. That
+          error tells you nothing about availability. Use the org endpoint instead:</p>
+          <pre><code class="language-sh">npm org ls eventrunner
+          npm org ls event-runner
+          </code></pre>
+          <p>What distinguishes the two states:</p>
+          <div class="table-scroll">
+          <table>
+          <thead>
+          <tr><th>Result</th><th>What it means</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>npm error code E404</code> … <code>Scope not found</code></td><td>the scope is <strong>free</strong></td></tr>
+          <tr><td>exits 0 (member list, or empty when you are not a member)</td><td>the scope <strong>already exists</strong></td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>The same distinction without the CLI, if you would rather not shell out — the registry answers
+          this endpoint unauthenticated:</p>
+          <pre><code class="language-sh">curl -o /dev/null -w &#39;%{http_code}\n&#39; https://registry.npmjs.org/-/org/eventrunner/user
+          curl -o /dev/null -w &#39;%{http_code}\n&#39; https://registry.npmjs.org/-/org/event-runner/user
+          </code></pre>
+          <p><code>404</code> means the scope is free; <code>200</code> means an org already holds it. (The
+          <code>https://www.npmjs.com/org/&lt;name&gt;</code> web page is <em>not</em> a usable check from a script — npmjs.com
+          answers <code>403</code> to non-browser clients for both free and taken scopes. Open it in a browser if you
+          want the human-readable view.)</p>
+          <p>If any of the four is already claimed, stop — someone else has taken it — and tell the maintainer
+          before doing anything else in this runbook.</p>
+          <h2 id="2-create-the-placeholder-packages-scratch-directory-outside-this-repo">2. Create the placeholder packages (scratch directory, outside this repo)<a class="heading-anchor" href="#2-create-the-placeholder-packages-scratch-directory-outside-this-repo" aria-label="Link to this section">#</a></h2>
+          <pre><code class="language-sh">mkdir -p /tmp/eventrunner-npm-claim/eventrunner
+          mkdir -p /tmp/eventrunner-npm-claim/event-runner
+          </code></pre>
+          <p>For each directory, write a <code>package.json</code> with this content (only the <code>name</code> field differs
+          between the two):</p>
+          <pre><code class="language-json">{
+            &quot;name&quot;: &quot;eventrunner&quot;,
+            &quot;version&quot;: &quot;0.0.0&quot;,
+            &quot;private&quot;: false,
+            &quot;description&quot;: &quot;Reserved. Not a published product yet — see https://github.com/CenterCoopMedia/eventrunner.&quot;,
+            &quot;license&quot;: &quot;UNLICENSED&quot;
+          }
+          </code></pre>
+          <p>Do not add any other files (no README, no code) — this is a placeholder claim, not a release. Do
+          not commit the placeholder packages to this repo; they are published from a scratch directory
+          outside it.</p>
+          <h2 id="3-confirm-npm-login-and-2fa-before-publishing">3. Confirm npm login and 2FA before publishing<a class="heading-anchor" href="#3-confirm-npm-login-and-2fa-before-publishing" aria-label="Link to this section">#</a></h2>
+          <pre><code class="language-sh">npm login
+          </code></pre>
+          <p>If prompted, complete 2FA. If you already have a session (<code>npm whoami</code> succeeds), you can skip
+          <code>npm login</code>, but still confirm you&#39;re the org account, not a personal one (see step 0).</p>
+          <h2 id="4-safety-stop-recheck-immediately-before-publication">4. Safety stop: recheck immediately before publication<a class="heading-anchor" href="#4-safety-stop-recheck-immediately-before-publication" aria-label="Link to this section">#</a></h2>
+          <p>Re-run all four of step 1&#39;s checks <strong>now</strong>, immediately before the publish in step 6, in case
+          someone else claimed a name since you started. If you are working through this runbook in one
+          sitting with no gap, the step-1 check already satisfies this. If any time has passed — a different
+          day, a paused session — re-run step 1 before going on.</p>
+          <h2 id="5-safety-stop-explicit-final-go-ahead">5. Safety stop: explicit final go-ahead<a class="heading-anchor" href="#5-safety-stop-explicit-final-go-ahead" aria-label="Link to this section">#</a></h2>
+          <p>Publishing an npm package and creating an npm organization are both public, externally-visible
+          actions with no undo (an unpublished name is typically not immediately re-claimable, and org
+          creation is similarly hard to walk back cleanly). Before running step 6 (publish) and step 7
+          (create orgs), get an explicit &quot;yes, go ahead&quot; from the maintainer in the same session — a plan
+          approval from an earlier conversation does not count as this go-ahead.</p>
+          <h2 id="6-publish-the-placeholders">6. Publish the placeholders<a class="heading-anchor" href="#6-publish-the-placeholders" aria-label="Link to this section">#</a></h2>
+          <pre><code class="language-sh">cd /tmp/eventrunner-npm-claim/eventrunner &amp;&amp; npm publish --access public
+          cd /tmp/eventrunner-npm-claim/event-runner &amp;&amp; npm publish --access public
+          </code></pre>
+          <p><code>npm publish</code> with 2FA enabled prompts for a one-time code (or an npm-website approval, if you&#39;ve
+          configured &quot;Authorization for publishing&quot; instead). Complete that prompt interactively. Do not
+          script around the 2FA prompt or store an automation token that skips it for this account.</p>
+          <h2 id="7-create-the-two-npm-organizationsscopes">7. Create the two npm organizations/scopes<a class="heading-anchor" href="#7-create-the-two-npm-organizationsscopes" aria-label="Link to this section">#</a></h2>
+          <p>Via the npm website (Account → Add Organization) or, if the installed npm CLI version supports it:</p>
+          <pre><code class="language-sh">npm org create eventrunner
+          npm org create event-runner
+          </code></pre>
+          <p>An org claims the <code>@eventrunner</code> / <code>@event-runner</code> scope even before anything is published under
+          it — this step alone secures the scope. Add the maintainer (and anyone else who should have
+          publish rights) as an org member with the appropriate role.</p>
+          <h2 id="8-verify">8. Verify<a class="heading-anchor" href="#8-verify" aria-label="Link to this section">#</a></h2>
+          <pre><code class="language-sh">npm view eventrunner
+          npm view event-runner
+          </code></pre>
+          <p>Both should now return the placeholder package&#39;s metadata (version <code>0.0.0</code>, the description text
+          above), not a 404.</p>
+          <pre><code class="language-sh">npm org ls eventrunner
+          npm org ls event-runner
+          </code></pre>
+          <p>Both should now exit 0 and list you as an org member (the same check that returned <code>Scope not
+          found</code> in step 1). The npm website&#39;s org page, opened in a browser, is the human-readable view of
+          the same fact.</p>
+          <h2 id="9-record-ownership-operator-storage-only-never-this-repo">9. Record ownership — operator storage only, never this repo<a class="heading-anchor" href="#9-record-ownership-operator-storage-only-never-this-repo" aria-label="Link to this section">#</a></h2>
+          <p>Record the following in the team&#39;s operator password/secrets manager (the same store
+          <a href="/eventrunner/docs/postmark-provisioning/"><code>docs/POSTMARK_PROVISIONING.md</code></a> uses for the Postmark account token),
+          <strong>not</strong> in this repository, any issue, or any commit:</p>
+          <ul>
+          <li>Which npm account (username/email) owns the <code>eventrunner</code> and <code>event-runner</code> packages and the
+          two org scopes.</li>
+          <li>Recovery email and 2FA recovery codes for that account.</li>
+          <li>Date the placeholders were published and the orgs created.</li>
+          <li>Who else was added as an org member and with what role.</li>
+          </ul>
+          <p>Do not paste any npm token, one-time code, or recovery code into this repo, an issue comment, or
+          any doc — only <em>where</em> the ownership record lives.</p>
+          <h2 id="done-when">Done when<a class="heading-anchor" href="#done-when" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li><code>npm view eventrunner</code> and <code>npm view event-runner</code> both return the placeholder metadata.</li>
+          <li><code>npm org ls eventrunner</code> and <code>npm org ls event-runner</code> both exit 0 against orgs owned by the
+          intended CCM account, with 2FA and recoverable ownership confirmed.</li>
+          <li>Ownership and recovery details are recorded in operator storage, not in this repo.</li>
+          </ul>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/NPM_NAME_CLAIM.md"><code>docs/NPM_NAME_CLAIM.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/eventbrite-verification/"><span>Previous</span>Eventbrite verification</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/contributing/"><span>Next</span>Contributing</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

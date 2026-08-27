@@ -178,6 +178,29 @@ never sets the flag, so every one of those branches compiles away — `deploy-cl
 deploy-time export of a real client (§8.6). `--out` is refused outside the repository, because the
 destination is deleted before the copy. The script commits nothing.
 
+### `build-pages.cjs`
+
+Renders the documentation site GitHub Pages serves at
+`https://centercoopmedia.github.io/eventrunner/docs/`. The Markdown in this repository is the only
+source; the HTML under `docs/docs/` is generated output and is committed.
+
+```sh
+node scripts/build-pages.cjs                    # write docs/docs/
+node scripts/build-pages.cjs --check            # compare only, write nothing
+```
+
+`scripts/lib/pages-manifest.cjs` lists every published document and its route. A document reaches
+the site only by being listed there, so historical planning records under `docs/plans/` stay out of
+the navigation. `scripts/lib/markdown-pages.cjs` is a small dependency-free Markdown renderer that
+escapes every character it takes from the source, so no document can inject markup into the site.
+Relative links to other published documents become site routes; links to anything else in the
+repository become GitHub URLs, and the build lists them.
+
+`--check` is the freshness gate, and it works like `generate-content.cjs --check`: it fails on any
+file whose committed bytes differ from a fresh render, and on any unexpected file left in
+`docs/docs/`. `scripts/build-pages.test.cjs` runs it, so the documentation CI tier enforces it with
+the runner's Node and no `npm install`.
+
 ### `verify-sender-domain.cjs`
 
 Wraps the configured EmailProvider's `verifySenderDomain()` as the onboarding checklist command

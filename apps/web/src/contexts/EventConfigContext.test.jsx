@@ -148,13 +148,13 @@ describe('EventConfigProvider', () => {
         <Probe />
       </EventConfigProvider>,
     );
-    // Snapshot default (generated/eventConfig.js theme.texture = 'paper').
-    expect(document.documentElement.dataset.texture).toBe('paper');
+    // Snapshot default (generated/eventConfig.js theme.texture = 'flat').
+    expect(document.documentElement.dataset.texture).toBe('flat');
 
     act(() => {
-      subscriptions.get('theme')({ texture: 'flat' });
+      subscriptions.get('theme')({ texture: 'paper' });
     });
-    expect(document.documentElement.dataset.texture).toBe('flat');
+    expect(document.documentElement.dataset.texture).toBe('paper');
   });
 });
 

@@ -7,6 +7,7 @@ const JOB_NAMES = Object.freeze([
   'docs',
   'demo',
   'lint',
+  'audit',
   'unit',
   'unitWeb',
   'build',
@@ -125,6 +126,10 @@ function resultForPaths(paths, mode, categories) {
     docs: docs || full,
     demo: demo || app || shared || full,
     lint: demoGenerator || docsGenerator || app || backend || shared || full,
+    // The audit policy reads package.json/package-lock.json across the
+    // workspace, so it runs on the same footprint as lint (any dependency
+    // manifest change already routes through isFullPath below).
+    audit: demoGenerator || docsGenerator || app || backend || shared || full,
     unit: backend || shared || full,
     unitWeb: app || shared || full,
     build: app || shared || full,

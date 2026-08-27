@@ -249,6 +249,27 @@ test('buildGlobalTokens derives urls, dates, and year', () => {
   assert.equal(tokens.venue_address, '1 Main St, Springfield, IL, 11111, USA');
 });
 
+// current_year must come from UTC, not the machine's local clock (issue
+// #102): otherwise the same email renders a different year depending on
+// where it is sent from. Pick a `now` where the local date and the UTC
+// date fall on opposite sides of a year boundary, so a `getFullYear()`
+// bug and a `getUTCFullYear()` fix disagree.
+test('buildGlobalTokens computes current_year from UTC, not the local timezone', () => {
+  const originalTZ = process.env.TZ;
+  try {
+    // UTC+14: this local clock is already Jan 1 of the next year while
+    // UTC is still Dec 31 of the prior one.
+    process.env.TZ = 'Pacific/Kiritimati';
+    const now = () => new Date('2026-12-31T20:00:00Z');
+    assert.equal(now().getFullYear(), 2027, 'test setup: local time must land in the next year');
+    const tokens = buildGlobalTokens(CONFIG, { now });
+    assert.equal(tokens.current_year, '2026');
+  } finally {
+    if (originalTZ === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTZ;
+  }
+});
+
 test('stripHtmlToText converts breaks and strips tags', () => {
   assert.equal(
     internals.stripHtmlToText('<p>a<br>b</p><ul><li>c</li></ul>'),

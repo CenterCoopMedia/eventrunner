@@ -16,12 +16,13 @@ Please do **not** open a public GitHub issue for security problems.
 repository. Reports filed there are visible only to maintainers.
 
 **Fallback:** if you cannot use GitHub's reporting flow, email
-info@collaborativejournalism.org with a description of the issue, steps to
+info@eventrunner.org with a description of the issue, steps to
 reproduce, and the affected version or commit.
 
-<!-- OPERATOR NOTE: before public launch, replace info@collaborativejournalism.org
-     with a dedicated security@ alias so vulnerability reports do not land in a
-     general-purpose inbox. -->
+<!-- OPERATOR NOTE: info@eventrunner.org is the operational address (Postmark Server
+     "Event Runner", verified per issue #98). Consider a dedicated security@ alias
+     once volume justifies splitting vulnerability reports out of the general-purpose
+     inbox. -->
 
 ## What to expect
 
@@ -43,6 +44,18 @@ configuration, data, or infrastructure), report it privately to the operator
 of that deployment — not through this repository. Issues in the shared
 codebase discovered via a deployment may be reported here through the private
 channels above, but do not include client data in the report.
+
+## Dependency audit policy
+
+CI runs `npm audit --omit=dev` on every pull request and fails the build on
+any high or critical finding in a production dependency. A finding only
+passes when a maintainer has logged it, with a reason, in
+[`scripts/ci/audit-exceptions.json`](scripts/ci/audit-exceptions.json). That
+file is the running record of every known vulnerability we have chosen not to
+fix yet — package, advisory link, severity, exposure, why it is unfixed, and
+the date we last reviewed it. Findings in build tools or local dev tooling
+(for example the Firebase CLI or Vite) are tracked there too, but they never
+fail CI on their own.
 
 ## No bounty program
 

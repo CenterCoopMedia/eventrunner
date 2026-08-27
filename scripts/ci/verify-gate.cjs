@@ -4,6 +4,7 @@ const JOBS = Object.freeze([
   { label: 'docs', selected: 'DOCS_SELECTED', result: 'DOCS_RESULT' },
   { label: 'demo', selected: 'DEMO_SELECTED', result: 'DEMO_RESULT' },
   { label: 'lint', selected: 'LINT_SELECTED', result: 'LINT_RESULT' },
+  { label: 'audit', selected: 'AUDIT_SELECTED', result: 'AUDIT_RESULT' },
   { label: 'unit', selected: 'UNIT_SELECTED', result: 'UNIT_RESULT' },
   { label: 'unit-web', selected: 'UNIT_WEB_SELECTED', result: 'UNIT_WEB_RESULT' },
   { label: 'build', selected: 'BUILD_SELECTED', result: 'BUILD_RESULT' },

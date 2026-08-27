@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code of conduct — Event Runner documentation</title>
+  <meta name="description" content="The behavior expected in every project space, and how to report a problem.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/code-of-conduct/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Code of conduct — Event Runner documentation">
+  <meta property="og:description" content="The behavior expected in every project space, and how to report a problem.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/code-of-conduct/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Code of conduct — Event Runner documentation">
+  <meta name="twitter:description" content="The behavior expected in every project space, and how to report a problem.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#faf7f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1526" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <img class="brand-mark" src="/eventrunner/favicon.svg" alt="" width="38" height="38">
+        <span class="brand-text">
+          <strong>Event Runner</strong>
+          <span>Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Code of conduct</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/" aria-current="page" class="is-current">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Contributor Covenant Code of Conduct</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#our-pledge">Our Pledge</a></li>
+              <li><a href="#our-standards">Our Standards</a></li>
+              <li><a href="#enforcement-responsibilities">Enforcement Responsibilities</a></li>
+              <li><a href="#scope">Scope</a></li>
+              <li><a href="#enforcement">Enforcement</a></li>
+              <li><a href="#enforcement-guidelines">Enforcement Guidelines</a></li>
+              <li><a href="#attribution">Attribution</a></li>
+            </ul>
+          </nav>
+          <h2 id="our-pledge">Our Pledge<a class="heading-anchor" href="#our-pledge" aria-label="Link to this section">#</a></h2>
+          <p>We as members, contributors, and leaders pledge to make participation in our
+          community a harassment-free experience for everyone, regardless of age, body
+          size, visible or invisible disability, ethnicity, sex characteristics, gender
+          identity and expression, level of experience, education, socio-economic status,
+          nationality, personal appearance, race, caste, color, religion, or sexual
+          identity and orientation.</p>
+          <p>We pledge to act and interact in ways that contribute to an open, welcoming,
+          diverse, inclusive, and healthy community.</p>
+          <h2 id="our-standards">Our Standards<a class="heading-anchor" href="#our-standards" aria-label="Link to this section">#</a></h2>
+          <p>Examples of behavior that contributes to a positive environment for our
+          community include:</p>
+          <ul>
+          <li>Demonstrating empathy and kindness toward other people</li>
+          <li>Being respectful of differing opinions, viewpoints, and experiences</li>
+          <li>Giving and gracefully accepting constructive feedback</li>
+          <li>Accepting responsibility and apologizing to those affected by our mistakes,
+          and learning from the experience</li>
+          <li>Focusing on what is best not just for us as individuals, but for the overall
+          community</li>
+          </ul>
+          <p>Examples of unacceptable behavior include:</p>
+          <ul>
+          <li>The use of sexualized language or imagery, and sexual attention or advances
+          of any kind</li>
+          <li>Trolling, insulting or derogatory comments, and personal or political attacks</li>
+          <li>Public or private harassment</li>
+          <li>Publishing others&#39; private information, such as a physical or email address,
+          without their explicit permission</li>
+          <li>Other conduct which could reasonably be considered inappropriate in a
+          professional setting</li>
+          </ul>
+          <h2 id="enforcement-responsibilities">Enforcement Responsibilities<a class="heading-anchor" href="#enforcement-responsibilities" aria-label="Link to this section">#</a></h2>
+          <p>Community leaders are responsible for clarifying and enforcing our standards of
+          acceptable behavior and will take appropriate and fair corrective action in
+          response to any behavior that they deem inappropriate, threatening, offensive,
+          or harmful.</p>
+          <p>Community leaders have the right and responsibility to remove, edit, or reject
+          comments, commits, code, wiki edits, issues, and other contributions that are
+          not aligned to this Code of Conduct, and will communicate reasons for moderation
+          decisions when appropriate.</p>
+          <h2 id="scope">Scope<a class="heading-anchor" href="#scope" aria-label="Link to this section">#</a></h2>
+          <p>This Code of Conduct applies within all community spaces, and also applies when
+          an individual is officially representing the community in public spaces.
+          Examples of representing our community include using an official e-mail address,
+          posting via an official social media account, or acting as an appointed
+          representative at an online or offline event.</p>
+          <h2 id="enforcement">Enforcement<a class="heading-anchor" href="#enforcement" aria-label="Link to this section">#</a></h2>
+          <p>Instances of abusive, harassing, or otherwise unacceptable behavior may be
+          reported to the community leaders responsible for enforcement at
+          info@collaborativejournalism.org.
+          All complaints will be reviewed and investigated promptly and fairly.</p>
+          <p>All community leaders are obligated to respect the privacy and security of the
+          reporter of any incident.</p>
+          <h2 id="enforcement-guidelines">Enforcement Guidelines<a class="heading-anchor" href="#enforcement-guidelines" aria-label="Link to this section">#</a></h2>
+          <p>Community leaders will follow these Community Impact Guidelines in determining
+          the consequences for any action they deem in violation of this Code of Conduct:</p>
+          <h3 id="1-correction">1. Correction<a class="heading-anchor" href="#1-correction" aria-label="Link to this section">#</a></h3>
+          <p><strong>Community Impact</strong>: Use of inappropriate language or other behavior deemed
+          unprofessional or unwelcome in the community.</p>
+          <p><strong>Consequence</strong>: A private, written warning from community leaders, providing
+          clarity around the nature of the violation and an explanation of why the
+          behavior was inappropriate. A public apology may be requested.</p>
+          <h3 id="2-warning">2. Warning<a class="heading-anchor" href="#2-warning" aria-label="Link to this section">#</a></h3>
+          <p><strong>Community Impact</strong>: A violation through a single incident or series of
+          actions.</p>
+          <p><strong>Consequence</strong>: A warning with consequences for continued behavior. No
+          interaction with the people involved, including unsolicited interaction with
+          those enforcing the Code of Conduct, for a specified period of time. This
+          includes avoiding interactions in community spaces as well as external channels
+          like social media. Violating these terms may lead to a temporary or permanent
+          ban.</p>
+          <h3 id="3-temporary-ban">3. Temporary Ban<a class="heading-anchor" href="#3-temporary-ban" aria-label="Link to this section">#</a></h3>
+          <p><strong>Community Impact</strong>: A serious violation of community standards, including
+          sustained inappropriate behavior.</p>
+          <p><strong>Consequence</strong>: A temporary ban from any sort of interaction or public
+          communication with the community for a specified period of time. No public or
+          private interaction with the people involved, including unsolicited interaction
+          with those enforcing the Code of Conduct, is allowed during this period.
+          Violating these terms may lead to a permanent ban.</p>
+          <h3 id="4-permanent-ban">4. Permanent Ban<a class="heading-anchor" href="#4-permanent-ban" aria-label="Link to this section">#</a></h3>
+          <p><strong>Community Impact</strong>: Demonstrating a pattern of violation of community
+          standards, including sustained inappropriate behavior, harassment of an
+          individual, or aggression toward or disparagement of classes of individuals.</p>
+          <p><strong>Consequence</strong>: A permanent ban from any sort of public interaction within the
+          community.</p>
+          <h2 id="attribution">Attribution<a class="heading-anchor" href="#attribution" aria-label="Link to this section">#</a></h2>
+          <p>This Code of Conduct is adapted from the [Contributor Covenant][homepage],
+          version 2.1, available at
+          [https://www.contributor-covenant.org/version/2/1/code_of_conduct.html][v2.1].</p>
+          <p>Community Impact Guidelines were inspired by
+          [Mozilla&#39;s code of conduct enforcement ladder][Mozilla CoC].</p>
+          <p>For answers to common questions about this code of conduct, see the FAQ at
+          [https://www.contributor-covenant.org/faq][FAQ]. Translations are available at
+          [https://www.contributor-covenant.org/translations][translations].</p>
+          <p>[homepage]: https://www.contributor-covenant.org
+          [v2.1]: https://www.contributor-covenant.org/version/2/1/code_of_conduct.html
+          [Mozilla CoC]: https://github.com/mozilla/diversity
+          [FAQ]: https://www.contributor-covenant.org/faq
+          [translations]: https://www.contributor-covenant.org/translations</p>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md"><code>CODE_OF_CONDUCT.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/contributing/"><span>Previous</span>Contributing</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/governance/"><span>Next</span>Governance</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

@@ -166,7 +166,7 @@ font CDN is ever requested at runtime — `theme.css` and the generated
 ## Branding placeholders
 
 `public/branding/` ships neutral, generic inline-SVG placeholder assets
-(logo, mark, favicon, OG image) — not the Run of Show product identity.
+(logo, mark, favicon, OG image) — not the Event Runner product identity.
 Per-event branding overrides these once an event is seeded; until then the
 shell stays event-neutral.
 

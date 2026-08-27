@@ -1,4 +1,4 @@
-# Run of Show
+# Event Runner
 
 A white-label event CMS for conferences and gatherings. Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates it. Client staff run the site from the admin CMS. They never touch the code.
 
@@ -7,6 +7,7 @@ A white-label event CMS for conferences and gatherings. Each client event gets i
 **Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2).
 
 Site: [centercoopmedia.github.io/eventrunner](https://centercoopmedia.github.io/eventrunner/)
+Documentation: [centercoopmedia.github.io/eventrunner/docs](https://centercoopmedia.github.io/eventrunner/docs/)
 Handbook: [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki)
 
 A public demo instance and README screenshots are pending the operator's deploy of that instance
@@ -78,11 +79,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Copyright 2026 Center for Cooperative Media. Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-Apache-2.0 does not grant trademark rights. "Run of Show" as a product name is reserved to the Center for Cooperative Media.
+Apache-2.0 does not grant trademark rights. "Event Runner" as a product name is reserved to the Center for Cooperative Media.
 
 ## Security
 
-Do not open a public issue for a vulnerability. Use [private vulnerability reporting](https://github.com/CenterCoopMedia/eventrunner/security) or email info@collaborativejournalism.org. See [SECURITY.md](SECURITY.md).
+Do not open a public issue for a vulnerability. Use [private vulnerability reporting](https://github.com/CenterCoopMedia/eventrunner/security) or email info@eventrunner.org. See [SECURITY.md](SECURITY.md).
 
 Operator-run client deployments are out of scope for public reports. Email the operator of that deployment.
 
@@ -93,7 +94,7 @@ Operator-run client deployments are out of scope for public reports. Email the o
 | Attendee or event staff with a how-to | [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) |
 | An organization that wants a hosted event | [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) |
 | Reporting a product bug | [Bug form](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml) |
-| CCM already hosts your site | info@collaborativejournalism.org |
+| CCM already hosts your site | info@eventrunner.org |
 | Changing the code | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 The [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki) is the handbook for attendees, staff, and clients. [GOVERNANCE.md](GOVERNANCE.md) is who decides.

@@ -124,6 +124,9 @@ async function renderAt(path) {
     await Promise.resolve();
     await Promise.resolve();
   });
+  await waitFor(() => {
+    expect(screen.queryByLabelText('Loading admin')).not.toBeInTheDocument();
+  });
   return result;
 }
 

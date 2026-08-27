@@ -10,7 +10,7 @@ The code is [Apache-2.0](https://github.com/CenterCoopMedia/eventrunner/blob/mai
 2. Setup and onboarding (sender domain, tickets, first admin)
 3. Support while the event is live
 
-The **Run of Show** name is CCM's. Apache-2.0 does not give anyone else the right to sell hosting under that name.
+The **Event Runner** name is CCM's. Apache-2.0 does not give anyone else the right to sell hosting under that name.
 
 ## What v1 includes
 
