@@ -154,7 +154,9 @@ export default function MySchedule() {
         days
           .filter((day) => (myByDay.get(day.id) ?? []).length > 0)
           .map((day) => (
-            <section key={day.id} aria-labelledby={`my-day-${day.id}`} className="mt-xl">
+            // The Atlas sheet, on the one surface that holds a programme
+            // (owner review, 2026-08-27). See Schedule.jsx for the rule.
+            <section key={day.id} aria-labelledby={`my-day-${day.id}`} className="map-grid mt-xl">
               {/* The same folio-on-a-rule day head Schedule.jsx uses (brief
                   §2.1): the standing head of the day, with the date sitting
                   on the same rule rather than stacked above it. */}

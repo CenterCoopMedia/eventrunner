@@ -159,9 +159,9 @@ describe('EventConfigProvider', () => {
 
   it('writes the preset\'s texture when the document names no texture of its own', () => {
     // A preset states its own texture (brief §4); config/theme.texture only
-    // overrides it. Field Guide is paper. A document that names the preset
-    // and omits the field must still render paper — reading the raw field
-    // here left the attribute stale and the overlay never painted.
+    // overrides it. Every preset is flat by default now (owner review,
+    // 2026-08-27), so a document that names one and omits the field must
+    // render flat — reading the raw field here left the attribute stale.
     render(
       <EventConfigProvider>
         <Probe />
@@ -170,13 +170,13 @@ describe('EventConfigProvider', () => {
     act(() => {
       subscriptions.get('theme')({ preset: 'field-guide' });
     });
-    expect(document.documentElement.dataset.texture).toBe('paper');
+    expect(document.documentElement.dataset.texture).toBe('flat');
 
     // And the override still wins over the preset it overrides.
     act(() => {
-      subscriptions.get('theme')({ preset: 'field-guide', texture: 'flat' });
+      subscriptions.get('theme')({ preset: 'field-guide', texture: 'paper' });
     });
-    expect(document.documentElement.dataset.texture).toBe('flat');
+    expect(document.documentElement.dataset.texture).toBe('paper');
   });
 });
 

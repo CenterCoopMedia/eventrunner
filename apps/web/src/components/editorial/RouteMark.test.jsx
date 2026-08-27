@@ -112,4 +112,33 @@ describe('map grid', () => {
     const block = indexCss.match(/\.map-grid::before \{[^}]*\}/)[0];
     expect(block).not.toMatch(/animation|transition/);
   });
+
+  it('is drawn on the schedule surface, never on the shell', () => {
+    // Owner review 2026-08-27: a coordinate grid is a device for reading a
+    // timetable. Behind an about page or a speaker bio it is texture for
+    // its own sake, so the class sits on the surface that holds the
+    // programme and nowhere else.
+    const layout = fs.readFileSync(path.resolve(here, '..', 'Layout.jsx'), 'utf8');
+    expect(layout).not.toMatch(/className="[^"]*\bmap-grid\b/);
+    for (const page of ['Schedule', 'MySchedule']) {
+      const source = fs.readFileSync(
+        path.resolve(here, '..', '..', 'pages', `${page}.jsx`),
+        'utf8',
+      );
+      expect(source).toMatch(/className="[^"]*\bmap-grid\b/);
+    }
+  });
+});
+
+describe('the paper overlay', () => {
+  it('paints only where a theme opts in, so a flat surface cannot leak', () => {
+    // Owner review 2026-08-27: flat surfaces are the shared default
+    // everywhere. The overlay used to paint by default and be suppressed
+    // under [data-texture='flat'], so any surface reaching a reader before
+    // the attribute was written — or with no attribute at all — got the dot
+    // pattern nobody asked for. An opt-in gate cannot leak.
+    expect(indexCss).toContain(":root[data-texture='paper'] .bg-paper::before");
+    expect(indexCss).not.toMatch(/^\s*\.bg-paper::before \{/m);
+    expect(indexCss).not.toContain(":root[data-texture='flat'] .bg-paper::before");
+  });
 });

@@ -43,17 +43,18 @@
     }
   },
 
-  "$font-note": "Brief §9.1. Zine runs one mono across body, data, and values on purpose: the even typewriter rhythm is the story.",
+  "$font-note": "Brief §9.1, retuned by the owner review (2026-08-27). Zine ran one mono across body, data, and mono. A mono body is a poor face for long-form prose: a rich-text page or a session description set in Fragment Mono is slow to read at any length. Body moves to Source Sans 3, the bundled neutral. Data and mono stay Fragment Mono, so times, room codes, and identifiers keep the typewriter rhythm the story is built on — the mono is now the VALUE face rather than the whole page.",
   "fonts": {
     "heading": "karrik",
-    "body": "fragment-mono",
+    "body": "sans-humanist",
     "data": "fragment-mono",
     "mono": "fragment-mono"
   },
   "$component-fonts-note": "--callout-font is a component token, not a fifth semantic role (brief §3.1, §4.3). It carries the one handwritten callout a page may hold. A client may point it at var(--font-heading) and drop the script face.",
   "componentFonts": { "--callout-font": "script-casual" },
 
-  "shape": { "radius": "sharp", "texture": "paper", "density": "loose" },
+  "$shape-note": "Texture is flat by default (owner review, 2026-08-27): flat surfaces are the shared default everywhere, and a client who wants the copier grain turns it on under the advanced settings. The grain is still the device brief §4.3 allows; it is no longer what a Zine site starts as.",
+  "shape": { "radius": "sharp", "texture": "flat", "density": "loose" },
   "motifSet": "none",
 
   "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). Zine uses the strong rule where the others use hairlines, so the page reads as cut-and-pasted blocks.",
@@ -131,23 +132,24 @@
     "component": {
       "label": "Session block",
       "prompt": "How a session block is printed.",
-      "default": "stamped-block",
+      "$default-note": "Flat is the default (owner review, 2026-08-27). The stamp is the theme's signature and it still ships under the brief §2.4 exception, but a printing artefact is a thing a client turns ON, not a thing they discover on their own schedule page.",
+      "default": "flat-block",
       "choices": [
-        {
-          "id": "stamped-block",
-          "label": "Stamped block",
-          "why": "Misregistration is what a two-pass print looks like, which is the story's whole production method. It ships under the brief §2.4 exception, Zine only.",
-          "tokens": {
-            "--session-card-stamp-offset": "4px",
-            "--folio-rule-top-width": "0"
-          }
-        },
         {
           "id": "flat-block",
           "label": "Flat block",
           "why": "The single-pass photocopy, so it stays in the story and gives a client an option that needs no exception to §2.1.",
           "tokens": {
             "--session-card-stamp-offset": "0",
+            "--folio-rule-top-width": "0"
+          }
+        },
+        {
+          "id": "stamped-block",
+          "label": "Stamped block",
+          "why": "Misregistration is what a two-pass print looks like, which is the story's whole production method. It ships under the brief §2.4 exception, Zine only.",
+          "tokens": {
+            "--session-card-stamp-offset": "4px",
             "--folio-rule-top-width": "0"
           }
         },

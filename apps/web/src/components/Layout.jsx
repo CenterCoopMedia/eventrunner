@@ -112,14 +112,15 @@ export default function Layout() {
           </nav>
         </div>
       </header>
-      {/* The sections are drawn on a sheet (brief §4.6): a faint coordinate
-          grid sits behind them, below hairline contrast and inert to the
-          pointer. --map-grid-size is zero in every preset but Atlas, and a
-          zero-size background paints nothing, so the sheet appears only
-          where the story has one. */}
+      {/* Ordinary pages sit on a flat surface. The Atlas sheet — the faint
+          coordinate grid behind a section (brief §4.6) — is drawn on the
+          SCHEDULE only (owner review, 2026-08-27): a grid is a device for
+          reading a timetable, and behind an about page or a speaker bio it
+          is texture for its own sake. `Schedule` and `MySchedule` carry the
+          `map-grid` class on the surface that holds the programme. */}
       <main
         id="main-content"
-        className="map-grid mx-auto w-full max-w-5xl flex-1 px-md pb-2xl pt-xl"
+        className="mx-auto w-full max-w-5xl flex-1 px-md pb-2xl pt-xl"
       >
         <Outlet />
       </main>

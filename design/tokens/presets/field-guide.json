@@ -8,14 +8,15 @@
   "tier": "experimental",
   "summary": "A naturalist's expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.",
 
-  "$palette-words-light": "warm plate stock, bark-brown ink, deep leaf green, muted clay, lichen-grey rule, herbarium cream, pressed-tan archive, pencil grey",
-  "$palette-words-dark": "deep forest neutral, bone-white text, lifted moss green, lifted clay, moth-grey rule, lantern warmth, nocturne slate, faded field-note grey",
+  "$palette-words-light": "near-neutral plate stock with a trace of warmth, soft bark ink, deep leaf green, muted clay, lichen-grey rule, herbarium cream, pressed archive, pencil grey",
+  "$palette-words-dark": "near-neutral night ground with a trace of warmth, bone-white text, lifted moss green, lifted clay, moth-grey rule, lantern warmth, nocturne slate, faded field-note grey",
+  "$ground-note": "Owner review, 2026-08-27: the ground was too warm. A tan canvas paired with earthy ink reads as the look #109 rejected, and it fought every client logo that was not itself brown. Surface, alt surface, and both inks move most of the way to neutral. Warmth is kept as a trace — a few channels of red over blue, no more — so the story is still a paper handbook and not a spreadsheet. The leaf-green primary and the clay accent are untouched: they are the theme's colour, and the ground is what had to get out of their way.",
   "palette": {
     "light": {
-      "surface": [247, 243, 234],
-      "surfaceAlt": [240, 235, 223],
-      "ink": [42, 33, 25],
-      "inkMuted": [102, 90, 74],
+      "surface": [248, 247, 244],
+      "surfaceAlt": [241, 240, 236],
+      "ink": [38, 35, 31],
+      "inkMuted": [96, 91, 84],
       "primary": [43, 86, 54],
       "primaryDark": [27, 60, 37],
       "primaryLight": [140, 172, 136],
@@ -27,10 +28,10 @@
       "keynote": [86, 60, 124]
     },
     "dark": {
-      "surface": [26, 30, 26],
-      "surfaceAlt": [38, 43, 37],
-      "ink": [237, 232, 220],
-      "inkMuted": [170, 168, 150],
+      "surface": [28, 28, 27],
+      "surfaceAlt": [40, 40, 38],
+      "ink": [235, 233, 228],
+      "inkMuted": [172, 170, 164],
       "primary": [142, 192, 142],
       "primaryDark": [180, 216, 176],
       "primaryLight": [64, 94, 64],
@@ -51,8 +52,10 @@
     "mono": "plex-mono"
   },
 
-  "shape": { "radius": "sharp", "texture": "paper", "density": "comfortable" },
-  "motifSet": "botanical",
+  "$shape-note": "Texture is flat by default (owner review, 2026-08-27). Brief §4.5 already called it \"flat with an optional light paper tone\"; the optional tone was on. Flat surfaces are the shared default everywhere, and the tone is one advanced setting away.",
+  "shape": { "radius": "sharp", "texture": "flat", "density": "comfortable" },
+  "$motif-note": "Motifs are off by default (owner review, 2026-08-27). Brief §3.8 turned `botanical` on for Field Guide. Drawings on every page of a client's real programme read as decoration, not as observation, so the set is now something a client enables when their subject supports it. `botanical` is still the theme's set, and it is one pick away in the Illustrations control.",
+  "motifSet": "none",
 
   "$tokens-note": "Preset-level remaps of existing tier 2 and tier 3 tokens. No new property name (brief §3.4). The plate frame is a hairline; the double rule is the plate device's own doubling. The specimen label is the one preset that turns its rules and its field names on: a label in this world is a tag, and a tag states what each field is.",
   "tokens": {
@@ -95,8 +98,20 @@
     "nameplate": {
       "label": "Nameplate treatment",
       "prompt": "The title page.",
-      "default": "framed-title-page",
+      "$default-note": "The ruled title is the default (owner review, 2026-08-27). Plate framing is reserved for content that supports it. An event name and a date range are not a botanical plate, so the frame moved to the alternate; the empty-state plate stays, because a blank sheet IS what that content is.",
+      "default": "ruled-title-no-frame",
       "choices": [
+        {
+          "id": "ruled-title-no-frame",
+          "label": "Ruled title, no frame",
+          "why": "The title page of a cheaper printing of the same book; quieter, and better for text-heavy events.",
+          "tokens": {
+            "--nameplate-align": "start",
+            "--nameplate-frame-width": "0",
+            "--nameplate-rule-top-width": "var(--rule-hairline-width)",
+            "--nameplate-meta-placement": "block"
+          }
+        },
         {
           "id": "framed-title-page",
           "label": "Framed title page",
@@ -116,17 +131,6 @@
             "--nameplate-frame-width": "0",
             "--nameplate-meta-placement": "inline",
             "--plate-frame-width": "var(--rule-strong-width)"
-          }
-        },
-        {
-          "id": "ruled-title-no-frame",
-          "label": "Ruled title, no frame",
-          "why": "The title page of a cheaper printing of the same book; quieter, and better for text-heavy events.",
-          "tokens": {
-            "--nameplate-align": "start",
-            "--nameplate-frame-width": "0",
-            "--nameplate-rule-top-width": "var(--rule-hairline-width)",
-            "--nameplate-meta-placement": "block"
           }
         }
       ]

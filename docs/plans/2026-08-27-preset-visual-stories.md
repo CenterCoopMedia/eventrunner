@@ -4,6 +4,9 @@
 **Status:** Settled. Read before preset work starts (brief §7, PR2).
 **Binding source:** `docs/plans/2026-08-27-design-system-overhaul.md`. Where this document and the
 brief disagree, the brief wins.
+**Amended:** 2026-08-27 by the owner's design and operator-workflow review. The review retuned
+Zine, Field Guide, and Atlas, and it is recorded in the brief under "Owner review". Where the
+review and either document disagree, the review wins.
 **Companion:** `docs/plans/2026-08-27-admin-identity-story.md`, the fixed admin identity.
 
 ## How to read this document
@@ -283,12 +286,12 @@ picks when they want the site to look edited.
 
 Someone made this by hand, at a copier, the week before the event. The display face is loud and
 slightly wrong in the way hand-cut lettering is wrong, and it does all the shouting so the rest of
-the page can stay flat and calm. The body is mono, which gives every line the same even rhythm — the
-typewriter under the poster. Space is generous and the accent is rare, appearing maybe twice on a
-page, at full strength, where it means something. Blocks sit on the page like stuck-down paper, with
-a second ink pass just off register behind them, and someone has gone through with a pen and marked
-the two things that matter. It is playful without being messy, because a good zine is a designed
-object that pretends not to be.
+the page can stay flat and calm. Running text is set in a plain sans that a reader can sit with,
+and every value beside it — a time, a room, a track letter — is set in the typewriter, so the mono
+rhythm marks the data rather than the whole page. Space is generous and the accent is rare,
+appearing maybe twice on a page, at full strength, where it means something. Blocks sit flat on the
+page like stuck-down paper, and a client who wants the second ink pass turns the stamp on. It is
+playful without being messy, because a good zine is a designed object that pretends not to be.
 
 ### 2. The vocabulary
 
@@ -314,15 +317,19 @@ object that pretends not to be.
 - **Empty state** — a blank flyer. The `empty-state` motif renders as an unmarked sheet with one
   plain line under it: "No sessions posted yet."
 - **Type roles** — heading is the hand-cut poster lettering (Karrik by default; see part 6). Body is
-  the typewriter (Fragment Mono). Data and mono are the same typewriter, holding captions, times,
-  and room numbers with tabular figures. Zine runs one mono across all three roles on purpose: the
-  even rhythm is the story. The handwritten callout runs on a component token, `--callout-font`,
-  which defaults to the bundled script face Caveat; a client may point it at `--font-heading`
-  instead. A component token is not a semantic role, so this adds no fifth role (§3.1, §3.2).
+  **Source Sans 3**, the bundled neutral, because long-form prose has to be readable: a rich-text
+  page or a session description set in a mono is slow to read at any length. Data and mono are the
+  typewriter (Fragment Mono), holding captions, times, room numbers, and identifiers with tabular
+  figures. **The mono is the value face, not the page face** — that is what the review changed, and
+  it is what keeps the typewriter rhythm meaningful instead of ambient. The handwritten callout runs
+  on a component token, `--callout-font`, which defaults to the bundled script face Caveat; a client
+  may point it at `--font-heading` instead. A component token is not a semantic role, so this adds
+  no fifth role (§3.1, §3.2).
 - **Motifs** — off by default. If enabled, hand-drawn linework acts as the marker doodle in the
   margin: one `divider` between long sections, one `empty-state` drawing, nothing more.
 - **Texture** — paper grain at low opacity is allowed here and only here, with
-  `pointer-events: none`. It is the copier, not a filter.
+  `pointer-events: none`. It is the copier, not a filter. It is **off by default**: flat surfaces
+  are the shared default everywhere, and a client turns the grain on under the advanced settings.
 - **Back issue** — last year's flyer, still up on the wall, sun-faded to the archive tokens.
 - **Dark mode** — the negative. Toner-black ground, paper-white ink, as though the same page were
   photocopied inverted. The accent stays the same hue and drops in chroma so it stays legible.
@@ -332,7 +339,9 @@ object that pretends not to be.
 1. **The nameplate fills the sheet.** On the home page the event name runs at `--text-nameplate`
    across the full measure, breaking across two or three lines, over a `--rule-nameplate` at strong
    width. Below it: date, place, one line. Nothing else above the fold.
-2. **The session block is stamped, and it peeks.** Each session block carries a hard offset layer
+2. **The session block can be stamped, and then it peeks.** The stamp is **off by default** (owner
+   review): a printing artefact is something a client turns on, not something they discover on
+   their own schedule page. With it on, each session block carries a hard offset layer
    behind it: same shape, no blur, no gradient, tinted with ink or the accent, offset by a fixed
    small amount. On hover and on `:focus-visible` the block lifts and the offset layer slides
    further out, like a sticker peeling or a second sheet sliding from under the first. Bind it:
@@ -402,12 +411,13 @@ who wants no script face points `--callout-font` at `--font-heading`.
 
 **(c) Component variants — the session block and the folio.**
 
-1. **Stamped block** *(default)* — the hard offset ink layer with the peek-out on hover and focus.
+1. **Flat block** *(default)* — the block with the stamp layer off, keeping the strong rule and the
+   hairline separation. This is the single-pass photocopy, so it stays in the story and it needs no
+   exception to §2.1.
+2. **Stamped block** — the hard offset ink layer with the peek-out on hover and focus.
    Misregistration is what a two-pass print looks like, which is the story's whole production
-   method.
-2. **Flat block** — the same block with the stamp layer off, keeping the strong rule and the
-   hairline separation. This is the single-pass photocopy, so it stays in the story and gives a
-   client an option that needs no exception to §2.1.
+   method. It is the theme's signature and it is the style's one expressive alternate, so it is the
+   choice the main workflow offers beside the default.
 3. **Struck folio** — the folio set in the mono face between a strong rule above and below. The
    typewriter section break of a photocopied programme; plain text plus rules, no chip or badge.
 
@@ -525,20 +535,26 @@ character is the confidence of a document that does not need to persuade you.
 
 ### 1. The story
 
-You are reading a naturalist's expedition handbook for this event. You arrive at a plate — a framed
-drawing with a hairline border and its own plate number — and then you read the labels: name, date,
-place, set in a small ruled block the way a specimen is tagged in a collection. The schedule reads as
-observation notes taken in the field, patient and dated, and the speaker page reads as the index at
-the back of the book. The palette stays quiet and earthy so the linework carries the character, the
-way a good plate lets ink do the work. Nothing rushes; the whole site has the tempo of someone who
-sat still long enough to see something.
+You are reading a naturalist's expedition handbook for this event. You read the labels: name, date,
+place, set in a small ruled block the way a specimen is tagged in a collection. Where the content is
+genuinely a plate — an empty sheet waiting to be filled — you get the frame and the plate number.
+Everywhere else the page is ruled and open, because framing content that is not a plate is a
+costume. The schedule reads as observation notes taken in the field, patient and dated, and the
+speaker page reads as the index at the back of the book. The ground is **near-neutral with a trace
+of warmth**, so a client's own green, or blue, or red sits on it without a fight, and the leaf-green
+primary and clay accent carry the colour on their own. Nothing rushes; the whole site has the tempo
+of someone who sat still long enough to see something.
 
 ### 2. The vocabulary
 
-- **Nameplate** — the title page of the handbook. Event name, dates, and edition line inside a
-  hairline frame, with the `nameplate-mark` motif slot holding one small engraved cut.
+- **Nameplate** — the title page of the handbook. Event name, dates, and edition line on a ruled
+  head. **The frame is the alternate, not the default** (owner review): an event name and a date
+  range are not a botanical plate, and framing them reads as costume. A client who wants the framed
+  title page picks it under Header style.
 - **Botanical plate** — a framed drawing with a double rule at the frame and a plate number in the
-  folio style. It opens a page or a section. It is never a hero image and never carries a photo.
+  folio style. **Reserved for content that supports it**: the empty state, which really is a blank
+  sheet, and a section a client opens with a drawing. It is never a hero image and never carries a
+  photo, and it is never a wrapper around ordinary copy.
 - **Specimen label** — a small ruled block stating a name, a date, and a place. It carries session
   metadata and speaker credit lines. It sits below the title it labels, or beside it, never above it.
   It is never a chip and never gets a pill radius.
@@ -558,8 +574,10 @@ sat still long enough to see something.
   narrative: **Vollkorn**, a warm text serif that reads long and never competes with linework. Data
   and mono both point at the specimen label hand: **IBM Plex Mono** with tabular figures, exact
   enough to tag a collection. A label in this world is a tag, and a tag is set in the exact hand.
-- **Motifs** — `botanical` on by default, `fauna` supported, both in engraving and botanical-plate
-  linework. Ink only, `aria-hidden`, at most three per page.
+- **Motifs** — **off by default** (owner review). `botanical` is still the theme's set and `fauna`
+  is still supported, both in engraving and botanical-plate linework; a client turns one on under
+  Illustrations where their subject supports it. Drawings on every page of a real programme read as
+  decoration, not as observation. Ink only, `aria-hidden`, at most three per page.
 - **Back issue** — a pressed specimen. The past day dries to the archive tokens and keeps its label.
 - **Dark mode** — night observation. A deep forest-neutral ground, warm bone-white text, the palette
   of a lamp on a field table. Both accents lift for the dark ground; the light values are never
@@ -583,10 +601,14 @@ sat still long enough to see something.
 
 ### 4. Palette words
 
-- **Light:** warm plate stock, bark-brown ink, deep leaf green, muted clay, lichen-grey rule,
-  herbarium cream, pressed-tan archive, pencil grey.
-- **Dark:** deep forest neutral, bone-white text, lifted moss green, lifted clay, moth-grey rule,
-  lantern warmth, nocturne slate, faded field-note grey.
+- **Light:** near-neutral plate stock with a trace of warmth, soft bark ink, deep leaf green, muted
+  clay, lichen-grey rule, herbarium cream, pressed archive, pencil grey.
+- **Dark:** near-neutral night ground with a trace of warmth, bone-white text, lifted moss green,
+  lifted clay, moth-grey rule, lantern warmth, nocturne slate, faded field-note grey.
+
+The ground moved most of the way to neutral in the owner review. A tan canvas paired with earthy ink
+is the look #109 rejected, and it fought every client logo that was not itself brown. Warmth is now
+a trace — a few channels of red over blue, no more.
 
 ### 5. What this story refuses
 
@@ -622,14 +644,15 @@ Body stays Vollkorn and data stays IBM Plex Mono under every option. Only the he
 
 **(b) Nameplate treatment — the title page.**
 
-1. **Framed title page** *(default)* — name and dates inside a hairline frame with the
-   `nameplate-mark` motif above the name. The opening plate of the handbook.
-2. **Plate-and-label** — a `botanical` plate to one side, the name and dates set as an oversized
+1. **Ruled title, no frame** *(default)* — name, dates, and edition line between a double rule above
+   and a hairline below. The title page of a cheaper printing of the same book; quieter, and better
+   for text-heavy events. The owner review made it the default: plate framing is reserved for
+   content that supports it, and an event name is not a plate.
+2. **Framed title page** — name and dates inside a hairline frame with the `nameplate-mark` motif
+   above the name. The opening plate of the handbook, and the alternate the main workflow offers.
+3. **Plate-and-label** — a `botanical` plate to one side, the name and dates set as an oversized
    specimen label beside it. It states the book's subject the way a frontispiece plate does, and the
    plate stays drawn linework, never a photo.
-3. **Ruled title, no frame** — name, dates, and edition line between a double rule above and a
-   hairline below. The title page of a cheaper printing of the same book; quieter, and better for
-   text-heavy events.
 
 **(c) Component variant — the session presentation.**
 
@@ -663,7 +686,12 @@ travel with.
   line, with contour and coordinate marks at the corner and the `nameplate-mark` motif slot holding
   the survey mark.
 - **Map grid** — the faint coordinate grid behind a section. Held below hairline contrast,
-  `pointer-events: none`. It is the sheet the network is drawn on.
+  `pointer-events: none`. It is the sheet the network is drawn on. **It renders in schedule
+  contexts only** (owner review): the schedule page and the personal schedule, on the surface that
+  holds the programme. A grid is a device for reading a timetable; behind an about page, a speaker
+  bio, or a policy page it is texture for its own sake, and ordinary content pages get a flat
+  surface. Route marks follow the same rule — they name lines, and lines only exist where the
+  programme does.
 - **Contour and coordinate marks** — thin survey marks at section corners. They state position. They
   never appear where nothing is being located.
 - **Lines** — the concurrent tracks, lettered A, B, C. A line is a route through the day. Each line

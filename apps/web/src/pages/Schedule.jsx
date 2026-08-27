@@ -216,7 +216,18 @@ export default function Schedule() {
             </div>
           ) : null}
 
-          <section key={activeDay.id} aria-labelledby={`day-${activeDay.id}`} className="mt-xl">
+          {/* The sheet the programme is drawn on (brief §4.6): a faint
+              coordinate grid, below hairline contrast and inert to the
+              pointer. It lives HERE and not on the shell, because a
+              coordinate grid is a device for reading a timetable (owner
+              review, 2026-08-27). --map-grid-size is zero in every preset
+              but Atlas, and a zero-size background paints nothing, so the
+              sheet appears only where the story has one. */}
+          <section
+            key={activeDay.id}
+            aria-labelledby={`day-${activeDay.id}`}
+            className="map-grid mt-xl"
+          >
             {/* The day head is a folio on a rule (brief §2.1): the standing
                 head of the day, with the date sitting on the same rule. It is
                 never stacked above the heading — it IS the heading. */}

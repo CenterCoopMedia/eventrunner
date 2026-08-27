@@ -57,13 +57,22 @@
      EventConfigProvider mirrors the resolved texture onto
      documentElement.dataset.texture (snapshot value at first paint, runtime
      value once config/theme lands) and this rule gates the overlay on that
-     attribute: 'paper' (the default — matches generated/theme.css) paints
-     the dot pattern, 'flat' suppresses it. The overlay is decorative, so it
-     must never intercept the pointer. */
+     attribute.
+
+     FLAT IS THE SHARED DEFAULT (owner review, 2026-08-27), and the gate is
+     written so that it cannot be otherwise. The overlay paints only under
+     [data-texture='paper'] — an explicit opt-in. It used to paint by
+     default and be suppressed under [data-texture='flat'], which meant any
+     surface that reached a reader before the attribute was written, or with
+     no attribute at all (a pre-preset document names no texture, so
+     resolveShape answers null and nothing is written), got the dot pattern
+     nobody asked for. An opt-in cannot leak; an opt-out always can.
+
+     The overlay is decorative, so it must never intercept the pointer. */
   .bg-paper {
     @apply relative bg-brand-surface;
   }
-  .bg-paper::before {
+  :root[data-texture='paper'] .bg-paper::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -73,9 +82,6 @@
       transparent 1px
     );
     background-size: 24px 24px;
-  }
-  :root[data-texture='flat'] .bg-paper::before {
-    content: none;
   }
 
   /* Editorial devices (design brief §2.1). Each class is the rendered form

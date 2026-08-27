@@ -90,13 +90,35 @@ test('every preset states the whole contract the brief §4 requires', () => {
   }
 });
 
-test('Field Guide and Atlas ship a motif set on; the other four ship none', () => {
-  // Brief §4 defaults, restated as a fact about the data.
-  assert.equal(PRESETS['field-guide'].motifSet, 'botanical');
+test('only Atlas ships a motif set on; the other five ship none', () => {
+  // Brief §4 defaults, as the owner review left them (2026-08-27). Field
+  // Guide shipped `botanical` on; drawings on every page of a client's real
+  // programme read as decoration rather than observation, so the set became
+  // something a client turns on. Atlas keeps `cartographic`, because its
+  // marks are wayfinding and its schedule is the sheet they belong to.
+  assert.equal(PRESETS['field-guide'].motifSet, 'none');
   assert.equal(PRESETS.atlas.motifSet, 'cartographic');
   for (const id of ['broadsheet', 'newsroom', 'zine', 'civic']) {
     assert.equal(PRESETS[id].motifSet, 'none', `${id} ships motifs off`);
   }
+});
+
+test('every style ships a flat surface; paper texture is something a client turns on', () => {
+  // Owner review 2026-08-27: flat surfaces are the shared default
+  // everywhere. Zine's copier grain and Field Guide's paper tone are both
+  // still available; neither is what a fresh site renders.
+  for (const id of Object.keys(PRESETS)) {
+    assert.equal(PRESETS[id].shape.texture, 'flat', `${id} ships flat`);
+  }
+});
+
+test('Zine reads long-form prose in a text face, and keeps the mono for values', () => {
+  // Owner review 2026-08-27. A mono body is a poor face for a rich-text
+  // page or a session description. The typewriter stays where a reader
+  // compares or copies a value.
+  assert.equal(PRESETS.zine.fonts.body, 'sans-humanist');
+  assert.equal(PRESETS.zine.fonts.data, 'fragment-mono');
+  assert.equal(PRESETS.zine.fonts.mono, 'fragment-mono');
 });
 
 test('the stamp is Zine only, and Zine ships the flat-block variant beside it', () => {

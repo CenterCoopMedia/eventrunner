@@ -355,7 +355,7 @@ const PRESETS = Object.freeze({
     },
     fonts: {
       heading: 'karrik',
-      body: 'fragment-mono',
+      body: 'sans-humanist',
       data: 'fragment-mono',
       mono: 'fragment-mono',
     },
@@ -364,7 +364,7 @@ const PRESETS = Object.freeze({
     },
     shape: {
       radius: 'sharp',
-      texture: 'paper',
+      texture: 'flat',
       density: 'loose',
     },
     motifSet: 'none',
@@ -447,23 +447,23 @@ const PRESETS = Object.freeze({
       component: {
         label: 'Session block',
         prompt: 'How a session block is printed.',
-        default: 'stamped-block',
+        default: 'flat-block',
         choices: [
-          {
-            id: 'stamped-block',
-            label: 'Stamped block',
-            why: 'Misregistration is what a two-pass print looks like, which is the story\'s whole production method. It ships under the brief §2.4 exception, Zine only.',
-            tokens: {
-              '--session-card-stamp-offset': '4px',
-              '--folio-rule-top-width': '0',
-            },
-          },
           {
             id: 'flat-block',
             label: 'Flat block',
             why: 'The single-pass photocopy, so it stays in the story and gives a client an option that needs no exception to §2.1.',
             tokens: {
               '--session-card-stamp-offset': '0',
+              '--folio-rule-top-width': '0',
+            },
+          },
+          {
+            id: 'stamped-block',
+            label: 'Stamped block',
+            why: 'Misregistration is what a two-pass print looks like, which is the story\'s whole production method. It ships under the brief §2.4 exception, Zine only.',
+            tokens: {
+              '--session-card-stamp-offset': '4px',
               '--folio-rule-top-width': '0',
             },
           },
@@ -660,10 +660,10 @@ const PRESETS = Object.freeze({
     summary: 'A naturalist\'s expedition handbook. Plates, specimen labels, and observation notes, with the linework carrying the character.',
     palette: {
       light: {
-        surface: [247, 243, 234],
-        surfaceAlt: [240, 235, 223],
-        ink: [42, 33, 25],
-        inkMuted: [102, 90, 74],
+        surface: [248, 247, 244],
+        surfaceAlt: [241, 240, 236],
+        ink: [38, 35, 31],
+        inkMuted: [96, 91, 84],
         primary: [43, 86, 54],
         primaryDark: [27, 60, 37],
         primaryLight: [140, 172, 136],
@@ -675,10 +675,10 @@ const PRESETS = Object.freeze({
         keynote: [86, 60, 124],
       },
       dark: {
-        surface: [26, 30, 26],
-        surfaceAlt: [38, 43, 37],
-        ink: [237, 232, 220],
-        inkMuted: [170, 168, 150],
+        surface: [28, 28, 27],
+        surfaceAlt: [40, 40, 38],
+        ink: [235, 233, 228],
+        inkMuted: [172, 170, 164],
         primary: [142, 192, 142],
         primaryDark: [180, 216, 176],
         primaryLight: [64, 94, 64],
@@ -698,10 +698,10 @@ const PRESETS = Object.freeze({
     },
     shape: {
       radius: 'sharp',
-      texture: 'paper',
+      texture: 'flat',
       density: 'comfortable',
     },
-    motifSet: 'botanical',
+    motifSet: 'none',
     tokens: {
       '--plate-frame-width': 'var(--rule-hairline-width)',
       '--plate-pad': 'var(--space-md)',
@@ -747,8 +747,19 @@ const PRESETS = Object.freeze({
       nameplate: {
         label: 'Nameplate treatment',
         prompt: 'The title page.',
-        default: 'framed-title-page',
+        default: 'ruled-title-no-frame',
         choices: [
+          {
+            id: 'ruled-title-no-frame',
+            label: 'Ruled title, no frame',
+            why: 'The title page of a cheaper printing of the same book; quieter, and better for text-heavy events.',
+            tokens: {
+              '--nameplate-align': 'start',
+              '--nameplate-frame-width': '0',
+              '--nameplate-rule-top-width': 'var(--rule-hairline-width)',
+              '--nameplate-meta-placement': 'block',
+            },
+          },
           {
             id: 'framed-title-page',
             label: 'Framed title page',
@@ -768,17 +779,6 @@ const PRESETS = Object.freeze({
               '--nameplate-frame-width': '0',
               '--nameplate-meta-placement': 'inline',
               '--plate-frame-width': 'var(--rule-strong-width)',
-            },
-          },
-          {
-            id: 'ruled-title-no-frame',
-            label: 'Ruled title, no frame',
-            why: 'The title page of a cheaper printing of the same book; quieter, and better for text-heavy events.',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-frame-width': '0',
-              '--nameplate-rule-top-width': 'var(--rule-hairline-width)',
-              '--nameplate-meta-placement': 'block',
             },
           },
         ],
