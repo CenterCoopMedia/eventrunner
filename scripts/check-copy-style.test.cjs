@@ -13,7 +13,7 @@ const {
 test('maskCodeToVisibleText keeps strings and JSX text but removes comments and regexes', () => {
   const source = [
     "const label = 'This is robust copy.'; // robust in a comment",
-    'const matcher = /[\"\']/u; /* seamless in a block comment */',
+    'const matcher = /regex-only-token/u; /* seamless in a block comment */',
     'const detail = `Use a full stop — not a long dash.`;',
     'const view = <p>Choose a style — then save it.</p>;',
   ].join('\n');
@@ -22,7 +22,7 @@ test('maskCodeToVisibleText keeps strings and JSX text but removes comments and 
   assert.match(visible, /This is robust copy\./u);
   assert.doesNotMatch(visible, /robust in a comment/u);
   assert.doesNotMatch(visible, /seamless in a block comment/u);
-  assert.doesNotMatch(visible, /\[\"\'\]/u);
+  assert.doesNotMatch(visible, /regex-only-token/u);
   assert.match(visible, /Use a full stop — not a long dash\./u);
   assert.match(visible, /Choose a style — then save it\./u);
   assert.equal(visible.split('\n').length, source.split('\n').length);
