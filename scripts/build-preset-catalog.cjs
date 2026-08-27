@@ -40,9 +40,23 @@ const TOKENS_DIR = path.join(ROOT, 'design', 'tokens');
 const PRESETS_DIR = path.join(TOKENS_DIR, 'presets');
 const TARGET = path.join(ROOT, 'packages', 'shared', 'src', 'presetCatalog.cjs');
 
-/** Preset ids, in the order the brief §4 lists them. */
+/**
+ * Preset ids, in the order the style picker offers them.
+ *
+ * ALL SIX ARE FIRST-CLASS (owner calibration, 2026-08-27). There is no
+ * stability tier and no experimental group. Order is the only ranking the
+ * catalog carries, and it is a RECOMMENDATION, not a verdict: Institutional
+ * leads because it is what a fresh deployment starts on, the two broadly
+ * applicable publication looks follow, and the three with the strongest
+ * point of view come last — where a client who wants one will still find it
+ * complete.
+ *
+ * The brief §4 lists them in a different order. That list is the writing
+ * order of the spec, not a picker order, so this supersedes it for the
+ * picker only.
+ */
 const PRESET_ORDER = Object.freeze([
-  'broadsheet', 'newsroom', 'zine', 'civic', 'field-guide', 'atlas',
+  'civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine',
 ]);
 
 /** Strip every `$`-prefixed note key, at every depth. */

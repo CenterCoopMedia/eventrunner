@@ -42,8 +42,7 @@ import {
   THEME_FONT_ROLES,
   THEME_TEXTURES,
   THEME_PRESET_IDS,
-  STABLE_PRESET_IDS as SHARED_STABLE_PRESET_IDS,
-  EXPERIMENTAL_PRESET_IDS as SHARED_EXPERIMENTAL_PRESET_IDS,
+  recommendedConfiguration,
   THEME_MOTIF_SET_IDS,
   DEFAULT_MODE_POLICY,
   DEFAULT_PRESET_ID,
@@ -160,13 +159,15 @@ export const TEXTURE_IDS = Object.freeze([...THEME_TEXTURES]);
 export const MODE_POLICY_IDS = Object.freeze([...THEME_MODE_POLICIES]);
 /** The mode policy a document without a `mode` field renders as. */
 export { DEFAULT_MODE_POLICY };
-/** The six preset ids (brief §4). data-theme carries one of these. */
+/**
+ * The six style ids, in picker order (brief §4). `data-theme` carries one of
+ * these. All six are first-class: the order is a recommendation and there is
+ * no second tier (owner calibration, 2026-08-27).
+ */
 export const PRESET_IDS = Object.freeze([...THEME_PRESET_IDS]);
-/** The style ids the picker leads with (owner review, 2026-08-27). */
-export const STABLE_PRESET_IDS = Object.freeze([...SHARED_STABLE_PRESET_IDS]);
-/** The style ids the picker keeps behind the "Experimental styles" disclosure. */
-export const EXPERIMENTAL_PRESET_IDS = Object.freeze([...SHARED_EXPERIMENTAL_PRESET_IDS]);
-/** The preset a new deployment starts on. */
+/** The `config/theme` a style produces the moment it is picked. */
+export { recommendedConfiguration };
+/** The style a new deployment starts on. */
 export { DEFAULT_PRESET_ID };
 /** The motif sets data-motif-set switches between (brief §3.8). */
 export const MOTIF_SET_IDS = Object.freeze([...THEME_MOTIF_SET_IDS]);

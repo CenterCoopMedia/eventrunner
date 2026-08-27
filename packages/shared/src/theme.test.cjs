@@ -15,11 +15,8 @@ const {
   DARK_MIN_CONTRAST_UI,
   THEME_CONTRAST_PAIRS,
   THEME_PRESET_IDS,
-  THEME_PRESET_TIERS,
-  STABLE_PRESET_IDS,
-  EXPERIMENTAL_PRESET_IDS,
   DEFAULT_PRESET_ID,
-  presetTier,
+  recommendedConfiguration,
   findThemeContrastFailures,
   getPreset,
   rgbToHex,
@@ -268,33 +265,46 @@ test('the font roles are heading, body, data, and mono — accent is not one of 
   assert.ok(!THEME_FONT_ROLES.includes('accent'));
 });
 
-test('the launch surface is the three stable styles, and the default is one of them', () => {
-  // Owner review 2026-08-27. A tier is a launch decision: every preset
-  // renders in full, and the tier says how much of it has been run against
-  // real client content.
-  assert.deepEqual([...STABLE_PRESET_IDS], ['newsroom', 'zine', 'civic']);
-  assert.deepEqual([...EXPERIMENTAL_PRESET_IDS], ['broadsheet', 'field-guide', 'atlas']);
-  assert.ok(STABLE_PRESET_IDS.includes(DEFAULT_PRESET_ID));
-  assert.equal(DEFAULT_PRESET_ID, 'civic');
-
-  // Every preset carries a tier, and the two lists together are the catalog.
-  for (const id of THEME_PRESET_IDS) {
-    assert.ok(THEME_PRESET_TIERS.includes(getPreset(id).tier), `${id} names a tier`);
-    assert.equal(presetTier(id), getPreset(id).tier);
-  }
-  assert.equal(
-    STABLE_PRESET_IDS.length + EXPERIMENTAL_PRESET_IDS.length,
-    THEME_PRESET_IDS.length,
+test('all six styles are first-class, in picker order, led by the default', () => {
+  // Owner calibration, 2026-08-27. The stability tier is withdrawn: no style
+  // carries a tier, nothing is labelled experimental, and the catalog is one
+  // flat ordered list. Order is a recommendation, and Institutional leads it
+  // because a fresh deployment starts there.
+  assert.deepEqual(
+    [...THEME_PRESET_IDS],
+    ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine'],
   );
-
-  // A preset added without a tier never reaches the launch surface.
-  assert.equal(presetTier('not-a-preset'), 'experimental');
+  assert.equal(THEME_PRESET_IDS[0], DEFAULT_PRESET_ID);
+  assert.equal(DEFAULT_PRESET_ID, 'civic');
+  for (const id of THEME_PRESET_IDS) {
+    assert.ok(!('tier' in getPreset(id)), `${id} states no tier`);
+  }
 });
 
-test('the client-facing style names are the plain ones the picker shows', () => {
-  assert.equal(getPreset('civic').label, 'Institutional');
-  assert.equal(getPreset('newsroom').label, 'Newsroom');
-  assert.equal(getPreset('zine').label, 'Zine');
+test('every style ships one recommended configuration that clears contrast in both modes', () => {
+  // "Each has one excellent recommended configuration that works
+  // immediately" (owner calibration). The recommended configuration is what
+  // picking the style hands the operator, so it has to be publishable as it
+  // stands — a failing pair is a publish error, not a warning.
+  for (const id of THEME_PRESET_IDS) {
+    const configuration = recommendedConfiguration(id);
+    assert.equal(configuration.preset, id);
+    const groups = Object.keys(getPreset(id).options || {});
+    assert.deepEqual(Object.keys(configuration.optionPicks).sort(), groups.sort());
+    for (const group of groups) {
+      const offered = getPreset(id).options[group].choices.map((choice) => choice.id);
+      assert.ok(
+        offered.includes(configuration.optionPicks[group]),
+        `${id}.${group} recommends a choice it offers`,
+      );
+    }
+    assert.deepEqual(
+      findThemeContrastFailures(configuration),
+      [],
+      `${id} publishes clean as recommended`,
+    );
+  }
+  assert.equal(recommendedConfiguration('not-a-style'), null);
 });
 
 test('both spellings of a palette key normalize to the same role', () => {

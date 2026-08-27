@@ -371,22 +371,22 @@
    properties: no block below introduces a property name the blocks
    above do not already carry. data-theme picks which one wins. */
 
-/* Broadsheet — light. */
-:root[data-theme='broadsheet'][data-mode='light'],
-[data-theme='broadsheet'][data-mode='light'] {
-  --brand-primary-rgb: 26 58 110;
-  --brand-primary-dark-rgb: 17 40 80;
-  --brand-primary-light-rgb: 126 150 192;
-  --brand-accent-rgb: 72 84 102;
-  --brand-surface-rgb: 247 244 238;
-  --brand-surface-alt-rgb: 239 235 227;
-  --brand-ink-rgb: 24 26 32;
-  --brand-ink-muted-rgb: 88 92 102;
-  --semantic-success-rgb: 26 94 60;
-  --semantic-warning-rgb: 138 84 12;
-  --semantic-danger-rgb: 162 34 42;
-  --semantic-highlight-rgb: 128 92 16;
-  --semantic-keynote-rgb: 78 52 130;
+/* Institutional — light. */
+:root[data-theme='civic'][data-mode='light'],
+[data-theme='civic'][data-mode='light'] {
+  --brand-primary-rgb: 26 82 150;
+  --brand-primary-dark-rgb: 16 56 106;
+  --brand-primary-light-rgb: 126 164 208;
+  --brand-accent-rgb: 64 80 98;
+  --brand-surface-rgb: 250 250 249;
+  --brand-surface-alt-rgb: 240 240 239;
+  --brand-ink-rgb: 23 24 26;
+  --brand-ink-muted-rgb: 80 83 89;
+  --semantic-success-rgb: 20 92 56;
+  --semantic-warning-rgb: 124 74 6;
+  --semantic-danger-rgb: 162 26 36;
+  --semantic-highlight-rgb: 116 84 10;
+  --semantic-keynote-rgb: 76 48 132;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -396,10 +396,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 216 213 209;
-  --rule-strong-rgb: 124 124 125;
-  --rule-nameplate-rgb: 24 26 32;
-  --color-border-control-rgb: 131 131 131;
+  --rule-hairline-rgb: 218 218 218;
+  --rule-strong-rgb: 125 126 126;
+  --rule-nameplate-rgb: 23 24 26;
+  --color-border-control-rgb: 132 132 133;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -419,22 +419,22 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Broadsheet — dark. */
-:root[data-theme='broadsheet'][data-mode='dark'],
-[data-theme='broadsheet'][data-mode='dark'] {
-  --brand-primary-rgb: 130 170 226;
-  --brand-primary-dark-rgb: 172 200 240;
-  --brand-primary-light-rgb: 70 96 138;
-  --brand-accent-rgb: 154 166 184;
-  --brand-surface-rgb: 28 27 26;
-  --brand-surface-alt-rgb: 40 38 36;
-  --brand-ink-rgb: 237 232 222;
-  --brand-ink-muted-rgb: 170 165 155;
-  --semantic-success-rgb: 124 198 148;
-  --semantic-warning-rgb: 226 172 88;
-  --semantic-danger-rgb: 240 138 140;
-  --semantic-highlight-rgb: 220 186 106;
-  --semantic-keynote-rgb: 186 162 236;
+/* Institutional — dark. */
+:root[data-theme='civic'][data-mode='dark'],
+[data-theme='civic'][data-mode='dark'] {
+  --brand-primary-rgb: 128 178 238;
+  --brand-primary-dark-rgb: 172 208 248;
+  --brand-primary-light-rgb: 56 90 134;
+  --brand-accent-rgb: 152 168 184;
+  --brand-surface-rgb: 25 26 28;
+  --brand-surface-alt-rgb: 37 39 42;
+  --brand-ink-rgb: 238 238 236;
+  --brand-ink-muted-rgb: 174 178 184;
+  --semantic-success-rgb: 126 204 152;
+  --semantic-warning-rgb: 234 180 92;
+  --semantic-danger-rgb: 246 142 146;
+  --semantic-highlight-rgb: 228 196 114;
+  --semantic-keynote-rgb: 190 168 244;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -444,10 +444,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 57 56 53;
-  --rule-strong-rgb: 143 140 134;
-  --rule-nameplate-rgb: 237 232 222;
-  --color-border-control-rgb: 137 134 128;
+  --rule-hairline-rgb: 55 56 57;
+  --rule-strong-rgb: 142 143 142;
+  --rule-nameplate-rgb: 238 238 236;
+  --color-border-control-rgb: 136 136 136;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -563,22 +563,22 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Zine — light. */
-:root[data-theme='zine'][data-mode='light'],
-[data-theme='zine'][data-mode='light'] {
-  --brand-primary-rgb: 198 26 84;
-  --brand-primary-dark-rgb: 156 16 64;
-  --brand-primary-light-rgb: 240 148 182;
-  --brand-accent-rgb: 44 58 110;
-  --brand-surface-rgb: 250 249 244;
-  --brand-surface-alt-rgb: 240 238 230;
-  --brand-ink-rgb: 20 19 18;
-  --brand-ink-muted-rgb: 86 84 80;
-  --semantic-success-rgb: 24 92 58;
-  --semantic-warning-rgb: 136 80 8;
-  --semantic-danger-rgb: 176 28 40;
-  --semantic-highlight-rgb: 126 88 12;
-  --semantic-keynote-rgb: 88 48 142;
+/* Broadsheet — light. */
+:root[data-theme='broadsheet'][data-mode='light'],
+[data-theme='broadsheet'][data-mode='light'] {
+  --brand-primary-rgb: 26 58 110;
+  --brand-primary-dark-rgb: 17 40 80;
+  --brand-primary-light-rgb: 126 150 192;
+  --brand-accent-rgb: 72 84 102;
+  --brand-surface-rgb: 247 244 238;
+  --brand-surface-alt-rgb: 239 235 227;
+  --brand-ink-rgb: 24 26 32;
+  --brand-ink-muted-rgb: 88 92 102;
+  --semantic-success-rgb: 26 94 60;
+  --semantic-warning-rgb: 138 84 12;
+  --semantic-danger-rgb: 162 34 42;
+  --semantic-highlight-rgb: 128 92 16;
+  --semantic-keynote-rgb: 78 52 130;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -588,10 +588,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 218 217 212;
-  --rule-strong-rgb: 123 122 120;
-  --rule-nameplate-rgb: 20 19 18;
-  --color-border-control-rgb: 130 129 126;
+  --rule-hairline-rgb: 216 213 209;
+  --rule-strong-rgb: 124 124 125;
+  --rule-nameplate-rgb: 24 26 32;
+  --color-border-control-rgb: 131 131 131;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -611,22 +611,22 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Zine — dark. */
-:root[data-theme='zine'][data-mode='dark'],
-[data-theme='zine'][data-mode='dark'] {
-  --brand-primary-rgb: 244 124 166;
-  --brand-primary-dark-rgb: 250 170 198;
-  --brand-primary-light-rgb: 118 42 74;
-  --brand-accent-rgb: 144 160 226;
-  --brand-surface-rgb: 21 20 22;
-  --brand-surface-alt-rgb: 33 32 35;
-  --brand-ink-rgb: 242 240 236;
-  --brand-ink-muted-rgb: 168 164 160;
-  --semantic-success-rgb: 122 202 150;
-  --semantic-warning-rgb: 230 176 90;
-  --semantic-danger-rgb: 244 138 142;
-  --semantic-highlight-rgb: 224 192 110;
-  --semantic-keynote-rgb: 190 166 244;
+/* Broadsheet — dark. */
+:root[data-theme='broadsheet'][data-mode='dark'],
+[data-theme='broadsheet'][data-mode='dark'] {
+  --brand-primary-rgb: 130 170 226;
+  --brand-primary-dark-rgb: 172 200 240;
+  --brand-primary-light-rgb: 70 96 138;
+  --brand-accent-rgb: 154 166 184;
+  --brand-surface-rgb: 28 27 26;
+  --brand-surface-alt-rgb: 40 38 36;
+  --brand-ink-rgb: 237 232 222;
+  --brand-ink-muted-rgb: 170 165 155;
+  --semantic-success-rgb: 124 198 148;
+  --semantic-warning-rgb: 226 172 88;
+  --semantic-danger-rgb: 240 138 140;
+  --semantic-highlight-rgb: 220 186 106;
+  --semantic-keynote-rgb: 186 162 236;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -636,10 +636,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 52 51 52;
-  --rule-strong-rgb: 143 141 140;
-  --rule-nameplate-rgb: 242 240 236;
-  --color-border-control-rgb: 136 134 133;
+  --rule-hairline-rgb: 57 56 53;
+  --rule-strong-rgb: 143 140 134;
+  --rule-nameplate-rgb: 237 232 222;
+  --color-border-control-rgb: 137 134 128;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -659,22 +659,22 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Institutional — light. */
-:root[data-theme='civic'][data-mode='light'],
-[data-theme='civic'][data-mode='light'] {
-  --brand-primary-rgb: 26 82 150;
-  --brand-primary-dark-rgb: 16 56 106;
-  --brand-primary-light-rgb: 126 164 208;
-  --brand-accent-rgb: 64 80 98;
-  --brand-surface-rgb: 250 250 249;
-  --brand-surface-alt-rgb: 240 240 239;
-  --brand-ink-rgb: 23 24 26;
-  --brand-ink-muted-rgb: 80 83 89;
-  --semantic-success-rgb: 20 92 56;
-  --semantic-warning-rgb: 124 74 6;
-  --semantic-danger-rgb: 162 26 36;
-  --semantic-highlight-rgb: 116 84 10;
-  --semantic-keynote-rgb: 76 48 132;
+/* Atlas — light. */
+:root[data-theme='atlas'][data-mode='light'],
+[data-theme='atlas'][data-mode='light'] {
+  --brand-primary-rgb: 180 38 34;
+  --brand-primary-dark-rgb: 142 26 24;
+  --brand-primary-light-rgb: 226 148 144;
+  --brand-accent-rgb: 34 88 122;
+  --brand-surface-rgb: 245 247 247;
+  --brand-surface-alt-rgb: 234 238 239;
+  --brand-ink-rgb: 20 26 30;
+  --brand-ink-muted-rgb: 84 94 100;
+  --semantic-success-rgb: 20 92 66;
+  --semantic-warning-rgb: 130 78 8;
+  --semantic-danger-rgb: 168 30 34;
+  --semantic-highlight-rgb: 118 86 12;
+  --semantic-keynote-rgb: 72 54 138;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -684,10 +684,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 218 218 218;
-  --rule-strong-rgb: 125 126 126;
-  --rule-nameplate-rgb: 23 24 26;
-  --color-border-control-rgb: 132 132 133;
+  --rule-hairline-rgb: 214 216 217;
+  --rule-strong-rgb: 121 125 128;
+  --rule-nameplate-rgb: 20 26 30;
+  --color-border-control-rgb: 128 132 134;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -707,22 +707,22 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Institutional — dark. */
-:root[data-theme='civic'][data-mode='dark'],
-[data-theme='civic'][data-mode='dark'] {
-  --brand-primary-rgb: 128 178 238;
-  --brand-primary-dark-rgb: 172 208 248;
-  --brand-primary-light-rgb: 56 90 134;
-  --brand-accent-rgb: 152 168 184;
-  --brand-surface-rgb: 25 26 28;
-  --brand-surface-alt-rgb: 37 39 42;
-  --brand-ink-rgb: 238 238 236;
-  --brand-ink-muted-rgb: 174 178 184;
-  --semantic-success-rgb: 126 204 152;
-  --semantic-warning-rgb: 234 180 92;
-  --semantic-danger-rgb: 246 142 146;
-  --semantic-highlight-rgb: 228 196 114;
-  --semantic-keynote-rgb: 190 168 244;
+/* Atlas — dark. */
+:root[data-theme='atlas'][data-mode='dark'],
+[data-theme='atlas'][data-mode='dark'] {
+  --brand-primary-rgb: 244 122 112;
+  --brand-primary-dark-rgb: 250 166 158;
+  --brand-primary-light-rgb: 118 46 42;
+  --brand-accent-rgb: 124 178 216;
+  --brand-surface-rgb: 22 27 32;
+  --brand-surface-alt-rgb: 33 40 46;
+  --brand-ink-rgb: 231 238 242;
+  --brand-ink-muted-rgb: 154 168 178;
+  --semantic-success-rgb: 116 202 158;
+  --semantic-warning-rgb: 230 178 92;
+  --semantic-danger-rgb: 244 138 138;
+  --semantic-highlight-rgb: 224 192 112;
+  --semantic-keynote-rgb: 182 166 244;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -732,10 +732,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 55 56 57;
-  --rule-strong-rgb: 142 143 142;
-  --rule-nameplate-rgb: 238 238 236;
-  --color-border-control-rgb: 136 136 136;
+  --rule-hairline-rgb: 51 57 61;
+  --rule-strong-rgb: 137 143 148;
+  --rule-nameplate-rgb: 231 238 242;
+  --color-border-control-rgb: 131 137 141;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -851,22 +851,22 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Atlas — light. */
-:root[data-theme='atlas'][data-mode='light'],
-[data-theme='atlas'][data-mode='light'] {
-  --brand-primary-rgb: 180 38 34;
-  --brand-primary-dark-rgb: 142 26 24;
-  --brand-primary-light-rgb: 226 148 144;
-  --brand-accent-rgb: 34 88 122;
-  --brand-surface-rgb: 245 247 247;
-  --brand-surface-alt-rgb: 234 238 239;
-  --brand-ink-rgb: 20 26 30;
-  --brand-ink-muted-rgb: 84 94 100;
-  --semantic-success-rgb: 20 92 66;
-  --semantic-warning-rgb: 130 78 8;
-  --semantic-danger-rgb: 168 30 34;
-  --semantic-highlight-rgb: 118 86 12;
-  --semantic-keynote-rgb: 72 54 138;
+/* Zine — light. */
+:root[data-theme='zine'][data-mode='light'],
+[data-theme='zine'][data-mode='light'] {
+  --brand-primary-rgb: 198 26 84;
+  --brand-primary-dark-rgb: 156 16 64;
+  --brand-primary-light-rgb: 240 148 182;
+  --brand-accent-rgb: 44 58 110;
+  --brand-surface-rgb: 250 249 244;
+  --brand-surface-alt-rgb: 240 238 230;
+  --brand-ink-rgb: 20 19 18;
+  --brand-ink-muted-rgb: 86 84 80;
+  --semantic-success-rgb: 24 92 58;
+  --semantic-warning-rgb: 136 80 8;
+  --semantic-danger-rgb: 176 28 40;
+  --semantic-highlight-rgb: 126 88 12;
+  --semantic-keynote-rgb: 88 48 142;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -876,10 +876,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 214 216 217;
-  --rule-strong-rgb: 121 125 128;
-  --rule-nameplate-rgb: 20 26 30;
-  --color-border-control-rgb: 128 132 134;
+  --rule-hairline-rgb: 218 217 212;
+  --rule-strong-rgb: 123 122 120;
+  --rule-nameplate-rgb: 20 19 18;
+  --color-border-control-rgb: 130 129 126;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -899,22 +899,22 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
-/* Atlas — dark. */
-:root[data-theme='atlas'][data-mode='dark'],
-[data-theme='atlas'][data-mode='dark'] {
-  --brand-primary-rgb: 244 122 112;
-  --brand-primary-dark-rgb: 250 166 158;
-  --brand-primary-light-rgb: 118 46 42;
-  --brand-accent-rgb: 124 178 216;
-  --brand-surface-rgb: 22 27 32;
-  --brand-surface-alt-rgb: 33 40 46;
-  --brand-ink-rgb: 231 238 242;
-  --brand-ink-muted-rgb: 154 168 178;
-  --semantic-success-rgb: 116 202 158;
-  --semantic-warning-rgb: 230 178 92;
-  --semantic-danger-rgb: 244 138 138;
-  --semantic-highlight-rgb: 224 192 112;
-  --semantic-keynote-rgb: 182 166 244;
+/* Zine — dark. */
+:root[data-theme='zine'][data-mode='dark'],
+[data-theme='zine'][data-mode='dark'] {
+  --brand-primary-rgb: 244 124 166;
+  --brand-primary-dark-rgb: 250 170 198;
+  --brand-primary-light-rgb: 118 42 74;
+  --brand-accent-rgb: 144 160 226;
+  --brand-surface-rgb: 21 20 22;
+  --brand-surface-alt-rgb: 33 32 35;
+  --brand-ink-rgb: 242 240 236;
+  --brand-ink-muted-rgb: 168 164 160;
+  --semantic-success-rgb: 122 202 150;
+  --semantic-warning-rgb: 230 176 90;
+  --semantic-danger-rgb: 244 138 142;
+  --semantic-highlight-rgb: 224 192 110;
+  --semantic-keynote-rgb: 190 166 244;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -924,10 +924,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 51 57 61;
-  --rule-strong-rgb: 137 143 148;
-  --rule-nameplate-rgb: 231 238 242;
-  --color-border-control-rgb: 131 137 141;
+  --rule-hairline-rgb: 52 51 52;
+  --rule-strong-rgb: 143 141 140;
+  --rule-nameplate-rgb: 242 240 236;
+  --color-border-control-rgb: 136 134 133;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);

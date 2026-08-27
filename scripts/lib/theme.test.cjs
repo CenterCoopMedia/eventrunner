@@ -7,8 +7,8 @@ const { defaultTheme, rgbToHex, hexToRgb, PLACEHOLDER_LOGOS } = require('./theme
 const { validateTheme } = require('shared/config');
 const {
   DEFAULT_PRESET_ID,
+  THEME_PRESET_IDS,
   getPreset,
-  presetTier,
   resolveLegacyColors,
 } = require('shared/theme');
 
@@ -36,12 +36,13 @@ test('every logo slot starts as a placeholder the readiness branding row can see
 
 test('the seed starts on the default preset, with its palette materialized', () => {
   const theme = defaultTheme();
-  // Owner review 2026-08-27: Institutional is the preset a new deployment
-  // gets, and it is on the stable tier by construction — the launch surface
-  // is what onboarding starts from.
+  // Owner review 2026-08-27: Institutional is the style a new deployment
+  // gets, and it is the style the picker leads with. All six are offered
+  // without a tier (owner calibration), so leading the list is the whole of
+  // what "recommended" means here.
   assert.equal(theme.preset, DEFAULT_PRESET_ID);
   assert.equal(DEFAULT_PRESET_ID, 'civic');
-  assert.equal(presetTier(DEFAULT_PRESET_ID), 'stable');
+  assert.equal(THEME_PRESET_IDS[0], DEFAULT_PRESET_ID);
   assert.equal(theme.motifSet, getPreset(DEFAULT_PRESET_ID).motifSet);
 
   // `colors` is an OUTPUT for a preset document: the one shared resolver

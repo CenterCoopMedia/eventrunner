@@ -415,47 +415,50 @@ const { PRESETS, ADMIN_TOKENS, MOTIF_SET_IDS } = require('./presetCatalog.cjs');
 const THEME_PRESET_IDS = Object.freeze(Object.keys(PRESETS));
 
 /**
- * The two stability tiers (owner review, 2026-08-27).
+ * ALL SIX STYLES ARE FIRST-CLASS (owner calibration, 2026-08-27).
  *
- * A tier is a LAUNCH decision, not a quality decision. Every preset renders
- * in full and every preset holds the same gates. What the tier says is how
- * much of the product has been run against real client content:
+ * An earlier pass split the catalog into a `stable` launch surface and an
+ * `experimental` group. That is withdrawn. Every style is complete,
+ * accessible, responsive, and offered without a warning label. What replaces
+ * the tier is progressive disclosure:
  *
- *   - `stable` — the launch surface. These lead the style picker, and one of
- *     them is what a fresh deployment starts on.
- *   - `experimental` — still fully functional. The picker groups them behind
- *     a disclosure that tells staff to test them on their own content first.
+ *   - `THEME_PRESET_IDS` is the picker order, and order is the only ranking.
+ *     It is a recommendation, not a verdict.
+ *   - Every style ships ONE recommended configuration — the option defaults
+ *     in its preset file — that works the moment it is picked.
+ *     `recommendedConfiguration` builds the `config/theme` a fresh pick
+ *     produces, and `theme.test.cjs` measures all six against the contrast
+ *     bar in both modes.
+ *   - Everything past that first excellent configuration lives behind the
+ *     editor's Advanced disclosure.
  */
-const THEME_PRESET_TIERS = Object.freeze(['stable', 'experimental']);
 
 /**
+ * The `config/theme` a staff member gets the moment they pick a style: the
+ * style id and its recommended option picks, nothing else.
+ *
  * @param {string} id a preset id
- * @returns {string} the preset's tier; `experimental` when it names none, so
- *   a preset added without a tier never lands on the launch surface by
- *   accident.
+ * @returns {{ preset: string, optionPicks: Record<string, string> }|null}
  */
-function presetTier(id) {
-  const tier = PRESETS[id]?.tier;
-  return THEME_PRESET_TIERS.includes(tier) ? tier : 'experimental';
+function recommendedConfiguration(id) {
+  const preset = getPreset(id);
+  if (!preset) return null;
+  const optionPicks = {};
+  for (const [group, spec] of Object.entries(preset.options || {})) {
+    optionPicks[group] = spec.default;
+  }
+  return { preset: id, optionPicks };
 }
 
-/** The preset ids on the launch surface, in catalog order. */
-const STABLE_PRESET_IDS = Object.freeze(
-  THEME_PRESET_IDS.filter((id) => presetTier(id) === 'stable'),
-);
-
-/** The preset ids behind the "Experimental styles" disclosure. */
-const EXPERIMENTAL_PRESET_IDS = Object.freeze(
-  THEME_PRESET_IDS.filter((id) => presetTier(id) === 'experimental'),
-);
-
 /**
- * The preset a new deployment gets (owner review, 2026-08-27).
+ * The style a new deployment gets (owner review, 2026-08-27; kept by the
+ * calibration).
  *
- * The brief §4.2 named Newsroom. The review moved the default to
- * Institutional: it is the plainest of the six, it targets the highest
+ * The brief §4.2 named Newsroom. Institutional is the onboarding default
+ * instead: it is the plainest of the six, it targets the highest
  * accessibility bar, and it is the look a client is least likely to have to
- * undo. The demo fixture stays on Newsroom, which is the story written for
+ * undo. That is a decision about where a client STARTS, not a ranking of the
+ * six. The demo fixture stays on Newsroom, which is the story written for
  * exactly that event.
  */
 const DEFAULT_PRESET_ID = 'civic';
@@ -886,10 +889,7 @@ module.exports = {
   canonicalColorKey,
   overrideTokenKey,
   THEME_PRESET_IDS,
-  THEME_PRESET_TIERS,
-  STABLE_PRESET_IDS,
-  EXPERIMENTAL_PRESET_IDS,
-  presetTier,
+  recommendedConfiguration,
   DEFAULT_PRESET_ID,
   THEME_MOTIF_SET_IDS,
   PRESETS,
