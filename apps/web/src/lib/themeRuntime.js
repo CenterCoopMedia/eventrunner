@@ -170,6 +170,20 @@ export const MOTIF_SET_IDS = Object.freeze([...THEME_MOTIF_SET_IDS]);
 export const NAV_PLACEMENT_IDS = Object.freeze([...THEME_NAV_PLACEMENTS]);
 
 /**
+ * What each placement is called, in an operator's words.
+ *
+ * ONE SET OF WORDS, because the setting is offered in two places — once for
+ * the site on the Branding tab, once as a per-page exception in the page
+ * editor — and an operator who sets it in one and then reads the other has
+ * to recognize their own choice. Two names for one value is two settings as
+ * far as they can tell.
+ */
+export const NAV_PLACEMENT_LABELS = Object.freeze({
+  top: 'Across the top',
+  side: 'Down the side',
+});
+
+/**
  * Convert a hex color string (data from config/theme) to `[r, g, b]`.
  * Accepts #rgb, #rrggbb, and #rrggbbaa (alpha ignored — opacity comes from
  * Tailwind's <alpha-value> modifiers), with or without the leading hash.

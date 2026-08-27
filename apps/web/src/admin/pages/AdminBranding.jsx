@@ -41,6 +41,7 @@ import {
   MODE_POLICY_IDS,
   MOTIF_SET_IDS,
   NAV_PLACEMENT_IDS,
+  NAV_PLACEMENT_LABELS,
   PRESET_IDS,
   RADIUS_IDS,
   THEME_COLOR_KEYS,
@@ -68,21 +69,6 @@ import ThemeProof, { PROOF_PAGES } from '../components/ThemeProof.jsx';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 
 const LOGO_SLOTS = ['primary', 'mark', 'footer', 'ogDefault', 'favicon'];
-
-/**
- * Where the site's navigation sits, in words (this review).
- *
- * IT IS ONE SETTING FOR THE WHOLE SITE, and it is here rather than on each
- * page for the reason the rest of this tab exists: the navigation is part
- * of what the site IS, not part of what one page is about. A reader who
- * meets a top nav on the home page and a side rail on the schedule has been
- * handed two sites, and the nav stops being the furniture they can stop
- * noticing.
- */
-const NAV_PLACEMENT_LABELS = Object.freeze({
-  top: 'Across the top',
-  side: 'Down the side',
-});
 
 /** What each slot is FOR — a path field alone never says (spec §7.2). */
 const LOGO_SLOT_LABELS = {
@@ -393,7 +379,7 @@ export default function AdminBranding() {
         <div className="flex min-w-0 flex-col gap-md">
           <Panel
             title="Preset"
-            description="The base look: two authored palettes, a type map, a shape, and a motif default. Picking a preset replaces every value you have not overridden yourself. Your own per-mode overrides and any font role you name below stay as they are."
+            description="The base look: Two authored palettes, a type map, a shape, and a motif default. Picking a preset replaces every value you have not overridden yourself. Your own per-mode overrides and any font role you name below stay as they are."
           >
             <div className="flex flex-col gap-sm">
               <SelectField
@@ -458,11 +444,29 @@ export default function AdminBranding() {
 
           <Panel title="Motifs, navigation, mode, and the admin mark">
             <div className="flex flex-col gap-sm">
+              {/* ONE SETTING FOR THE WHOLE SITE, and it is here rather than
+                  on each page for the reason the rest of this tab exists:
+                  the navigation is part of what the site IS, not part of
+                  what one page is about. A reader who meets a top nav on the
+                  home page and a rail on the schedule has been handed two
+                  sites, and the nav stops being furniture they can stop
+                  noticing.
+
+                  The words come from lib/themeRuntime.js, which is also
+                  where the page editor's per-page exception reads them, so
+                  an operator meets one name per placement. */}
               <SelectField
                 label="Where the navigation sits"
                 value={form.navPlacement}
                 options={[
-                  { value: '', label: 'Across the top (the default)' },
+                  {
+                    value: '',
+                    // Blank is a real answer and not a repeat of "top": it
+                    // stores nothing, which is what leaves the placement to
+                    // the house. The label says which way that falls so
+                    // nobody has to guess.
+                    label: `Follow the house default — ${NAV_PLACEMENT_LABELS.top}`,
+                  },
                   ...NAV_PLACEMENT_IDS.map((id) => ({
                     value: id,
                     label: NAV_PLACEMENT_LABELS[id] ?? id,

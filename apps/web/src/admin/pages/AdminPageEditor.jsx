@@ -44,6 +44,7 @@ import {
   PAGE_LAYOUT_DEFAULTS,
   PAGE_LAYOUT_VALUES,
 } from '../../lib/pageLayout.js';
+import { NAV_PLACEMENT_LABELS } from '../../lib/themeRuntime.js';
 import {
   PAGE_TEMPLATES,
   PAGE_TEMPLATE_IDS,
@@ -142,11 +143,6 @@ const EDITABLE_LAYOUT_KEYS = Object.freeze(['header', 'arrangement', 'density'])
  */
 const SITE_NAV_PLACEMENT = '';
 
-/** What each navigation placement is called, in an operator's words. */
-const NAV_PLACEMENT_LABELS = Object.freeze({
-  top: 'A row across the top',
-  side: 'A rail down the leading edge',
-});
 
 /** One word per enum value, so a select never reads like a field name. */
 const LAYOUT_VALUE_LABELS = Object.freeze({
@@ -443,7 +439,7 @@ export default function AdminPageEditor({ mode }) {
             />
             {isSystemPage ? (
               <p className="text-caption text-admin-ink-secondary">
-                This is a system page: it has a dedicated route in the app, so
+                This is a system page: It has a dedicated route in the app, so
                 it cannot be deleted or turned into a regular page.
               </p>
             ) : null}

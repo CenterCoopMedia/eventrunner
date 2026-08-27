@@ -49,12 +49,12 @@ feature, so they have no insertion point to pick.
 
 ## Content (Pages → Content editor)
 
-Filling in what a page's blocks actually say is a separate step from shaping the page: pick a
+Filling in what a page's blocks actually say is a separate step from shaping the page: Pick a
 page, then a section, then the block inside it. A page's *structure* — its sections, which block
 types each allows, default blocks — is set in the page editor above; this tree of screens is for
 the block *content* itself. Every one of the eight CMS block types is editable here.
 
-**A statistic needs four things**, and the editor will not save one without them: the finding in
+**A statistic needs four things**, and the editor will not save one without them: The finding in
 words ("Two thirds of sessions are workshops", not "Session types"), what the number counts and
 over what period, where the number came from and the date you read it, and a line describing the
 finding for a screen reader. A stat block saved before this rule existed keeps working; the next
@@ -162,30 +162,30 @@ serving the last-good copy rather than breaking the send.
 
 ### Event settings
 
-The `config/event` fields an admin owns: name, dates, timezone, venue, sender address, and the rest
+The `config/event` fields an admin owns: Name, dates, timezone, venue, sender address, and the rest
 of the event's identity fields. This is a merge-then-validate write — the form only needs to send
 the keys it's actually changing; fields it doesn't touch (like the legal postal address or SEO
 metadata) are left alone.
 
-**Tracks** live here too: the lines your event runs when sessions happen at the same time in
+**Tracks** live here too: The lines your event runs when sessions happen at the same time in
 different rooms. Each track has a letter (A to Z) and a name, and the schedule shows both — a
 reader tells two lines apart by the letter and the name, never by colour alone. Sessions point at a
 track by its letter, so renaming a track is one edit here rather than a change to every session.
 Leave the list empty if everything happens in one room.
 
 **What the track list changes on the public site.** Once you list tracks, the schedule draws as a
-grid on a wide screen: time down the left, one column per track, in the order you listed them. On a
+grid on a wide screen: Time down the left, one column per track, in the order you listed them. On a
 phone — and for anyone reading with a screen reader — the same day reads as a time-ordered list,
 which is a designed view rather than a lesser one. A session with no track runs across the whole
 width, which is what a plenary is. A session that names a parent is listed under it as a stop on
 the way through it rather than as a separate entry, in both views.
 
-**Past days become back issues.** When a day ends, its page keeps every word and quietens: the
+**Past days become back issues.** When a day ends, its page keeps every word and quietens: The
 colour drops out, the day head says "Back issue", and the controls that act on a live event —
 bookmarking, reactions, adding to a calendar — go away. Nothing is hidden, and every link still
 works. Setting an **archive date** for the whole event does the same thing to every day at once.
 
-**Printing.** Print any schedule page and you get the handout: every day of the event, every
+**Printing.** Print any schedule page and you get the handout: Every day of the event, every
 session and every stop under it, tracks named by letter and name, no buttons. You do not have to
 prepare anything for it.
 
@@ -198,7 +198,7 @@ no separate "add it to the admin UI" step.
 
 ### Badges
 
-The badge catalog: categories, each with a max-picks cap and its list of badges, which attendees
+The badge catalog: Categories, each with a max-picks cap and its list of badges, which attendees
 self-select from on their profile. Also a whole-document replace — editing one badge sends the
 complete set of categories back.
 

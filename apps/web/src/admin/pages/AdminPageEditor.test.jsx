@@ -59,6 +59,7 @@ vi.mock('firebase/firestore', () => ({
 
 import App from '../../App.jsx';
 import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
+import { NAV_PLACEMENT_LABELS } from '../../lib/themeRuntime.js';
 
 const SCHOLARSHIPS_DRAFT = {
   id: 'scholarships',
@@ -502,10 +503,14 @@ describe('page editor', () => {
     // following it means rather than sending the operator to another tab.
     expect(nav).toHaveValue('');
     expect(within(nav).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'Follow the site setting — A row across the top',
-      'Only this page: A row across the top',
-      'Only this page: A rail down the leading edge',
+      'Follow the site setting — Across the top',
+      'Only this page: Across the top',
+      'Only this page: Down the side',
     ]);
+    // The words are the Branding tab's words. The setting is offered in two
+    // places and an operator has to recognize their own choice in both, so
+    // both read one list — lib/themeRuntime.js NAV_PLACEMENT_LABELS.
+    expect(NAV_PLACEMENT_LABELS).toEqual({ top: 'Across the top', side: 'Down the side' });
   });
 
   it('stores a page-level navigation exception without disturbing the template', async () => {

@@ -56,7 +56,7 @@ export const PAGE_TEMPLATES = Object.freeze({
   standard: Object.freeze({
     label: 'Standard page',
     description:
-      'The ordinary page: a running header, one column, and normal spacing. Start here.',
+      'The ordinary page: A running header, one column, and normal spacing. Start here.',
     layout: Object.freeze({
       header: 'nameplate-compact',
       arrangement: 'list',

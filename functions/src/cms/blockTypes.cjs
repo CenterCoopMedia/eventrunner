@@ -41,7 +41,7 @@ const BLOCK_TYPES = Object.freeze({
   text: blockType({
     id: 'text',
     label: 'Text',
-    description: 'A single plain-text value: headings, labels, short copy.',
+    description: 'A single plain-text value: Headings, labels, short copy.',
     fields: [field('value', 'string', true)],
   }),
   richtext: blockType({
@@ -63,7 +63,7 @@ const BLOCK_TYPES = Object.freeze({
   cta: blockType({
     id: 'cta',
     label: 'Call to action',
-    description: 'A button or prominent link: label plus destination.',
+    description: 'A button or prominent link: Label plus destination.',
     fields: [
       field('label', 'string', true),
       field('url', 'url', true),
@@ -74,7 +74,7 @@ const BLOCK_TYPES = Object.freeze({
     id: 'stat',
     label: 'Statistic',
     description:
-      'A number that carries evidence: the figure and its caption, plus the four parts ' +
+      'A number that carries evidence: The figure and its caption, plus the four parts ' +
       'every stat must state — the finding in words, what it counts, where it came from, ' +
       'and what a screen reader hears. All six are required to write one.',
     fields: [
