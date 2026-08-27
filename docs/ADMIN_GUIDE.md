@@ -10,7 +10,7 @@ This is the whole visual setup, start to finish. It takes about twenty minutes a
 
 1. **Pick a site style.** Settings → Branding, the first control. Six ship; three are the launch surface and three sit behind a disclosure until you have tried them on your own content. Picking one replaces every value you have not changed yourself, so do this first.
 2. **Add the identity assets.** Five slots: the primary logo and the square icon, then the footer logo, the social sharing image, and the favicon behind **More image slots**. Same picker the Media tab uses. A slot you leave empty falls back to the event name in type, which is a finished look and not a placeholder.
-3. **Set the Main brand colour.** One colour. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. You do not set them, and no second colour anywhere changes how the public site looks.
+3. **Set the Main brand colour.** One colour. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. You do not set them, and there is no second colour to set anywhere.
 4. **Preview representative pages.** The **Page preview** beside the controls renders *your* pages with the draft applied. Look at three: the home page, the schedule on its longest day, and one long text page. Check each light and dark.
 5. **Resolve the warnings.** Anything the editor flags — a colour pair too close to read, a logo the wrong shape — is named with the pair, the mode, and the measurement. Fix what it names.
 6. **Publish.** The live public site restyles with no deploy. This is a config write, not a code change.
@@ -36,8 +36,6 @@ Work down the controls in this order.
 **Navigation.** Whether the navigation runs across the top or down the leading edge. One choice, every page, for the same reason the header is site-wide.
 
 **Light or dark.** Always light, always dark, or follow the reader's own setting. Every site style defines both, so there is no wrong answer here.
-
-**Admin marker colour.** The one colour on this tab that does not touch the public site. It is used in exactly two places in the admin panel — the marker beside the section you are in, and the mark on the page-header rule — and leaving it blank uses the admin's own ink, which is what most deployments do. If the colour you enter is too pale to read against the admin background, the marker falls back to that ink and the panel tells you the ratio it measured and what it fell back to; your value is stored exactly as you typed it, so you can adjust it rather than start again.
 
 **Advanced.** Everything else the system can do, behind a disclosure, and none of it is needed for a finished site:
 
