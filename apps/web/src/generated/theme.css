@@ -1016,6 +1016,64 @@
   --marginalia-rgb: var(--color-ink-motif-rgb);
 }
 
+/* Print palette (brief §2.1, §3.3). Paper has no dark mode: a reader who
+   prints from a dark screen gets the light edition. Every print rule reads
+   these tokens, so re-pointing them here is the whole switch. */
+@media print {
+  /* The light edition, whatever the screen is in. */
+  html:root,
+  html:root[data-mode='dark'],
+  html:root[data-theme][data-mode='dark'] {
+    --brand-primary-rgb: 178 30 50;
+    --brand-primary-dark-rgb: 140 20 38;
+    --brand-primary-light-rgb: 224 148 158;
+    --brand-accent-rgb: 46 84 126;
+    --brand-surface-rgb: 246 247 249;
+    --brand-surface-alt-rgb: 236 238 242;
+    --brand-ink-rgb: 22 24 29;
+    --brand-ink-muted-rgb: 88 95 108;
+    --semantic-success-rgb: 22 96 62;
+    --semantic-warning-rgb: 134 82 10;
+    --semantic-danger-rgb: 170 32 44;
+    --semantic-highlight-rgb: 124 90 14;
+    --semantic-keynote-rgb: 82 54 140;
+    --color-surface-rgb: var(--brand-surface-rgb);
+    --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+    --color-text-primary-rgb: var(--brand-ink-rgb);
+    --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+    --color-accent-rgb: var(--brand-primary-rgb);
+    --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+    --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+    --color-accent-secondary-rgb: var(--brand-accent-rgb);
+    --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+    --rule-hairline-rgb: 215 216 218;
+    --rule-strong-rgb: 123 124 128;
+    --rule-nameplate-rgb: 22 24 29;
+    --color-border-control-rgb: 130 131 135;
+    --session-card-rule-rgb: var(--rule-hairline-rgb);
+    --session-card-surface-rgb: var(--color-surface-rgb);
+    --session-card-stamp-rgb: var(--color-accent-rgb);
+    --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+    --nameplate-text-rgb: var(--color-text-primary-rgb);
+    --nameplate-frame-rgb: var(--rule-hairline-rgb);
+    --section-rule-rgb: var(--rule-strong-rgb);
+    --folio-rule-rgb: var(--rule-hairline-rgb);
+    --folio-text-rgb: var(--color-text-secondary-rgb);
+    --schedule-grid-rgb: var(--rule-hairline-rgb);
+    --schedule-forward-rgb: var(--color-surface-alt-rgb);
+    --schedule-trace-rgb: var(--color-accent-rgb);
+    --back-issue-ink-rgb: var(--color-text-secondary-rgb);
+    --back-issue-rule-rgb: var(--rule-hairline-rgb);
+    --plate-frame-rgb: var(--rule-hairline-rgb);
+    --specimen-label-rule-rgb: var(--rule-hairline-rgb);
+    --map-grid-rgb: var(--rule-hairline-rgb);
+    --route-mark-rgb: var(--color-accent-rgb);
+    --route-mark-ink-rgb: var(--color-surface-rgb);
+    --callout-rgb: var(--color-text-primary-rgb);
+    --marginalia-rgb: var(--color-ink-motif-rgb);
+  }
+}
+
 /* Admin identity — light (admin story part 6). Emitted once per mode, never once per theme: the admin obeys data-mode and ignores data-theme. */
 :root,
 :root[data-mode='light'] {
