@@ -130,7 +130,7 @@ export function buildIcsCalendar(eventConfig, sessions, { now = new Date() } = {
   const unfolded = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    `PRODID:-//Run of Show//${prodIdName}//EN`,
+    `PRODID:-//Event Runner//${prodIdName}//EN`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     ...(Array.isArray(sessions) ? sessions : [])

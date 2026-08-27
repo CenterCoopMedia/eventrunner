@@ -16,12 +16,13 @@ Please do **not** open a public GitHub issue for security problems.
 repository. Reports filed there are visible only to maintainers.
 
 **Fallback:** if you cannot use GitHub's reporting flow, email
-info@collaborativejournalism.org with a description of the issue, steps to
+info@eventrunner.org with a description of the issue, steps to
 reproduce, and the affected version or commit.
 
-<!-- OPERATOR NOTE: before public launch, replace info@collaborativejournalism.org
-     with a dedicated security@ alias so vulnerability reports do not land in a
-     general-purpose inbox. -->
+<!-- OPERATOR NOTE: info@eventrunner.org is the operational address (Postmark Server
+     "Event Runner", verified per issue #98). Consider a dedicated security@ alias
+     once volume justifies splitting vulnerability reports out of the general-purpose
+     inbox. -->
 
 ## What to expect
 

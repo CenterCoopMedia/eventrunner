@@ -608,17 +608,24 @@ token, password, or API key value into this document — name only *where* it wa
 - [ ] Counsel engaged: yes/no, date, and (once available) their finding on 3a/3b
 
 ### Workstream B
-- [ ] DKIM TXT record added and visible in Cloudflare: yes/no
-- [ ] Return-Path CNAME added, confirmed "DNS only" (not proxied): yes/no
-- [ ] DMARC TXT record added: yes/no
-- [ ] Inbound forwarding for events@runofshow.net set up (optional): yes/no
+- [x] Domain is `eventrunner.org` (superseding `runofshow.net` above — see issue #98's verified
+      source of truth). DKIM TXT record added and visible in Cloudflare: yes
+- [x] Return-Path CNAME added, confirmed "DNS only" (not proxied): yes — `pm-bounces.eventrunner.org`
+- [x] DMARC TXT record added: yes
+- [x] Inbound forwarding for `info@eventrunner.org` set up: yes, via Cloudflare Email Routing,
+      forwarding to the maintainer's real inbox (`amditisj@montclair.edu`) — this is the inbound
+      side, entirely separate from Postmark's outbound-only sending; see issue #91 for the
+      live-sending cutover once Postmark approves the account.
 
 ### Workstream C
-- [ ] Postmark account created; plan tier and Server capacity confirmed: (plan name / Server limit)
-- [ ] Server `runofshow-dev` created; `EMAIL_PROVIDER_API_KEY` stored as a GitHub Environment
-      secret at: (name the environment, not the value) and mirrored to Secret Manager at project:
-      (project id). `EMAIL_ACCOUNT_API_KEY` confirmed in operator storage only (not this project's
-      GitHub Environment or Secret Manager): yes/no
+- [x] Postmark Server `Event Runner` created for the `eventrunner.org` sender domain (issue #98's
+      verified source of truth). Plan tier and Server capacity: not yet recorded here — see issue #91.
+- [ ] `EMAIL_PROVIDER_API_KEY` stored as a GitHub Environment secret at: (name the environment, not
+      the value) and mirrored to Secret Manager at project: (project id) — pending, see issue #91.
+      `EMAIL_ACCOUNT_API_KEY` (the Postmark account token) confirmed in operator storage only, never
+      a deployment's GitHub Environment or Secret Manager: yes, per issue #98's verified source of
+      truth ("Postmark account token remains operator-only"; "application deployments receive only
+      their Server token").
 - [ ] `verify-sender-domain.cjs` output: (paste exit code and summary line, not any secret)
 - [ ] SPF line in that output (informational only — any value is fine when DKIM and Return-Path
       pass; no SPF record to publish): (paste the SPF verdict)

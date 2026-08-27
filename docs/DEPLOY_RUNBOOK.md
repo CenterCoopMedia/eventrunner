@@ -99,7 +99,7 @@ Now the deploy principal:
 ```sh
 gcloud iam service-accounts create "<DEPLOY_SA>" \
   --project=<GCP_PROJECT_ID> \
-  --display-name="Run of Show deploy (<CLIENT_ENV>)"
+  --display-name="Event Runner deploy (<CLIENT_ENV>)"
 
 DEPLOY_SA_EMAIL="<DEPLOY_SA>@<GCP_PROJECT_ID>.iam.gserviceaccount.com"
 
@@ -477,7 +477,7 @@ from minutes to about a day (§0–3, and `docs/CLIENT_ONBOARDING.md` §3 item 3
 `node scripts/init-event.cjs --check` after a domain change of any kind rather than assuming the
 readiness table is still accurate; the sender-domain and Auth rows in particular are
 operator-attested and do not re-verify themselves on a timer. See issue #66 for the fuller
-per-client-subdomain (`client.runofshow.net`) provisioning flow this repo will eventually build on
+per-client-subdomain (`client.eventrunner.org`) provisioning flow this repo will eventually build on
 top of this same Hosting custom-domain mechanism — the wildcard-vs-per-client CNAME strategy is out
 of scope here and tracked there, not in this runbook. The Cloud Run site-publisher has since landed
 (#36) and is documented in §9; it is orthogonal to per-client subdomains, reaching the job as
@@ -519,7 +519,7 @@ its grants are the entire blast radius of a compromised publisher image:
 ```sh
 gcloud iam service-accounts create site-publisher \
   --project=<GCP_PROJECT_ID> \
-  --display-name="Run of Show site publisher (<CLIENT_ENV>)"
+  --display-name="Event Runner site publisher (<CLIENT_ENV>)"
 
 PUBLISHER_SA_EMAIL="site-publisher@<GCP_PROJECT_ID>.iam.gserviceaccount.com"
 

@@ -1,6 +1,6 @@
 # Governance
 
-Run of Show is a public Apache-2.0 project operated by the Center for Cooperative Media at Montclair State University.
+Event Runner is a public Apache-2.0 project operated by the Center for Cooperative Media at Montclair State University.
 
 ## Who decides
 

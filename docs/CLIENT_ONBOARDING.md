@@ -105,7 +105,7 @@ path (client edits are still never overwritten). This is what clears the Auth ro
 Firebase Hosting → add the custom domain, complete DNS verification (a TXT record), and wait for
 certificate issuance before announcing the site. Both steps can take anywhere from minutes to about
 a day; re-check readiness (§6) rather than assuming it finished. If this client's domain is a
-`*.runofshow.net` subdomain rather than their own domain, see the wildcard-vs-per-client DNS note
+`*.eventrunner.org` subdomain rather than their own domain, see the wildcard-vs-per-client DNS note
 in `docs/DEPLOY_RUNBOOK.md` (issue #66) — the attach mechanics are the same Hosting custom-domain
 flow either way.
 
