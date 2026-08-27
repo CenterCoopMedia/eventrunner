@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import SystemPage from '../components/SystemPage.jsx';
 import Tag from '../components/editorial/Tag.jsx';
 import { publishDateLabel, sortUpdates, toPublishDate } from '../lib/updateDates.js';
 
@@ -56,7 +57,7 @@ export default function Updates() {
   const visible = sortUpdates(updates.filter((u) => u?.visible !== false));
 
   return (
-    <article>
+    <SystemPage pageId="updates">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">Updates</h1>
       {visible.length === 0 ? (
         <div className="mt-lg">
@@ -107,6 +108,6 @@ export default function Updates() {
           })}
         </ul>
       )}
-    </article>
+    </SystemPage>
   );
 }

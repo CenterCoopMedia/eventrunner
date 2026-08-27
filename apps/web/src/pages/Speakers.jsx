@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import SystemPage from '../components/SystemPage.jsx';
 import SpecimenLabel from '../components/editorial/SpecimenLabel.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
 
@@ -39,7 +40,7 @@ export default function Speakers() {
   }
 
   return (
-    <article>
+    <SystemPage pageId="speakers">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">Speakers</h1>
       {speakers.length === 0 ? (
         <div className="mt-lg">
@@ -106,6 +107,6 @@ export default function Speakers() {
           })}
         </ul>
       )}
-    </article>
+    </SystemPage>
   );
 }

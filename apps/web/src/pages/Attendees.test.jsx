@@ -18,6 +18,12 @@ vi.mock('../contexts/ProfileContext.jsx', () => ({
 vi.mock('../lib/profileSource.js', () => ({
   subscribeDirectory: (...args) => subscribeDirectoryMock(...args),
 }));
+// The page shell reads the cmsPages document for its layout and its slot
+// sections (components/SystemPage.jsx). This route has no seeded page, which
+// is exactly the "no document, default layout, no sections" case.
+vi.mock('../contexts/ContentContext.jsx', () => ({
+  useContent: () => ({ getPage: () => null, getSectionBlocks: () => [] }),
+}));
 
 const { default: Attendees } = await import('./Attendees.jsx');
 

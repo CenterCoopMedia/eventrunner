@@ -36,6 +36,11 @@
     "--section-rule-width": "var(--rule-strong-width)",
     "--section-rule-gap": "var(--space-lg)"
   },
+  "$page-note": "The hybrid page shell (brief §6.1, §6.2). A system page's composable sections sit at --page-section-gap from what comes before them, and a ruled directory row is padded at --page-row-pad-block. Both are what the `density` layout variant moves: tight, comfortable, and loose remap them in index.css, and a page that states no density keeps the preset's own.",
+  "page": {
+    "--page-section-gap": "var(--space-2xl)",
+    "--page-row-pad-block": "var(--space-md)"
+  },
   "folio-rule": {
     "--folio-rule-rgb": "--rule-hairline-rgb",
     "--folio-text-rgb": "--color-text-secondary-rgb",

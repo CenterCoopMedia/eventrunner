@@ -15,7 +15,7 @@
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
+import SystemPage from '../components/SystemPage.jsx';
 import CtaBlock from '../components/blocks/CtaBlock.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
@@ -50,9 +50,6 @@ export default function Home() {
   const heroCtas = getSectionBlocks('hero').filter(
     (block) => block.blockType === 'cta',
   );
-  const otherSections = (page?.sections ?? []).filter(
-    (section) => section.id !== 'hero',
-  );
 
   return (
     // data-content-source mirrors ContentContext's own `source` field
@@ -62,7 +59,11 @@ export default function Home() {
     // runtime cmsContent listener has delivered its first live batch",
     // since a freshly-seeded project's live content and the committed demo
     // snapshot render identical text by construction (spec §8.6 hygiene).
-    <article data-content-source={source}>
+    //
+    // The lead is the core (brief §6.2), so the `hero` section is the core's
+    // own and never renders again as a slot section. Everything else the
+    // page stores renders around the core in its stated slot.
+    <SystemPage pageId={['home', '/']} exclude={['hero']} data-content-source={source}>
       <section
         className="pb-xl"
         {...(leadTitle ? { 'aria-labelledby': 'hero-title' } : { 'aria-label': 'Introduction' })}
@@ -130,22 +131,6 @@ export default function Home() {
         </section>
       ) : null}
 
-      {otherSections.map((section) => {
-        const blocks = getSectionBlocks(section.id);
-        if (!blocks.length) return null;
-        return (
-          <section
-            key={section.id}
-            aria-labelledby={`section-${section.id}`}
-            className="mt-2xl"
-          >
-            <SectionHead level={2} id={`section-${section.id}`} title={section.label} />
-            <div className="mt-md">
-              <SectionBlocks blocks={blocks} />
-            </div>
-          </section>
-        );
-      })}
-    </article>
+    </SystemPage>
   );
 }

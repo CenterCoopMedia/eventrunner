@@ -103,6 +103,10 @@ function renderSchedule({
                 organizationsData: [],
                 loading,
                 getBlock: () => null,
+                // The page shell reads the page document for its layout and
+                // its slot sections (components/SystemPage.jsx).
+                getPage: () => null,
+                getSectionBlocks: () => [],
               }}
             >
               <Schedule />

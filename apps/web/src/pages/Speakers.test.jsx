@@ -9,7 +9,9 @@ import { MemoryRouter } from 'react-router-dom';
 
 let speakers;
 vi.mock('../contexts/ContentContext.jsx', () => ({
-  useContent: () => ({ speakers }),
+  // The page shell reads the cmsPages document for its layout and its
+  // slot sections (components/SystemPage.jsx); this directory has neither.
+  useContent: () => ({ speakers, getPage: () => null, getSectionBlocks: () => [] }),
 }));
 let features = { speakers: true };
 vi.mock('../contexts/EventConfigContext.jsx', () => ({

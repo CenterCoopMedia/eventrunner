@@ -11,7 +11,9 @@ const SAFE_URL = 'https://example.org';
 
 let organizationsData;
 vi.mock('../contexts/ContentContext.jsx', () => ({
-  useContent: () => ({ organizationsData }),
+  // The page shell reads the cmsPages document for its layout and its
+  // slot sections (components/SystemPage.jsx); this directory has neither.
+  useContent: () => ({ organizationsData, getPage: () => null, getSectionBlocks: () => [] }),
 }));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ features: { sponsors: true } }),

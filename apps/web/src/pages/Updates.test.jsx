@@ -47,7 +47,9 @@ function renderUpdates({ features = { updates: true }, updates = [] } = {}) {
       <EventConfigContext.Provider
         value={{ eventConfig: {}, features, theme: {}, badges: null, source: 'snapshot' }}
       >
-        <ContentContext.Provider value={{ updates, getBlock: () => null }}>
+        <ContentContext.Provider
+          value={{ updates, getBlock: () => null, getPage: () => null, getSectionBlocks: () => [] }}
+        >
           <Updates />
         </ContentContext.Provider>
       </EventConfigContext.Provider>

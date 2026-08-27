@@ -19,6 +19,7 @@ import { badgeLabel, visibleBadgeIds } from '../lib/badgeDisplay.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
+import SystemPage from '../components/SystemPage.jsx';
 import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
 import Tag from '../components/editorial/Tag.jsx';
 
@@ -109,7 +110,7 @@ export default function Attendees() {
 
   return (
     <div className="grid gap-xl lg:grid-cols-[2fr_1fr]">
-      <article>
+      <SystemPage pageId="attendees">
         <h1 className="font-heading text-h1 font-semibold text-text-primary">Attendees</h1>
         {status === 'ready' && !attendeeAccess ? (
           <p className="mt-xs max-w-prose text-body text-text-secondary">
@@ -194,7 +195,7 @@ export default function Attendees() {
             })}
           </ul>
         )}
-      </article>
+      </SystemPage>
       <ProfileSidebar />
     </div>
   );

@@ -163,6 +163,10 @@
   --section-rule-width: var(--rule-strong-width);
   --section-rule-gap: var(--space-lg);
 
+  /* Tier 3 — page contract (brief §3.1). */
+  --page-section-gap: var(--space-2xl);
+  --page-row-pad-block: var(--space-md);
+
   /* Tier 3 — folio-rule contract (brief §3.1). */
   --folio-rule-width: var(--rule-hairline-width);
   --folio-rule-top-width: 0;

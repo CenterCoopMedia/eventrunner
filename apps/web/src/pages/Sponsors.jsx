@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import SystemPage from '../components/SystemPage.jsx';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 
 export default function Sponsors() {
@@ -35,7 +36,7 @@ export default function Sponsors() {
   }
 
   return (
-    <article>
+    <SystemPage pageId="sponsors">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">Sponsors</h1>
       {visible.length === 0 ? (
         <div className="mt-lg">
@@ -86,6 +87,6 @@ export default function Sponsors() {
           ))}
         </ul>
       )}
-    </article>
+    </SystemPage>
   );
 }
