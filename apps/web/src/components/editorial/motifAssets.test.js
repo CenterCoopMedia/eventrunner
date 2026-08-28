@@ -12,8 +12,21 @@ const LIVE_SLOTS = [
   { file: 'empty-state.svg', width: 320, height: 128 },
 ];
 
+const PAINT_PROPERTIES = new Set([
+  'color',
+  'fill',
+  'flood-color',
+  'lighting-color',
+  'stop-color',
+  'stroke',
+]);
+
 function readAsset(file) {
   return readFileSync(resolve(ASSET_DIR, file), 'utf8');
+}
+
+function markupOnly(svg) {
+  return svg.replace(/<!--[\s\S]*?-->/g, '');
 }
 
 function parseViewBox(svg) {
@@ -26,10 +39,79 @@ function parseViewBox(svg) {
   return { width, height };
 }
 
+function parseNumericStrokeWidth(value) {
+  if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(value.trim())) {
+    throw new Error(`Unsupported stroke-width value: ${JSON.stringify(value)}`);
+  }
+  return Number(value);
+}
+
+function styleDeclarations(style) {
+  return style
+    .split(';')
+    .map((declaration) => declaration.trim())
+    .filter(Boolean)
+    .map((declaration) => {
+      const colon = declaration.indexOf(':');
+      if (colon < 1) throw new Error(`Unsupported inline style: ${JSON.stringify(declaration)}`);
+      return {
+        property: declaration.slice(0, colon).trim().toLowerCase(),
+        value: declaration.slice(colon + 1).trim(),
+      };
+    });
+}
+
 function strokeWidths(svg) {
-  return [...svg.matchAll(/stroke-width="([0-9]*\.?[0-9]+)"/g)]
-    .map((match) => Number(match[1]))
-    .filter(Number.isFinite);
+  const markup = markupOnly(svg);
+  if (/<style\b/i.test(markup) || /\bclass\s*=/i.test(markup)) {
+    throw new Error('Motif SVGs cannot use stylesheet or class-based stroke declarations.');
+  }
+
+  const widths = [...markup.matchAll(/\bstroke-width\s*=\s*["']([^"']+)["']/gi)].map(
+    (match) => parseNumericStrokeWidth(match[1]),
+  );
+
+  for (const match of markup.matchAll(/\bstyle\s*=\s*["']([^"']*)["']/gi)) {
+    for (const { property, value } of styleDeclarations(match[1])) {
+      if (property === 'stroke-width') widths.push(parseNumericStrokeWidth(value));
+    }
+  }
+
+  const withoutSupportedDeclarations = markup
+    .replace(/\bstroke-width\s*=\s*["'](?:\d+(?:\.\d+)?|\.\d+)["']/gi, '')
+    .replace(/\bstyle\s*=\s*["']([^"']*)["']/gi, (_attribute, style) => {
+      const remaining = styleDeclarations(style).filter(
+        ({ property }) => property !== 'stroke-width',
+      );
+      return remaining.length
+        ? `style="${remaining.map(({ property, value }) => `${property}: ${value}`).join('; ')}"`
+        : '';
+    });
+
+  if (/\bstroke-width\b/i.test(withoutSupportedDeclarations)) {
+    throw new Error('Motif SVG contains an unsupported stroke-width declaration.');
+  }
+  return widths;
+}
+
+function paintValues(svg) {
+  const markup = markupOnly(svg);
+  if (/<style\b/i.test(markup) || /\bclass\s*=/i.test(markup)) {
+    throw new Error('Motif SVGs cannot use stylesheet or class-based paint declarations.');
+  }
+
+  const values = [];
+  for (const match of markup.matchAll(
+    /\b(color|fill|flood-color|lighting-color|stop-color|stroke)\s*=\s*["']([^"']+)["']/gi,
+  )) {
+    values.push({ property: match[1].toLowerCase(), value: match[2].trim() });
+  }
+  for (const match of markup.matchAll(/\bstyle\s*=\s*["']([^"']*)["']/gi)) {
+    for (const declaration of styleDeclarations(match[1])) {
+      if (PAINT_PROPERTIES.has(declaration.property)) values.push(declaration);
+    }
+  }
+  return values;
 }
 
 describe('fauna motif assets', () => {
@@ -47,8 +129,12 @@ describe('fauna motif assets', () => {
   );
 
   it.each(LIVE_SLOTS)('$file inherits motif ink and carries no fixed color', ({ file }) => {
-    const svg = readAsset(file);
-    expect(svg).toContain('currentColor');
-    expect(svg).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    const values = paintValues(readAsset(file));
+    expect(values.length).toBeGreaterThan(0);
+    for (const { property, value } of values) {
+      expect([`${property}: currentColor`, `${property}: none`]).toContain(
+        `${property}: ${value}`,
+      );
+    }
   });
 });
