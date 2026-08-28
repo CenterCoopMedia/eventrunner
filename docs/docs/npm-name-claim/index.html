@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -140,7 +141,7 @@
           <h2 id="1-check-availability-do-this-first-and-again-in-step-4-immediately-before-publishing">1. Check availability (do this first, and again in step 4 immediately before publishing)<a class="heading-anchor" href="#1-check-availability-do-this-first-and-again-in-step-4-immediately-before-publishing" aria-label="Link to this section">#</a></h2>
           <p>Package names and scopes are two different registry objects and need two different checks.</p>
           <p><strong>The two package names</strong> — <code>npm view</code> is the right tool here:</p>
-          <pre><code class="language-sh">npm view eventrunner
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">npm view eventrunner
           npm view event-runner
           </code></pre>
           <p>Expected result for both: <code>npm error code E404</code> / <code>404 Not Found</code> (the npm CLI&#39;s &quot;not found&quot;
@@ -149,11 +150,11 @@
           version or dist-tag, so a bare scope fails with <code>EINVALIDTAGNAME</code> (&quot;Tags may not have any
           characters that encodeURIComponent encodes&quot;) no matter whether the scope is free or taken. That
           error tells you nothing about availability. Use the org endpoint instead:</p>
-          <pre><code class="language-sh">npm org ls eventrunner
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">npm org ls eventrunner
           npm org ls event-runner
           </code></pre>
           <p>What distinguishes the two states:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Result</th><th>What it means</th></tr>
@@ -166,7 +167,7 @@
           </div>
           <p>The same distinction without the CLI, if you would rather not shell out — the registry answers
           this endpoint unauthenticated:</p>
-          <pre><code class="language-sh">curl -o /dev/null -w &#39;%{http_code}\n&#39; https://registry.npmjs.org/-/org/eventrunner/user
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">curl -o /dev/null -w &#39;%{http_code}\n&#39; https://registry.npmjs.org/-/org/eventrunner/user
           curl -o /dev/null -w &#39;%{http_code}\n&#39; https://registry.npmjs.org/-/org/event-runner/user
           </code></pre>
           <p><code>404</code> means the scope is free; <code>200</code> means an org already holds it. (The
@@ -176,12 +177,12 @@
           <p>If any of the four is already claimed, stop — someone else has taken it — and tell the maintainer
           before doing anything else in this runbook.</p>
           <h2 id="2-create-the-placeholder-packages-scratch-directory-outside-this-repo">2. Create the placeholder packages (scratch directory, outside this repo)<a class="heading-anchor" href="#2-create-the-placeholder-packages-scratch-directory-outside-this-repo" aria-label="Link to this section">#</a></h2>
-          <pre><code class="language-sh">mkdir -p /tmp/eventrunner-npm-claim/eventrunner
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">mkdir -p /tmp/eventrunner-npm-claim/eventrunner
           mkdir -p /tmp/eventrunner-npm-claim/event-runner
           </code></pre>
           <p>For each directory, write a <code>package.json</code> with this content (only the <code>name</code> field differs
           between the two):</p>
-          <pre><code class="language-json">{
+          <pre data-scroll-region data-scroll-label="Code example (json)"><code class="language-json">{
             &quot;name&quot;: &quot;eventrunner&quot;,
             &quot;version&quot;: &quot;0.0.0&quot;,
             &quot;private&quot;: false,
@@ -193,7 +194,7 @@
           not commit the placeholder packages to this repo; they are published from a scratch directory
           outside it.</p>
           <h2 id="3-confirm-npm-login-and-2fa-before-publishing">3. Confirm npm login and 2FA before publishing<a class="heading-anchor" href="#3-confirm-npm-login-and-2fa-before-publishing" aria-label="Link to this section">#</a></h2>
-          <pre><code class="language-sh">npm login
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">npm login
           </code></pre>
           <p>If prompted, complete 2FA. If you already have a session (<code>npm whoami</code> succeeds), you can skip
           <code>npm login</code>, but still confirm you&#39;re the org account, not a personal one (see step 0).</p>
@@ -209,7 +210,7 @@
           (create orgs), get an explicit &quot;yes, go ahead&quot; from the maintainer in the same session — a plan
           approval from an earlier conversation does not count as this go-ahead.</p>
           <h2 id="6-publish-the-placeholders">6. Publish the placeholders<a class="heading-anchor" href="#6-publish-the-placeholders" aria-label="Link to this section">#</a></h2>
-          <pre><code class="language-sh">cd /tmp/eventrunner-npm-claim/eventrunner &amp;&amp; npm publish --access public
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">cd /tmp/eventrunner-npm-claim/eventrunner &amp;&amp; npm publish --access public
           cd /tmp/eventrunner-npm-claim/event-runner &amp;&amp; npm publish --access public
           </code></pre>
           <p><code>npm publish</code> with 2FA enabled prompts for a one-time code (or an npm-website approval, if you&#39;ve
@@ -217,19 +218,19 @@
           script around the 2FA prompt or store an automation token that skips it for this account.</p>
           <h2 id="7-create-the-two-npm-organizationsscopes">7. Create the two npm organizations/scopes<a class="heading-anchor" href="#7-create-the-two-npm-organizationsscopes" aria-label="Link to this section">#</a></h2>
           <p>Via the npm website (Account → Add Organization) or, if the installed npm CLI version supports it:</p>
-          <pre><code class="language-sh">npm org create eventrunner
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">npm org create eventrunner
           npm org create event-runner
           </code></pre>
           <p>An org claims the <code>@eventrunner</code> / <code>@event-runner</code> scope even before anything is published under
           it — this step alone secures the scope. Add the maintainer (and anyone else who should have
           publish rights) as an org member with the appropriate role.</p>
           <h2 id="8-verify">8. Verify<a class="heading-anchor" href="#8-verify" aria-label="Link to this section">#</a></h2>
-          <pre><code class="language-sh">npm view eventrunner
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">npm view eventrunner
           npm view event-runner
           </code></pre>
           <p>Both should now return the placeholder package&#39;s metadata (version <code>0.0.0</code>, the description text
           above), not a 404.</p>
-          <pre><code class="language-sh">npm org ls eventrunner
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">npm org ls eventrunner
           npm org ls event-runner
           </code></pre>
           <p>Both should now exit 0 and list you as an org member (the same check that returned <code>Scope not

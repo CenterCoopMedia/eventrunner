@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -123,7 +124,7 @@
           <p>By participating you agree to the <a href="/eventrunner/docs/code-of-conduct/">Code of Conduct</a>. Reports go to info@eventrunner.org.</p>
           <h2 id="where-to-start">Where to start<a class="heading-anchor" href="#where-to-start" aria-label="Link to this section">#</a></h2>
           <p>Pick the path that matches what you are doing. If you are not changing code, you probably want <a href="https://github.com/CenterCoopMedia/eventrunner/discussions">Discussions</a> or the <a href="https://github.com/CenterCoopMedia/eventrunner/wiki">wiki</a>, not a pull request.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>You are…</th><th>Do this</th></tr>
@@ -163,7 +164,7 @@
           <li>Use Node 22 (<code>node -v</code>) — the Cloud Functions runtime pins that major, so <code>functions/package.json</code> declares <code>&quot;node&quot;: &quot;22&quot;</code> and npm warns (<code>EBADENGINE</code>) on newer majors.</li>
           <li>From the repo root:</li>
           </ol>
-          <pre><code class="language-bash">npm run prepare:functions   # packs packages/shared into functions/vendor/ — required before install
+          <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">npm run prepare:functions   # packs packages/shared into functions/vendor/ — required before install
           npm install
           npm run lint
           npm test
@@ -182,7 +183,7 @@
           </ol>
           <h3 id="sign-your-commits-dco">Sign your commits (DCO)<a class="heading-anchor" href="#sign-your-commits-dco" aria-label="Link to this section">#</a></h3>
           <p>Every commit needs a <code>Signed-off-by</code> trailer:</p>
-          <pre><code>git commit -s -m &quot;Fix schedule timezone rollover&quot;
+          <pre data-scroll-region data-scroll-label="Code example"><code>git commit -s -m &quot;Fix schedule timezone rollover&quot;
           </code></pre>
           <p>That adds a line to the commit message — <code>Signed-off-by: Your Name &lt;you@example.org&gt;</code> — using the name and email from your git config. It is not a CLA and nobody countersigns it; by adding it you are personally certifying the <a href="https://developercertificate.org/">Developer Certificate of Origin</a> (spec §1.5): that you wrote the change or otherwise have the right to submit it under this project&#39;s license, and that you understand it is public and permanently recorded with your contribution.</p>
           <p>Forgot on a commit that is not pushed yet: <code>git commit --amend -s</code>. Forgot on several: <code>git rebase --signoff &lt;base-branch&gt;</code> rewrites every commit on your branch to add the trailer, then force-push your branch (never <code>main</code>).</p>
@@ -196,7 +197,7 @@
           <p>UI changes need a keyboard path and visible focus. If you change a flow that attendees or staff use, say how you checked it (keyboard, zoom, or a screen reader). Do not rely on color alone.</p>
           <p>The full interface bar — accessibility, typography, color tokens, motion, and microcopy — is <a href="/eventrunner/docs/interface-guidelines/">docs/interface-guidelines.md</a>. UI pull requests are reviewed against it.</p>
           <h2 id="tests">Tests<a class="heading-anchor" href="#tests" aria-label="Link to this section">#</a></h2>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Command</th><th>What it covers</th></tr>
@@ -235,7 +236,7 @@
           HTML has drifted from a fresh render — the same freshness rule
           <code>apps/web/src/generated/**</code> lives under. Edit the Markdown, then run
           <code>node scripts/build-pages.cjs</code> and commit both.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Changed paths</th><th>Selected tier</th></tr>

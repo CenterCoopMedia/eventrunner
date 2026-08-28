@@ -459,7 +459,11 @@ function renderBlocks(lines, context) {
         index += 1;
       }
       const languageClass = language ? ` class="language-${escapeHtml(language)}"` : '';
-      out.push(`<pre><code${languageClass}>${escapeHtml(body.join('\n'))}\n</code></pre>`);
+      const scrollLabel = language ? `Code example (${escapeHtml(language)})` : 'Code example';
+      out.push(
+        `<pre data-scroll-region data-scroll-label="${scrollLabel}">` +
+        `<code${languageClass}>${escapeHtml(body.join('\n'))}\n</code></pre>`,
+      );
       continue;
     }
 
@@ -510,7 +514,7 @@ function renderBlocks(lines, context) {
         .map((row) => `<tr>${row.map((value, column) => cell('td', value, column)).join('')}</tr>`)
         .join('\n');
       out.push(
-        '<div class="table-scroll">\n<table>\n<thead>\n' +
+        '<div class="table-scroll" data-scroll-region data-scroll-label="Table">\n<table>\n<thead>\n' +
         `<tr>${head}</tr>\n</thead>\n<tbody>\n${body}\n</tbody>\n</table>\n</div>`,
       );
       continue;

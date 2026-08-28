@@ -17,6 +17,11 @@
   color: rgb(var(--color-text-secondary-rgb));
 }
 
+[data-scroll-region]:focus-visible {
+  outline: var(--rule-strong-width) solid rgb(var(--color-accent-rgb));
+  outline-offset: var(--space-3xs);
+}
+
 .breadcrumbs ol {
   display: flex;
   flex-wrap: wrap;

@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -201,7 +202,7 @@
           per-deployment GitHub Environment <strong>secret</strong> (not variable) on the client&#39;s <code>&lt;CLIENT_ENV&gt;</code>
           environment, per <code>docs/DEPLOY_RUNBOOK.md</code> §3, then mirrored into Secret Manager for the deployed
           <code>emailDeliveryWebhook</code> function to read via <code>defineSecret</code>:</p>
-          <pre><code class="language-sh"># GitHub Environment secret (Settings → Environments → &lt;CLIENT_ENV&gt; → Secrets):
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh"># GitHub Environment secret (Settings → Environments → &lt;CLIENT_ENV&gt; → Secrets):
           #   EMAIL_PROVIDER_API_KEY  = the Server Token from step 2.3 (per-client)
 
           # Secret Manager, once per client project (docs/DEPLOY_RUNBOOK.md §3):
@@ -255,7 +256,7 @@
           <h3 id="4b-publish-the-records-cloudflare-eventrunnerorg">4b. Publish the records — Cloudflare (eventrunner.org)<a class="heading-anchor" href="#4b-publish-the-records-cloudflare-eventrunnerorg" aria-label="Link to this section">#</a></h3>
           <p>CCM&#39;s DNS for <code>eventrunner.org</code> is managed in Cloudflare. In the Cloudflare dashboard for the zone →
           <strong>DNS</strong> → <strong>Records</strong> → <strong>Add record</strong>, twice:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Field</th><th>DKIM record</th><th>Return-Path record</th></tr>
@@ -275,7 +276,7 @@
           proxy instead of leaving it as a plain DNS answer, so bounce handling (and Postmark&#39;s verification
           check) never resolves correctly. Click the cloud icon to toggle it to grey before saving.</p>
           <p>Then, separately, publish DMARC — not a Postmark record, the domain owner&#39;s own policy:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Field</th><th>Value</th></tr>
@@ -296,7 +297,7 @@
           <p>From an operator (or provisioning-agent) machine, with this deployment&#39;s <code>EMAIL_PROVIDER_API_KEY</code>
           loaded and the account token from operator storage (§3) — not from the client&#39;s GitHub Environment
           or Secret Manager, since it doesn&#39;t live there:</p>
-          <pre><code class="language-sh">EVENT_EMAIL_PROVIDER=postmark \
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">EVENT_EMAIL_PROVIDER=postmark \
           EMAIL_PROVIDER_API_KEY=&lt;server token from §2.3&gt; \
           EMAIL_ACCOUNT_API_KEY=&lt;account token from §1.2, operator storage&gt; \
           EVENT_FIREBASE_PROJECT_ID=&lt;GCP_PROJECT_ID for this deployment&gt; \
@@ -318,7 +319,7 @@
           <ol>
           <li><p>Generate a random <code>user:pass</code> pair for this deployment — never reused across deployments
           (rotating it means re-registering the URL below). For example:</p>
-          <pre><code class="language-sh">printf &#39;eventrunner-demo:%s\n&#39; &quot;$(openssl rand -hex 20)&quot;
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">printf &#39;eventrunner-demo:%s\n&#39; &quot;$(openssl rand -hex 20)&quot;
           # → eventrunner-demo:9f2c...   (use the whole &quot;user:pass&quot; string as EMAIL_WEBHOOK_BASIC_AUTH)
           </code></pre></li>
           </ol>
@@ -332,7 +333,7 @@
           <code>emailDeliveryWebhook</code>.</p>
           <p>In this deployment&#39;s Postmark <strong>Server</strong> → the stream identified above → <strong>Webhooks</strong> → add
           webhook:</p>
-          <pre><code>https://&lt;user&gt;:&lt;pass&gt;@&lt;EVENT_FIREBASE_REGION&gt;-&lt;EVENT_FIREBASE_PROJECT_ID&gt;.cloudfunctions.net/emailDeliveryWebhook
+          <pre data-scroll-region data-scroll-label="Code example"><code>https://&lt;user&gt;:&lt;pass&gt;@&lt;EVENT_FIREBASE_REGION&gt;-&lt;EVENT_FIREBASE_PROJECT_ID&gt;.cloudfunctions.net/emailDeliveryWebhook
           </code></pre>
           <p>For the <code>eventrunner-demo</code> example: <code>https://eventrunner-demo:9f2c...@us-central1-&lt;GCP_PROJECT_ID&gt;.cloudfunctions.net/emailDeliveryWebhook</code>,
           using the region and project id that deployment&#39;s GitHub Environment variables actually name
@@ -399,7 +400,7 @@
           <h3 id="72-store-the-server-token-in-the-demo-deployment">7.2. Store the Server token in the demo deployment<a class="heading-anchor" href="#72-store-the-server-token-in-the-demo-deployment" aria-label="Link to this section">#</a></h3>
           <p>The Server token is <code>EMAIL_PROVIDER_API_KEY</code> for the <code>eventrunner-demo</code> deployment specifically —
           <strong>not</strong> the Postmark Account Token, which stays operator-only (§7.7).</p>
-          <pre><code class="language-sh"># GitHub Environment secret (Settings → Environments → demo → Secrets):
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh"># GitHub Environment secret (Settings → Environments → demo → Secrets):
           #   EMAIL_PROVIDER_API_KEY = the &quot;Event Runner&quot; Server Token
 
           # Secret Manager mirror, once for the eventrunner-demo project:
@@ -421,7 +422,7 @@
           <p>This needs the deployed <code>emailDeliveryWebhook</code> function&#39;s real region/project (Tier A
           <code>EVENT_FIREBASE_REGION</code> / <code>EVENT_FIREBASE_PROJECT_ID</code> for the <code>demo</code> environment), so it can only
           happen after a functions deploy has landed for <code>eventrunner-demo</code>.</p>
-          <pre><code class="language-sh">printf &#39;eventrunner-demo:%s\n&#39; &quot;$(openssl rand -hex 20)&quot;
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">printf &#39;eventrunner-demo:%s\n&#39; &quot;$(openssl rand -hex 20)&quot;
           # → eventrunner-demo:9f2c...   (use the whole &quot;user:pass&quot; string as EMAIL_WEBHOOK_BASIC_AUTH)
           </code></pre>
           <p>Store the whole string as the <code>EMAIL_WEBHOOK_BASIC_AUTH</code> GitHub Environment secret for <code>demo</code>, and
@@ -435,14 +436,14 @@
           <li><p>Set the demo&#39;s sender address to <code>info@eventrunner.org</code> — the address on the domain §4 already
           verified. Either edit it in the admin panel (Settings → sender) for the running deployment, or
           re-run the seed against the demo project with the refreshed value:</p>
-          <pre><code class="language-sh">EVENT_FIREBASE_PROJECT_ID=eventrunner-demo node scripts/seed-demo-event.cjs --force
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">EVENT_FIREBASE_PROJECT_ID=eventrunner-demo node scripts/seed-demo-event.cjs --force
           </code></pre>
           <p>(<code>--force</code> is required: <code>writeConfigDocs</code> skips a <code>config/*</code> document that already exists.)</p></li>
           </ol>
           <ol start="2">
           <li><p>Re-run the verification script so <code>config/event.sender.domainVerified</code> is stamped for the
           address the demo will actually send from:</p>
-          <pre><code class="language-sh">EVENT_EMAIL_PROVIDER=postmark \
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">EVENT_EMAIL_PROVIDER=postmark \
           EMAIL_PROVIDER_API_KEY=&lt;server token from §7.2&gt; \
           EMAIL_ACCOUNT_API_KEY=&lt;account token from §1.2, operator storage&gt; \
           EVENT_FIREBASE_PROJECT_ID=eventrunner-demo \
@@ -467,7 +468,7 @@
           messageStream</code> for the demo deployment (unset → the Server&#39;s default <code>Outbound</code> stream). Register
           on that stream, in Postmark: <code>Event Runner</code> Server → the identified stream → <strong>Webhooks</strong> → add
           webhook:</p>
-          <pre><code>https://&lt;user&gt;:&lt;pass&gt;@&lt;EVENT_FIREBASE_REGION&gt;-eventrunner-demo.cloudfunctions.net/emailDeliveryWebhook
+          <pre data-scroll-region data-scroll-label="Code example"><code>https://&lt;user&gt;:&lt;pass&gt;@&lt;EVENT_FIREBASE_REGION&gt;-eventrunner-demo.cloudfunctions.net/emailDeliveryWebhook
           </code></pre>
           <p>using the <code>user:pass</code> from §7.3 and this deployment&#39;s actual <code>EVENT_FIREBASE_REGION</code> GitHub
           Environment variable (do not guess the region).</p>
@@ -482,7 +483,7 @@
           GitHub Environment secret or Secret Manager entry for <code>eventrunner-demo</code> (or any client project).
           It&#39;s only used locally, as an environment variable, when running <code>scripts/verify-sender-domain.cjs</code>
           by hand. Confirm this is still true after this addendum&#39;s changes:</p>
-          <pre><code class="language-sh">gh secret list --env demo        # should NOT list EMAIL_ACCOUNT_API_KEY
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">gh secret list --env demo        # should NOT list EMAIL_ACCOUNT_API_KEY
           gcloud secrets list --project=eventrunner-demo   # should NOT list EMAIL_ACCOUNT_API_KEY
           </code></pre>
           <h3 id="78-verification-round-trip-real-otp-send-bounce-checked-against-sent_emails">7.8. Verification round-trip: real OTP send + bounce, checked against <code>sent_emails</code><a class="heading-anchor" href="#78-verification-round-trip-real-otp-send-bounce-checked-against-sent_emails" aria-label="Link to this section">#</a></h3>

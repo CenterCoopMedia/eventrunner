@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -163,7 +164,7 @@
           <h2 id="pages">Pages<a class="heading-anchor" href="#pages" aria-label="Link to this section">#</a></h2>
           <p>Every page document (About, Travel, Conduct, and anything else seeded or added) shows its state in the list, in the same three words every editor uses: <strong>Draft</strong> (never published), <strong>Live</strong> (published, with nothing pending), or <strong>Live with unpublished changes</strong> (published, with newer edits saved but not published yet). Create, edit, and publish from here.</p>
           <p><strong>Pick what kind of page this is.</strong> Six named tasks, and picking one shapes the page:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Template</th><th>For</th></tr>
@@ -196,7 +197,7 @@
           <h2 id="speakers">Speakers<a class="heading-anchor" href="#speakers" aria-label="Link to this section">#</a></h2>
           <p>The canonical speaker list, with each record&#39;s pipeline status and the entry points to create, edit, invite, and review pending edits. This list reads the real speaker records, not the public-facing projection, on purpose: An admin needs to see speakers who are not published yet — drafts, outstanding invites, soft-deleted records.</p>
           <p><strong>Pipeline states</strong>, top to bottom of what a record moves through:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Status</th><th>What it means</th><th>Action available</th></tr>

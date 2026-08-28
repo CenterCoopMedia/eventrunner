@@ -390,9 +390,12 @@ describe('the two views of a day', () => {
 
   it('draws the grid at a wide viewport, when the event runs lines', () => {
     withViewport(true, () => {
-      renderSchedule({ eventConfig: eventWithTracks, scheduleData: tracked });
+      const { container } = renderSchedule({ eventConfig: eventWithTracks, scheduleData: tracked });
       expect(screen.getByRole('table', { name: /day one, sessions by track/i })).toBeInTheDocument();
       expect(screen.getByRole('columnheader', { name: /practice/i })).toBeInTheDocument();
+      const region = container.querySelector('.horizontal-scroll-region');
+      expect(region).not.toBeNull();
+      expect(region).toHaveAttribute('data-scroll-label', 'Day one schedule grid');
     });
   });
 

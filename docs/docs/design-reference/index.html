@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -206,7 +207,7 @@
           </ul>
           <h2 id="header-style">Header style<a class="heading-anchor" href="#header-style" aria-label="Link to this section">#</a></h2>
           <p>Four header styles, and a site picks one. The header is the site&#39;s identity, and it repeats on every page — which is exactly why it is <strong>not</strong> a heading: Every page owns its own <code>h1</code>, and the header sits outside it. Each site style also names its own three, tuned to it — Broadsheet&#39;s full measure, Newsroom&#39;s rule-bounded bar, Zine&#39;s full sheet — and those are the ones the picker offers once a style is chosen.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Style</th><th>What it draws</th><th>Reach for it when</th></tr>
@@ -227,7 +228,7 @@
           <p><strong>Engine.</strong> The <code>component</code> option group (<code>optionPicks.component</code>). Like every option, it remaps tokens the style already declares — the session contracts in tier 3 — and introduces no property name of its own.</p>
           <h2 id="typography">Typography<a class="heading-anchor" href="#typography" aria-label="Link to this section">#</a></h2>
           <p><strong>Four roles, never family names.</strong> A component asks for a role and gets whatever the resolved style says that role is.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Role</th><th>What it carries</th></tr>
@@ -258,7 +259,7 @@
           <h2 id="layout">Layout<a class="heading-anchor" href="#layout" aria-label="Link to this section">#</a></h2>
           <h3 id="pages-are-chosen-by-task">Pages are chosen by task<a class="heading-anchor" href="#pages-are-chosen-by-task" aria-label="Link to this section">#</a></h3>
           <p>An operator knows &quot;this is a long read&quot; and &quot;this is a directory with an introduction&quot;. They do not know, and should not have to work out, what <code>arrangement</code> should be. So the page editor asks the question they can answer:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Template</th><th>What it is for</th></tr>
@@ -308,7 +309,7 @@
           <p><code>light</code>, <code>dark</code>, or <code>system</code>. Every style defines both palettes, so no choice here leaves the site half-dressed. The mode arrives as <code>data-mode</code> on the root element, written by the runtime; a deployment whose policy is not <code>light</code> also gets a first-paint block, so the ground is right before that attribute lands and a reader never sees a flash of the other mode.</p>
           <h2 id="tokens">Tokens<a class="heading-anchor" href="#tokens" aria-label="Link to this section">#</a></h2>
           <p>Three tiers, and each one only reads the one below it.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Tier</th><th>Names look like</th><th>What it is</th></tr>
