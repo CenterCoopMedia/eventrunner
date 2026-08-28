@@ -63,6 +63,7 @@ const KNOWN_FEATURE_KEYS = [
   'schedulePdf', 'icsExport', 'updates',
   'autoApproveTicketHolders', 'publicAttendeeProfiles',
   'webmcpPublic',
+  'webmcpAdmin',
 ];
 
 /** @param {*} v @returns {boolean} */

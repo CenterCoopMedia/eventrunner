@@ -17,6 +17,7 @@ const mediaUsage = require('./src/media/usage.cjs');
 const adminConfig = require('./src/admin/config.cjs');
 const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
 const adminFeedback = require('./src/admin/feedback.cjs');
+const webMcpDiagnostics = require('./src/admin/webMcpDiagnostics.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
 const schedulePdf = require('./src/schedule/pdf.cjs');
 const publicOg = require('./src/public/og.cjs');
@@ -59,6 +60,7 @@ module.exports = {
   ...adminConfig.handlers,
   ...adminLiveUpdates.handlers,
   ...adminFeedback.handlers,
+  ...webMcpDiagnostics.handlers,
   ...scheduleBookmarks.handlers,
   ...schedulePdf.handlers,
   ...publicOg.handlers,

@@ -32,6 +32,8 @@ Admin tools register only after the existing admin gate succeeds. They call exis
 
 Candidate read-only diagnostics are event readiness, current draft validation, publish-queue status, redacted system errors, media usage, and ticketing health. Each result must be bounded and must omit attendee, ticket, payment, invitation, and email details.
 
+The authenticated set uses the separate validated `webmcpAdmin` feature flag. The flag defaults off. It registers only inside the successful admin gate and calls six fixed admin endpoints with the current Firebase ID token. A model cannot select an endpoint, collection, path, URL, query, event, or document id. The current-page validator receives only the page id owned by the open admin route.
+
 ## Write decision
 
 No tool in the first two phases publishes, deploys, deletes, sends email, exports data, changes provider setup, or saves a draft. A write tool requires a separate security and product review after the read-only tools have passed supported-browser acceptance testing. The review must name the exact side effect, schema, authorization path, validation path, audit record, confirmation behavior, and rollback.

@@ -35,6 +35,7 @@ import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
 import AdminTicketing from './pages/AdminTicketing.jsx';
+import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
 const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
@@ -90,6 +91,7 @@ export function AdminGate({ children }) {
 export default function AdminApp() {
   return (
     <AdminGate>
+      <AdminWebMcpRegistration />
       <Routes>
         <Route element={<AdminLayout />}>
           <Route index element={<Navigate to="pages" replace />} />

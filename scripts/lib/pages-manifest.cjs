@@ -93,6 +93,12 @@ const SECTIONS = Object.freeze([
         summary: 'Create, edit, preview, and publish sessions without breaking schedule references.',
       },
       {
+        source: 'docs/operator/webmcp-diagnostics.md',
+        route: 'webmcp-diagnostics/',
+        title: 'Use read-only browser diagnostics',
+        summary: 'Enable, use, and verify bounded public and authenticated site tools.',
+      },
+      {
         source: 'docs/design-reference.md',
         route: 'design-reference/',
         title: 'Site design reference',
