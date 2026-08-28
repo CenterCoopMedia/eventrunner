@@ -447,7 +447,12 @@ test('validateBadgesConfig rejects a config whose maximum selectable total excee
 });
 
 test('validateFeatures: booleans only, unknown keys rejected', () => {
-  assert.equal(validateFeatures({ schedule: true, badges: false }).ok, true);
+  assert.equal(validateFeatures({
+    schedule: true,
+    badges: false,
+    webmcpPublic: true,
+    webmcpAdmin: true,
+  }).ok, true);
   const bad = validateFeatures({ schedule: 'yes', broadcasts: true });
   assert.equal(bad.ok, false);
   assert.ok(bad.errors.some((e) => e.includes('features.schedule')));

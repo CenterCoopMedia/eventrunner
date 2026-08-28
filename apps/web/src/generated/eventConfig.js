@@ -163,6 +163,8 @@ export const features = {
   updates: false,
   autoApproveTicketHolders: false,
   publicAttendeeProfiles: false,
+  webmcpPublic: false,
+  webmcpAdmin: false,
 };
 
 export const theme = {

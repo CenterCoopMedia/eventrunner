@@ -37,6 +37,8 @@ const FEATURE_HINTS = {
   updates: 'Publish written updates.',
   autoApproveTicketHolders: 'Approve ticket holders without review.',
   publicAttendeeProfiles: 'Make attendee profiles publicly visible.',
+  webmcpPublic: 'Expose bounded public read-only site tools in supported browsers.',
+  webmcpAdmin: 'Expose authenticated read-only admin diagnostics in supported browsers.',
 };
 
 /** Every known flag, defaulted off, overlaid with what is configured now. */

@@ -51,6 +51,7 @@ import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
 import FeedbackModal from './FeedbackModal.jsx';
 import DemoBanner from './DemoBanner.jsx';
+import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
 
 /**
  * The page's own header, read into the theme's vocabulary.
@@ -182,6 +183,7 @@ export default function Layout() {
 
   return (
     <div className="page-surface flex min-h-screen flex-col">
+      <PublicWebMcpRegistration />
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
