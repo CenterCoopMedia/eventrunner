@@ -34,6 +34,7 @@
  */
 
 const { speakerDisplayName, isPubliclyVisibleSpeaker } = require('shared/speaker');
+const { configuredThemeColor } = require('shared/theme');
 
 const DEFAULT_COLORS = Object.freeze({
   // Fallback palette (spec §7.6 allowlist path) — used only for the fields
@@ -94,7 +95,7 @@ function resolveThemeColors(theme) {
   const colors = theme && typeof theme === 'object' ? theme.colors : null;
   const out = {};
   for (const key of Object.keys(DEFAULT_COLORS)) {
-    const configured = colors && typeof colors === 'object' ? colors[key] : undefined;
+    const configured = configuredThemeColor(colors, key);
     out[key] = hexToRgb01(configured) || hexToRgb01(DEFAULT_COLORS[key]);
   }
   return out;

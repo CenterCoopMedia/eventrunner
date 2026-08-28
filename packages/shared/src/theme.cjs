@@ -232,6 +232,32 @@ function canonicalColorKey(key) {
 }
 
 /**
+ * Read one canonical color role from either stored spelling. A canonical
+ * field always wins when a transitional document contains both forms.
+ *
+ * @param {unknown} colors config/theme.colors
+ * @param {string} key canonical color role
+ * @returns {string} the configured value, or an empty string
+ */
+function configuredThemeColor(colors, key) {
+  if (!isPlainObject(colors)) return '';
+  if (Object.prototype.hasOwnProperty.call(colors, key)) {
+    const direct = colors[key];
+    return typeof direct === 'string' ? direct : '';
+  }
+  for (const [storedKey, value] of Object.entries(colors)) {
+    if (
+      canonicalColorKey(storedKey) === key &&
+      typeof value === 'string' &&
+      value
+    ) {
+      return value;
+    }
+  }
+  return '';
+}
+
+/**
  * Canonical color role → the tier 2 custom property it writes.
  *
  * This is the map the advanced per-mode override path edits: an operator
@@ -913,6 +939,13 @@ function readPaletteMap(colors) {
   for (const [key, hex] of Object.entries(colors)) {
     const role = overrideTokenKey(key);
     const rgb = hexToRgb(hex);
+    if (
+      role &&
+      canonicalColorKey(key) !== key &&
+      Object.prototype.hasOwnProperty.call(colors, role)
+    ) {
+      continue;
+    }
     if (role && rgb) palette[role] = rgb;
   }
   return palette;
@@ -1152,6 +1185,7 @@ module.exports = {
   THEME_COLOR_PROPERTIES,
   THEME_PROPERTY_COLOR_KEYS,
   canonicalColorKey,
+  configuredThemeColor,
   overrideTokenKey,
   THEME_PRESET_IDS,
   recommendedConfiguration,

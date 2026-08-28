@@ -249,6 +249,29 @@ test('buildGlobalTokens derives urls, dates, and year', () => {
   assert.equal(tokens.venue_address, '1 Main St, Springfield, IL, 11111, USA');
 });
 
+test('buildGlobalTokens accepts seeded color aliases and prefers canonical colors', () => {
+  const aliased = buildGlobalTokens({
+    ...CONFIG,
+    theme: { colors: { brandPrimary: '#123456', brandInk: '#234567' } },
+  });
+  assert.equal(aliased.brand_primary, '#123456');
+  assert.equal(aliased.brand_ink, '#234567');
+
+  const mixed = buildGlobalTokens({
+    ...CONFIG,
+    theme: {
+      colors: {
+        primary: '#abcdef',
+        brandPrimary: '#123456',
+        ink: '#345678',
+        brandInk: '#234567',
+      },
+    },
+  });
+  assert.equal(mixed.brand_primary, '#abcdef');
+  assert.equal(mixed.brand_ink, '#345678');
+});
+
 // current_year must come from UTC, not the machine's local clock (issue
 // #102): otherwise the same email renders a different year depending on
 // where it is sent from. Pick a `now` where the local date and the UTC

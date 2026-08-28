@@ -1,5 +1,7 @@
 'use strict';
 
+const { configuredThemeColor } = require('shared/theme');
+
 /**
  * Template renderer (spec §6.1–6.2).
  *
@@ -153,8 +155,8 @@ function buildGlobalTokens(config, { now = () => new Date() } = {}) {
     sender_name: event.sender?.name || '',
     sender_email: event.sender?.email || '',
     operator_name: event.legal?.operatorName || '',
-    brand_primary: theme.colors?.primary || '',
-    brand_ink: theme.colors?.ink || '',
+    brand_primary: configuredThemeColor(theme.colors, 'primary'),
+    brand_ink: configuredThemeColor(theme.colors, 'ink'),
     logo_url: theme.logoUrl || '',
     // UTC, not the local clock: a laptop and a CI runner in different
     // timezones must render the same token for the same instant.
