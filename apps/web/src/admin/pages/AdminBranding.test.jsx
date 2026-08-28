@@ -123,10 +123,6 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
       <App />
     </MemoryRouter>,
   );
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-  });
   // Two waits, not one: the lazy admin chunk, and then the admin probe the
   // gate holds on (AdminGate renders "Checking your access…" until it
   // answers). Waiting only for the chunk lets an assertion run while the
@@ -140,10 +136,19 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
     // file is slower than the default budget allows for.
     { timeout: 5000 },
   );
-  await act(async () => {
-    configSubscriptions.get('theme')(themeDoc);
-    await Promise.resolve();
-  });
+  await waitFor(() => expect(configSubscriptions.has('theme')).toBe(true));
+  act(() => configSubscriptions.get('theme')(themeDoc));
+  if (typeof themeDoc.brandColor === 'string') {
+    await waitFor(() =>
+      expect(screen.getByLabelText('Main brand colour')).toHaveValue(themeDoc.brandColor),
+    );
+  } else if (themeDoc.preset) {
+    await waitFor(() => expect(screen.getByLabelText('Site style')).toHaveValue(themeDoc.preset));
+  } else if (themeDoc.colors?.primary) {
+    await waitFor(() =>
+      expect(screen.getByLabelText('Primary')).toHaveValue(themeDoc.colors.primary),
+    );
+  }
   return result;
 }
 

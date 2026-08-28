@@ -8,7 +8,7 @@
 // pinned here so a future edit to the `url` branch cannot widen the picker
 // to them by accident.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
@@ -91,10 +91,6 @@ async function renderAt(path) {
       <App />
     </MemoryRouter>,
   );
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-  });
   // Two waits, not one: the lazy admin chunk, and then the admin probe the
   // gate holds on (AdminGate renders "Checking your access…" until it
   // answers). Waiting only for the chunk lets an assertion run while the
@@ -109,6 +105,7 @@ async function renderAt(path) {
     // outrun the default budget on a loaded machine.
     { timeout: 5000 },
   );
+  await screen.findByRole('heading', { level: 1 });
   return result;
 }
 

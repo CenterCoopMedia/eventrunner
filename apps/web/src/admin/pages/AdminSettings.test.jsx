@@ -77,10 +77,6 @@ async function renderAt(path) {
       <App />
     </MemoryRouter>,
   );
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-  });
   // Two waits, not one: the lazy admin chunk, and then the admin probe the
   // gate holds on (AdminGate renders "Checking your access…" until it
   // answers). Waiting only for the chunk lets an assertion run while the
@@ -100,10 +96,31 @@ async function renderAt(path) {
 
 /** Push a runtime config doc through the provider's listener. */
 async function pushConfig(docId, data) {
-  await act(async () => {
-    configSubscriptions.get(docId)(data);
-    await Promise.resolve();
-  });
+  await waitFor(() => expect(configSubscriptions.has(docId)).toBe(true));
+  act(() => configSubscriptions.get(docId)(data));
+
+  if (docId === 'event' && screen.queryByLabelText('Event name')) {
+    await waitFor(() => expect(screen.getByLabelText('Event name')).toHaveValue(data.name ?? ''));
+    return;
+  }
+  if (docId === 'features') {
+    const visibleFlag = Object.keys(data).find((flag) => screen.queryByLabelText(flag));
+    if (visibleFlag) {
+      await waitFor(() =>
+        data[visibleFlag]
+          ? expect(screen.getByLabelText(visibleFlag)).toBeChecked()
+          : expect(screen.getByLabelText(visibleFlag)).not.toBeChecked(),
+      );
+    }
+    return;
+  }
+  if (docId === 'badges' && screen.queryByLabelText('Category 1 label')) {
+    await waitFor(() =>
+      expect(screen.getByLabelText('Category 1 label')).toHaveValue(
+        data.categories?.[0]?.label ?? '',
+      ),
+    );
+  }
 }
 
 beforeEach(() => {

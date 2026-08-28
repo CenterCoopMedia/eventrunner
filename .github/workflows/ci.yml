@@ -1,192 +1,408 @@
-name: Repair PR 133
+name: CI
 
+# Credential-free by design (spec §8.1): no secrets, no Firebase project.
+# Every job must be runnable from a fork PR.
 on:
+  push:
+    branches: [main]
   pull_request:
-    types: [synchronize]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  repair:
-    if: github.head_ref == 'codex/123-admin-test-readiness' && github.actor != 'github-actions[bot]'
+  changes:
+    name: Classify changed paths
     runs-on: ubuntu-latest
+    # The classifier is repository-owned so path selection is reviewable with
+    # the rest of the change. Pushes to main fail open to the full matrix;
+    # only pull requests use the path-specific tiers.
+    outputs:
+      docs: ${{ steps.classify.outputs.docs }}
+      demo: ${{ steps.classify.outputs.demo }}
+      lint: ${{ steps.classify.outputs.lint }}
+      audit: ${{ steps.classify.outputs.audit }}
+      unit: ${{ steps.classify.outputs.unit }}
+      unitWeb: ${{ steps.classify.outputs.unitWeb }}
+      build: ${{ steps.classify.outputs.build }}
+      hygiene: ${{ steps.classify.outputs.hygiene }}
+      rules: ${{ steps.classify.outputs.rules }}
+      e2e: ${{ steps.classify.outputs.e2e }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: codex/123-admin-test-readiness
           fetch-depth: 0
+      - name: Classify the changed paths
+        id: classify
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/ci/classify-changes.cjs
 
+  dco:
+    name: DCO sign-off
+    runs-on: ubuntu-latest
+    # Credential-free (spec §8.1, §1.5): reads only the checked-out git
+    # range from the PR event payload — no token, no third-party action, so
+    # a fork PR runs it exactly like a same-repo PR. Skipped on push (a
+    # merge to main has already passed this check as a PR).
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify every commit is signed off
+        run: node scripts/check-dco.cjs "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    # Credential-free by construction, not just by omitting `env:` — the
+    # marketplace gitleaks-action requires a paid GITLEAKS_LICENSE secret
+    # for an organization-owned repo (this one), which a fork PR could never
+    # have anyway. Downloading the plain gitleaks CLI, checksum-verified
+    # against the release's published SHA-256, needs no token, no license,
+    # and no third-party Action's trust boundary in this workflow at all —
+    # same reasoning as scripts/check-dco.cjs above. Version pinned; bump
+    # both the version and the checksum together on a deliberate upgrade.
+    env:
+      GITLEAKS_VERSION: "8.21.2"
+      GITLEAKS_SHA256: "5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: this job also runs on push to main, and a shallow
+          # checkout would only ever scan the tip commit.
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          curl -sSL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: gitleaks (PR range)
+        if: github.event_name == 'pull_request'
+        run: |
+          ./gitleaks detect --source . --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
+            --redact -v
+      - name: gitleaks (full history)
+        if: github.event_name == 'push'
+        run: ./gitleaks detect --source . --log-opts="--all" --redact -v
+
+  docs:
+    name: Documentation checks
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    # This tier intentionally uses only the runner's Node installation. It
+    # checks local links and generated Pages HTML without an npm install.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check documentation links and Pages markup
+        run: node scripts/check-docs.cjs
+      - name: Run documentation checker tests
+        run: node --test scripts/check-docs.test.cjs
+      - name: Run focused documentation generator tests
+        run: |
+          if [ -f scripts/build-pages.cjs ]; then
+            test -f scripts/build-pages.test.cjs
+            node --test scripts/build-pages.test.cjs
+          fi
+
+  lint:
+    name: Lint
+    needs: changes
+    if: needs.changes.outputs.lint == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: "22"
           cache: npm
-
-      - name: Replace timing guesses with page-owned readiness
-        shell: bash
-        run: |
-          python <<'PY'
-          from pathlib import Path
-          import re
-
-          affected = [
-              'apps/web/src/admin/pages/AdminPageEditor.test.jsx',
-              'apps/web/src/admin/pages/AdminBranding.test.jsx',
-              'apps/web/src/admin/pages/AdminContentBlockEditor.test.jsx',
-              'apps/web/src/admin/pages/AdminSettings.test.jsx',
-          ]
-          pump = re.compile(
-              r"\n  await act\(async \(\) => \{\n"
-              r"    await Promise\.resolve\(\);\n"
-              r"    await Promise\.resolve\(\);\n"
-              r"  \}\);\n"
-          )
-          for path in affected:
-              file = Path(path)
-              text = file.read_text()
-              text, count = pump.subn('\n', text, count=1)
-              if count != 1:
-                  raise SystemExit(f'{path}: expected one fixed microtask pump, found {count}')
-              file.write_text(text)
-
-          def replace_once(path, old, new):
-              file = Path(path)
-              text = file.read_text()
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'{path}: expected one match, found {count}')
-              file.write_text(text.replace(old, new, 1))
-
-          gate_tail = """    { timeout: 5000 },
-            );
-            return result;
-          }
-          """
-          gate_ready = """    { timeout: 5000 },
-            );
-            await screen.findByRole('heading', { level: 1 });
-            return result;
-          }
-          """
-          for path in [
-              'apps/web/src/admin/pages/AdminPageEditor.test.jsx',
-              'apps/web/src/admin/pages/AdminContentBlockEditor.test.jsx',
-          ]:
-              replace_once(path, gate_tail, gate_ready)
-
-          path = Path('apps/web/src/admin/pages/AdminBranding.test.jsx')
-          text = path.read_text()
-          pattern = re.compile(
-              r"  await act\(async \(\) => \{\n"
-              r"    configSubscriptions\.get\('theme'\)\(themeDoc\);\n"
-              r"    await Promise\.resolve\(\);\n"
-              r"  \}\);"
-          )
-          replacement = """  await waitFor(() => expect(configSubscriptions.has('theme')).toBe(true));
-            act(() => configSubscriptions.get('theme')(themeDoc));
-            await screen.findByLabelText('Main brand colour');
-            const expectedBrand = themeDoc.brandColor ?? themeDoc.colors?.primary;
-            if (expectedBrand) {
-              await waitFor(() =>
-                expect(screen.getByLabelText('Main brand colour')).toHaveValue(expectedBrand),
-              );
-            }"""
-          text, count = pattern.subn(replacement, text, count=1)
-          if count != 1:
-              raise SystemExit(f'AdminBranding.test.jsx: expected one theme push, found {count}')
-          path.write_text(text)
-
-          path = Path('apps/web/src/admin/pages/AdminSettings.test.jsx')
-          text = path.read_text()
-          pattern = re.compile(
-              r"async function pushConfig\(docId, data\) \{\n"
-              r"  await act\(async \(\) => \{\n"
-              r"    configSubscriptions\.get\(docId\)\(data\);\n"
-              r"    await Promise\.resolve\(\);\n"
-              r"  \}\);\n"
-              r"\}"
-          )
-          replacement = """async function pushConfig(docId, data) {
-            await waitFor(() => expect(configSubscriptions.has(docId)).toBe(true));
-            act(() => configSubscriptions.get(docId)(data));
-
-            if (docId === 'event') {
-              await waitFor(() => {
-                if (data.name) expect(screen.getByLabelText('Event name')).toHaveValue(data.name);
-                if (data.shortName) expect(screen.getByText(data.shortName)).toBeInTheDocument();
-              });
-              return;
-            }
-            if (docId === 'features') {
-              const [flag] = Object.keys(data);
-              if (flag) {
-                await waitFor(() =>
-                  data[flag]
-                    ? expect(screen.getByLabelText(flag)).toBeChecked()
-                    : expect(screen.getByLabelText(flag)).not.toBeChecked(),
-                );
-              }
-              return;
-            }
-            if (docId === 'badges' && data.categories?.[0]?.label) {
-              await waitFor(() =>
-                expect(screen.getByLabelText('Category 1 label')).toHaveValue(
-                  data.categories[0].label,
-                ),
-              );
-            }
-          }"""
-          text, count = pattern.subn(replacement, text, count=1)
-          if count != 1:
-              raise SystemExit(f'AdminSettings.test.jsx: expected one pushConfig helper, found {count}')
-          path.write_text(text)
-
-          for path in [
-              'apps/web/src/admin/pages/AdminPageEditor.test.jsx',
-              'apps/web/src/admin/pages/AdminContentBlockEditor.test.jsx',
-          ]:
-              file = Path(path)
-              text = file.read_text()
-              if 'act(' not in text:
-                  text = text.replace(
-                      'import { act, fireEvent, render, screen, waitFor, within }',
-                      'import { fireEvent, render, screen, waitFor, within }',
-                  ).replace(
-                      'import { act, fireEvent, render, screen, waitFor }',
-                      'import { fireEvent, render, screen, waitFor }',
-                  )
-              file.write_text(text)
-          PY
-
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
       - name: Install dependencies
-        run: |
-          npm run prepare:functions
-          npm ci
+        run: npm ci
+      - name: Run ESLint
+        run: npm run lint
+      - name: Check user-facing copy
+        run: npm run check:copy
 
-      - name: Stress the affected tests
-        shell: bash
-        run: |
-          for pass in 1 2 3; do
-            npm run test -w apps/web -- \
-              src/admin/pages/AdminPageEditor.test.jsx \
-              src/admin/pages/AdminBranding.test.jsx \
-              src/admin/pages/AdminContentBlockEditor.test.jsx \
-              src/admin/pages/AdminSettings.test.jsx
-          done
-          npm run test:web
-          npm run test:web
-          npm run lint
-          npm run check:copy
-          npm test
-          git diff --check
+  audit:
+    name: Dependency audit policy
+    needs: changes
+    if: needs.changes.outputs.audit == 'true'
+    runs-on: ubuntu-latest
+    # Credential-free (spec §8.1): `npm audit` reads the committed lockfiles
+    # against the public npm advisory database, no token or project needed,
+    # so this runs the same on a fork PR as every other job. Policy (issue
+    # #103): fail only on high/critical findings in production dependencies
+    # (`npm audit --omit=dev`) that are not listed in
+    # scripts/ci/audit-exceptions.json. Dev-tooling findings (firebase-tools,
+    # vite, and their transitive tar/uuid findings) are tracked in that same
+    # file but can never fail this job.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Check the audit policy
+        run: node scripts/ci/audit-policy.cjs
 
-      - name: Restore CI and commit the repaired tests
-        shell: bash
-        run: |
-          git show origin/main:.github/workflows/ci.yml > .github/workflows/ci.yml
-          git rm -f .github/workflows/patch-133-review.yml 2>/dev/null || true
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -s -m "Wait for admin page data in tests"
-          git push origin HEAD:codex/123-admin-test-readiness
+  unit:
+    name: Shared package tests
+    needs: changes
+    if: needs.changes.outputs.unit == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Run unit tests
+        run: npm test
+
+  unit-web:
+    name: Web unit tests
+    needs: changes
+    if: needs.changes.outputs.unitWeb == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Run web unit tests
+        run: npm run test:web
+
+  build:
+    name: Web build
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    # Credential-free (spec §8.1): the committed synthetic snapshot in
+    # apps/web/src/generated/ feeds the build, and VITE_FIREBASE_* values are
+    # non-secret client config — CI uses inline dummies so fork PRs build.
+    env:
+      VITE_FIREBASE_API_KEY: ci-dummy-api-key
+      VITE_FIREBASE_AUTH_DOMAIN: ci-dummy.firebaseapp.com
+      VITE_FIREBASE_PROJECT_ID: ci-dummy
+      VITE_FIREBASE_STORAGE_BUCKET: ci-dummy.appspot.com
+      VITE_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+      VITE_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Build the web app from the committed snapshot
+        run: npm run build
+      - name: Assert dist exists
+        run: test -f apps/web/dist/index.html
+
+  hygiene:
+    name: Generated-content hygiene
+    needs: changes
+    if: needs.changes.outputs.hygiene == 'true'
+    runs-on: ubuntu-latest
+    # Regenerates apps/web/src/generated/* from the synthetic demo fixture
+    # (spec §8.6) and fails on any byte-for-byte difference, so the
+    # committed snapshot cannot drift or be overwritten with anything other
+    # than demo data. No credentials — this reads scripts/lib/demo-event.cjs,
+    # never a real project, so it runs on fork PRs too.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Check the committed snapshot against the demo fixture
+        run: node scripts/generate-content.cjs --demo --check
+
+  demo:
+    name: Demo build hygiene
+    needs: changes
+    if: needs.changes.outputs.demo == 'true'
+    runs-on: ubuntu-latest
+    # Rebuilds the static demo (spec issue #94) and fails on any byte-for-byte
+    # difference from the committed docs/demo/, so the GitHub Pages demo
+    # cannot drift from apps/web source or the committed synthetic snapshot
+    # (see the `hygiene` job above for the snapshot itself). The build is
+    # deterministic — verified by hand: three consecutive builds of unchanged
+    # input, including Vite's content-hashed asset filenames, come out
+    # byte-identical (see scripts/build-demo.test.cjs and RELEASING.md).
+    # No credentials — same demo-mode build scripts/build-demo.cjs always
+    # runs, with its own placeholder VITE_FIREBASE_* values — so this runs on
+    # fork PRs too.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Run demo generator tests
+        run: node --test scripts/build-demo.test.cjs
+      - name: Check the committed demo against a fresh build
+        run: node scripts/build-demo.cjs --check
+
+  rules:
+    name: Security rules on emulators
+    needs: changes
+    if: needs.changes.outputs.rules == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: firebase-emulators-${{ runner.os }}-
+      - name: Run rules tests
+        run: npm run test:rules
+
+  e2e:
+    name: E2E on emulators
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    # Credential-free (spec §8.1, issue #38): Playwright drives the real app
+    # against the full emulator suite (auth, firestore, storage, functions)
+    # with the console email provider and manual ticketing — no secrets, no
+    # live project, so this runs the same on a fork PR as every other job.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        env:
+          # Installed explicitly below, cached on its own key — skip the
+          # postinstall fetch here so a `npm ci` cache hit never re-downloads
+          # a browser binary npm never asked for.
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: firebase-emulators-${{ runner.os }}-
+      - name: Run e2e tests
+        # Invoke the script directly rather than through `npm run test:e2e`
+        # (which is just this same script — see package.json) so local and
+        # CI share exactly one invocation path, with nothing to drift: the
+        # captured-mail log every OTP/invite journey reads only exists
+        # because scripts/dev/run-e2e.sh tees `emulators:exec`'s output to
+        # it before Playwright starts. Reimplementing the emulators:exec
+        # call here instead would silently drop that tee.
+        run: bash scripts/dev/run-e2e.sh
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          # e2e/.tmp carries the captured-mail file every OTP/invite journey
+          # reads plus the full emulator log, which is what a mail-related
+          # failure actually needs to be diagnosed from the artifact alone.
+          path: |
+            playwright-report/
+            e2e/.tmp/
+          retention-days: 7
+
+  gate:
+    name: CI gate
+    if: always()
+    needs: [changes, dco, secrets, docs, demo, lint, audit, unit, unit-web, build, hygiene, rules, e2e]
+    runs-on: ubuntu-latest
+    # Keep this job's name stable and require it in branch protection. The
+    # selected jobs must pass; skipped jobs are acceptable only when the
+    # classifier explicitly did not select them. DCO is intentionally skipped
+    # on pushes to main because it already ran on the merged pull request.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the selected CI tiers passed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DCO_RESULT: ${{ needs.dco.result }}
+          SECRETS_RESULT: ${{ needs.secrets.result }}
+          DOCS_SELECTED: ${{ needs.changes.outputs.docs }}
+          DOCS_RESULT: ${{ needs.docs.result }}
+          DEMO_SELECTED: ${{ needs.changes.outputs.demo }}
+          DEMO_RESULT: ${{ needs.demo.result }}
+          LINT_SELECTED: ${{ needs.changes.outputs.lint }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          AUDIT_SELECTED: ${{ needs.changes.outputs.audit }}
+          AUDIT_RESULT: ${{ needs.audit.result }}
+          UNIT_SELECTED: ${{ needs.changes.outputs.unit }}
+          UNIT_RESULT: ${{ needs.unit.result }}
+          UNIT_WEB_SELECTED: ${{ needs.changes.outputs.unitWeb }}
+          UNIT_WEB_RESULT: ${{ needs['unit-web'].result }}
+          BUILD_SELECTED: ${{ needs.changes.outputs.build }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          HYGIENE_SELECTED: ${{ needs.changes.outputs.hygiene }}
+          HYGIENE_RESULT: ${{ needs.hygiene.result }}
+          RULES_SELECTED: ${{ needs.changes.outputs.rules }}
+          RULES_RESULT: ${{ needs.rules.result }}
+          E2E_SELECTED: ${{ needs.changes.outputs.e2e }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: node scripts/ci/verify-gate.cjs
