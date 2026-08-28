@@ -12,6 +12,20 @@ The budget measures the JavaScript graph required for the first public route. It
 
 The first committed limits must be below the measured pre-change initial graph. Later changes can reduce a limit. They must not raise a limit without a written reason and new measurements.
 
+Run these checks after each build:
+
+```sh
+node scripts/ci/bundle-budget.cjs --dist apps/web/dist
+node scripts/ci/bundle-budget.cjs --dist docs/demo
+```
+
+The committed limits are:
+
+- 1,020,000 raw bytes and 275,000 gzip bytes for the initial graph.
+- 180,000 raw bytes and 50,000 gzip bytes for each deferred chunk.
+
+See [the current bundle report](public-bundle-report.md) for measured results.
+
 ## Split rules
 
 - Split at route or feature boundaries that a visitor can understand.

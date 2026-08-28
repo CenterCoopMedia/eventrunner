@@ -79,57 +79,60 @@ describe('Home', () => {
 });
 
 describe('ContentPage (catch-all route)', () => {
-  it('renders a non-system page at its own root-level path', () => {
+  it('renders a non-system page at its own root-level path', async () => {
     renderAt('/faq');
     const faqPage = pagesData.find((p) => p.id === 'faq');
     expect(
-      screen.getByRole('heading', { level: 1, name: faqPage.label }),
+      await screen.findByRole('heading', { level: 1, name: faqPage.label }),
     ).toBeInTheDocument();
     // The FAQ item renders as a disclosure with its question.
     expect(screen.getByText(siteContent.faq_items__what_is_this.question)).toBeInTheDocument();
   });
 
-  it('404s cleanly on an unknown path', () => {
+  it('404s cleanly on an unknown path', async () => {
     renderAt('/definitely-not-published');
     expect(
-      screen.getByRole('heading', { name: 'Page not found' }),
+      await screen.findByRole('heading', { name: 'Page not found' }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Go to the home page' }),
     ).toBeInTheDocument();
   });
 
-  it('the old /p/ prefix 404s — it is retired, not redirected', () => {
+  it('the old /p/ prefix 404s — it is retired, not redirected', async () => {
     renderAt('/p/faq');
     expect(
-      screen.getByRole('heading', { name: 'Page not found' }),
+      await screen.findByRole('heading', { name: 'Page not found' }),
     ).toBeInTheDocument();
   });
 
-  it('shows the unreviewed-template notice on the seeded legal pages (spec §5.5)', () => {
+  it('shows the unreviewed-template notice on the seeded legal pages (spec §5.5)', async () => {
     // config/event.legal.reviewRequired is true on every fresh deployment,
     // and the public notice is one of the two places §5.1.1 puts the
     // enforcement an operator cannot miss.
     expect(eventConfig.legal.reviewRequired).toBe(true);
     renderAt('/privacy');
-    expect(screen.getByRole('note')).toHaveTextContent('unreviewed template');
+    expect(await screen.findByRole('note')).toHaveTextContent('unreviewed template');
   });
 
-  it('does not show the notice on a non-legal page', () => {
+  it('does not show the notice on a non-legal page', async () => {
     renderAt('/faq');
+    await screen.findByRole('heading', { name: 'Frequently asked questions' });
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
-  it('a system route wins over the catch-all even though both could match', () => {
+  it('a system route wins over the catch-all even though both could match', async () => {
     renderAt('/schedule');
     // Schedule is a dedicated route (spec §2.4), not routed through
     // ContentPage — its own page renders, not a 404 and not the generic
     // content article wrapper.
+    expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument();
   });
 
-  it('404s a live/draft doc still carrying the retired /p/ path, not renders it', () => {
+  it('404s a live/draft doc still carrying the retired /p/ path, not renders it', async () => {
     renderAt('/p/faq');
+    await screen.findByRole('heading', { name: 'Page not found' });
     act(() => {
       subscriptions.get('cmsPages')([
         ...pagesData,
@@ -152,8 +155,9 @@ describe('ContentPage (catch-all route)', () => {
     expect(screen.queryByRole('heading', { name: 'Legacy FAQ' })).not.toBeInTheDocument();
   });
 
-  it('404s a doc saved under a reserved prefix like /signin/help', () => {
+  it('404s a doc saved under a reserved prefix like /signin/help', async () => {
     renderAt('/signin/help');
+    await screen.findByRole('heading', { name: 'Page not found' });
     act(() => {
       subscriptions.get('cmsPages')([
         ...pagesData,
@@ -173,8 +177,9 @@ describe('ContentPage (catch-all route)', () => {
     expect(screen.queryByRole('heading', { name: 'Sign-in help' })).not.toBeInTheDocument();
   });
 
-  it('leaves a normal root-level page unaffected by the reserved-path check', () => {
+  it('leaves a normal root-level page unaffected by the reserved-path check', async () => {
     renderAt('/faq');
+    await screen.findByRole('heading', { name: 'Frequently asked questions' });
     act(() => {
       subscriptions.get('cmsPages')(pagesData);
     });

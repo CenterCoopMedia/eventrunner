@@ -15,24 +15,10 @@ import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
 import ProfileSetupRedirect from './components/ProfileSetupRedirect.jsx';
 import Home from './pages/Home.jsx';
-import Schedule from './pages/Schedule.jsx';
-import SessionDetail from './pages/SessionDetail.jsx';
-import MySchedule from './pages/MySchedule.jsx';
-import Speakers from './pages/Speakers.jsx';
-import SpeakerDetail from './pages/SpeakerDetail.jsx';
-import Sponsors from './pages/Sponsors.jsx';
-import Updates from './pages/Updates.jsx';
-import UpdateDetail from './pages/UpdateDetail.jsx';
-import ContentPage from './pages/ContentPage.jsx';
 import Login from './pages/Login.jsx';
-import SpeakerAccept from './pages/SpeakerAccept.jsx';
-import SpeakerProfile from './pages/SpeakerProfile.jsx';
-import TicketClaim from './pages/TicketClaim.jsx';
-import Profile from './pages/Profile.jsx';
-import Attendees from './pages/Attendees.jsx';
-import AttendeeProfile from './pages/AttendeeProfile.jsx';
 import LoadingState from './components/LoadingState.jsx';
 import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';
+import DeferredPage from './components/DeferredPage.jsx';
 import { clearReloadFlag } from './lib/chunkReload.js';
 
 // Code-split the admin CMS out of the public bundle (issue #95): AdminApp
@@ -45,6 +31,31 @@ const AdminApp = lazy(() => import('./admin/AdminApp.jsx').then((module) => {
   clearReloadFlag();
   return module;
 }));
+
+function lazyPage(importer) {
+  return lazy(() =>
+    importer().then((module) => {
+      clearReloadFlag();
+      return module;
+    }),
+  );
+}
+
+const Schedule = lazyPage(() => import('./pages/Schedule.jsx'));
+const SessionDetail = lazyPage(() => import('./pages/SessionDetail.jsx'));
+const MySchedule = lazyPage(() => import('./pages/MySchedule.jsx'));
+const Speakers = lazyPage(() => import('./pages/Speakers.jsx'));
+const SpeakerDetail = lazyPage(() => import('./pages/SpeakerDetail.jsx'));
+const Sponsors = lazyPage(() => import('./pages/Sponsors.jsx'));
+const Updates = lazyPage(() => import('./pages/Updates.jsx'));
+const UpdateDetail = lazyPage(() => import('./pages/UpdateDetail.jsx'));
+const ContentPage = lazyPage(() => import('./pages/ContentPage.jsx'));
+const SpeakerAccept = lazyPage(() => import('./pages/SpeakerAccept.jsx'));
+const SpeakerProfile = lazyPage(() => import('./pages/SpeakerProfile.jsx'));
+const TicketClaim = lazyPage(() => import('./pages/TicketClaim.jsx'));
+const Profile = lazyPage(() => import('./pages/Profile.jsx'));
+const Attendees = lazyPage(() => import('./pages/Attendees.jsx'));
+const AttendeeProfile = lazyPage(() => import('./pages/AttendeeProfile.jsx'));
 
 export function AppRoutes() {
   return (
@@ -69,36 +80,36 @@ export function AppRoutes() {
       />
       <Route element={<Layout />}>
         <Route index element={<Home />} />
-        <Route path="schedule" element={<Schedule />} />
-        <Route path="schedule/mine" element={<MySchedule />} />
-        <Route path="schedule/:sessionId" element={<SessionDetail />} />
-        <Route path="speakers" element={<Speakers />} />
-        <Route path="speakers/:slug" element={<SpeakerDetail />} />
-        <Route path="sponsors" element={<Sponsors />} />
-        <Route path="updates" element={<Updates />} />
-        <Route path="updates/:id" element={<UpdateDetail />} />
+        <Route path="schedule" element={<DeferredPage component={Schedule} label="schedule" />} />
+        <Route path="schedule/mine" element={<DeferredPage component={MySchedule} label="your schedule" />} />
+        <Route path="schedule/:sessionId" element={<DeferredPage component={SessionDetail} label="session" />} />
+        <Route path="speakers" element={<DeferredPage component={Speakers} label="speakers" />} />
+        <Route path="speakers/:slug" element={<DeferredPage component={SpeakerDetail} label="speaker" />} />
+        <Route path="sponsors" element={<DeferredPage component={Sponsors} label="sponsors" />} />
+        <Route path="updates" element={<DeferredPage component={Updates} label="updates" />} />
+        <Route path="updates/:id" element={<DeferredPage component={UpdateDetail} label="update" />} />
         <Route path="signin" element={<Login />} />
         {/* Speaker invite acceptance (issue #21). Singular `speaker`, and
             reserved in shared/routing alongside the plural directory route:
             every invitation email ever sent links here, so a generic
             cmsPages path must never be able to claim the segment. */}
-        <Route path="speaker/accept" element={<SpeakerAccept />} />
+        <Route path="speaker/accept" element={<DeferredPage component={SpeakerAccept} label="speaker invitation" />} />
         {/* The speaker profile wizard (issue #22): self-service editing of
             the caller's own speakers/{id} record, distinct from /profile
             (the attendee users/{uid} record). Sits under the same reserved
             `speaker` segment as speaker/accept, and speaker.accepted's CTA
             (functions/src/email/templates/speaker.accepted.cjs) links
             straight here. */}
-        <Route path="speaker/profile" element={<SpeakerProfile />} />
+        <Route path="speaker/profile" element={<DeferredPage component={SpeakerProfile} label="speaker profile" />} />
         {/* Self-service ticket claim (issue #33): every `ticket.claim_prompt`
             CTA (manual.cjs, eventbrite.cjs getRegistrationPrompt) links
             here. `ticket` is reserved in shared/routing alongside `speaker`,
             for the same reason — mail already sent with this link must
             keep working. */}
-        <Route path="ticket/claim" element={<TicketClaim />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="attendees" element={<Attendees />} />
-        <Route path="attendees/:uid" element={<AttendeeProfile />} />
+        <Route path="ticket/claim" element={<DeferredPage component={TicketClaim} label="ticket claim" />} />
+        <Route path="profile" element={<DeferredPage component={Profile} label="profile" />} />
+        <Route path="attendees" element={<DeferredPage component={Attendees} label="attendees" />} />
+        <Route path="attendees/:uid" element={<DeferredPage component={AttendeeProfile} label="attendee" />} />
         {/* Generic cmsPages route by their own root-level `path`
             (issue #52) — this catch-all matches whatever the system
             routes above didn't, and ContentPage looks the current
@@ -106,7 +117,7 @@ export function AppRoutes() {
             through to NotFound itself when nothing matches. It MUST
             stay the LAST route: react-router matches routes in order,
             and "*" matches everything. */}
-        <Route path="*" element={<ContentPage />} />
+        <Route path="*" element={<DeferredPage component={ContentPage} label="page" />} />
       </Route>
     </Routes>
   );

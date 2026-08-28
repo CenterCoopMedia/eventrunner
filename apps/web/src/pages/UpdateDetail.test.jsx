@@ -12,7 +12,7 @@ const VISIBLE_UPDATE = {
   id: 'update-1',
   title: '[Fixture] Parking has moved',
   body: 'Please use lot B starting Thursday.',
-  publishAt: new Date('2026-10-01T00:00:00Z'),
+  publishAt: new Date('2026-10-01T12:00:00Z'),
   visible: true,
 };
 const HIDDEN_UPDATE = {

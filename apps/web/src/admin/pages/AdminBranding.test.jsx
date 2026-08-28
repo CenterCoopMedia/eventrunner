@@ -184,7 +184,7 @@ describe('the proof', () => {
     // The public shell, rendered by the app's own routes and components.
     expect(within(frame()).getByRole('banner')).toBeInTheDocument();
     expect(within(frame()).getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
-  });
+  }, 10_000);
 
   it('applies the candidate to the FRAME, and the room never adopts it', async () => {
     await renderBranding();
@@ -201,7 +201,7 @@ describe('the proof', () => {
     fireEvent.change(screen.getByLabelText('Site style'), { target: { value: 'zine' } });
     await waitFor(() => expect(frame().dataset.theme).toBe('zine'));
     expect({ ...document.documentElement.dataset }).toEqual(room);
-  });
+  }, 10_000);
 
   it('states the page, the mode, the width, and the draft below the frame', async () => {
     await renderBranding();
@@ -211,7 +211,7 @@ describe('the proof', () => {
     expect(screen.getByText('Schedule · light · 1440px · published theme')).toBeInTheDocument();
     // And the FRAME really moved. `initialEntries` is read once, so the
     // router has to remount or the line and the picture disagree.
-    expect(within(frame()).getByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
+    expect(await within(frame()).findByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
   });
 
   it('switches light and dark instantly, as two proofs of one forme', async () => {
@@ -258,7 +258,9 @@ describe('the proof', () => {
     expect(screen.getAllByText(/Schedule · light · 1440px · stress test/).length)
       .toBeGreaterThan(0);
     // The frame is rendering the fixture, not the real programme.
-    expect(frame().textContent).toContain('Roundtable: Sustaining multi-newsroom');
+    await waitFor(() =>
+      expect(frame().textContent).toContain('Roundtable: Sustaining multi-newsroom'),
+    );
   });
 
   it('previews the session page a shared link lands on', async () => {
