@@ -24,8 +24,8 @@ jobs:
 
       - name: Install the workspace
         run: |
-          npm ci
           npm run prepare:functions
+          npm ci
 
       - name: Pack source, git metadata, and installed dependencies
         shell: bash
