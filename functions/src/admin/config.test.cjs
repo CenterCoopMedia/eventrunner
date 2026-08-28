@@ -81,6 +81,14 @@ function fakeDb(seed = {}) {
       },
     };
   }
+  function queryRef(col, field, value, max = Infinity) {
+    return {
+      _query: { col, field, value, max },
+      limit(limitValue) {
+        return queryRef(col, field, value, limitValue);
+      },
+    };
+  }
   const db = {
     docs,
     writes,
@@ -94,6 +102,10 @@ function fakeDb(seed = {}) {
           autoId += 1;
           return docRef(name, id === undefined ? `auto${autoId}` : id);
         },
+        where(field, operator, value) {
+          if (operator !== '==') throw new Error(`unsupported operator ${operator}`);
+          return queryRef(name, field, value);
+        },
       };
     },
     // Same optimistic model as real Firestore: buffered writes commit only
@@ -105,6 +117,19 @@ function fakeDb(seed = {}) {
         const ops = [];
         const tx = {
           async get(ref) {
+            if (ref._query) {
+              const { col, field, value, max } = ref._query;
+              const matches = [...docs.entries()]
+                .filter(([key, data]) => key.startsWith(`${col}/`) && data?.[field] === value)
+                .slice(0, max);
+              for (const [key] of matches) reads.set(key, versionOf(key));
+              return {
+                docs: matches.map(([key, data]) => ({
+                  id: key.slice(col.length + 1),
+                  data: () => data,
+                })),
+              };
+            }
             reads.set(ref._key, versionOf(ref._key));
             const snap = await ref.get();
             if (db.onTransactionRead) await db.onTransactionRead(ref._key);
@@ -574,6 +599,55 @@ test('a first event write defaults the verification pair, never omits it', async
   const written = deps.db.docs.get('config/event');
   assert.equal(written.sender.domainVerified, false);
   assert.equal(written.sender.domainVerifiedAt, null);
+});
+
+test('removing a referenced venue place is rejected across live and draft sessions', async () => {
+  const event = validEvent({
+    venue: {
+      places: [
+        { id: 'main-hall', name: 'Main hall' },
+        { id: 'studio', name: 'Studio' },
+      ],
+      movements: [],
+    },
+  });
+  const deps = makeDeps({
+    'config/event': event,
+    'cmsSchedule/keynote': { title: 'Opening keynote', placeId: 'main-hall' },
+    'cmsSchedule_drafts/workshop': { title: 'Draft workshop', placeId: 'main-hall' },
+  });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { venue: { places: [{ id: 'studio', name: 'Studio' }], movements: [] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /venue\.places: cannot remove "main-hall"/);
+  assert.match(res.body.error.message, /Opening keynote/);
+  assert.match(res.body.error.message, /Draft workshop/);
+  assert.equal(deps.db.docs.get('config/event').venue.places.length, 2);
+});
+
+test('an unused venue place can be removed', async () => {
+  const event = validEvent({
+    venue: {
+      places: [
+        { id: 'main-hall', name: 'Main hall' },
+        { id: 'studio', name: 'Studio' },
+      ],
+      movements: [],
+    },
+  });
+  const deps = makeDeps({ 'config/event': event });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { venue: { places: [{ id: 'studio', name: 'Studio' }], movements: [] } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(deps.db.docs.get('config/event').venue.places, [
+    { id: 'studio', name: 'Studio' },
+  ]);
 });
 
 // -------------------------------------------------------- gates and shape

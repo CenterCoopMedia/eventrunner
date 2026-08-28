@@ -26,6 +26,12 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader from '../components/adminChrome.jsx';
+import { subscribeAdminCollection } from '../adminSource.js';
+import VenueReferenceEditor, {
+  normalizeVenueReferences,
+  validateVenueReferences,
+  venueReferencesPayload,
+} from '../components/VenueReferenceEditor.jsx';
 
 const blankDay = () => ({ id: '', label: '', date: '', startTime: '', endTime: '' });
 const blankTrack = () => ({ letter: '', name: '' });
@@ -65,6 +71,7 @@ function toForm(eventConfig) {
       postalCode: venue.postalCode ?? '',
       country: venue.country ?? '',
       mapUrl: venue.mapUrl ?? '',
+      ...normalizeVenueReferences(venue),
     },
     sender: {
       email: sender.email ?? '',
@@ -125,6 +132,7 @@ function toPayload(form) {
       postalCode: orNull(form.venue.postalCode),
       country: orNull(form.venue.country),
       mapUrl: orNull(form.venue.mapUrl),
+      ...venueReferencesPayload(form.venue),
     },
     sender: {
       email: form.sender.email,
@@ -159,6 +167,8 @@ export default function AdminEventSettings() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
+  const [liveSessions, setLiveSessions] = useState([]);
+  const [draftSessions, setDraftSessions] = useState([]);
   const errorRef = useRef(null);
   // Adopt runtime config once CONFIG/EVENT itself arrives (the snapshot
   // renders first), then stop — later listener echoes must not overwrite
@@ -179,6 +189,15 @@ export default function AdminEventSettings() {
     if (error) errorRef.current?.focus();
   }, [error]);
 
+  useEffect(() => {
+    const unsubscribeLive = subscribeAdminCollection('cmsSchedule', setLiveSessions);
+    const unsubscribeDrafts = subscribeAdminCollection('cmsSchedule_drafts', setDraftSessions);
+    return () => {
+      unsubscribeLive?.();
+      unsubscribeDrafts?.();
+    };
+  }, []);
+
   const fieldErrors = useMemo(() => {
     const map = new Map();
     for (const segment of error?.fieldErrors ?? []) {
@@ -186,7 +205,22 @@ export default function AdminEventSettings() {
     }
     return map;
   }, [error]);
-  const errorFor = (field) => fieldErrors.get(field);
+  const localVenueErrors = useMemo(
+    () => validateVenueReferences(form.venue),
+    [form.venue],
+  );
+  const errorFor = (field) => localVenueErrors.get(field) ?? fieldErrors.get(field);
+  const placeUsage = useMemo(() => {
+    const usage = new Map();
+    for (const session of [...liveSessions, ...draftSessions]) {
+      if (!session.placeId) continue;
+      const rows = usage.get(session.placeId) ?? [];
+      const label = session.title || session.id;
+      if (!rows.includes(label)) rows.push(label);
+      usage.set(session.placeId, rows);
+    }
+    return usage;
+  }, [liveSessions, draftSessions]);
 
   const setGroup = (group, patch) =>
     setForm((current) => ({ ...current, [group]: { ...current[group], ...patch } }));
@@ -208,6 +242,13 @@ export default function AdminEventSettings() {
     setStatus('');
     try {
       await call('updateEventConfig', { event: toPayload(form) });
+      setForm((current) => ({
+        ...current,
+        venue: {
+          ...current.venue,
+          places: current.venue.places.map((place) => ({ ...place, persisted: true })),
+        },
+      }));
       setStatus('Saved. The site picks the change up live.');
       showToast('Event settings saved.');
     } catch (err) {
@@ -436,6 +477,13 @@ export default function AdminEventSettings() {
         </div>
       </Panel>
 
+      <VenueReferenceEditor
+        venue={form.venue}
+        onChange={(patch) => setGroup('venue', patch)}
+        errorFor={errorFor}
+        placeUsage={placeUsage}
+      />
+
       <Panel
         title="Registration"
         description="Naive local datetimes (YYYY-MM-DDTHH:MM) in the event’s timezone."
@@ -549,7 +597,11 @@ export default function AdminEventSettings() {
       </Panel>
 
       <div>
-        <button type="submit" className={primaryButtonClass} disabled={saving}>
+        <button
+          type="submit"
+          className={primaryButtonClass}
+          disabled={saving || localVenueErrors.size > 0}
+        >
           {saving ? 'Saving…' : 'Save event settings'}
         </button>
       </div>

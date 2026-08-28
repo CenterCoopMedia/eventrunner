@@ -21,10 +21,12 @@ vi.mock('../../lib/contentSource.js', () => ({
   subscribeSpeakersPublic: () => () => {},
 }));
 vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
+const adminSubscriptions = new Map();
 vi.mock('../adminSource.js', () => ({
-  subscribeAdminCollection: (_name, onNext) => {
+  subscribeAdminCollection: (name, onNext) => {
+    adminSubscriptions.set(name, onNext);
     onNext([]);
-    return () => {};
+    return () => adminSubscriptions.delete(name);
   },
 }));
 vi.mock('firebase/auth', () => ({
@@ -125,6 +127,7 @@ async function pushConfig(docId, data) {
 
 beforeEach(() => {
   configSubscriptions.clear();
+  adminSubscriptions.clear();
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -181,6 +184,80 @@ describe('event settings', () => {
       { letter: 'A', name: 'Practice' },
       { letter: 'B', name: 'Sustainability' },
     ]);
+  });
+
+  it('edits venue places and one-way movements', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [
+          { id: 'main-hall', name: 'Main hall' },
+          { id: 'studio', name: 'Studio', floor: '2' },
+        ],
+        movements: [{ from: 'main-hall', to: 'studio', walkingMinutes: 0 }],
+      },
+    });
+    expect(screen.getByLabelText('Place 1 id')).toHaveValue('main-hall');
+    expect(screen.getByLabelText('Movement 1 walking minutes')).toHaveValue(0);
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.change(screen.getByLabelText('Place 2 name'), {
+      target: { value: 'Editing studio' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const venue = bodyOf(0).event.venue;
+    expect(venue.places[1]).toEqual({ id: 'studio', name: 'Editing studio', floor: '2' });
+    expect(venue.movements[0].walkingMinutes).toBe(0);
+  });
+
+  it('blocks removal when a live or draft revision uses a place', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [
+          { id: 'main-hall', name: 'Main hall' },
+          { id: 'studio', name: 'Studio' },
+        ],
+        movements: [],
+      },
+    });
+    act(() => {
+      adminSubscriptions.get('cmsSchedule')([
+        { id: 'keynote', title: 'Opening keynote', placeId: 'main-hall' },
+      ]);
+      adminSubscriptions.get('cmsSchedule_drafts')([
+        { id: 'keynote', title: 'Opening keynote', placeId: 'studio' },
+      ]);
+    });
+    expect(screen.getByRole('button', { name: 'Remove Main hall' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove Studio' })).toBeDisabled();
+    expect(screen.getAllByText(/Used by Opening keynote/)).toHaveLength(2);
+  });
+
+  it('removes dependent unsaved routes and moves focus to a surviving control', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [
+          { id: 'main-hall', name: 'Main hall' },
+          { id: 'studio', name: 'Studio' },
+        ],
+        movements: [{ from: 'main-hall', to: 'studio', walkingMinutes: 4 }],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Main hall' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('1 unsaved route');
+    expect(screen.queryByLabelText('Movement 1 from')).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Remove Studio' })).toHaveFocus(),
+    );
   });
 
   it('says plainly that an event with one room needs no tracks', async () => {
