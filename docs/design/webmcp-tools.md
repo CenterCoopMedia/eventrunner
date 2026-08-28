@@ -1,6 +1,6 @@
 # Read-only WebMCP tools
 
-Event Runner can expose named browser tools through `document.modelContext` when a supported top-level browser provides the API. The normal site remains the source of truth and the complete fallback.
+Event Runner can expose named browser tools through `document.modelContext` when a supported top-level browser provides the API. The implementation also accepts `navigator.modelContext` for compatibility with earlier browser previews. The normal site remains the source of truth and the complete fallback.
 
 Reference: https://learn.chatgpt.com/docs/webmcp
 
@@ -8,7 +8,7 @@ Reference: https://learn.chatgpt.com/docs/webmcp
 
 - Register tools from JavaScript in the top-level event page or authenticated admin app.
 - Do not depend on declarative markup or an iframe.
-- Check that `document.modelContext?.registerTool` is a function. Unsupported browsers perform no registration and keep the same interface and network behavior.
+- Check that `document.modelContext?.registerTool` is a function, then check the earlier `navigator.modelContext` preview surface. Unsupported browsers perform no registration and keep the same interface and network behavior.
 - Register only when the event’s experimental flag permits the relevant tool set.
 - Use stable allowlisted names, explicit descriptions, narrow JSON schemas, `additionalProperties: false`, and `readOnlyHint: true` for every tool in the first two phases.
 - Do not build a generic wrapper around function names, Firebase paths, URLs, queries, or document ids.
@@ -21,6 +21,8 @@ The public event site can expose bounded facts that the same visitor can already
 - `inspect_public_page`: current public page type, route, and the public content source that resolved it.
 - `check_public_schedule`: bounded consistency results over the published schedule only.
 - `get_public_release_context`: public build and generated-content version information.
+
+The public set is on for the static demo. A client deployment must set the validated `webmcpPublic` feature flag. The flag defaults off when it is absent.
 
 A public result never includes a draft, user profile, attendee record, ticket, invitation, email, provider state, storage path, internal error, secret, token, or non-public identifier. Lists have explicit maximum lengths and include a truncation count.
 

@@ -62,6 +62,7 @@ const KNOWN_FEATURE_KEYS = [
   'badges', 'liveUpdates', 'feedbackInbox',
   'schedulePdf', 'icsExport', 'updates',
   'autoApproveTicketHolders', 'publicAttendeeProfiles',
+  'webmcpPublic',
 ];
 
 /** @param {*} v @returns {boolean} */
