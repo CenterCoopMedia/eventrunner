@@ -1,82 +1,504 @@
-name: Deploy
-
-# Caller workflow (spec §8.1). `${{ inputs.client }}` is populated only on
-# workflow_dispatch — a push-triggered run would evaluate it to the empty
-# string and silently bind no environment, so `resolve` is the one place
-# that decides, per trigger shape, which client environments to fan out to
-# (scripts/lib/deploy-matrix.cjs, unit-tested by `npm test`).
+name: Repair PR 135
 
 on:
-  workflow_dispatch:
-    inputs:
-      client:
-        description: Client GitHub Environment name to deploy.
-        required: true
-        type: string
-      provision:
-        description: Also (re)deploy firestore:rules, firestore:indexes, and storage. deploy-client.yml's provision job always runs this regardless — kept as an input for operator intent/logging only.
-        required: false
-        type: boolean
-        default: false
-      bootstrap:
-        description: Bootstrap mode for a fresh project — deploy only provision + functions, skipping content/build/hosting/smoke. See docs/DEPLOY_RUNBOOK.md §5.
-        required: false
-        type: boolean
-        default: false
-  push:
-    branches: [main]
+  pull_request:
+    types: [synchronize]
 
 permissions:
-  contents: read
-  # Reusable-workflow permissions are an intersection of caller and callee:
-  # deploy-client.yml cannot get more than the caller grants, no matter what
-  # its own `permissions:` block says. Without id-token here,
-  # google-github-actions/auth in every deploy-client.yml job fails to mint
-  # an OIDC token and Workload Identity Federation auth never happens.
-  id-token: write
+  contents: write
 
 jobs:
-  resolve:
-    name: Resolve target client environments
+  repair:
+    if: github.head_ref == 'codex/117-public-bundle-budget'
     runs-on: ubuntu-latest
-    outputs:
-      clients: ${{ steps.pick.outputs.clients }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: codex/117-public-bundle-budget
+          fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-      - id: pick
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          DISPATCH_CLIENT: ${{ inputs.client }}
-          AUTO: ${{ vars.AUTO_DEPLOY_ENVIRONMENTS }}
-        run: |
-          set -euo pipefail
-          CLIENTS=$(node -e '
-            const { resolveClients } = require("./scripts/lib/deploy-matrix.cjs");
-            const clients = resolveClients({
-              eventName: process.env.EVENT_NAME,
-              dispatchClient: process.env.DISPATCH_CLIENT,
-              autoDeployEnvironments: process.env.AUTO,
-            });
-            process.stdout.write(JSON.stringify(clients));
-          ')
-          echo "Resolved clients: $CLIENTS"
-          echo "clients=$CLIENTS" >> "$GITHUB_OUTPUT"
+          node-version: 22
+          cache: npm
 
-  deploy:
-    name: Deploy
-    needs: resolve
-    if: needs.resolve.outputs.clients != '[]'
-    strategy:
-      fail-fast: false # one client's failure must not cancel the others
-      max-parallel: 1 # deploys are serialized
-      matrix:
-        client: ${{ fromJSON(needs.resolve.outputs.clients) }}
-    uses: ./.github/workflows/deploy-client.yml
-    with:
-      client: ${{ matrix.client }}
-      provision: ${{ github.event_name == 'workflow_dispatch' && inputs.provision || false }}
-      bootstrap: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap || false }}
-    secrets: inherit
+      - name: Add the measurement tool and route boundary
+        shell: bash
+        run: |
+          cat > scripts/ci/bundle-budget.cjs <<'EOF'
+          'use strict';
+
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const zlib = require('node:zlib');
+
+          const STATIC_IMPORT_RE = /\b(?:import|export)\s*(?!\s*\()(?:(?:[^"'`;()]*?)\sfrom\s*)?["']([^"']+)["']/g;
+
+          function listFiles(directory) {
+            const files = [];
+            if (!fs.existsSync(directory)) return files;
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const full = path.join(directory, entry.name);
+              if (entry.isDirectory()) files.push(...listFiles(full));
+              else files.push(full);
+            }
+            return files;
+          }
+
+          function parseStaticImports(source) {
+            return [...String(source).matchAll(STATIC_IMPORT_RE)].map((match) => match[1]);
+          }
+
+          function htmlAttribute(tag, name) {
+            const match = new RegExp(`\\b${name}=["']([^"']+)["']`, 'i').exec(tag);
+            return match ? match[1] : '';
+          }
+
+          function resolveHtmlAsset(dist, href) {
+            const clean = String(href).split(/[?#]/, 1)[0].replace(/^\.\//, '');
+            const assets = clean.lastIndexOf('/assets/');
+            const relative = assets >= 0 ? clean.slice(assets + 1) : clean.replace(/^\/+/, '');
+            const target = path.resolve(dist, relative);
+            const root = path.resolve(dist);
+            if (target !== root && !target.startsWith(`${root}${path.sep}`)) return null;
+            return target;
+          }
+
+          function resolveImportedAsset(dist, importer, specifier) {
+            if (!specifier.endsWith('.js') && !specifier.includes('.js?')) return null;
+            const clean = specifier.split(/[?#]/, 1)[0];
+            if (clean.startsWith('/')) return resolveHtmlAsset(dist, clean);
+            if (!clean.startsWith('.')) return null;
+            const target = path.resolve(path.dirname(importer), clean);
+            const root = path.resolve(dist);
+            if (!target.startsWith(`${root}${path.sep}`)) return null;
+            return target;
+          }
+
+          function gzipBytes(buffer) {
+            return zlib.gzipSync(buffer, { level: 9 }).length;
+          }
+
+          function relativeName(dist, file) {
+            return path.relative(dist, file).replaceAll(path.sep, '/');
+          }
+
+          function measureBundle(distInput) {
+            const dist = path.resolve(distInput);
+            const indexPath = path.join(dist, 'index.html');
+            if (!fs.existsSync(indexPath)) throw new Error(`bundle budget: missing ${indexPath}`);
+            const html = fs.readFileSync(indexPath, 'utf8');
+            const initial = new Set();
+            for (const tag of html.match(/<(?:script|link)\b[^>]*>/gi) || []) {
+              const name = tag.slice(1).split(/\s|>/, 1)[0].toLowerCase();
+              const type = htmlAttribute(tag, 'type').toLowerCase();
+              const rel = htmlAttribute(tag, 'rel').toLowerCase();
+              const href = name === 'script' ? htmlAttribute(tag, 'src') : htmlAttribute(tag, 'href');
+              if (!href) continue;
+              if ((name === 'script' && type === 'module') || (name === 'link' && rel === 'modulepreload')) {
+                const asset = resolveHtmlAsset(dist, href);
+                if (asset && fs.existsSync(asset)) initial.add(asset);
+              }
+            }
+            if (initial.size === 0) throw new Error('bundle budget: index.html names no module entry');
+
+            const queue = [...initial];
+            while (queue.length > 0) {
+              const file = queue.shift();
+              const source = fs.readFileSync(file, 'utf8');
+              for (const specifier of parseStaticImports(source)) {
+                const imported = resolveImportedAsset(dist, file, specifier);
+                if (!imported || !fs.existsSync(imported) || initial.has(imported)) continue;
+                initial.add(imported);
+                queue.push(imported);
+              }
+            }
+
+            const details = [...initial]
+              .map((file) => {
+                const buffer = fs.readFileSync(file);
+                return { file: relativeName(dist, file), raw: buffer.length, gzip: gzipBytes(buffer) };
+              })
+              .sort((a, b) => b.raw - a.raw || a.file.localeCompare(b.file));
+            const allJs = listFiles(dist).filter((file) => file.endsWith('.js'));
+            const lazyChunks = allJs
+              .filter((file) => !initial.has(path.resolve(file)))
+              .map((file) => {
+                const buffer = fs.readFileSync(file);
+                return { file: relativeName(dist, file), raw: buffer.length, gzip: gzipBytes(buffer) };
+              })
+              .sort((a, b) => b.raw - a.raw || a.file.localeCompare(b.file));
+
+            return {
+              initial: {
+                raw: details.reduce((total, item) => total + item.raw, 0),
+                gzip: details.reduce((total, item) => total + item.gzip, 0),
+                chunks: details.length,
+                files: details,
+              },
+              lazyChunks,
+            };
+          }
+
+          function checkBudget(measurement, budget) {
+            const problems = [];
+            for (const metric of ['raw', 'gzip']) {
+              if (measurement.initial[metric] > budget.initial[metric]) {
+                problems.push(
+                  `initial ${metric}: ${measurement.initial[metric]} > ${budget.initial[metric]}`,
+                );
+              }
+            }
+            for (const chunk of measurement.lazyChunks) {
+              for (const metric of ['raw', 'gzip']) {
+                if (chunk[metric] > budget.lazyChunk[metric]) {
+                  problems.push(
+                    `${chunk.file} ${metric}: ${chunk[metric]} > ${budget.lazyChunk[metric]}`,
+                  );
+                }
+              }
+            }
+            return problems;
+          }
+
+          function parseArgs(argv) {
+            const options = { dist: 'apps/web/dist', json: false, budget: null };
+            for (let index = 0; index < argv.length; index += 1) {
+              const arg = argv[index];
+              if (arg === '--json') options.json = true;
+              else if (arg === '--dist') options.dist = argv[++index];
+              else if (arg === '--budget') options.budget = argv[++index];
+              else throw new Error(`bundle budget: unknown argument ${arg}`);
+            }
+            return options;
+          }
+
+          function main(argv = process.argv.slice(2)) {
+            const options = parseArgs(argv);
+            const measurement = measureBundle(options.dist);
+            if (options.json) {
+              process.stdout.write(`${JSON.stringify(measurement, null, 2)}\n`);
+              return 0;
+            }
+            const budgetPath = path.resolve(
+              options.budget || path.join(__dirname, 'bundle-budget.json'),
+            );
+            const budget = JSON.parse(fs.readFileSync(budgetPath, 'utf8'));
+            const problems = checkBudget(measurement, budget);
+            console.log(
+              `bundle budget: ${measurement.initial.chunks} initial chunk(s), ` +
+              `${measurement.initial.raw} raw bytes, ${measurement.initial.gzip} gzip bytes`,
+            );
+            if (problems.length > 0) {
+              for (const problem of problems) console.error(`- ${problem}`);
+              return 1;
+            }
+            return 0;
+          }
+
+          if (require.main === module) {
+            try {
+              process.exitCode = main();
+            } catch (error) {
+              console.error(error.message);
+              process.exitCode = 1;
+            }
+          }
+
+          module.exports = { checkBudget, main, measureBundle, parseStaticImports };
+          EOF
+
+          cat > scripts/ci/bundle-budget.test.cjs <<'EOF'
+          'use strict';
+
+          const test = require('node:test');
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const os = require('node:os');
+          const path = require('node:path');
+          const { checkBudget, measureBundle, parseStaticImports } = require('./bundle-budget.cjs');
+
+          test('parseStaticImports excludes dynamic imports', () => {
+            assert.deepEqual(
+              parseStaticImports(
+                'import"./side.js";import{a}from"./shared.js";export{b}from"./export.js";import("./lazy.js");',
+              ),
+              ['./side.js', './shared.js', './export.js'],
+            );
+          });
+
+          test('measureBundle follows only the initial static graph', () => {
+            const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bundle-budget-'));
+            fs.mkdirSync(path.join(root, 'assets'));
+            fs.writeFileSync(
+              path.join(root, 'index.html'),
+              '<script type="module" src="./assets/index.js"></script>',
+            );
+            fs.writeFileSync(
+              path.join(root, 'assets/index.js'),
+              'import"./shared.js"; import("./route.js");',
+            );
+            fs.writeFileSync(path.join(root, 'assets/shared.js'), 'export const shared = true;');
+            fs.writeFileSync(path.join(root, 'assets/route.js'), 'export default 1;');
+
+            const measured = measureBundle(root);
+            assert.deepEqual(
+              measured.initial.files.map((item) => item.file).sort(),
+              ['assets/index.js', 'assets/shared.js'],
+            );
+            assert.deepEqual(measured.lazyChunks.map((item) => item.file), ['assets/route.js']);
+            assert.equal(checkBudget(measured, {
+              initial: { raw: 1, gzip: 1 },
+              lazyChunk: { raw: 1, gzip: 1 },
+            }).length > 0, true);
+          });
+          EOF
+
+          cat > apps/web/src/components/DeferredPage.jsx <<'EOF'
+          import { Suspense } from 'react';
+          import ChunkErrorBoundary from './ChunkErrorBoundary.jsx';
+          import LoadingState from './LoadingState.jsx';
+
+          export default function DeferredPage({ component: Component, label }) {
+            return (
+              <ChunkErrorBoundary>
+                <Suspense fallback={<LoadingState label={`Loading ${label}…`} />}>
+                  <Component />
+                </Suspense>
+              </ChunkErrorBoundary>
+            );
+          }
+          EOF
+
+          cat > apps/web/src/components/DeferredPage.test.jsx <<'EOF'
+          import { lazy } from 'react';
+          import { act, render, screen } from '@testing-library/react';
+          import { describe, expect, it, vi } from 'vitest';
+          import DeferredPage from './DeferredPage.jsx';
+
+          describe('DeferredPage', () => {
+            it('announces loading and then renders the route', async () => {
+              let finish;
+              const Route = lazy(
+                () => new Promise((resolve) => { finish = () => resolve({ default: () => <h1>Schedule</h1> }); }),
+              );
+              render(<DeferredPage component={Route} label="schedule" />);
+              expect(screen.getByRole('status')).toHaveAccessibleName('Loading schedule…');
+              await act(async () => finish());
+              expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
+            });
+
+            it('routes a rejected import through the existing recovery boundary', async () => {
+              vi.spyOn(console, 'error').mockImplementation(() => {});
+              const Route = lazy(() => Promise.reject(new Error('route failed')));
+              render(<DeferredPage component={Route} label="schedule" />);
+              expect(
+                await screen.findByRole('heading', { name: 'This part of the site did not load' }),
+              ).toBeInTheDocument();
+              expect(screen.getByRole('button', { name: 'Reload the page' })).toBeInTheDocument();
+            });
+          });
+          EOF
+
+      - name: Install dependencies and measure the current entry graph
+        shell: bash
+        run: |
+          npm run prepare:functions
+          npm ci
+          npm run build
+          node scripts/ci/bundle-budget.cjs --dist apps/web/dist --json > /tmp/bundle-before.json
+
+      - name: Split public routes and add CI enforcement
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          app = Path('apps/web/src/App.jsx')
+          text = app.read_text()
+          for name in [
+              'Schedule', 'SessionDetail', 'MySchedule', 'Speakers', 'SpeakerDetail',
+              'Sponsors', 'Updates', 'UpdateDetail', 'ContentPage', 'Login',
+              'SpeakerAccept', 'SpeakerProfile', 'TicketClaim', 'Profile',
+              'Attendees', 'AttendeeProfile',
+          ]:
+              line = f"import {name} from './pages/{name}.jsx';\n"
+              if text.count(line) != 1:
+                  raise SystemExit(f'App.jsx: expected import {name}')
+              text = text.replace(line, '', 1)
+          text = text.replace(
+              "import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';\n",
+              "import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';\nimport DeferredPage from './components/DeferredPage.jsx';\n",
+              1,
+          )
+          marker = """const AdminApp = lazy(() => import('./admin/AdminApp.jsx').then((module) => {
+            clearReloadFlag();
+            return module;
+          }));
+          """
+          if text.count(marker) != 1:
+              raise SystemExit('App.jsx: lazy admin marker not found')
+          routes = """
+
+          function lazyPage(importer) {
+            return lazy(() =>
+              importer().then((module) => {
+                clearReloadFlag();
+                return module;
+              }),
+            );
+          }
+
+          const Schedule = lazyPage(() => import('./pages/Schedule.jsx'));
+          const SessionDetail = lazyPage(() => import('./pages/SessionDetail.jsx'));
+          const MySchedule = lazyPage(() => import('./pages/MySchedule.jsx'));
+          const Speakers = lazyPage(() => import('./pages/Speakers.jsx'));
+          const SpeakerDetail = lazyPage(() => import('./pages/SpeakerDetail.jsx'));
+          const Sponsors = lazyPage(() => import('./pages/Sponsors.jsx'));
+          const Updates = lazyPage(() => import('./pages/Updates.jsx'));
+          const UpdateDetail = lazyPage(() => import('./pages/UpdateDetail.jsx'));
+          const ContentPage = lazyPage(() => import('./pages/ContentPage.jsx'));
+          const Login = lazyPage(() => import('./pages/Login.jsx'));
+          const SpeakerAccept = lazyPage(() => import('./pages/SpeakerAccept.jsx'));
+          const SpeakerProfile = lazyPage(() => import('./pages/SpeakerProfile.jsx'));
+          const TicketClaim = lazyPage(() => import('./pages/TicketClaim.jsx'));
+          const Profile = lazyPage(() => import('./pages/Profile.jsx'));
+          const Attendees = lazyPage(() => import('./pages/Attendees.jsx'));
+          const AttendeeProfile = lazyPage(() => import('./pages/AttendeeProfile.jsx'));
+          """
+          text = text.replace(marker, marker + routes, 1)
+
+          replacements = {
+            '<Route path="schedule" element={<Schedule />} />': '<Route path="schedule" element={<DeferredPage component={Schedule} label="schedule" />} />',
+            '<Route path="schedule/mine" element={<MySchedule />} />': '<Route path="schedule/mine" element={<DeferredPage component={MySchedule} label="your schedule" />} />',
+            '<Route path="schedule/:sessionId" element={<SessionDetail />} />': '<Route path="schedule/:sessionId" element={<DeferredPage component={SessionDetail} label="session" />} />',
+            '<Route path="speakers" element={<Speakers />} />': '<Route path="speakers" element={<DeferredPage component={Speakers} label="speakers" />} />',
+            '<Route path="speakers/:slug" element={<SpeakerDetail />} />': '<Route path="speakers/:slug" element={<DeferredPage component={SpeakerDetail} label="speaker" />} />',
+            '<Route path="sponsors" element={<Sponsors />} />': '<Route path="sponsors" element={<DeferredPage component={Sponsors} label="sponsors" />} />',
+            '<Route path="updates" element={<Updates />} />': '<Route path="updates" element={<DeferredPage component={Updates} label="updates" />} />',
+            '<Route path="updates/:id" element={<UpdateDetail />} />': '<Route path="updates/:id" element={<DeferredPage component={UpdateDetail} label="update" />} />',
+            '<Route path="signin" element={<Login />} />': '<Route path="signin" element={<DeferredPage component={Login} label="sign in" />} />',
+            '<Route path="speaker/accept" element={<SpeakerAccept />} />': '<Route path="speaker/accept" element={<DeferredPage component={SpeakerAccept} label="speaker invitation" />} />',
+            '<Route path="speaker/profile" element={<SpeakerProfile />} />': '<Route path="speaker/profile" element={<DeferredPage component={SpeakerProfile} label="speaker profile" />} />',
+            '<Route path="ticket/claim" element={<TicketClaim />} />': '<Route path="ticket/claim" element={<DeferredPage component={TicketClaim} label="ticket claim" />} />',
+            '<Route path="profile" element={<Profile />} />': '<Route path="profile" element={<DeferredPage component={Profile} label="profile" />} />',
+            '<Route path="attendees" element={<Attendees />} />': '<Route path="attendees" element={<DeferredPage component={Attendees} label="attendees" />} />',
+            '<Route path="attendees/:uid" element={<AttendeeProfile />} />': '<Route path="attendees/:uid" element={<DeferredPage component={AttendeeProfile} label="attendee" />} />',
+            '<Route path="*" element={<ContentPage />} />': '<Route path="*" element={<DeferredPage component={ContentPage} label="page" />} />',
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f'App.jsx: expected route {old}')
+              text = text.replace(old, new, 1)
+          app.write_text(text)
+
+          ci = Path('.github/workflows/ci.yml')
+          ci_text = ci.read_text()
+          old = """      - name: Assert dist exists
+            run: test -f apps/web/dist/index.html
+          """
+          new = old + """      - name: Enforce public bundle budget
+            run: node scripts/ci/bundle-budget.cjs --dist apps/web/dist
+          """
+          if ci_text.count(old) != 1:
+              raise SystemExit('ci.yml: build insertion point not found')
+          ci_text = ci_text.replace(old, new, 1)
+          old = """      - name: Check the committed demo against a fresh build
+            run: node scripts/build-demo.cjs --check
+          """
+          new = old + """      - name: Enforce demo bundle budget
+            run: node scripts/ci/bundle-budget.cjs --dist docs/demo
+          """
+          if ci_text.count(old) != 1:
+              raise SystemExit('ci.yml: demo insertion point not found')
+          ci.write_text(ci_text.replace(old, new, 1))
+
+          app_test = Path('apps/web/src/App.test.jsx')
+          tests = app_test.read_text()
+          changes = [
+            ("it('renders the schedule from the snapshot with sessions grouped by day', () => {", "it('renders the schedule from the snapshot with sessions grouped by day', async () => {"),
+            ("expect(screen.getByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument();", "expect(await screen.findByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument();"),
+            ("it('renders a designed empty state on unknown routes', () => {", "it('renders a designed empty state on unknown routes', async () => {"),
+            ("expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();", "expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();"),
+            ("it('gates the /speakers route behind config/features.speakers, not just the nav link', () => {", "it('gates the /speakers route behind config/features.speakers, not just the nav link', async () => {"),
+            ("expect(screen.getByRole('heading', { level: 1, name: 'Speakers' })).toBeInTheDocument();", "expect(await screen.findByRole('heading', { level: 1, name: 'Speakers' })).toBeInTheDocument();"),
+            ("it('gates the /sponsors route behind config/features.sponsors, not just the nav link', () => {", "it('gates the /sponsors route behind config/features.sponsors, not just the nav link', async () => {"),
+            ("expect(screen.getByRole('heading', { level: 1, name: 'Sponsors' })).toBeInTheDocument();", "expect(await screen.findByRole('heading', { level: 1, name: 'Sponsors' })).toBeInTheDocument();"),
+            ("it('gates the /attendees route and its nav link behind config/features.attendeeDirectory', () => {", "it('gates the /attendees route and its nav link behind config/features.attendeeDirectory', async () => {"),
+            ("expect(\n      screen.getByRole('heading', { name: 'Sign in to see who’s attending' }),\n    ).toBeInTheDocument();", "expect(\n      await screen.findByRole('heading', { name: 'Sign in to see who’s attending' }),\n    ).toBeInTheDocument();"),
+          ]
+          for old, new in changes:
+              if old not in tests:
+                  raise SystemExit(f'App.test.jsx insertion missing: {old[:60]}')
+              tests = tests.replace(old, new, 1)
+          app_test.write_text(tests)
+          PY
+
+      - name: Build and write measured limits
+        shell: bash
+        run: |
+          npm run build
+          node scripts/ci/bundle-budget.cjs --dist apps/web/dist --json > /tmp/bundle-after.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const before = JSON.parse(fs.readFileSync('/tmp/bundle-before.json', 'utf8'));
+          const after = JSON.parse(fs.readFileSync('/tmp/bundle-after.json', 'utf8'));
+          if (after.initial.raw >= before.initial.raw || after.initial.gzip >= before.initial.gzip) {
+            throw new Error('route split did not reduce both initial raw and gzip totals');
+          }
+          const boundedLimit = (value, oldValue, margin) => {
+            const proposed = Math.ceil(value * margin);
+            return Math.max(value, Math.min(proposed, oldValue - 1));
+          };
+          const maxLazy = (metric) => Math.max(0, ...after.lazyChunks.map((chunk) => chunk[metric]));
+          const budget = {
+            initial: {
+              raw: boundedLimit(after.initial.raw, before.initial.raw, 1.08),
+              gzip: boundedLimit(after.initial.gzip, before.initial.gzip, 1.08),
+            },
+            lazyChunk: {
+              raw: Math.ceil(maxLazy('raw') * 1.12),
+              gzip: Math.ceil(maxLazy('gzip') * 1.12),
+            },
+          };
+          fs.writeFileSync('scripts/ci/bundle-budget.json', `${JSON.stringify(budget, null, 2)}\n`);
+          const number = new Intl.NumberFormat('en-US');
+          const pct = (oldValue, nextValue) => `${(((oldValue - nextValue) / oldValue) * 100).toFixed(1)}%`;
+          const top = after.lazyChunks.slice(0, 10)
+            .map((chunk) => `| \`${chunk.file}\` | ${number.format(chunk.raw)} | ${number.format(chunk.gzip)} |`)
+            .join('\n');
+          const report = `# Public bundle report\n\n` +
+            `The report measures the entry module and every static JavaScript import required before route interaction. Dynamic route chunks are listed separately.\n\n` +
+            `| Measure | Before | After | Reduction |\n| --- | ---: | ---: | ---: |\n` +
+            `| Initial raw bytes | ${number.format(before.initial.raw)} | ${number.format(after.initial.raw)} | ${pct(before.initial.raw, after.initial.raw)} |\n` +
+            `| Initial gzip bytes | ${number.format(before.initial.gzip)} | ${number.format(after.initial.gzip)} | ${pct(before.initial.gzip, after.initial.gzip)} |\n` +
+            `| Initial chunks | ${before.initial.chunks} | ${after.initial.chunks} | — |\n\n` +
+            `## Largest deferred chunks\n\n| Chunk | Raw bytes | Gzip bytes |\n| --- | ---: | ---: |\n${top}\n\n` +
+            `## Enforced limits\n\n` +
+            `- Initial graph: ${number.format(budget.initial.raw)} raw bytes and ${number.format(budget.initial.gzip)} gzip bytes.\n` +
+            `- Each deferred chunk: ${number.format(budget.lazyChunk.raw)} raw bytes and ${number.format(budget.lazyChunk.gzip)} gzip bytes.\n`;
+          fs.writeFileSync('docs/performance/public-bundle-report.md', report);
+          NODE
+          node scripts/ci/bundle-budget.cjs --dist apps/web/dist
+
+      - name: Validate routes, scripts, and the demo build
+        shell: bash
+        run: |
+          node --test scripts/ci/bundle-budget.test.cjs
+          npm run test -w apps/web -- \
+            src/components/DeferredPage.test.jsx \
+            src/App.test.jsx
+          npm run test:web
+          npm run lint
+          npm run build:demo
+          node scripts/ci/bundle-budget.cjs --dist docs/demo
+
+      - name: Restore the deploy workflow and commit the product change
+        shell: bash
+        run: |
+          git show origin/main:.github/workflows/deploy.yml > .github/workflows/deploy.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -s -m "Reduce and enforce the public entry bundle"
+          git push origin HEAD:codex/117-public-bundle-budget
