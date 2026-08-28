@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -79,6 +80,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
@@ -123,7 +125,7 @@
           <li><strong>Architecture:</strong> the <a href="/eventrunner/docs/decisions/0001-event-platform-v1/">v1 spec</a> and <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">triage record</a> are the contract. Changes to those decisions land as a new ADR, not a drive-by PR.</li>
           </ul>
           <h2 id="what-belongs-where">What belongs where<a class="heading-anchor" href="#what-belongs-where" aria-label="Link to this section">#</a></h2>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Situation</th><th>Where it goes</th></tr>

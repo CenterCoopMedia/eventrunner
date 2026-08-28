@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Work with sessions in the admin — Event Runner documentation</title>
+  <meta name="description" content="Create, edit, preview, and publish sessions without breaking schedule references.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/admin-sessions/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Work with sessions in the admin — Event Runner documentation">
+  <meta property="og:description" content="Create, edit, preview, and publish sessions without breaking schedule references.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/admin-sessions/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Work with sessions in the admin — Event Runner documentation">
+  <meta name="twitter:description" content="Create, edit, preview, and publish sessions without breaking schedule references.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/tokens.css">
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2.5" y="2" width="3" height="20"/>
+          <rect x="5.5" y="2" width="16" height="3"/>
+          <rect x="5.5" y="11" width="9.5" height="2"/>
+          <rect x="5.5" y="19.5" width="13" height="2.5"/>
+        </svg>
+        <span class="brand-words">
+          <strong>Event Runner</strong>
+          <span class="brand-line">Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Work with sessions in the admin</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/" aria-current="page" class="is-current">Work with sessions in the admin</a></li>
+          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Work with sessions in the admin</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#create-a-session">Create a session</a></li>
+              <li><a href="#edit-and-publish">Edit and publish</a></li>
+              <li><a href="#change-event-structure">Change event structure</a></li>
+            </ul>
+          </nav>
+          <p>Open <strong>Sessions</strong> in the Content section of the admin docket. The register groups sessions by event day and keeps each child directly below its parent.</p>
+          <h2 id="create-a-session">Create a session<a class="heading-anchor" href="#create-a-session" aria-label="Link to this section">#</a></h2>
+          <ol>
+          <li>Select <strong>Create a session</strong>.</li>
+          <li>Enter the public title and description.</li>
+          <li>Select an event day, start time, and end time.</li>
+          <li>Select a track or leave it unset.</li>
+          <li>Select a recorded place when the venue list includes one. The public location text remains a separate field.</li>
+          <li>Select a parent only when this session belongs inside a same-day top-level session.</li>
+          <li>Save the draft.</li>
+          </ol>
+          <p>A child session can leave its track unset to inherit the parent’s track. A child cannot have another child.</p>
+          <h2 id="edit-and-publish">Edit and publish<a class="heading-anchor" href="#edit-and-publish" aria-label="Link to this section">#</a></h2>
+          <p>The register shows whether each session is Draft, Changed, or Live. Open the session, make the change, and save the draft. A rejected save keeps the values in the form and identifies the field or relationship that needs work.</p>
+          <p>Use preview to inspect the draft in the event site. Publish only after the draft is ready. Publishing a child requires its parent to be live or included in the same publish action.</p>
+          <h2 id="change-event-structure">Change event structure<a class="heading-anchor" href="#change-event-structure" aria-label="Link to this section">#</a></h2>
+          <p>Tracks, places, and movement routes live in <strong>Event</strong> settings. Add a track or place there before assigning it to a session. A place cannot be removed while a live or draft session still uses it.</p>
+          <p>The place selection is a stable internal reference. The public location field is the wording attendees read. Changing one does not rewrite the other.</p>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/admin-sessions.md"><code>docs/operator/admin-sessions.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/admin-guide/"><span>Previous</span>Admin guide</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/design-reference/"><span>Next</span>Site design reference</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

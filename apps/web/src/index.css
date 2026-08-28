@@ -46,6 +46,13 @@
 }
 
 @layer components {
+  .horizontal-scroll-region:focus-visible {
+    outline: 2px solid rgb(var(--color-accent-rgb));
+    outline-offset: var(--space-3xs);
+  }
+}
+
+@layer components {
   /* Skip link: first focusable element on every page (Layout.jsx). */
   .skip-link {
     @apply sr-only focus:not-sr-only focus:absolute focus:start-md focus:top-md focus:z-50

@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -79,6 +80,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
@@ -162,7 +164,7 @@
           </ul></li>
           <li><p>Merge it to <code>main</code> like any other PR (review, green CI).</p></li>
           <li><p>Tag the merge commit and push the tag:</p>
-          <pre><code class="language-sh">git checkout main &amp;&amp; git pull
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">git checkout main &amp;&amp; git pull
           git tag -s vX.Y.Z -m &quot;vX.Y.Z&quot;
           git push origin vX.Y.Z
           </code></pre>

@@ -215,6 +215,37 @@ class MergedConfigInvalidError extends Error {
   }
 }
 
+const SESSION_COLLECTIONS = Object.freeze(['cmsSchedule', 'cmsSchedule_drafts']);
+
+function venuePlaceIds(event) {
+  const places = event?.venue?.places;
+  if (!Array.isArray(places)) return [];
+  return places.map((place) => place?.id).filter((id) => typeof id === 'string');
+}
+
+async function removedPlaceReferences({ db, tx, stored, written }) {
+  const nextIds = new Set(venuePlaceIds(written));
+  const removed = venuePlaceIds(stored).filter((id) => !nextIds.has(id));
+  if (removed.length === 0) return [];
+
+  const bySession = new Map();
+  for (const placeId of removed) {
+    for (const collectionName of SESSION_COLLECTIONS) {
+      const query = db.collection(collectionName).where('placeId', '==', placeId).limit(20);
+      const snapshot = await tx.get(query);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        bySession.set(`${collectionName}/${doc.id}`, {
+          id: doc.id,
+          title: typeof data?.title === 'string' && data.title.trim() ? data.title.trim() : doc.id,
+          placeId,
+        });
+      }
+    }
+  }
+  return [...bySession.values()].slice(0, 20);
+}
+
 /**
  * Validate and apply one config write. Returns a verdict instead of
  * touching `res`, so the four handlers share it and tests can drive the
@@ -306,6 +337,15 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
         };
         const verdict = validate(written);
         if (!verdict.ok) throw new MergedConfigInvalidError(verdict.errors);
+        const references = await removedPlaceReferences({ db, tx, stored, written });
+        if (references.length > 0) {
+          const places = [...new Set(references.map((reference) => reference.placeId))];
+          const sessions = references.map((reference) => reference.title).join(', ');
+          throw new MergedConfigInvalidError([
+            `venue.places: cannot remove ${places.map((id) => `"${id}"`).join(', ')} because `
+              + `live or draft sessions still use it (${sessions})`,
+          ]);
+        }
       }
       tx.set(ref, { ...written, updatedAt: at, updatedBy: actor.email });
       // cmsVersionHistory-style audit row (spec §1.3 item 4), committed
@@ -425,6 +465,8 @@ module.exports = {
   internals: {
     applyConfigWrite,
     findReadOnlyViolations,
+    removedPlaceReferences,
+    venuePlaceIds,
     findUnknownEventKeys,
     deepMerge,
     stripStamps,

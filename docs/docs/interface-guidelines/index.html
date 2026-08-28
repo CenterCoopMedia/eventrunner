@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -79,6 +80,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
@@ -138,7 +140,7 @@
           </ul>
           <h2 id="vocabulary-the-words-staff-see">Vocabulary: The words staff see<a class="heading-anchor" href="#vocabulary-the-words-staff-see" aria-label="Link to this section">#</a></h2>
           <p>Staff meet this system through words, not through token names. One term per flow (Writing, below), and the staff term is the one that ships in every operator-facing surface: Admin labels and hints, <code>docs/ADMIN_GUIDE.md</code>, the handbook, and any message a person reads.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>What staff see</th><th>What the code calls it</th></tr>
@@ -159,7 +161,7 @@
           <p><strong>The right-hand column is internal.</strong> Those are component names, token names, attribute values, and stored document fields. Use them freely in this document, in <code>docs/adr/0001-event-platform-v1.md</code>, in code, and in commit messages: That is architecture, and renaming it would break the thing it names. Where one appears below beside a staff word, it is marked. What must never happen is one of those words reaching a person using the product.</p>
           <h2 id="editorial-devices">Editorial devices<a class="heading-anchor" href="#editorial-devices" aria-label="Link to this section">#</a></h2>
           <p>Typography and rules do the visual work. Color decorates very little, and shadow decorates nothing (design brief §2.1). Each device below has one job: Use it where its job applies, and never as decoration. The shared implementations live in <code>apps/web/src/components/editorial/</code>, and each one resolves through its tier-3 token contract, so a preset retunes a device by remapping tokens rather than by changing a component.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Device</th><th>Component</th><th>What it is</th><th>The rule</th></tr>
@@ -193,7 +195,7 @@
           <p>Cards, boxes, and chrome: A rule replaces a card border wherever a rule can do the job. Elevation is tint, not shadow — where a surface must sit above another, shift its tone with a low-opacity overlay of the theme&#39;s ink or accent.</p>
           <h2 id="headers">Headers<a class="heading-anchor" href="#headers" aria-label="Link to this section">#</a></h2>
           <p>A public page renders one of four headers (design brief §2.5.1). <code>config/theme.header</code> names the deployment&#39;s default and a page may state its own; <code>standard</code> is the base, and a value outside the four resolves to it rather than to no header at all.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Treatment</th><th>What it draws</th></tr>

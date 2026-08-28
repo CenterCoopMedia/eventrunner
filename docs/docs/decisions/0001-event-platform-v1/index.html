@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -80,6 +81,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
@@ -146,7 +148,7 @@
           <p>The cost is the ESM/CJS boundary: <code>apps/web</code> is ESM (Vite), <code>functions</code> is CommonJS
           (<code>firebase-functions</code> v2 on Node 22). The shared package is therefore authored in CommonJS with a
           hand-written ESM shim and a conditional <code>exports</code> map:</p>
-          <pre><code class="language-jsonc">// packages/shared/package.json
+          <pre data-scroll-region data-scroll-label="Code example (jsonc)"><code class="language-jsonc">// packages/shared/package.json
           {
             &quot;name&quot;: &quot;shared&quot;,
             &quot;private&quot;: true,
@@ -167,7 +169,7 @@
           crash at cold start with <code>Cannot find module &#39;shared&#39;</code>. A monorepo-aware bundler would solve it; the
           no-transpile constraint says otherwise.</p>
           <p><strong>Resolution: a <code>prepare-functions</code> pack step, run by <code>firebase.json</code>&#39;s predeploy hook.</strong></p>
-          <pre><code class="language-jsonc">// firebase.json
+          <pre data-scroll-region data-scroll-label="Code example (jsonc)"><code class="language-jsonc">// firebase.json
           &quot;functions&quot;: {
             &quot;source&quot;: &quot;functions&quot;,
             &quot;codebase&quot;: &quot;default&quot;,
@@ -175,7 +177,7 @@
             &quot;ignore&quot;: [&quot;node_modules&quot;, &quot;.git&quot;, &quot;vendor/*.tgz.tmp&quot;, &quot;**/*.test.cjs&quot;]
           }
           </code></pre>
-          <pre><code class="language-jsonc">// functions/package.json
+          <pre data-scroll-region data-scroll-label="Code example (jsonc)"><code class="language-jsonc">// functions/package.json
           &quot;dependencies&quot;: {
             &quot;shared&quot;: &quot;file:./vendor/shared.tgz&quot;,
             &quot;firebase-admin&quot;: &quot;...&quot;, &quot;firebase-functions&quot;: &quot;...&quot;
@@ -198,7 +200,7 @@
           isolate/bundle step (<code>esbuild --bundle</code> into <code>functions/</code>), which is the transpile step the
           constraint rules out.</p>
           <h3 id="12-directory-structure">1.2 Directory structure<a class="heading-anchor" href="#12-directory-structure" aria-label="Link to this section">#</a></h3>
-          <pre><code>run-of-show/
+          <pre data-scroll-region data-scroll-label="Code example"><code>run-of-show/
           ├── LICENSE                          # Apache-2.0 — DAY ONE, first public commit (§1.5)
           ├── NOTICE                           # Apache-2.0 §4(d) attribution — day one
           ├── SECURITY.md                      # disclosure policy — DAY ONE, first public commit (§1.5)
@@ -294,7 +296,7 @@
           <code>functions/src/&lt;domain&gt;/</code>, each module exporting <code>{ handlers, internals }</code> where <code>internals</code>
           carries the pure functions the test file drives directly (the <code>_*Internals</code> pattern already in
           use here, formalized).</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Module</th><th>Files</th><th>v1 exports</th><th>Notes</th></tr>
@@ -348,7 +350,7 @@
           hardcoded <code>projectId: &#39;cjs2026&#39;</code> and <code>STORAGE_BUCKET = &#39;cjs2026.firebasestorage.app&#39;</code> in favor of
           <code>EVENT_FIREBASE_PROJECT_ID</code> / <code>EVENT_STORAGE_BUCKET</code> env reads with a <code>firebase.json</code>-adjacent
           <code>.firebaserc</code> fallback.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Script</th><th>From</th><th>Change</th></tr>
@@ -409,7 +411,7 @@
           variables and secrets, one environment per client deployment. <code>.env.example</code> documents the full set;
           <code>packages/shared/src/config/deploy.cjs</code> validates required values and fails the build loudly when one
           is missing.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Variable</th><th>Kind</th><th>Consumer</th><th>Notes</th></tr>
@@ -450,7 +452,7 @@
           <code>config/bootstrap</code>, which is server-only. All are <code>allow write: if false</code> for clients; the only
           writers are the validated admin endpoints in <code>admin/config.cjs</code> (§1.3) and the init/verification
           scripts.</p>
-          <pre><code class="language-ts">// config/event
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">// config/event
           {
             name: string,                    // &quot;2027 Collaborative Journalism Summit&quot;
             shortName: string,               // &quot;CJS2027&quot; — used in email subjects, PDF header
@@ -511,7 +513,7 @@
             updatedAt: Timestamp, updatedBy: string
           }
           </code></pre>
-          <pre><code class="language-ts">// config/features        — booleans only; every one defaults false except the first four
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">// config/features        — booleans only; every one defaults false except the first four
           {
             schedule: true, speakers: true, sponsors: true, attendeeDirectory: true,
             sessionBookmarks: boolean, sessionReactions: boolean, sessionMaterials: boolean,
@@ -537,7 +539,7 @@
           <p>Tier A wins on conflict for anything that appears in both (project ID, provider selection): Tier B
           copies exist only so the admin UI can display them read-only.</p>
           <h3 id="23-mapping-todays-hardcoded-values">2.3 Mapping today&#39;s hardcoded values<a class="heading-anchor" href="#23-mapping-todays-hardcoded-values" aria-label="Link to this section">#</a></h3>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Today</th><th>Location</th><th>Tier</th></tr>
@@ -589,7 +591,7 @@
           <p><code>src/utils/summitStatus.js</code> (a hardcoded <code>SUMMIT_END</code> Date and a <code>hasSummitEnded()</code> boolean) is
           replaced by a pure function in <code>packages/shared/src/config/lifecycle.cjs</code>, used identically by web
           and functions:</p>
-          <pre><code class="language-ts">type EventPhase = &#39;draft&#39; | &#39;announced&#39; | &#39;registration_open&#39; | &#39;registration_closed&#39;
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">type EventPhase = &#39;draft&#39; | &#39;announced&#39; | &#39;registration_open&#39; | &#39;registration_closed&#39;
                           | &#39;in_progress&#39; | &#39;ended&#39; | &#39;archived&#39;
 
           function getEventPhase(eventConfig, now = new Date()): EventPhase
@@ -600,7 +602,7 @@
           phases are editorial rather than chronological — dates cannot distinguish &quot;seeded but not announced&quot;
           from &quot;announced&quot;, and nothing in a calendar says &quot;we are done with this site&quot; — so each has an
           explicit timestamp field (<code>announcedAt</code>, <code>archivedAt</code>, §2.2). Evaluation order, first match wins:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Phase</th><th>Condition</th></tr>
@@ -637,7 +639,7 @@
           queue of its own. A managed transactional provider owns queuing, retry, rate shaping, and
           suppression. <strong>None of it is ported, and the v1.1 announcements feature must not reintroduce it</strong>:
           a batch send is one call to the provider&#39;s batch endpoint plus one audit row per recipient.</p>
-          <pre><code class="language-ts">interface EmailAddress { email: string; name?: string }
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">interface EmailAddress { email: string; name?: string }
 
           interface EmailMessage {
             to: string | EmailAddress            // exactly one recipient per send() call
@@ -720,7 +722,7 @@
           plus repeated webhook deliveries is how a recipient gets the same message a dozen times, and the
           recovery path for a genuinely lost send is an admin resend, which passes a fresh <code>onceKey</code>.</p>
           <p>Which sends pass one, and the key shape:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Send</th><th><code>onceKey</code></th></tr>
@@ -770,7 +772,7 @@
           delivers delivery/bounce/complaint webhooks as unsigned JSON — there is no signature header to
           verify, so the HMAC scheme used for the generic adapter cannot be implemented for it. The interface
           carries the verification instead of assuming it:</p>
-          <pre><code class="language-ts">interface EmailProvider {
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">interface EmailProvider {
             // ...
             verifyDeliveryWebhook?(rawBody: Buffer, headers: Record&lt;string,string&gt;): boolean
           }
@@ -799,7 +801,7 @@
           control: an unauthenticated caller working through a list of distinct addresses never trips it, and
           every request that gets through costs one provider send. Both controls below default off/conservative,
           so an existing deployment keeps its current behavior until an operator opts in.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Control</th><th>Variable</th><th>Behavior</th></tr>
@@ -837,7 +839,7 @@
           <h3 id="32-operatornotifier">3.2 OperatorNotifier<a class="heading-anchor" href="#32-operatornotifier" aria-label="Link to this section">#</a></h3>
           <p>Replaces every direct <code>/alert</code>, <code>/alert-action</code>, <code>/cjs-error</code>, and <code>api.telegram.org</code> call. There are
           16 such call sites in <code>functions/index.js</code> today.</p>
-          <pre><code class="language-ts">interface OperatorEvent {
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">interface OperatorEvent {
             kind: &#39;error&#39; | &#39;warning&#39; | &#39;info&#39;
             title: string                        // short, deployment-prefixed by the core
             summary: string
@@ -874,7 +876,7 @@
           matched/unmatched bifurcation into two collections with a transactional cross-collection claim
           (<code>claimAttendeeSlot</code>), and an unmatched-ticket email flow that auto-matches when the ticket holder
           later creates an account.</p>
-          <pre><code class="language-ts">interface TicketRecord {
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">interface TicketRecord {
             externalId: string                   // provider attendee/ticket id — the dedup key
             orderId: string
             email: string                        // lowercased
@@ -955,7 +957,7 @@
           <code>registered | confirmed | approved</code> while <code>useRegisteredUsers.js:32</code> queries the same three and
           <code>AttendeesTab</code> writes a fourth value, <code>ticket_only</code>).</p>
           <p><code>users/{uid}.registrationStatus</code> ∈ <code>pending | ticketed | approved | revoked</code>.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>From</th><th>To</th><th>Trigger</th></tr>
@@ -975,7 +977,7 @@
           workshop. &quot;A ticket became <code>refunded</code> or <code>cancelled</code>&quot; is not a revocation condition; it is a reason
           to recompute. After any change to a ticket claimed by <code>uid</code>,
           <code>recomputeEntitlement(uid)</code> evaluates both sources:</p>
-          <pre><code>hasValidTicket = tickets.where(&#39;claimedByUid&#39;,&#39;==&#39;,uid).where(&#39;status&#39;,&#39;==&#39;,&#39;valid&#39;) is non-empty
+          <pre data-scroll-region data-scroll-label="Code example"><code>hasValidTicket = tickets.where(&#39;claimedByUid&#39;,&#39;==&#39;,uid).where(&#39;status&#39;,&#39;==&#39;,&#39;valid&#39;) is non-empty
           hasAdminGrant  = users/{uid}.approvalSource == &#39;admin&#39;
           entitled       = hasValidTicket || hasAdminGrant
           </code></pre>
@@ -997,7 +999,7 @@
           (<code>firestore.rules:157-159</code>) grants <code>attendees_only</code> profiles to <strong>any</strong> authenticated user; since
           every new account starts at <code>pending</code>, anyone who completes a sign-in — no ticket, no approval —
           can enumerate the directory. v1 rules branch on the requester&#39;s own <code>users</code> doc:</p>
-          <pre><code>function requesterIsApprovedAttendee() {
+          <pre data-scroll-region data-scroll-label="Code example"><code>function requesterIsApprovedAttendee() {
             return request.auth != null &amp;&amp;
               (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.registrationStatus == &#39;approved&#39; ||
                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.speakerId != null);
@@ -1026,7 +1028,7 @@
           false — there is nothing for the user to buy, and the admin is the one who adds them. Under <code>none</code>
           the message should not be sent at all. A token substitution cannot express &quot;do not send this.&quot;</p>
           <p>So the provider owns the decision, the wording of the action, and the destination:</p>
-          <pre><code class="language-ts">interface RegistrationPromptContext {
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">interface RegistrationPromptContext {
             user: { uid: string; email: string; displayName: string | null }
             registrationStatus: &#39;pending&#39; | &#39;ticketed&#39; | &#39;approved&#39; | &#39;revoked&#39;
             isSpeaker: boolean
@@ -1044,7 +1046,7 @@
           }
           </code></pre>
           <p>Provider behavior:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Provider</th><th><code>trigger: account_created</code>, no ticket</th><th>Ticket exists, unclaimed</th></tr>
@@ -1065,7 +1067,7 @@
           <hr>
           <h2 id="4-firestore-schema-for-v1">4. Firestore schema for v1<a class="heading-anchor" href="#4-firestore-schema-for-v1" aria-label="Link to this section">#</a></h2>
           <h3 id="41-surviving-collections">4.1 Surviving collections<a class="heading-anchor" href="#41-surviving-collections" aria-label="Link to this section">#</a></h3>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Collection</th><th>Purpose</th><th>Renamed from</th></tr>
@@ -1130,7 +1132,7 @@
           delete-from-both cleanup path. One collection with <code>{ claimedByUid: string | null, claimedAt }</code>
           makes the claim a single-document transaction and removes the drift class the <code>check-eb-count-drift</code>
           and <code>cleanup-eb-drift</code> scripts exist to detect.</p>
-          <pre><code class="language-ts">// tickets/{externalId}
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">// tickets/{externalId}
           { externalId, orderId, email, firstName, lastName, ticketClass, quantity,
             purchasedAt, status, provider,                 // &#39;eventbrite&#39; | &#39;manual&#39;
             claimedByUid: string | null, claimedAt: Timestamp | null,
@@ -1320,7 +1322,7 @@
           pages (§5.5), neither of which an operator can miss. Pre-launch, the operator runs
           <code>init-event.cjs --check</code>, a read-only mode that exits non-zero if any of the following is unmet, and
           prints exactly what to do about each:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Check</th><th>Passes when</th></tr>
@@ -1345,7 +1347,7 @@
           a React renderer — a block type with no renderer is a broken page, and Firestore cannot supply a
           component.</p>
           <p><code>PAGE_CONFIGS</code> becomes <code>cmsPages/{pageId}</code>:</p>
-          <pre><code class="language-ts">// cmsPages/{pageId}
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">// cmsPages/{pageId}
           {
             id: string,                  // &#39;home&#39;
             label: string,               // &#39;Home page&#39;
@@ -1417,7 +1419,7 @@
           city guide (<code>:393</code>). A partially-seeded deployment would render another event&#39;s directions. So the
           port strips every fallback and makes the repeating groups variable-length, with the shape seeded
           explicitly:</p>
-          <pre><code class="language-ts">// cmsPages/travel sections, and the cmsContent fields they seed
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">// cmsPages/travel sections, and the cmsContent fields they seed
           travel_header   : page_title, page_subtitle
           travel_venue    : venue_name, venue_building, venue_address, venue_maps_url, venue_notes
           travel_lodging  : lodging_title, lodging_subtitle, booking_url, booking_disclaimer
@@ -1502,7 +1504,7 @@
           logs a <code>system_errors</code> row, and fires an <code>OperatorEvent</code>. (3) Template changes that matter for
           correctness (a new required token) ship with the code that produces the token, so they are reviewed
           and tested; client-visible copy changes still happen in the admin panel without a deploy.</p>
-          <pre><code>functions/src/email/templates/
+          <pre data-scroll-region data-scroll-label="Code example"><code>functions/src/email/templates/
             layout.cjs             # shared HTML wrapper: banner, brand colors, footer
             auth.otp.cjs
             account.welcome.cjs
@@ -1565,7 +1567,7 @@
           <code>{{sender_name}}</code>, <code>{{sender_email}}</code>, <code>{{operator_name}}</code>, <code>{{postal_address_html}}</code>,
           <code>{{brand_primary}}</code>, <code>{{brand_ink}}</code>, <code>{{logo_url}}</code>, <code>{{social_links_html}}</code>, <code>{{current_year}}</code>.</p>
           <p>Per-template tokens:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Template</th><th>Tokens</th><th>Phase</th></tr>
@@ -1620,13 +1622,13 @@
           <code>buildSchedulePdf</code>&#39;s color table needs numeric RGB, and email templates need literal hex because
           mail clients do not resolve CSS custom properties. Most are not.</p>
           <h3 id="72-the-chain">7.2 The chain<a class="heading-anchor" href="#72-the-chain" aria-label="Link to this section">#</a></h3>
-          <pre><code>config/theme (Firestore)
+          <pre data-scroll-region data-scroll-label="Code example"><code>config/theme (Firestore)
              → generate-content.cjs → apps/web/src/generated/theme.css   (build-time :root custom properties)
              → EventConfigProvider → &lt;style id=&quot;event-theme-runtime&quot;&gt;     (runtime override, same properties)
              → tailwind.config.js maps brand-* utilities to var(--brand-*)
           </code></pre>
           <p><code>tailwind.config.js</code> stops carrying hex:</p>
-          <pre><code class="language-js">colors: {
+          <pre data-scroll-region data-scroll-label="Code example (js)"><code class="language-js">colors: {
             &#39;brand-primary&#39;:    &#39;rgb(var(--brand-primary-rgb) / &lt;alpha-value&gt;)&#39;,
             &#39;brand-primary-dark&#39;:  &#39;rgb(var(--brand-primary-dark-rgb) / &lt;alpha-value&gt;)&#39;,
             &#39;brand-accent&#39;:     &#39;rgb(var(--brand-accent-rgb) / &lt;alpha-value&gt;)&#39;,
@@ -1646,7 +1648,7 @@
           <code>adminAccent</code> no longer exists. See the design brief,
           <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-27-design-system-overhaul.md"><code>plans/2026-08-27-design-system-overhaul.md</code></a>, for
           the current one.]</p>
-          <pre><code class="language-ts">{
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">{
             colors: {
               primary: &#39;#2A9D8F&#39;, primaryDark: &#39;#1E7268&#39;, primaryLight: &#39;#5FBFB3&#39;,
               accent: &#39;#C84B31&#39;, surface: &#39;#F5F0E6&#39;, surfaceAlt: &#39;#EDE8DC&#39;,
@@ -1701,7 +1703,7 @@
           <h2 id="8-deploy-pipeline">8. Deploy pipeline<a class="heading-anchor" href="#8-deploy-pipeline" aria-label="Link to this section">#</a></h2>
           <h3 id="81-two-workflows-cleanly-split">8.1 Two workflows, cleanly split<a class="heading-anchor" href="#81-two-workflows-cleanly-split" aria-label="Link to this section">#</a></h3>
           <p><code>ci.yml</code> — runs on every push and pull request, including forks. <strong>No secrets, no Firebase project.</strong></p>
-          <pre><code>lint            → npm run lint (web + functions + tests)
+          <pre data-scroll-region data-scroll-label="Code example"><code>lint            → npm run lint (web + functions + tests)
           unit:web        → vitest run --workspace apps/web
           unit:functions  → vitest run --workspace functions
           rules           → firebase emulators:exec --only firestore,storage &#39;vitest run --config vitest.rules.config.js&#39;
@@ -1716,7 +1718,7 @@
           <code>workflow_dispatch</code>; a push-triggered run for <code>AUTO_DEPLOY_ENVIRONMENTS</code> would evaluate it to the
           empty string and bind no environment at all, silently running without the secrets it needs. The
           split:</p>
-          <pre><code class="language-yaml"># deploy.yml — resolves WHICH clients, then fans out
+          <pre data-scroll-region data-scroll-label="Code example (yaml)"><code class="language-yaml"># deploy.yml — resolves WHICH clients, then fans out
           on:
             workflow_dispatch:
               inputs:
@@ -1759,7 +1761,7 @@
           <p><code>deploy-client.yml</code> is <code>workflow_call</code>-only, and <strong>every</strong> job in it declares
           <code>environment: ${{ inputs.client }}</code> — which resolves correctly for both trigger shapes because the
           value arrives as a workflow input, not as <code>inputs.client</code> on the outer event. Jobs, in order:</p>
-          <pre><code>guard        → refuse to run when the ref is from a fork
+          <pre data-scroll-region data-scroll-label="Code example"><code>guard        → refuse to run when the ref is from a fork
           shared       → pack packages/shared into functions/ (§1.1) — prerequisite of every functions deploy
           provision    → deploy firestore:rules, firestore:indexes, storage   ← indexes + storage rules are
                                                                                  deployed by CI for the first time
@@ -1772,7 +1774,7 @@
           post         → deploy updatesMeta after hosting (self-fetches the live HTML template)
           </code></pre>
           <p><strong>The functions job runs unconditionally on dispatch, and on a paths filter only for push runs:</strong></p>
-          <pre><code class="language-yaml">if: &gt;-
+          <pre data-scroll-region data-scroll-label="Code example (yaml)"><code class="language-yaml">if: &gt;-
             github.event_name == &#39;workflow_dispatch&#39; ||
             needs.changes.outputs.functions == &#39;true&#39;
           </code></pre>
@@ -1782,7 +1784,7 @@
           is — deploys zero functions into an empty project, and the bootstrap then fails at first sign-in with
           no obvious cause. Push runs keep the filter, which is what protects the deploy quota.</p>
           <p><strong>The paths filter covers every input to the functions artifact</strong>, not just <code>functions/**</code>:</p>
-          <pre><code class="language-yaml">filters: |
+          <pre data-scroll-region data-scroll-label="Code example (yaml)"><code class="language-yaml">filters: |
             functions:
               - &#39;functions/**&#39;
               - &#39;packages/shared/**&#39;      # packed into functions/ at deploy time (§1.1)
@@ -1801,7 +1803,7 @@
           <h3 id="82-repo-variables-and-secrets">8.2 Repo variables and secrets<a class="heading-anchor" href="#82-repo-variables-and-secrets" aria-label="Link to this section">#</a></h3>
           <p>Per §2.1. Repository-level variables: <code>AUTO_DEPLOY_ENVIRONMENTS</code> only. Everything else is
           environment-scoped. Full v1 secret surface per environment:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Secret</th><th>Required when</th></tr>
@@ -1845,7 +1847,7 @@
           the edit unpublishes live content instead. Editing and publishing must touch different documents.</p>
           <p><strong>Two-revision model.</strong> Every publishable collection <code>C</code> — <code>cmsContent</code>, <code>cmsSchedule</code>,
           <code>cmsOrganizations</code>, <code>cmsTimeline</code>, <code>cmsUpdates</code>, <code>cmsPages</code> — gets a draft sibling <code>C_drafts</code>:</p>
-          <pre><code class="language-ts">// C/{docId} — the PUBLISHED revision. Anonymously readable. Content fields only.
+          <pre data-scroll-region data-scroll-label="Code example (ts)"><code class="language-ts">// C/{docId} — the PUBLISHED revision. Anonymously readable. Content fields only.
           { ...contentFields, visible: boolean, revision: number,
             publishedAt: Timestamp, publishedBy: string }
 
@@ -1879,7 +1881,7 @@
           </ol>
           <p><strong>Rules consequence.</strong> Content collections become anonymously readable and must gate on visibility;
           draft collections are never anonymously readable at all:</p>
-          <pre><code>match /cmsContent/{docId} {
+          <pre data-scroll-region data-scroll-label="Code example"><code>match /cmsContent/{docId} {
             allow read: if resource.data.visible == true;
             allow read: if isAdmin() || isSuperAdmin();
             allow write: if false;                       // via cmsPublish (Admin SDK)
@@ -1923,7 +1925,7 @@
           (<code>speaker-photos/{userId}</code> does have the owner check; <code>profile-photos</code> does not.)</li>
           </ul>
           <p>v1 rules:</p>
-          <pre><code>match /profile-photos/{userId}/{allPaths=**} {
+          <pre data-scroll-region data-scroll-label="Code example"><code>match /profile-photos/{userId}/{allPaths=**} {
             allow read: if true;
             allow write: if request.auth != null &amp;&amp; request.auth.uid == userId
                          &amp;&amp; request.resource.size &lt; 2 * 1024 * 1024
@@ -1966,7 +1968,7 @@
           <p>Legend: <strong>as-is</strong> = copy with renames and import-path changes only. <strong>changed</strong> = port with the named
           modifications. <strong>rewrite</strong> = new implementation against the same requirement. <strong>drop</strong> = the layer
           exists only to compensate for infrastructure v1 does not have.</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>v1 feature</th><th>Source in <code>cjs2026</code></th><th>Destination</th><th>Disposition</th></tr>

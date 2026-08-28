@@ -24,6 +24,7 @@ import { PlateNumber } from '../components/editorial/Plate.jsx';
 import Marginalia from '../components/editorial/Marginalia.jsx';
 import ScheduleGrid from '../components/ScheduleGrid.jsx';
 import SchedulePrint from '../components/SchedulePrint.jsx';
+import HorizontalScrollRegion from '../components/HorizontalScrollRegion.jsx';
 import { resolveTracks, withCallingPoints } from '../lib/scheduleGrid.js';
 import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
@@ -273,14 +274,17 @@ export default function Schedule() {
                 // The programme page: time down, lettered lines across (brief
                 // §2.1). It scrolls inside its own box rather than pushing
                 // the page sideways.
-                <div className="mt-sm overflow-x-auto">
+                <HorizontalScrollRegion
+                  label={`${activeDay.label} schedule grid`}
+                  className="mt-sm overflow-x-auto"
+                >
                   <ScheduleGrid
                     day={activeDay}
                     entries={entries}
                     columns={columns}
                     eventConfig={eventConfig}
                   />
-                </div>
+                </HorizontalScrollRegion>
               ) : (
                 // The time-ordered list. It is the other first-class view,
                 // not a lesser one (visual story, Civic, moment 1): fixed

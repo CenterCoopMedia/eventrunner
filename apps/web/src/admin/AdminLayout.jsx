@@ -12,7 +12,7 @@
 // The chrome contract is unchanged: skip link, landmark structure, one
 // keyboard path per control, `aria-current` on the active section.
 //
-// THE DOCKET. Fourteen named sections do not fit a tab row honestly, so
+// THE DOCKET. Fifteen named sections do not fit a tab row honestly, so
 // they read as a standing list down the leading edge, grouped by what the
 // operator came to do: content, people, operations, system. Group heads are
 // folios on a hairline. Every item is a word — no icon rail, no collapse to
@@ -46,6 +46,7 @@ export const DOCKET = Object.freeze([
     label: 'Content',
     items: [
       { to: 'pages', label: 'Pages' },
+      { to: 'sessions', label: 'Sessions' },
       { to: 'content', label: 'Content' },
       { to: 'media', label: 'Media' },
       { to: 'materials', label: 'Materials' },

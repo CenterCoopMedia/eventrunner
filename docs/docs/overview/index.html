@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -79,6 +80,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
@@ -154,7 +156,7 @@
           </ol>
           <p>See spec §2.</p>
           <h2 id="repo-layout">Repo layout<a class="heading-anchor" href="#repo-layout" aria-label="Link to this section">#</a></h2>
-          <pre><code>apps/web            Vite frontend (not landed yet)
+          <pre data-scroll-region data-scroll-label="Code example"><code>apps/web            Vite frontend (not landed yet)
           functions           Cloud Functions by domain module (not landed yet)
           packages/shared     Config schema, lifecycle clock, time, registration, badges
           scripts             Operator tools (not landed yet)
@@ -163,7 +165,7 @@
           <p><code>packages/shared</code> is CommonJS with hand-written ESM shims so the same module serves Vite and Cloud Functions with no transpile step.</p>
           <h2 id="develop">Develop<a class="heading-anchor" href="#develop" aria-label="Link to this section">#</a></h2>
           <p>Node 22+.</p>
-          <pre><code class="language-bash">npm test
+          <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">npm test
           </code></pre>
           <p>That runs the shared-package suite on Node&#39;s built-in test runner. No install step and no credentials. The emulator loop (<code>npm run dev:emulators</code>) lands with the web app and functions.</p>
           <p>Rules that apply to every PR:</p>
@@ -180,7 +182,7 @@
           <p>Do not open a public issue for a vulnerability. Use <a href="https://github.com/CenterCoopMedia/eventrunner/security">private vulnerability reporting</a> or email info@eventrunner.org. See <a href="/eventrunner/docs/security/">SECURITY.md</a>.</p>
           <p>Operator-run client deployments are out of scope for public reports. Email the operator of that deployment.</p>
           <h2 id="support">Support<a class="heading-anchor" href="#support" aria-label="Link to this section">#</a></h2>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>You are…</th><th>Start here</th></tr>

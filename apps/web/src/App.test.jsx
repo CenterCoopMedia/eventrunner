@@ -129,9 +129,9 @@ describe('app shell', () => {
     expect(document.title).toBe(eventConfig.name);
   });
 
-  it('renders the schedule from the snapshot with sessions grouped by day', () => {
+  it('renders the schedule from the snapshot with sessions grouped by day', async () => {
     renderAt('/schedule');
-    expect(screen.getByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument();
     // The page carries two views of the day — the screen one and the
     // printed programme, which lists every day and prints only on paper.
     // This asserts the one a reader is looking at (Schedule.test.jsx).
@@ -139,16 +139,16 @@ describe('app shell', () => {
     expect(onScreen.getByText('Welcome and orientation')).toBeInTheDocument();
   });
 
-  it('renders a designed empty state on unknown routes', () => {
+  it('renders a designed empty state on unknown routes', async () => {
     renderAt('/definitely-not-a-page');
-    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Go to the home page' })).toBeInTheDocument();
   });
 
-  it('gates the /speakers route behind config/features.speakers, not just the nav link', () => {
+  it('gates the /speakers route behind config/features.speakers, not just the nav link', async () => {
     renderAt('/speakers');
     // Snapshot enables speakers, so direct navigation renders the page.
-    expect(screen.getByRole('heading', { level: 1, name: 'Speakers' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Speakers' })).toBeInTheDocument();
 
     act(() => {
       configSubscriptions.get('features')({ speakers: false });
@@ -161,9 +161,9 @@ describe('app shell', () => {
     ).toBeInTheDocument();
   });
 
-  it('gates the /sponsors route behind config/features.sponsors, not just the nav link', () => {
+  it('gates the /sponsors route behind config/features.sponsors, not just the nav link', async () => {
     renderAt('/sponsors');
-    expect(screen.getByRole('heading', { level: 1, name: 'Sponsors' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sponsors' })).toBeInTheDocument();
 
     act(() => {
       configSubscriptions.get('features')({ sponsors: false });
@@ -174,12 +174,12 @@ describe('app shell', () => {
     ).toBeInTheDocument();
   });
 
-  it('gates the /attendees route and its nav link behind config/features.attendeeDirectory', () => {
+  it('gates the /attendees route and its nav link behind config/features.attendeeDirectory', async () => {
     renderAt('/attendees');
     // The snapshot enables the directory; signed out with no public profiles,
     // the page asks for sign-in rather than rendering an empty directory.
     expect(
-      screen.getByRole('heading', { name: 'Sign in to see who’s attending' }),
+      await screen.findByRole('heading', { name: 'Sign in to see who’s attending' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Attendees' })).toBeInTheDocument();
 

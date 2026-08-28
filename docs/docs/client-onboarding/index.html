@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -79,6 +80,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/" aria-current="page" class="is-current">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
@@ -166,7 +168,7 @@
           <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/examples/demo-answers.json"><code>docs/examples/demo-answers.json</code></a> for a filled-in example). At
           minimum it needs the event name, dates, timezone, venue, the public URL, the ticketing provider
           choice (and its event ID if <code>eventbrite</code>), the email provider choice, and the sender address.</p>
-          <pre><code class="language-sh">export GOOGLE_APPLICATION_CREDENTIALS=&lt;path to your own gcloud ADC, for this one-time step&gt;
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">export GOOGLE_APPLICATION_CREDENTIALS=&lt;path to your own gcloud ADC, for this one-time step&gt;
           export EVENT_FIREBASE_PROJECT_ID=&lt;the client&#39;s GCP project id&gt;
           node scripts/init-event.cjs --answers client-answers.json --admin &lt;first-admin@client-domain&gt;
           </code></pre>
@@ -194,7 +196,7 @@
           </ol>
           <p>There is no Admin SDK read for &quot;is Google sign-in enabled&quot; — nothing in the platform can check
           this for you. Once both steps are done, record it:</p>
-          <pre><code class="language-sh">node scripts/init-event.cjs --attest-auth
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/init-event.cjs --attest-auth
           </code></pre>
           <p>This stamps <code>config/event.auth</code> (<code>googleProviderEnabled</code>, <code>authorizedDomainsConfigured</code>,
           <code>attestedAt</code>, <code>attestedBy</code>) and — because enabling Google sign-in changes what the seeded privacy
@@ -218,14 +220,14 @@
           <li>a DMARC policy.</li>
           </ul>
           <p>Then confirm:</p>
-          <pre><code class="language-sh">node scripts/verify-sender-domain.cjs
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/verify-sender-domain.cjs
           </code></pre>
           <p>Reads <code>config/event.sender.email</code> for the domain unless you pass <code>--domain</code>, and — on a <strong>pass</strong> —
           is the <em>only</em> writer of <code>config/event.sender.domainVerified</code>/<code>domainVerifiedAt</code>, which is what
           clears the sender row in <code>--check</code>. A provider with no domain API of its own (<code>webhook</code>, <code>console</code>)
           can never get an automated pass; for those, confirm the DNS yourself and record it with
           <code>--attest</code>:</p>
-          <pre><code class="language-sh">node scripts/verify-sender-domain.cjs --attest
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/verify-sender-domain.cjs --attest
           </code></pre>
           <p>Don&#39;t skip this step because &quot;the emails are going out fine in testing&quot; — quarantine is
           inconsistent across mail filters and shows up as an intermittent, hard-to-reproduce client
@@ -233,7 +235,7 @@
           <h3 id="5-ticketing-capability-gated">5. Ticketing (capability-gated)<a class="heading-anchor" href="#5-ticketing-capability-gated" aria-label="Link to this section">#</a></h3>
           <p>Complete the step for the provider this client selected. The checklist supports Eventbrite,
           manual CSV import, and deployments with no ticketing provider:</p>
-          <div class="table-scroll">
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
           <tr><th>Provider</th><th>Step</th></tr>
@@ -271,7 +273,7 @@
           terms on the client&#39;s behalf; the templates are a starting point, not a finished document.</p>
           <h2 id="4-readiness-gating---check">4. Readiness gating (<code>--check</code>)<a class="heading-anchor" href="#4-readiness-gating---check" aria-label="Link to this section">#</a></h2>
           <p>Once every item above is done (or deliberately attested), confirm launch readiness read-only:</p>
-          <pre><code class="language-sh">node scripts/init-event.cjs --check
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/init-event.cjs --check
           </code></pre>
           <p>This prints the same seven-row table <code>init-event.cjs</code> prints as warnings, but here it <strong>gates</strong>:
           exit 0 only when every row is met (legal review cleared, sender domain verified/attested, at least

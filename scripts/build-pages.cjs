@@ -399,6 +399,7 @@ function head({ title, description, canonical, themeTags, ogType }) {
     `  <link rel="stylesheet" href="${SITE_BASE}${TOKENS_FILE}">`,
     `  <link rel="stylesheet" href="${SITE_BASE}styles.css">`,
     `  <link rel="stylesheet" href="${SITE_BASE}docs.css">`,
+    `  <script src="${SITE_BASE}scroll-regions.js" defer></script>`,
     '</head>',
     '<body>',
     '  <a class="skip-link" href="#main">Skip to content</a>',

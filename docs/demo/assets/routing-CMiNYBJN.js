@@ -1,0 +1,1 @@
+const e=Object.freeze(["schedule","speakers","speaker","sponsors","signin","profile","attendees","p","admin","updates","ticket"]);function t(s){return e.includes(s)}var n={RESERVED_PATH_SEGMENTS:e,isReservedPathSegment:t};export{n as r};

@@ -4,7 +4,7 @@
 // isAdmin). The server (requireAdmin) and firestore.rules remain the
 // enforcement; these tests pin the UI's three states.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../lib/configSource.js', () => ({
@@ -77,6 +77,10 @@ async function renderAt(path) {
     await Promise.resolve();
     await Promise.resolve();
   });
+  await waitFor(
+    () => expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument(),
+    { timeout: 10_000 },
+  );
   return result;
 }
 
@@ -113,6 +117,7 @@ describe('admin route gating', () => {
     // Every settings surface is reachable from the shell.
     for (const tab of [
       'Pages',
+      'Sessions',
       'Content',
       'Event',
       'Features',

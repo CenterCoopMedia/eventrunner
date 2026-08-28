@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/eventrunner/tokens.css">
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -79,6 +80,7 @@
         <p class="docs-nav-section">Operate</p>
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
           <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
@@ -124,7 +126,7 @@
           (<code>EVENT_TICKETING_EVENT_ID</code>), and an API token (<code>TICKETING_API_TOKEN</code>) from the account&#39;s API keys
           page. A dev/staging Event Runner deployment with <code>EVENT_TICKETING_PROVIDER=eventbrite</code> configured.</p>
           <h2 id="setup-register-the-webhook">Setup: register the webhook<a class="heading-anchor" href="#setup-register-the-webhook" aria-label="Link to this section">#</a></h2>
-          <pre><code class="language-sh">EVENT_TICKETING_PROVIDER=eventbrite EVENT_TICKETING_EVENT_ID=&lt;sandbox event id&gt; \
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">EVENT_TICKETING_PROVIDER=eventbrite EVENT_TICKETING_EVENT_ID=&lt;sandbox event id&gt; \
           TICKETING_API_TOKEN=&lt;from Eventbrite account&gt; \
           TICKETING_WEBHOOK_SECRET=&lt;generate one, e.g. `openssl rand -hex 20`, store like EMAIL_WEBHOOK_BASIC_AUTH&gt; \
           EVENT_FIREBASE_PROJECT_ID=&lt;dev project id&gt; \

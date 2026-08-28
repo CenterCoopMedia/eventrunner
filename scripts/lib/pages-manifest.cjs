@@ -87,6 +87,12 @@ const SECTIONS = Object.freeze([
         summary: 'Running a client site from the admin panel, in the order the work happens.',
       },
       {
+        source: 'docs/operator/admin-sessions.md',
+        route: 'admin-sessions/',
+        title: 'Work with sessions in the admin',
+        summary: 'Create, edit, preview, and publish sessions without breaking schedule references.',
+      },
+      {
         source: 'docs/design-reference.md',
         route: 'design-reference/',
         title: 'Site design reference',

@@ -222,6 +222,8 @@ jobs:
         run: npm run build
       - name: Assert dist exists
         run: test -f apps/web/dist/index.html
+      - name: Enforce public bundle budget
+        run: node scripts/ci/bundle-budget.cjs --dist apps/web/dist
 
   hygiene:
     name: Generated-content hygiene
@@ -275,6 +277,8 @@ jobs:
         run: node --test scripts/build-demo.test.cjs
       - name: Check the committed demo against a fresh build
         run: node scripts/build-demo.cjs --check
+      - name: Enforce demo bundle budget
+        run: node scripts/ci/bundle-budget.cjs --dist docs/demo
 
   rules:
     name: Security rules on emulators

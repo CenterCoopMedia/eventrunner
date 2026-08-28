@@ -11,6 +11,7 @@
 // is the same config/bootstrap.adminEmails + verified-email test the server's
 // requireAdmin applies. Its tri-state (adminStatus) is what keeps the gate
 // from answering before the probe has.
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx';
@@ -34,6 +35,13 @@ import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
 import AdminTicketing from './pages/AdminTicketing.jsx';
+
+const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
+const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
+
+function DeferredAdminPage({ children, label }) {
+  return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
+}
 
 export function AdminGate({ children }) {
   const { user, adminStatus, loading } = useAuth();
@@ -88,6 +96,18 @@ export default function AdminApp() {
           <Route path="pages" element={<AdminPagesList />} />
           <Route path="pages/new" element={<AdminPageEditor mode="create" />} />
           <Route path="pages/:pageId" element={<AdminPageEditor mode="edit" />} />
+          <Route
+            path="sessions"
+            element={<DeferredAdminPage label="sessions"><AdminSessionsList /></DeferredAdminPage>}
+          />
+          <Route
+            path="sessions/new"
+            element={<DeferredAdminPage label="session"><AdminSessionEditor mode="create" /></DeferredAdminPage>}
+          />
+          <Route
+            path="sessions/:sessionId"
+            element={<DeferredAdminPage label="session"><AdminSessionEditor mode="edit" /></DeferredAdminPage>}
+          />
           <Route path="speakers" element={<AdminSpeakersList />} />
           <Route path="speakers/new" element={<AdminSpeakerEditor mode="create" />} />
           <Route path="speakers/:speakerId" element={<AdminSpeakerEditor mode="edit" />} />

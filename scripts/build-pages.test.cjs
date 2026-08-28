@@ -463,7 +463,11 @@ test('table alignment is carried through', () => {
 
 test('fenced code keeps its language and escapes its contents', () => {
   const { html } = renderMarkdown('# T\n\n```sh\necho "<a>" && true\n```\n');
-  assert.ok(html.includes('<pre><code class="language-sh">'));
+  assert.ok(
+    html.includes(
+      '<pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">',
+    ),
+  );
   assert.ok(html.includes('&lt;a&gt;'));
   assert.ok(html.includes('&amp;&amp;'));
 });
@@ -525,7 +529,7 @@ test('escapeHtml covers every dangerous character', () => {
 test('no rendered page leaks unrendered markdown syntax', () => {
   for (const [file, html] of site.files) {
     const body = html
-      .replace(/<pre>[\s\S]*?<\/pre>/g, '')
+      .replace(/<pre\b[^>]*>[\s\S]*?<\/pre>/g, '')
       .replace(/<code>[\s\S]*?<\/code>/g, '');
     const text = textOf(body);
     assert.ok(!/\[[^\]\n]+\]\([^)\n]+\)/.test(text), `${file}: unrendered markdown link`);
