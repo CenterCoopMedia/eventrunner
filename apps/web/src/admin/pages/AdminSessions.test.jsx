@@ -90,7 +90,7 @@ describe('admin Sessions workspace', () => {
   });
 
   it('creates a draft through the generic schedule endpoint', async () => {
-    await renderAt('/admin/sessions/new');
+    await renderAt('/admin/sessions/new/session');
     await screen.findByRole('heading', { name: 'New session' });
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
     fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Opening session' } });
@@ -108,6 +108,57 @@ describe('admin Sessions workspace', () => {
       docId: 'opening-session',
       fields: { title: 'Opening session', dayId: 'day-1', startTime: '09:00', endTime: '10:00' },
     });
+  });
+
+  it('does not save or publish until required fields are valid', async () => {
+    await renderAt('/admin/sessions/new/session');
+    await screen.findByRole('heading', { name: 'New session' });
+    expect(screen.getByRole('button', { name: 'Save and publish' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps creation separate from a session named new and encodes edit links', async () => {
+    await renderAt('/admin/sessions');
+    await screen.findByRole('heading', { name: 'Sessions' });
+    pushSessions([], [
+      { id: 'new', dayId: 'day-1', title: 'Named new', status: 'dirty' },
+      { id: 'panel?day2#room', dayId: 'day-1', title: 'Panel', status: 'dirty' },
+    ]);
+
+    expect(screen.getByRole('link', { name: 'Create a session' }))
+      .toHaveAttribute('href', '/admin/sessions/new/session');
+    expect(screen.getByRole('link', { name: 'Named new' }))
+      .toHaveAttribute('href', '/admin/sessions/new');
+    expect(screen.getByRole('link', { name: 'Panel' }))
+      .toHaveAttribute('href', '/admin/sessions/panel%3Fday2%23room');
+  });
+
+  it('resumes a part-way bulk publish with the queue id', async () => {
+    await renderAt('/admin/sessions');
+    await screen.findByRole('heading', { name: 'Sessions' });
+    pushSessions([], [
+      { id: 'opening', dayId: 'day-1', title: 'Opening', status: 'dirty' },
+    ]);
+    fetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({
+          error: { code: 'publish-failed', message: 'Publish failed part-way.' },
+          queueId: 'queue-42',
+        }),
+      })
+      .mockResolvedValueOnce(response({
+        results: { cmsSchedule: { published: ['opening'], skipped: [] } },
+      }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
+    const resume = await screen.findByRole('button', { name: 'Resume publish' });
+    fireEvent.click(resume);
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1)).toEqual({ queueId: 'queue-42' });
   });
 
   it('publishes a draft-only parent with its child', async () => {

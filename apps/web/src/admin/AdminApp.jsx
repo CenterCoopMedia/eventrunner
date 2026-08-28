@@ -103,7 +103,7 @@ export default function AdminApp() {
             element={<DeferredAdminPage label="sessions"><AdminSessionsList /></DeferredAdminPage>}
           />
           <Route
-            path="sessions/new"
+            path="sessions/new/session"
             element={<DeferredAdminPage label="session"><AdminSessionEditor mode="create" /></DeferredAdminPage>}
           />
           <Route

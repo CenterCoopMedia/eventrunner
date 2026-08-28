@@ -60,6 +60,7 @@ import {
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { configuredThemeColor } from '../themeColors.js';
 import {
   DEFAULT_MODE_POLICY,
   DENSITY_IDS,
@@ -157,8 +158,8 @@ export function toPickerHex(value) {
  * what the site actually looks like rather than from blanks.
  */
 function seedColor(colors, key) {
-  const configured = colors?.[key];
-  if (typeof configured === 'string' && configured) return configured;
+  const configured = configuredThemeColor(colors, key);
+  if (configured) return configured;
   if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return '';
   const resolved = window
     .getComputedStyle(document.documentElement)

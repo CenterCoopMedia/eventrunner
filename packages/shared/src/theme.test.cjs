@@ -10,6 +10,7 @@ const {
   THEME_COLOR_KEYS,
   THEME_COLOR_KEY_ALIASES,
   canonicalColorKey,
+  configuredThemeColor,
   DARK_GROUND_RGB,
   DARK_MIN_CONTRAST,
   DARK_MIN_CONTRAST_UI,
@@ -408,6 +409,15 @@ test('both spellings of a palette key normalize to the same role', () => {
   for (const role of Object.values(THEME_COLOR_KEY_ALIASES)) {
     assert.ok(THEME_COLOR_KEYS.includes(role), `${role} is a known role`);
   }
+});
+
+test('canonical palette keys win over aliases in all shared readers', () => {
+  const canonical = rgbToHex([17, 34, 51]);
+  const alias = rgbToHex([171, 205, 239]);
+  const colors = { accent: canonical, brandAccent: alias };
+
+  assert.equal(configuredThemeColor(colors, 'accent'), canonical);
+  assert.deepEqual(resolveThemePalettes({ colors }).light.accent, [17, 34, 51]);
 });
 
 /* -------------------------------------------------------------------------

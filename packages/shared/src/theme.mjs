@@ -21,6 +21,7 @@ export {
   THEME_COLOR_PROPERTIES,
   THEME_PROPERTY_COLOR_KEYS,
   canonicalColorKey,
+  configuredThemeColor,
   overrideTokenKey,
   THEME_PRESET_IDS,
   recommendedConfiguration,

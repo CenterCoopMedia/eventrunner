@@ -172,7 +172,9 @@ export default function AdminSessionEditor({ mode }) {
         setStatus('Draft saved. It is not live until you publish it.');
         showToast('Session draft saved.');
       }
-      if (mode === 'create') navigate(`../${docId}`, { replace: true });
+      if (mode === 'create') {
+        navigate(`/admin/sessions/${encodeURIComponent(docId)}`, { replace: true });
+      }
     } catch (err) {
       setError(err);
     } finally {
@@ -214,7 +216,7 @@ export default function AdminSessionEditor({ mode }) {
         actions={
           mode === 'edit' ? (
             <a
-              href={`/schedule/${sessionId}?preview=1`}
+              href={`/schedule/${encodeURIComponent(sessionId)}?preview=1`}
               target="_blank"
               rel="noreferrer"
               className={secondaryButtonClass}
