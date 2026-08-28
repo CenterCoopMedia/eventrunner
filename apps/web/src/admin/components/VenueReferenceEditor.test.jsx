@@ -47,6 +47,19 @@ describe('venue reference helpers', () => {
     expect(errors.get('venue.movements[2].to')).toMatch(/already recorded/);
   });
 
+  it('rejects blank walking minutes before payload conversion', () => {
+    const errors = validateVenueReferences({
+      places: [
+        { id: 'main-hall', name: 'Main hall' },
+        { id: 'studio', name: 'Studio' },
+      ],
+      movements: [
+        { from: 'main-hall', to: 'studio', walkingMinutes: '', accessibleRoute: '' },
+      ],
+    });
+    expect(errors.get('venue.movements[0].walkingMinutes')).toMatch(/whole number/);
+  });
+
   it('sends zero walking minutes and null optional strings', () => {
     expect(
       venueReferencesPayload({
