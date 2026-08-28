@@ -252,24 +252,24 @@ test('buildGlobalTokens derives urls, dates, and year', () => {
 test('buildGlobalTokens accepts seeded color aliases and prefers canonical colors', () => {
   const aliased = buildGlobalTokens({
     ...CONFIG,
-    theme: { colors: { brandPrimary: '#123456', brandInk: '#234567' } },
+    theme: { colors: { brandPrimary: 'rgb(18, 52, 86)', brandInk: 'rgb(35, 69, 103)' } },
   });
-  assert.equal(aliased.brand_primary, '#123456');
-  assert.equal(aliased.brand_ink, '#234567');
+  assert.equal(aliased.brand_primary, 'rgb(18, 52, 86)');
+  assert.equal(aliased.brand_ink, 'rgb(35, 69, 103)');
 
   const mixed = buildGlobalTokens({
     ...CONFIG,
     theme: {
       colors: {
-        primary: '#abcdef',
-        brandPrimary: '#123456',
-        ink: '#345678',
-        brandInk: '#234567',
+        primary: 'rgb(171, 205, 239)',
+        brandPrimary: 'rgb(18, 52, 86)',
+        ink: 'rgb(52, 86, 120)',
+        brandInk: 'rgb(35, 69, 103)',
       },
     },
   });
-  assert.equal(mixed.brand_primary, '#abcdef');
-  assert.equal(mixed.brand_ink, '#345678');
+  assert.equal(mixed.brand_primary, 'rgb(171, 205, 239)');
+  assert.equal(mixed.brand_ink, 'rgb(52, 86, 120)');
 });
 
 // current_year must come from UTC, not the machine's local clock (issue
