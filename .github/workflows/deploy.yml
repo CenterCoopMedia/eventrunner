@@ -1,179 +1,82 @@
-name: Repair PR 133
+name: Deploy
+
+# Caller workflow (spec §8.1). `${{ inputs.client }}` is populated only on
+# workflow_dispatch — a push-triggered run would evaluate it to the empty
+# string and silently bind no environment, so `resolve` is the one place
+# that decides, per trigger shape, which client environments to fan out to
+# (scripts/lib/deploy-matrix.cjs, unit-tested by `npm test`).
 
 on:
-  pull_request:
-    types: [synchronize]
+  workflow_dispatch:
+    inputs:
+      client:
+        description: Client GitHub Environment name to deploy.
+        required: true
+        type: string
+      provision:
+        description: Also (re)deploy firestore:rules, firestore:indexes, and storage. deploy-client.yml's provision job always runs this regardless — kept as an input for operator intent/logging only.
+        required: false
+        type: boolean
+        default: false
+      bootstrap:
+        description: Bootstrap mode for a fresh project — deploy only provision + functions, skipping content/build/hosting/smoke. See docs/DEPLOY_RUNBOOK.md §5.
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches: [main]
 
 permissions:
-  contents: write
+  contents: read
+  # Reusable-workflow permissions are an intersection of caller and callee:
+  # deploy-client.yml cannot get more than the caller grants, no matter what
+  # its own `permissions:` block says. Without id-token here,
+  # google-github-actions/auth in every deploy-client.yml job fails to mint
+  # an OIDC token and Workload Identity Federation auth never happens.
+  id-token: write
 
 jobs:
-  repair:
-    if: github.head_ref == 'codex/123-admin-test-readiness'
+  resolve:
+    name: Resolve target client environments
     runs-on: ubuntu-latest
+    outputs:
+      clients: ${{ steps.pick.outputs.clients }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: codex/123-admin-test-readiness
-          fetch-depth: 0
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
-
-      - name: Replace timing guesses with page-owned readiness
-        shell: bash
+          node-version: "22"
+      - id: pick
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_CLIENT: ${{ inputs.client }}
+          AUTO: ${{ vars.AUTO_DEPLOY_ENVIRONMENTS }}
         run: |
-          python <<'PY'
-          from pathlib import Path
-
-          pump = """  await act(async () => {
-            await Promise.resolve();
-            await Promise.resolve();
-          });
-          """
-          for path in [
-              'apps/web/src/admin/pages/AdminPageEditor.test.jsx',
-              'apps/web/src/admin/pages/AdminBranding.test.jsx',
-              'apps/web/src/admin/pages/AdminContentBlockEditor.test.jsx',
-              'apps/web/src/admin/pages/AdminSettings.test.jsx',
-          ]:
-              file = Path(path)
-              text = file.read_text()
-              if text.count(pump) != 1:
-                  raise SystemExit(f'{path}: expected one fixed microtask pump')
-              file.write_text(text.replace(pump, '', 1))
-
-          def replace_once(path, old, new):
-              file = Path(path)
-              text = file.read_text()
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'{path}: expected one match, found {count}')
-              file.write_text(text.replace(old, new, 1))
-
-          gate_tail = """    { timeout: 5000 },
-            );
-            return result;
-          }
-          """
-          gate_with_heading = """    { timeout: 5000 },
-            );
-            await screen.findByRole('heading', { level: 1 });
-            return result;
-          }
-          """
-          for path in [
-              'apps/web/src/admin/pages/AdminPageEditor.test.jsx',
-              'apps/web/src/admin/pages/AdminContentBlockEditor.test.jsx',
-          ]:
-              replace_once(path, gate_tail, gate_with_heading)
-
-          replace_once(
-              'apps/web/src/admin/pages/AdminBranding.test.jsx',
-              """  await act(async () => {
-            configSubscriptions.get('theme')(themeDoc);
-            await Promise.resolve();
-          });
-            return result;
-          }
-          """,
-              """  await waitFor(() => expect(configSubscriptions.has('theme')).toBe(true));
-            act(() => configSubscriptions.get('theme')(themeDoc));
-            const expectedBrand = themeDoc.brandColor ?? themeDoc.colors?.primary;
-            if (expectedBrand) {
-              await waitFor(() =>
-                expect(screen.getByLabelText('Main brand colour')).toHaveValue(expectedBrand),
-              );
-            }
-            return result;
-          }
-          """,
-          )
-
-          replace_once(
-              'apps/web/src/admin/pages/AdminSettings.test.jsx',
-              """async function pushConfig(docId, data) {
-            await act(async () => {
-              configSubscriptions.get(docId)(data);
-              await Promise.resolve();
+          set -euo pipefail
+          CLIENTS=$(node -e '
+            const { resolveClients } = require("./scripts/lib/deploy-matrix.cjs");
+            const clients = resolveClients({
+              eventName: process.env.EVENT_NAME,
+              dispatchClient: process.env.DISPATCH_CLIENT,
+              autoDeployEnvironments: process.env.AUTO,
             });
-          }
-          """,
-              """async function pushConfig(docId, data) {
-            await waitFor(() => expect(configSubscriptions.has(docId)).toBe(true));
-            act(() => configSubscriptions.get(docId)(data));
+            process.stdout.write(JSON.stringify(clients));
+          ')
+          echo "Resolved clients: $CLIENTS"
+          echo "clients=$CLIENTS" >> "$GITHUB_OUTPUT"
 
-            if (docId === 'event') {
-              await waitFor(() => {
-                if (data.name) expect(screen.getByLabelText('Event name')).toHaveValue(data.name);
-                if (data.shortName) expect(screen.getByText(data.shortName)).toBeInTheDocument();
-              });
-              return;
-            }
-            if (docId === 'features') {
-              const [flag] = Object.keys(data);
-              if (flag) {
-                await waitFor(() =>
-                  data[flag]
-                    ? expect(screen.getByLabelText(flag)).toBeChecked()
-                    : expect(screen.getByLabelText(flag)).not.toBeChecked(),
-                );
-              }
-              return;
-            }
-            if (docId === 'badges' && data.categories?.[0]?.label) {
-              await waitFor(() =>
-                expect(screen.getByLabelText('Category 1 label')).toHaveValue(
-                  data.categories[0].label,
-                ),
-              );
-            }
-          }
-          """,
-          )
-
-          for path in [
-              'apps/web/src/admin/pages/AdminPageEditor.test.jsx',
-              'apps/web/src/admin/pages/AdminContentBlockEditor.test.jsx',
-          ]:
-              file = Path(path)
-              text = file.read_text()
-              if 'act(' not in text:
-                  text = text.replace(
-                      'import { act, fireEvent, render, screen, waitFor, within }',
-                      'import { fireEvent, render, screen, waitFor, within }',
-                  ).replace(
-                      'import { act, fireEvent, render, screen, waitFor }',
-                      'import { fireEvent, render, screen, waitFor }',
-                  )
-              file.write_text(text)
-          PY
-
-      - name: Stress the affected tests
-        shell: bash
-        run: |
-          npm run prepare:functions
-          npm ci
-          for pass in 1 2 3; do
-            npm run test -w apps/web -- \
-              src/admin/pages/AdminPageEditor.test.jsx \
-              src/admin/pages/AdminBranding.test.jsx \
-              src/admin/pages/AdminContentBlockEditor.test.jsx \
-              src/admin/pages/AdminSettings.test.jsx
-          done
-          npm run test:web
-          npm run test:web
-          npm run lint
-
-      - name: Restore workflows and commit the repaired tests
-        shell: bash
-        run: |
-          git show origin/main:.github/workflows/deploy.yml > .github/workflows/deploy.yml
-          git rm -f .github/workflows/patch-133-review.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -s -m "Wait for admin page data in tests"
-          git push origin HEAD:codex/123-admin-test-readiness
+  deploy:
+    name: Deploy
+    needs: resolve
+    if: needs.resolve.outputs.clients != '[]'
+    strategy:
+      fail-fast: false # one client's failure must not cancel the others
+      max-parallel: 1 # deploys are serialized
+      matrix:
+        client: ${{ fromJSON(needs.resolve.outputs.clients) }}
+    uses: ./.github/workflows/deploy-client.yml
+    with:
+      client: ${{ matrix.client }}
+      provision: ${{ github.event_name == 'workflow_dispatch' && inputs.provision || false }}
+      bootstrap: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap || false }}
+    secrets: inherit
