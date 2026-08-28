@@ -1,82 +1,962 @@
-name: Deploy
-
-# Caller workflow (spec §8.1). `${{ inputs.client }}` is populated only on
-# workflow_dispatch — a push-triggered run would evaluate it to the empty
-# string and silently bind no environment, so `resolve` is the one place
-# that decides, per trigger shape, which client environments to fan out to
-# (scripts/lib/deploy-matrix.cjs, unit-tested by `npm test`).
+name: Repair PR 136
 
 on:
-  workflow_dispatch:
-    inputs:
-      client:
-        description: Client GitHub Environment name to deploy.
-        required: true
-        type: string
-      provision:
-        description: Also (re)deploy firestore:rules, firestore:indexes, and storage. deploy-client.yml's provision job always runs this regardless — kept as an input for operator intent/logging only.
-        required: false
-        type: boolean
-        default: false
-      bootstrap:
-        description: Bootstrap mode for a fresh project — deploy only provision + functions, skipping content/build/hosting/smoke. See docs/DEPLOY_RUNBOOK.md §5.
-        required: false
-        type: boolean
-        default: false
-  push:
-    branches: [main]
+  pull_request:
+    types: [synchronize]
 
 permissions:
-  contents: read
-  # Reusable-workflow permissions are an intersection of caller and callee:
-  # deploy-client.yml cannot get more than the caller grants, no matter what
-  # its own `permissions:` block says. Without id-token here,
-  # google-github-actions/auth in every deploy-client.yml job fails to mint
-  # an OIDC token and Workload Identity Federation auth never happens.
-  id-token: write
+  contents: write
 
 jobs:
-  resolve:
-    name: Resolve target client environments
+  repair:
+    if: github.head_ref == 'codex/120a-venue-reference-editor'
     runs-on: ubuntu-latest
-    outputs:
-      clients: ${{ steps.pick.outputs.clients }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: codex/120a-venue-reference-editor
+          fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-      - id: pick
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          DISPATCH_CLIENT: ${{ inputs.client }}
-          AUTO: ${{ vars.AUTO_DEPLOY_ENVIRONMENTS }}
-        run: |
-          set -euo pipefail
-          CLIENTS=$(node -e '
-            const { resolveClients } = require("./scripts/lib/deploy-matrix.cjs");
-            const clients = resolveClients({
-              eventName: process.env.EVENT_NAME,
-              dispatchClient: process.env.DISPATCH_CLIENT,
-              autoDeployEnvironments: process.env.AUTO,
-            });
-            process.stdout.write(JSON.stringify(clients));
-          ')
-          echo "Resolved clients: $CLIENTS"
-          echo "clients=$CLIENTS" >> "$GITHUB_OUTPUT"
+          node-version: 22
+          cache: npm
 
-  deploy:
-    name: Deploy
-    needs: resolve
-    if: needs.resolve.outputs.clients != '[]'
-    strategy:
-      fail-fast: false # one client's failure must not cancel the others
-      max-parallel: 1 # deploys are serialized
-      matrix:
-        client: ${{ fromJSON(needs.resolve.outputs.clients) }}
-    uses: ./.github/workflows/deploy-client.yml
-    with:
-      client: ${{ matrix.client }}
-      provision: ${{ github.event_name == 'workflow_dispatch' && inputs.provision || false }}
-      bootstrap: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap || false }}
-    secrets: inherit
+      - name: Add the venue reference editor
+        shell: bash
+        run: |
+          cat > apps/web/src/admin/components/VenueReferenceEditor.jsx <<'EOF'
+          import { useMemo, useRef, useState } from 'react';
+          import {
+            Panel,
+            SelectField,
+            TextField,
+            dangerButtonClass,
+            secondaryButtonClass,
+          } from './formControls.jsx';
+
+          const PLACE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+          export const blankPlace = () => ({ id: '', name: '', floor: '', persisted: false });
+          export const blankMovement = () => ({
+            from: '',
+            to: '',
+            walkingMinutes: '0',
+            accessibleRoute: '',
+          });
+
+          export function placeIdFromName(name) {
+            return String(name ?? '')
+              .normalize('NFKD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '')
+              .replace(/-+/g, '-');
+          }
+
+          export function normalizeVenueReferences(venue) {
+            return {
+              places: Array.isArray(venue?.places)
+                ? venue.places.map((place) => ({
+                    id: place?.id ?? '',
+                    name: place?.name ?? '',
+                    floor: place?.floor ?? '',
+                    persisted: true,
+                  }))
+                : [],
+              movements: Array.isArray(venue?.movements)
+                ? venue.movements.map((movement) => ({
+                    from: movement?.from ?? '',
+                    to: movement?.to ?? '',
+                    walkingMinutes:
+                      movement?.walkingMinutes === undefined || movement?.walkingMinutes === null
+                        ? ''
+                        : String(movement.walkingMinutes),
+                    accessibleRoute: movement?.accessibleRoute ?? '',
+                  }))
+                : [],
+            };
+          }
+
+          const optional = (value) => {
+            const trimmed = String(value ?? '').trim();
+            return trimmed ? trimmed : null;
+          };
+
+          export function venueReferencesPayload(venue) {
+            return {
+              places: (venue?.places ?? []).map((place) => ({
+                id: String(place.id ?? '').trim(),
+                name: String(place.name ?? '').trim(),
+                floor: optional(place.floor),
+              })),
+              movements: (venue?.movements ?? []).map((movement) => ({
+                from: movement.from,
+                to: movement.to,
+                walkingMinutes: Number(movement.walkingMinutes),
+                accessibleRoute: optional(movement.accessibleRoute),
+              })),
+            };
+          }
+
+          export function validateVenueReferences(venue) {
+            const errors = new Map();
+            const ids = new Set();
+            for (const [index, place] of (venue?.places ?? []).entries()) {
+              const idField = `venue.places[${index}].id`;
+              const nameField = `venue.places[${index}].name`;
+              const id = String(place.id ?? '').trim();
+              if (!PLACE_ID_RE.test(id)) {
+                errors.set(idField, 'Use lowercase letters, digits, and single hyphens.');
+              } else if (ids.has(id)) {
+                errors.set(idField, `Place id “${id}” is already used.`);
+              } else {
+                ids.add(id);
+              }
+              if (!String(place.name ?? '').trim()) errors.set(nameField, 'Enter a place name.');
+            }
+
+            const pairs = new Set();
+            for (const [index, movement] of (venue?.movements ?? []).entries()) {
+              const at = `venue.movements[${index}]`;
+              if (!ids.has(movement.from)) errors.set(`${at}.from`, 'Select a defined place.');
+              if (!ids.has(movement.to)) errors.set(`${at}.to`, 'Select a defined place.');
+              if (movement.from && movement.from === movement.to) {
+                errors.set(`${at}.to`, 'Choose a different destination.');
+              }
+              const pair = `${movement.from}\u0000${movement.to}`;
+              if (movement.from && movement.to) {
+                if (pairs.has(pair)) errors.set(`${at}.to`, 'This one-way route is already recorded.');
+                pairs.add(pair);
+              }
+              const rawMinutes = String(movement.walkingMinutes ?? '').trim();
+              const minutes = Number(rawMinutes);
+              if (!/^\d+$/.test(rawMinutes) || !Number.isInteger(minutes) || minutes < 0 || minutes > 120) {
+                errors.set(`${at}.walkingMinutes`, 'Enter a whole number from 0 to 120.');
+              }
+            }
+            return errors;
+          }
+
+          function afterRender(callback) {
+            setTimeout(callback, 0);
+          }
+
+          export default function VenueReferenceEditor({ venue, onChange, errorFor, placeUsage }) {
+            const [notice, setNotice] = useState('');
+            const addPlaceRef = useRef(null);
+            const addMovementRef = useRef(null);
+            const placeRemoveRefs = useRef([]);
+            const movementRemoveRefs = useRef([]);
+            const places = venue.places ?? [];
+            const movements = venue.movements ?? [];
+            const options = useMemo(
+              () => [
+                { value: '', label: 'Select a place' },
+                ...places.map((place) => ({
+                  value: place.id,
+                  label: place.name ? `${place.name} (${place.id || 'no id'})` : place.id || 'Unnamed place',
+                })),
+              ],
+              [places],
+            );
+
+            const changePlace = (index, patch) =>
+              onChange({
+                places: places.map((place, placeIndex) =>
+                  placeIndex === index ? { ...place, ...patch } : place,
+                ),
+              });
+            const changeMovement = (index, patch) =>
+              onChange({
+                movements: movements.map((movement, movementIndex) =>
+                  movementIndex === index ? { ...movement, ...patch } : movement,
+                ),
+              });
+
+            const removePlace = (index) => {
+              const place = places[index];
+              const uses = placeUsage.get(place.id) ?? [];
+              if (uses.length > 0) return;
+              const removedMovements = movements.filter(
+                (movement) => movement.from === place.id || movement.to === place.id,
+              ).length;
+              onChange({
+                places: places.filter((_, placeIndex) => placeIndex !== index),
+                movements: movements.filter(
+                  (movement) => movement.from !== place.id && movement.to !== place.id,
+                ),
+              });
+              setNotice(
+                removedMovements > 0
+                  ? `${place.name || place.id} and ${removedMovements} unsaved route${removedMovements === 1 ? '' : 's'} will be removed when you save.`
+                  : `${place.name || place.id} will be removed when you save.`,
+              );
+              afterRender(() =>
+                (placeRemoveRefs.current[index] ||
+                  placeRemoveRefs.current[index - 1] ||
+                  addPlaceRef.current)?.focus(),
+              );
+            };
+
+            const removeMovement = (index) => {
+              onChange({ movements: movements.filter((_, movementIndex) => movementIndex !== index) });
+              setNotice('The route will be removed when you save.');
+              afterRender(() =>
+                (movementRemoveRefs.current[index] ||
+                  movementRemoveRefs.current[index - 1] ||
+                  addMovementRef.current)?.focus(),
+              );
+            };
+
+            return (
+              <>
+                {notice ? <p role="status" className="text-caption text-admin-ink-secondary">{notice}</p> : null}
+                <Panel
+                  title="Places"
+                  description="Stable room references for sessions and transfer routes. Names and floors can change without changing an id."
+                  actions={
+                    <button
+                      ref={addPlaceRef}
+                      type="button"
+                      className={secondaryButtonClass}
+                      onClick={() => onChange({ places: [...places, blankPlace()] })}
+                    >
+                      Add place
+                    </button>
+                  }
+                >
+                  {places.length === 0 ? (
+                    <p className="text-caption text-admin-ink-secondary">No places configured yet.</p>
+                  ) : (
+                    <ol className="flex flex-col">
+                      {places.map((place, index) => {
+                        const uses = placeUsage.get(place.id) ?? [];
+                        return (
+                          <li
+                            key={`${place.id}-${index}`}
+                            className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
+                          >
+                            <div className="grid gap-sm sm:grid-cols-3">
+                              <TextField
+                                label={`Place ${index + 1} name`}
+                                value={place.name}
+                                onChange={(value) => {
+                                  const patch = { name: value };
+                                  if (!place.persisted && !place.id) patch.id = placeIdFromName(value);
+                                  changePlace(index, patch);
+                                }}
+                                error={errorFor(`venue.places[${index}].name`)}
+                              />
+                              <TextField
+                                label={`Place ${index + 1} id`}
+                                value={place.id}
+                                onChange={(value) => changePlace(index, { id: value })}
+                                error={errorFor(`venue.places[${index}].id`) ?? errorFor('venue.places')}
+                                hint="Lowercase letters, digits, and single hyphens. Keep a saved id stable."
+                                className="font-admin-data"
+                              />
+                              <TextField
+                                label={`Place ${index + 1} floor`}
+                                value={place.floor}
+                                onChange={(value) => changePlace(index, { floor: value })}
+                                error={errorFor(`venue.places[${index}].floor`)}
+                              />
+                            </div>
+                            {uses.length > 0 ? (
+                              <p className="mt-xs text-caption text-admin-state-caution">
+                                Used by {uses.slice(0, 4).join(', ')}{uses.length > 4 ? ` and ${uses.length - 4} more` : ''}. Move those sessions before removing this place.
+                              </p>
+                            ) : null}
+                            <button
+                              ref={(node) => { placeRemoveRefs.current[index] = node; }}
+                              type="button"
+                              className={`${dangerButtonClass} mt-sm`}
+                              disabled={uses.length > 0}
+                              onClick={() => removePlace(index)}
+                            >
+                              Remove {place.name || `place ${index + 1}`}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
+                </Panel>
+
+                <Panel
+                  title="Movements"
+                  description="One recorded, one-way route between two places. Zero minutes means across the corridor."
+                  actions={
+                    <button
+                      ref={addMovementRef}
+                      type="button"
+                      className={secondaryButtonClass}
+                      onClick={() => onChange({ movements: [...movements, blankMovement()] })}
+                    >
+                      Add movement
+                    </button>
+                  }
+                >
+                  {movements.length === 0 ? (
+                    <p className="text-caption text-admin-ink-secondary">No movements configured yet.</p>
+                  ) : (
+                    <ol className="flex flex-col">
+                      {movements.map((movement, index) => (
+                        <li
+                          key={index}
+                          className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
+                        >
+                          <div className="grid gap-sm sm:grid-cols-2">
+                            <SelectField
+                              label={`Movement ${index + 1} from`}
+                              value={movement.from}
+                              onChange={(value) => changeMovement(index, { from: value })}
+                              options={options}
+                              error={errorFor(`venue.movements[${index}].from`)}
+                            />
+                            <SelectField
+                              label={`Movement ${index + 1} to`}
+                              value={movement.to}
+                              onChange={(value) => changeMovement(index, { to: value })}
+                              options={options}
+                              error={errorFor(`venue.movements[${index}].to`)}
+                            />
+                            <TextField
+                              label={`Movement ${index + 1} walking minutes`}
+                              type="number"
+                              min="0"
+                              max="120"
+                              step="1"
+                              value={movement.walkingMinutes}
+                              onChange={(value) => changeMovement(index, { walkingMinutes: value })}
+                              error={errorFor(`venue.movements[${index}].walkingMinutes`)}
+                              hint="A whole number from 0 to 120."
+                            />
+                            <TextField
+                              label={`Movement ${index + 1} accessible route`}
+                              value={movement.accessibleRoute}
+                              onChange={(value) => changeMovement(index, { accessibleRoute: value })}
+                              error={errorFor(`venue.movements[${index}].accessibleRoute`)}
+                              hint="Optional step-free route guidance."
+                            />
+                          </div>
+                          <button
+                            ref={(node) => { movementRemoveRefs.current[index] = node; }}
+                            type="button"
+                            className={`${dangerButtonClass} mt-sm`}
+                            onClick={() => removeMovement(index)}
+                          >
+                            Remove movement {index + 1}
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </Panel>
+              </>
+            );
+          }
+          EOF
+
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              file = Path(path)
+              text = file.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}')
+              file.write_text(text.replace(old, new, 1))
+
+          path = 'apps/web/src/admin/pages/AdminEventSettings.jsx'
+          replace_once(
+              path,
+              "import AdminPageHeader from '../components/adminChrome.jsx';\n",
+              """import AdminPageHeader from '../components/adminChrome.jsx';
+          import { subscribeAdminCollection } from '../adminSource.js';
+          import VenueReferenceEditor, {
+            normalizeVenueReferences,
+            validateVenueReferences,
+            venueReferencesPayload,
+          } from '../components/VenueReferenceEditor.jsx';
+          """,
+          )
+          replace_once(
+              path,
+              """    venue: {
+            name: venue.name ?? '',
+            addressLine1: venue.addressLine1 ?? '',
+            addressLine2: venue.addressLine2 ?? '',
+            city: venue.city ?? '',
+            region: venue.region ?? '',
+            postalCode: venue.postalCode ?? '',
+            country: venue.country ?? '',
+            mapUrl: venue.mapUrl ?? '',
+          },
+          """,
+              """    venue: {
+            name: venue.name ?? '',
+            addressLine1: venue.addressLine1 ?? '',
+            addressLine2: venue.addressLine2 ?? '',
+            city: venue.city ?? '',
+            region: venue.region ?? '',
+            postalCode: venue.postalCode ?? '',
+            country: venue.country ?? '',
+            mapUrl: venue.mapUrl ?? '',
+            ...normalizeVenueReferences(venue),
+          },
+          """,
+          )
+          replace_once(
+              path,
+              """      mapUrl: orNull(form.venue.mapUrl),
+            },
+          """,
+              """      mapUrl: orNull(form.venue.mapUrl),
+              ...venueReferencesPayload(form.venue),
+            },
+          """,
+          )
+          replace_once(
+              path,
+              """  const [status, setStatus] = useState('');
+            const errorRef = useRef(null);
+          """,
+              """  const [status, setStatus] = useState('');
+            const [liveSessions, setLiveSessions] = useState([]);
+            const [draftSessions, setDraftSessions] = useState([]);
+            const errorRef = useRef(null);
+          """,
+          )
+          replace_once(
+              path,
+              """  useEffect(() => {
+            if (error) errorRef.current?.focus();
+          }, [error]);
+          """,
+              """  useEffect(() => {
+            if (error) errorRef.current?.focus();
+          }, [error]);
+
+            useEffect(() => {
+              const unsubscribeLive = subscribeAdminCollection('cmsSchedule', setLiveSessions);
+              const unsubscribeDrafts = subscribeAdminCollection('cmsSchedule_drafts', setDraftSessions);
+              return () => {
+                unsubscribeLive?.();
+                unsubscribeDrafts?.();
+              };
+            }, []);
+          """,
+          )
+          replace_once(
+              path,
+              """  const errorFor = (field) => fieldErrors.get(field);
+          """,
+              """  const localVenueErrors = useMemo(
+              () => validateVenueReferences(form.venue),
+              [form.venue],
+            );
+            const errorFor = (field) => localVenueErrors.get(field) ?? fieldErrors.get(field);
+            const placeUsage = useMemo(() => {
+              const visible = new Map();
+              for (const session of liveSessions) visible.set(session.id, session);
+              for (const session of draftSessions) visible.set(session.id, session);
+              const usage = new Map();
+              for (const session of visible.values()) {
+                if (!session.placeId) continue;
+                const rows = usage.get(session.placeId) ?? [];
+                rows.push(session.title || session.id);
+                usage.set(session.placeId, rows);
+              }
+              return usage;
+            }, [liveSessions, draftSessions]);
+          """,
+          )
+          replace_once(
+              path,
+              """      await call('updateEventConfig', { event: toPayload(form) });
+                setStatus('Saved. The site picks the change up live.');
+          """,
+              """      await call('updateEventConfig', { event: toPayload(form) });
+                setForm((current) => ({
+                  ...current,
+                  venue: {
+                    ...current.venue,
+                    places: current.venue.places.map((place) => ({ ...place, persisted: true })),
+                  },
+                }));
+                setStatus('Saved. The site picks the change up live.');
+          """,
+          )
+          replace_once(
+              path,
+              """      </Panel>
+
+                <Panel
+                  title="Registration"
+          """,
+              """      </Panel>
+
+                <VenueReferenceEditor
+                  venue={form.venue}
+                  onChange={(patch) => setGroup('venue', patch)}
+                  errorFor={errorFor}
+                  placeUsage={placeUsage}
+                />
+
+                <Panel
+                  title="Registration"
+          """,
+          )
+          replace_once(
+              path,
+              """        <button type="submit" className={primaryButtonClass} disabled={saving}>
+          """,
+              """        <button
+                  type="submit"
+                  className={primaryButtonClass}
+                  disabled={saving || localVenueErrors.size > 0}
+                >
+          """,
+          )
+
+          # Update the design contract to match the authoritative schema and
+          # remove the ordering/focus ambiguities identified in review.
+          doc = Path('docs/design/admin-schedule-workflow.md')
+          text = doc.read_text()
+          text = text.replace(
+              'Refuse duplicate ids and empty names before save.',
+              'Require a nonempty id made from lowercase letters, digits, and single hyphens. Refuse duplicate ids and empty names before save.',
+          )
+          text = text.replace(
+              '`walkingMinutes` is a whole number. Zero means across the corridor and is valid.',
+              '`walkingMinutes` is a whole number from 0 to 120. Zero means across the corridor and is valid.',
+          )
+          text = text.replace(
+              'Group sessions by event day, then order them by start time and title. Keep parent and child sessions adjacent.',
+              'Group sessions by event day. Order top-level sessions by start time and title, then place each child directly below its parent even when an unrelated top-level session starts between the two times.',
+          )
+          text = text.replace(
+              'Preview and publish use the existing CMS boundaries.',
+              'Preview and publish use the existing CMS boundaries. Publishing a child includes its draft-only parent in the same publish set, or explains why the action is unavailable until the parent is live.',
+          )
+          text = text.replace(
+              'Restore focus to the initiating control after a cancelled confirmation or a completed inline action.',
+              'After a cancelled confirmation, restore focus to the initiating control. After a row is removed, move focus to the next row action, the previous row action, the add control, or the section heading, in that order.',
+          )
+          doc.write_text(text)
+          PY
+
+      - name: Add the transactional place-reference guard
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              file = Path(path)
+              text = file.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}')
+              file.write_text(text.replace(old, new, 1))
+
+          path = 'functions/src/admin/config.cjs'
+          marker = """class MergedConfigInvalidError extends Error {
+            constructor(errors) {
+              super(errors.join('; '));
+              this.name = 'MergedConfigInvalidError';
+              this.errors = errors;
+            }
+          }
+          """
+          addition = r'''
+
+          const SESSION_COLLECTIONS = Object.freeze(['cmsSchedule', 'cmsSchedule_drafts']);
+
+          function venuePlaceIds(event) {
+            const places = event?.venue?.places;
+            if (!Array.isArray(places)) return [];
+            return places.map((place) => place?.id).filter((id) => typeof id === 'string');
+          }
+
+          async function removedPlaceReferences({ db, tx, stored, written }) {
+            const nextIds = new Set(venuePlaceIds(written));
+            const removed = venuePlaceIds(stored).filter((id) => !nextIds.has(id));
+            if (removed.length === 0) return [];
+
+            const bySession = new Map();
+            for (const placeId of removed) {
+              for (const collectionName of SESSION_COLLECTIONS) {
+                const query = db
+                  .collection(collectionName)
+                  .where('placeId', '==', placeId)
+                  .limit(20);
+                const snapshot = await tx.get(query);
+                for (const doc of snapshot.docs) {
+                  const data = doc.data();
+                  bySession.set(doc.id, {
+                    id: doc.id,
+                    title: typeof data?.title === 'string' && data.title.trim() ? data.title.trim() : doc.id,
+                    placeId,
+                  });
+                }
+              }
+            }
+            return [...bySession.values()].slice(0, 20);
+          }
+          '''
+          replace_once(path, marker, marker + addition)
+          old = """        const verdict = validate(written);
+                if (!verdict.ok) throw new MergedConfigInvalidError(verdict.errors);
+              }
+              tx.set(ref, { ...written, updatedAt: at, updatedBy: actor.email });
+          """
+          new = """        const verdict = validate(written);
+                if (!verdict.ok) throw new MergedConfigInvalidError(verdict.errors);
+                const references = await removedPlaceReferences({ db, tx, stored, written });
+                if (references.length > 0) {
+                  const places = [...new Set(references.map((reference) => reference.placeId))];
+                  const sessions = references.map((reference) => reference.title).join(', ');
+                  throw new MergedConfigInvalidError([
+                    `venue.places: cannot remove ${places.map((id) => `"${id}"`).join(', ')} because ` +
+                      `live or draft sessions still use it (${sessions})`,
+                  ]);
+                }
+              }
+              tx.set(ref, { ...written, updatedAt: at, updatedBy: actor.email });
+          """
+          replace_once(path, old, new)
+          replace_once(
+              path,
+              """    findReadOnlyViolations,
+          """,
+              """    findReadOnlyViolations,
+                removedPlaceReferences,
+                venuePlaceIds,
+          """,
+          )
+          PY
+
+      - name: Extend the config fake and add regression tests
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('functions/src/admin/config.test.cjs')
+          text = path.read_text()
+          old = """  function docRef(col, id) {
+            const key = `${col}/${id}`;
+            return {
+              _key: key,
+              async get() {
+                const data = docs.get(key);
+                return { exists: data !== undefined, data: () => data };
+              },
+              async set(data) {
+                applySet(key, data);
+              },
+            };
+          }
+          """
+          new = old + """  function queryRef(col, field, value, max = Infinity) {
+            return {
+              _query: { col, field, value, max },
+              limit(limitValue) {
+                return queryRef(col, field, value, limitValue);
+              },
+            };
+          }
+          """
+          if text.count(old) != 1:
+              raise SystemExit('config.test.cjs: docRef marker missing')
+          text = text.replace(old, new, 1)
+          old = """        doc(id) {
+                  autoId += 1;
+                  return docRef(name, id === undefined ? `auto${autoId}` : id);
+                },
+          """
+          new = old + """        where(field, operator, value) {
+                  if (operator !== '==') throw new Error(`unsupported operator ${operator}`);
+                  return queryRef(name, field, value);
+                },
+          """
+          if text.count(old) != 1:
+              raise SystemExit('config.test.cjs: collection marker missing')
+          text = text.replace(old, new, 1)
+          old = """          async get(ref) {
+                    reads.set(ref._key, versionOf(ref._key));
+                    const snap = await ref.get();
+                    if (db.onTransactionRead) await db.onTransactionRead(ref._key);
+                    return snap;
+                  },
+          """
+          new = """          async get(ref) {
+                    if (ref._query) {
+                      const { col, field, value, max } = ref._query;
+                      const matches = [...docs.entries()]
+                        .filter(([key, data]) => key.startsWith(`${col}/`) && data?.[field] === value)
+                        .slice(0, max);
+                      for (const [key] of matches) reads.set(key, versionOf(key));
+                      return {
+                        docs: matches.map(([key, data]) => ({
+                          id: key.slice(col.length + 1),
+                          data: () => data,
+                        })),
+                      };
+                    }
+                    reads.set(ref._key, versionOf(ref._key));
+                    const snap = await ref.get();
+                    if (db.onTransactionRead) await db.onTransactionRead(ref._key);
+                    return snap;
+                  },
+          """
+          if text.count(old) != 1:
+              raise SystemExit('config.test.cjs: transaction get marker missing')
+          text = text.replace(old, new, 1)
+          if 'removing a referenced venue place is rejected across live and draft sessions' not in text:
+              text += r'''
+
+          test('removing a referenced venue place is rejected across live and draft sessions', async () => {
+            const event = validEvent({
+              venue: {
+                places: [
+                  { id: 'main-hall', name: 'Main hall' },
+                  { id: 'studio', name: 'Studio' },
+                ],
+                movements: [],
+              },
+            });
+            const deps = makeDeps({
+              'config/event': event,
+              'cmsSchedule/keynote': { title: 'Opening keynote', placeId: 'main-hall' },
+              'cmsSchedule_drafts/workshop': { title: 'Draft workshop', placeId: 'main-hall' },
+            });
+            const res = makeRes();
+            await createUpdateEventConfigHandler(deps)(
+              makeReq({ event: { venue: { places: [{ id: 'studio', name: 'Studio' }], movements: [] } } }),
+              res,
+            );
+            assert.equal(res.statusCode, 400);
+            assert.match(res.body.error.message, /venue\.places: cannot remove "main-hall"/);
+            assert.match(res.body.error.message, /Opening keynote/);
+            assert.match(res.body.error.message, /Draft workshop/);
+            assert.equal(deps.db.docs.get('config/event').venue.places.length, 2);
+          });
+
+          test('an unused venue place can be removed', async () => {
+            const event = validEvent({
+              venue: {
+                places: [
+                  { id: 'main-hall', name: 'Main hall' },
+                  { id: 'studio', name: 'Studio' },
+                ],
+                movements: [],
+              },
+            });
+            const deps = makeDeps({ 'config/event': event });
+            const res = makeRes();
+            await createUpdateEventConfigHandler(deps)(
+              makeReq({ event: { venue: { places: [{ id: 'studio', name: 'Studio' }], movements: [] } } }),
+              res,
+            );
+            assert.equal(res.statusCode, 200);
+            assert.deepEqual(deps.db.docs.get('config/event').venue.places, [
+              { id: 'studio', name: 'Studio' },
+            ]);
+          });
+          '''
+          path.write_text(text)
+
+          test_path = Path('apps/web/src/admin/components/VenueReferenceEditor.test.jsx')
+          test_path.write_text(r'''import { describe, expect, it } from 'vitest';
+          import {
+            normalizeVenueReferences,
+            placeIdFromName,
+            validateVenueReferences,
+            venueReferencesPayload,
+          } from './VenueReferenceEditor.jsx';
+
+          describe('venue reference helpers', () => {
+            it('generates a valid starting id and keeps stored ids marked as persisted', () => {
+              expect(placeIdFromName('Main Hall — East')).toBe('main-hall-east');
+              expect(
+                normalizeVenueReferences({ places: [{ id: 'main-hall', name: 'Renamed hall' }] })
+                  .places[0],
+              ).toMatchObject({ id: 'main-hall', persisted: true });
+            });
+
+            it('matches the shared place and movement validation before save', () => {
+              const venue = {
+                places: [
+                  { id: 'Main Hall', name: '', floor: '' },
+                  { id: 'studio', name: 'Studio', floor: '' },
+                ],
+                movements: [
+                  { from: 'studio', to: 'studio', walkingMinutes: '121', accessibleRoute: '' },
+                ],
+              };
+              const errors = validateVenueReferences(venue);
+              expect(errors.get('venue.places[0].id')).toMatch(/lowercase/);
+              expect(errors.get('venue.places[0].name')).toMatch(/place name/);
+              expect(errors.get('venue.movements[0].to')).toMatch(/different/);
+              expect(errors.get('venue.movements[0].walkingMinutes')).toMatch(/0 to 120/);
+            });
+
+            it('sends zero walking minutes and null optional strings', () => {
+              expect(
+                venueReferencesPayload({
+                  places: [{ id: 'main-hall', name: 'Main hall', floor: '' }],
+                  movements: [
+                    { from: 'main-hall', to: 'studio', walkingMinutes: '0', accessibleRoute: '' },
+                  ],
+                }),
+              ).toEqual({
+                places: [{ id: 'main-hall', name: 'Main hall', floor: null }],
+                movements: [
+                  { from: 'main-hall', to: 'studio', walkingMinutes: 0, accessibleRoute: null },
+                ],
+              });
+            });
+          });
+          ''')
+          PY
+
+      - name: Add integration tests for references and focus behavior
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/src/admin/pages/AdminSettings.test.jsx')
+          text = path.read_text()
+          text = text.replace(
+              """vi.mock('../adminSource.js', () => ({
+            subscribeAdminCollection: (_name, onNext) => {
+              onNext([]);
+              return () => {};
+            },
+          }));
+          """,
+              """const adminSubscriptions = new Map();
+          vi.mock('../adminSource.js', () => ({
+            subscribeAdminCollection: (name, onNext) => {
+              adminSubscriptions.set(name, onNext);
+              onNext([]);
+              return () => adminSubscriptions.delete(name);
+            },
+          }));
+          """,
+          )
+          text = text.replace(
+              """beforeEach(() => {
+            configSubscriptions.clear();
+          """,
+              """beforeEach(() => {
+            configSubscriptions.clear();
+            adminSubscriptions.clear();
+          """,
+              1,
+          )
+          if 'edits venue places and one-way movements' not in text:
+              marker = "\n  it('says plainly that an event with one room needs no tracks'"
+              addition = r'''
+
+            it('edits venue places and one-way movements', async () => {
+              await renderAt('/admin/settings');
+              await pushConfig('event', {
+                ...LIVE_EVENT,
+                venue: {
+                  ...LIVE_EVENT.venue,
+                  places: [
+                    { id: 'main-hall', name: 'Main hall' },
+                    { id: 'studio', name: 'Studio', floor: '2' },
+                  ],
+                  movements: [{ from: 'main-hall', to: 'studio', walkingMinutes: 0 }],
+                },
+              });
+              expect(screen.getByLabelText('Place 1 id')).toHaveValue('main-hall');
+              expect(screen.getByLabelText('Movement 1 walking minutes')).toHaveValue(0);
+
+              fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+              fireEvent.change(screen.getByLabelText('Place 2 name'), {
+                target: { value: 'Editing studio' },
+              });
+              fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+              await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+              const venue = bodyOf(0).event.venue;
+              expect(venue.places[1]).toEqual({ id: 'studio', name: 'Editing studio', floor: '2' });
+              expect(venue.movements[0].walkingMinutes).toBe(0);
+            });
+
+            it('blocks removal when a live or draft session uses a place', async () => {
+              await renderAt('/admin/settings');
+              await pushConfig('event', {
+                ...LIVE_EVENT,
+                venue: {
+                  ...LIVE_EVENT.venue,
+                  places: [{ id: 'main-hall', name: 'Main hall' }],
+                  movements: [],
+                },
+              });
+              act(() => {
+                adminSubscriptions.get('cmsSchedule')([
+                  { id: 'keynote', title: 'Opening keynote', placeId: 'main-hall' },
+                ]);
+              });
+              const remove = screen.getByRole('button', { name: 'Remove Main hall' });
+              expect(remove).toBeDisabled();
+              expect(screen.getByText(/Used by Opening keynote/)).toBeInTheDocument();
+            });
+
+            it('removes dependent unsaved routes and moves focus to a surviving control', async () => {
+              await renderAt('/admin/settings');
+              await pushConfig('event', {
+                ...LIVE_EVENT,
+                venue: {
+                  ...LIVE_EVENT.venue,
+                  places: [
+                    { id: 'main-hall', name: 'Main hall' },
+                    { id: 'studio', name: 'Studio' },
+                  ],
+                  movements: [{ from: 'main-hall', to: 'studio', walkingMinutes: 4 }],
+                },
+              });
+              fireEvent.click(screen.getByRole('button', { name: 'Remove Main hall' }));
+              expect(await screen.findByRole('status')).toHaveTextContent('1 unsaved route');
+              expect(screen.queryByLabelText('Movement 1 from')).toBeNull();
+              await waitFor(() => expect(screen.getByRole('button', { name: 'Remove Studio' })).toHaveFocus());
+            });
+          '''
+              if marker not in text:
+                  raise SystemExit('AdminSettings.test.jsx insertion point missing')
+              text = text.replace(marker, addition + marker, 1)
+          path.write_text(text)
+          PY
+
+      - name: Validate and regenerate the demo
+        shell: bash
+        run: |
+          npm run prepare:functions
+          npm ci
+          node --test functions/src/admin/config.test.cjs
+          npm run test -w apps/web -- \
+            src/admin/components/VenueReferenceEditor.test.jsx \
+            src/admin/pages/AdminSettings.test.jsx
+          npm run lint
+          npm run build:demo
+          npm run test:web
+
+      - name: Restore the deploy workflow and commit the product change
+        shell: bash
+        run: |
+          git show origin/main:.github/workflows/deploy.yml > .github/workflows/deploy.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -s -m "Add venue reference editing and guards"
+          git push origin HEAD:codex/120a-venue-reference-editor
