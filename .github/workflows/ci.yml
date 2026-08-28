@@ -35,7 +35,6 @@ jobs:
               'apps/web/src/admin/pages/AdminContentBlockEditor.test.jsx',
               'apps/web/src/admin/pages/AdminSettings.test.jsx',
           ]
-
           pump = re.compile(
               r"\n  await act\(async \(\) => \{\n"
               r"    await Promise\.resolve\(\);\n"
@@ -75,16 +74,15 @@ jobs:
           ]:
               replace_once(path, gate_tail, gate_ready)
 
-          replace_once(
-              'apps/web/src/admin/pages/AdminBranding.test.jsx',
-              """  await act(async () => {
-            configSubscriptions.get('theme')(themeDoc);
-            await Promise.resolve();
-          });
-            return result;
-          }
-          """,
-              """  await waitFor(() => expect(configSubscriptions.has('theme')).toBe(true));
+          path = Path('apps/web/src/admin/pages/AdminBranding.test.jsx')
+          text = path.read_text()
+          pattern = re.compile(
+              r"  await act\(async \(\) => \{\n"
+              r"    configSubscriptions\.get\('theme'\)\(themeDoc\);\n"
+              r"    await Promise\.resolve\(\);\n"
+              r"  \}\);"
+          )
+          replacement = """  await waitFor(() => expect(configSubscriptions.has('theme')).toBe(true));
             act(() => configSubscriptions.get('theme')(themeDoc));
             await screen.findByLabelText('Main brand colour');
             const expectedBrand = themeDoc.brandColor ?? themeDoc.colors?.primary;
@@ -92,22 +90,23 @@ jobs:
               await waitFor(() =>
                 expect(screen.getByLabelText('Main brand colour')).toHaveValue(expectedBrand),
               );
-            }
-            return result;
-          }
-          """,
-          )
+            }"""
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f'AdminBranding.test.jsx: expected one theme push, found {count}')
+          path.write_text(text)
 
-          replace_once(
-              'apps/web/src/admin/pages/AdminSettings.test.jsx',
-              """async function pushConfig(docId, data) {
-            await act(async () => {
-              configSubscriptions.get(docId)(data);
-              await Promise.resolve();
-            });
-          }
-          """,
-              """async function pushConfig(docId, data) {
+          path = Path('apps/web/src/admin/pages/AdminSettings.test.jsx')
+          text = path.read_text()
+          pattern = re.compile(
+              r"async function pushConfig\(docId, data\) \{\n"
+              r"  await act\(async \(\) => \{\n"
+              r"    configSubscriptions\.get\(docId\)\(data\);\n"
+              r"    await Promise\.resolve\(\);\n"
+              r"  \}\);\n"
+              r"\}"
+          )
+          replacement = """async function pushConfig(docId, data) {
             await waitFor(() => expect(configSubscriptions.has(docId)).toBe(true));
             act(() => configSubscriptions.get(docId)(data));
 
@@ -136,9 +135,11 @@ jobs:
                 ),
               );
             }
-          }
-          """,
-          )
+          }"""
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f'AdminSettings.test.jsx: expected one pushConfig helper, found {count}')
+          path.write_text(text)
 
           for path in [
               'apps/web/src/admin/pages/AdminPageEditor.test.jsx',
