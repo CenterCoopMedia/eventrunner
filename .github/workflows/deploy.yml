@@ -1,523 +1,82 @@
-name: Repair PR 134
+name: Deploy
+
+# Caller workflow (spec §8.1). `${{ inputs.client }}` is populated only on
+# workflow_dispatch — a push-triggered run would evaluate it to the empty
+# string and silently bind no environment, so `resolve` is the one place
+# that decides, per trigger shape, which client environments to fan out to
+# (scripts/lib/deploy-matrix.cjs, unit-tested by `npm test`).
 
 on:
-  pull_request:
-    types: [synchronize]
+  workflow_dispatch:
+    inputs:
+      client:
+        description: Client GitHub Environment name to deploy.
+        required: true
+        type: string
+      provision:
+        description: Also (re)deploy firestore:rules, firestore:indexes, and storage. deploy-client.yml's provision job always runs this regardless — kept as an input for operator intent/logging only.
+        required: false
+        type: boolean
+        default: false
+      bootstrap:
+        description: Bootstrap mode for a fresh project — deploy only provision + functions, skipping content/build/hosting/smoke. See docs/DEPLOY_RUNBOOK.md §5.
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches: [main]
 
 permissions:
-  contents: write
+  contents: read
+  # Reusable-workflow permissions are an intersection of caller and callee:
+  # deploy-client.yml cannot get more than the caller grants, no matter what
+  # its own `permissions:` block says. Without id-token here,
+  # google-github-actions/auth in every deploy-client.yml job fails to mint
+  # an OIDC token and Workload Identity Federation auth never happens.
+  id-token: write
 
 jobs:
-  repair:
-    if: github.head_ref == 'codex/124-keyboard-scroll-regions'
+  resolve:
+    name: Resolve target client environments
     runs-on: ubuntu-latest
+    outputs:
+      clients: ${{ steps.pick.outputs.clients }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: codex/124-keyboard-scroll-regions
-          fetch-depth: 0
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
-
-      - name: Implement keyboard-reachable scroll regions
-        shell: bash
+          node-version: "22"
+      - id: pick
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_CLIENT: ${{ inputs.client }}
+          AUTO: ${{ vars.AUTO_DEPLOY_ENVIRONMENTS }}
         run: |
-          python <<'PY'
-          from pathlib import Path
+          set -euo pipefail
+          CLIENTS=$(node -e '
+            const { resolveClients } = require("./scripts/lib/deploy-matrix.cjs");
+            const clients = resolveClients({
+              eventName: process.env.EVENT_NAME,
+              dispatchClient: process.env.DISPATCH_CLIENT,
+              autoDeployEnvironments: process.env.AUTO,
+            });
+            process.stdout.write(JSON.stringify(clients));
+          ')
+          echo "Resolved clients: $CLIENTS"
+          echo "clients=$CLIENTS" >> "$GITHUB_OUTPUT"
 
-          def replace_once(path, old, new):
-              file = Path(path)
-              text = file.read_text()
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'{path}: expected one match, found {count}')
-              file.write_text(text.replace(old, new, 1))
-
-          Path('apps/web/src/components/HorizontalScrollRegion.jsx').write_text(r'''import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-
-export function hasHorizontalOverflow(node) {
-  return Boolean(node) && node.scrollWidth > node.clientWidth;
-}
-
-export default function HorizontalScrollRegion({
-  label,
-  className = '',
-  children,
-  ...props
-}) {
-  const regionRef = useRef(null);
-  const [overflowing, setOverflowing] = useState(false);
-
-  const measure = useCallback(() => {
-    const next = hasHorizontalOverflow(regionRef.current);
-    setOverflowing((current) => (current === next ? current : next));
-  }, []);
-
-  // Content can change without replacing this component. Measure after each
-  // render, then keep the answer current as layout and descendants change.
-  useLayoutEffect(() => {
-    measure();
-  });
-
-  useLayoutEffect(() => {
-    const node = regionRef.current;
-    if (!node) return undefined;
-
-    const ResizeObserverType = globalThis.ResizeObserver;
-    const resizeObserver =
-      typeof ResizeObserverType === 'function' ? new ResizeObserverType(measure) : null;
-    const observeContent = () => {
-      resizeObserver?.observe(node);
-      if (node.firstElementChild) resizeObserver?.observe(node.firstElementChild);
-    };
-    observeContent();
-
-    const MutationObserverType = globalThis.MutationObserver;
-    const mutationObserver =
-      typeof MutationObserverType === 'function'
-        ? new MutationObserverType(() => {
-            observeContent();
-            measure();
-          })
-        : null;
-    mutationObserver?.observe(node, {
-      attributes: true,
-      characterData: true,
-      childList: true,
-      subtree: true,
-    });
-
-    const view = typeof window === 'undefined' ? null : window;
-    view?.addEventListener('resize', measure);
-    return () => {
-      resizeObserver?.disconnect();
-      mutationObserver?.disconnect();
-      view?.removeEventListener('resize', measure);
-    };
-  }, [measure]);
-
-  return (
-    <div
-      {...props}
-      ref={regionRef}
-      className={['horizontal-scroll-region', className].filter(Boolean).join(' ')}
-      data-scroll-label={label}
-      tabIndex={overflowing ? 0 : undefined}
-      role={overflowing ? 'region' : undefined}
-      aria-label={overflowing ? label : undefined}
-    >
-      {children}
-    </div>
-  );
-}
-''')
-
-          Path('apps/web/src/components/HorizontalScrollRegion.test.jsx').write_text(r'''import { act, render } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import HorizontalScrollRegion, { hasHorizontalOverflow } from './HorizontalScrollRegion.jsx';
-
-let resizeObservers;
-let mutationObservers;
-let originalResizeObserver;
-let originalMutationObserver;
-
-class ResizeObserverDouble {
-  constructor(callback) {
-    this.callback = callback;
-    this.observe = vi.fn();
-    this.disconnect = vi.fn();
-    resizeObservers.push(this);
-  }
-}
-
-class MutationObserverDouble {
-  constructor(callback) {
-    this.callback = callback;
-    this.observe = vi.fn();
-    this.disconnect = vi.fn();
-    mutationObservers.push(this);
-  }
-}
-
-function setWidths(node, { client, scroll }) {
-  Object.defineProperty(node, 'clientWidth', { configurable: true, value: client });
-  Object.defineProperty(node, 'scrollWidth', { configurable: true, value: scroll });
-}
-
-beforeEach(() => {
-  resizeObservers = [];
-  mutationObservers = [];
-  originalResizeObserver = globalThis.ResizeObserver;
-  originalMutationObserver = globalThis.MutationObserver;
-  globalThis.ResizeObserver = ResizeObserverDouble;
-  globalThis.MutationObserver = MutationObserverDouble;
-});
-
-afterEach(() => {
-  globalThis.ResizeObserver = originalResizeObserver;
-  globalThis.MutationObserver = originalMutationObserver;
-});
-
-describe('HorizontalScrollRegion', () => {
-  it('adds and removes region semantics as measured overflow changes', () => {
-    const { container, unmount } = render(
-      <HorizontalScrollRegion label="Day one schedule grid">
-        <div>Programme</div>
-      </HorizontalScrollRegion>,
-    );
-    const region = container.firstElementChild;
-    setWidths(region, { client: 320, scroll: 320 });
-    act(() => resizeObservers[0].callback([]));
-    expect(region).not.toHaveAttribute('tabindex');
-    expect(region).not.toHaveAttribute('role');
-    expect(region).not.toHaveAttribute('aria-label');
-
-    setWidths(region, { client: 320, scroll: 640 });
-    act(() => resizeObservers[0].callback([]));
-    expect(region).toHaveAttribute('tabindex', '0');
-    expect(region).toHaveAttribute('role', 'region');
-    expect(region).toHaveAccessibleName('Day one schedule grid');
-
-    setWidths(region, { client: 640, scroll: 640 });
-    act(() => mutationObservers[0].callback([]));
-    expect(region).not.toHaveAttribute('tabindex');
-    expect(region).not.toHaveAttribute('role');
-
-    unmount();
-    expect(resizeObservers[0].disconnect).toHaveBeenCalledOnce();
-    expect(mutationObservers[0].disconnect).toHaveBeenCalledOnce();
-  });
-
-  it('uses the window resize fallback when ResizeObserver is unavailable', () => {
-    globalThis.ResizeObserver = undefined;
-    const { container } = render(
-      <HorizontalScrollRegion label="Wide table">
-        <table><tbody><tr><td>Value</td></tr></tbody></table>
-      </HorizontalScrollRegion>,
-    );
-    const region = container.firstElementChild;
-    setWidths(region, { client: 200, scroll: 400 });
-    act(() => window.dispatchEvent(new Event('resize')));
-    expect(region).toHaveAttribute('tabindex', '0');
-    expect(region).toHaveAccessibleName('Wide table');
-  });
-
-  it('uses strict width comparison', () => {
-    expect(hasHorizontalOverflow({ clientWidth: 200, scrollWidth: 200 })).toBe(false);
-    expect(hasHorizontalOverflow({ clientWidth: 200, scrollWidth: 201 })).toBe(true);
-  });
-});
-''')
-
-          replace_once(
-              'apps/web/src/pages/Schedule.jsx',
-              "import SchedulePrint from '../components/SchedulePrint.jsx';\n",
-              "import SchedulePrint from '../components/SchedulePrint.jsx';\nimport HorizontalScrollRegion from '../components/HorizontalScrollRegion.jsx';\n",
-          )
-          replace_once(
-              'apps/web/src/pages/Schedule.jsx',
-              '                <div className="mt-sm overflow-x-auto">',
-              """                <HorizontalScrollRegion
-                  label={`${activeDay.label} schedule grid`}
-                  className="mt-sm overflow-x-auto"
-                >""",
-          )
-          replace_once(
-              'apps/web/src/pages/Schedule.jsx',
-              """                  />
-                </div>
-              ) : (
-          """,
-              """                  />
-                </HorizontalScrollRegion>
-              ) : (
-          """,
-          )
-
-          css = Path('apps/web/src/index.css')
-          css_text = css.read_text()
-          marker = '  .horizontal-scroll-region:focus-visible {'
-          if marker not in css_text:
-              css.write_text(css_text + r'''
-
-@layer components {
-  .horizontal-scroll-region:focus-visible {
-    outline: 2px solid rgb(var(--color-accent-rgb));
-    outline-offset: var(--space-3xs);
-  }
-}
-''')
-
-          Path('docs/scroll-regions.js').write_text(r'''(function attachScrollRegions(factory) {
-  const api = factory();
-  if (typeof module === 'object' && module.exports) module.exports = api;
-  if (typeof window !== 'undefined' && window.document) api.installScrollRegions(window);
-})(function buildScrollRegions() {
-  function text(value) {
-    return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
-  }
-
-  function contextualLabel(node) {
-    const caption = node.querySelector?.('caption');
-    if (text(caption?.textContent)) return text(caption.textContent);
-
-    let sibling = node.previousElementSibling;
-    while (sibling) {
-      if (/^H[2-6]$/.test(sibling.tagName) && text(sibling.textContent)) {
-        return text(sibling.textContent);
-      }
-      sibling = sibling.previousElementSibling;
-    }
-    return text(node.getAttribute('data-scroll-label')) || 'Scrollable content';
-  }
-
-  function updateScrollRegion(node) {
-    const overflowing = Number(node.scrollWidth) > Number(node.clientWidth);
-    if (overflowing) {
-      node.setAttribute('tabindex', '0');
-      node.setAttribute('role', 'region');
-      if (!node.hasAttribute('aria-label') && !node.hasAttribute('aria-labelledby')) {
-        node.setAttribute('aria-label', contextualLabel(node));
-        node.setAttribute('data-scroll-generated-label', 'true');
-      }
-    } else {
-      node.removeAttribute('tabindex');
-      node.removeAttribute('role');
-      if (node.getAttribute('data-scroll-generated-label') === 'true') {
-        node.removeAttribute('aria-label');
-        node.removeAttribute('data-scroll-generated-label');
-      }
-    }
-    return overflowing;
-  }
-
-  function observeScrollRegion(node, view) {
-    const refresh = () => updateScrollRegion(node);
-    const ResizeObserverType = view.ResizeObserver;
-    const resizeObserver =
-      typeof ResizeObserverType === 'function' ? new ResizeObserverType(refresh) : null;
-    const observeContent = () => {
-      resizeObserver?.observe(node);
-      if (node.firstElementChild) resizeObserver?.observe(node.firstElementChild);
-    };
-    observeContent();
-
-    const MutationObserverType = view.MutationObserver;
-    const mutationObserver =
-      typeof MutationObserverType === 'function'
-        ? new MutationObserverType(() => {
-            observeContent();
-            refresh();
-          })
-        : null;
-    mutationObserver?.observe(node, {
-      attributes: true,
-      characterData: true,
-      childList: true,
-      subtree: true,
-    });
-    view.addEventListener?.('resize', refresh);
-    refresh();
-
-    return () => {
-      resizeObserver?.disconnect();
-      mutationObserver?.disconnect();
-      view.removeEventListener?.('resize', refresh);
-    };
-  }
-
-  function installScrollRegions(view) {
-    const document = view.document;
-    let disposers = [];
-    const start = () => {
-      disposers = [...document.querySelectorAll('[data-scroll-region]')].map((node) =>
-        observeScrollRegion(node, view),
-      );
-    };
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', start, { once: true });
-    } else {
-      start();
-    }
-    return () => {
-      document.removeEventListener?.('DOMContentLoaded', start);
-      for (const dispose of disposers) dispose();
-      disposers = [];
-    };
-  }
-
-  return { contextualLabel, installScrollRegions, observeScrollRegion, updateScrollRegion };
-});
-''')
-
-          Path('scripts/scroll-regions.test.cjs').write_text(r''''use strict';
-
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const {
-  observeScrollRegion,
-  updateScrollRegion,
-} = require('../docs/scroll-regions.js');
-
-function element({ clientWidth = 100, scrollWidth = 100, label = 'Table' } = {}) {
-  const attributes = new Map([['data-scroll-label', label]]);
-  return {
-    clientWidth,
-    scrollWidth,
-    firstElementChild: {},
-    previousElementSibling: null,
-    querySelector: () => null,
-    setAttribute: (name, value) => attributes.set(name, String(value)),
-    getAttribute: (name) => attributes.get(name) ?? null,
-    hasAttribute: (name) => attributes.has(name),
-    removeAttribute: (name) => attributes.delete(name),
-  };
-}
-
-test('updateScrollRegion adds semantics only while content overflows', () => {
-  const node = element({ clientWidth: 100, scrollWidth: 200, label: 'Code example' });
-  assert.equal(updateScrollRegion(node), true);
-  assert.equal(node.getAttribute('tabindex'), '0');
-  assert.equal(node.getAttribute('role'), 'region');
-  assert.equal(node.getAttribute('aria-label'), 'Code example');
-
-  node.scrollWidth = 100;
-  assert.equal(updateScrollRegion(node), false);
-  assert.equal(node.getAttribute('tabindex'), null);
-  assert.equal(node.getAttribute('role'), null);
-  assert.equal(node.getAttribute('aria-label'), null);
-});
-
-test('observeScrollRegion recomputes on resize and cleans up observers', () => {
-  let resizeCallback;
-  let disconnected = 0;
-  let removed = 0;
-  class ResizeObserverDouble {
-    constructor(callback) { resizeCallback = callback; }
-    observe() {}
-    disconnect() { disconnected += 1; }
-  }
-  const node = element();
-  const view = {
-    ResizeObserver: ResizeObserverDouble,
-    addEventListener() {},
-    removeEventListener() { removed += 1; },
-  };
-  const dispose = observeScrollRegion(node, view);
-  node.scrollWidth = 300;
-  resizeCallback();
-  assert.equal(node.getAttribute('role'), 'region');
-  dispose();
-  assert.equal(disconnected, 1);
-  assert.equal(removed, 1);
-});
-''')
-
-          replace_once(
-              'scripts/lib/markdown-pages.cjs',
-              """      out.push(`<pre><code${languageClass}>${escapeHtml(body.join('\\n'))}\\n</code></pre>`);
-          """,
-              """      const scrollLabel = language ? `Code example (${escapeHtml(language)})` : 'Code example';
-            out.push(
-              `<pre data-scroll-region data-scroll-label="${scrollLabel}">` +
-              `<code${languageClass}>${escapeHtml(body.join('\\n'))}\\n</code></pre>`,
-            );
-          """,
-          )
-          replace_once(
-              'scripts/lib/markdown-pages.cjs',
-              "'<div class=\"table-scroll\">\\n<table>\\n<thead>\\n' +",
-              "'<div class=\"table-scroll\" data-scroll-region data-scroll-label=\"Table\">\\n<table>\\n<thead>\\n' +",
-          )
-
-          Path('scripts/lib/markdown-scroll-regions.test.cjs').write_text(r''''use strict';
-
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { renderMarkdown } = require('./markdown-pages.cjs');
-
-test('wide Markdown structures opt into measured scroll behavior', () => {
-  const code = renderMarkdown('# Example\n\n```js\nconst value = 1;\n```').html;
-  assert.match(code, /<pre data-scroll-region data-scroll-label="Code example \(js\)">/);
-
-  const table = renderMarkdown('# Table\n\n| Name | Value |\n| --- | --- |\n| A | B |').html;
-  assert.match(table, /class="table-scroll" data-scroll-region data-scroll-label="Table"/);
-});
-''')
-
-          replace_once(
-              'scripts/build-pages.cjs',
-              """    `  <link rel="stylesheet" href="${SITE_BASE}docs.css">`,
-            '</head>',
-          """,
-              """    `  <link rel="stylesheet" href="${SITE_BASE}docs.css">`,
-            `  <script src="${SITE_BASE}scroll-regions.js" defer></script>`,
-            '</head>',
-          """,
-          )
-
-          docs_css = Path('docs/docs.css')
-          docs_css_text = docs_css.read_text()
-          if '[data-scroll-region]:focus-visible' not in docs_css_text:
-              docs_css.write_text(docs_css_text + r'''
-
-[data-scroll-region]:focus-visible {
-  outline: var(--rule-strong-width) solid rgb(var(--color-accent-rgb));
-  outline-offset: var(--space-3xs);
-}
-''')
-
-          schedule_test = Path('apps/web/src/pages/Schedule.test.jsx')
-          schedule_text = schedule_test.read_text()
-          if 'wires the grid through the measured scroll-region component' not in schedule_text:
-              insert = r'''
-
-  it('wires the grid through the measured scroll-region component', () => {
-    const originalMatchMedia = window.matchMedia;
-    window.matchMedia = () => ({
-      matches: true,
-      addEventListener() {},
-      removeEventListener() {},
-    });
-    const { container } = renderSchedule();
-    const region = container.querySelector('.horizontal-scroll-region');
-    expect(region).not.toBeNull();
-    expect(region).toHaveAttribute('data-scroll-label', 'Day one schedule grid');
-    window.matchMedia = originalMatchMedia;
-  });
-'''
-              marker = "\n  it('renders session times on the event wall clock from config.timezone'"
-              if marker not in schedule_text:
-                  raise SystemExit('Schedule.test.jsx insertion point not found')
-              schedule_test.write_text(schedule_text.replace(marker, insert + marker, 1))
-          PY
-
-      - name: Validate and regenerate committed output
-        shell: bash
-        run: |
-          npm run prepare:functions
-          npm ci
-          npm run test -w apps/web -- \
-            src/components/HorizontalScrollRegion.test.jsx \
-            src/pages/Schedule.test.jsx
-          node --test \
-            scripts/scroll-regions.test.cjs \
-            scripts/lib/markdown-scroll-regions.test.cjs \
-            scripts/build-pages.test.cjs
-          npm run lint
-          node scripts/build-pages.cjs
-          npm run build:demo
-          npm run test:web
-
-      - name: Restore the deploy workflow and commit the product change
-        shell: bash
-        run: |
-          git show origin/main:.github/workflows/deploy.yml > .github/workflows/deploy.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -s -m "Make horizontal scroll regions keyboard reachable"
-          git push origin HEAD:codex/124-keyboard-scroll-regions
+  deploy:
+    name: Deploy
+    needs: resolve
+    if: needs.resolve.outputs.clients != '[]'
+    strategy:
+      fail-fast: false # one client's failure must not cancel the others
+      max-parallel: 1 # deploys are serialized
+      matrix:
+        client: ${{ fromJSON(needs.resolve.outputs.clients) }}
+    uses: ./.github/workflows/deploy-client.yml
+    with:
+      client: ${{ matrix.client }}
+      provision: ${{ github.event_name == 'workflow_dispatch' && inputs.provision || false }}
+      bootstrap: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap || false }}
+    secrets: inherit
