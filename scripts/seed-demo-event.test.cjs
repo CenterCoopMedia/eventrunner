@@ -67,3 +67,50 @@ test('a missing or blank project id is never a demo project', () => {
   assert.equal(isDemoProject(''), false);
   assert.equal(isDemoProject(undefined), false);
 });
+
+test('a known slug collision stops all seed writes, including with --force', async () => {
+  const { DEMO_SPEAKERS } = require('./lib/demo-event.cjs');
+  const slug = DEMO_SPEAKERS[0].slug;
+  for (const args of [{}, { force: true }, { 'dry-run': true }]) {
+    const db = makeFakeDb({ [`speaker_slugs/${slug}`]: { speakerId: 'existing-speaker' } });
+    await assert.rejects(runSeed(db, args), { code: 'demo-speaker-conflict' });
+    assert.deepEqual(db.writes, []);
+  }
+});
+
+test('the real admin update path remains intact after a forced demo reseed', async () => {
+  const { DEMO_SPEAKERS } = require('./lib/demo-event.cjs');
+  const { applyUpdateSpeaker } = require('../functions/src/speakers/profile.cjs');
+  const db = makeFakeDb();
+  await runSeed(db);
+  const speaker = DEMO_SPEAKERS[0];
+  const result = await applyUpdateSpeaker({
+    db, speakerId: speaker.id, payload: { bio: 'Keep the operator biography.' },
+    actor: { uid: 'demo-operator', email: 'operator@example.test' }, now: () => 2000,
+  });
+  assert.equal(result.ok, true);
+  const before = db.read('speakers', speaker.id);
+  await runSeed(db, { force: true });
+  assert.deepEqual(db.read('speakers', speaker.id), before);
+  assert.equal(db.read('speaker_slugs', speaker.slug).speakerId, speaker.id);
+});
+
+test('an active account link and invitation survive the complete seed path', async () => {
+  const { DEMO_SPEAKERS } = require('./lib/demo-event.cjs');
+  const db = makeFakeDb();
+  await runSeed(db);
+  const id = DEMO_SPEAKERS[0].id;
+  await db.collection('speakers').doc(id).update({
+    uid: 'linked-demo-user', inviteToken: 'synthetic-pending-invitation',
+  });
+  const before = db.read('speakers', id);
+  await runSeed(db);
+  assert.deepEqual(db.read('speakers', id), before);
+});
+
+test('a legacy canonical slug collision is found before config writes', async () => {
+  const { DEMO_SPEAKERS } = require('./lib/demo-event.cjs');
+  const db = makeFakeDb({ 'speakers/existing-speaker': { slug: DEMO_SPEAKERS[0].slug } });
+  await assert.rejects(runSeed(db), { code: 'demo-speaker-conflict' });
+  assert.deepEqual(db.writes, []);
+});

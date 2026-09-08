@@ -17,7 +17,8 @@
  *
  * Idempotent on the same terms as init (§5.1): documents still carrying
  * `seeded: true` are refreshed, anything edited on the demo instance is
- * left alone.
+ * left alone. Speakers also retain admin edits, account links, invitations,
+ * and pending changes even when their old seeded flag is still true.
  *
  * Usage (emulator):
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
@@ -27,6 +28,11 @@
  * Usage (the real demo project):
  *   EVENT_FIREBASE_PROJECT_ID=<demo project> node scripts/seed-demo-event.cjs
  *
+ * Run --dry-run first. A speaker slug conflict fails before any seed write.
+ * A real run repeats ownership checks when the speaker transaction commits.
+ * --force does not overwrite protected speakers or take another slug owner.
+ * The speaker set is atomic; config and CMS collections are separate writes.
+ *
  * The project id must contain "demo": the one thing this script must never
  * do is overwrite a client deployment with placeholder speakers. Pass
  * --i-know-this-is-not-a-demo-project to override deliberately.
@@ -35,6 +41,7 @@
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { demoEvent } = require('./lib/demo-event.cjs');
 const { writeConfigDocs, seedCollection } = require('./lib/write.cjs');
+const { seedDemoSpeakers } = require('./lib/demo-speakers.cjs');
 
 const FLAGS = ['dry-run', 'force', 'i-know-this-is-not-a-demo-project', 'help'];
 
@@ -78,6 +85,10 @@ async function seedDemo({ db, store, args, now = Date.now }) {
 
   console.log(`\nseed-demo-event: ${dryRun ? 'DRY RUN — ' : ''}seeding the synthetic demo event\n`);
 
+  // Find existing speaker conflicts before config or CMS writes start.
+  // This is not a lock across the seed run: the final transaction checks again.
+  const speakerPlan = await seedDemoSpeakers({ db, speakers: demo.speakers, dryRun: true, now });
+
   // writeConfigDocs answers { results, effective } — the per-doc decisions
   // AND what the project now holds. Destructuring matters: iterating the
   // wrapper object threw "configResults is not iterable" and took the whole
@@ -99,33 +110,16 @@ async function seedDemo({ db, store, args, now = Date.now }) {
     );
   }
 
-  // Speakers are a plain collection, not part of the two-revision publish
-  // model (§4.3: the speaker profile is its own single source of truth),
-  // so they are written directly rather than through draft + publish.
-  //
-  // The matching `speaker_slugs/{slug}` reservation is written too. That
-  // collection is the lock createSpeaker takes to keep slugs unique
-  // (functions/src/speakers/profile.cjs); a seeded speaker with no
-  // reservation would leave its slug apparently free, so the demo would
-  // happily accept a second speaker claiming the same public URL.
-  let speakerWrites = 0;
-  for (const speaker of demo.speakers) {
-    const { id, ...fields } = speaker;
-    const ref = db.collection('speakers').doc(id);
-    const snap = await ref.get();
-    if (snap.exists && snap.data()?.seeded !== true) continue;
-    speakerWrites += 1;
-    if (!dryRun) {
-      await ref.set({ ...fields, updatedAt: new Date(now()) });
-      if (fields.slug) {
-        await db.collection('speaker_slugs').doc(fields.slug).set({
-          speakerId: id,
-          updatedAt: new Date(now()),
-        });
-      }
-    }
-  }
-  console.log(`  speakers          ${speakerWrites} written`);
+  // Canonical speakers and their slug reservations change together. The
+  // existing onSpeakerWritten trigger still owns the public projection.
+  const speakerResult = dryRun ? speakerPlan : await seedDemoSpeakers({
+    db, speakers: demo.speakers, now,
+  });
+  const speakerWrites = speakerResult.created.length + speakerResult.refreshed.length;
+  console.log(
+    `  speakers          ${speakerWrites} ${dryRun ? 'planned' : 'written'}, ` +
+    `${speakerResult.skipped.length} left alone`,
+  );
 
   console.log(
     '\nseed-demo-event: done. Regenerate the committed snapshot with:\n' +
