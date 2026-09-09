@@ -22,7 +22,7 @@ Your public profile is the slice other attendees can see. The rest stays on your
 
 ## Long pages
 
-A page with several sections, such as FAQ or Travel, shows a filter box and a list of its sections near the top. Type a keyword to narrow the page to matching content, or select a section in the list to jump straight to it.
+A page with enough content, such as a long FAQ or travel guide, shows a filter box and a list of its sections near the top. Type a keyword to narrow the page to matching content, or select a section in the list to jump straight to it.
 
 ## When something is wrong
 

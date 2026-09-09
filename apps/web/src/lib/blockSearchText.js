@@ -17,9 +17,8 @@ function joined(...parts) {
   return parts.filter((part) => typeof part === 'string' && part.trim()).join(' ');
 }
 
-/** The searchable text for one cmsContent block, blank for a type with none. */
-export function blockSearchText(block) {
-  if (!block || typeof block !== 'object') return '';
+/** The type-specific half of a block's searchable text. */
+function typeSearchText(block) {
   switch (block.blockType) {
     case 'text':
       return plain(block.value);
@@ -30,7 +29,10 @@ export function blockSearchText(block) {
     case 'cta':
       return joined(block.label);
     case 'stat':
-      return joined(block.takeaway, block.label, block.description, block.source, block.alt);
+      // The figure itself (block.value, e.g. "1,200") is as much a fact a
+      // reader searches by as its label or takeaway — a query for the
+      // number should find the stat that states it.
+      return joined(block.value, block.takeaway, block.label, block.description, block.source, block.alt);
     case 'list_item':
       return plain(block.text);
     case 'faq_item':
@@ -42,11 +44,21 @@ export function blockSearchText(block) {
   }
 }
 
-/** Whether a block's own text contains the query, case-insensitive. An empty
- * or whitespace-only query matches everything, so "no filter yet" and "every
+/** The searchable text for one cmsContent block, blank for a type with none.
+ * `sectionLabel`, when given, is appended so a query for the section's own
+ * name (e.g. "Venue") matches every block filed under it, not only a block
+ * that happens to repeat the word. */
+export function blockSearchText(block, { sectionLabel } = {}) {
+  if (!block || typeof block !== 'object') return '';
+  return joined(typeSearchText(block), sectionLabel);
+}
+
+/** Whether a block's own text (plus its section's label, via `options.
+ * sectionLabel`) contains the query, case-insensitive. An empty or
+ * whitespace-only query matches everything, so "no filter yet" and "every
  * block matches" are the same state. */
-export function blockMatchesQuery(block, query) {
+export function blockMatchesQuery(block, query, options) {
   const trimmed = (query ?? '').trim().toLowerCase();
   if (!trimmed) return true;
-  return blockSearchText(block).toLowerCase().includes(trimmed);
+  return blockSearchText(block, options).toLowerCase().includes(trimmed);
 }

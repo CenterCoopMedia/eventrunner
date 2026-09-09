@@ -47,6 +47,28 @@ describe('blockSearchText', () => {
     ).toBe('Venue entrance Main doors');
   });
 
+  it('includes the stat figure itself, not only its label and takeaway', () => {
+    expect(
+      blockSearchText({ blockType: 'stat', value: '1,200', label: 'attendees' }),
+    ).toBe('1,200 attendees');
+    // A search for the number a reader actually reads finds the stat.
+    expect(blockMatchesQuery({ blockType: 'stat', value: '1,200', label: 'attendees' }, '1,200')).toBe(
+      true,
+    );
+  });
+
+  it('appends the section label when one is given, so a section name is searchable', () => {
+    expect(
+      blockSearchText(
+        { blockType: 'text', value: 'Doors open at nine' },
+        { sectionLabel: 'Venue' },
+      ),
+    ).toBe('Doors open at nine Venue');
+    expect(blockSearchText({ blockType: 'text', value: 'Doors open at nine' })).toBe(
+      'Doors open at nine',
+    );
+  });
+
   it('returns an empty string for an unknown or missing block', () => {
     expect(blockSearchText(null)).toBe('');
     expect(blockSearchText({ blockType: 'mystery' })).toBe('');
@@ -69,5 +91,11 @@ describe('blockMatchesQuery', () => {
     expect(blockMatchesQuery(block, '')).toBe(true);
     expect(blockMatchesQuery(block, '   ')).toBe(true);
     expect(blockMatchesQuery(block, undefined)).toBe(true);
+  });
+
+  it('matches a query against the section label even when the block text does not carry it', () => {
+    const plainBlock = { blockType: 'text', value: 'Ramp access at the north door.' };
+    expect(blockMatchesQuery(plainBlock, 'venue')).toBe(false);
+    expect(blockMatchesQuery(plainBlock, 'venue', { sectionLabel: 'Venue' })).toBe(true);
   });
 });

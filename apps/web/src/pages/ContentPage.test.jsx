@@ -4,7 +4,7 @@
 // 404 used everywhere else on the site.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, act, fireEvent, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter } from 'react-router-dom';
 
 // Credential-free (spec §8.1): stub the provider seams so no Firebase env or
 // network is needed — same approach as App.test.jsx. contentSource's
@@ -191,50 +191,265 @@ describe('ContentPage (catch-all route)', () => {
 });
 
 // Search and a section index on long content pages (issue #14, spec M7-14).
-// Generic behaviour, exercised on the seeded FAQ page — the same route the
-// rest of this file already renders — plus one synthetic short page to prove
-// the feature stays off below the section threshold.
+// Generic behaviour: the real seeded pages (FAQ has two sections, three
+// blocks total) sit well under the threshold, so every scenario here uses a
+// synthetic page pushed the same way the reserved-path tests above do —
+// full control over section and block counts is the point, to pin the
+// threshold's actual boundary rather than whatever the demo fixture
+// currently happens to contain.
 describe('ContentPage — search and section index on long pages', () => {
-  const faqPage = pagesData.find((p) => p.id === 'faq');
-  const faqQuestion = siteContent.faq_items__what_is_this.question;
+  /** A page section shaped the way cmsPages actually stores one. */
+  function pageSection(id, label) {
+    return {
+      id,
+      label,
+      description: '',
+      allowedBlocks: ['text'],
+      maxBlocks: 20,
+      reorderable: true,
+      defaultBlocks: [],
+    };
+  }
 
-  it('shows a filter box and a section index once a page has more than one section', async () => {
-    renderAt('/faq');
-    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+  /** A cmsContent text block. */
+  function textBlock(section, field, value, order = 0) {
+    return {
+      id: `${section}__${field}`,
+      section,
+      field,
+      blockType: 'text',
+      value,
+      visible: true,
+      order,
+    };
+  }
 
-    const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
-    expect(filter).toBeInTheDocument();
+  function pushPage(page) {
+    act(() => {
+      subscriptions.get('cmsPages')([...pagesData, page]);
+    });
+  }
 
+  function pushContent(blocks) {
+    act(() => {
+      subscriptions.get('cmsContent')(blocks);
+    });
+  }
+
+  // Three populated sections — crosses the section-count branch of the
+  // threshold (issue review decision #8) on its own, with only three blocks
+  // total, so it never crosses the block-count branch too. The first
+  // section's block text deliberately shares no word with the others, so a
+  // query can isolate any one section cleanly.
+  const LONG_SECTIONS_PAGE = {
+    id: 'long-sections',
+    label: 'Long sections fixture',
+    path: '/long-sections',
+    icon: null,
+    order: 99,
+    visible: true,
+    systemPage: false,
+    sections: [
+      pageSection('ls_intro', 'Introduction'),
+      pageSection('ls_middle', 'Middle notes'),
+      pageSection('ls_end', 'Closing'),
+    ],
+  };
+  const LONG_SECTIONS_BLOCKS = [
+    textBlock('ls_intro', 'summary', 'Welcome to the fixture page for these tests.'),
+    textBlock('ls_middle', 'note', 'The ramp is at the north door, a fact worth knowing.'),
+    textBlock('ls_end', 'note', 'Zzyzx, a word that appears nowhere else on this page.'),
+  ];
+
+  function renderLongSectionsPage() {
+    renderAt('/long-sections');
+    pushPage(LONG_SECTIONS_PAGE);
+    pushContent(LONG_SECTIONS_BLOCKS);
+  }
+
+  it('shows a filter box and a section index once a page crosses the section-count threshold', async () => {
+    renderLongSectionsPage();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' }),
+    ).toBeInTheDocument();
+
+    expect(screen.getByRole('searchbox', { name: 'Filter by keyword' })).toBeInTheDocument();
     const index = screen.getByRole('navigation', { name: 'Sections on this page' });
-    for (const section of faqPage.sections) {
-      expect(within(index).getByRole('link', { name: section.label })).toHaveAttribute(
-        'href',
-        `#section-${section.id}`,
-      );
-    }
+    // The first section's heading is screen-reader only (it stands in for
+    // the page title) and is left out of the index — see the omission test
+    // below — so only the other two sections are listed here.
+    expect(within(index).getByRole('link', { name: 'Middle notes' })).toHaveAttribute(
+      'href',
+      '#section-ls_middle',
+    );
+    expect(within(index).getByRole('link', { name: 'Closing' })).toHaveAttribute(
+      'href',
+      '#section-ls_end',
+    );
+  });
+
+  it('shows the filter and index on a page that crosses the block-count branch instead, at two sections', async () => {
+    const page = {
+      id: 'long-blocks',
+      label: 'Long blocks fixture',
+      path: '/long-blocks',
+      icon: null,
+      order: 99,
+      visible: true,
+      systemPage: false,
+      sections: [pageSection('lb_a', 'Overview'), pageSection('lb_b', 'More detail')],
+    };
+    const blocks = [
+      textBlock('lb_a', 'one', 'Point one.', 0),
+      textBlock('lb_a', 'two', 'Point two.', 1),
+      textBlock('lb_a', 'three', 'Point three.', 2),
+      textBlock('lb_a', 'four', 'Point four.', 3),
+      textBlock('lb_b', 'one', 'Detail one.', 0),
+      textBlock('lb_b', 'two', 'Detail two.', 1),
+      textBlock('lb_b', 'three', 'Detail three.', 2),
+      textBlock('lb_b', 'four', 'Detail four.', 3),
+    ];
+    renderAt('/long-blocks');
+    pushPage(page);
+    pushContent(blocks);
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Long blocks fixture' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Filter by keyword' })).toBeInTheDocument();
+  });
+
+  it('stays off a page with two sections and only seven blocks — one short of the block-count branch', async () => {
+    const page = {
+      id: 'short-blocks',
+      label: 'Short blocks fixture',
+      path: '/short-blocks',
+      icon: null,
+      order: 99,
+      visible: true,
+      systemPage: false,
+      sections: [pageSection('sb_a', 'Overview'), pageSection('sb_b', 'More detail')],
+    };
+    const blocks = [
+      textBlock('sb_a', 'one', 'Point one.', 0),
+      textBlock('sb_a', 'two', 'Point two.', 1),
+      textBlock('sb_a', 'three', 'Point three.', 2),
+      textBlock('sb_a', 'four', 'Point four.', 3),
+      textBlock('sb_b', 'one', 'Detail one.', 0),
+      textBlock('sb_b', 'two', 'Detail two.', 1),
+      textBlock('sb_b', 'three', 'Detail three.', 2),
+    ];
+    renderAt('/short-blocks');
+    pushPage(page);
+    pushContent(blocks);
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Short blocks fixture' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Sections on this page' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders no filter box or section index on a page with only one section', async () => {
+    renderAt('/short-page');
+    await screen.findByRole('heading', { name: 'Page not found' });
+    pushPage({
+      id: 'short-page',
+      label: 'Short page',
+      path: '/short-page',
+      icon: null,
+      order: 99,
+      visible: true,
+      systemPage: false,
+      sections: [pageSection('short_only', 'Only section')],
+    });
+    pushContent([textBlock('short_only', 'body', 'The only thing on this page.')]);
+
+    expect(await screen.findByText('The only thing on this page.')).toBeInTheDocument();
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Sections on this page' }),
+    ).not.toBeInTheDocument();
   });
 
   it('narrows blocks by keyword and drops a section with no remaining match', async () => {
-    renderAt('/faq');
-    await screen.findByRole('heading', { level: 1, name: faqPage.label });
-    expect(screen.getByText(faqQuestion)).toBeInTheDocument();
+    renderLongSectionsPage();
+    await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });
 
     const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
-    fireEvent.change(filter, { target: { value: 'Harborlight' } });
+    fireEvent.change(filter, { target: { value: 'Zzyzx' } });
 
-    // The question matches; the plain intro paragraph above it does not, so
-    // its whole section drops rather than rendering an empty heading.
-    expect(screen.getByText(faqQuestion)).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: 'Introduction' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Closing' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Introduction' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Middle notes' })).not.toBeInTheDocument();
     const index = screen.getByRole('navigation', { name: 'Sections on this page' });
-    expect(within(index).queryByRole('link', { name: 'Introduction' })).not.toBeInTheDocument();
+    expect(within(index).queryByRole('link', { name: 'Middle notes' })).not.toBeInTheDocument();
+    expect(within(index).getByRole('link', { name: 'Closing' })).toBeInTheDocument();
   });
 
-  it('states the empty result when nothing matches, and clearing restores the page', async () => {
-    renderAt('/faq');
-    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+  it('matches a section by its own label, not only by its block text (issue review decision #9)', async () => {
+    renderLongSectionsPage();
+    await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });
+
+    // "Middle" appears in the section's own label, not in its block text
+    // ("The ramp is at the north door, a fact worth knowing.").
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter by keyword' }), {
+      target: { value: 'Middle' },
+    });
+
+    expect(screen.getByRole('heading', { name: 'Middle notes' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Closing' })).not.toBeInTheDocument();
+  });
+
+  it('gives the page-first section a real, visible heading once filtering puts a different section first', async () => {
+    renderLongSectionsPage();
+    await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });
+
+    // Unfiltered: the page's own first section (Introduction) renders
+    // screen-reader only, because it usually repeats the page title.
+    expect(screen.getByRole('heading', { name: 'Introduction' }).className).toMatch(/sr-only/);
+
+    // "fact" matches only Middle notes' block text — Introduction and
+    // Closing both drop, so Middle notes renders at index 0. It is NOT the
+    // page's own first section, so it must still get a real heading rather
+    // than inheriting the screen-reader-only treatment from its position.
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter by keyword' }), {
+      target: { value: 'fact' },
+    });
+    const middleHeading = screen.getByRole('heading', { name: 'Middle notes' });
+    expect(middleHeading.className).not.toMatch(/sr-only/);
+    expect(screen.queryByRole('heading', { name: 'Introduction' })).not.toBeInTheDocument();
+  });
+
+  it('omits the page-first section from the index — its heading has nothing visible to land on', async () => {
+    renderLongSectionsPage();
+    await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });
+
+    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
+    expect(within(index).queryByRole('link', { name: 'Introduction' })).not.toBeInTheDocument();
+    expect(within(index).getByRole('link', { name: 'Middle notes' })).toBeInTheDocument();
+    expect(within(index).getByRole('link', { name: 'Closing' })).toBeInTheDocument();
+  });
+
+  it('moves focus to the target section heading when a section link is activated', async () => {
+    renderLongSectionsPage();
+    await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });
+
+    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
+    fireEvent.click(within(index).getByRole('link', { name: 'Closing' }));
+
+    expect(document.activeElement).toHaveAttribute('id', 'section-ls_end');
+    expect(within(index).getByRole('link', { name: 'Closing' })).toHaveAttribute(
+      'aria-current',
+      'location',
+    );
+  });
+
+  it('states the empty result when nothing matches, and clearing restores the page and focus', async () => {
+    renderLongSectionsPage();
+    await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });
 
     const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
     fireEvent.change(filter, { target: { value: 'zzzznotarealword' } });
@@ -242,71 +457,112 @@ describe('ContentPage — search and section index on long pages', () => {
     expect(
       await screen.findByRole('heading', { name: 'Nothing matches that filter' }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(faqQuestion)).not.toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/no.*match/i);
+    expect(screen.queryByRole('heading', { name: 'Closing' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
-    expect(screen.getByText(faqQuestion)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Closing' })).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Nothing matches that filter' }),
     ).not.toBeInTheDocument();
+    // Focus lands back on the filter, not on the body the unmounted button left.
+    expect(document.activeElement).toBe(filter);
   });
 
-  it('moves focus to the target section heading when a section link is activated', async () => {
-    renderAt('/faq');
-    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+  it('returns focus to the filter input after the beside-the-box Clear filter action too', async () => {
+    renderLongSectionsPage();
+    await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });
 
-    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
-    fireEvent.click(within(index).getByRole('link', { name: 'Questions and answers' }));
+    const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
+    fireEvent.change(filter, { target: { value: 'Zzyzx' } });
+    expect(screen.getByRole('heading', { name: 'Closing' })).toBeInTheDocument();
 
-    expect(document.activeElement).toHaveAttribute('id', 'section-faq_items');
-    expect(
-      within(index).getByRole('link', { name: 'Questions and answers' }),
-    ).toHaveAttribute('aria-current', 'location');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
+    expect(filter).toHaveValue('');
+    expect(document.activeElement).toBe(filter);
   });
 
-  it('renders no filter box or section index on a page with only one section', async () => {
-    renderAt('/short-page');
-    await screen.findByRole('heading', { name: 'Page not found' });
+  it('settles the announced status text about 300ms after typing stops, not on every keystroke', async () => {
+    renderLongSectionsPage();
+    await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });
+
+    const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
+    const status = screen.getByRole('status');
+    // Always mounted, empty while idle — never absent from the DOM.
+    expect(status).toBeInTheDocument();
+    expect(status).toHaveTextContent('');
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(filter, { target: { value: 'fact' } });
+      // The visible list narrows immediately...
+      expect(screen.getByRole('heading', { name: 'Middle notes' })).toBeInTheDocument();
+      // ...but the announced text has not settled yet.
+      expect(status).toHaveTextContent('');
+
+      act(() => {
+        vi.advanceTimersByTime(299);
+      });
+      expect(status).toHaveTextContent('');
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(status).toHaveTextContent('1 of 3 items match');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resets the filter when navigating from one content page to another (App renders one unkeyed catch-all element)', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={['/long-sections']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <Link to="/long-blocks">Go to long blocks</Link>
+        <App />
+      </MemoryRouter>,
+    );
     act(() => {
       subscriptions.get('cmsPages')([
         ...pagesData,
+        LONG_SECTIONS_PAGE,
         {
-          id: 'short-page',
-          label: 'Short page',
-          path: '/short-page',
+          id: 'long-blocks',
+          label: 'Long blocks fixture',
+          path: '/long-blocks',
           icon: null,
           order: 99,
           visible: true,
           systemPage: false,
-          sections: [
-            {
-              id: 'short_only',
-              label: 'Only section',
-              description: '',
-              allowedBlocks: ['text'],
-              maxBlocks: 1,
-              reorderable: true,
-              defaultBlocks: [],
-            },
-          ],
+          sections: [pageSection('lb_a', 'Overview'), pageSection('lb_b', 'More detail')],
         },
       ]);
       subscriptions.get('cmsContent')([
-        {
-          id: 'short_only__body',
-          section: 'short_only',
-          field: 'body',
-          blockType: 'text',
-          value: 'The only thing on this page.',
-          visible: true,
-          order: 0,
-        },
+        ...LONG_SECTIONS_BLOCKS,
+        textBlock('lb_a', 'one', 'Point one.', 0),
+        textBlock('lb_a', 'two', 'Point two.', 1),
+        textBlock('lb_a', 'three', 'Point three.', 2),
+        textBlock('lb_a', 'four', 'Point four.', 3),
+        textBlock('lb_b', 'one', 'Detail one.', 0),
+        textBlock('lb_b', 'two', 'Detail two.', 1),
+        textBlock('lb_b', 'three', 'Detail three.', 2),
+        textBlock('lb_b', 'four', 'Detail four.', 3),
       ]);
     });
 
-    expect(await screen.findByText('The only thing on this page.')).toBeInTheDocument();
-    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('navigation', { name: 'Sections on this page' })).not.toBeInTheDocument();
+    await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });
+    const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
+    fireEvent.change(filter, { target: { value: 'Zzyzx' } });
+    expect(screen.queryByRole('heading', { name: 'Introduction' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Go to long blocks' }));
+    await screen.findByRole('heading', { level: 1, name: 'Long blocks fixture' });
+
+    expect(screen.getByRole('searchbox', { name: 'Filter by keyword' })).toHaveValue('');
+    // Nothing left over from the /long-sections query — every long-blocks
+    // section is showing.
+    expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'More detail' })).toBeInTheDocument();
   });
 });

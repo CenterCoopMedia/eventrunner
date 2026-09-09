@@ -7,15 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- A content page with more than one populated section (FAQ, Travel, Privacy, and any other CMS
-  page shaped like them) now shows a keyword filter and a same-page section index above its
-  content: the filter narrows the page to matching blocks and states plainly when nothing matches,
-  and the index marks the section currently in view and moves keyboard/screen-reader focus to a
-  section when it is chosen. The behavior is generic to any long content page, not specific to
-  FAQ (CJS parity plan, M7 issue 14).
-
 ### Changed
 
 - The landing page and the documentation site now use the product's own design language: the same
@@ -87,6 +78,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Credential-free secret scanning: a `secrets` CI job runs the gitleaks CLI (checksum-verified download, no marketplace action, no license secret) over the pull request range and, on push to `main`, the full history; `.gitleaks.toml` allowlists two known-synthetic test fixture values by exact string match (#39 sliver).
 - Playwright end-to-end suite on the Firebase emulators (#38): four critical journeys — OTP sign-in, CMS publish/isolation, the speaker invite pipeline, and ticket-claim-to-bookmark — seeded once per run via the same `init-event.cjs`/`seed-demo-event.cjs` operator scripts a real deployment uses, driven through `scripts/dev/run-e2e.sh` (`firebase emulators:exec` wrapping `vite`) and a new `e2e` CI job that clones the rules job's emulator/Java setup. OTP and invite-token capture reads a dedicated `E2E_MAIL_FILE` sink the console email provider appends to, replacing an unreliable scrape of colorized emulator stdout.
 - `docs/POSTMARK_PROVISIONING.md`: an end-to-end Postmark account/server/stream provisioning runbook plus the missing `EMAIL_ACCOUNT_API_KEY` secret documentation in `.env.example` and the ADR/deploy-runbook secret tables (#4).
+- A long content page (FAQ, Travel, Privacy, and any other CMS page shaped like them) now shows a
+  keyword filter and a same-page section index above its content once the page has at least three
+  populated sections, or two sections carrying eight or more blocks between them: the filter
+  narrows the page to matching blocks and states plainly when nothing matches, and the index marks
+  the section currently in view and moves keyboard/screen-reader focus to a section when it is
+  chosen. The behavior is generic to any long content page, not specific to FAQ (CJS parity plan,
+  M7 issue 14).
 
 ### Fixed
 

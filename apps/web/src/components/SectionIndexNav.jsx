@@ -28,19 +28,25 @@ function focusSection(id) {
  * @param {{ sections: Array<{ id: string, label: string }> }} props
  */
 export default function SectionIndexNav({ sections }) {
-  const [activeId, setActiveId] = useState(sections[0]?.id ?? null);
+  // No section starts "current": only IntersectionObserver activity below
+  // ever assigns one. Neither the initial render nor an environment with no
+  // IntersectionObserver (nor a moment where nothing is in the band) pins
+  // the first entry as a stand-in — an unmarked list is the honest answer
+  // when the reader's own scroll position hasn't said otherwise yet.
+  const [activeId, setActiveId] = useState(null);
   // A stable key for the effect below: the actual section ids change when a
   // keyword filter narrows the page, and the observer has to re-target.
   const ids = sections.map((section) => section.id).join('|');
 
   useEffect(() => {
-    // The section a filter removed can no longer be "current".
-    if (sections.length > 0 && !sections.some((section) => section.id === activeId)) {
-      setActiveId(sections[0].id);
-    }
-    // activeId is read, not depended on: this only reacts to the id SET
-    // changing, and reading it fresh here (rather than in the deps array)
-    // avoids re-running on every observer-driven activeId update below.
+    // A section a filter removed can no longer be current, and there is no
+    // stand-in for it — same rule as the initial state above. sections is
+    // read fresh here rather than listed as a dependency: it is a new array
+    // reference every render, and ids (below) is the stable summary of the
+    // one thing this effect needs to react to, its actual id SET changing.
+    setActiveId((current) =>
+      sections.some((section) => section.id === current) ? current : null,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids]);
 
@@ -52,14 +58,23 @@ export default function SectionIndexNav({ sections }) {
       .filter(Boolean);
     if (targets.length === 0) return undefined;
 
-    // The band a heading has to cross to count as "in view": past a fixed
-    // header allowance at the top, and within the top third of the
-    // viewport, so the reader's own reading position decides which section
-    // is current rather than whatever merely touches the viewport edge.
+    // The band a heading has to cross to count as "in view": past the same
+    // fixed-header allowance the site already gives every in-page anchor
+    // (`[id] { scroll-margin-top: 5rem }`, index.css) — so a jump from this
+    // list and a jump from a plain #fragment land the reader in the same
+    // place — and within the top third of the viewport, so the reader's own
+    // reading position decides which section is current rather than
+    // whatever merely touches the viewport edge.
     const observer = new ObserverType(
       (entries) => {
         const visible = entries.filter((entry) => entry.isIntersecting);
-        if (visible.length === 0) return;
+        if (visible.length === 0) {
+          // Nothing crossed the band this tick — scrolled above the first
+          // section's mark, past the last one, or between two that don't
+          // meet — so nothing is current, not whatever was last.
+          setActiveId(null);
+          return;
+        }
         // Two sections can cross the band in the same tick; observer entry
         // order is not guaranteed, so the topmost heading wins rather than
         // whichever entry the browser happened to report last.
@@ -68,7 +83,7 @@ export default function SectionIndexNav({ sections }) {
         );
         setActiveId(topmost.target.id);
       },
-      { rootMargin: '-96px 0px -70% 0px' },
+      { rootMargin: '-80px 0px -70% 0px' },
     );
     targets.forEach((target) => observer.observe(target));
     return () => observer.disconnect();

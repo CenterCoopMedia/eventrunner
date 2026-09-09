@@ -184,6 +184,13 @@
           <li>Credential-free secret scanning: a <code>secrets</code> CI job runs the gitleaks CLI (checksum-verified download, no marketplace action, no license secret) over the pull request range and, on push to <code>main</code>, the full history; <code>.gitleaks.toml</code> allowlists two known-synthetic test fixture values by exact string match (#39 sliver).</li>
           <li>Playwright end-to-end suite on the Firebase emulators (#38): four critical journeys — OTP sign-in, CMS publish/isolation, the speaker invite pipeline, and ticket-claim-to-bookmark — seeded once per run via the same <code>init-event.cjs</code>/<code>seed-demo-event.cjs</code> operator scripts a real deployment uses, driven through <code>scripts/dev/run-e2e.sh</code> (<code>firebase emulators:exec</code> wrapping <code>vite</code>) and a new <code>e2e</code> CI job that clones the rules job&#39;s emulator/Java setup. OTP and invite-token capture reads a dedicated <code>E2E_MAIL_FILE</code> sink the console email provider appends to, replacing an unreliable scrape of colorized emulator stdout.</li>
           <li><code>docs/POSTMARK_PROVISIONING.md</code>: an end-to-end Postmark account/server/stream provisioning runbook plus the missing <code>EMAIL_ACCOUNT_API_KEY</code> secret documentation in <code>.env.example</code> and the ADR/deploy-runbook secret tables (#4).</li>
+          <li>A long content page (FAQ, Travel, Privacy, and any other CMS page shaped like them) now shows a
+          keyword filter and a same-page section index above its content once the page has at least three
+          populated sections, or two sections carrying eight or more blocks between them: the filter
+          narrows the page to matching blocks and states plainly when nothing matches, and the index marks
+          the section currently in view and moves keyboard/screen-reader focus to a section when it is
+          chosen. The behavior is generic to any long content page, not specific to FAQ (CJS parity plan,
+          M7 issue 14).</li>
           </ul>
           <h3 id="fixed-1">Fixed<a class="heading-anchor" href="#fixed-1" aria-label="Link to this section">#</a></h3>
           <ul>

@@ -16,7 +16,7 @@
 // reserved-looking path. So the router re-checks RESERVED_PATH_SEGMENTS
 // itself, on both the requested URL and the matched doc's stored path, and
 // 404s rather than trusting stored data to already be clean.
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
 import { useContent } from '../contexts/ContentContext.jsx';
@@ -39,10 +39,35 @@ const LEGAL_PAGE_IDS = ['privacy', 'terms'];
 
 // Search and a section index on a long content page (issue #14, spec
 // M7-14). Generic over every content page, not FAQ-specific: any page
-// rendered through this route gets the same treatment once it has enough
-// sections for an index to earn its place. A one-section page has nothing
-// to jump to and nothing worth narrowing, so the floor is two.
-const SECTION_INDEX_MIN_SECTIONS = 2;
+// rendered through this route gets the same treatment once it is long
+// enough for an index to earn its place — either shape counts as long:
+// three or more populated sections, or two sections carrying a real amount
+// of content between them. A page under both bars has nothing worth
+// jumping to or narrowing.
+const SECTION_INDEX_MIN_SECTIONS = 3;
+const SECTION_INDEX_MIN_SECTIONS_WITH_BLOCKS = 2;
+const SECTION_INDEX_MIN_BLOCKS = 8;
+
+// How long a reader's keystrokes have to go quiet before the status region
+// restates itself. The visible list narrows on every keystroke; the ANNOUNCED
+// text does not, or a screen reader hears "3 of 12 items match" rebuilt on
+// every letter typed.
+const STATUS_SETTLE_MS = 300;
+
+/** The page's sections whose block list still has something matching `query`
+ * (an empty query matches every block, so this is the identity map then).
+ * A block matches on its own text OR its section's label, so a query for
+ * "Venue" finds every block filed under a Venue section. */
+function filterSections(sections, query) {
+  return sections
+    .map(({ section, blocks }) => ({
+      section,
+      blocks: blocks.filter((block) =>
+        blockMatchesQuery(block, query, { sectionLabel: section.label }),
+      ),
+    }))
+    .filter(({ blocks }) => blocks.length > 0);
+}
 
 export default function ContentPage() {
   const { pathname } = useLocation();
@@ -52,6 +77,25 @@ export default function ContentPage() {
   // renders regardless of which page (or no page) this URL resolves to
   // (react-hooks/rules-of-hooks).
   const [query, setQuery] = useState('');
+  const [settledQuery, setSettledQuery] = useState('');
+  const filterInputRef = useRef(null);
+
+  // App.jsx renders this component from one catch-all route with no
+  // per-page key, so moving from one content page to another reuses this
+  // same instance rather than remounting it — a filter typed on /faq must
+  // not still be narrowing /travel a moment later.
+  useEffect(() => {
+    setQuery('');
+    setSettledQuery('');
+  }, [pathname]);
+
+  // The debounce for the status text specifically (see STATUS_SETTLE_MS
+  // above) — the visible filteredSections below stays driven by the raw
+  // query, so the list itself still narrows instantly.
+  useEffect(() => {
+    const id = setTimeout(() => setSettledQuery(query), STATUS_SETTLE_MS);
+    return () => clearTimeout(id);
+  }, [query]);
 
   // The requested URL itself may be reserved territory (a stale /p/... link,
   // a guess at /signin/help) even before a page lookup happens.
@@ -77,36 +121,53 @@ export default function ContentPage() {
     .map((section) => ({ section, blocks: getSectionBlocks(section.id) }))
     .filter(({ blocks }) => blocks.length > 0);
 
-  // A one-section page has nothing to jump to and nothing worth narrowing
-  // (SECTION_INDEX_MIN_SECTIONS above) — this is the ONLY thing that gates
-  // the feature, so typing a query that thins the result list can never
-  // make the filter box that produced it disappear.
-  const isLongPage = baseSections.length >= SECTION_INDEX_MIN_SECTIONS;
+  const totalBlocks = baseSections.reduce((sum, { blocks }) => sum + blocks.length, 0);
 
-  // An empty query matches every block (blockMatchesQuery), so this is a
-  // no-op — and therefore safe to always compute — when the field is empty.
-  const filteredSections = isLongPage
-    ? baseSections
-        .map(({ section, blocks }) => ({
-          section,
-          blocks: blocks.filter((block) => blockMatchesQuery(block, query)),
-        }))
-        .filter(({ blocks }) => blocks.length > 0)
+  // This is the ONLY thing that gates the feature, and it reads baseSections
+  // (never the filtered list), so typing a query that thins the result list
+  // can never make the filter box that produced it disappear.
+  const isLongPage =
+    baseSections.length >= SECTION_INDEX_MIN_SECTIONS ||
+    (baseSections.length >= SECTION_INDEX_MIN_SECTIONS_WITH_BLOCKS &&
+      totalBlocks >= SECTION_INDEX_MIN_BLOCKS);
+
+  // An empty query matches every block (blockMatchesQuery), so both of these
+  // are safe to always compute — they equal baseSections when the field is
+  // idle, filtered or not.
+  const filteredSections = isLongPage ? filterSections(baseSections, query) : baseSections;
+  const settledFilteredSections = isLongPage
+    ? filterSections(baseSections, settledQuery)
     : baseSections;
 
   const trimmedQuery = query.trim();
-  const totalBlocks = baseSections.reduce((sum, { blocks }) => sum + blocks.length, 0);
-  const matchedBlocks = filteredSections.reduce((sum, { blocks }) => sum + blocks.length, 0);
-  const resultsSummary = !trimmedQuery
+  const settledTrimmedQuery = settledQuery.trim();
+  const settledMatchedBlocks = settledFilteredSections.reduce(
+    (sum, { blocks }) => sum + blocks.length,
+    0,
+  );
+  const resultsSummary = !settledTrimmedQuery
     ? ''
-    : matchedBlocks === 0
-      ? `No matches for “${trimmedQuery}”.`
-      : `${matchedBlocks} of ${totalBlocks} ${totalBlocks === 1 ? 'match' : 'matches'} for “${trimmedQuery}”.`;
+    : settledMatchedBlocks === 0
+      ? `No items match “${settledTrimmedQuery}”.`
+      : `${settledMatchedBlocks} of ${totalBlocks} items match “${settledTrimmedQuery}”.`;
 
-  const indexSections = filteredSections.map(({ section }) => ({
-    id: `section-${section.id}`,
-    label: section.label,
-  }));
+  // The page's own first section, independent of what the filter currently
+  // shows. Its heading renders screen-reader only below (it usually repeats
+  // the page title), so this id is the one thing that decides that — never
+  // "whichever section a filter happens to put first" (see the render loop).
+  const firstSectionId = baseSections[0]?.section.id ?? null;
+
+  // The invisible heading's own section is left out of the index: a sighted
+  // keyboard user who activates it would land on a heading with nothing to
+  // see, which reads as a bug, not a jump.
+  const indexSections = filteredSections
+    .filter(({ section }) => section.id !== firstSectionId)
+    .map(({ section }) => ({ id: `section-${section.id}`, label: section.label }));
+
+  const clearFilter = () => {
+    setQuery('');
+    filterInputRef.current?.focus();
+  };
 
   return (
     <article>
@@ -132,17 +193,19 @@ export default function ContentPage() {
           </label>
           <input
             id="content-page-filter"
+            ref={filterInputRef}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Filter this page"
             className={inputClass}
           />
-          {resultsSummary ? (
-            <p role="status" className="mt-2xs text-caption text-text-secondary">
-              {resultsSummary}
-            </p>
-          ) : null}
+          {/* Always mounted — even idle and empty — so the region itself
+              never appears or disappears as a change to announce; only its
+              text does, and only once typing settles (STATUS_SETTLE_MS). */}
+          <p role="status" className="mt-2xs text-caption text-text-secondary">
+            {resultsSummary}
+          </p>
           {/* Filtering to nothing already gets its own Clear filter action
               inside the empty state below — a second one beside the input
               would just be the same control said twice. */}
@@ -150,7 +213,7 @@ export default function ContentPage() {
             <button
               type="button"
               className={`${quietActionClass} mt-2xs`}
-              onClick={() => setQuery('')}
+              onClick={clearFilter}
             >
               Clear filter
             </button>
@@ -173,7 +236,7 @@ export default function ContentPage() {
           title="Nothing matches that filter"
           description="Try a different word, or clear the filter to see the whole page."
           action={
-            <button type="button" className={primaryActionClass} onClick={() => setQuery('')}>
+            <button type="button" className={primaryActionClass} onClick={clearFilter}>
               Clear filter
             </button>
           }
@@ -187,11 +250,15 @@ export default function ContentPage() {
           >
             {/* The first section's label usually repeats the page title;
                 keep it for screen readers only — and with no visible heading
-                there is no section boundary to draw either. tabIndex={-1} on
-                both heading forms lets the section index (above) move focus
-                here without pulling either into the tab order (interface
-                guidelines: Accessibility — only tabindex 0 and -1). */}
-            {index === 0 ? (
+                there is no section boundary to draw either. Anchored to the
+                PAGE's own first section id (firstSectionId), never to render
+                position: a filter can put a different section at index 0,
+                and that section still needs its real, visible heading.
+                tabIndex={-1} on both heading forms lets the section index
+                (above) move focus here without pulling either into the tab
+                order (interface guidelines: Accessibility — only tabindex 0
+                and -1). */}
+            {section.id === firstSectionId ? (
               <h2 id={`section-${section.id}`} tabIndex={-1} className="sr-only">
                 {section.label}
               </h2>
