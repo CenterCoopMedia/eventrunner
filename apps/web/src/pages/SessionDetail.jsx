@@ -50,7 +50,11 @@ export default function SessionDetail() {
   // calling it only on the "found" branch below.
   const session = scheduleData.find((s) => s.id === sessionId && s.visible);
   const speakerNames = useSessionSpeakerNames(session?.speakerIds);
-  useDocumentTitle(session?.title);
+  // Gated on the feature as well as on the record: with the schedule
+  // switched off this route renders "not available", and a tab naming a
+  // session over that page would advertise what the event has turned off.
+  // The server refuses the same route for the same reason.
+  useDocumentTitle(features.schedule ? session?.title : null);
 
   if (!features.schedule) {
     return (

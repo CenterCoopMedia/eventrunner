@@ -15,6 +15,7 @@ const {
     resetTemplateCacheForTest,
     lastKnownTemplate,
     TEMPLATE_REVALIDATE_FLOOR_MS,
+    TEMPLATE_FETCH_TIMEOUT_MS,
   },
 } = require('./og.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
@@ -457,8 +458,11 @@ const {
     buildRouteHtml,
     buildEventJsonLd,
     brandingObjectUrl,
+    resolveCardImage,
+    imageTypeFor,
     zoneOffset,
     ROUTE_CACHE_CONTROL,
+    DEFAULT_CARD_IMAGE,
   },
 } = require('./og.cjs');
 
@@ -745,20 +749,76 @@ test('brandingObjectUrl: a flat branding path resolves against the site, an uplo
   assert.equal(brandingObjectUrl(null, { base: 'https://example.org', bucket: 'b' }), null);
 });
 
-test('routeMeta: the social image comes from the theme slot, falling back to the event seo path', async () => {
-  const withSlot = await getRoute(routeHandler(), '/travel');
-  assert.ok(withSlot.sent.includes('<meta property="og:image" content="https://example.org/branding/og-default.svg">'));
-  assert.ok(withSlot.sent.includes('<meta name="twitter:card" content="summary_large_image">'));
+test('imageTypeFor: names the type a crawler will meet, and nothing for a shape it will not decode', () => {
+  assert.equal(imageTypeFor('branding/card.png'), 'image/png');
+  assert.equal(imageTypeFor('branding/abc/card.JPG'), 'image/jpeg');
+  assert.equal(imageTypeFor('branding/card.jpeg'), 'image/jpeg');
+  assert.equal(imageTypeFor('branding/card.webp'), 'image/webp');
+  // The one that matters: the seeded placeholder is an SVG, which the card
+  // crawlers do not reliably render.
+  assert.equal(imageTypeFor('branding/og-default.svg'), null);
+  assert.equal(imageTypeFor('branding/card'), null);
+  assert.equal(imageTypeFor(null), null);
+});
 
-  const noSlot = await getRoute(routeHandler({ theme: { logos: {} } }), '/travel');
-  assert.ok(noSlot.sent.includes('<meta property="og:image" content="https://example.org/branding/og-default.svg">'));
+test('resolveCardImage: an operator PNG wins; an SVG anywhere falls through to the bundled raster', () => {
+  const base = 'https://example.org';
+  const bucket = 'fixture-bucket.appspot.com';
 
-  const noImage = await getRoute(
-    routeHandler({ theme: { logos: {} }, event: { ...SITE_EVENT, seo: { description: 'A line.' } } }),
+  const uploaded = resolveCardImage({
+    config: {
+      theme: { logos: { ogDefault: 'branding/abc123/card.png' } },
+      tierA: { storageBucket: bucket },
+    },
+    base,
+  });
+  assert.ok(uploaded.url.startsWith('https://firebasestorage.googleapis.com/'));
+  assert.equal(uploaded.type, 'image/png');
+  // Nothing measured it, so nothing states a size for it.
+  assert.equal(uploaded.width, null);
+  assert.equal(uploaded.height, null);
+
+  // Both configured values are the seeded SVG: neither is usable, and the
+  // bundled raster is what a deployment that never touched the slot gets.
+  const seeded = resolveCardImage({
+    config: {
+      theme: { logos: { ogDefault: 'branding/og-default.svg' } },
+      event: { seo: { defaultOgImagePath: 'branding/og-default.svg' } },
+      tierA: { storageBucket: bucket },
+    },
+    base,
+  });
+  assert.deepEqual(seeded, {
+    url: 'https://example.org/branding/og-default.png',
+    type: 'image/png',
+    width: 1200,
+    height: 630,
+  });
+  assert.equal(seeded.url.endsWith(DEFAULT_CARD_IMAGE.path), true);
+
+  const bare = resolveCardImage({ config: {}, base });
+  assert.equal(bare.url, 'https://example.org/branding/og-default.png');
+});
+
+test('routeMeta: the card names the raster default, with its type and its size', async () => {
+  const res = await getRoute(routeHandler(), '/travel');
+  assert.ok(res.sent.includes('<meta property="og:image" content="https://example.org/branding/og-default.png">'));
+  assert.ok(res.sent.includes('<meta property="og:image:type" content="image/png">'));
+  assert.ok(res.sent.includes('<meta property="og:image:width" content="1200">'));
+  assert.ok(res.sent.includes('<meta property="og:image:height" content="630">'));
+  assert.ok(res.sent.includes('<meta name="twitter:card" content="summary_large_image">'));
+  // The SVG placeholder is never offered to a crawler.
+  assert.ok(!res.sent.includes('og-default.svg'));
+});
+
+test('routeMeta: an uploaded card is used as it is, with no size invented for it', async () => {
+  const res = await getRoute(
+    routeHandler({ theme: { logos: { ogDefault: 'branding/abc123/card.png' } } }),
     '/travel',
   );
-  assert.ok(!noImage.sent.includes('og:image'));
-  assert.ok(noImage.sent.includes('<meta name="twitter:card" content="summary">'));
+  assert.ok(res.sent.includes('firebasestorage.googleapis.com'));
+  assert.ok(res.sent.includes('<meta property="og:image:type" content="image/png">'));
+  assert.ok(!res.sent.includes('og:image:width'));
 });
 
 // ---------------------------------------------------------------- escaping
@@ -772,7 +832,7 @@ test('buildRouteHtml: escapes injected values, and a $-pattern in a title is ins
       url: 'https://example.org/x',
       siteName: 'S & S',
       ogType: 'website',
-      imageUrl: null,
+      image: null,
       noindex: false,
       jsonLd: null,
     },
@@ -792,8 +852,10 @@ test('routeMeta: sets a cache header so the edge, not the function, answers repe
   // files; the shared cache holds it for the config cache's own window.
   assert.ok(/max-age=0/.test(ROUTE_CACHE_CONTROL));
   assert.ok(/s-maxage=300/.test(ROUTE_CACHE_CONTROL));
-  // Nothing may be served stale afterwards either — that is the same
-  // reason max-age is zero.
+  // must-revalidate, so a cache under pressure may not answer from a copy
+  // it was told is stale: that copy names asset files a deploy has removed.
+  assert.ok(/must-revalidate/.test(ROUTE_CACHE_CONTROL));
+  // And nothing may be served stale while it refreshes, for the same reason.
   assert.ok(!/stale-while-revalidate/.test(ROUTE_CACHE_CONTROL));
 });
 
@@ -950,4 +1012,161 @@ test('resolveRouteMeta: the shell falls back to the event, never to an empty tit
   assert.equal(meta.title, 'Event site');
   assert.equal(meta.noindex, true);
   assert.equal(meta.url, null);
+});
+
+// ------------------------------------------------------- the fetch deadline
+
+test('fetchTemplate: a stalled hosting connection aborts and serves the held copy', async () => {
+  resetTemplateCacheForTest();
+  await fetchTemplate({
+    publicUrl: 'https://example.org',
+    fetchImpl: async () => etagRes('"v1"', 'HELD'),
+    now: () => 0,
+  });
+
+  // Never resolves on its own: the only way out is the abort signal, which
+  // is exactly the failure a hosting connection that hangs produces. The
+  // keep-alive timer is a test artifact — AbortSignal.timeout's own timer
+  // is unref'd, so with nothing else pending this runner would call the
+  // event loop drained before the deadline arrives. A real request is what
+  // holds the loop open in production.
+  let sawSignal = null;
+  const stalled = (url, init) => {
+    sawSignal = init.signal;
+    return new Promise((_resolve, reject) => {
+      const keepAlive = setTimeout(() => {}, 1000);
+      init.signal.addEventListener('abort', () => {
+        clearTimeout(keepAlive);
+        reject(init.signal.reason);
+      });
+    });
+  };
+
+  const startedAt = Date.now();
+  const served = await fetchTemplate({
+    publicUrl: 'https://example.org',
+    fetchImpl: stalled,
+    now: () => 60 * 1000,
+    timeoutMs: 25,
+  });
+  assert.equal(served, 'HELD');
+  assert.ok(sawSignal, 'the fetch is given a signal to abort on');
+  // The reader waited on the deadline, not on the function's own timeout.
+  assert.ok(Date.now() - startedAt < 2000);
+});
+
+test('fetchTemplate: a stall with nothing ever fetched throws rather than hanging', async () => {
+  resetTemplateCacheForTest();
+  const stalled = (url, init) => new Promise((_resolve, reject) => {
+    const keepAlive = setTimeout(() => {}, 1000);
+    init.signal.addEventListener('abort', () => {
+      clearTimeout(keepAlive);
+      reject(init.signal.reason);
+    });
+  });
+  await assert.rejects(() => fetchTemplate({
+    publicUrl: 'https://example.org',
+    fetchImpl: stalled,
+    timeoutMs: 25,
+  }));
+});
+
+test('fetchTemplate: the deadline defaults to the named constant, not to nothing', async () => {
+  resetTemplateCacheForTest();
+  let timedOut = null;
+  await fetchTemplate({
+    publicUrl: 'https://example.org',
+    fetchImpl: async (url, init) => {
+      timedOut = init.signal;
+      return etagRes('"v1"', 'HELD');
+    },
+  });
+  assert.ok(timedOut instanceof AbortSignal);
+  assert.equal(timedOut.aborted, false);
+  assert.equal(typeof TEMPLATE_FETCH_TIMEOUT_MS, 'number');
+  assert.ok(TEMPLATE_FETCH_TIMEOUT_MS > 0 && TEMPLATE_FETCH_TIMEOUT_MS <= 10 * 1000);
+});
+
+// -------------------------------------------- system pages, resolved by id
+
+test('routeMeta: a system page whose stored path drifted is still described at its real route', async () => {
+  // A pre-guard or hand-edited document: the route App.jsx mounts is
+  // /schedule, and only the document disagrees. Resolving by path would
+  // find nothing and call a working built-in route a missing page.
+  const docs = {
+    ...SITE_DOCS,
+    'cmsPages/schedule': {
+      id: 'schedule', label: 'Programme', path: '/p/schedule', order: 1, visible: true, systemPage: true,
+    },
+  };
+  const res = await getRoute(routeHandler({}, docs), '/schedule');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('<title>Programme · [Fixture] Harborlight Media Summit</title>'));
+  assert.ok(res.sent.includes('<link rel="canonical" href="https://example.org/schedule">'));
+  assert.ok(!res.sent.includes('noindex'));
+});
+
+test('routeMeta: the drifted path itself is not a page — nothing is served at the address it claims', async () => {
+  const docs = {
+    ...SITE_DOCS,
+    'cmsPages/sponsors': {
+      id: 'sponsors', label: 'Our supporters', path: '/supporters', order: 3, visible: true, systemPage: true,
+    },
+  };
+  const res = await getRoute(routeHandler({}, docs), '/supporters');
+  assert.equal(res.statusCode, 200);
+  // App.jsx mounts sponsors at /sponsors and the catch-all refuses a system
+  // page, so /supporters is a 404 in the app; titling it would be a lie.
+  assert.ok(!res.sent.includes('Our supporters'));
+  assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
+});
+
+test('routeMeta: a system route with no document at all still reads as unindexable, not as a page', async () => {
+  const docs = { ...SITE_DOCS };
+  delete docs['cmsPages/sponsors'];
+  const res = await getRoute(routeHandler({}, docs), '/sponsors');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
+});
+
+test('resolveRouteSubject: reads a system page by its id and a generic page by its path', async () => {
+  const db = makeFakeDb({
+    ...SITE_DOCS,
+    'cmsPages/schedule': {
+      id: 'schedule', label: 'Programme', path: '/p/schedule', order: 1, visible: true, systemPage: true,
+    },
+  });
+  const config = siteConfig();
+  const system = await resolveRouteSubject({ db, config, path: '/schedule' });
+  assert.equal(system.kind, 'page');
+  assert.equal(system.doc.label, 'Programme');
+  const generic = await resolveRouteSubject({ db, config, path: '/travel' });
+  assert.equal(generic.doc.label, 'Travel and venue');
+});
+
+// ------------------------------------------------------------ page depth
+
+test('routeMeta: a page saved at a deep path is described, however deep it is', async () => {
+  // validatePageDoc accepts a nested route at any depth, so there is no
+  // depth for this function to refuse.
+  const deep = '/about/team/editors/desk/audience/local/weekly';
+  assert.equal(deep.split('/').length - 1, 7);
+  const docs = {
+    ...SITE_DOCS,
+    'cmsPages/weekly': {
+      id: 'weekly', label: 'The weekly desk', path: deep, order: 9, visible: true, systemPage: false,
+    },
+  };
+  const res = await getRoute(routeHandler({}, docs), deep);
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('<title>The weekly desk · [Fixture] Harborlight Media Summit</title>'));
+  assert.ok(res.sent.includes(`<link rel="canonical" href="https://example.org${deep}">`));
+});
+
+test('resolveRouteSubject: a path the system could never have stored is refused before any query', async () => {
+  const db = makeFakeDb(SITE_DOCS);
+  const config = siteConfig();
+  for (const path of ['/Travel', '/tra vel', '/-travel', '/travel-']) {
+    assert.equal(await resolveRouteSubject({ db, config, path }), null, path);
+  }
 });

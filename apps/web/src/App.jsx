@@ -14,6 +14,7 @@ import { ProfileProvider } from './contexts/ProfileContext.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
 import ProfileSetupRedirect from './components/ProfileSetupRedirect.jsx';
+import RouteTitle from './components/RouteTitle.jsx';
 import Home from './pages/Home.jsx';
 import Login from './pages/Login.jsx';
 import LoadingState from './components/LoadingState.jsx';
@@ -146,6 +147,7 @@ export default function App() {
           <ContentGate>
             <ToastProvider>
               <ProfileSetupRedirect />
+              <RouteTitle />
               <AppRoutes />
             </ToastProvider>
           </ContentGate>

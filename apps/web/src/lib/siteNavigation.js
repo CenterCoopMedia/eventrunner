@@ -35,34 +35,25 @@
 // cannot turn into a working link — an unknown system id, a generic page on
 // a reserved segment, a path that is not a path at all — is dropped rather
 // than rendered as a link to a 404 or, worse, off the site.
-import { firstPathSegment, isCanonicalPagePath, isReservedPathSegment } from 'shared/routing';
+import {
+  SYSTEM_PAGE_ROUTES,
+  firstPathSegment,
+  isCanonicalPagePath,
+  isReservedPathSegment,
+} from 'shared/routing';
 
 /**
  * The system pages, by the stable document id the seed writes, and for each
  * one: the route App.jsx mounts, the feature flag that route checks, and
  * whether the route owns children.
  *
- * `feature: null` for the home page — the index route is always mounted and
- * no flag turns the event's front door off.
- *
- * `children: true` marks a route with descendants (/schedule/:sessionId,
- * /speakers/:slug, /updates/:id, /attendees/:uid). Those keep prefix
- * matching so the section stays marked while a reader is inside it; every
- * other item matches its own URL exactly.
- *
- * Keep in sync by hand with the static <Route path="..."> list in
- * apps/web/src/App.jsx and with the `systemPage: true` docs in
- * scripts/lib/seed.cjs; siteNavigation.test.js reads App.jsx and pins both
- * directions.
+ * The map itself lives in the shared package, because the sitemap builders
+ * (scripts/lib/site-manifest.cjs) and the server-rendered per-route
+ * metadata (functions/src/public/og.cjs) have to answer the same question
+ * in two other runtimes, and three copies would be three answers. This name
+ * is the navigation's own way of saying it.
  */
-export const SYSTEM_PAGES = Object.freeze({
-  home: Object.freeze({ to: '/', feature: null, children: false }),
-  schedule: Object.freeze({ to: '/schedule', feature: 'schedule', children: true }),
-  speakers: Object.freeze({ to: '/speakers', feature: 'speakers', children: true }),
-  sponsors: Object.freeze({ to: '/sponsors', feature: 'sponsors', children: false }),
-  attendees: Object.freeze({ to: '/attendees', feature: 'attendeeDirectory', children: true }),
-  updates: Object.freeze({ to: '/updates', feature: 'updates', children: true }),
-});
+export const SYSTEM_PAGES = SYSTEM_PAGE_ROUTES;
 
 /** @param {unknown} v @returns {boolean} */
 function isNonEmptyString(v) {

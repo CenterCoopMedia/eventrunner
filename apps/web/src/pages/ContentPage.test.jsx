@@ -106,6 +106,21 @@ describe('ContentPage (catch-all route)', () => {
     expect(document.title).toBe(eventConfig.name);
   });
 
+  it('names a listing route too, which has no record of its own to name', async () => {
+    // /schedule renders its own component and never calls useDocumentTitle,
+    // so before the central resolver a direct load showed the server's
+    // title and then dropped to the bare event name.
+    renderAt('/schedule');
+    const schedulePage = pagesData.find((p) => p.id === 'schedule');
+    await screen.findByRole('heading', { level: 1, name: schedulePage.label });
+    expect(document.title).toBe(`${schedulePage.label} · ${eventConfig.name}`);
+  });
+
+  it('names the event alone on the home page, as the server titles it', async () => {
+    renderAt('/');
+    expect(document.title).toBe(eventConfig.name);
+  });
+
   it('404s cleanly on an unknown path', async () => {
     renderAt('/definitely-not-published');
     expect(

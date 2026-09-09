@@ -15,13 +15,27 @@
 // only one effect reads.
 
 import { useEffect } from 'react';
+import { SYSTEM_PAGE_ROUTES, isCanonicalPagePath, systemPageIdForPath } from 'shared/routing';
 
-let routeTitlePart = null;
+// TWO LAYERS, AND THE MORE SPECIFIC ONE WINS.
+//
+// `claimed` is a page naming ITSELF — a session, a speaker, a content page.
+// It is the only one that knows what record it is showing.
+//
+// `derived` is the answer for every other route, resolved centrally from
+// the page documents (RouteTitle.jsx). The listing routes — /schedule,
+// /speakers, /sponsors, /updates, /attendees — render their own components
+// and have no record to name, so without this layer a direct load would
+// show the server's title and then drop to the bare event name the moment
+// the app booted. That is exactly the flicker the server-set title exists
+// to avoid.
+let claimedPart = null;
+let derivedPart = null;
 const subscribers = new Set();
 
-/** The part the current route contributes, or null. */
+/** The part in force: what a page claimed, else what the route derives. */
 export function getRouteTitlePart() {
-  return routeTitlePart;
+  return claimedPart ?? derivedPart;
 }
 
 /**
@@ -38,24 +52,44 @@ export function subscribeRouteTitle(listener) {
   };
 }
 
-function setRouteTitlePart(value) {
-  const next = typeof value === 'string' && value.trim() ? value.trim() : null;
-  if (next === routeTitlePart) return next;
-  routeTitlePart = next;
-  subscribers.forEach((listener) => listener(routeTitlePart));
+/** A part, normalized: trimmed, and blank means none. */
+function normalize(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function publish(previous) {
+  const next = getRouteTitlePart();
+  if (next === previous) return next;
+  subscribers.forEach((listener) => listener(next));
   return next;
 }
 
-/** Test hook: forget the part and every listener between tests. */
+function setClaimedPart(value) {
+  const before = getRouteTitlePart();
+  claimedPart = normalize(value);
+  publish(before);
+  return claimedPart;
+}
+
+function setDerivedPart(value) {
+  const before = getRouteTitlePart();
+  derivedPart = normalize(value);
+  publish(before);
+  return derivedPart;
+}
+
+/** Test hook: forget both parts and every listener between tests. */
 export function resetRouteTitleForTest() {
-  routeTitlePart = null;
+  claimedPart = null;
+  derivedPart = null;
   subscribers.clear();
 }
 
 /**
- * Name the current route. The part is cleared on unmount, so a page that
- * has nothing to add — or a route that fails to resolve one — leaves the
- * event name standing alone rather than the previous page's name.
+ * Name the current route from the page showing the record — a session, a
+ * speaker, a content page. The part is cleared on unmount, so a page that
+ * has nothing to add, or one whose record does not resolve, falls back to
+ * whatever the route derives rather than keeping the previous page's name.
  *
  * An empty or absent part is the same as no part: a record still loading
  * must not write `undefined` into the tab.
@@ -68,9 +102,63 @@ export function resetRouteTitleForTest() {
  */
 export function useDocumentTitle(part) {
   useEffect(() => {
-    const applied = setRouteTitlePart(part);
+    const applied = setClaimedPart(part);
     return () => {
-      if (routeTitlePart === applied) setRouteTitlePart(null);
+      if (claimedPart === applied) setClaimedPart(null);
     };
+  }, [part]);
+}
+
+/**
+ * The part a route derives from the page documents alone, with no record
+ * of its own to name.
+ *
+ * It answers the same question the server answers for the same URL
+ * (functions/src/public/og.cjs `resolveRouteSubject`) and by the same
+ * rules, so the tab does not change when the app boots: a SYSTEM page is
+ * found by its stable id through the shared route map, never by its stored
+ * path, and a generic page is found by its path. A route whose feature is
+ * off, or whose page is hidden, names nothing — the same routes the server
+ * leaves at the bare event name.
+ *
+ * @param {{ pathname: string, pages?: Array<object>|null, features?: object|null }} args
+ * @returns {string|null}
+ */
+export function routeTitlePartFor({ pathname, pages, features }) {
+  const path = typeof pathname === 'string' && pathname.length > 1
+    ? pathname.replace(/\/+$/, '')
+    : '/';
+  const all = Array.isArray(pages) ? pages : [];
+  const visible = (page) => page && page.visible !== false;
+
+  // The home page names nothing, exactly as the server titles '/' with the
+  // event name alone: "Home page" names the document for an editor, not
+  // the site for a reader.
+  if (path === '/') return null;
+
+  const systemId = systemPageIdForPath(path);
+  if (systemId) {
+    const gate = SYSTEM_PAGE_ROUTES[systemId].feature;
+    if (gate !== null && !features?.[gate]) return null;
+    const page = all.find((candidate) => candidate?.id === systemId && candidate?.systemPage === true);
+    return visible(page) ? normalize(page.label) : null;
+  }
+
+  if (!isCanonicalPagePath(path)) return null;
+  const page = all.find((candidate) => candidate?.path === path && candidate?.systemPage !== true);
+  return visible(page) ? normalize(page.label) : null;
+}
+
+/**
+ * Publish the derived part for the current route. One caller — the
+ * component that sits inside the content provider and watches the location
+ * (apps/web/src/components/RouteTitle.jsx).
+ *
+ * @param {string|null} part
+ */
+export function useDerivedDocumentTitle(part) {
+  useEffect(() => {
+    setDerivedPart(part);
+    return () => setDerivedPart(null);
   }, [part]);
 }

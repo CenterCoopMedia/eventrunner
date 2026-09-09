@@ -24,20 +24,26 @@
  */
 
 const { configuredThemeColor } = require('./shared-theme.cjs');
+const { SYSTEM_PAGE_ROUTES } = require('shared/routing');
 
 /**
  * A `cmsPages` system page id -> the `config/features` key its own route
  * checks before rendering. Mirrors the `if (!features.x)` guard already in
  * each page component; a system page absent from this map (home) has no
  * gate beyond `visible`.
+ *
+ * Derived from the one system page map in the shared package rather than
+ * restated here: the navigation and the server-rendered per-route metadata
+ * read the same map, and a gate that disagreed with the route's own check
+ * would put a page in the sitemap that renders "not available".
  */
-const SYSTEM_PAGE_FEATURE_GATES = Object.freeze({
-  schedule: 'schedule',
-  speakers: 'speakers',
-  sponsors: 'sponsors',
-  updates: 'updates',
-  attendees: 'attendeeDirectory',
-});
+const SYSTEM_PAGE_FEATURE_GATES = Object.freeze(
+  Object.fromEntries(
+    Object.entries(SYSTEM_PAGE_ROUTES)
+      .filter(([, route]) => route.feature !== null)
+      .map(([id, route]) => [id, route.feature]),
+  ),
+);
 
 /**
  * System page ids whose own React route tree owns further paths under it
@@ -46,8 +52,14 @@ const SYSTEM_PAGE_FEATURE_GATES = Object.freeze({
  * pages is excluded, robots.txt has to disallow the whole subtree — an
  * exact-path rule for `/schedule` alone would leave every session detail
  * page reachable. `sponsors` and `home` carry no such subtree today.
+ *
+ * Read off the same shared map, for the same reason as the gates above.
  */
-const SYSTEM_PAGES_WITH_CHILDREN = new Set(['schedule', 'speakers', 'attendees', 'updates']);
+const SYSTEM_PAGES_WITH_CHILDREN = new Set(
+  Object.entries(SYSTEM_PAGE_ROUTES)
+    .filter(([, route]) => route.children)
+    .map(([id]) => id),
+);
 
 /**
  * Session ids App.jsx's static route tree already claims under `/schedule`.

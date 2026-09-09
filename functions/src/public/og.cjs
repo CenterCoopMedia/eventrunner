@@ -55,6 +55,18 @@
  */
 const TEMPLATE_REVALIDATE_FLOOR_MS = 10 * 1000;
 
+/**
+ * How long the self-fetch waits before it gives up and answers from what
+ * this container already holds.
+ *
+ * The request being served is a page load, and hosting is one hop away, so
+ * three seconds is already far past a healthy response. Without a deadline
+ * a stalled connection would hold the reader until the function's own
+ * timeout — tens of seconds spent to end up serving the same held copy the
+ * abort reaches in three.
+ */
+const TEMPLATE_FETCH_TIMEOUT_MS = 3000;
+
 let templateCache = null; // { html, etag, loadedAt }
 
 /** Test hook: drop the per-container template cache. */
@@ -93,18 +105,34 @@ function lastKnownTemplate() {
  *   cannot reach hosting has no honest answer, and fabricated HTML is not
  *   one
  */
-async function fetchTemplate({ publicUrl, now = Date.now, forceRefresh = false, fetchImpl = fetch }) {
+async function fetchTemplate({
+  publicUrl,
+  now = Date.now,
+  forceRefresh = false,
+  fetchImpl = fetch,
+  timeoutMs = TEMPLATE_FETCH_TIMEOUT_MS,
+}) {
   if (!forceRefresh && templateCache && now() - templateCache.loadedAt < TEMPLATE_REVALIDATE_FLOOR_MS) {
     return templateCache.html;
   }
   const base = typeof publicUrl === 'string' ? publicUrl.replace(/\/+$/, '') : '';
   const conditional = !forceRefresh && templateCache && isNonEmptyString(templateCache.etag);
-  const init = conditional ? { headers: { 'If-None-Match': templateCache.etag } } : undefined;
+  const init = {
+    // A connection that stalls rather than fails is the worst case here: a
+    // fetch with no deadline holds the request until the FUNCTION's timeout,
+    // so a reader waits tens of seconds for a page this container could
+    // have answered from the copy in its own memory. The abort makes a
+    // stall look like every other failure, which is already handled.
+    signal: AbortSignal.timeout(timeoutMs),
+    ...(conditional ? { headers: { 'If-None-Match': templateCache.etag } } : {}),
+  };
 
   let res;
   try {
     res = await fetchImpl(`${base}/index.html`, init);
   } catch (err) {
+    // Includes the abort above: a stalled hosting connection is a failed
+    // one as far as this function is concerned.
     if (templateCache) return templateCache.html;
     throw err;
   }
@@ -244,6 +272,11 @@ function requestedUpdateId(req) {
 // -------------------------------------------------------------------- http
 
 const { methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
+const {
+  SYSTEM_PAGE_ROUTES,
+  isCanonicalPagePath,
+  systemPageIdForPath,
+} = require('shared/routing');
 
 /**
  * @param {{ db: FirebaseFirestore.Firestore, getConfig: () => Promise<object>,
@@ -342,42 +375,22 @@ function createUpdatesMetaHandler({
 /**
  * Cache-Control for a routeMeta response.
  *
- * `max-age=0` — the browser revalidates. The shell names hashed asset
- * files, so a copy held in one reader's browser across a deploy is the
- * classic way to serve a page whose scripts no longer exist. Nothing
- * permits serving it stale afterwards either, for the same reason.
+ * `max-age=0, must-revalidate` — the browser revalidates, and may not fall
+ * back to its stored copy when revalidation fails. The shell names hashed
+ * asset files, so a copy held across a deploy is the classic way to serve a
+ * page whose scripts no longer exist; `max-age=0` alone still permits a
+ * cache to serve it stale under pressure, which is the same failure by
+ * another route. There is no `stale-while-revalidate` here for that reason.
  *
  * `s-maxage=300` — the Hosting CDN holds it for five minutes, the same
  * window the config container cache uses, and a hosting deploy clears it.
  * A publish reaches social previews within that window rather than at the
  * next cold start.
  */
-const ROUTE_CACHE_CONTROL = 'public, max-age=0, s-maxage=300';
-
-/**
- * The feature flag that gates each system route's first path segment. A
- * route whose flag is off describes nothing: the app renders a disabled
- * state there, and a card that advertises content the event has turned off
- * is worse than no card. Same reasoning as updatesMeta's `features.updates`
- * gate.
- *
- * `/attendees` is absent on purpose: the directory is behind sign-in, so
- * `firebase.json` rewrites it to the static shell and no request for it
- * ever reaches this function. `/updates` is present because the
- * `/updates/**` rewrite does not claim the bare list route.
- */
-const SEGMENT_FEATURES = Object.freeze({
-  schedule: 'schedule',
-  speakers: 'speakers',
-  sponsors: 'sponsors',
-  updates: 'updates',
-});
+const ROUTE_CACHE_CONTROL = 'public, max-age=0, s-maxage=300, must-revalidate';
 
 /** Ceiling on a request path before it is even parsed. */
 const MAX_ROUTE_PATH_LENGTH = 512;
-
-/** Deeper than any route the app mounts or any page path the CMS accepts. */
-const MAX_ROUTE_SEGMENTS = 6;
 
 /**
  * A record id or slug this handler will look up. Anything else is not a
@@ -421,6 +434,15 @@ function requestedRoutePath(req) {
 /**
  * What the route is about, read from live documents only.
  *
+ * A SYSTEM PAGE IS RESOLVED BY ITS ID, A GENERIC PAGE BY ITS PATH. That is
+ * the same split the navigation and the sitemap make, through the same
+ * shared map (`SYSTEM_PAGE_ROUTES`), and for the same reason: a system
+ * page's `path` is a copy of a fact that lives in App.jsx, so a legacy or
+ * hand-edited document can carry a path no route mounts. Resolving
+ * `/schedule` by path would then find nothing and describe a working
+ * built-in route as a page that does not exist — noindex, no canonical,
+ * no title — which is worse than the drift itself.
+ *
  * Visibility is checked STRICTLY (`=== true`) everywhere, for the reason
  * updatesMeta states: this runs on the Admin SDK, which bypasses
  * firestore.rules, so a document with the field merely absent must not
@@ -438,8 +460,16 @@ async function resolveRouteSubject({ db, config, path }) {
   const segments = path === '/' ? [] : path.slice(1).split('/');
   const [first, second] = segments;
   const features = (config && config.features) || {};
-  if (first && SEGMENT_FEATURES[first] && features[SEGMENT_FEATURES[first]] !== true) return null;
-  if (segments.length > MAX_ROUTE_SEGMENTS) return null;
+
+  // The feature gate belongs to the ROUTE, so it is read off the system
+  // map and applied before any lookup. A route whose flag is off describes
+  // nothing: the app renders a disabled state there, and a card that
+  // advertises content the event has turned off is worse than no card.
+  const systemId = systemPageIdForPath(path);
+  if (systemId) {
+    const gate = SYSTEM_PAGE_ROUTES[systemId].feature;
+    if (gate !== null && features[gate] !== true) return null;
+  }
 
   // The two detail routes own their second segment outright: `schedule`
   // and `speakers` are reserved (shared/routing), so no page document can
@@ -458,13 +488,28 @@ async function resolveRouteSubject({ db, config, path }) {
     return data && data.visible === true ? { kind: 'session', doc: data } : null;
   }
 
-  // Everything else is matched against the page's own `path`, which is not
-  // always one segment: `validatePageDoc` accepts a nested route such as
-  // `/about/team`, and the catch-all renderer matches it the same way.
+  // A system LISTING route: read the document by id, never by path.
+  if (systemId && segments.length <= 1) {
+    const snap = await db.collection('cmsPages').doc(systemId).get();
+    const page = snap.exists ? snap.data() : null;
+    return page && page.visible === true ? { kind: 'page', doc: page } : null;
+  }
+
+  // A generic page IS its stored path, so the path is the lookup key — and
+  // it has to be a path this system could have stored, asked of data the
+  // validator never saw. `validatePageDoc` accepts a nested route such as
+  // `/about/team` at any depth, so there is no depth to refuse: what is
+  // refused is a value that is not a canonical page path at all.
+  if (!isCanonicalPagePath(path)) return null;
   const snap = await db.collection('cmsPages').where('path', '==', path).limit(1).get();
   const doc = snap.docs[0];
   const page = doc ? doc.data() : null;
-  return page && page.visible === true ? { kind: 'page', doc: page } : null;
+  if (!page || page.visible !== true) return null;
+  // A document that claims to be a system page but was found by path is
+  // one whose path drifted onto a generic route. It is not served there —
+  // App.jsx mounts system pages at their own routes and the catch-all
+  // refuses them — so describing it here would title a 404.
+  return page.systemPage === true ? null : { kind: 'page', doc: page };
 }
 
 /**
@@ -491,6 +536,71 @@ function brandingObjectUrl(value, { base, bucket }) {
       : null;
   }
   return `${base}/${path}`;
+}
+
+/**
+ * The bundled fallback card, shipped in the web build at
+ * apps/web/public/branding/ and rendered by
+ * scripts/dev/build-og-placeholder.mjs.
+ *
+ * It is a PNG and not the SVG beside it because the Open Graph and Twitter
+ * crawlers do not reliably accept SVG: they fetch the file themselves, and
+ * one that will not decode leaves a card with a blank frame — worse than a
+ * plain card, because it reads as a broken link. The SVG stays for the
+ * app's own in-page use, where SVG is fine.
+ *
+ * The dimensions are stated because they are known: a crawler that has the
+ * size in the tags can lay the card out before the image arrives, and the
+ * two Open Graph consumers that most need it (the ones that render a
+ * preview while a person is still typing) will not wait for a fetch.
+ */
+const DEFAULT_CARD_IMAGE = Object.freeze({
+  path: 'branding/og-default.png',
+  type: 'image/png',
+  width: 1200,
+  height: 630,
+});
+
+/** The media type a branding object path names, or null when unknown. */
+function imageTypeFor(objectPath) {
+  const match = /\.([a-z0-9]+)$/i.exec(typeof objectPath === 'string' ? objectPath : '');
+  const known = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+  return match ? known[match[1].toLowerCase()] ?? null : null;
+}
+
+/**
+ * The card image for every route of this deployment: the operator's own
+ * choice when they made one, and the bundled raster otherwise.
+ *
+ * An SVG candidate is SKIPPED rather than used, wherever it comes from —
+ * the theme slot, or `config/event.seo.defaultOgImagePath`, whose seeded
+ * value is the SVG placeholder. Falling through to the raster is the whole
+ * point: a deployment that has never touched the slot must still unfurl.
+ * An operator who uploads a PNG or a JPEG gets theirs, and its dimensions
+ * are left unstated because nothing here has measured it.
+ *
+ * @param {{ config: object, base: string }} args
+ * @returns {{ url: string, type: string|null, width: number|null, height: number|null }|null}
+ */
+function resolveCardImage({ config, base }) {
+  const bucket = config?.tierA?.storageBucket || null;
+  const candidates = [config?.theme?.logos?.ogDefault, config?.event?.seo?.defaultOgImagePath];
+  for (const candidate of candidates) {
+    if (!isNonEmptyString(candidate)) continue;
+    const type = imageTypeFor(candidate);
+    if (type === null) continue; // an SVG, or a shape no crawler decodes
+    const url = brandingObjectUrl(candidate, { base, bucket });
+    if (url) return { url, type, width: null, height: null };
+  }
+  const url = brandingObjectUrl(DEFAULT_CARD_IMAGE.path, { base, bucket });
+  return url
+    ? {
+      url,
+      type: DEFAULT_CARD_IMAGE.type,
+      width: DEFAULT_CARD_IMAGE.width,
+      height: DEFAULT_CARD_IMAGE.height,
+    }
+    : null;
 }
 
 /**
@@ -664,19 +774,14 @@ function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
   const eventDescription = isNonEmptyString(event?.seo?.description)
     ? event.seo.description.trim()
     : (isNonEmptyString(event?.tagline) ? event.tagline.trim() : '');
-  const imageUrl = brandingObjectUrl(
-    isNonEmptyString(config?.theme?.logos?.ogDefault)
-      ? config.theme.logos.ogDefault
-      : event?.seo?.defaultOgImagePath,
-    { base, bucket: config?.tierA?.storageBucket || null },
-  );
+  const image = resolveCardImage({ config, base });
   const url = `${base}${path}`;
   const shell = {
     title: siteName,
     description: eventDescription,
     url: null,
     siteName,
-    imageUrl,
+    image,
     ogType: 'website',
     noindex: !degraded,
     jsonLd: null,
@@ -684,7 +789,12 @@ function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
   if (!subject) return shell;
 
   const titled = (name) => (isNonEmptyString(name) ? `${name.trim()} · ${siteName}` : siteName);
-  const described = { ...shell, url, noindex: false, jsonLd: buildEventJsonLd({ event, url: base, imageUrl }) };
+  const described = {
+    ...shell,
+    url,
+    noindex: false,
+    jsonLd: buildEventJsonLd({ event, url: base, imageUrl: image ? image.url : null }),
+  };
 
   if (subject.kind === 'session') {
     return {
@@ -725,7 +835,8 @@ function buildRouteHtml({ template, meta }) {
   const description = escapeHtml(meta.description);
   const siteName = escapeHtml(meta.siteName);
   const url = isNonEmptyString(meta.url) ? escapeHtml(meta.url) : null;
-  const image = isNonEmptyString(meta.imageUrl) ? escapeHtml(meta.imageUrl) : null;
+  const card = meta.image && isNonEmptyString(meta.image.url) ? meta.image : null;
+  const image = card ? escapeHtml(card.url) : null;
 
   const tags = [];
   if (description) tags.push(`<meta name="description" content="${description}">`);
@@ -736,7 +847,18 @@ function buildRouteHtml({ template, meta }) {
   if (url) tags.push(`<meta property="og:url" content="${url}">`);
   tags.push(`<meta property="og:site_name" content="${siteName}">`);
   tags.push(`<meta property="og:type" content="${escapeHtml(meta.ogType || 'website')}">`);
-  if (image) tags.push(`<meta property="og:image" content="${image}">`);
+  if (image) {
+    tags.push(`<meta property="og:image" content="${image}">`);
+    // Stated only when known: the type comes from the file's own extension
+    // and the size only from the card this repo renders itself.
+    if (isNonEmptyString(card.type)) {
+      tags.push(`<meta property="og:image:type" content="${escapeHtml(card.type)}">`);
+    }
+    if (Number.isInteger(card.width) && Number.isInteger(card.height)) {
+      tags.push(`<meta property="og:image:width" content="${card.width}">`);
+      tags.push(`<meta property="og:image:height" content="${card.height}">`);
+    }
+  }
   tags.push(`<meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}">`);
   tags.push(`<meta name="twitter:title" content="${title}">`);
   if (description) tags.push(`<meta name="twitter:description" content="${description}">`);
@@ -888,7 +1010,11 @@ module.exports = {
     buildRouteHtml,
     buildEventJsonLd,
     brandingObjectUrl,
+    resolveCardImage,
+    imageTypeFor,
     zoneOffset,
     ROUTE_CACHE_CONTROL,
+    TEMPLATE_FETCH_TIMEOUT_MS,
+    DEFAULT_CARD_IMAGE,
   },
 };

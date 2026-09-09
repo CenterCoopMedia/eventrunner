@@ -362,7 +362,9 @@ client already past step 3 never needs it again.
   `EVENT_PUBLIC_URL`.
 - Between `hosting` and `smoke`, the `post` job redeploys `updatesMeta` and `routeMeta`
   (`functions/src/public/og.cjs`) alone. Both self-fetch the deployed hosting `index.html` as their
-  SSR template and hold it per container (issue #27; M7 issue 4). A container that cold-started
+  SSR template and hold it per container (issue #27; M7 issue 4). That self-fetch carries its own
+  three-second deadline (`TEMPLATE_FETCH_TIMEOUT_MS`), so a hosting connection that stalls rather
+  than fails costs a reader three seconds and the held copy, not the function's whole timeout. A container that cold-started
   before THIS run's hosting deploy is holding the previous build's asset references, and
   **`routeMeta` is the catch-all rewrite, so for it that stale copy is not only a bad crawl: it is
   the first HTML every visitor gets, naming Vite-hashed asset files that this deploy has already
@@ -377,11 +379,12 @@ client already past step 3 never needs it again.
 - **What `routeMeta` costs, and the cache header that bounds it.** Every public route that is not a
   static file now reaches a function on its first uncached load, rather than being rewritten
   straight to `index.html`. Three things bound that. The response carries
-  `Cache-Control: public, max-age=0, s-maxage=300`, so the Hosting CDN — not the function — answers
-  repeat traffic for the same URL, and `max-age=0` keeps a reader's own browser from holding a
-  shell that names asset files a later deploy removed. There is deliberately no
-  `stale-while-revalidate`: permitting a stale copy to be served while it refreshes is the same
-  hazard `max-age=0` exists to close. The template is the revalidated per-container copy above, so
+  `Cache-Control: public, max-age=0, s-maxage=300, must-revalidate`, so the Hosting CDN — not the
+  function — answers repeat traffic for the same URL, while `max-age=0, must-revalidate` keeps a
+  reader's own browser from holding, or falling back to, a shell that names asset files a later
+  deploy removed: `max-age=0` alone still lets a cache serve a stale copy under pressure. There is
+  deliberately no `stale-while-revalidate` for the same reason. The template is the revalidated
+  per-container copy above, so
   a warm container transfers no body between deploys. And the config read is `core/config.cjs`'s
   shared 5-minute container cache, which `s-maxage` matches: a publish reaches search and social
   previews within that window instead of at the next cold start, and a hosting deploy clears the
@@ -391,6 +394,16 @@ client already past step 3 never needs it again.
   and reach the function, where they cost one Firestore page lookup and return the plain shell.
   That is a line on the functions invocation graph, not an incident; if a client's graph is
   dominated by it, the answer is a Cloud Functions max-instances limit, not a rewrite change.
+- **The card image a deployment falls back to is a PNG, not the SVG placeholder.** The Open Graph
+  and Twitter crawlers fetch the image themselves and do not reliably decode SVG, so a card built
+  on `branding/og-default.svg` unfurls with an empty frame, which a reader takes for a broken link
+  rather than a plain one. `routeMeta` therefore skips any SVG candidate, wherever it comes from (the
+  `config/theme.logos.ogDefault` slot or `config/event.seo.defaultOgImagePath`, whose seeded value
+  is that SVG), and points at `branding/og-default.png`, rendered by
+  `scripts/dev/build-og-placeholder.mjs` and shipped in the web build. An operator who uploads a
+  PNG or a JPEG through the Branding tab gets theirs instead. The tags state the image type always
+  and the size only for the bundled card, which is the only one anything here has measured. The
+  SVG stays in the bundle: the app renders it in-page, where SVG is fine.
 - **`routeMeta` does not answer 5xx once it has ever fetched a template.** The site's whole front
   door is this function, so each read it makes degrades on its own: a hosting request that fails or
   answers non-2xx serves the held template, and a config read that fails — or an unset

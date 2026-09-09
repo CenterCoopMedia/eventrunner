@@ -2,8 +2,9 @@
 // No Firebase, no network (spec §8.1); context providers only, same pattern
 // as Schedule.test.jsx.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { getRouteTitlePart, resetRouteTitleForTest } from '../lib/useDocumentTitle.js';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
@@ -178,6 +179,26 @@ describe('SessionDetail', () => {
     expect(
       screen.getByRole('heading', { name: 'This event doesn’t have a public schedule' }),
     ).toBeInTheDocument();
+  });
+
+  it('names the session in the tab, and names nothing when the schedule is switched off', () => {
+    resetRouteTitleForTest();
+    renderDetail('fx-early');
+    expect(getRouteTitlePart()).toBe('[Fixture] Morning kickoff');
+    cleanup();
+
+    // With the feature off this route renders "not available"; a tab
+    // naming a session over that page would advertise what the event has
+    // turned off, which is the same reason the server refuses the route.
+    resetRouteTitleForTest();
+    renderDetail('fx-early', { features: { schedule: false } });
+    expect(getRouteTitlePart()).toBeNull();
+  });
+
+  it('names nothing for a session that is not published', () => {
+    resetRouteTitleForTest();
+    renderDetail('fx-hidden');
+    expect(getRouteTitlePart()).toBeNull();
   });
 
   it('shows the loading state while runtime content is loading', () => {

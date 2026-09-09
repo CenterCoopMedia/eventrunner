@@ -115,10 +115,82 @@ function isCanonicalPagePath(path) {
   return segments.every((segment) => PAGE_PATH_SEGMENT_RE.test(segment));
 }
 
+/**
+ * THE SYSTEM PAGES, BY THE STABLE DOCUMENT ID THE SEED WRITES.
+ *
+ * A generic page IS its stored `path`: the catch-all resolves a URL against
+ * that field, so the document decides where it is served. A system page is
+ * not — the route it renders through is declared in apps/web/src/App.jsx,
+ * and the document only describes it. Its `path` is a COPY of a fact that
+ * lives in code, and a copy can drift: the server refuses to move it
+ * (functions/src/cms/pages.cjs) and the editor renders the field read-only,
+ * but a document written before either guard, or written straight into
+ * Firestore around them, can still carry a path no route mounts.
+ *
+ * So every reader that has to turn a system page document into a route, or
+ * a route back into a system page document, does it through this map and by
+ * `id`. It lives in the shared package because there are three such readers
+ * in three runtimes — the navigation (apps/web/src/lib/siteNavigation.js),
+ * the sitemap and robots builders (scripts/lib/site-manifest.cjs), and the
+ * server-rendered per-route metadata (functions/src/public/og.cjs) — and a
+ * second copy of this map is a second answer to "where does the schedule
+ * live".
+ *
+ * For each id: `to` is the route App.jsx mounts, `feature` is the
+ * `config/features` key that route checks before rendering anything (null
+ * for the home page — the index route is always mounted and no flag turns
+ * the event's front door off), and `children` marks a route with
+ * descendants (/schedule/:sessionId, /speakers/:slug, /updates/:id,
+ * /attendees/:uid).
+ *
+ * Keep in sync by hand with the static <Route path="..."> list in
+ * apps/web/src/App.jsx and with the `systemPage: true` docs in
+ * scripts/lib/seed.cjs; apps/web/src/lib/siteNavigation.test.js reads
+ * App.jsx and pins both directions.
+ */
+const SYSTEM_PAGE_ROUTES = Object.freeze({
+  home: Object.freeze({ to: '/', feature: null, children: false }),
+  schedule: Object.freeze({ to: '/schedule', feature: 'schedule', children: true }),
+  speakers: Object.freeze({ to: '/speakers', feature: 'speakers', children: true }),
+  sponsors: Object.freeze({ to: '/sponsors', feature: 'sponsors', children: false }),
+  attendees: Object.freeze({ to: '/attendees', feature: 'attendeeDirectory', children: true }),
+  updates: Object.freeze({ to: '/updates', feature: 'updates', children: true }),
+});
+
+/** Route path -> system page id, built once from the map above. */
+const SYSTEM_PAGE_ID_BY_ROUTE = Object.freeze(
+  Object.fromEntries(Object.entries(SYSTEM_PAGE_ROUTES).map(([id, route]) => [route.to, id])),
+);
+
+/**
+ * The system page a request path belongs to, by its ROUTE rather than by
+ * any stored path: '/' is home, '/schedule' and '/schedule/abc' are both
+ * the schedule. Null for anything no system route mounts.
+ *
+ * A detail path only resolves through a route that declares `children`, so
+ * '/sponsors/anything' is not the sponsors page — nothing mounts it.
+ *
+ * @param {string} path a request path, normalized (no trailing slash)
+ * @returns {string|null}
+ */
+function systemPageIdForPath(path) {
+  const value = typeof path === 'string' ? path : '';
+  if (Object.prototype.hasOwnProperty.call(SYSTEM_PAGE_ID_BY_ROUTE, value)) {
+    return SYSTEM_PAGE_ID_BY_ROUTE[value];
+  }
+  const segment = firstPathSegment(value);
+  if (!segment) return null;
+  const id = SYSTEM_PAGE_ID_BY_ROUTE[`/${segment}`];
+  if (!id) return null;
+  return SYSTEM_PAGE_ROUTES[id].children ? id : null;
+}
+
 module.exports = {
   RESERVED_PATH_SEGMENTS,
   PAGE_PATH_SEGMENT_RE,
+  SYSTEM_PAGE_ROUTES,
   firstPathSegment,
   isReservedPathSegment,
   isCanonicalPagePath,
+  systemPageIdForPath,
 };

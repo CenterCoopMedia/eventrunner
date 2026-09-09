@@ -60,8 +60,13 @@ export default function SpeakerDetail() {
   // Resolved ahead of every early return so useDocumentTitle (a hook) is
   // called unconditionally — React's rules of hooks forbid calling it only
   // on the "found" branch below.
+  //
+  // Gated on the feature as well as on the record: with the directory
+  // switched off this route renders "not available", and a tab naming a
+  // speaker over that page would advertise what the event has turned off.
+  // The server refuses the same route for the same reason.
   const speaker = speakers.find((candidate) => candidate.slug === slug);
-  useDocumentTitle(speaker ? text(speaker.displayName) : null);
+  useDocumentTitle(features.speakers && speaker ? text(speaker.displayName) : null);
 
   if (!features.speakers) {
     return (
