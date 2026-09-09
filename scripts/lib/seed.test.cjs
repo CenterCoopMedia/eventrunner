@@ -13,6 +13,10 @@ const { RESERVED_PATH_SEGMENTS } = require('shared/routing');
 
 const TIER_A = { publicUrl: 'https://example.org', ticketingProvider: 'none', emailProvider: 'console' };
 
+function isNonEmptyDescription(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 function configDocs(overrides = {}) {
   const built = buildConfigDocs({
     answers: {
@@ -38,13 +42,13 @@ function configDocs(overrides = {}) {
   return built.docs;
 }
 
-test('the twelve §5.3 pages are seeded, with the six system pages marked', () => {
+test('the fourteen default pages are seeded, with the six system pages marked', () => {
   const pages = defaultPages();
   assert.deepEqual(
     pages.map((p) => p.id),
     [
       'home', 'schedule', 'speakers', 'sponsors', 'travel', 'faq', 'conduct', 'contact',
-      'privacy', 'terms', 'attendees', 'updates',
+      'privacy', 'terms', 'attendees', 'updates', 'recap', 'guidelines',
     ],
   );
   assert.deepEqual(
@@ -115,12 +119,18 @@ test('generic pages sit at root-level paths that are not reserved (issue #52)', 
   }
 });
 
-test('page ids, paths, and section ids are unique — cmsContent is keyed section__field globally', () => {
+test('page ids, paths, orders, and section ids are unique — cmsContent is keyed section__field globally', () => {
   const pages = defaultPages();
   const ids = pages.map((p) => p.id);
   const paths = pages.map((p) => p.path);
+  const orders = pages.map((p) => p.order);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(new Set(paths).size, paths.length);
+  assert.equal(
+    new Set(orders).size,
+    orders.length,
+    'two pages sharing an order would collide in the admin Pages list — a sibling page seeded at the same base order is a real risk here',
+  );
   const sectionIds = pages.flatMap((p) => p.sections.map((s) => s.id));
   assert.equal(
     new Set(sectionIds).size,
@@ -145,6 +155,35 @@ test('no content doc is seeded for an empty travel list section', () => {
   const listSections = ['travel_lodging', 'travel_transit', 'travel_shuttle', 'travel_local'];
   for (const doc of content) {
     assert.equal(listSections.includes(doc.section), false, `${doc.id} would render a placeholder hotel`);
+  }
+});
+
+test('the recap and guidelines pages seed no default blocks (issue: seed a recap page and a guidelines page)', () => {
+  // Same shape as the travel page's variable-length lists (§5.3): every
+  // section carries a description that instructs the operator, and NO
+  // seeded content, so the page renders the site's empty state until an
+  // operator adds something. Neither page may carry event-specific copy.
+  const pages = defaultPages();
+  for (const id of ['recap', 'guidelines']) {
+    const page = pages.find((p) => p.id === id);
+    assert.ok(page, `${id} page missing from defaultPages()`);
+    assert.equal(page.systemPage, false, `${id} is a generic content page, not a system route`);
+    assert.ok(page.sections.length > 0, `${id} should describe at least one section`);
+    for (const section of page.sections) {
+      assert.deepEqual(section.defaultBlocks, [], `${id}.${section.id} must seed empty so it renders nothing`);
+      assert.ok(isNonEmptyDescription(section.description), `${id}.${section.id} needs a placeholder description`);
+    }
+  }
+});
+
+test('no content doc is seeded for the recap or guidelines pages', () => {
+  const docs = configDocs();
+  const content = buildSeedContent({ pages: defaultPages(), docs, tierA: TIER_A });
+  for (const doc of content) {
+    assert.ok(
+      !doc.section.startsWith('recap_') && !doc.section.startsWith('guidelines_'),
+      `${doc.id} would render placeholder copy on a page that must ship empty`,
+    );
   }
 });
 

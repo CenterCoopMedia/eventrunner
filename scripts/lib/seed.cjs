@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * The twelve default pages and their placeholder content (spec §5.3, §5.4).
+ * The fourteen default pages and their placeholder content (spec §5.3, §5.4).
  *
  * Pure. `defaultPages()` returns cmsPages documents in exactly the shape
  * `validatePageDoc` (functions/src/cms/pages.cjs) accepts — init runs that
@@ -42,10 +42,16 @@ function block(field, blockType, description) {
 }
 
 /**
- * The twelve seeded pages (§5.3): home, schedule, speakers, sponsors,
+ * The fourteen seeded pages (§5.3): home, schedule, speakers, sponsors,
  * attendees, updates (system pages, each owning a dedicated React route),
- * then travel, faq, conduct, contact, privacy, terms as generic content
- * pages at their own root-level paths.
+ * then travel, faq, conduct, contact, privacy, terms, recap, guidelines as
+ * generic content pages at their own root-level paths.
+ *
+ * recap and guidelines follow the travel page's empty-section pattern all
+ * the way through, not just for its repeating lists: every section on both
+ * pages seeds with zero default blocks, so both pages render the site's
+ * empty state until an operator writes something. Neither may carry a real
+ * event's copy, the way every other placeholder here already does not.
  *
  * EVERY SYSTEM ROUTE GETS A DOCUMENT, INCLUDING THE TWO THAT SEED NO
  * CONTENT. Attendees and Updates own dedicated routes (shared/routing
@@ -287,6 +293,60 @@ function defaultPages() {
       visible: true,
       systemPage: true,
       sections: [],
+    },
+    // Issue "Seed a recap page and a guidelines page": two more generic
+    // content pages, appended after updates for the same reason attendees
+    // and updates sit at the end (see the comment above `defaultPages`).
+    // Both seed EVERY section with zero default blocks, the same pattern
+    // the travel page's variable-length lists use: a section's description
+    // is the only placeholder text there is, an operator's own writing is
+    // what fills it, and a page that carries nothing yet renders the site's
+    // empty state rather than a guess at what either page should say.
+    {
+      id: 'recap',
+      label: 'Event recap',
+      path: '/recap',
+      icon: null,
+      order: 12,
+      visible: true,
+      systemPage: false,
+      sections: [
+        section('recap_summary', 'Summary', 'A short look back at how the event went.',
+          ['richtext'], 4),
+        section('recap_stats', 'By the numbers', 'Headline figures from the event.',
+          ['stat'], 6),
+        section('recap_highlights', 'Highlights', 'One entry per takeaway or theme from the event.',
+          ['list_item', 'richtext'], 20),
+        section('recap_media', 'Photos and recordings', 'Links to photos, recordings, or other event media.',
+          ['link_group', 'richtext'], 20),
+        section('recap_next', 'More from the event', 'Links to the schedule, speakers, or a program download.',
+          ['link_group'], 10),
+        section('recap_survey', 'Feedback', 'A link to a post-event survey, if there is one.',
+          ['cta', 'link_group'], 4),
+      ],
+    },
+    {
+      id: 'guidelines',
+      label: 'Speaker guidelines',
+      path: '/guidelines',
+      icon: null,
+      order: 13,
+      visible: true,
+      systemPage: false,
+      sections: [
+        section('guidelines_intro', 'Introduction', 'One paragraph welcoming speakers to this page.',
+          ['richtext'], 2),
+        section('guidelines_formats', 'Session formats', 'One entry per session format speakers may be assigned, with its length and shape.',
+          ['list_item', 'richtext'], 20),
+        section('guidelines_deadlines', 'Deadlines', 'Key dates a speaker needs to know, such as when materials are due.',
+          ['list_item', 'richtext'], 20),
+        section('guidelines_av', 'On-site setup', 'What is provided in the room and what a speaker should bring.',
+          ['richtext', 'list_item'], 20),
+        section('guidelines_sharing', 'Sharing your materials', 'How slides, recordings, and photos are handled after the event.',
+          ['richtext'], 10),
+        section('guidelines_help', 'Questions', 'Who a speaker can contact with questions before the event.',
+          ['richtext', 'link_group'], 6),
+      ],
     },
   ];
 }

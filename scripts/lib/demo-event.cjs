@@ -287,6 +287,149 @@ const DEMO_CONTENT = Object.freeze({
   },
 });
 
+/**
+ * Build one cmsContent doc in the same shape `buildSeedContent`'s push
+ * closure produces (scripts/lib/seed.cjs) — id, section, field, blockType,
+ * the block's own fields, visible, order, seeded, seededAt.
+ *
+ * @param {string} section
+ * @param {string} field
+ * @param {string} blockType
+ * @param {object} fields block-type-specific fields
+ * @param {number} order
+ * @returns {object} a cmsContent document
+ */
+function demoExtraDoc(section, field, blockType, fields, order) {
+  return {
+    id: `${section}__${field}`,
+    section,
+    field,
+    blockType,
+    ...fields,
+    visible: true,
+    order,
+    seeded: true,
+    seededAt: DEMO_SEEDED_AT,
+  };
+}
+
+/**
+ * Demo-only content for the recap and guidelines pages.
+ *
+ * Both pages seed with zero default blocks in `defaultPages()` (§5.3): a
+ * real client's recap and guidelines pages must never carry a guess at
+ * event copy, so the seed leaves every one of their sections empty for an
+ * operator to fill. `DEMO_CONTENT` above only overlays fields onto docs
+ * `buildSeedContent` already produced, so it has nothing to overlay for
+ * either page — with no docs of its own, the demo showed "Nothing here
+ * yet" on both, which is correct for a fresh deployment but wrong for a
+ * fixture whose whole point is to look like a well-run, finished event
+ * (issue #109's point, applied here).
+ *
+ * These are extra docs, not overlays, built directly against the section
+ * ids and allowed block types `defaultPages()` declares for `recap` and
+ * `guidelines` — fictional throughout, no real names, places, or
+ * organizations, following the [Demo] Harborlight Media Summit already
+ * established above.
+ */
+const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
+  demoExtraDoc('recap_summary', 'body', 'richtext', {
+    value:
+      '<p>The [Demo] Harborlight Media Summit closed its third year with three days of shared ' +
+      'sessions and hands-on workshops. Turnout was the highest yet, and the workshop tracks ' +
+      'filled within a day of registration opening.</p>',
+  }, 0),
+  demoExtraDoc('recap_stats', 'attendees', 'stat', {
+    value: '438',
+    label: 'people attended',
+    takeaway: 'Attendance topped four hundred for the first time',
+    description: 'Checked-in badges across all three days of the summit.',
+    source: 'Summit registration desk count, read 16 May 2026.',
+    alt: 'Attendance reached 438 people across the three-day summit.',
+  }, 0),
+  demoExtraDoc('recap_stats', 'sessions', 'stat', {
+    value: '36',
+    label: 'sessions held',
+    takeaway: 'Nearly every planned session ran on schedule',
+    description: 'Sessions that ran on the published programme, counting workshops, panels, and plenaries.',
+    source: 'Summit programme, read 16 May 2026.',
+    alt: '36 of the 38 planned sessions ran as scheduled.',
+  }, 1),
+  demoExtraDoc('recap_highlights', 'first', 'list_item', {
+    text: 'The workshop on audience research on a small budget filled within a day of opening.',
+  }, 0),
+  demoExtraDoc('recap_highlights', 'second', 'list_item', {
+    text: 'Attendees asked for a longer unconference block next year, and the organizing ' +
+      'committee is considering it.',
+  }, 1),
+  demoExtraDoc('recap_highlights', 'third', 'list_item', {
+    text: 'Two newsroom partnerships announced a shared beat during the closing plenary.',
+  }, 2),
+  demoExtraDoc('recap_media', 'photos', 'link_group', {
+    group: 'Media',
+    label: 'Photos from all three days',
+    url: 'https://example.org/harborlight-2026-photos',
+  }, 0),
+  demoExtraDoc('recap_media', 'recordings', 'link_group', {
+    group: 'Media',
+    label: 'Session recordings',
+    url: 'https://example.org/harborlight-2026-recordings',
+  }, 1),
+  demoExtraDoc('recap_next', 'schedule', 'link_group', {
+    group: 'Continue exploring',
+    label: 'Browse the full schedule',
+    url: '/schedule',
+  }, 0),
+  demoExtraDoc('recap_next', 'speakers', 'link_group', {
+    group: 'Continue exploring',
+    label: 'See who spoke',
+    url: '/speakers',
+  }, 1),
+  demoExtraDoc('recap_next', 'program', 'link_group', {
+    group: 'Continue exploring',
+    label: 'Download the program PDF',
+    url: 'https://example.org/harborlight-2026-program.pdf',
+  }, 2),
+  demoExtraDoc('recap_survey', 'link', 'cta', {
+    label: 'Share your feedback',
+    url: 'https://example.org/harborlight-2026-survey',
+    external: true,
+  }, 0),
+  demoExtraDoc('guidelines_intro', 'welcome', 'richtext', {
+    value:
+      '<p>Everything a [Demo] Harborlight Media Summit speaker needs to know before session ' +
+      'day, from format to on-site setup.</p>',
+  }, 0),
+  demoExtraDoc('guidelines_formats', 'keynote', 'list_item', {
+    text: 'Keynote: 30 minutes, one speaker, no audience Q&A.',
+  }, 0),
+  demoExtraDoc('guidelines_formats', 'panel', 'list_item', {
+    text: 'Panel: 45 minutes, three to four speakers, with 15 minutes for audience questions.',
+  }, 1),
+  demoExtraDoc('guidelines_formats', 'workshop', 'list_item', {
+    text: 'Workshop: 90 minutes, hands-on, with time built in for participants to work.',
+  }, 2),
+  demoExtraDoc('guidelines_deadlines', 'slides', 'list_item', {
+    text: 'Slides are due one week before the summit begins.',
+  }, 0),
+  demoExtraDoc('guidelines_deadlines', 'bio', 'list_item', {
+    text: 'Speaker bios and headshots are due two weeks before the summit begins.',
+  }, 1),
+  demoExtraDoc('guidelines_av', 'setup', 'richtext', {
+    value:
+      '<p>Every room has a projector, a wired microphone, and a connection for your own ' +
+      'laptop. Bring your own adapter if your laptop needs one.</p>',
+  }, 0),
+  demoExtraDoc('guidelines_sharing', 'policy', 'richtext', {
+    value:
+      '<p>Slides are posted to the session page after the summit unless a speaker asks ' +
+      'otherwise. Sessions are not recorded this year.</p>',
+  }, 0),
+  demoExtraDoc('guidelines_help', 'contact', 'richtext', {
+    value: '<p>Email speakers@example.org with questions before the summit.</p>',
+  }, 0),
+]);
+
 /** Fictional sessions across the three demo days. */
 const DEMO_SESSIONS = Object.freeze([
   {
@@ -582,7 +725,7 @@ function demoEvent() {
   }).map((doc) => {
     const overlay = DEMO_CONTENT[doc.id];
     return overlay ? { ...doc, ...overlay } : doc;
-  });
+  }).concat(DEMO_PAGE_EXTRA_CONTENT);
 
   return {
     config,
@@ -629,4 +772,5 @@ module.exports = {
   DEMO_SPEAKERS,
   DEMO_ORGANIZATIONS,
   DEMO_CONTENT,
+  DEMO_PAGE_EXTRA_CONTENT,
 };
