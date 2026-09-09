@@ -19,6 +19,7 @@ const {
   },
 } = require('./og.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
+const { isPublicPage } = require('shared/page');
 
 const TEMPLATE = [
   '<!doctype html>',
@@ -670,6 +671,27 @@ test('routeMeta: a page doc with `visible` omitted is treated as unpublished', a
   const docs = { ...SITE_DOCS, 'cmsPages/no-flag': { id: 'no-flag', label: 'No visible field', path: '/no-flag' } };
   const res = await getRoute(routeHandler({}, docs), '/no-flag');
   assert.ok(!res.sent.includes('No visible field'));
+});
+
+test('routeMeta: what gets described is exactly what the shared predicate calls public', async () => {
+  // One rule, three readers: the header navigation
+  // (apps/web/src/lib/siteNavigation.js), the sitemap
+  // (scripts/lib/site-manifest.cjs), and these tags. A card that titles a
+  // page the navigation does not link, or that 404s when opened, is those
+  // three disagreeing about who can see what.
+  const features = { schedule: true, speakers: true, sponsors: true, updates: false };
+  const cases = [
+    { path: '/travel', page: SITE_DOCS['cmsPages/travel'] },
+    { path: '/hidden', page: SITE_DOCS['cmsPages/hidden'] },
+    { path: '/sponsors', page: SITE_DOCS['cmsPages/sponsors'] },
+    { path: '/updates', page: { id: 'updates', label: 'Updates', path: '/updates', order: 11, visible: true, systemPage: true } },
+  ];
+  const docs = { ...SITE_DOCS, 'cmsPages/updates': cases[3].page };
+  for (const { path, page } of cases) {
+    const res = await getRoute(routeHandler({ features }, docs), path);
+    const described = !res.sent.includes('<meta name="robots" content="noindex">');
+    assert.equal(described, isPublicPage(page, features), `${path}: described disagrees with isPublicPage`);
+  }
 });
 
 // --------------------------------------------------------- structured data

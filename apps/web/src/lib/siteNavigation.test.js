@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { KNOWN_FEATURE_KEYS } from 'shared/config';
 import { RESERVED_PATH_SEGMENTS, firstPathSegment } from 'shared/routing';
+import { isPublicPage } from 'shared/page';
 import { SYSTEM_PAGES, buildNavItems } from './siteNavigation.js';
 
 const here = nodePath.dirname(fileURLToPath(import.meta.url));
@@ -127,6 +128,37 @@ describe('buildNavItems', () => {
       ALL_ON,
     );
     expect(labels(items)).toEqual(['Home', 'Travel']);
+  });
+
+  it('links exactly the pages the shared predicate calls public', () => {
+    // One rule, three readers: this list, the sitemap
+    // (scripts/lib/site-manifest.cjs), and the route metadata the server
+    // writes for a link unfurler (functions/src/public/og.cjs). A page
+    // linked here but absent from the sitemap, or described in a card and
+    // then 404ing, is those three disagreeing.
+    const pages = [
+      HOME,
+      SCHEDULE,
+      TRAVEL,
+      { ...TRAVEL, id: 'draft', label: 'Draft', path: '/draft', order: 5, visible: false },
+      { id: 'updates', label: 'Updates', path: '/updates', order: 6, visible: true, systemPage: true },
+    ];
+    const features = { ...ALL_ON, updates: false };
+    const linked = new Set(paths(buildNavItems(pages, features)));
+    for (const page of pages) {
+      const expected = isPublicPage(page, features);
+      expect(linked.has(page.path)).toBe(expected);
+    }
+  });
+
+  it('drops a page that never stated whether it is visible', () => {
+    // The shared contract is `visible === true`, not `!== false`: a
+    // document mid-write or hand-written straight into Firestore must not
+    // read as published anywhere — and the sitemap and the server already
+    // read it that way, so the navigation was the odd one out.
+    const stateless = { id: 'about', label: 'About', path: '/about', order: 1 };
+    expect(isPublicPage(stateless, ALL_ON)).toBe(false);
+    expect(paths(buildNavItems([HOME, stateless], ALL_ON))).toEqual(['/']);
   });
 
   it('orders by the page order field, not by document order', () => {

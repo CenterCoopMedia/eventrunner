@@ -8,6 +8,8 @@
 // slightly different ways. This module holds the answers more than one of
 // them needs.
 
+const { SYSTEM_PAGE_ROUTES } = require('./routing.cjs');
+
 /** @param {unknown} v @returns {boolean} */
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
@@ -33,6 +35,67 @@ function pageHeading(page) {
   return isNonEmptyString(page.label) ? page.label.trim() : '';
 }
 
+/**
+ * The `config/features` key a page's own route checks before it renders
+ * anything, or null for a page no flag gates.
+ *
+ * Read off the page's ID, which is its identity: a system page's `path` is
+ * a copy of a fact that lives in App.jsx and a copy can drift, while the
+ * document id is the one thing about it nothing in the editor can change.
+ *
+ * @param {unknown} page a cmsPages document
+ * @returns {string|null}
+ */
+function pageFeatureGate(page) {
+  const id = page && typeof page === 'object' ? page.id : null;
+  if (typeof id !== 'string') return null;
+  if (!Object.prototype.hasOwnProperty.call(SYSTEM_PAGE_ROUTES, id)) return null;
+  return SYSTEM_PAGE_ROUTES[id].feature;
+}
+
+/**
+ * Whether a page document is one the public site publishes: it is visible,
+ * and whatever feature gates its route is on.
+ *
+ * ONE PREDICATE, BECAUSE THERE IS ONE QUESTION. Three surfaces answer it —
+ * the header navigation (apps/web/src/lib/siteNavigation.js), the sitemap
+ * and robots file (scripts/lib/site-manifest.cjs), and the per-route
+ * metadata the server writes for a link unfurler (functions/src/public/
+ * og.cjs) — and three copies of a rule are three chances to disagree about
+ * which pages a stranger can see. A page listed in a sitemap but missing
+ * from the navigation, or described in a card but 404ing when opened, is
+ * that disagreement showing.
+ *
+ * TWO GATES, NOT ONE. `visible` is the editor's own answer and it covers
+ * every page. A system page is gated again on the flag its route already
+ * checks for itself, because the seed ships every system page visible while
+ * `features.updates` is off by default — visibility alone would offer a
+ * link to a route that renders "not available".
+ *
+ * `visible` IS READ STRICTLY `=== true`. A document with the field merely
+ * absent — mid-write, hand-written straight into Firestore, or older than
+ * the field — must not read as published. The server side of this runs on
+ * the Admin SDK, which bypasses firestore.rules, so nothing else is
+ * standing behind this check there.
+ *
+ * This is the whole public test for a page and nothing more. A surface with
+ * a further question of its own asks it separately: the sitemap also drops
+ * a route that renders a sign-in prompt to a signed-out visitor, and the
+ * navigation also drops a page whose stored path could not become a link.
+ *
+ * @param {unknown} page a cmsPages document
+ * @param {object|null|undefined} features config/features
+ * @returns {boolean}
+ */
+function isPublicPage(page, features) {
+  if (!page || typeof page !== 'object') return false;
+  if (page.visible !== true) return false;
+  const gate = pageFeatureGate(page);
+  return gate === null || features?.[gate] === true;
+}
+
 module.exports = {
   pageHeading,
+  pageFeatureGate,
+  isPublicPage,
 };
