@@ -20,6 +20,10 @@ Session files and links stay closed until the session is over, unless staff rele
 
 Your public profile is the slice other attendees can see. The rest stays on your account. You pick badges from the list the event offers. You cannot invent a free-text badge.
 
+## Long pages
+
+A page with several sections, such as FAQ or Travel, shows a filter box and a list of its sections near the top. Type a keyword to narrow the page to matching content, or select a section in the list to jump straight to it.
+
 ## When something is wrong
 
 1. Confirm you are on the event's real site (the URL the organizer published).

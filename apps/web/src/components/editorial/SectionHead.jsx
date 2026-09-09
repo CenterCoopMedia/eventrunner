@@ -28,6 +28,7 @@ import Rule from './Rule.jsx';
  *   variant?: 'title' | 'folio',
  *   rule?: 'strong' | 'hairline' | 'none',
  *   className?: string,
+ *   tabIndex?: -1,                      // a jump target a section index can focus (issue #14)
  * }} props
  */
 export default function SectionHead({
@@ -38,6 +39,7 @@ export default function SectionHead({
   variant = 'title',
   rule = 'strong',
   className = '',
+  tabIndex,
 }) {
   const Tag = `h${level >= 2 && level <= 6 ? level : 2}`;
   const isFolioHead = variant === 'folio';
@@ -56,6 +58,7 @@ export default function SectionHead({
       >
         <Tag
           id={id}
+          tabIndex={tabIndex}
           className={
             isFolioHead
               ? 'folio whitespace-nowrap font-medium'

@@ -3,7 +3,7 @@
 // `path` via the catch-all route, and unknown paths get the same designed
 // 404 used everywhere else on the site.
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // Credential-free (spec §8.1): stub the provider seams so no Firebase env or
@@ -187,5 +187,126 @@ describe('ContentPage (catch-all route)', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: faqPage.label }),
     ).toBeInTheDocument();
+  });
+});
+
+// Search and a section index on long content pages (issue #14, spec M7-14).
+// Generic behaviour, exercised on the seeded FAQ page — the same route the
+// rest of this file already renders — plus one synthetic short page to prove
+// the feature stays off below the section threshold.
+describe('ContentPage — search and section index on long pages', () => {
+  const faqPage = pagesData.find((p) => p.id === 'faq');
+  const faqQuestion = siteContent.faq_items__what_is_this.question;
+
+  it('shows a filter box and a section index once a page has more than one section', async () => {
+    renderAt('/faq');
+    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+
+    const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
+    expect(filter).toBeInTheDocument();
+
+    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
+    for (const section of faqPage.sections) {
+      expect(within(index).getByRole('link', { name: section.label })).toHaveAttribute(
+        'href',
+        `#section-${section.id}`,
+      );
+    }
+  });
+
+  it('narrows blocks by keyword and drops a section with no remaining match', async () => {
+    renderAt('/faq');
+    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+    expect(screen.getByText(faqQuestion)).toBeInTheDocument();
+
+    const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
+    fireEvent.change(filter, { target: { value: 'Harborlight' } });
+
+    // The question matches; the plain intro paragraph above it does not, so
+    // its whole section drops rather than rendering an empty heading.
+    expect(screen.getByText(faqQuestion)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Introduction' }),
+    ).not.toBeInTheDocument();
+    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
+    expect(within(index).queryByRole('link', { name: 'Introduction' })).not.toBeInTheDocument();
+  });
+
+  it('states the empty result when nothing matches, and clearing restores the page', async () => {
+    renderAt('/faq');
+    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+
+    const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
+    fireEvent.change(filter, { target: { value: 'zzzznotarealword' } });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Nothing matches that filter' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(faqQuestion)).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/no.*match/i);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
+    expect(screen.getByText(faqQuestion)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Nothing matches that filter' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('moves focus to the target section heading when a section link is activated', async () => {
+    renderAt('/faq');
+    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+
+    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
+    fireEvent.click(within(index).getByRole('link', { name: 'Questions and answers' }));
+
+    expect(document.activeElement).toHaveAttribute('id', 'section-faq_items');
+    expect(
+      within(index).getByRole('link', { name: 'Questions and answers' }),
+    ).toHaveAttribute('aria-current', 'location');
+  });
+
+  it('renders no filter box or section index on a page with only one section', async () => {
+    renderAt('/short-page');
+    await screen.findByRole('heading', { name: 'Page not found' });
+    act(() => {
+      subscriptions.get('cmsPages')([
+        ...pagesData,
+        {
+          id: 'short-page',
+          label: 'Short page',
+          path: '/short-page',
+          icon: null,
+          order: 99,
+          visible: true,
+          systemPage: false,
+          sections: [
+            {
+              id: 'short_only',
+              label: 'Only section',
+              description: '',
+              allowedBlocks: ['text'],
+              maxBlocks: 1,
+              reorderable: true,
+              defaultBlocks: [],
+            },
+          ],
+        },
+      ]);
+      subscriptions.get('cmsContent')([
+        {
+          id: 'short_only__body',
+          section: 'short_only',
+          field: 'body',
+          blockType: 'text',
+          value: 'The only thing on this page.',
+          visible: true,
+          order: 0,
+        },
+      ]);
+    });
+
+    expect(await screen.findByText('The only thing on this page.')).toBeInTheDocument();
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Sections on this page' })).not.toBeInTheDocument();
   });
 });

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A content page with more than one populated section (FAQ, Travel, Privacy, and any other CMS
+  page shaped like them) now shows a keyword filter and a same-page section index above its
+  content: the filter narrows the page to matching blocks and states plainly when nothing matches,
+  and the index marks the section currently in view and moves keyboard/screen-reader focus to a
+  section when it is chosen. The behavior is generic to any long content page, not specific to
+  FAQ (CJS parity plan, M7 issue 14).
+
 ### Changed
 
 - The landing page and the documentation site now use the product's own design language: the same
