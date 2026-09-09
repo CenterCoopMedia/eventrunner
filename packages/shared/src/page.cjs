@@ -26,12 +26,26 @@ function isNonEmptyString(v) {
  * would read oddly as a heading. Most pages state no `title` at all, and
  * for those the label IS the heading: one name, written once.
  *
+ * A SYSTEM PAGE NAMES ITSELF IN CODE, SO ITS DOCUMENT DOES NOT.
+ *
+ * A content page's `<h1>` is drawn from this function (ContentPage.jsx), so
+ * a stored title moves the heading, the tab, and the link card together. A
+ * system page's heading is not: Schedule.jsx writes "Schedule" into its own
+ * `<h1>`, the home page draws its hero title, and no document reaches
+ * either. Honouring a title there would rename the tab and the unfurled
+ * card and leave the heading where it was — one page under two names, which
+ * is the disagreement this module exists to prevent. So a system page is
+ * headed by its `label`, the name its route was built to show, and the
+ * editor no longer offers the field for one (AdminPageEditor.jsx). Documents
+ * written while it did, or written straight into Firestore, still carry a
+ * title; this is where that title stops.
+ *
  * @param {unknown} page a cmsPages document
  * @returns {string} the heading, or '' when the page names itself nothing
  */
 function pageHeading(page) {
   if (!page || typeof page !== 'object') return '';
-  if (isNonEmptyString(page.title)) return page.title.trim();
+  if (page.systemPage !== true && isNonEmptyString(page.title)) return page.title.trim();
   return isNonEmptyString(page.label) ? page.label.trim() : '';
 }
 

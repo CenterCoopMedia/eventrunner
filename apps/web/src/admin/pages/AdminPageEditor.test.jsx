@@ -394,6 +394,33 @@ describe('page editor', () => {
     expect(screen.getByLabelText('Navigation label')).not.toHaveAttribute('readonly');
   });
 
+  it('offers no page heading for a system page, and says why', async () => {
+    // A system page writes its own <h1> in its route's code — Schedule.jsx
+    // writes "Schedule" — so a heading typed here would rename the browser
+    // tab and the link card and leave the page's own heading alone. The
+    // room does not offer a control that cannot do what it says.
+    draftDocs = [{
+      ...SCHOLARSHIPS_DRAFT,
+      id: 'schedule',
+      label: 'Schedule',
+      path: '/schedule',
+      systemPage: true,
+    }];
+    await renderAt('/admin/pages/schedule');
+
+    await screen.findByLabelText('Navigation label');
+    expect(screen.queryByLabelText('Page heading')).toBeNull();
+    expect(screen.getByText('This page draws its own heading.')).toBeInTheDocument();
+  });
+
+  it('offers the page heading on a content page, whose heading it sets', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+
+    expect(await screen.findByLabelText('Page heading')).toBeInTheDocument();
+    expect(screen.queryByText('This page draws its own heading.')).toBeNull();
+  });
+
   it('leaves a regular page’s address editable', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');

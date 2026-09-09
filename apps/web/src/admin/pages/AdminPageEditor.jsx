@@ -62,6 +62,7 @@ import {
   TextAreaField,
   TextField,
   dangerButtonClass,
+  fieldHintClass,
   fieldLabelClass,
   primaryButtonClass,
   secondaryButtonClass,
@@ -399,14 +400,32 @@ export default function AdminPageEditor({ mode }) {
               heading of its own is headed by its navigation label. The
               field exists for the pages whose short label reads oddly as a
               heading — a nav that says FAQ over a page headed "Frequently
-              asked questions". */}
-          <TextField
-            label="Page heading"
-            value={page.title}
-            onChange={(value) => update({ title: value })}
-            error={errorFor('title')}
-            hint="Optional. The heading at the top of the page, when it differs from the navigation label. Leave blank to use the label."
-          />
+              asked questions".
+
+              A SYSTEM PAGE IS NOT ONE OF THEM, so it is not offered the
+              field. A content page's heading is drawn from this document
+              (ContentPage.jsx renders shared/page pageHeading), but a
+              system page writes its own: Schedule.jsx puts "Schedule" in
+              its <h1> and the home page draws its hero title. A heading
+              typed here would move that page's browser tab and its link
+              card and leave the heading on the page where it was — a
+              control that does not do what its label says. pageHeading
+              ignores a stored title on a system page for the same reason,
+              so the tab and the card keep agreeing with the <h1>. */}
+          {isSystemPage ? (
+            <div className="flex flex-col gap-3xs">
+              <p className={fieldLabelClass}>Page heading</p>
+              <p className={fieldHintClass}>This page draws its own heading.</p>
+            </div>
+          ) : (
+            <TextField
+              label="Page heading"
+              value={page.title}
+              onChange={(value) => update({ title: value })}
+              error={errorFor('title')}
+              hint="Optional. The heading at the top of the page, when it differs from the navigation label. Leave blank to use the label."
+            />
+          )}
           {/* A system page's path names a route that is declared in the
               app's code, not in this document — the document only
               describes it. Editing it here would not move the page, it

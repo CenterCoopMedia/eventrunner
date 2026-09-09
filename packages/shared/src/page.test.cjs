@@ -27,6 +27,28 @@ test('pageHeading trims what it returns, so a stray space never reaches a headin
   assert.equal(pageHeading({ label: 'FAQ', title: '  Frequently asked questions  ' }), 'Frequently asked questions');
 });
 
+test('pageHeading leaves a system page named by its label, whatever title it carries', () => {
+  // A system page's <h1> is written in its route's code — Schedule.jsx
+  // writes "Schedule", the home page draws its hero title — so a stored
+  // `title` could only rename the browser tab and the link card and never
+  // the heading itself, which is three names for one page. The editor no
+  // longer offers the field for these pages; a document written before it
+  // stopped, or written straight into Firestore, can still carry one.
+  assert.equal(
+    pageHeading({ id: 'schedule', label: 'Schedule', title: 'The full programme', systemPage: true }),
+    'Schedule',
+  );
+  assert.equal(
+    pageHeading({ id: 'home', label: 'Home', title: 'Welcome', systemPage: true }),
+    'Home',
+  );
+  // A content page is still headed by the title it states.
+  assert.equal(
+    pageHeading({ id: 'faq', label: 'FAQ', title: 'Frequently asked questions', systemPage: false }),
+    'Frequently asked questions',
+  );
+});
+
 test('pageHeading names nothing for a page that names itself nothing', () => {
   assert.equal(pageHeading(null), '');
   assert.equal(pageHeading(undefined), '');
