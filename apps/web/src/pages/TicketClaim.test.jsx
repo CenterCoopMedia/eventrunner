@@ -9,7 +9,7 @@
 // ONE generic failure message for all of them; these tests assert that
 // collapse rather than trying to distinguish causes the server does not.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
@@ -80,7 +80,13 @@ describe('signed out', () => {
     renderClaim();
     await screen.findByText('Sign in to claim your ticket');
     expect(screen.queryByLabelText('Order number')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/signin');
+    // The shell's own account control is also a "Sign in" link now
+    // (Layout.jsx), so ask the page for its own.
+    const main = screen.getByRole('main');
+    expect(within(main).getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/signin',
+    );
   });
 });
 

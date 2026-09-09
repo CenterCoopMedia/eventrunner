@@ -4,6 +4,8 @@ You registered for an event. This page is what the site is supposed to let you d
 
 ## Sign in
 
+The last item in the site navigation is your account control. It reads **Sign in** until you are signed in, and **Your profile** after that. It is in the same place on every page, in the top row or in the side rail, whichever the site uses.
+
 You can sign in with Google or with a 6-digit code we email you. University and nonprofit inboxes often quarantine the code. Check junk, and wait a minute before requesting another.
 
 There is no password to remember. If the code never arrives, ask in [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) or email the event organizer.

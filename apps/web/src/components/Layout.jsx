@@ -22,7 +22,10 @@
 // WHAT IS IN THE LIST IS DATA, NOT CODE. The items are the visible cmsPages
 // documents in their own `order`, built by lib/siteNavigation.js — see that
 // module for the two gates (an editor's `visible`, plus the feature flag a
-// system page's route already checks).
+// system page's route already checks). ONE ITEM IS NOT A PAGE: the account
+// control closes the list, and it is the shell's own (see ACCOUNT_SIGNED_OUT
+// below) because no page document describes a route that changes with who
+// is reading.
 //
 // WHERE THE PLACEMENT COMES FROM, IN ORDER — THE PAGE, THEN THE SITE.
 //
@@ -46,6 +49,7 @@
 import { useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
+import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
@@ -94,9 +98,90 @@ function navClass({ isActive }) {
   ].join(' ');
 }
 
+// THE ACCOUNT CONTROL: ONE CONTROL, TWO DESTINATIONS (M7 issue 2).
+//
+// A reader who is not signed in is offered the sign-in page; a reader who is
+// gets their own profile. There is no third state and no second control —
+// signing out lives on the sign-in page itself, where the account it ends is
+// named, rather than as a header button that logs a reader out of a site
+// they were only reading.
+//
+// It is the LAST ITEM OF THE NAV, not a separate control beside it, so it
+// inherits everything the nav already settled: one landmark, one keyboard
+// path in document order, and both placements at once (`side` moves the
+// whole list, so a control outside it would have to be placed twice and
+// would then be two controls to a screen reader).
+//
+// WHILE THE AUTH HANDSHAKE IS STILL IN FLIGHT the shell renders the
+// signed-out answer. `loading` from useAuth is what reports that tick, and
+// it is read here rather than left to `user` being null by coincidence —
+// the two states are different facts and the code should say which one it
+// is acting on.
+//
+// Rendering the sign-in control is the right stand-in rather than a gap in
+// the nav: a reader who is not signed in is the common case, and Login.jsx's
+// own already-signed-in branch means a signed-in reader who clicks during
+// that tick still lands somewhere true instead of on a form they do not
+// need. It is not free — "Sign in" and "Your profile" are different widths,
+// so a signed-in reader can see the last item of the nav resettle once. That
+// is one reflow of one item, against a nav that is otherwise empty of an
+// account control until the handshake finishes.
+//
+// `end` is the same question the nav items answer (lib/siteNavigation.js
+// `children`): does this route own a subtree the item should stay marked
+// inside? /signin does not and never will — it is one form — so it matches
+// its own URL exactly. /profile owns none TODAY, which is exactly why it
+// must not be pinned to `end`: the day it grows /profile/settings, an `end`
+// match would quietly stop marking the control while the reader is inside
+// the section it names.
+const ACCOUNT_SIGNED_OUT = Object.freeze({ to: '/signin', label: 'Sign in', end: true });
+// "Your profile" is what the profile page and ProfileSidebar already call
+// it (docs/COPY_STYLE.md: one term for one concept).
+const ACCOUNT_SIGNED_IN = Object.freeze({ to: '/profile', label: 'Your profile', end: false });
+
+/**
+ * Tailwind's font-weight utilities by name. Deliberately a closed list and
+ * not `/^font-/`: `font-data` and `font-heading` are font FAMILIES in this
+ * theme and share the prefix.
+ */
+const FONT_WEIGHT_UTILITY =
+  /^font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/;
+
+/**
+ * The quiet action with its own font weight taken out, so the active state
+ * below can set one WITHOUT competing with it.
+ *
+ * Two utilities for one property in one class attribute are not resolved by
+ * their order in the string — CSS does not read that — but by which rule the
+ * stylesheet emits last. That is Tailwind's business and not something this
+ * file should be relying on, so the weight is REMOVED rather than overridden
+ * and the string carries exactly one. Removing by name also survives the
+ * shared shape changing its weight, which a hardcoded 'font-medium' would
+ * not.
+ */
+const QUIET_ACTION_UNWEIGHTED = quietActionClass
+  .split(/\s+/)
+  .filter((token) => !FONT_WEIGHT_UTILITY.test(token))
+  .join(' ');
+
+/**
+ * The account control's classes. The quiet action is the shared shape
+ * (controlClasses.js) and the active state adds WEIGHT plus a RULE UNDER
+ * THE WORD — the same two markers the nav items carry, and never color
+ * alone (docs/interface-guidelines.md, Accessibility). The underline sets a
+ * property the quiet action does not touch at all; the weight replaces the
+ * one it does (see QUIET_ACTION_UNWEIGHTED).
+ */
+function accountClass({ isActive }) {
+  return isActive
+    ? `${QUIET_ACTION_UNWEIGHTED} font-semibold underline underline-offset-4`
+    : quietActionClass;
+}
+
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage } = useContent();
+  const { user, loading: authLoading } = useAuth();
   const { pathname } = useLocation();
   // Branding slots come from config/theme (spec §7.2 logos). A slot holds
   // either a flat seeded path (`branding/mark.svg`, which also ships in the
@@ -139,16 +224,21 @@ export default function Layout() {
   // the flags do.
   const navItems = useMemo(() => buildNavItems(pages, features), [pages, features]);
 
+  // Two destinations, one control. An unfinished handshake is the
+  // signed-out answer, said explicitly (see ACCOUNT_SIGNED_OUT above).
+  const account = !authLoading && user ? ACCOUNT_SIGNED_IN : ACCOUNT_SIGNED_OUT;
+
   // One nav, placed two ways. The list, its labels, its landmark, and its
   // position in the document are identical either way — `side` only moves
   // it to the leading edge at wide viewports, where there is room for a
   // rail beside the page (brief §6.1).
   //
-  // No items means no landmark: a deployment whose pages are all hidden (or
-  // one that has not been seeded yet) must not ship an empty "Main" nav for
-  // a screen reader to land in. The identity in the header links home
-  // either way, so the front door is never lost.
-  const nav = navItems.length === 0 ? null : (
+  // The landmark always renders now. It used to disappear when no page was
+  // navigable, so that a deployment with every page hidden did not ship an
+  // empty "Main" nav for a screen reader to land in; the account control is
+  // in the list unconditionally, so the list is never empty and that reader
+  // can still reach sign-in.
+  const nav = (
     <nav
       aria-label="Main"
       className={
@@ -171,6 +261,11 @@ export default function Layout() {
             </NavLink>
           </li>
         ))}
+        <li>
+          <NavLink to={account.to} end={account.end} className={accountClass}>
+            {account.label}
+          </NavLink>
+        </li>
       </ul>
     </nav>
   );

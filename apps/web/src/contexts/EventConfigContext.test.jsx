@@ -21,6 +21,7 @@ import {
   useFeatures,
 } from './EventConfigContext.jsx';
 import Layout from '../components/Layout.jsx';
+import AuthContext from './AuthContext.jsx';
 import ContentContext from './ContentContext.jsx';
 import {
   eventConfig as snapshotEventConfig,
@@ -213,7 +214,11 @@ describe('Layout nav', () => {
               the config subscriptions, so the page lookup answers nothing
               and the shell keeps its own rule. */}
           <ContentContext.Provider value={{ pages: NAV_PAGES, getPage: () => null }}>
-            <Layout />
+            {/* The shell's account control reads the auth state (M7 issue
+                2); nobody is signed in in these tests. */}
+            <AuthContext.Provider value={{ user: null, loading: false }}>
+              <Layout />
+            </AuthContext.Provider>
           </ContentContext.Provider>
         </EventConfigProvider>
       </MemoryRouter>,
