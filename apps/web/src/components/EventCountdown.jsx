@@ -13,43 +13,63 @@
 //   in_progress           stop counting; state that the event is running.
 //   ended or archived     state the stated post event line.
 //
+// Counting is an ALLOWLIST of the phases before the event starts — draft,
+// and any phase this file does not yet know about, render nothing rather
+// than a countdown — because a denylist of the phases that stop counting
+// would count down on a draft event nobody has announced yet.
+//
 // The figures sit in the mono face with tabular figures (interface
 // guidelines, Typography), the same contract StatBlock's legacy shape
 // uses. Ticking is a once-per-second text update, never a transform or an
 // opacity animation, so it needs no `prefers-reduced-motion` guard — CSS
 // motion durations already collapse under that media query (index.css),
 // and there is no motion here to begin with.
-import { useEffect, useState } from 'react';
+//
+// The running line also polls the phase, at a much lower frequency: nothing
+// else re-renders this component while the event is in progress (the event
+// config does not change on its own), so without its own low-frequency
+// check the running line would sit there forever after the last day ends,
+// only correcting itself on the reader's next page load.
+import { useEffect, useId, useState } from 'react';
 import { getEventPhase } from 'shared/config';
 import { countdownParts, resolveEventStart } from '../lib/eventTime.js';
 
 const RUNNING_LINE = 'This event is happening now.';
 const POST_EVENT_LINE = 'This event has ended.';
+const COUNTDOWN_LABEL = 'Time until the event starts';
+
+// Only these phases count down. Anything else — draft, in_progress, ended,
+// archived, or a phase this file has not been taught — renders nothing or
+// its own stated line below, never a countdown.
+const COUNTING_PHASES = new Set(['announced', 'registration_open', 'registration_closed']);
+
+// Once a minute is enough to catch the event's own end without a reload;
+// it is not a rendering rate, so it carries no motion concern of its own.
+const RUNNING_CHECK_MS = 60_000;
 
 const UNITS = [
-  { key: 'days', label: 'Days' },
-  { key: 'hours', label: 'Hours' },
-  { key: 'minutes', label: 'Minutes' },
-  { key: 'seconds', label: 'Seconds' },
+  { key: 'days', label: 'Days', pad: false },
+  { key: 'hours', label: 'Hours', pad: true },
+  { key: 'minutes', label: 'Minutes', pad: true },
+  { key: 'seconds', label: 'Seconds', pad: true },
 ];
 
 const STATED_LINE_CLASS = 'mt-md max-w-prose text-body text-text-secondary text-pretty';
 
 export default function EventCountdown({ eventConfig }) {
+  const labelId = useId();
   const [now, setNow] = useState(() => new Date());
   const phase = getEventPhase(eventConfig, now);
   const target = resolveEventStart(eventConfig);
-  // Counting is gated on both the phase and a resolvable target: a
-  // misconfigured event with no valid days never reaches in_progress on
-  // its own clock, so phase alone would tick forever toward nothing.
-  const counting =
-    phase !== 'in_progress' && phase !== 'ended' && phase !== 'archived' && Boolean(target);
+  const counting = COUNTING_PHASES.has(phase) && Boolean(target);
+  const watchingRunning = phase === 'in_progress';
 
   useEffect(() => {
-    if (!counting) return undefined;
-    const id = setInterval(() => setNow(new Date()), 1000);
+    const delayMs = counting ? 1000 : watchingRunning ? RUNNING_CHECK_MS : null;
+    if (delayMs === null) return undefined;
+    const id = setInterval(() => setNow(new Date()), delayMs);
     return () => clearInterval(id);
-  }, [counting]);
+  }, [counting, watchingRunning]);
 
   if (phase === 'in_progress') {
     return <p className={STATED_LINE_CLASS}>{RUNNING_LINE}</p>;
@@ -59,7 +79,7 @@ export default function EventCountdown({ eventConfig }) {
     return <p className={STATED_LINE_CLASS}>{POST_EVENT_LINE}</p>;
   }
 
-  if (!target) return null;
+  if (!counting) return null;
 
   // Clamped at zero (never negative): a tick can land in the moment
   // between the target passing and this component's own next read of
@@ -67,17 +87,30 @@ export default function EventCountdown({ eventConfig }) {
   const parts = countdownParts(target.getTime() - now.getTime());
 
   return (
-    <dl className="mt-md flex flex-wrap gap-lg border-t-hairline border-t-rule-hairline pt-sm">
-      {UNITS.map((unit) => (
-        <div key={unit.key} className="flex flex-col">
-          <dt className="order-last mt-2xs font-data text-caption text-text-secondary">
-            {unit.label}
-          </dt>
-          <dd data-numeric className="font-mono text-h3 font-semibold text-text-primary">
-            {String(parts[unit.key]).padStart(2, '0')}
-          </dd>
-        </div>
-      ))}
-    </dl>
+    // The outer gap (from the copy above) reads at least twice the gap
+    // between the figures themselves (interface guidelines, Layout: named
+    // steps pair sm with lg) — a group boundary, not a run of equally
+    // spaced siblings.
+    <div className="mt-lg border-t-hairline border-t-rule-hairline pt-sm">
+      <p id={labelId} className="font-data text-caption text-text-secondary">
+        {COUNTDOWN_LABEL}
+      </p>
+      {/* Not a live region: a screen reader is not interrupted once a
+          second for a figure nobody asked to be read aloud. The visible
+          label above states what the group is; a reader who tabs to it
+          hears that label, then the figures, at their own pace. */}
+      <dl aria-labelledby={labelId} className="mt-xs flex flex-wrap gap-sm">
+        {UNITS.map((unit) => (
+          <div key={unit.key} className="flex flex-col">
+            <dt className="order-last mt-2xs font-data text-caption text-text-secondary">
+              {unit.label}
+            </dt>
+            <dd data-numeric className="font-mono text-h3 font-semibold text-text-primary">
+              {unit.pad ? String(parts[unit.key]).padStart(2, '0') : String(parts[unit.key])}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }

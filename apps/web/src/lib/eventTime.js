@@ -234,6 +234,14 @@ export function formatDayDate(day, timeZone) {
  * either. A per-day filter here would let the countdown count down to a day
  * the lifecycle clock does not recognize as the event's start.
  *
+ * `validDays` also requires every day to carry a valid `endTime`, even
+ * though only `startTime` feeds this function's own answer: a day with no
+ * `endTime` is one `getEventPhase` treats as absent entirely, so it can
+ * never reach `in_progress` on its own clock. Skipping that check here
+ * would let the countdown resolve a target `getEventPhase` does not
+ * recognize — counting down to zero and sitting there, because the phase
+ * it is waiting for never arrives.
+ *
  * @param {object} eventConfig
  * @returns {Date | null}
  */
@@ -246,6 +254,7 @@ export function resolveEventStart(eventConfig) {
     if (!day || typeof day !== 'object') return null;
     if (typeof day.date !== 'string' || !DATE_RE.test(day.date)) return null;
     if (typeof day.startTime !== 'string' || !TIME_24H_RE.test(day.startTime)) return null;
+    if (typeof day.endTime !== 'string' || !TIME_24H_RE.test(day.endTime)) return null;
   }
   const [first] = days
     .slice()

@@ -164,6 +164,22 @@ describe('resolveEventStart', () => {
     };
     expect(resolveEventStart(eventConfig)).toBeNull();
   });
+
+  it('is null when a day has no endTime — validDays requires one too, and a day it cannot see can never bring the lifecycle clock to in_progress, so the countdown must never target it either', () => {
+    const eventConfig = {
+      timezone: ZONE,
+      days: [{ date: '2026-10-14', startTime: '09:00' }], // no endTime
+    };
+    expect(resolveEventStart(eventConfig)).toBeNull();
+  });
+
+  it('is null when endTime is malformed', () => {
+    const eventConfig = {
+      timezone: ZONE,
+      days: [{ date: '2026-10-14', startTime: '09:00', endTime: 'five pm' }],
+    };
+    expect(resolveEventStart(eventConfig)).toBeNull();
+  });
 });
 
 describe('countdownParts', () => {

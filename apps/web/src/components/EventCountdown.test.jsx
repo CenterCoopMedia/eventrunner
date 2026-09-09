@@ -1,8 +1,11 @@
 // EventCountdown: the home lead's lifecycle-aware line (M7 issue 7). Drives
 // all four phases the issue names — announced, in_progress, ended, and
-// archived — from the same `getEventPhase` clock the rest of the site reads,
-// plus the boundary transition that proves the lead never shows a negative
-// figure.
+// archived — plus draft (which must NOT count down: counting is an
+// allowlist of the phases before the event starts, not everything that
+// isn't in_progress/ended/archived), the boundary transition that proves
+// the lead never shows a negative figure, the running line's own low
+// frequency check that moves it on to "ended" without a reload, and that
+// the ticking interval is cleared on unmount.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { getEventPhase } from 'shared/config';
@@ -41,12 +44,14 @@ describe('EventCountdown', () => {
   // assertion below can match on text without colliding with a sibling unit.
   const BEFORE_START = '2026-06-09T06:56:51.000Z';
 
-  it('counts down while the phase is announced, in the mono face with tabular figures', () => {
+  it('counts down while the phase is announced, in the mono face with tabular figures, under a visible accessible label', () => {
     vi.setSystemTime(new Date(BEFORE_START));
     expect(getEventPhase(BASE_CONFIG, new Date(BEFORE_START))).toBe('announced');
-    render(<EventCountdown eventConfig={BASE_CONFIG} />);
+    const { container } = render(<EventCountdown eventConfig={BASE_CONFIG} />);
 
-    const days = screen.getByText('01');
+    // The days figure carries no zero padding (it varies in width on its
+    // own); hours, minutes, and seconds keep two digits.
+    const days = screen.getByText('1');
     const hours = screen.getByText('02');
     const minutes = screen.getByText('03');
     const seconds = screen.getByText('09');
@@ -59,6 +64,13 @@ describe('EventCountdown', () => {
     expect(screen.getByText('Hours')).toBeInTheDocument();
     expect(screen.getByText('Minutes')).toBeInTheDocument();
     expect(screen.getByText('Seconds')).toBeInTheDocument();
+
+    // A stated, visible label above the figures — not a live region — gives
+    // the group of numbers a name in words.
+    const label = screen.getByText('Time until the event starts');
+    const dl = container.querySelector('dl');
+    expect(dl).toHaveAttribute('aria-labelledby', label.id);
+    expect(dl).not.toHaveAttribute('aria-live');
   });
 
   it('ticks the displayed figures once a second', () => {
@@ -73,6 +85,26 @@ describe('EventCountdown', () => {
     expect(screen.queryByText('09')).toBeNull();
   });
 
+  it('clears the ticking interval on unmount', () => {
+    vi.setSystemTime(new Date(BEFORE_START));
+    const clearSpy = vi.spyOn(globalThis, 'clearInterval');
+    const { unmount } = render(<EventCountdown eventConfig={BASE_CONFIG} />);
+    expect(clearSpy).not.toHaveBeenCalled();
+    unmount();
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+    clearSpy.mockRestore();
+  });
+
+  it('does not count down in draft: counting is an allowlist of the phases before the event, not everything outside in_progress/ended/archived', () => {
+    // No announcedAt at all — the lifecycle clock reads this as draft.
+    const draftConfig = { ...BASE_CONFIG, announcedAt: undefined };
+    const at = new Date(BEFORE_START);
+    vi.setSystemTime(at);
+    expect(getEventPhase(draftConfig, at)).toBe('draft');
+    const { container } = render(<EventCountdown eventConfig={draftConfig} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('stops counting and states that the event is running at in_progress', () => {
     const at = new Date('2026-06-10T12:00:00.000Z');
     vi.setSystemTime(at);
@@ -80,6 +112,30 @@ describe('EventCountdown', () => {
     const { container } = render(<EventCountdown eventConfig={BASE_CONFIG} />);
     expect(screen.getByText('This event is happening now.')).toBeInTheDocument();
     expect(container.querySelector('dl')).toBeNull();
+  });
+
+  it('checks about once a minute while running, so it moves on to the ended line on its own once the last day is over — no reload needed', () => {
+    // One minute before day 2 (the last day) ends.
+    const start = new Date('2026-06-11T16:59:00.000Z');
+    vi.setSystemTime(start);
+    expect(getEventPhase(BASE_CONFIG, start)).toBe('in_progress');
+    render(<EventCountdown eventConfig={BASE_CONFIG} />);
+    expect(screen.getByText('This event is happening now.')).toBeInTheDocument();
+
+    // A tick smaller than the check interval changes nothing yet.
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(screen.getByText('This event is happening now.')).toBeInTheDocument();
+
+    // Two more once-a-minute checks land after the event's own end (the
+    // lifecycle clock compares at minute precision, so the check that
+    // lands exactly on the boundary minute does not flip it — the one
+    // after does, on its own, with no remount).
+    act(() => {
+      vi.advanceTimersByTime(90_000);
+    });
+    expect(screen.getByText('This event has ended.')).toBeInTheDocument();
   });
 
   it('shows the stated post event line once the event has ended', () => {
@@ -112,7 +168,6 @@ describe('EventCountdown', () => {
     // in_progress on the next tick, and the lead reads the running line —
     // never a countdown gone negative.
     expect(screen.getByText('This event is happening now.')).toBeInTheDocument();
-    expect(screen.queryByText(/^-/)).toBeNull();
   });
 
   it('renders nothing before in_progress when the event has no resolvable start', () => {

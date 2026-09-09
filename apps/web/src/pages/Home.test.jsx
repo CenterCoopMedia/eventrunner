@@ -7,7 +7,7 @@
 // React throw and blank the whole homepage. The render must guard the type
 // defensively, independent of the write-boundary fix in
 // packages/shared/src/config/schema.cjs.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 let eventConfig;
@@ -132,5 +132,30 @@ describe('Home lead image', () => {
     heroBlocks = [{ ...LEAD, alt: '' }];
     const { container } = render(<Home />);
     expect(container.querySelector('img')).toBeNull();
+  });
+});
+
+// The lifecycle-aware countdown (M7 issue 7) lives inside the same lead
+// section as the heading and tagline above — this proves it actually
+// renders there, rather than only unit-testing EventCountdown in isolation.
+describe('Home lead countdown', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'));
+    eventConfig = {
+      name: 'Demo Event',
+      timezone: 'UTC',
+      announcedAt: '2026-01-01T00:00',
+      days: [{ id: 'day-1', date: '2026-10-14', startTime: '09:00', endTime: '17:00' }],
+    };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders the countdown in the lead, ahead of a future event', () => {
+    render(<Home />);
+    expect(screen.getByText('Time until the event starts')).toBeInTheDocument();
   });
 });
