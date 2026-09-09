@@ -76,11 +76,15 @@ export default function VenueMap({ map, image, className = '' }) {
 
   return (
     <div className={['venue-map grid gap-lg md:grid-cols-3', className].filter(Boolean).join(' ')}>
-      <div className="relative md:col-span-2">
-        {/* The frame holds its ratio before the bytes arrive, so the markers
-            land where they belong on first paint instead of stacking at the
-            top and jumping down when the picture loads. `contain` inside it,
-            because a cropped plan is a plan with rooms cut off it. */}
+      <div className="venue-map__frame md:col-span-2">
+        {/* The frame is the picture and nothing more (index.css): it shrinks
+            to whatever box the image's own proportions make. It cannot hold
+            a shape of its own, because the markers below are positioned
+            against THIS box — a frame wider or taller than the plan inside
+            it letterboxes the plan and puts every marker on the wrong room.
+            The cost is a single layout shift when the bytes arrive, which
+            nothing here can reserve against: a stored map is a path and a
+            sentence, not a width and a height. */}
         <img
           src={image.src}
           alt={map.alt}
@@ -90,8 +94,9 @@ export default function VenueMap({ map, image, className = '' }) {
         />
         {/* Decoration for the reader who can see the plan: the same numbers
             the list carries, sitting where the operator placed them. The
-            coordinates are percentages of the frame, so a marker holds its
-            spot at every size the picture is served at. */}
+            coordinates are percentages of the picture — which is what the
+            frame above is — so a marker holds its spot at every size the
+            picture is served at. */}
         {marked.map((room) => (
           <span
             key={room.id}

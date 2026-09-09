@@ -6,6 +6,9 @@
 // the accessibility tree, because they say nothing the list does not. The
 // rest is about the picture that does not arrive — a public page owes a
 // reader silence there, not a note about somebody else's storage bucket.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
@@ -13,6 +16,9 @@ const { assetUrl } = vi.hoisted(() => ({ assetUrl: vi.fn() }));
 vi.mock('../lib/mediaSource.js', () => ({ assetUrl }));
 
 import VenueMap, { useVenueMapImage } from './VenueMap.jsx';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const indexCss = fs.readFileSync(path.resolve(here, '..', 'index.css'), 'utf8');
 
 const MAP = {
   image: 'cms-images/abc/plan.png',
@@ -74,10 +80,37 @@ describe('VenueMap', () => {
     expect(markers[0].style.top).toBe('80%');
   });
 
-  it('holds the frame by token so the markers do not move when the picture loads', () => {
-    assetUrl.mockReturnValue('https://storage.example/plan.png');
-    render(<MapHarness map={MAP} />);
-    expect(screen.getByAltText(MAP.alt)).toHaveClass('venue-map__image');
+  it('hangs the markers on the picture\u2019s own box, whatever shape the plan is', () => {
+    // THE BUG THIS REPLACES: the frame held a fixed 4:3 ratio and the image
+    // sat inside it on `object-fit: contain`. A portrait plan was letterboxed
+    // \u2014 bars above and below \u2014 and every marker, placed as a percentage of
+    // the FRAME, then pointed at a spot the picture was not drawn on. "60%
+    // down" landed on grey. So the frame is whatever box the image's own
+    // bytes make, and the markers are its children.
+    assetUrl.mockReturnValue('https://storage.example/portrait-plan.png');
+    const { container } = render(<MapHarness map={MAP} />);
+    const image = screen.getByAltText(MAP.alt);
+    const frame = container.querySelector('.venue-map__frame');
+
+    expect(image).toHaveClass('venue-map__image');
+    expect(image.parentElement).toBe(frame);
+    for (const marker of container.querySelectorAll('.venue-map__marker')) {
+      expect(marker.parentElement).toBe(frame);
+    }
+
+    // Nothing on either element forces a ratio the plan does not have: no
+    // aspect utility, no inline ratio, and no `contain` fit to letterbox
+    // inside one. jsdom does no layout, so the rule itself is the evidence.
+    for (const element of [frame, image]) {
+      expect(element.className).not.toMatch(/aspect-/);
+      expect(element.style.aspectRatio).toBe('');
+    }
+    const rule = indexCss.match(/\.venue-map__image \{[^}]*\}/)[0];
+    expect(rule).not.toMatch(/aspect-ratio/);
+    expect(rule).not.toMatch(/object-fit/);
+    // The frame shrinks to the picture instead of stretching past it, which
+    // is what makes "60% across the frame" mean "60% across the plan".
+    expect(indexCss).toMatch(/\.venue-map__frame \{[^}]*inline-size: fit-content;/);
   });
 
   it('renders the picture with no markers when nothing has been placed', () => {

@@ -261,6 +261,12 @@ export default function AdminEventSettings() {
     setMapChecked(true);
     if (validateVenueMap(form.venue).size > 0) {
       setStatus('');
+      // A rejection from the SERVER, if one is still standing, goes now.
+      // Nothing is being sent, so its summary is stating a problem that may
+      // already be fixed — and the focus move below lands on the first
+      // marked field in the form, which would be one of that old
+      // rejection's rather than the map field doing the refusing.
+      setError(null);
       window.setTimeout(() => {
         const invalid = formRef.current?.querySelector('[aria-invalid="true"]');
         invalid?.focus();

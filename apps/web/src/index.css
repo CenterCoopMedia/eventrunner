@@ -253,16 +253,29 @@
     }
   }
 
-  /* Venue map: the uploaded plan of the building. The frame is fixed by
-     token, like the lead image, so the numbered markers sitting on it at
-     percentage coordinates are in place on first paint rather than stacking
-     at the top and jumping when the picture loads. `contain`, not `cover`:
-     a cropped plan is a plan with rooms cut off it. */
+  /* Venue map: the uploaded plan of the building. THE FRAME IS THE PICTURE.
+     The numbered markers sit on the frame at percentage coordinates, so any
+     gap between the frame and the plan drawn inside it is a marker pointing
+     at the wrong room. A fixed ratio with `contain` was exactly that gap:
+     it letterboxed every plan that was not that ratio, and "60% down the
+     frame" then landed on a grey bar. So the image sizes itself from its
+     own bytes — the column's full width whenever it has the pixels for it,
+     capped in height so a tall plan does not run off the screen, and never
+     stretched to a shape it is not — and the frame shrinks to that box.
+     Nothing is reserved before the bytes arrive, because nothing records a
+     stored plan's dimensions to reserve it FROM; the page shifts once on
+     load, which is the honest cost of markers that point at the right room. */
+  .venue-map__frame {
+    position: relative;
+    inline-size: fit-content;
+    max-inline-size: 100%;
+  }
   .venue-map__image {
     display: block;
-    inline-size: 100%;
-    aspect-ratio: var(--venue-map-aspect);
-    object-fit: contain;
+    inline-size: auto;
+    block-size: auto;
+    max-inline-size: 100%;
+    max-block-size: var(--venue-map-max-block-size);
   }
 
   /* Folio: a small-caps plain-text label that sits ON a rule. Never above a

@@ -504,7 +504,16 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
           <ImagePicker
             label="Map image"
             value={map.image}
-            onChange={(value) => changeMap({ image: value })}
+            // CLEARING THE PICTURE CLEARS WHAT BELONGED TO IT. The alt text
+            // describes THAT plan and the markers are coordinates on it, so
+            // leaving either behind in the form means the next picture
+            // chosen here publishes an unrelated plan under the old
+            // sentence, with the old dots over rooms it does not show. The
+            // fields stop rendering either way; this is what makes them
+            // stop existing.
+            onChange={(value) =>
+              changeMap(value ? { image: value } : { image: '', alt: '', markers: [] })
+            }
             hint="Choose or upload the map. Clearing this removes the map from the travel page."
             error={errorFor('venue.map.image')}
           />

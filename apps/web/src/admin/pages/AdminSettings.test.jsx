@@ -306,6 +306,42 @@ describe('event settings', () => {
     // own budget rather than failing as a flake on a busy machine.
   }, 20000);
 
+  it('drops the server\u2019s rejection before the map\u2019s own refusal takes focus', async () => {
+    // A save the SERVER refused leaves a summary and marks its fields. The
+    // next save is refused LOCALLY, by the map, and returns before anything
+    // is sent \u2014 so the old rejection has to go with it. It used to survive:
+    // the summary went on stating a problem the person had already fixed,
+    // and focus, which lands on the first marked field in the form, landed
+    // on the corrected one rather than on the map field doing the refusing.
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [{ id: 'main-hall', name: 'Main hall' }],
+        movements: [],
+        map: { image: 'cms-images/a/plan.png', alt: 'A plan.', markers: [] },
+      },
+    });
+
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'name: must be a nonempty string'));
+    fireEvent.change(screen.getByLabelText('Event name'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Event name')).toHaveAttribute('aria-invalid', 'true');
+
+    // Fix the name the server named, then break the map instead.
+    fireEvent.change(screen.getByLabelText('Event name'), { target: { value: 'Renamed summit' } });
+    fireEvent.change(screen.getByLabelText('Map alt text'), { target: { value: '  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    const alt = screen.getByLabelText('Map alt text');
+    await waitFor(() => expect(document.activeElement).toBe(alt));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Event name')).not.toHaveAttribute('aria-invalid');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks removal when a live or draft revision uses a place', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', {

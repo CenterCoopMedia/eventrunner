@@ -581,6 +581,56 @@ describe('ContentPage — search and section index on long pages', () => {
     );
   });
 
+  it('counts the retained map as a result so the status does not deny what is on screen', async () => {
+    renderAt('/map-status');
+    await screen.findByRole('heading', { name: 'Page not found' });
+    pushPage({
+      id: 'map-status',
+      label: 'Map status fixture',
+      path: '/map-status',
+      icon: null,
+      order: 99,
+      visible: true,
+      systemPage: false,
+      sections: [
+        pageSection('ms_intro', 'Introduction'),
+        pageSection('ms_notes', 'Notes'),
+        pageSection(VENUE_MAP_SECTION_ID, 'Venue map'),
+      ],
+    });
+    pushContent([
+      textBlock('ms_intro', 'summary', 'Welcome to the fixture page for these tests.'),
+      textBlock('ms_notes', 'note', 'The ramp is at the north door, a fact worth knowing.'),
+    ]);
+    await screen.findByRole('heading', { level: 1, name: 'Map status fixture' });
+
+    const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
+    const status = screen.getByRole('status');
+
+    vi.useFakeTimers();
+    try {
+      // The map is not a block and carries no block text, so it survives a
+      // filter on its section's label alone. The count used to read blocks
+      // only, so the live region announced "No items match" over a page
+      // that was, right then, showing the plan the reader had asked for.
+      fireEvent.change(filter, { target: { value: 'Venue' } });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
+      expect(status).toHaveTextContent('1 of 3 items match');
+
+      // A query nothing answers still says so, map and all.
+      fireEvent.change(filter, { target: { value: 'Zzyzx' } });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(status).toHaveTextContent('No items match');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows no empty state on a page whose only content is the map', async () => {
     renderAt('/map-only');
     await screen.findByRole('heading', { name: 'Page not found' });

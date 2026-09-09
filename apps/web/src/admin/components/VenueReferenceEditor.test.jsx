@@ -262,6 +262,35 @@ describe('VenueReferenceEditor map panel', () => {
     expect(screen.getByRole('status')).toHaveTextContent('its map marker');
   });
 
+  it('takes the alt text and the markers with the picture when it is cleared', () => {
+    render(
+      <EditorHarness
+        venue={{
+          ...venue,
+          map: { ...venue.map, markers: [{ placeId: 'studio', x: '40', y: '60' }] },
+        }}
+      />,
+    );
+    expect(screen.getByLabelText('Map alt text')).toHaveValue('A floor plan.');
+    expect(screen.getByLabelText('Marker 1 room')).toHaveValue('studio');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+
+    // Both fields are gone from the panel, which is what clearing the image
+    // has always looked like \u2014 the point is that they are gone from the FORM
+    // STATE too. They used to sit there unrendered and come back the moment
+    // another picture was chosen: an unrelated plan, described by the old
+    // sentence, with the old dots over rooms it does not show.
+    expect(screen.queryByLabelText('Map alt text')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Marker 1 room')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Map image'), {
+      target: { value: 'cms-images/b/other-plan.png' },
+    });
+    expect(screen.getByLabelText('Map alt text')).toHaveValue('');
+    expect(screen.queryByLabelText('Marker 1 room')).not.toBeInTheDocument();
+  });
+
   it('offers no marker rows until an image is chosen', () => {
     render(<EditorHarness venue={{ ...venue, map: { image: '', alt: '', markers: [] } }} />);
     expect(screen.queryByRole('button', { name: 'Add marker' })).not.toBeInTheDocument();

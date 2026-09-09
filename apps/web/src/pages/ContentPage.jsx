@@ -232,15 +232,25 @@ export default function ContentPage() {
 
   const trimmedQuery = query.trim();
   const settledTrimmedQuery = settledQuery.trim();
-  const settledMatchedBlocks = settledFilteredSections.reduce(
-    (sum, { blocks }) => sum + blocks.length,
-    0,
-  );
+  // THE MAP COUNTS AS ONE. It is not a block, so counting blocks alone made
+  // the live region announce "No items match" over a page that was, right
+  // then, showing the plan the query had retained (filterSections keeps a
+  // map on its section's label). The status has to describe what is on
+  // screen, so the one thing on screen that is not a block is counted like
+  // one — on both sides of the ratio, or "1 of 2" would be counting a match
+  // the total never admitted to having.
+  const countItems = (sections) =>
+    sections.reduce(
+      (sum, { blocks, map: sectionMap }) => sum + blocks.length + (sectionMap ? 1 : 0),
+      0,
+    );
+  const totalItems = countItems(baseSections);
+  const settledMatchedItems = countItems(settledFilteredSections);
   const resultsSummary = !settledTrimmedQuery
     ? ''
-    : settledMatchedBlocks === 0
+    : settledMatchedItems === 0
       ? `No items match “${settledTrimmedQuery}”.`
-      : `${settledMatchedBlocks} of ${totalBlocks} items match “${settledTrimmedQuery}”.`;
+      : `${settledMatchedItems} of ${totalItems} items match “${settledTrimmedQuery}”.`;
 
   // The invisible heading's own section is left out of the index: a sighted
   // keyboard user who activates it would land on a heading with nothing to
