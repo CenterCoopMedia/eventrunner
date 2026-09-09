@@ -120,12 +120,22 @@ describe('admin Sessions workspace', () => {
     fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:00' } });
 
     const field = screen.getByLabelText('Recording link');
-    fireEvent.change(field, { target: { value: 'javascript:alert(1)' } });
-    expect(await screen.findByText('Enter a link that starts with http:// or https://.')).toBeInTheDocument();
-    expect(field).toHaveAttribute('aria-invalid', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
-    expect(fetch).not.toHaveBeenCalled();
+    // A scheme with no slashes is the typo an operator cannot see, and it
+    // is the one the old protocol-only check let through: stored, it
+    // resolves as a path on the event's own site rather than reaching the
+    // video host at all. The editor refuses it for the same reason the
+    // server does, and with the same wording.
+    for (const bad of ['javascript:alert(1)', 'https:video.example.org/watch', '//video.example.org/x']) {
+      fireEvent.change(field, { target: { value: bad } });
+      expect(
+        await screen.findByText('Enter a link that starts with http:// or https://.'),
+        `accepted ${bad}`,
+      ).toBeInTheDocument();
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+      expect(fetch).not.toHaveBeenCalled();
+    }
 
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
     fireEvent.change(field, { target: { value: 'https://video.example.org/watch?v=abc' } });
