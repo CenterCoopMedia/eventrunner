@@ -27,6 +27,7 @@
  * the data instead of needing a special case in the renderer.
  */
 
+const { VENUE_MAP_SECTION_ID } = require('shared/venue');
 const { buildLegalContent } = require('./legal.cjs');
 const { getDefaultTemplate } = require('../../functions/src/email/templates.cjs');
 
@@ -164,6 +165,14 @@ function defaultPages() {
             block('venue_address', 'text', 'Street address of the venue.'),
             block('venue_notes', 'richtext', 'Entrances, accessibility, and arrival notes.'),
           ]),
+        // The uploaded venue map. This section holds NO seeded block: the
+        // map is `config/event.venue.map`, set in admin Event settings from
+        // the media library, and the page renders it wherever it states a
+        // section with this id. Until somebody uploads one the section is
+        // empty and renders nothing, exactly like the lists below — and any
+        // richtext an operator adds here sits above it as arrival notes.
+        section(VENUE_MAP_SECTION_ID, 'Venue map', 'The uploaded map of the building and the rooms on it. Upload the map in Event settings.',
+          ['richtext'], 4),
         // Variable-length lists (§5.3): seeded with no items, so a client
         // with one hotel and five transit options is a CMS edit, and a
         // half-filled travel page renders sparse rather than wrong.

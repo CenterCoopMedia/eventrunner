@@ -166,6 +166,10 @@ The event's own identity fields: Name, dates, timezone, venue, sender address, a
 
 **Printing.** Print any schedule page and you get the handout: Every day of the event, every session and every stop under it, tracks named by letter and name, no buttons. You do not have to prepare anything for it, and you get the light edition even if you print from a dark screen.
 
+**Venue map.** Upload a map of the building and the travel page prints it, with the venue's rooms listed beside it. Under **Venue map** you choose or upload the image the same way you pick any other picture, and then write the **alt text**: One sentence saying what the map shows. The alt text is required — a map with none does not publish, because an image nobody described tells a reader using a screen reader nothing at all.
+
+**Marking rooms on the map.** A marker puts a numbered dot on the image where one of your places is. Add one with **Add marker**, pick the room, and type how far **across** and **down** it sits as percentages of the picture: 0 across is the left edge, 100 the right; 0 down is the top, 100 the bottom. Every place is listed beside the map whether or not you mark it, and the number on the dot is the number in the list, so a reader can match the two. One marker per room, and a marker for a room you later delete is refused at the save rather than left pointing at nothing. **Remove marker** takes one off.
+
 ## Settings → Features
 
 Feature flags, wired to a **whole-document replace** — every known flag is always sent, and an omitted flag means disabled. When a new flag is added to the platform it appears here automatically, because the form's key list comes from the same shared schema the server validates against.

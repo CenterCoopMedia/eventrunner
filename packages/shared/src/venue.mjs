@@ -1,6 +1,9 @@
 export {
   VENUE_PLACE_KEYS,
   VENUE_MOVEMENT_KEYS,
+  VENUE_MAP_KEYS,
+  VENUE_MARKER_KEYS,
+  VENUE_MAP_SECTION_ID,
   PLACE_ID_RE,
   MAX_WALKING_MINUTES,
   resolveVenuePlaces,
@@ -8,4 +11,6 @@ export {
   sessionPlaceId,
   resolveMovement,
   sessionMovement,
+  storageObjectPath,
+  resolveVenueMap,
 } from './venue.cjs';

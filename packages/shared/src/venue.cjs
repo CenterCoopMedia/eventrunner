@@ -75,6 +75,49 @@ const VENUE_MOVEMENT_KEYS = Object.freeze([
 ]);
 
 /**
+ * THE MAP: a picture of the building, and the same rooms in words.
+ *
+ * `config/event.venue.map` is `{ image, alt, markers[] }`. It is a THIRD
+ * fact about the venue, recorded by the same operator as the places and the
+ * movements, and it invents nothing the other two do not already say:
+ *
+ *   image     the Storage object path of an uploaded picture (the media
+ *             library's stored identity — see admin ImagePicker; never a
+ *             download URL, which changes when an object is replaced).
+ *   alt       what the picture shows, in the operator's own words.
+ *   markers[] `{ placeId, x, y }` — where one of `places[]` sits on that
+ *             picture, as percentages of its width and height.
+ *
+ * THE MARKERS ARE NOT THE ROOM LIST. A marker is a coordinate; the rooms
+ * are `places[]`, which is also what a session points at by `placeId`, so
+ * the list beside the map names the same rooms the schedule does and a room
+ * is renamed in one place. A marked room carries a number; an unmarked one
+ * is still a room of this venue and is still listed, without one. That is
+ * why this reader returns rooms rather than markers: the text list is the
+ * accessible equal of the image, not a caption on it, and it does not
+ * shrink to whatever the operator got round to placing.
+ *
+ * ALT TEXT IS NOT OPTIONAL. An image with no words for it is an image half
+ * the readers cannot use, so this reader answers `null` rather than handing
+ * a page an unlabelled picture — the same rule the lead image device
+ * follows.
+ */
+const VENUE_MAP_KEYS = Object.freeze(['image', 'alt', 'markers']);
+
+/** Keys a `config/event.venue.map.markers[]` entry may carry. */
+const VENUE_MARKER_KEYS = Object.freeze(['placeId', 'x', 'y']);
+
+/**
+ * The seeded travel-page section the public map renders in.
+ *
+ * Named here rather than in either caller because two of them have to agree
+ * on it and they cannot import each other: `scripts/lib/seed.cjs` writes the
+ * section into the travel page document, and `apps/web` renders the map
+ * where a page states a section with this id.
+ */
+const VENUE_MAP_SECTION_ID = 'travel_map';
+
+/**
  * A place id: lowercase, digits, single hyphens. The same slug shape the
  * rest of the system uses for a stable identifier that appears in stored
  * references — a session's `placeId` points at one, so it has to survive a
@@ -258,9 +301,102 @@ function sessionMovement(eventConfig, fromSession, toSession) {
   return resolveMovement(eventConfig, sessionPlaceId(fromSession), sessionPlaceId(toSession));
 }
 
+/**
+ * A Storage object path, trimmed, or `null`.
+ *
+ * The same shapes `apps/web/src/lib/mediaSource.js` refuses before building
+ * a URL — an absolute URL, a leading slash, a parent traversal — because a
+ * map whose path can only build a nonsense URL is a map that will render as
+ * a broken image. The reader treats one as absent and renders nothing; the
+ * validator, which shares this function, refuses it at the save, where
+ * somebody can still paste the right thing.
+ *
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+function storageObjectPath(value) {
+  if (typeof value !== 'string') return null;
+  const path = value.trim();
+  if (path.length === 0) return null;
+  if (path.startsWith('/') || path.includes('..') || /^[a-z][a-z0-9+.-]*:/i.test(path)) return null;
+  return path;
+}
+
+/** A marker coordinate: a finite percentage of the image, 0 to 100. */
+function isCoordinate(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
+/**
+ * THE MAP AND ITS ROOMS, or `null`.
+ *
+ * `null` for a venue with no map, a map with no usable image path, and a map
+ * with no alt text — an unlabelled image renders nowhere.
+ *
+ * Otherwise the picture plus every place this venue records, in the venue's
+ * own order, each carrying its marker number and coordinates when the
+ * operator placed it and `null` for all three when they did not. Numbers run
+ * in the order the markers are recorded, so the number drawn on the image and
+ * the number read in the list are one number. A marker naming a place the
+ * venue does not define, carrying a coordinate outside the image, or naming
+ * a place an earlier marker already placed, is dropped: the validator refuses
+ * those at the save, and a page must not white-screen over one that predates
+ * it.
+ *
+ * @param {object|null} eventConfig
+ * @returns {{
+ *   image: string,
+ *   alt: string,
+ *   rooms: Array<{
+ *     id: string, name: string, floor: string|null,
+ *     number: number|null, x: number|null, y: number|null,
+ *   }>,
+ * } | null}
+ */
+function resolveVenueMap(eventConfig) {
+  const map = venueOf(eventConfig).map;
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return null;
+
+  const image = storageObjectPath(map.image);
+  if (!image) return null;
+  if (!isNonEmptyString(map.alt)) return null;
+
+  const places = resolveVenuePlaces(eventConfig);
+  const placeIds = new Set(places.map((place) => place.id));
+  // A number is spent only on a marker that ends up drawn, so the numbers a
+  // reader sees run 1, 2, 3 with no gap where a dropped marker was.
+  const placed = new Map();
+  if (Array.isArray(map.markers)) {
+    for (const marker of map.markers) {
+      if (!marker || typeof marker !== 'object' || Array.isArray(marker)) continue;
+      if (typeof marker.placeId !== 'string' || !placeIds.has(marker.placeId)) continue;
+      if (placed.has(marker.placeId)) continue;
+      if (!isCoordinate(marker.x) || !isCoordinate(marker.y)) continue;
+      placed.set(marker.placeId, { number: placed.size + 1, x: marker.x, y: marker.y });
+    }
+  }
+
+  const rooms = places.map((place) => {
+    const marker = placed.get(place.id) ?? null;
+    return {
+      id: place.id,
+      name: place.name,
+      floor: place.floor ?? null,
+      number: marker ? marker.number : null,
+      x: marker ? marker.x : null,
+      y: marker ? marker.y : null,
+    };
+  });
+
+  return { image, alt: map.alt.trim(), rooms };
+}
+
 module.exports = {
   VENUE_PLACE_KEYS,
   VENUE_MOVEMENT_KEYS,
+  VENUE_MAP_KEYS,
+  VENUE_MARKER_KEYS,
+  VENUE_MAP_SECTION_ID,
   PLACE_ID_RE,
   MAX_WALKING_MINUTES,
   resolveVenuePlaces,
@@ -268,4 +404,6 @@ module.exports = {
   sessionPlaceId,
   resolveMovement,
   sessionMovement,
+  storageObjectPath,
+  resolveVenueMap,
 };

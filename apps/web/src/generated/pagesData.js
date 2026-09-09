@@ -235,6 +235,17 @@ export const pagesData = [
         ],
       },
       {
+        id: 'travel_map',
+        label: 'Venue map',
+        description: 'The uploaded map of the building and the rooms on it. Upload the map in Event settings.',
+        allowedBlocks: [
+          'richtext',
+        ],
+        maxBlocks: 4,
+        reorderable: true,
+        defaultBlocks: [],
+      },
+      {
         id: 'travel_lodging',
         label: 'Lodging',
         description: 'One entry per hotel or block booking. Empty until a client adds one.',

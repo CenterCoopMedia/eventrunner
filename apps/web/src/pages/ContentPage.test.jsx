@@ -31,6 +31,10 @@ vi.mock('../lib/contentSource.js', () => ({
 }));
 vi.mock('../firebase.js', () => ({
   app: {}, auth: {}, db: {}, storage: {},
+  // The travel page resolves the venue map's Storage path to a URL; the
+  // bucket is named so the resolve succeeds, and nothing is fetched.
+  storageBucketName: 'demo.appspot.com',
+  storageDownloadOrigin: 'https://firebasestorage.example',
   // App Check is unconfigured in a credential-free run, which is also its
   // production default: no site key, no attestation header (issue #45).
   appCheckEnabled: false,
@@ -119,6 +123,24 @@ describe('ContentPage (catch-all route)', () => {
   it('names the event alone on the home page, as the server titles it', async () => {
     renderAt('/');
     expect(document.title).toBe(eventConfig.name);
+  });
+
+  it('renders the venue map on the travel page, rooms and all', async () => {
+    // The map is config/event data, not a block, and the seeded travel page
+    // asks for it by stating the venue-map section. So the section renders
+    // with no blocks in it at all — and a reader who cannot see the picture
+    // still gets every room name as text.
+    renderAt('/travel');
+    const travel = pagesData.find((p) => p.id === 'travel');
+    const mapSection = travel.sections.find((s) => s.id === 'travel_map');
+    expect(mapSection.defaultBlocks).toHaveLength(0);
+    expect(
+      await screen.findByRole('heading', { name: mapSection.label }),
+    ).toBeInTheDocument();
+    expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
+    for (const place of eventConfig.venue.places) {
+      expect(screen.getByText(place.name)).toBeInTheDocument();
+    }
   });
 
   it('404s cleanly on an unknown path', async () => {

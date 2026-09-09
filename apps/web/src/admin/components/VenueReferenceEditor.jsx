@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { storageObjectPath } from 'shared/venue';
 import {
   Panel,
   SelectField,
@@ -6,9 +7,11 @@ import {
   dangerButtonClass,
   secondaryButtonClass,
 } from './formControls.jsx';
+import ImagePicker from './media/ImagePicker.jsx';
 
 const PLACE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EMPTY_REFERENCES = Object.freeze([]);
+const EMPTY_MAP = Object.freeze({ image: '', alt: '', markers: EMPTY_REFERENCES });
 
 export const blankPlace = () => ({ id: '', name: '', floor: '', persisted: false });
 export const blankMovement = () => ({
@@ -17,6 +20,7 @@ export const blankMovement = () => ({
   walkingMinutes: '0',
   accessibleRoute: '',
 });
+export const blankMarker = () => ({ placeId: '', x: '50', y: '50' });
 
 export function placeIdFromName(name) {
   return String(name ?? '')
@@ -28,8 +32,26 @@ export function placeIdFromName(name) {
     .replace(/-+/g, '-');
 }
 
+/** A stored number as a form string; '' for one that was never recorded. */
+const numberField = (value) =>
+  value === undefined || value === null || value === '' ? '' : String(value);
+
 export function normalizeVenueReferences(venue) {
+  const map = venue?.map && typeof venue.map === 'object' && !Array.isArray(venue.map)
+    ? venue.map
+    : null;
   return {
+    map: {
+      image: map?.image ?? '',
+      alt: map?.alt ?? '',
+      markers: Array.isArray(map?.markers)
+        ? map.markers.map((marker) => ({
+            placeId: marker?.placeId ?? '',
+            x: numberField(marker?.x),
+            y: numberField(marker?.y),
+          }))
+        : [],
+    },
     places: Array.isArray(venue?.places)
       ? venue.places.map((place) => ({
           id: place?.id ?? '',
@@ -57,8 +79,30 @@ const optional = (value) => {
   return trimmed || null;
 };
 
+/**
+ * The map, or null.
+ *
+ * No image is no map, and null is the server's "clear this" — so an operator
+ * who clears the picker removes the stored map rather than leaving a record
+ * of an image that is no longer there.
+ */
+function venueMapPayload(map) {
+  const image = String(map?.image ?? '').trim();
+  if (!image) return null;
+  return {
+    image,
+    alt: String(map?.alt ?? '').trim(),
+    markers: (map?.markers ?? []).map((marker) => ({
+      placeId: marker.placeId,
+      x: Number(marker.x),
+      y: Number(marker.y),
+    })),
+  };
+}
+
 export function venueReferencesPayload(venue) {
   return {
+    map: venueMapPayload(venue?.map),
     places: (venue?.places ?? []).map((place) => ({
       id: String(place.id ?? '').trim(),
       name: String(place.name ?? '').trim(),
@@ -109,6 +153,38 @@ export function validateVenueReferences(venue) {
       errors.set(`${at}.walkingMinutes`, 'Enter a whole number from 0 to 120.');
     }
   }
+
+  // The map. Nothing is checked until an image is chosen, because until then
+  // there is no map to be wrong about.
+  const map = venue?.map;
+  if (String(map?.image ?? '').trim()) {
+    // The picker's path stays editable as text, so a URL can be typed into
+    // it — and a URL cannot be resolved against the bucket.
+    if (!storageObjectPath(map.image)) {
+      errors.set('venue.map.image', 'Use a path from the media library, not a URL.');
+    }
+    if (!String(map.alt ?? '').trim()) {
+      errors.set('venue.map.alt', 'Enter alt text saying what the map shows.');
+    }
+    const marked = new Set();
+    for (const [index, marker] of (map.markers ?? []).entries()) {
+      const at = `venue.map.markers[${index}]`;
+      if (!ids.has(marker.placeId)) {
+        errors.set(`${at}.placeId`, 'Select a defined place.');
+      } else if (marked.has(marker.placeId)) {
+        errors.set(`${at}.placeId`, 'This room is already marked on the map.');
+      } else {
+        marked.add(marker.placeId);
+      }
+      for (const axis of ['x', 'y']) {
+        const raw = String(marker[axis] ?? '').trim();
+        const value = Number(raw);
+        if (raw === '' || !Number.isFinite(value) || value < 0 || value > 100) {
+          errors.set(`${at}.${axis}`, 'Enter a number from 0 to 100.');
+        }
+      }
+    }
+  }
   return errors;
 }
 
@@ -120,10 +196,14 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
   const [notice, setNotice] = useState('');
   const addPlaceRef = useRef(null);
   const addMovementRef = useRef(null);
+  const addMarkerRef = useRef(null);
   const placeRemoveRefs = useRef([]);
   const movementRemoveRefs = useRef([]);
+  const markerRemoveRefs = useRef([]);
   const places = venue.places ?? EMPTY_REFERENCES;
   const movements = venue.movements ?? EMPTY_REFERENCES;
+  const map = venue.map ?? EMPTY_MAP;
+  const markers = map.markers ?? EMPTY_REFERENCES;
   const options = useMemo(
     () => [
       { value: '', label: 'Select a place' },
@@ -160,10 +240,20 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
       movements: movements.filter(
         (movement) => movement.from !== place.id && movement.to !== place.id,
       ),
+      // A marker for a room that is going leaves a coordinate pointing at
+      // nothing, which the server refuses by name. It goes with the room.
+      map: { ...map, markers: markers.filter((marker) => marker.placeId !== place.id) },
     });
-    setNotice(
+    const removedMarker = markers.some((marker) => marker.placeId === place.id);
+    const alsoGoing = [
       removedMovements > 0
-        ? `${place.name || place.id} and ${removedMovements} unsaved route${removedMovements === 1 ? '' : 's'} will be removed when you save.`
+        ? `${removedMovements} unsaved route${removedMovements === 1 ? '' : 's'}`
+        : null,
+      removedMarker ? 'its map marker' : null,
+    ].filter(Boolean);
+    setNotice(
+      alsoGoing.length > 0
+        ? `${place.name || place.id} and ${alsoGoing.join(' and ')} will be removed when you save.`
         : `${place.name || place.id} will be removed when you save.`,
     );
     afterRender(() =>
@@ -180,6 +270,24 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
       (movementRemoveRefs.current[index]
         || movementRemoveRefs.current[index - 1]
         || addMovementRef.current)?.focus(),
+    );
+  };
+
+  const changeMap = (patch) => onChange({ map: { ...map, ...patch } });
+  const changeMarker = (index, patch) =>
+    changeMap({
+      markers: markers.map((marker, markerIndex) =>
+        markerIndex === index ? { ...marker, ...patch } : marker,
+      ),
+    });
+
+  const removeMarker = (index) => {
+    changeMap({ markers: markers.filter((_, markerIndex) => markerIndex !== index) });
+    setNotice('The marker will be removed when you save.');
+    afterRender(() =>
+      (markerRemoveRefs.current[index]
+        || markerRemoveRefs.current[index - 1]
+        || addMarkerRef.current)?.focus(),
     );
   };
 
@@ -328,6 +436,109 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
             ))}
           </ol>
         )}
+      </Panel>
+
+      {/* THE MAP. An uploaded picture of the building, plus where the places
+          above sit on it. The room list the public page prints beside the
+          picture is the places list, not this one — a marker only says where
+          a room already named sits, so a room is never named twice and a
+          venue with no markers still publishes a readable room list. */}
+      <Panel
+        title="Venue map"
+        description="An uploaded map of the building. The public travel page prints the room list beside it, so a reader who cannot see the image still gets every room name."
+        actions={
+          map.image ? (
+            <button
+              ref={addMarkerRef}
+              type="button"
+              className={secondaryButtonClass}
+              onClick={() => changeMap({ markers: [...markers, blankMarker()] })}
+            >
+              Add marker
+            </button>
+          ) : null
+        }
+      >
+        <div className="flex flex-col gap-sm">
+          <ImagePicker
+            label="Map image"
+            value={map.image}
+            onChange={(value) => changeMap({ image: value })}
+            hint="Choose or upload the map. Clearing this removes the map from the travel page."
+            error={errorFor('venue.map.image')}
+          />
+          {map.image ? (
+            <TextField
+              label="Map alt text"
+              value={map.alt}
+              onChange={(value) => changeMap({ alt: value })}
+              error={errorFor('venue.map.alt')}
+              hint="What the map shows, in a sentence. Required, and the map does not publish without it."
+            />
+          ) : null}
+        </div>
+
+        {map.image ? (
+          <div className="mt-sm">
+            {markers.length === 0 ? (
+              <p className="text-caption text-admin-ink-secondary">
+                No rooms marked yet. Every place is listed beside the map either way; a marker
+                also puts a numbered dot on the image.
+              </p>
+            ) : (
+              <ol className="flex flex-col">
+                {markers.map((marker, index) => (
+                  <li
+                    key={`${marker.placeId}-${index}`}
+                    className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
+                  >
+                    <div className="grid gap-sm sm:grid-cols-3">
+                      <SelectField
+                        label={`Marker ${index + 1} room`}
+                        value={marker.placeId}
+                        onChange={(value) => changeMarker(index, { placeId: value })}
+                        options={options}
+                        error={errorFor(`venue.map.markers[${index}].placeId`)}
+                      />
+                      {/* Typed, not dragged: a number is the coordinate a
+                          keyboard can reach, and it is the stored value. */}
+                      <TextField
+                        label={`Marker ${index + 1} across (%)`}
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={marker.x}
+                        onChange={(value) => changeMarker(index, { x: value })}
+                        error={errorFor(`venue.map.markers[${index}].x`)}
+                        hint="0 is the left edge, 100 the right."
+                      />
+                      <TextField
+                        label={`Marker ${index + 1} down (%)`}
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={marker.y}
+                        onChange={(value) => changeMarker(index, { y: value })}
+                        error={errorFor(`venue.map.markers[${index}].y`)}
+                        hint="0 is the top edge, 100 the bottom."
+                      />
+                    </div>
+                    <button
+                      ref={(node) => { markerRemoveRefs.current[index] = node; }}
+                      type="button"
+                      className={`${dangerButtonClass} mt-sm`}
+                      onClick={() => removeMarker(index)}
+                    >
+                      Remove marker {index + 1}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        ) : null}
       </Panel>
     </>
   );

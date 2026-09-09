@@ -19,10 +19,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
+import { VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
+import VenueMap from '../components/VenueMap.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import SectionIndexNav from '../components/SectionIndexNav.jsx';
@@ -66,14 +68,21 @@ const STATUS_SETTLE_MS = 300;
  * A block matches on its own text OR its section's label, so a query for
  * "Venue" finds every block filed under a Venue section. */
 function filterSections(sections, query) {
+  const trimmed = query.trim().toLowerCase();
   return sections
-    .map(({ section, blocks }) => ({
+    .map(({ section, blocks, map }) => ({
       section,
       blocks: blocks.filter((block) =>
         blockMatchesQuery(block, query, { sectionLabel: section.label }),
       ),
+      // The venue map is not a block and carries no block text, so the
+      // filter cannot narrow INSIDE it. It survives on its section's label,
+      // the same thing a block filed under that section already matches on —
+      // and an empty query keeps it, which is what makes this the identity
+      // map for a page whose only content is the map.
+      map: map && (!trimmed || section.label.toLowerCase().includes(trimmed)) ? map : null,
     }))
-    .filter(({ blocks }) => blocks.length > 0);
+    .filter(({ blocks, map }) => blocks.length > 0 || map);
 }
 
 export default function ContentPage() {
@@ -129,9 +138,25 @@ export default function ContentPage() {
   const showLegalNotice =
     LEGAL_PAGE_IDS.includes(page.id) && eventConfig?.legal?.reviewRequired === true;
 
+  // THE VENUE MAP IS NOT A BLOCK. It is a picture of the building plus the
+  // rooms the schedule already points at, so it lives on config/event beside
+  // the address (shared/venue.cjs) rather than being retyped into CMS
+  // content. A page ASKS for it by stating a section with this id — the
+  // seeded travel page does, and any page an operator adds one to gets it
+  // too — which keeps the page a document and this route its renderer.
+  const venueMap = resolveVenueMap(eventConfig);
+
   const baseSections = (page.sections ?? [])
-    .map((section) => ({ section, blocks: getSectionBlocks(section.id) }))
-    .filter(({ blocks }) => blocks.length > 0);
+    .map((section) => ({
+      section,
+      blocks: getSectionBlocks(section.id),
+      map: section.id === VENUE_MAP_SECTION_ID ? venueMap : null,
+    }))
+    // A section with nothing in it renders nothing, and a map is something.
+    // A map section carries no blocks, so this is the one place that decides
+    // it counts as populated — which is also what carries it into the
+    // long-page gate and the section index below.
+    .filter(({ blocks, map }) => blocks.length > 0 || map);
 
   const totalBlocks = baseSections.reduce((sum, { blocks }) => sum + blocks.length, 0);
   const hasFaqItem = baseSections.some(({ blocks }) =>
@@ -263,7 +288,7 @@ export default function ContentPage() {
           }
         />
       ) : (
-        filteredSections.map(({ section, blocks }, index) => (
+        filteredSections.map(({ section, blocks, map }, index) => (
           <section
             key={section.id}
             aria-labelledby={`section-${section.id}`}
@@ -293,6 +318,7 @@ export default function ContentPage() {
             )}
             <div className={index === 0 ? undefined : 'mt-md'}>
               <SectionBlocks blocks={blocks} />
+              <VenueMap map={map} className={blocks.length > 0 ? 'mt-md' : undefined} />
             </div>
           </section>
         ))

@@ -290,6 +290,12 @@ function buildEvent({ answers, tierA }) {
       // guessing one from two room names.
       places: Array.isArray(venue.places) ? venue.places : [],
       movements: Array.isArray(venue.movements) ? venue.movements : [],
+      // The uploaded map, for the same reason: null on a fresh deployment,
+      // because nobody has uploaded a plan of the building yet. An operator
+      // adds one from admin Event settings, out of the media library.
+      map: venue.map && typeof venue.map === 'object' && !Array.isArray(venue.map)
+        ? venue.map
+        : null,
     },
     sender: {
       email: orDefault(sender.email, ''),

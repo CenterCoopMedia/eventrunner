@@ -112,6 +112,27 @@ export const eventConfig = {
         walkingMinutes: 1,
       },
     ],
+    map: {
+      image: 'branding/og-default.svg',
+      alt: 'Placeholder image standing in for an uploaded plan of the building.',
+      markers: [
+        {
+          placeId: 'main-hall',
+          x: 50,
+          y: 42,
+        },
+        {
+          placeId: 'room-a',
+          x: 34,
+          y: 68,
+        },
+        {
+          placeId: 'room-b',
+          x: 66,
+          y: 68,
+        },
+      ],
+    },
   },
   sender: {
     email: 'summit@example.org',

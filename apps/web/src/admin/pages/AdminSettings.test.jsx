@@ -213,6 +213,37 @@ describe('event settings', () => {
     expect(venue.movements[0].walkingMinutes).toBe(0);
   });
 
+  it('sends the venue map, its alt text, and a marker as numbers', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [{ id: 'main-hall', name: 'Main hall' }],
+        movements: [],
+        map: { image: 'cms-images/a/plan.png', alt: 'A plan.', markers: [] },
+      },
+    });
+    expect(screen.getByLabelText('Map alt text')).toHaveValue('A plan.');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add marker' }));
+    fireEvent.change(screen.getByLabelText('Marker 1 room'), {
+      target: { value: 'main-hall' },
+    });
+    fireEvent.change(screen.getByLabelText('Marker 1 across (%)'), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText('Marker 1 down (%)'), { target: { value: '75' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // Percentages go over the wire as numbers, which is what the shared
+    // validator and the public renderer both expect.
+    expect(bodyOf(0).event.venue.map).toEqual({
+      image: 'cms-images/a/plan.png',
+      alt: 'A plan.',
+      markers: [{ placeId: 'main-hall', x: 25, y: 75 }],
+    });
+  });
+
   it('blocks removal when a live or draft revision uses a place', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', {
