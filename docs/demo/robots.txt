@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+Disallow: /admin$
+Disallow: /admin/*
+Disallow: /attendees$
+Disallow: /attendees/*
+Disallow: /profile$
+Disallow: /schedule/mine$
+Disallow: /signin$
+Disallow: /speaker/accept
+Disallow: /speaker/profile$
+Disallow: /ticket/claim
+Disallow: /updates$
+Disallow: /updates/*
+
+Sitemap: https://centercoopmedia.github.io/eventrunner/demo/sitemap.xml

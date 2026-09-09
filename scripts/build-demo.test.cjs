@@ -24,8 +24,10 @@ const {
   listFilesRecursive,
   DEFAULT_BASE,
   DEFAULT_OUT,
+  DEMO_ORIGIN,
   DEMO_FIREBASE_ENV,
   UsageError,
+  main,
 } = require('./build-demo.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -172,4 +174,27 @@ test('listFilesRecursive: nested paths use forward slashes, missing dir is empty
     assert.deepEqual(listFilesRecursive(a), ['nested/deeper/f.txt']);
     assert.deepEqual(listFilesRecursive(path.join(a, 'does-not-exist')), []);
   });
+});
+
+// --- site files (scripts/write-site-files.cjs) -------------------------------
+//
+// The demo needs a real public URL — GitHub Pages serves it under a
+// subpath, not a domain of its own — so its sitemap/robots/manifest can
+// carry working absolute URLs. Whether the write actually happens, and
+// produces correct output, is exercised by running the real CLI (`npm run
+// build:demo` / `node scripts/build-demo.cjs --check`), the same as every
+// other end-to-end demo-build behavior this file's own header describes.
+
+test('the demo public URL is derived from GitHub Pages\' own origin', () => {
+  assert.equal(DEMO_ORIGIN, 'https://centercoopmedia.github.io');
+});
+
+test('main is exported as an async function, for the site-files write it now awaits', () => {
+  assert.equal(typeof main, 'function');
+  assert.equal(main.constructor.name, 'AsyncFunction');
+});
+
+test('an unknown flag is still refused before any build or site-files write is attempted', async () => {
+  const code = await main(['--bogus']);
+  assert.equal(code, 2);
 });

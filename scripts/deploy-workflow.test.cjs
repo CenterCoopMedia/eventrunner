@@ -109,6 +109,27 @@ test('web deployment passes the client error reporting setting', () => {
   );
 });
 
+// A fresh deployment, and every ordinary code deploy, never runs the
+// Cloud Run publisher (that only fires on a CMS publish) — without this
+// step apps/web/dist would carry no sitemap.xml or robots.txt until
+// someone happened to publish a content change afterward.
+test('the build job writes sitemap.xml, robots.txt, and the manifest right after the vite build, from the same generated snapshot', () => {
+  const buildJob = job('build');
+  const buildIdx = buildJob.indexOf('- name: Build the web app against the generated snapshot');
+  const writeIdx = buildJob.indexOf('- name: Write sitemap.xml, robots.txt, and the web manifest');
+  assert.notEqual(buildIdx, -1, 'the build step must exist');
+  assert.notEqual(writeIdx, -1, 'the site-files write step must exist');
+  assert.ok(writeIdx > buildIdx, 'the site-files write must run after the vite build');
+
+  const write = step('Write sitemap.xml, robots.txt, and the web manifest');
+  assert.match(write, /node scripts\/write-site-files\.cjs/);
+  assert.match(write, /--dist apps\/web\/dist/);
+  // The SAME generated snapshot the build step just downloaded and built
+  // from (runner.temp/generated), never the committed demo copy.
+  assert.match(write, /--generated "\$\{\{ runner\.temp \}\}\/generated"/);
+  assert.match(write, /--public-url "\$\{\{ vars\.EVENT_PUBLIC_URL \}\}"/);
+});
+
 // --- site publisher (spec §8.4 phase 5, issue #36) -----------------------------
 
 test('deploy validation receives the site-publisher variables before GCP is touched', () => {

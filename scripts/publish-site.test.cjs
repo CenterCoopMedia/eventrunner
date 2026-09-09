@@ -398,6 +398,10 @@ const SITE_DOCS = {
   theme: {},
   pages: [
     { id: 'home', path: '/', order: 0, visible: true, systemPage: true },
+    // Public, so its session detail routes are eligible too.
+    { id: 'schedule', path: '/schedule', order: 1, visible: true, systemPage: true },
+    // Public, so its speaker detail routes are eligible too.
+    { id: 'speakers', path: '/speakers', order: 2, visible: true, systemPage: true },
     { id: 'travel', path: '/travel', order: 4, visible: true, systemPage: false },
     // Off by default (features.updates is false above).
     { id: 'updates', path: '/updates', order: 11, visible: true, systemPage: true },

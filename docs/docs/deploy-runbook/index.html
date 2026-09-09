@@ -549,6 +549,14 @@
           job&#39;s own service account — no GitHub token, no <code>repository_dispatch</code>, no cross-project credential
           (spec §8.4 phase 5; the container is <code>publisher/Dockerfile</code>, the logic is
           <code>scripts/publish-site.cjs</code>).</p>
+          <p><strong>Sitemap, robots, and manifest do not wait for this job.</strong> <code>scripts/publish-site.cjs</code> writes
+          <code>sitemap.xml</code>, <code>robots.txt</code>, and the web manifest from a live Firestore read, but this job runs only
+          when a CMS publish triggers it — a fresh deployment, and every ordinary <code>deploy-client.yml</code> run,
+          never runs it at all. That workflow&#39;s <code>build</code> job instead runs <code>scripts/write-site-files.cjs</code> right
+          after <code>npm run build</code>, from the SAME generated snapshot the build just used (never the committed
+          demo copy), through the same builders in <code>scripts/lib/site-manifest.cjs</code> — so a client&#39;s site never
+          goes without these files between its first deploy and its first content publish, whether or not the
+          site publisher is enabled at all.</p>
           <p><strong>It is optional.</strong> With <code>EVENT_SITE_PUBLISHER_ENABLED</code> unset or <code>false</code>, nothing below exists, the
           <code>publisher</code> deploy job is skipped, <code>EVENT_SITE_PUBLISHER_JOB</code> is never written into the functions
           env, and <code>cmsPublish</code> skips the invoke without writing anything. That is the phase 2–4 behavior:

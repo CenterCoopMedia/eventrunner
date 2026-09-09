@@ -69,6 +69,23 @@ function statedTrack(value) {
 }
 
 /**
+ * A session document id App.jsx's static route tree already claims under
+ * `/schedule`. `/schedule/mine` is the signed-in visitor's personal
+ * schedule (apps/web/src/pages/MySchedule.jsx), mounted as its own
+ * `<Route>` ahead of the dynamic `/schedule/:sessionId` route — a session
+ * whose id is `mine` would not merely collide with something, it would be
+ * permanently unreachable as itself, because react-router always resolves
+ * `/schedule/mine` to the personal-schedule route first. The admin editor
+ * derives a new session's id from its title
+ * (apps/web/src/admin/sessionDoc.js `sessionIdFromTitle`), so a session
+ * titled "Mine" is the ordinary way an operator would hit this by
+ * accident, not an adversarial one — hence a clear, named error here
+ * rather than a silent shadow. scripts/lib/site-manifest.cjs filters the
+ * same id out of the sitemap as a second, independent guard.
+ */
+const RESERVED_SESSION_IDS = new Set(['mine']);
+
+/**
  * Shape-check the three structural fields without touching Firestore.
  * Pure, so the cheap rejections cost no reads.
  *
@@ -84,6 +101,12 @@ function statedTrack(value) {
  */
 function validateSessionShape(fields, docId) {
   const errors = [];
+  if (RESERVED_SESSION_IDS.has(docId)) {
+    errors.push(
+      `docId: "${docId}" is reserved for the personal schedule route (/schedule/mine) ` +
+      'and cannot be used as a session id',
+    );
+  }
   const track = fields?.track;
   if (track !== undefined && track !== null && track !== '') {
     if (typeof track !== 'string' || !TRACK_LETTER_RE.test(track)) {
@@ -613,6 +636,7 @@ module.exports = {
   internals: {
     SESSIONS,
     SESSIONS_DRAFTS,
+    RESERVED_SESSION_IDS,
     findChildren,
     readSession,
     readTrackLetters,

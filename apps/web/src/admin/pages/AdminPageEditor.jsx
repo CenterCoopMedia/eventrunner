@@ -395,12 +395,23 @@ export default function AdminPageEditor({ mode }) {
             error={errorFor('label')}
             hint="Shown as the page heading and in navigation."
           />
+          {/* A system page's path names a route that is declared in the
+              app's code, not in this document — the document only
+              describes it. Editing it here would not move the page, it
+              would strand the document, so the field states the address
+              and does not offer to change it. The server refuses the
+              change too (functions/src/cms/pages.cjs). */}
           <TextField
             label="Path"
             value={page.path}
             onChange={(value) => update({ path: value })}
             error={errorFor('path')}
-            hint={`The URL path this page is served at, e.g. /scholarships. These first segments belong to built-in routes and cannot be used: ${RESERVED_PATH_SEGMENTS.join(', ')}.`}
+            readOnly={isSystemPage}
+            hint={
+              isSystemPage
+                ? 'A built-in page is served at a fixed address, which cannot change.'
+                : `The URL path this page is served at, e.g. /scholarships. These first segments belong to built-in routes and cannot be used: ${RESERVED_PATH_SEGMENTS.join(', ')}.`
+            }
           />
           <TextField
             label="Icon"
