@@ -30,6 +30,7 @@ import AssetImage from '../components/media/AssetImage.jsx';
 import Rule from '../components/editorial/Rule.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
+import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { sortSessions } from './Schedule.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
 
@@ -56,6 +57,17 @@ export default function SpeakerDetail() {
   const { eventConfig, features } = useEventConfig();
   const { speakers, scheduleData } = useContent();
 
+  // Resolved ahead of every early return so useDocumentTitle (a hook) is
+  // called unconditionally — React's rules of hooks forbid calling it only
+  // on the "found" branch below.
+  //
+  // Gated on the feature as well as on the record: with the directory
+  // switched off this route renders "not available", and a tab naming a
+  // speaker over that page would advertise what the event has turned off.
+  // The server refuses the same route for the same reason.
+  const speaker = speakers.find((candidate) => candidate.slug === slug);
+  useDocumentTitle(features.speakers && speaker ? text(speaker.displayName) : null);
+
   if (!features.speakers) {
     return (
       <EmptyState
@@ -70,7 +82,6 @@ export default function SpeakerDetail() {
     );
   }
 
-  const speaker = speakers.find((candidate) => candidate.slug === slug);
   if (!speaker) return <NotFoundState />;
 
   const affiliation = [text(speaker.jobTitle), text(speaker.organization)].filter(Boolean).join(', ');

@@ -34,7 +34,11 @@ const {
   internals: storeInternals,
 } = require('./store.cjs');
 const { validateSpeakerReferences } = require('../speakers/references.cjs');
-const { validateSessionStructure, checkSessionDeletable } = require('../schedule/sessions.cjs');
+const {
+  validateSessionStructure,
+  normalizeSessionRecordingUrl,
+  checkSessionDeletable,
+} = require('../schedule/sessions.cjs');
 const { deleteMaterialsForSession } = require('../materials/store.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -193,12 +197,21 @@ async function checkSpeakerReferences({ db, tx = null, collection, fields }) {
  * a parent deleted or re-parented mid-save aborts this write rather than
  * slipping past a check that has already run.
  *
+ * Like the speaker seam, the returned `fields` are what the caller
+ * persists: a `recordingUrl` that passed the check comes back in canonical
+ * form (normalizeSessionRecordingUrl). Normalizing here rather than in the
+ * validator keeps validateSessionStructure a pure verdict, and normalizing
+ * AFTER the verdict rather than before means nothing unsafe is ever tidied
+ * into looking safe — a refused value never reaches this line.
+ *
  * @param {{ db: object, tx?: object, collection: string, docId: string, fields: object }} args
- * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
+ * @returns {Promise<{ ok: true, fields: object } | { ok: false, message: string }>}
  */
 async function checkSessionStructure({ db, tx = null, collection, docId, fields }) {
-  if (collection !== 'cmsSchedule') return { ok: true };
-  return validateSessionStructure({ db, tx, docId, fields });
+  if (collection !== 'cmsSchedule') return { ok: true, fields };
+  const verdict = await validateSessionStructure({ db, tx, docId, fields });
+  if (!verdict.ok) return verdict;
+  return { ok: true, fields: normalizeSessionRecordingUrl(fields) };
 }
 
 /**
@@ -314,7 +327,7 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
           tx,
           collection,
           docId,
-          fields: references.fields,
+          fields: structure.fields,
           visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
           actor,
           now,
@@ -401,7 +414,7 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
           tx,
           collection,
           docId,
-          fields: references.fields,
+          fields: structure.fields,
           visible: typeof req.body?.visible === 'boolean' ? req.body.visible : undefined,
           actor,
           now,

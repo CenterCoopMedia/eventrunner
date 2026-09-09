@@ -53,6 +53,10 @@ Fonts come from the bundled open-licence sets, so no page asks an external font 
 
 Every page document (About, Travel, Conduct, and anything else seeded or added) shows its state in the list, in the same three words every editor uses: **Draft** (never published), **Live** (published, with nothing pending), or **Live with unpublished changes** (published, with newer edits saved but not published yet). Create, edit, and publish from here.
 
+**The site navigation is this list.** Every page that is visible gets a link in the header, in the order the list shows, under the label you gave it — so adding a page adds its link, hiding a page removes it, and renaming a page renames it in the navigation too. Nobody has to deploy anything for that to happen. One thing keeps a visible page out: a system page whose feature is switched off on the Features tab. An Updates page is still a page when *Updates* is off — it just has nowhere to send a reader.
+
+**One item is not a page.** The navigation ends with the account control, which the site adds itself. It reads **Sign in** for a reader who is not signed in and **Your profile** for one who is. You cannot remove it or reorder it, and it needs no page document.
+
 **Pick what kind of page this is.** Six named tasks, and picking one shapes the page:
 
 | Template | For |
@@ -70,7 +74,15 @@ The individual settings behind that — header, arrangement, spacing — are sti
 
 One page can still differ. **Change the individual settings** also carries **Navigation on this page**: Leave it on *Follow the site setting* — which names what the site is currently set to — or overrule it for this page alone. Use it sparingly and on purpose: A rail beside one long directory is a decision; a rail on three pages out of nine is an accident. It is not part of a template, so setting it leaves the template alone.
 
+**What a shared link shows.** The server builds the tab title, the search description, and the link preview card for each page from the page's own name plus the event settings, so a link to the travel page shows the travel page's own name rather than the site's front door. Sessions and speaker pages use their own record. The picture on the card is the **social sharing image** slot on the Branding tab; leave it empty and a neutral placeholder is used. Upload a PNG or a JPEG there, sized 1200 by 630, and not an SVG: the services that draw these cards fetch the file themselves and do not reliably render SVG, so one would leave the card blank. Three things are deliberately left plain: a page that is hidden, a system page whose feature is switched off, and an address that matches no page. Those get the event name alone and are marked so search engines skip them, so an unfinished page cannot be found through search before you publish it. A change reaches previews within a few minutes of the publish.
+
 **A system page** — home, schedule, speakers, sponsors, attendees, updates — keeps its built-in feature and lets you put sections around it. Each section on one of those pages picks where it is inserted: **Before the main feature** or **After the main feature**. Custom pages have no built-in feature, so they have no insertion point to pick.
+
+## Sessions
+
+The schedule itself: Create, edit, publish, and delete a session. Saving writes a draft, and publishing sends it to the public schedule, the same two steps every other content tab uses. Use **Preview draft** to read the session's public page with the draft applied before you publish it.
+
+**Recording link.** One optional field on a session, in the **Public session** panel. Enter the address where attendees can watch the session afterwards. The link must start with `http://` or `https://`; the editor and the server both refuse anything else, so a session cannot store an address a reader's browser would treat as a script. Leave the field empty until the recording is public. A session with a recording link shows **Watch the recording** on its schedule row and on its session page, and the link opens in a new tab. A session with no link shows nothing at all, so an empty field does not promise a recording later. The link stays on the page after the event, when a past day becomes a back issue and the live controls come off.
 
 ## Content (Pages → Content editor)
 
@@ -152,7 +164,15 @@ The event's own identity fields: Name, dates, timezone, venue, sender address, a
 
 **Past days become back issues.** When a day ends, its page keeps every word and quietens: The colour drops out, the day head says "Back issue", and the controls that act on a live event — bookmarking, reactions, adding to a calendar — go away. Nothing is hidden, and every link still works. Setting an **archive date** for the whole event does the same thing to every day at once.
 
+**The home page counts down on its own.** Before the first day starts, the home page shows a live countdown to that moment, reading the dates and timezone set here. Once the first day begins, the countdown stops and the page states that the event is running, checking about once a minute so it moves on to stating the event has ended on its own once the last day is over — a reader does not have to reload the page for that. Setting the **archive date** states the same "event has ended" line; nothing looks different to a reader. Nothing to configure: the page always reads the same dates, timezone, and archive date this section sets.
+
 **Printing.** Print any schedule page and you get the handout: Every day of the event, every session and every stop under it, tracks named by letter and name, no buttons. You do not have to prepare anything for it, and you get the light edition even if you print from a dark screen.
+
+**Venue map.** Upload a map of the building and the travel page prints it, with the venue's rooms listed beside it. Under **Venue map** you choose or upload the image the same way you pick any other picture, and then write the **alt text**: One sentence saying what the map shows. The alt text is required — a map with none does not publish, because an image nobody described tells a reader using a screen reader nothing at all. The picture has to come from the media library, so a link to a map on somebody else's site is refused; upload the file instead.
+
+**Where the map appears.** The travel page carries a section called **Venue map** (its id is `travel_map`), and the map draws wherever that section sits, so you move the map by moving the section in Pages. If your travel page does not have that section — every site set up before this feature shipped is in that position — the map draws at the end of the page instead, so uploading one always publishes something.
+
+**Marking rooms on the map.** A marker puts a numbered dot on the image where one of your places is. Add one with **Add marker**, pick the room, and type how far **across** and **down** it sits as percentages of the picture: 0 across is the left edge, 100 the right; 0 down is the top, 100 the bottom. Every place is listed beside the map whether or not you mark it, and the number on the dot is the number in the list, so a reader can match the two. Numbers run down the list in the order your places are listed, not the order you added the markers. One marker per room. **Remove marker** takes one off, and removing a place takes its marker with it — the panel says so before you save.
 
 ## Settings → Features
 

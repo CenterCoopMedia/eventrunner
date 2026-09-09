@@ -40,11 +40,26 @@ import RouteMark from './editorial/RouteMark.jsx';
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';
 import CallingPoints from './CallingPoints.jsx';
 import SessionFormat from './session/SessionFormat.jsx';
+import RecordingLink, { sessionRecordingUrl } from './session/RecordingLink.jsx';
 import { buildGridRows } from '../lib/scheduleGrid.js';
 import { formatSessionStart, formatSessionTimeRange } from '../lib/eventTime.js';
 
-/** One session inside a cell: the title, the room, and its calling points. */
+/**
+ * One session inside a cell: the title, the room, its calling points, and
+ * its recording.
+ *
+ * THE GRID CARRIES NO CONTROLS, and the recording link is not one. A
+ * bookmark, a reaction and a calendar are acts on the event, and the grid
+ * leaves all three to the list view and the session's own page. A recording
+ * is a fact the operator recorded about this session — the same class of
+ * thing as the room and the calling points, both of which are already
+ * here — and a schedule read on a wide screen with tracks is EXACTLY the
+ * view where a reader looks back over a finished day. Leaving it out sent
+ * every desktop reader to the session page to find out whether a recording
+ * existed at all.
+ */
 function GridEntry({ entry, eventConfig }) {
+  const recordingUrl = sessionRecordingUrl(entry.session);
   const { search } = useLocation();
   const range = formatSessionTimeRange(eventConfig, entry.session);
   return (
@@ -76,6 +91,15 @@ function GridEntry({ entry, eventConfig }) {
         points={entry.children}
         eventConfig={eventConfig}
       />
+      {/* The same component the list row and the session page use, so the
+          three surfaces cannot drift on the label, the target, or the
+          accessible name. Wrapped rather than rendered bare so a cell with
+          no recording adds no empty line to a dense column. */}
+      {recordingUrl ? (
+        <p className="mt-xs">
+          <RecordingLink session={entry.session} />
+        </p>
+      ) : null}
     </div>
   );
 }

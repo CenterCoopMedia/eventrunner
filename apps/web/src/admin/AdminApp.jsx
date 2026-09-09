@@ -24,7 +24,6 @@ import AdminContentPages from './pages/AdminContentPages.jsx';
 import AdminContentSections from './pages/AdminContentSections.jsx';
 import AdminContentSection from './pages/AdminContentSection.jsx';
 import AdminContentBlockEditor from './pages/AdminContentBlockEditor.jsx';
-import AdminEventSettings from './pages/AdminEventSettings.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminBranding from './pages/AdminBranding.jsx';
@@ -39,6 +38,14 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
 const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
+// Event settings is the largest page in this area — the whole config/event
+// form plus the venue editor, which now carries the map panel and its
+// markers. Statically imported it rode into the admin entry chunk that every
+// other admin screen waits on, and the venue map pushed that chunk past the
+// deferred ceiling (scripts/ci/bundle-budget.json). It is one screen behind
+// one link, exactly like the session editor above, so it is loaded when
+// somebody asks for it.
+const AdminEventSettings = lazy(() => import('./pages/AdminEventSettings.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -132,7 +139,14 @@ export default function AdminApp() {
             path="content/:pageId/:sectionId/:field"
             element={<AdminContentBlockEditor mode="edit" />}
           />
-          <Route path="settings" element={<AdminEventSettings />} />
+          <Route
+            path="settings"
+            element={
+              <DeferredAdminPage label="event settings">
+                <AdminEventSettings />
+              </DeferredAdminPage>
+            }
+          />
           <Route path="features" element={<AdminFeatureSettings />} />
           <Route path="badges" element={<AdminBadgeSettings />} />
           <Route path="branding" element={<AdminBranding />} />

@@ -360,27 +360,89 @@ client already past step 3 never needs it again.
   the `smoke` job and pass — it OPTIONS-preflights every endpoint in `.github/smoke-endpoints.json`
   against `https://<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net` and GETs
   `EVENT_PUBLIC_URL`.
-- Between `hosting` and `smoke`, the `post` job redeploys `updatesMeta` (`functions/src/public/og.cjs`)
-  alone. That function self-fetches the deployed hosting `index.html` as its SSR OG-tag template and
-  caches it per container (issue #27) — a container that cold-started before THIS run's hosting
-  deploy would otherwise keep serving crawlers the previous build's asset references until its cache
-  TTL or a natural recycle. Forcing a redeploy here forces a fresh cold start immediately after the
-  new template exists. This was the ADR's `post` step (§8.1), deferred at the M2 deploy PR pending
-  `functions/src/public/og.cjs` landing (this issue) — `smoke`'s OPTIONS-preflight of `updatesMeta`
-  now runs against the freshly-redeployed instance, not the one from the `functions` job earlier in
-  the same run.
-- `firebase.json`'s `/updates/**` hosting rewrite names `updatesMeta`'s Cloud Functions **region** in
-  object form (`"function": { "functionId": "updatesMeta", "region": "..." }`) — the shorthand string
-  form (`"function": "updatesMeta"`) silently defaults to `us-central1`, which would route every
-  non-default-region client's `/updates/**` requests at a backend that does not exist there (a 404
-  from Hosting, not from the function). Region is per-client (`EVENT_FIREBASE_REGION`), while
+- Between `hosting` and `smoke`, the `post` job redeploys `updatesMeta` and `routeMeta`
+  (`functions/src/public/og.cjs`) alone. Both self-fetch the deployed hosting `index.html` as their
+  SSR template and hold it per container (issue #27; M7 issue 4). That self-fetch carries its own
+  three-second deadline (`TEMPLATE_FETCH_TIMEOUT_MS`), so a hosting connection that stalls rather
+  than fails costs a reader three seconds and the held copy, not the function's whole timeout. A container that cold-started
+  before THIS run's hosting deploy is holding the previous build's asset references, and
+  **`routeMeta` is the catch-all rewrite, so for it that stale copy is not only a bad crawl: it is
+  the first HTML every visitor gets, naming Vite-hashed asset files that this deploy has already
+  replaced.** The held copy is revalidated against hosting's ETag every ten seconds
+  (`TEMPLATE_REVALIDATE_FLOOR_MS`), so it corrects itself quickly on its own; redeploying here
+  makes the changeover immediate instead. Anyone who deploys hosting by hand, outside this
+  workflow, gets the ten-second correction and can redeploy these two functions to skip it. This
+  was the ADR's `post` step (§8.1), deferred at the M2 deploy PR pending
+  `functions/src/public/og.cjs` landing — `smoke`'s OPTIONS-preflight of both functions now runs
+  against the freshly-redeployed instances, not the ones from the `functions` job earlier in the
+  same run.
+- **What `routeMeta` costs, and the cache header that bounds it.** Every public route that is not a
+  static file now reaches a function on its first uncached load, rather than being rewritten
+  straight to `index.html`. Three things bound that. The response carries
+  `Cache-Control: public, max-age=0, s-maxage=300, must-revalidate`, so the Hosting CDN — not the
+  function — answers repeat traffic for the same URL, while `max-age=0, must-revalidate` keeps a
+  reader's own browser from holding, or falling back to, a shell that names asset files a later
+  deploy removed: `max-age=0` alone still lets a cache serve a stale copy under pressure. There is
+  deliberately no `stale-while-revalidate` for the same reason. The template is the revalidated
+  per-container copy above, so
+  a warm container transfers no body between deploys. And the config read is `core/config.cjs`'s
+  shared 5-minute container cache, which `s-maxage` matches: a publish reaches search and social
+  previews within that window instead of at the next cold start, and a hosting deploy clears the
+  CDN. If a client reports a page preview that will not update, five minutes is the number to wait
+  before looking for a real fault. The one cost the CDN does not absorb is scanner traffic:
+  requests for addresses that do not exist (`/wp-login.php` and its friends) each miss the cache
+  and reach the function, where they cost one Firestore page lookup and return the plain shell.
+  That is a line on the functions invocation graph, not an incident; if a client's graph is
+  dominated by it, the answer is a Cloud Functions max-instances limit, not a rewrite change.
+- **The card image a deployment falls back to is a PNG, not the SVG placeholder.** The Open Graph
+  and Twitter crawlers fetch the image themselves and do not reliably decode SVG, so a card built
+  on `branding/og-default.svg` unfurls with an empty frame, which a reader takes for a broken link
+  rather than a plain one. `routeMeta` therefore skips any SVG candidate, wherever it comes from (the
+  `config/theme.logos.ogDefault` slot or `config/event.seo.defaultOgImagePath`, whose seeded value
+  is that SVG), and points at `branding/og-default.png`, rendered by
+  `scripts/dev/build-og-placeholder.mjs` and shipped in the web build. An operator who uploads a
+  PNG or a JPEG through the Branding tab gets theirs instead. The tags state the image type always
+  and the size only for the bundled card, which is the only one anything here has measured. The
+  SVG stays in the bundle: the app renders it in-page, where SVG is fine.
+- **`routeMeta` does not answer 5xx once it has ever fetched a template.** The site's whole front
+  door is this function, so each read it makes degrades on its own: a hosting request that fails or
+  answers non-2xx serves the held template, and a config read that fails — or an unset
+  `EVENT_PUBLIC_URL` — serves that template with the event-level tags and no `noindex`, because a
+  read that failed is not a page that does not exist. Only a container that has never fetched a
+  template at all answers 500. A run of 500s from this function therefore means the very first
+  self-fetch is failing: check `EVENT_PUBLIC_URL` and that hosting is actually serving
+  `/index.html`.
+- `firebase.json`'s rewrite **order** is load-bearing. `/updates/**` goes to `updatesMeta` first;
+  then the account and staff routes (`/signin`, `/profile`, `/attendees`, `/attendees/**`,
+  `/schedule/mine`, `/speaker/**`, `/ticket/**`, `/admin`, `/admin/**`) are rewritten straight to
+  `/index.html`, because they carry nothing a crawler should index and spending a function
+  invocation to say so is waste; then the `**` catch-all goes to `routeMeta`. Adding a public route
+  needs nothing here — the catch-all already covers it. Adding an authenticated one means adding it
+  to that middle block, **above** the catch-all, and to the `headers` block below it. Hosting
+  serves an existing static file before it applies any rewrite, which is what keeps `/assets/**`,
+  `/branding/**`, and `routeMeta`'s own self-fetch of `/index.html` from re-entering the function.
+  `scripts/deploy-workflow.test.cjs` asserts the whole arrangement, so a rewrite added out of order
+  fails the suite rather than a deploy.
+- Those same private sources appear again under `hosting.headers`, setting
+  `X-Robots-Tag: noindex`. The shell they serve is one file for every route, so it cannot carry a
+  per-route robots meta the way a `routeMeta` response can; hosting states it in the response
+  header instead, which crawlers read the same way. Without it, the one part of the site with no
+  server-set tags would be the part that most needs them.
+- Both hosting rewrites name their function's Cloud Functions **region** in object form
+  (`"function": { "functionId": "...", "region": "..." }`) — the shorthand string form
+  (`"function": "routeMeta"`) silently defaults to `us-central1`, which would route every
+  non-default-region client's public requests at a backend that does not exist there (a 404 from
+  Hosting, not from the function). Region is per-client (`EVENT_FIREBASE_REGION`), while
   `firebase.json` is one file shared by every client's deploy — the same shape of problem
-  `EVENT_HOSTING_SITE` is (target names, not literal site ids), and the same fix: the `hosting` job's
-  "Set the updatesMeta rewrite region for this project" step patches the **working copy** of
+  `EVENT_HOSTING_SITE` is (target names, not literal site ids), and the same fix: the `hosting`
+  job's "Set the function rewrite regions for this project" step patches the **working copy** of
   `firebase.json` with `jq` immediately before `firebase deploy --only hosting:site` reads it,
   defaulting to `us-central1` when `EVENT_FIREBASE_REGION` is unset (matching every other region
-  default in this pipeline). Nothing is committed back — the committed file keeps `us-central1` as
-  its placeholder, correct for that value and every client that doesn't override the region.
+  default in this pipeline). It patches every object-form rewrite, so a rewrite added later cannot
+  be left behind on the placeholder. Nothing is committed back — the committed file keeps
+  `us-central1` as its placeholder, correct for that value and every client that doesn't override
+  the region. The site publisher applies the same patch in code (`patchHostingRegion`,
+  `scripts/publish-site.cjs`).
 - If `google-github-actions/auth` fails with `permission_denied` on a run you expected to succeed
   (dispatched from `main`), the attribute condition (§1) or the repository+ref binding (§2) is the
   first thing to re-check — copy the exact `repository` and `ref` claims GitHub sent from the failed
@@ -495,6 +557,15 @@ and runs `firebase deploy --only hosting`. Entirely inside the client's own proj
 job's own service account — no GitHub token, no `repository_dispatch`, no cross-project credential
 (spec §8.4 phase 5; the container is `publisher/Dockerfile`, the logic is
 `scripts/publish-site.cjs`).
+
+**Sitemap, robots, and manifest do not wait for this job.** `scripts/publish-site.cjs` writes
+`sitemap.xml`, `robots.txt`, and the web manifest from a live Firestore read, but this job runs only
+when a CMS publish triggers it — a fresh deployment, and every ordinary `deploy-client.yml` run,
+never runs it at all. That workflow's `build` job instead runs `scripts/write-site-files.cjs` right
+after `npm run build`, from the SAME generated snapshot the build just used (never the committed
+demo copy), through the same builders in `scripts/lib/site-manifest.cjs` — so a client's site never
+goes without these files between its first deploy and its first content publish, whether or not the
+site publisher is enabled at all.
 
 **It is optional.** With `EVENT_SITE_PUBLISHER_ENABLED` unset or `false`, nothing below exists, the
 `publisher` deploy job is skipped, `EVENT_SITE_PUBLISHER_JOB` is never written into the functions
@@ -615,11 +686,12 @@ The exit code names the stage, so triage rarely needs the log:
 | Exit | Meaning |
 |---|---|
 | `0` | published |
+| `1` | an unexpected error in the entrypoint itself |
 | `2` | the job's environment is invalid — nothing ran; compare `gcloud run jobs describe` against §3 |
 | `3` | `generate-content.cjs` failed — usually `datastore.user` missing, or `config/event` absent |
 | `4` | the vite build failed — a missing `VITE_*` value, or the task ran out of memory |
 | `5` | `firebase deploy --only hosting` failed — usually `firebasehosting.admin` missing |
-| `1` | an unexpected error in the entrypoint itself |
+| `6` | writing sitemap.xml, robots.txt, or the web manifest failed — usually `config/event` or `cmsPages` unreadable; runs after the build, before hosting deploys |
 
 Common failures on the invoke side, from the queue row's `publisher.invoke.error`:
 
@@ -642,6 +714,23 @@ worth knowing before an incident:
 - **Rolling back the code is a deploy.** Reverting on `main` rebuilds and repushes the image under
   the new commit SHA and updates the job, so the next publish uses the rolled-back code. The old
   image stays in Artifact Registry under its own SHA tag; nothing is overwritten.
+
+### 9.3.1 The publisher does not redeploy the SSR meta functions
+
+`deploy-client.yml`'s `post` job redeploys `updatesMeta` and `routeMeta` after every hosting deploy,
+for the template reason in §6. **The publisher job does not, and cannot** — its service account
+holds `firebasehosting.admin` and nothing else, on purpose (§9.1). So a CMS publish changes the
+hosting release without restarting a single function container.
+
+That is survivable rather than an outage because the held template is revalidated against hosting's
+ETag rather than trusted for a fixed span: past `TEMPLATE_REVALIDATE_FLOOR_MS` (ten seconds,
+`functions/src/public/og.cjs`) the next request revalidates, the changed build answers 200 with the
+new body, and the container is current from then on. The exposure is that ten-second floor, not the
+five minutes a flat cache would have cost.
+
+If a client does report a blank page straight after a publish, that window is the first thing to
+rule out — wait ten seconds and reload. Redeploying the two functions
+(`firebase deploy --only functions:updatesMeta,functions:routeMeta`) clears it immediately.
 
 Stranded rows are not an incident. If neither `cmsPublish` nor the job reports a result, the
 `cleanupStrandedPublishRows` sweep (`functions/src/maintenance/cleanup.cjs`, every 30 minutes) marks

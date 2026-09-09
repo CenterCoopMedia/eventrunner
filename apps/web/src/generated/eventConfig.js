@@ -112,6 +112,27 @@ export const eventConfig = {
         walkingMinutes: 1,
       },
     ],
+    map: {
+      image: 'branding/venue-plan-placeholder.svg',
+      alt: 'Placeholder floor plan: an outline with a corridor across it and rooms off both sides, standing in for a plan of the building.',
+      markers: [
+        {
+          placeId: 'main-hall',
+          x: 52,
+          y: 27,
+        },
+        {
+          placeId: 'room-a',
+          x: 20,
+          y: 27,
+        },
+        {
+          placeId: 'room-b',
+          x: 17,
+          y: 79,
+        },
+      ],
+    },
   },
   sender: {
     email: 'summit@example.org',

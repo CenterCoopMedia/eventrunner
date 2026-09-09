@@ -6,8 +6,10 @@
  *   cmsSavePage   POST { page } — validate the cmsPages doc shape and write
  *                 the DRAFT revision only (cmsPages_drafts, status 'dirty');
  *                 refuses to flip systemPage true -> false so the delete
- *                 guard below cannot be laundered via save -> publish; a
- *                 generic page's `path` must be root-level, normalized, not
+ *                 guard below cannot be laundered via save -> publish;
+ *                 refuses to move a systemPage's `path`, which names a route
+ *                 declared in App.jsx and so is not the document's to change;
+ *                 a generic page's `path` must be root-level, normalized, not
  *                 reserved (shared/routing, issue #52), and not already
  *                 claimed by another page (draft or live).
  *   cmsDeletePage POST { id }   — remove live + draft in one batch; refuses
@@ -32,7 +34,7 @@ const { isKnownBlockType } = require('./blockTypes.cjs');
 const { PAGE_TEMPLATE_IDS, isKnownPageTemplate } = require('./pageTemplates.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } = require('../core/errors.cjs');
-const { isReservedPathSegment } = require('shared/routing');
+const { PAGE_PATH_SEGMENT_RE, isReservedPathSegment } = require('shared/routing');
 
 const PAGES_COLLECTION = 'cmsPages';
 const PAGES_DRAFTS = 'cmsPages_drafts';
@@ -40,8 +42,11 @@ const PAGES_DRAFTS = 'cmsPages_drafts';
 /** Doc ids are URL-path and Firestore-path safe; no slashes, no dots. */
 const DOC_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-/** One normalized path segment: lowercase slug, no leading/trailing hyphen. */
-const PATH_SEGMENT_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+// One normalized path segment: lowercase slug, no leading/trailing hyphen.
+// It lives in shared/routing (PAGE_PATH_SEGMENT_RE) beside the reserved
+// segment list, because the renderers have to ask the same question of data
+// this validator never saw — anything written before it landed, or written
+// straight into Firestore around it.
 
 /** Keys a cmsPages doc may carry — anything else is rejected by name. */
 const PAGE_KEYS = Object.freeze(['id', 'label', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template']);
@@ -146,7 +151,7 @@ function validatePageDoc(doc) {
   } else {
     const segments = doc.path.slice(1).split('/');
     segments.forEach((segment) => {
-      if (!PATH_SEGMENT_RE.test(segment)) {
+      if (!PAGE_PATH_SEGMENT_RE.test(segment)) {
         errors.push(
           `path: segment '${segment}' must be lowercase letters, digits, and hyphens, with no leading or trailing hyphen`,
         );
@@ -331,6 +336,41 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
       }
       if (isSystem) {
         return forbidden(res, 'systemPage: a system page cannot be changed into a regular page.');
+      }
+    }
+
+    // A SYSTEM PAGE'S PATH IS ITS MOUNTED ROUTE, AND THE ROUTE IS IN CODE.
+    // The React route a system page renders through is declared in
+    // apps/web/src/App.jsx; the document only describes it. So an edit that
+    // moves `path` off that route does not move the page — it strands the
+    // document: /schedule keeps serving the schedule, and the doc claiming
+    // /agenda now describes a route nothing mounts. Every consumer that
+    // addresses a system page by path (metadata, the sitemap, the catch-all
+    // renderer) then disagrees with the router. Refuse the edit instead, and
+    // say which value stands.
+    if (page.systemPage === true) {
+      let storedPath;
+      try {
+        const [draftSnap, liveSnap] = await Promise.all([
+          db.collection(PAGES_DRAFTS).doc(page.id).get(),
+          db.collection(PAGES_COLLECTION).doc(page.id).get(),
+        ]);
+        // Live first: it is the path the public site is actually serving.
+        // The draft stands in only before a first publish.
+        storedPath = (liveSnap.exists && liveSnap.data().path)
+          || (draftSnap.exists && draftSnap.data().path)
+          || null;
+      } catch (err) {
+        log.error('cmsSavePage system path check failed', err);
+        return internal(res, 'The page could not be saved.');
+      }
+      // No stored path is a page being created, or one written before the
+      // field existed — there is nothing to drift from, so nothing to refuse.
+      if (storedPath && storedPath !== page.path) {
+        return forbidden(
+          res,
+          `path: a system page keeps the route it is mounted at; '${storedPath}' cannot be changed.`,
+        );
       }
     }
 

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   validateSessionShape,
+  normalizeSessionRecordingUrl,
   checkSessionTrack,
   checkSessionPlace,
   checkSessionParent,
@@ -26,6 +27,27 @@ function dbWithTracks(letters, seed = {}) {
     ...seed,
   });
 }
+
+// --- reserved docId ("mine" collides with /schedule/mine, App.jsx) ---------
+
+test('a docId of "mine" is refused, naming the reserved route', () => {
+  const { ok, errors } = validateSessionShape(session(), 'mine');
+  assert.equal(ok, false);
+  assert.match(errors[0], /^docId: "mine" is reserved for the personal schedule route \(\/schedule\/mine\)/);
+});
+
+test('an ordinary docId is unaffected by the reserved-id check', () => {
+  assert.equal(validateSessionShape(session(), 'session-1').ok, true);
+  assert.equal(validateSessionShape(session(), 'mine-workshop').ok, true);
+  assert.equal(validateSessionShape(session(), 'schedule-mine').ok, true);
+});
+
+test('the reserved-id check runs through validateSessionStructure too, and reports before any Firestore read', async () => {
+  const db = makeFakeDb();
+  const result = await validateSessionStructure({ db, docId: 'mine', fields: session() });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /docId: "mine" is reserved/);
+});
 
 // --- track (design brief §4.6) ----------------------------------------------
 
@@ -170,6 +192,100 @@ test('the place is read fresh from config/event, not from a cached config', asyn
     venue: { places: [{ id: 'main-hall', name: 'Main hall' }, { id: 'room-a', name: 'Room A' }] },
   });
   assert.equal((await checkSessionPlace({ db, fields: session({ placeId: 'room-a' }) })).ok, true);
+});
+
+// --- recordingUrl: where a finished session can be watched ------------------
+
+test('a session may carry no recording link at all', () => {
+  for (const recordingUrl of [undefined, null, '']) {
+    assert.equal(validateSessionShape(session({ recordingUrl }), 'session-1').ok, true);
+  }
+});
+
+test('a recording link may be http or https', () => {
+  for (const url of ['https://video.example.org/watch?v=abc', 'http://video.example.org/abc']) {
+    assert.equal(validateSessionShape(session({ recordingUrl: url }), 'session-1').ok, true, url);
+  }
+});
+
+test('an unsafe or malformed recording link is rejected by name', () => {
+  const bad = [
+    'javascript:alert(1)',
+    'data:text/html,x',
+    'mailto:someone@example.org',
+    'file:///etc/passwd',
+    // Protocol-relative. It parses in a browser against whatever page it
+    // sits on, so it must never be stored as "a link the operator meant".
+    '//evil.com',
+    // The scheme with no slashes. `new URL()` ACCEPTS this and reports
+    // protocol 'https:', so the old protocol-only check let it through;
+    // rendered in an href it resolves as a path on the event's own site,
+    // and the reader never reaches video.example.org at all.
+    'https:video.example.org/watch',
+    'http:video.example.org',
+    'https:/video.example.org/watch',
+    'video.example.org/abc',
+    'not a url',
+    42,
+    {},
+  ];
+  for (const value of bad) {
+    const { ok, errors } = validateSessionShape(session({ recordingUrl: value }), 'session-1');
+    assert.equal(ok, false, `accepted ${JSON.stringify(value)}`);
+    assert.match(errors[0], /^recordingUrl: /);
+  }
+});
+
+test('a bad recording link fails the whole structure check', async () => {
+  const db = dbWithTracks(['A']);
+  const verdict = await validateSessionStructure({
+    db,
+    docId: 'session-1',
+    fields: session({ recordingUrl: 'javascript:alert(1)' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^recordingUrl: /);
+});
+
+test('a scheme without its slashes fails the whole structure check too', async () => {
+  const db = dbWithTracks(['A']);
+  const verdict = await validateSessionStructure({
+    db,
+    docId: 'session-1',
+    fields: session({ recordingUrl: 'https:video.example.org/watch' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^recordingUrl: /);
+});
+
+test('what is stored is the canonical href, not the string as typed', () => {
+  assert.deepEqual(
+    normalizeSessionRecordingUrl(session({ recordingUrl: 'HTTPS://Video.Example.ORG/watch?v=abc' })),
+    session({ recordingUrl: 'https://video.example.org/watch?v=abc' }),
+  );
+  assert.equal(
+    normalizeSessionRecordingUrl(session({ recordingUrl: 'https://video.example.org' })).recordingUrl,
+    'https://video.example.org/',
+  );
+});
+
+test('normalizing leaves every other session alone, and never repairs a refused link', () => {
+  // An unset key, a cleared field, and a link already in canonical form all
+  // come back as the SAME object, so a merge patch cannot gain a key it
+  // never mentioned.
+  for (const fields of [
+    session(),
+    session({ recordingUrl: null }),
+    session({ recordingUrl: '' }),
+    session({ recordingUrl: 'https://video.example.org/watch' }),
+  ]) {
+    assert.equal(normalizeSessionRecordingUrl(fields), fields);
+  }
+  // A value validateSessionShape refuses is passed through untouched rather
+  // than tidied into something that looks safe. The write never reaches
+  // here, and if it ever did, the bad value would still be visible as bad.
+  const bad = session({ recordingUrl: 'https:video.example.org/watch' });
+  assert.equal(normalizeSessionRecordingUrl(bad), bad);
 });
 
 // --- parentId ---------------------------------------------------------------

@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * The twelve default pages and their placeholder content (spec §5.3, §5.4).
+ * The fifteen default pages and their placeholder content (spec §5.3, §5.4).
  *
  * Pure. `defaultPages()` returns cmsPages documents in exactly the shape
  * `validatePageDoc` (functions/src/cms/pages.cjs) accepts — init runs that
@@ -27,6 +27,7 @@
  * the data instead of needing a special case in the renderer.
  */
 
+const { VENUE_MAP_SECTION_ID } = require('shared/venue');
 const { buildLegalContent } = require('./legal.cjs');
 const { getDefaultTemplate } = require('../../functions/src/email/templates.cjs');
 
@@ -42,10 +43,19 @@ function block(field, blockType, description) {
 }
 
 /**
- * The twelve seeded pages (§5.3): home, schedule, speakers, sponsors,
+ * The fifteen seeded pages (§5.3): home, schedule, speakers, sponsors,
  * attendees, updates (system pages, each owning a dedicated React route),
- * then travel, faq, conduct, contact, privacy, terms as generic content
- * pages at their own root-level paths.
+ * then travel, faq, conduct, contact, privacy, terms, recap, guidelines,
+ * city_guide as generic content pages at their own root-level paths.
+ *
+ * recap, guidelines, and city_guide follow the travel page's empty-section
+ * pattern all the way through, not just for its repeating lists: every
+ * section on all three pages seeds with zero default blocks, so each page
+ * renders the site's empty state until an operator writes something.
+ * None of the three may carry a real event's copy, the way every other
+ * placeholder here already does not — city_guide in particular names no
+ * city, no restaurant, no attraction, and no transit line; the section
+ * descriptions instruct an operator without guessing at their answer.
  *
  * EVERY SYSTEM ROUTE GETS A DOCUMENT, INCLUDING THE TWO THAT SEED NO
  * CONTENT. Attendees and Updates own dedicated routes (shared/routing
@@ -155,6 +165,14 @@ function defaultPages() {
             block('venue_address', 'text', 'Street address of the venue.'),
             block('venue_notes', 'richtext', 'Entrances, accessibility, and arrival notes.'),
           ]),
+        // The uploaded venue map. This section holds NO seeded block: the
+        // map is `config/event.venue.map`, set in admin Event settings from
+        // the media library, and the page renders it wherever it states a
+        // section with this id. Until somebody uploads one the section is
+        // empty and renders nothing, exactly like the lists below — and any
+        // richtext an operator adds here sits above it as arrival notes.
+        section(VENUE_MAP_SECTION_ID, 'Venue map', 'The uploaded map of the building and the rooms on it. Upload the map in Event settings.',
+          ['richtext'], 4),
         // Variable-length lists (§5.3): seeded with no items, so a client
         // with one hotel and five transit options is a CMS edit, and a
         // half-filled travel page renders sparse rather than wrong.
@@ -287,6 +305,96 @@ function defaultPages() {
       visible: true,
       systemPage: true,
       sections: [],
+    },
+    // Issue "Seed a recap page and a guidelines page": two more generic
+    // content pages, appended after updates for the same reason attendees
+    // and updates sit at the end (see the comment above `defaultPages`).
+    // Both seed EVERY section with zero default blocks, the same pattern
+    // the travel page's variable-length lists use: a section's description
+    // is the only placeholder text there is, an operator's own writing is
+    // what fills it, and a page that carries nothing yet renders the site's
+    // empty state rather than a guess at what either page should say.
+    {
+      id: 'recap',
+      label: 'Event recap',
+      path: '/recap',
+      icon: null,
+      order: 12,
+      visible: true,
+      systemPage: false,
+      sections: [
+        section('recap_summary', 'Summary', 'A short look back at how the event went.',
+          ['richtext'], 4),
+        section('recap_stats', 'By the numbers', 'Headline figures from the event.',
+          ['stat'], 6),
+        section('recap_highlights', 'Highlights', 'One entry per takeaway or theme from the event.',
+          ['list_item', 'richtext'], 20),
+        section('recap_media', 'Photos and recordings', 'Links to photos, recordings, or other event media.',
+          ['link_group', 'richtext'], 20),
+        section('recap_next', 'More from the event', 'Links to the schedule, speakers, or a program download.',
+          ['link_group'], 10),
+        section('recap_survey', 'Feedback', 'A link to a post-event survey, if there is one.',
+          ['cta', 'link_group'], 4),
+      ],
+    },
+    {
+      id: 'guidelines',
+      label: 'Speaker guidelines',
+      path: '/guidelines',
+      icon: null,
+      order: 13,
+      visible: true,
+      systemPage: false,
+      sections: [
+        section('guidelines_intro', 'Introduction', 'One paragraph welcoming speakers to this page.',
+          ['richtext'], 2),
+        section('guidelines_formats', 'Session formats', 'One entry per session format speakers may be assigned, with its length and shape.',
+          ['list_item', 'richtext'], 20),
+        section('guidelines_deadlines', 'Deadlines', 'Key dates a speaker needs to know, such as when materials are due.',
+          ['list_item', 'richtext'], 20),
+        section('guidelines_av', 'On-site setup', 'What is provided in the room and what a speaker should bring.',
+          ['richtext', 'list_item'], 20),
+        section('guidelines_sharing', 'Sharing your materials', 'How slides, recordings, and photos are handled after the event.',
+          ['richtext'], 10),
+        section('guidelines_help', 'Questions', 'Who a speaker can contact with questions before the event.',
+          ['richtext', 'link_group'], 6),
+      ],
+    },
+    // Issue "Seed a city guide page": a third generic content page appended
+    // after guidelines for the same reason recap and guidelines sit after
+    // updates (see the comment above `defaultPages`). Every section seeds
+    // with zero default blocks, the travel page's variable-length-list
+    // pattern: a section's description is the only placeholder text there
+    // is, and no copy about any city appears here or anywhere else in this
+    // seed — an operator's own writing is what fills it in.
+    //
+    // Directions to and around the venue itself already live on the travel
+    // page ("Around the venue" and "Getting here" — travel_local and
+    // travel_transit above); this page is the wider city, not the venue.
+    {
+      id: 'city_guide',
+      label: 'City guide',
+      path: '/city-guide',
+      icon: null,
+      order: 14,
+      visible: true,
+      systemPage: false,
+      sections: [
+        // Every generic page's first section renders its heading offscreen
+        // (ContentPage.jsx treats it as repeating the page title), so a page
+        // whose real first section is actual content — Places to eat here —
+        // needs a leading intro section the way faq, conduct, and contact
+        // already have one, or that first content section loses both its
+        // visible heading and its entry in the section index.
+        section('city_guide_intro', 'Introduction', 'One paragraph before the city guide.',
+          ['richtext'], 2),
+        section('city_guide_eat', 'Places to eat', 'One entry per restaurant, cafe, or other place to eat near the venue.',
+          ['list_item', 'richtext'], 20),
+        section('city_guide_see', 'Things to see', 'One entry per sight, attraction, or activity near the venue.',
+          ['list_item', 'richtext'], 20),
+        section('city_guide_around', 'Getting around', 'One entry per transit option, parking note, or way to move between places.',
+          ['list_item', 'richtext'], 20),
+      ],
     },
   ];
 }

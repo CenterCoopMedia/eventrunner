@@ -2,6 +2,13 @@
 // between the media UI and Firebase Storage (tests mock this module, same
 // convention as lib/profileSource.js and lib/contentSource.js).
 //
+// Nothing here loads the Storage SDK. Everything below is string work and
+// file validation, which is all a page needs to SHOW media, so this module is
+// safe for Layout and every public route to import. The two calls that do
+// need the SDK — an attendee's own photo upload and delete — live in
+// lib/photoUpload.js, which only the lazy /profile route imports
+// (docs/performance/public-bundle-budget.md).
+//
 // Two upload paths, because storage.rules grants exactly one of them to a
 // client (spec §8.5):
 //
@@ -31,8 +38,8 @@
 // to the rules. `allow get: if true` on the public namespaces is what makes
 // it work for anonymous visitors, `session-materials/` stays closed, and a
 // thumbnail costs no metadata round trip.
-import { deleteObject, ref, uploadBytes } from 'firebase/storage';
-import { storage, storageBucketName, storageDownloadOrigin } from '../firebase.js';
+import { storageObjectPath } from 'shared/venue';
+import { storageBucketName, storageDownloadOrigin } from '../firebase.js';
 import { IS_DEMO } from './demoMode.js';
 
 /** Mirrors storage.rules for `profile-photos/{uid}/**` — keep in step. */
@@ -116,15 +123,15 @@ export function fileToBase64(file) {
  * absolute URL, a leading slash, a parent traversal — so every caller can
  * treat "not a path" and "no path" the same way.
  *
+ * The rule itself lives in `shared/venue` (storageObjectPath), because the
+ * config validator has to refuse at the save exactly what this refuses at
+ * the render. Two copies of that regex would eventually be two rules.
+ *
  * @param {unknown} value
  * @returns {string|null}
  */
 export function storagePath(value) {
-  if (typeof value !== 'string') return null;
-  const path = value.trim();
-  if (path.length === 0) return null;
-  if (path.startsWith('/') || path.includes('..') || /^[a-z][a-z0-9+.-]*:/i.test(path)) return null;
-  return path;
+  return storageObjectPath(value);
 }
 
 /**
@@ -185,44 +192,4 @@ export function brandingSrc(value) {
   return path.split('/').length > 2
     ? assetUrl(path)
     : `${import.meta.env.BASE_URL}${path}`;
-}
-
-/**
- * Upload an attendee's own photo directly to their owner-bound prefix.
- * The filename is fixed per content type rather than taken from the file, so
- * a person replacing their photo overwrites one object instead of
- * accumulating every avatar they have ever picked.
- *
- * @param {{ uid: string, file: File }} args
- * @returns {Promise<{ path: string }>}
- */
-export async function uploadProfilePhoto({ uid, file }) {
-  const problem = checkFile(file, {
-    types: PROFILE_PHOTO_TYPES,
-    maxBytes: PROFILE_PHOTO_MAX_BYTES,
-    exclusive: true,
-  });
-  if (problem) throw new Error(problem);
-  const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
-  const path = `profile-photos/${uid}/photo.${extension}`;
-  await uploadBytes(ref(storage, path), file, { contentType: file.type });
-  return { path };
-}
-
-/**
- * Delete an attendee's own photo object. Best-effort: clearing `photoPath`
- * on the profile is what actually removes the photo from the site, and a
- * failed object delete must not block that save.
- *
- * @param {string} path
- * @returns {Promise<void>}
- */
-export async function deleteOwnPhoto(path) {
-  if (typeof path !== 'string' || !path.startsWith('profile-photos/')) return;
-  try {
-    await deleteObject(ref(storage, path));
-  } catch {
-    // An object that is already gone, or a rules refusal on somebody else's
-    // path, both end the same way: nothing to clean up here.
-  }
 }

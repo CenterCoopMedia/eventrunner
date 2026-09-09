@@ -48,6 +48,7 @@
     "bookmarkSession",
     "buildSchedulePdf",
     "updatesMeta",
+    "routeMeta",
     "reactToSession",
     "logClientError",
     "listSystemErrors",

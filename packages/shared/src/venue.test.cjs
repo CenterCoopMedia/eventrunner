@@ -18,6 +18,7 @@ const {
   sessionPlaceId,
   resolveMovement,
   sessionMovement,
+  resolveVenueMap,
 } = require('./venue.cjs');
 
 /** A venue with three places and two one-way moves between two of them. */
@@ -173,4 +174,120 @@ test('sessionMovement asks the same question about two sessions', () => {
   assert.equal(sessionMovement(CONFIG, inHall, unplaced), null);
   assert.equal(sessionMovement(CONFIG, unplaced, inRoomA), null);
   assert.equal(sessionMovement(CONFIG, inHall, inHall), null);
+});
+
+/**
+ * THE MAP. The same question as everything above, asked about a picture:
+ * does this module ever describe a room the operator did not place, or hand
+ * a page an image with no words for the reader who cannot see it?
+ */
+const MAP_CONFIG = Object.freeze({
+  venue: {
+    places: [
+      { id: 'main-hall', name: 'Main hall', floor: 'Ground floor' },
+      { id: 'room-a', name: 'Room A', floor: 'First floor' },
+      { id: 'room-b', name: 'Room B' },
+    ],
+    map: {
+      image: 'cms-images/abc/plan.png',
+      alt: 'Floor plan of the two levels, with the hall on the ground floor.',
+      markers: [
+        { placeId: 'room-a', x: 20, y: 30.5 },
+        { placeId: 'main-hall', x: 60, y: 80 },
+      ],
+    },
+  },
+});
+
+test('resolveVenueMap numbers the placed rooms and still lists the unplaced ones', () => {
+  const map = resolveVenueMap(MAP_CONFIG);
+  assert.equal(map.image, 'cms-images/abc/plan.png');
+  assert.equal(map.alt, 'Floor plan of the two levels, with the hall on the ground floor.');
+  // Rooms read in the venue's own order, and the NUMBERS RUN DOWN THAT LIST
+  // — not in the order the markers happen to be stored in. Room A's marker
+  // was recorded first and it still numbers 2, because it is the second room
+  // a reader meets.
+  assert.deepEqual(map.rooms, [
+    { id: 'main-hall', name: 'Main hall', floor: 'Ground floor', number: 1, x: 60, y: 80 },
+    { id: 'room-a', name: 'Room A', floor: 'First floor', number: 2, x: 20, y: 30.5 },
+    { id: 'room-b', name: 'Room B', floor: null, number: null, x: null, y: null },
+  ]);
+});
+
+test('resolveVenueMap skips a number for a room nobody placed', () => {
+  // main-hall is unmarked, so the two rooms that are drawn number 1 and 2 —
+  // a list that jumped from 1 to 3 would read as a lost marker.
+  const map = resolveVenueMap({
+    venue: {
+      places: MAP_CONFIG.venue.places,
+      map: {
+        image: 'cms-images/abc/plan.png',
+        alt: 'A plan.',
+        markers: [
+          { placeId: 'room-b', x: 10, y: 10 },
+          { placeId: 'room-a', x: 20, y: 20 },
+        ],
+      },
+    },
+  });
+  assert.deepEqual(
+    map.rooms.map((room) => [room.id, room.number]),
+    [['main-hall', null], ['room-a', 1], ['room-b', 2]],
+  );
+});
+
+test('resolveVenueMap answers null unless there is both an image and words for it', () => {
+  const withMap = (map) => ({ venue: { places: MAP_CONFIG.venue.places, map } });
+  assert.equal(resolveVenueMap(null), null);
+  assert.equal(resolveVenueMap({}), null);
+  assert.equal(resolveVenueMap({ venue: {} }), null);
+  assert.equal(resolveVenueMap(withMap(null)), null);
+  assert.equal(resolveVenueMap(withMap('plan.png')), null);
+  assert.equal(resolveVenueMap(withMap({ alt: 'A plan.' })), null);
+  // An image nobody described is an image half the readers cannot use, so it
+  // does not render at all rather than rendering unlabelled.
+  assert.equal(resolveVenueMap(withMap({ image: 'cms-images/a/p.png' })), null);
+  assert.equal(resolveVenueMap(withMap({ image: 'cms-images/a/p.png', alt: '  ' })), null);
+  // Not an object path this app could ever build a URL from.
+  assert.equal(resolveVenueMap(withMap({ image: '/leading', alt: 'A plan.' })), null);
+  assert.equal(
+    resolveVenueMap(withMap({ image: 'https://example.org/p.png', alt: 'A plan.' })),
+    null,
+  );
+});
+
+test('resolveVenueMap drops a marker it cannot honestly place', () => {
+  const markers = [
+    { placeId: 'room-z', x: 10, y: 10 },
+    { placeId: 'room-a', x: -1, y: 10 },
+    { placeId: 'room-a', x: 10, y: 101 },
+    { placeId: 'room-a', x: '10', y: 10 },
+    { placeId: 'room-a', x: 10 },
+    'room-a',
+    { placeId: 'room-a', x: 0, y: 0 },
+    { placeId: 'room-a', x: 50, y: 50 },
+  ];
+  const map = resolveVenueMap({
+    venue: {
+      places: MAP_CONFIG.venue.places,
+      map: { image: 'cms-images/abc/plan.png', alt: 'A plan.', markers },
+    },
+  });
+  const roomA = map.rooms.find((room) => room.id === 'room-a');
+  // Zero is a corner of the image, not a missing coordinate — and the first
+  // usable marker for a room wins, so a second one cannot move it.
+  assert.deepEqual(roomA, {
+    id: 'room-a',
+    name: 'Room A',
+    floor: 'First floor',
+    number: 1,
+    x: 0,
+    y: 0,
+  });
+  assert.equal(map.rooms.filter((room) => room.number !== null).length, 1);
+});
+
+test('resolveVenueMap renders a map for a venue that has recorded no places', () => {
+  const map = resolveVenueMap({ venue: { map: { image: 'cms-images/a/p.png', alt: 'A plan.' } } });
+  assert.deepEqual(map, { image: 'cms-images/a/p.png', alt: 'A plan.', rooms: [] });
 });

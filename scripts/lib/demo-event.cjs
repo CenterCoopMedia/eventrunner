@@ -146,6 +146,23 @@ const DEMO_ANSWERS = Object.freeze({
         },
         { from: 'room-b', to: 'room-a', walkingMinutes: 1 },
       ],
+      // THE UPLOADED MAP, WITH ITS ROOMS MARKED. A real deployment picks a
+      // plan of its own building out of the media library; the fixture has
+      // no building, so it points at the neutral placeholder plan that ships
+      // in the bundle — an outline, a corridor, four rooms, no words — and
+      // says so in the alt text rather than describing a floor plan nobody
+      // drew. The markers sit on the rooms that plan actually draws.
+      map: {
+        image: 'branding/venue-plan-placeholder.svg',
+        alt:
+          'Placeholder floor plan: an outline with a corridor across it and rooms off both ' +
+          'sides, standing in for a plan of the building.',
+        markers: [
+          { placeId: 'main-hall', x: 52, y: 27 },
+          { placeId: 'room-a', x: 20, y: 27 },
+          { placeId: 'room-b', x: 17, y: 79 },
+        ],
+      },
     },
     sender: { email: 'summit@example.org', name: '[Demo] Harborlight Media Summit', replyTo: null },
     legal: {
@@ -286,6 +303,190 @@ const DEMO_CONTENT = Object.freeze({
     value: '<p>Contact the organizing team before the summit.</p>',
   },
 });
+
+/**
+ * Build one cmsContent doc in the same shape `buildSeedContent`'s push
+ * closure produces (scripts/lib/seed.cjs) — id, section, field, blockType,
+ * the block's own fields, visible, order, seeded, seededAt.
+ *
+ * @param {string} section
+ * @param {string} field
+ * @param {string} blockType
+ * @param {object} fields block-type-specific fields
+ * @param {number} order
+ * @returns {object} a cmsContent document
+ */
+function demoExtraDoc(section, field, blockType, fields, order) {
+  return {
+    id: `${section}__${field}`,
+    section,
+    field,
+    blockType,
+    ...fields,
+    visible: true,
+    order,
+    seeded: true,
+    seededAt: DEMO_SEEDED_AT,
+  };
+}
+
+/**
+ * Demo-only content for the recap, guidelines, and city guide pages.
+ *
+ * All three pages seed with zero default blocks in `defaultPages()` (§5.3):
+ * a real client's recap, guidelines, and city guide pages must never carry
+ * a guess at event or city copy, so the seed leaves every one of their
+ * sections empty for an operator to fill. `DEMO_CONTENT` above only
+ * overlays fields onto docs `buildSeedContent` already produced, so it has
+ * nothing to overlay for any of the three — with no docs of its own, the
+ * demo showed "Nothing here yet" on all three, which is correct for a fresh
+ * deployment but wrong for a fixture whose whole point is to look like a
+ * well-run, finished event (issue #109's point, applied here).
+ *
+ * These are extra docs, not overlays, built directly against the section
+ * ids and allowed block types `defaultPages()` declares for `recap`,
+ * `guidelines`, and `city_guide` — fictional throughout, no real names,
+ * places, or organizations, following the [Demo] Harborlight Media Summit
+ * already established above. The city guide entries name fictional
+ * establishments in the fixture's own fictional town (Millhaven), never a
+ * real restaurant, attraction, or transit line.
+ */
+const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
+  // This recap is deliberately about the PREVIOUS edition, not the one
+  // DEMO_ANSWERS configures (14-16 October 2026, still upcoming as far as
+  // the demo's own lifecycle is concerned — see DEMO_EVENT_OVERRIDES
+  // above). A recap describing an event `config/event.days` has not
+  // happened yet is a real contradiction, not a demo-flavor choice, so the
+  // heading and every date below say "previous edition" and land in 2025,
+  // a year ahead of the configured days rather than inside them.
+  demoExtraDoc('recap_summary', 'body', 'richtext', {
+    value:
+      '<p>A look back at the previous edition of the [Demo] Harborlight Media Summit, held ' +
+      'over three days in October 2025. Turnout was the highest yet, and the workshop tracks ' +
+      'filled within a day of registration opening.</p>',
+  }, 0),
+  demoExtraDoc('recap_stats', 'attendees', 'stat', {
+    value: '438',
+    label: 'people attended the previous edition',
+    takeaway: 'Attendance topped four hundred for the first time',
+    description: 'Checked-in badges across all three days of the previous edition.',
+    source: 'Summit registration desk count, read 20 October 2025.',
+    alt: 'Attendance reached 438 people across the three-day summit.',
+  }, 0),
+  demoExtraDoc('recap_stats', 'sessions', 'stat', {
+    value: '36',
+    label: 'sessions held',
+    takeaway: 'Nearly every planned session ran on schedule',
+    description: 'Sessions that ran on the published programme, counting workshops, panels, and plenaries.',
+    source: 'Summit programme, read 20 October 2025.',
+    alt: '36 of the 38 planned sessions ran as scheduled.',
+  }, 1),
+  demoExtraDoc('recap_highlights', 'first', 'list_item', {
+    text: 'The workshop on audience research on a small budget filled within a day of opening.',
+  }, 0),
+  demoExtraDoc('recap_highlights', 'second', 'list_item', {
+    text: 'Attendees asked for a longer unconference block at the next summit, and the ' +
+      'organizing committee is considering it.',
+  }, 1),
+  demoExtraDoc('recap_highlights', 'third', 'list_item', {
+    text: 'Two newsroom partnerships announced a shared beat during the closing plenary.',
+  }, 2),
+  demoExtraDoc('recap_media', 'photos', 'link_group', {
+    group: 'Media',
+    label: 'Photos from the previous edition',
+    url: 'https://example.org/harborlight-2025-photos',
+  }, 0),
+  demoExtraDoc('recap_media', 'recordings', 'link_group', {
+    group: 'Media',
+    label: 'Session recordings from the previous edition',
+    url: 'https://example.org/harborlight-2025-recordings',
+  }, 1),
+  demoExtraDoc('recap_next', 'schedule', 'link_group', {
+    group: 'Continue exploring',
+    label: 'Browse the current schedule',
+    url: '/schedule',
+  }, 0),
+  demoExtraDoc('recap_next', 'speakers', 'link_group', {
+    group: 'Continue exploring',
+    label: 'See who is speaking next',
+    url: '/speakers',
+  }, 1),
+  demoExtraDoc('recap_next', 'program', 'link_group', {
+    group: 'Continue exploring',
+    label: 'Download the previous edition program PDF',
+    url: 'https://example.org/harborlight-2025-program.pdf',
+  }, 2),
+  demoExtraDoc('recap_survey', 'link', 'cta', {
+    label: 'Share your feedback on the previous edition',
+    url: 'https://example.org/harborlight-2025-survey',
+    external: true,
+  }, 0),
+  demoExtraDoc('guidelines_intro', 'welcome', 'richtext', {
+    value:
+      '<p>Everything a [Demo] Harborlight Media Summit speaker needs to know before session ' +
+      'day, from format to on-site setup.</p>',
+  }, 0),
+  demoExtraDoc('guidelines_formats', 'keynote', 'list_item', {
+    text: 'Keynote: 30 minutes, one speaker, no audience Q&A.',
+  }, 0),
+  demoExtraDoc('guidelines_formats', 'panel', 'list_item', {
+    text: 'Panel: 45 minutes, three to four speakers, with 15 minutes for audience questions.',
+  }, 1),
+  demoExtraDoc('guidelines_formats', 'workshop', 'list_item', {
+    text: 'Workshop: 90 minutes, hands-on, with time built in for participants to work.',
+  }, 2),
+  demoExtraDoc('guidelines_deadlines', 'slides', 'list_item', {
+    text: 'Slides are due one week before the summit begins.',
+  }, 0),
+  demoExtraDoc('guidelines_deadlines', 'bio', 'list_item', {
+    text: 'Speaker bios and headshots are due two weeks before the summit begins.',
+  }, 1),
+  demoExtraDoc('guidelines_av', 'setup', 'richtext', {
+    value:
+      '<p>Every room has a projector, a wired microphone, and a connection for your own ' +
+      'laptop. Bring your own adapter if your laptop needs one.</p>',
+  }, 0),
+  demoExtraDoc('guidelines_sharing', 'policy', 'richtext', {
+    value:
+      '<p>Slides are posted to the session page after the summit unless a speaker asks ' +
+      'otherwise. Sessions are not recorded this year.</p>',
+  }, 0),
+  demoExtraDoc('guidelines_help', 'contact', 'richtext', {
+    value: '<p>Email speakers@example.org with questions before the summit.</p>',
+  }, 0),
+  demoExtraDoc('city_guide_intro', 'welcome', 'richtext', {
+    value:
+      '<p>A short guide to Millhaven for anyone staying a few extra days around the summit. ' +
+      'Everything below is an easy walk or a short ride from Harborlight Hall.</p>',
+  }, 0),
+  demoExtraDoc('city_guide_eat', 'diner', 'list_item', {
+    text: '[Demo] Foghorn Diner: a short walk from Harborlight Hall, open for breakfast and lunch every day of the summit.',
+  }, 0),
+  demoExtraDoc('city_guide_eat', 'bakery', 'list_item', {
+    text: '[Demo] Cedar Street Bakery: coffee and pastries, with seating for a quick working breakfast before the first session.',
+  }, 1),
+  demoExtraDoc('city_guide_eat', 'noodle_house', 'list_item', {
+    text: '[Demo] Old Mill Noodle House: a sit-down dinner option a few blocks from the venue, busiest after the last session of the day.',
+  }, 2),
+  demoExtraDoc('city_guide_see', 'harbor_walk', 'list_item', {
+    text: '[Demo] Millhaven Harbor Walk: a paved path along the water, level the whole way and about twenty minutes end to end.',
+  }, 0),
+  demoExtraDoc('city_guide_see', 'exchange_museum', 'list_item', {
+    text: '[Demo] Grain Exchange Museum: a small local-history museum in the old exchange building, open afternoons.',
+  }, 1),
+  demoExtraDoc('city_guide_see', 'sculpture_park', 'list_item', {
+    text: '[Demo] Riverside Sculpture Park: an outdoor gallery of local artists’ work, free to enter.',
+  }, 2),
+  demoExtraDoc('city_guide_around', 'streetcar', 'list_item', {
+    text: '[Demo] Millhaven Streetcar stops directly outside Harborlight Hall and runs every fifteen minutes on weekdays.',
+  }, 0),
+  demoExtraDoc('city_guide_around', 'rideshare', 'list_item', {
+    text: 'Rideshare pickup and drop-off is at the east entrance of Harborlight Hall, away from the main doors.',
+  }, 1),
+  demoExtraDoc('city_guide_around', 'bike_share', 'list_item', {
+    text: 'A bike share dock sits beside the harbor walk, about five minutes on foot from the venue.',
+  }, 2),
+]);
 
 /** Fictional sessions across the three demo days. */
 const DEMO_SESSIONS = Object.freeze([
@@ -582,7 +783,7 @@ function demoEvent() {
   }).map((doc) => {
     const overlay = DEMO_CONTENT[doc.id];
     return overlay ? { ...doc, ...overlay } : doc;
-  });
+  }).concat(DEMO_PAGE_EXTRA_CONTENT);
 
   return {
     config,
@@ -629,4 +830,5 @@ module.exports = {
   DEMO_SPEAKERS,
   DEMO_ORGANIZATIONS,
   DEMO_CONTENT,
+  DEMO_PAGE_EXTRA_CONTENT,
 };

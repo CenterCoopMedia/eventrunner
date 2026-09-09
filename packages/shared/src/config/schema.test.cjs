@@ -282,6 +282,160 @@ test('validateEventConfig rejects places or movements that are not arrays', () =
   assert.ok(result.errors.includes('venue.movements: must be an array'));
 });
 
+// The uploaded venue map: venue.map (shared/venue.cjs).
+const MAP_PLACES = Object.freeze([
+  { id: 'main-hall', name: 'Main hall' },
+  { id: 'room-a', name: 'Room A' },
+]);
+
+test('validateEventConfig accepts a map with alt text, with or without markers', () => {
+  const withMap = (map) => validateEventConfig({
+    ...VALID_EVENT,
+    venue: { places: MAP_PLACES, map },
+  });
+  // A venue with no map at all, which is every deployment until someone
+  // uploads one.
+  assert.equal(validateEventConfig({ ...VALID_EVENT, venue: { places: MAP_PLACES } }).ok, true);
+  assert.equal(withMap(null).ok, true);
+  // An uploaded picture nobody has placed a room on yet is still a map.
+  assert.equal(withMap({ image: 'cms-images/a/plan.png', alt: 'A floor plan.' }).ok, true);
+  assert.equal(withMap({
+    image: 'cms-images/a/plan.png',
+    alt: 'A floor plan.',
+    markers: [
+      { placeId: 'main-hall', x: 0, y: 100 },
+      { placeId: 'room-a', x: 12.5, y: 40 },
+    ],
+  }).ok, true);
+});
+
+test('validateEventConfig refuses a map image with no alt text', () => {
+  // The image renders for the readers who can see it and states nothing at
+  // all to the ones who cannot, which is the failure this field exists to
+  // stop. Refused at the save, where somebody can still type the sentence.
+  for (const alt of [undefined, null, '', '   ', 42]) {
+    const result = validateEventConfig({
+      ...VALID_EVENT,
+      venue: { places: MAP_PLACES, map: { image: 'cms-images/a/plan.png', alt } },
+    });
+    assert.equal(result.ok, false, `alt ${JSON.stringify(alt)}`);
+    assert.ok(result.errors.some((e) => e.startsWith('venue.map.alt:')));
+  }
+  // Only the media library's own namespaces. A profile photo is owner bound
+  // and session materials are closed to public reads; neither is a picture
+  // an operator picked out of the library.
+  for (const image of ['profile-photos/abc/photo.png', 'session-materials/a/deck.png', 'plan.png']) {
+    const result = validateEventConfig({
+      ...VALID_EVENT,
+      venue: { places: MAP_PLACES, map: { image, alt: 'A floor plan.' } },
+    });
+    assert.equal(result.ok, false, image);
+    assert.ok(result.errors.some((e) => e.startsWith('venue.map.image:')), image);
+  }
+  // Both library namespaces are accepted: branding carries the seeded
+  // placeholders, cms-images everything an operator uploads.
+  for (const image of ['cms-images/a/plan.png', 'branding/plan.svg']) {
+    const result = validateEventConfig({
+      ...VALID_EVENT,
+      venue: { places: MAP_PLACES, map: { image, alt: 'A floor plan.' } },
+    });
+    assert.equal(result.ok, true, `${image}: ${result.errors.join('; ')}`);
+  }
+  // A URL in the image field renders as a broken image on the public page,
+  // because the app builds a Storage URL from the stored path.
+  for (const image of ['https://example.org/plan.png', '/plan.png', '../plan.png']) {
+    const result = validateEventConfig({
+      ...VALID_EVENT,
+      venue: { places: MAP_PLACES, map: { image, alt: 'A floor plan.' } },
+    });
+    assert.equal(result.ok, false, image);
+    assert.ok(result.errors.some((e) => e.startsWith('venue.map.image:')));
+  }
+  // Alt text with no image is a description of nothing.
+  const orphan = validateEventConfig({
+    ...VALID_EVENT,
+    venue: { places: MAP_PLACES, map: { alt: 'A floor plan.' } },
+  });
+  assert.equal(orphan.ok, false);
+  assert.ok(orphan.errors.some((e) => e.startsWith('venue.map.image:')));
+});
+
+test('validateEventConfig refuses a marker outside the image or off the places list', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    venue: {
+      places: MAP_PLACES,
+      map: {
+        image: 'cms-images/a/plan.png',
+        alt: 'A floor plan.',
+        markers: [
+          { placeId: 'room-z', x: 10, y: 10 },
+          { placeId: 'room-a', x: 101, y: 10 },
+          { placeId: 'room-a', x: 10, y: -1 },
+          { placeId: 'main-hall', x: '10', y: 10 },
+          { placeId: 'main-hall', x: 10, y: 10, label: 'Hall' },
+          'main-hall',
+        ],
+      },
+    },
+  });
+  assert.equal(result.ok, false);
+  // Named, the same way a movement naming an undefined place is named: the
+  // operator renamed a room and the marker is now pointing at nothing.
+  assert.ok(result.errors.some((e) => e.includes('"room-z" is not one of this venue\'s places')));
+  assert.ok(result.errors.some((e) => e.startsWith('venue.map.markers[1].x:')));
+  assert.ok(result.errors.some((e) => e.startsWith('venue.map.markers[2].y:')));
+  assert.ok(result.errors.some((e) => e.startsWith('venue.map.markers[3].x:')));
+  assert.ok(result.errors.some((e) => e === 'venue.map.markers[4].label: unknown marker field'));
+  assert.ok(result.errors.some((e) => e === 'venue.map.markers[5]: must be an object'));
+});
+
+test('validateEventConfig refuses two markers for one room, and a malformed map', () => {
+  const duplicate = validateEventConfig({
+    ...VALID_EVENT,
+    venue: {
+      places: MAP_PLACES,
+      map: {
+        image: 'cms-images/a/plan.png',
+        alt: 'A floor plan.',
+        markers: [
+          { placeId: 'room-a', x: 10, y: 10 },
+          { placeId: 'room-a', x: 50, y: 50 },
+        ],
+      },
+    },
+  });
+  assert.equal(duplicate.ok, false);
+  assert.ok(duplicate.errors.some((e) => e.startsWith('venue.map.markers[1].placeId:')));
+
+  const shapes = validateEventConfig({
+    ...VALID_EVENT,
+    venue: { places: MAP_PLACES, map: ['plan.png'] },
+  });
+  assert.equal(shapes.ok, false);
+  assert.ok(shapes.errors.includes('venue.map: must be an object or null'));
+
+  const markers = validateEventConfig({
+    ...VALID_EVENT,
+    venue: {
+      places: MAP_PLACES,
+      map: { image: 'cms-images/a/plan.png', alt: 'A floor plan.', markers: 'room-a' },
+    },
+  });
+  assert.equal(markers.ok, false);
+  assert.ok(markers.errors.includes('venue.map.markers: must be an array'));
+
+  const unknown = validateEventConfig({
+    ...VALID_EVENT,
+    venue: {
+      places: MAP_PLACES,
+      map: { image: 'cms-images/a/plan.png', alt: 'A floor plan.', caption: 'Level one' },
+    },
+  });
+  assert.equal(unknown.ok, false);
+  assert.ok(unknown.errors.includes('venue.map.caption: unknown map field'));
+});
+
 test('validateEventConfig: tagline must be a string when present, but is optional', () => {
   assert.equal(validateEventConfig({ ...VALID_EVENT, tagline: 'A gathering' }).ok, true);
   assert.equal(validateEventConfig({ ...VALID_EVENT, tagline: undefined }).ok, true);

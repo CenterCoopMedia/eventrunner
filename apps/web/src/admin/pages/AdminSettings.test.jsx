@@ -79,14 +79,17 @@ async function renderAt(path) {
       <App />
     </MemoryRouter>,
   );
-  // Two waits, not one: the lazy admin chunk, and then the admin probe the
-  // gate holds on (AdminGate renders "Checking your access…" until it
-  // answers). Waiting only for the chunk lets an assertion run while the
-  // gate is still checking, which is a flake under load, not a bug.
+  // Three waits, not one: the lazy admin chunk, the admin probe the gate
+  // holds on (AdminGate renders "Checking your access…" until it answers),
+  // and the route's own chunk — /admin/settings is deferred too, so the
+  // form itself arrives after the area around it. Waiting only for the
+  // chunk lets an assertion run while the gate is still checking, which is
+  // a flake under load, not a bug.
   await waitFor(
     () => {
       expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading event settings…')).not.toBeInTheDocument();
     },
     // The admin chunk now pulls the whole public app in with it (the theme
     // editor's frame renders real pages), so the first mount in a file can
@@ -159,7 +162,11 @@ describe('event settings', () => {
     expect(payload.sender).not.toHaveProperty('domainVerified');
 
     expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
-  });
+    // The whole settings page — three forms, every panel — renders twice
+    // here, and this one asserts against all of it. It runs close to the
+    // 5s default on a loaded machine, so it states its own budget rather
+    // than failing as a flake somebody has to re-run to understand.
+  }, 20000);
 
   // The event's concurrent tracks (design brief §4.6): a letter and a name,
   // set here once, so a session names a line by its letter alone.
@@ -211,6 +218,128 @@ describe('event settings', () => {
     const venue = bodyOf(0).event.venue;
     expect(venue.places[1]).toEqual({ id: 'studio', name: 'Editing studio', floor: '2' });
     expect(venue.movements[0].walkingMinutes).toBe(0);
+  });
+
+  it('sends the venue map, its alt text, and a marker as numbers', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [{ id: 'main-hall', name: 'Main hall' }],
+        movements: [],
+        map: { image: 'cms-images/a/plan.png', alt: 'A plan.', markers: [] },
+      },
+    });
+    expect(screen.getByLabelText('Map alt text')).toHaveValue('A plan.');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add marker' }));
+    fireEvent.change(screen.getByLabelText('Marker 1 room'), {
+      target: { value: 'main-hall' },
+    });
+    fireEvent.change(screen.getByLabelText('Marker 1 across (%)'), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText('Marker 1 down (%)'), { target: { value: '75' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // Percentages go over the wire as numbers, which is what the shared
+    // validator and the public renderer both expect.
+    expect(bodyOf(0).event.venue.map).toEqual({
+      image: 'cms-images/a/plan.png',
+      alt: 'A plan.',
+      markers: [{ placeId: 'main-hall', x: 25, y: 75 }],
+    });
+  });
+
+  it('refuses a map save at submit without ever disabling the button', async () => {
+    // Issue #219: the map's fields do NOT join the set that disables "Save
+    // event settings". A save is attempted, refused, and the person is put
+    // in front of the field that refused it — from the keyboard, which is
+    // the only way some people reach that button at all.
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [{ id: 'main-hall', name: 'Main hall' }],
+        movements: [],
+        map: { image: 'cms-images/a/plan.png', alt: 'A plan.', markers: [] },
+      },
+    });
+
+    fireEvent.change(screen.getByLabelText('Map alt text'), { target: { value: '  ' } });
+    const save = screen.getByRole('button', { name: 'Save event settings' });
+    expect(save).toBeEnabled();
+    save.focus();
+    fireEvent.click(save);
+
+    const alt = screen.getByLabelText('Map alt text');
+    await waitFor(() => expect(document.activeElement).toBe(alt));
+    expect(alt).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText(/alt text saying what the map shows/i)).toBeInTheDocument();
+    // Nothing was sent.
+    expect(fetch).not.toHaveBeenCalled();
+
+    // A blank coordinate is refused the same way rather than becoming 0.
+    fireEvent.change(alt, { target: { value: 'A plan.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add marker' }));
+    fireEvent.change(screen.getByLabelText('Marker 1 room'), {
+      target: { value: 'main-hall' },
+    });
+    fireEvent.change(screen.getByLabelText('Marker 1 across (%)'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    const across = screen.getByLabelText('Marker 1 across (%)');
+    await waitFor(() => expect(across).toHaveAttribute('aria-invalid', 'true'));
+    expect(fetch).not.toHaveBeenCalled();
+
+    // Fixed, and the same button now saves.
+    fireEvent.change(across, { target: { value: '40' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.venue.map.markers[0]).toEqual({
+      placeId: 'main-hall',
+      x: 40,
+      y: 50,
+    });
+    // Three save attempts against the whole settings page, so it states its
+    // own budget rather than failing as a flake on a busy machine.
+  }, 20000);
+
+  it('drops the server\u2019s rejection before the map\u2019s own refusal takes focus', async () => {
+    // A save the SERVER refused leaves a summary and marks its fields. The
+    // next save is refused LOCALLY, by the map, and returns before anything
+    // is sent \u2014 so the old rejection has to go with it. It used to survive:
+    // the summary went on stating a problem the person had already fixed,
+    // and focus, which lands on the first marked field in the form, landed
+    // on the corrected one rather than on the map field doing the refusing.
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [{ id: 'main-hall', name: 'Main hall' }],
+        movements: [],
+        map: { image: 'cms-images/a/plan.png', alt: 'A plan.', markers: [] },
+      },
+    });
+
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'name: must be a nonempty string'));
+    fireEvent.change(screen.getByLabelText('Event name'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Event name')).toHaveAttribute('aria-invalid', 'true');
+
+    // Fix the name the server named, then break the map instead.
+    fireEvent.change(screen.getByLabelText('Event name'), { target: { value: 'Renamed summit' } });
+    fireEvent.change(screen.getByLabelText('Map alt text'), { target: { value: '  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    const alt = screen.getByLabelText('Map alt text');
+    await waitFor(() => expect(document.activeElement).toBe(alt));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Event name')).not.toHaveAttribute('aria-invalid');
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('blocks removal when a live or draft revision uses a place', async () => {

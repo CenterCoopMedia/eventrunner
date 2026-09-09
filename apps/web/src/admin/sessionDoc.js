@@ -85,6 +85,7 @@ export function sessionFields(form) {
     placeId: optional(form.placeId),
     location: optional(form.location),
     parentId: optional(form.parentId),
+    recordingUrl: optional(form.recordingUrl),
   };
 }
 

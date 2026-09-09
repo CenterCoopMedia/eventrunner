@@ -54,4 +54,11 @@ describe('SectionHead', () => {
     render(<SectionHead title="Dates" level={9} />);
     expect(screen.getByRole('heading', { level: 2, name: 'Dates' })).toBeInTheDocument();
   });
+
+  it('carries no tabindex unless one is given (issue #14 jump-target contract)', () => {
+    const { rerender } = render(<SectionHead title="Dates" />);
+    expect(screen.getByRole('heading', { name: 'Dates' })).not.toHaveAttribute('tabindex');
+    rerender(<SectionHead title="Dates" tabIndex={-1} />);
+    expect(screen.getByRole('heading', { name: 'Dates' })).toHaveAttribute('tabindex', '-1');
+  });
 });

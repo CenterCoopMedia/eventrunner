@@ -116,6 +116,150 @@ async function seedCollection({ db, store, collection, docs, dryRun = false, now
 }
 
 /**
+ * Path-collision preflight for the page seed (Codex review, seed a recap
+ * page and a guidelines page: P1).
+ *
+ * `seedCollection`'s existing-document check only ever looks at
+ * `cmsPages/{id}` — it decides purely by DOC ID. A page's route is its
+ * `path`, not its id, so that check is blind to the one collision that
+ * actually breaks the site: an operator who has moved a live page to a
+ * different id but kept the SAME path, or drafted a brand-new page at a
+ * path a seeded id also wants. Nothing stops `seedCollection` from writing
+ * a second `cmsPages` document at that path, and `getPage`
+ * (apps/web/src/contexts/ContentContext.jsx) resolves the collision
+ * arbitrarily from then on — whichever of the two documents its snapshot
+ * happens to read first.
+ *
+ * Reads BOTH live and draft `cmsPages`, because a path claimed only in an
+ * unpublished draft becomes a live collision the moment that draft
+ * publishes, and this preflight is the only chance to catch it before a
+ * seed write ever lands. Live ownership wins when a path is claimed in
+ * both revisions — that is the route as it actually resolves today.
+ *
+ * @param {{ db: object, pages: object[] }} args pages carry at least
+ *   `{ id, path }` — the DEFAULT_PAGES() shape, or any subset of it.
+ * @returns {Promise<Map<string, { path: string, ownerId: string }>>}
+ *   keyed by the SEEDED page id that collides; empty when nothing does.
+ */
+async function findPagePathCollisions({ db, pages }) {
+  const [liveSnap, draftSnap] = await Promise.all([
+    db.collection('cmsPages').get(),
+    db.collection('cmsPages_drafts').get(),
+  ]);
+  const owners = new Map(); // path -> the doc id that currently owns it
+  for (const snap of [liveSnap, draftSnap]) {
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      const docPath = data?.path;
+      if (typeof docPath === 'string' && !owners.has(docPath)) {
+        owners.set(docPath, doc.id);
+      }
+    }
+  }
+  const collisions = new Map();
+  for (const page of pages) {
+    const ownerId = owners.get(page.path);
+    if (ownerId && ownerId !== page.id) {
+      collisions.set(page.id, { path: page.path, ownerId });
+    }
+  }
+  return collisions;
+}
+
+/**
+ * Section-id collision preflight for the page seed (Codex review, seed a
+ * city guide page: P2).
+ *
+ * cmsContent is keyed globally by `${section}__${field}` (seed.cjs), not
+ * scoped to a page — a page merely NAMES which section ids belong to it in
+ * its own `sections` array. Nothing stops two different pages from naming
+ * the same section id, and nothing stops content surviving under a section
+ * id whose page was later deleted (deleting a page removes the page
+ * document, not the cmsContent filed under its sections). Either way,
+ * seeding a page whose section ids already resolve to someone else's
+ * content would make that content show up on, and become editable from,
+ * the seeded page — a real page take-over, not merely stale data. This is
+ * the same class of bug findPagePathCollisions closes for `path`, one
+ * level down: a doc id is not the only key a seed can collide on.
+ *
+ * Two distinct ownership problems, both checked here, per section id:
+ *   - a DIFFERENT page (live or draft) already lists this section id among
+ *     its own `sections` — the id is doing real work for someone else's
+ *     page right now; or
+ *   - no page (live or draft) claims this section id at all, but cmsContent
+ *     (live or draft) still carries a doc filed under it — content orphaned
+ *     by an earlier page deletion, sitting there ownerless until something
+ *     reuses the id.
+ *
+ * Reads all four collections — live and draft cmsPages, live and draft
+ * cmsContent — for the same reason findPagePathCollisions does: an
+ * unpublished claim on either side becomes a live collision the moment it
+ * publishes, and this preflight is the only chance to catch it first.
+ *
+ * @param {{ db: object, pages: object[] }} args pages carry at least
+ *   `{ id, sections: [{ id }] }` — the DEFAULT_PAGES() shape, or any
+ *   subset of it.
+ * @returns {Promise<Map<string, { sectionId: string, ownerId?: string }>>}
+ *   keyed by the SEEDED page id that collides; `ownerId` is present only
+ *   for a page-owned collision and absent for an orphaned-content one;
+ *   empty when nothing does.
+ */
+async function findPageSectionCollisions({ db, pages }) {
+  const [liveSnap, draftSnap, contentSnap, contentDraftSnap] = await Promise.all([
+    db.collection('cmsPages').get(),
+    db.collection('cmsPages_drafts').get(),
+    db.collection('cmsContent').get(),
+    db.collection('cmsContent_drafts').get(),
+  ]);
+
+  // section id -> the doc id of the page that currently lists it as one of
+  // its own sections, in either revision. First writer (live, then draft)
+  // wins the same way findPagePathCollisions' owners map does.
+  const sectionOwners = new Map();
+  for (const snap of [liveSnap, draftSnap]) {
+    for (const doc of snap.docs) {
+      const sections = doc.data()?.sections;
+      if (!Array.isArray(sections)) continue;
+      for (const section of sections) {
+        const sectionId = section?.id;
+        if (typeof sectionId === 'string' && !sectionOwners.has(sectionId)) {
+          sectionOwners.set(sectionId, doc.id);
+        }
+      }
+    }
+  }
+
+  // Section ids cmsContent still carries a doc under, in either revision —
+  // what makes an ownerless id "orphaned" rather than simply unused.
+  const contentSectionIds = new Set();
+  for (const snap of [contentSnap, contentDraftSnap]) {
+    for (const doc of snap.docs) {
+      const sectionId = doc.data()?.section;
+      if (typeof sectionId === 'string') contentSectionIds.add(sectionId);
+    }
+  }
+
+  const collisions = new Map();
+  for (const page of pages) {
+    const sections = Array.isArray(page.sections) ? page.sections : [];
+    for (const section of sections) {
+      const sectionId = section?.id;
+      if (typeof sectionId !== 'string') continue;
+      const ownerId = sectionOwners.get(sectionId);
+      if (ownerId && ownerId !== page.id) {
+        collisions.set(page.id, { sectionId, ownerId });
+        break;
+      }
+      if (!ownerId && contentSectionIds.has(sectionId)) {
+        collisions.set(page.id, { sectionId });
+        break;
+      }
+    }
+  }
+  return collisions;
+}
+
+/**
  * Seed the `email_templates/{id}` overrides (spec §5.1 step f). A flat
  * document write, not the CMS draft/publish path `seedCollection` uses —
  * `email_templates` is a code-default registry with an OPTIONAL override
@@ -190,6 +334,8 @@ async function readConfig({ db }) {
 module.exports = {
   writeConfigDocs,
   seedCollection,
+  findPagePathCollisions,
+  findPageSectionCollisions,
   seedEmailTemplateOverrides,
   countSeeded,
   readConfig,

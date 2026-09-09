@@ -260,6 +260,42 @@ test('publishDocs: republish bumps revision by exactly one from the live doc', a
   assert.equal(db.read('cmsContent_drafts', 'hero__title').basedOnRevision, 5);
 });
 
+test('publishDocs carries a session\'s recordingUrl from the draft to the live doc', async () => {
+  // `contentFields` is a DENYLIST (the draft minus RESERVED_FIELDS), so a
+  // new session field publishes by default rather than by being listed.
+  // Nothing else here would fail if `recordingUrl` were added to
+  // RESERVED_FIELDS by accident, and the symptom would be a link an
+  // operator saves, previews, publishes, and then cannot find on the
+  // public page. So the seam is pinned.
+  const db = makeFakeDb({
+    'cmsSchedule_drafts/s1': {
+      title: 'Recorded panel',
+      recordingUrl: 'https://video.example.org/watch?v=s1',
+      visible: true, status: 'dirty', basedOnRevision: null,
+    },
+  });
+  await publishDocs({ db, collection: 'cmsSchedule', docIds: ['s1'], actor: ACTOR, now });
+  assert.equal(db.read('cmsSchedule', 's1').recordingUrl, 'https://video.example.org/watch?v=s1');
+});
+
+test('publishDocs republishes a session that has cleared its recordingUrl', async () => {
+  // Clearing the field sends null (admin/sessionDoc.js), and null is a
+  // value like any other: the live doc must end up carrying the cleared
+  // state rather than keeping the address the last publish put there.
+  const db = makeFakeDb({
+    'cmsSchedule/s1': {
+      title: 'Recorded panel', recordingUrl: 'https://video.example.org/watch?v=s1',
+      visible: true, revision: 1, publishedAt: new Date(0), publishedBy: 'x',
+    },
+    'cmsSchedule_drafts/s1': {
+      title: 'Recorded panel', recordingUrl: null,
+      visible: true, status: 'dirty', basedOnRevision: 1,
+    },
+  });
+  await publishDocs({ db, collection: 'cmsSchedule', docIds: ['s1'], actor: ACTOR, now });
+  assert.equal(db.read('cmsSchedule', 's1').recordingUrl, null);
+});
+
 // --- publish preserves cmsSchedule.materialCount (issue #23 follow-up) -----
 //
 // materialCount is maintained transactionally by functions/src/materials/

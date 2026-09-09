@@ -2,8 +2,9 @@
 // No Firebase, no network (spec §8.1); context providers only, same pattern
 // as Schedule.test.jsx.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { getRouteTitlePart, resetRouteTitleForTest } from '../lib/useDocumentTitle.js';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
@@ -46,6 +47,17 @@ const fixtureSessions = [
     location: 'Main hall',
     type: 'keynote',
     speakerIds: [],
+    visible: true,
+  },
+  {
+    id: 'fx-recorded',
+    dayId: 'fx-day-1',
+    startTime: '10:00',
+    endTime: '10:45',
+    title: '[Fixture] Recorded panel',
+    type: 'panel',
+    speakerIds: [],
+    recordingUrl: 'https://video.example.org/watch?v=fx-recorded',
     visible: true,
   },
   {
@@ -169,6 +181,26 @@ describe('SessionDetail', () => {
     ).toBeInTheDocument();
   });
 
+  it('names the session in the tab, and names nothing when the schedule is switched off', () => {
+    resetRouteTitleForTest();
+    renderDetail('fx-early');
+    expect(getRouteTitlePart()).toBe('[Fixture] Morning kickoff');
+    cleanup();
+
+    // With the feature off this route renders "not available"; a tab
+    // naming a session over that page would advertise what the event has
+    // turned off, which is the same reason the server refuses the route.
+    resetRouteTitleForTest();
+    renderDetail('fx-early', { features: { schedule: false } });
+    expect(getRouteTitlePart()).toBeNull();
+  });
+
+  it('names nothing for a session that is not published', () => {
+    resetRouteTitleForTest();
+    renderDetail('fx-hidden');
+    expect(getRouteTitlePart()).toBeNull();
+  });
+
   it('shows the loading state while runtime content is loading', () => {
     renderDetail('fx-early', { loading: true });
     expect(screen.getByRole('status', { name: 'Loading the session…' })).toBeInTheDocument();
@@ -177,6 +209,21 @@ describe('SessionDetail', () => {
   it('renders no pill row when every relevant feature flag is off', () => {
     renderDetail('fx-early');
     expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
+  });
+
+  it('links the recording on a session that has one, with every feature flag off', () => {
+    // The recording is a field on the session record, not a feature, so it
+    // reaches the page even on a deployment that runs none of the optional
+    // session features.
+    renderDetail('fx-recorded');
+    expect(
+      screen.getByRole('link', { name: 'Watch the recording of [Fixture] Recorded panel' }),
+    ).toHaveAttribute('href', 'https://video.example.org/watch?v=fx-recorded');
+  });
+
+  it('says nothing about a recording on a session without one', () => {
+    renderDetail('fx-early');
+    expect(screen.queryByText(/recording/i)).toBeNull();
   });
 
   it('offers a signed-out visitor the sign-in path when features.sessionBookmarks is on', () => {

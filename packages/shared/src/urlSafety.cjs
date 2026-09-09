@@ -9,22 +9,69 @@
  */
 
 /**
- * Returns true if the URL parses and its protocol is http: or https:.
+ * An ABSOLUTE http(s) URL starts with the scheme AND the two slashes.
  *
- * Rejects javascript:, data:, file:, blob:, mailto: and unparseable input —
- * the protocol allowlist is the load-bearing check, not a denylist. Used to
- * gate user-submitted URLs (link-type session materials) before rendering
+ * The protocol test alone was not enough, and the gap was not theoretical.
+ * `new URL('https:video.example.org/watch')` parses and reports protocol
+ * `https:` — the WHATWG parser treats a special scheme with no `//` as a
+ * relative reference against the scheme — so the string passed every check
+ * and was stored as if it named an external site. Put in an `href` it does
+ * not go to video.example.org at all: the browser resolves it against the
+ * page it sits on, and a reader clicking "Watch the recording" lands on
+ * `/schedule/video.example.org/watch` on the event's own domain. A missing
+ * pair of slashes is a typo an operator cannot see in the field and cannot
+ * diagnose from the result, so it is refused at the point of entry.
+ *
+ * The regex gates the SYNTAX and the parse gates the rest; neither alone is
+ * sufficient, so both run.
+ */
+const ABSOLUTE_HTTP_RE = /^https?:\/\//i;
+
+/**
+ * The canonical form of an http(s) URL, or '' when the input is not one.
+ *
+ * Returning the parsed `href` rather than the raw string is what makes the
+ * check and the stored value agree: what a later reader clicks is exactly
+ * the string this function approved, with the host lower-cased and every
+ * component percent-encoded the way the parser reads it. Storing the raw
+ * text instead leaves the door open to a value that validates as one URL
+ * and resolves as another.
+ *
+ * @param {string} url
+ * @returns {string} the canonical href, or '' if the URL is not a safe one
+ */
+function safeUrlHref(url) {
+  if (typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!ABSOLUTE_HTTP_RE.test(trimmed)) return '';
+  try {
+    const parsed = new URL(trimmed);
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Returns true if the URL is an absolute http(s) link.
+ *
+ * Rejects javascript:, data:, file:, blob:, mailto:, protocol-relative
+ * `//host` shapes, scheme-without-slashes shapes (see ABSOLUTE_HTTP_RE) and
+ * unparseable input — the protocol allowlist is the load-bearing check, not
+ * a denylist. Used to gate user-submitted URLs (link-type session
+ * materials, a session's recording link) before storing them or rendering
  * them as anchor tags or window.open targets.
+ *
+ * Every caller in this repo asks the same question — "may this be a link
+ * target that leaves the site" — so the rule lives here rather than in one
+ * of them, and the browser-side check a reader's page runs stays identical
+ * to the one the server enforced on the way in.
  *
  * @param {string} url
  * @returns {boolean}
  */
 function isSafeUrl(url) {
-  try {
-    return ['http:', 'https:'].includes(new URL(url).protocol);
-  } catch {
-    return false;
-  }
+  return safeUrlHref(url) !== '';
 }
 
 /**
@@ -77,4 +124,4 @@ function scrubLinkLabel(label) {
   return trimmed;
 }
 
-module.exports = { isSafeUrl, looksLikeUrl, scrubLinkLabel };
+module.exports = { isSafeUrl, safeUrlHref, looksLikeUrl, scrubLinkLabel };

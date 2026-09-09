@@ -1,9 +1,10 @@
 // Public speaker page (issue #22): rendered from the SAME live
 // speakers_public projection Speakers.jsx reads, plus the sessions cross-
 // link (a query over scheduleData, not a stored list — spec §4.3).
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { getRouteTitlePart, resetRouteTitleForTest } from '../lib/useDocumentTitle.js';
 
 let speakers;
 let scheduleData;
@@ -48,6 +49,11 @@ const PROJECTED = {
 };
 
 describe('SpeakerDetail', () => {
+  beforeEach(() => {
+    cleanup();
+    resetRouteTitleForTest();
+  });
+
   it('renders the speaker by slug, including bio, affiliation, and socials', () => {
     speakers = [PROJECTED];
     scheduleData = [];
@@ -110,6 +116,29 @@ describe('SpeakerDetail', () => {
     renderAt('/speakers/rae-okonkwo');
     expect(screen.getByText('This event doesn’t have a public speaker directory')).toBeInTheDocument();
     features = { speakers: true, schedule: true };
+  });
+
+  it('names the speaker in the tab, and names nobody when the directory is switched off', () => {
+    speakers = [PROJECTED];
+    scheduleData = [];
+    renderAt('/speakers/rae-okonkwo');
+    expect(getRouteTitlePart()).toBe(PROJECTED.displayName);
+    cleanup();
+
+    // With the feature off this route renders "not available"; a tab
+    // naming a speaker over that page would advertise what the event has
+    // turned off, which is the same reason the server refuses the route.
+    features = { speakers: false, schedule: true };
+    renderAt('/speakers/rae-okonkwo');
+    expect(getRouteTitlePart()).toBeNull();
+    features = { speakers: true, schedule: true };
+  });
+
+  it('names nobody for a slug no speaker holds', () => {
+    speakers = [PROJECTED];
+    scheduleData = [];
+    renderAt('/speakers/nobody-here');
+    expect(getRouteTitlePart()).toBeNull();
   });
 
   it('does not render a session list when features.schedule is off (issue #22 review P2-6)', () => {

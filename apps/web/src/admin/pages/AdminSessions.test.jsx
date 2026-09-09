@@ -110,6 +110,41 @@ describe('admin Sessions workspace', () => {
     });
   });
 
+  it('sends the recording link, and refuses an unsafe one before it reaches the server', async () => {
+    await renderAt('/admin/sessions/new/session');
+    await screen.findByRole('heading', { name: 'New session' });
+    fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Opening session' } });
+    fireEvent.change(screen.getByLabelText('Public description'), { target: { value: 'Welcome everyone.' } });
+    fireEvent.change(screen.getByLabelText('Event day'), { target: { value: 'day-1' } });
+    fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:00' } });
+    fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:00' } });
+
+    const field = screen.getByLabelText('Recording link');
+    // A scheme with no slashes is the typo an operator cannot see, and it
+    // is the one the old protocol-only check let through: stored, it
+    // resolves as a path on the event's own site rather than reaching the
+    // video host at all. The editor refuses it for the same reason the
+    // server does, and with the same wording.
+    for (const bad of ['javascript:alert(1)', 'https:video.example.org/watch', '//video.example.org/x']) {
+      fireEvent.change(field, { target: { value: bad } });
+      expect(
+        await screen.findByText('Enter a link that starts with http:// or https://.'),
+        `accepted ${bad}`,
+      ).toBeInTheDocument();
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+      expect(fetch).not.toHaveBeenCalled();
+    }
+
+    fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
+    fireEvent.change(field, { target: { value: 'https://video.example.org/watch?v=abc' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields.recordingUrl).toBe('https://video.example.org/watch?v=abc');
+  });
+
   it('does not save or publish until required fields are valid', async () => {
     await renderAt('/admin/sessions/new/session');
     await screen.findByRole('heading', { name: 'New session' });

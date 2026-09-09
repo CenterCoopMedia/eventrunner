@@ -24,7 +24,60 @@
           "region": "us-central1"
         }
       },
-      { "source": "**", "destination": "/index.html" }
+      { "source": "/signin", "destination": "/index.html" },
+      { "source": "/profile", "destination": "/index.html" },
+      { "source": "/attendees", "destination": "/index.html" },
+      { "source": "/attendees/**", "destination": "/index.html" },
+      { "source": "/schedule/mine", "destination": "/index.html" },
+      { "source": "/speaker/**", "destination": "/index.html" },
+      { "source": "/ticket/**", "destination": "/index.html" },
+      { "source": "/admin", "destination": "/index.html" },
+      { "source": "/admin/**", "destination": "/index.html" },
+      {
+        "source": "**",
+        "function": {
+          "functionId": "routeMeta",
+          "region": "us-central1"
+        }
+      }
+    ],
+    "headers": [
+      {
+        "source": "/signin",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      },
+      {
+        "source": "/profile",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      },
+      {
+        "source": "/attendees",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      },
+      {
+        "source": "/attendees/**",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      },
+      {
+        "source": "/schedule/mine",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      },
+      {
+        "source": "/speaker/**",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      },
+      {
+        "source": "/ticket/**",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      },
+      {
+        "source": "/admin",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      },
+      {
+        "source": "/admin/**",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      }
     ]
   },
   "emulators": {

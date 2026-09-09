@@ -37,10 +37,17 @@ describe('session document helpers', () => {
     expect(sessionIdFromTitle('Café: Opening Session')).toBe('cafe-opening-session');
     expect(sessionFields({
       title: ' Session ', description: '', dayId: 'day-1', startTime: '09:00', endTime: '10:00',
-      track: '', placeId: '', location: '', parentId: '', visible: true,
+      track: '', placeId: '', location: '', parentId: '', recordingUrl: '', visible: true,
     })).toEqual({
       title: 'Session', description: '', dayId: 'day-1', startTime: '09:00', endTime: '10:00',
-      track: null, placeId: null, location: null, parentId: null,
+      track: null, placeId: null, location: null, parentId: null, recordingUrl: null,
     });
+  });
+
+  it('trims a recording link and sends it as it was typed', () => {
+    expect(sessionFields({
+      title: 'Session', description: '', dayId: 'day-1', startTime: '09:00', endTime: '10:00',
+      recordingUrl: '  https://video.example.org/watch?v=abc  ',
+    }).recordingUrl).toBe('https://video.example.org/watch?v=abc');
   });
 });

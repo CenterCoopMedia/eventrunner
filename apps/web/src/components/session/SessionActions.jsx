@@ -24,12 +24,15 @@
 // Bookmarking a session that has finished, reacting to it, or adding it to
 // a calendar are all acts on an event that is not happening: the controls
 // go out of the document rather than sitting there disabled. The materials
-// a session left behind are content, so they stay.
+// a session left behind are content, so they stay, and so does its
+// recording link — both surfaces get that one, on a live day and on a back
+// issue, whenever the session record carries a link.
 import { Link, useLocation } from 'react-router-dom';
 import BookmarkAction from './BookmarkAction.jsx';
 import CalendarMenu from './CalendarMenu.jsx';
 import MaterialsLink from './MaterialsLink.jsx';
 import ReactionGroup from './ReactionGroup.jsx';
+import RecordingLink, { sessionRecordingUrl } from './RecordingLink.jsx';
 import { rowActionClass } from './sessionActionClass.js';
 
 /**
@@ -66,17 +69,22 @@ export default function SessionActions({
   const showCalendar = live && features.icsExport;
   const showMaterials = onRow && features.sessionMaterials;
   const showReactions = !onRow && live && features.sessionReactions;
+  // A recording survives the back issue and needs no feature flag: it is a
+  // link an operator typed onto this session, on both surfaces or on
+  // neither. `live` deliberately does not gate it — see RecordingLink.
+  const showRecording = Boolean(sessionRecordingUrl(session));
 
   // On a row the details link is unconditional — a session always has a
   // detail page — so the row always has at least one control and the
   // wrapper always renders. On the detail page every control is optional,
   // and a deployment with all of them off must add no empty box.
-  if (!onRow && !showBookmark && !showCalendar && !showReactions) return null;
+  if (!onRow && !showBookmark && !showCalendar && !showReactions && !showRecording) return null;
 
   return (
     <div className="session-actions flex flex-wrap items-start gap-x-md gap-y-2xs">
       {showBookmark ? <BookmarkAction session={session} bookmarked={bookmarked} /> : null}
       {showMaterials ? <MaterialsLink session={session} /> : null}
+      {showRecording ? <RecordingLink session={session} /> : null}
       {showCalendar ? <CalendarMenu eventConfig={eventConfig} session={session} /> : null}
       {showReactions ? <ReactionGroup session={session} /> : null}
       {onRow ? <DetailsLink session={session} /> : null}

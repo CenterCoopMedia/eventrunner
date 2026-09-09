@@ -18,7 +18,7 @@
  *      (functions/src/core/auth.cjs requireAdmin, firestore.rules isAdmin,
  *      and the web AuthContext probe all read it; nothing reads an
  *      ADMIN_EMAILS env var any more);
- *   d. seeds `cmsPages` with the twelve default pages (§5.3);
+ *   d. seeds `cmsPages` with the fifteen default pages (§5.3);
  *   e. seeds `cmsContent` with placeholder blocks for every `defaultBlocks`
  *      entry, and the two legal pages from the provider-aware templates
  *      (§5.4, §5.5);
@@ -67,7 +67,8 @@ const { manualChecklist, formatChecklist } = require('./lib/checklist.cjs');
 const { validateDeployEnv } = require('shared/config');
 const { uploadPlaceholderBranding } = require('./lib/branding.cjs');
 const {
-  writeConfigDocs, seedCollection, seedEmailTemplateOverrides, countSeeded, readConfig,
+  writeConfigDocs, seedCollection, findPagePathCollisions, findPageSectionCollisions,
+  seedEmailTemplateOverrides, countSeeded, readConfig,
 } = require('./lib/write.cjs');
 
 const FLAGS = [
@@ -335,7 +336,41 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   // as if Google sign-in had never been enabled.
   const content = buildSeedContent({ pages, docs: effective, tierA, seededAt });
 
-  const pageResult = await seedCollection({ db, store, collection: 'cmsPages', docs: pageDocs, dryRun, now, force });
+  // Path-collision preflight (Codex review, seed a recap page and a
+  // guidelines page: P1): seedCollection decides purely by doc id, so it
+  // cannot see a DIFFERENT page id already sitting on the path a seeded
+  // page wants — including under --force, which only relaxes the
+  // already-initialized refusal, never this. Every seeded page is
+  // checked, not only the two most recently added ones: a client's own
+  // page reassignment could just as easily collide with 'travel' or
+  // 'faq'. A colliding page is left out of the write entirely and
+  // reported the same way every other skip already is.
+  const pathCollisions = await findPagePathCollisions({ db, pages: pageDocs });
+  // Section-id collision preflight (Codex review, seed a city guide page:
+  // P2): cmsContent is keyed globally by section id, so a seeded page's
+  // section ids can just as easily collide with a DIFFERENT page's own
+  // sections, or with content orphaned by an earlier page's deletion, as a
+  // path can. Same treatment as the path check: a colliding page is left
+  // out of the write entirely, checked across every seeded page.
+  const sectionCollisions = await findPageSectionCollisions({ db, pages: pageDocs });
+  const collisionSkips = [
+    ...[...pathCollisions].map(([id, collision]) => ({
+      id,
+      reason: `path ${collision.path} is already owned by page '${collision.ownerId}' — not seeded`,
+    })),
+    ...[...sectionCollisions].map(([id, collision]) => ({
+      id,
+      reason: collision.ownerId
+        ? `section '${collision.sectionId}' is already owned by page '${collision.ownerId}' — not seeded`
+        : `section '${collision.sectionId}' is orphaned content from a deleted page — not seeded`,
+    })),
+  ];
+  const seedablePages = pageDocs.filter(
+    (page) => !pathCollisions.has(page.id) && !sectionCollisions.has(page.id),
+  );
+
+  const pageResult = await seedCollection({ db, store, collection: 'cmsPages', docs: seedablePages, dryRun, now, force });
+  pageResult.skipped = [...collisionSkips, ...pageResult.skipped];
   console.log(
     `  cmsPages          ${pageResult.created.length} created, ${pageResult.refreshed.length} refreshed, ` +
     `${pageResult.skipped.length} left alone`,

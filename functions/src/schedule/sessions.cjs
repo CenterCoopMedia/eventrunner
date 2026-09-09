@@ -41,6 +41,16 @@
  *             free-text `location` stays exactly what it was, a label an
  *             operator writes for a reader, and is not touched here.
  *
+ *   recordingUrl  where the session can be watched afterwards. One http or
+ *             https link, checked against the same protocol allowlist every
+ *             other operator-supplied link goes through (shared/urlSafety
+ *             isSafeUrl). It sits ON THE SESSION rather than in a lookup
+ *             table keyed by session id: the recording is a fact about this
+ *             session, and a separate table goes stale the moment a session
+ *             is renamed or removed. No embargo applies — an operator adds
+ *             the link when the recording is public, and a session with no
+ *             link says nothing.
+ *
  * WALKING MINUTES ARE STILL NOT HERE, and now there is somewhere they are.
  * "Transfer to Line B · Hall 2 · 6 min walk" (brief §4.6) is a fact about a
  * PAIR of rooms in a building, not about a session, and a per-session
@@ -53,6 +63,7 @@
 
 const { TRACK_LETTER_RE } = require('shared/config');
 const { PLACE_ID_RE } = require('shared/venue');
+const { isSafeUrl, safeUrlHref } = require('shared/urlSafety');
 const { isValidDocId } = require('../cms/store.cjs');
 
 /** The live sessions collection and its draft sibling (§8.4). */
@@ -67,6 +78,23 @@ const CONFIG_EVENT_DOC = 'event';
 function statedTrack(value) {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
+
+/**
+ * A session document id App.jsx's static route tree already claims under
+ * `/schedule`. `/schedule/mine` is the signed-in visitor's personal
+ * schedule (apps/web/src/pages/MySchedule.jsx), mounted as its own
+ * `<Route>` ahead of the dynamic `/schedule/:sessionId` route — a session
+ * whose id is `mine` would not merely collide with something, it would be
+ * permanently unreachable as itself, because react-router always resolves
+ * `/schedule/mine` to the personal-schedule route first. The admin editor
+ * derives a new session's id from its title
+ * (apps/web/src/admin/sessionDoc.js `sessionIdFromTitle`), so a session
+ * titled "Mine" is the ordinary way an operator would hit this by
+ * accident, not an adversarial one — hence a clear, named error here
+ * rather than a silent shadow. scripts/lib/site-manifest.cjs filters the
+ * same id out of the sitemap as a second, independent guard.
+ */
+const RESERVED_SESSION_IDS = new Set(['mine']);
 
 /**
  * Shape-check the three structural fields without touching Firestore.
@@ -84,6 +112,12 @@ function statedTrack(value) {
  */
 function validateSessionShape(fields, docId) {
   const errors = [];
+  if (RESERVED_SESSION_IDS.has(docId)) {
+    errors.push(
+      `docId: "${docId}" is reserved for the personal schedule route (/schedule/mine) ` +
+      'and cannot be used as a session id',
+    );
+  }
   const track = fields?.track;
   if (track !== undefined && track !== null && track !== '') {
     if (typeof track !== 'string' || !TRACK_LETTER_RE.test(track)) {
@@ -100,6 +134,29 @@ function validateSessionShape(fields, docId) {
       errors.push(
         'placeId: must be a place id — lowercase letters, digits and single hyphens — ' +
         `got ${JSON.stringify(placeId)}`,
+      );
+    }
+  }
+
+  const recordingUrl = fields?.recordingUrl;
+  if (recordingUrl !== undefined && recordingUrl !== null && recordingUrl !== '') {
+    // The protocol allowlist is the whole check, and it runs HERE rather
+    // than only in the editor: the client is one of several writers, and a
+    // javascript: or data: target that reaches Firestore is rendered by
+    // every reader from then on. Nothing is checked about the host — an
+    // operator may host a recording anywhere, and a domain list would be a
+    // guess about one deployment's video provider.
+    //
+    // isSafeUrl requires the two slashes as well as the scheme
+    // (shared/urlSafety): `https:video.example.org/watch` parses, reports
+    // protocol `https:`, and then resolves as a path on the EVENT's own
+    // domain the moment a reader clicks it. What survives this check is
+    // stored in canonical form — see normalizeSessionRecordingUrl, which
+    // the content-write seam applies.
+    if (typeof recordingUrl !== 'string' || !isSafeUrl(recordingUrl)) {
+      errors.push(
+        'recordingUrl: must be a link that starts with http:// or https://, ' +
+        `got ${JSON.stringify(recordingUrl)}`,
       );
     }
   }
@@ -600,8 +657,35 @@ async function validateSessionStructure({ db, tx = null, docId, fields }) {
   return { ok: true };
 }
 
+/**
+ * The session's fields with `recordingUrl` in canonical form.
+ *
+ * Validation says whether a string MAY be stored; this says what gets
+ * stored. Keeping the two apart is what lets validateSessionStructure stay
+ * a pure verdict — it is called for its answer, not its output — while the
+ * write seam still persists exactly the string the check approved, host
+ * lower-cased and every component percent-encoded the way a browser will
+ * read it back (shared/urlSafety safeUrlHref).
+ *
+ * Every other value passes through untouched, including `null` (an editor
+ * clearing the field) and an unset key (a merge patch that never mentioned
+ * it). A value this returns unchanged is one validateSessionShape has
+ * already refused, so nothing unsafe is normalized into looking safe.
+ *
+ * @param {object} fields the session's fields as they will be stored
+ * @returns {object} the same fields, or a copy with a canonical recordingUrl
+ */
+function normalizeSessionRecordingUrl(fields) {
+  const raw = fields?.recordingUrl;
+  if (typeof raw !== 'string' || raw.trim() === '') return fields;
+  const href = safeUrlHref(raw);
+  if (!href || href === raw) return fields;
+  return { ...fields, recordingUrl: href };
+}
+
 module.exports = {
   validateSessionShape,
+  normalizeSessionRecordingUrl,
   checkSessionTrack,
   checkSessionPlace,
   checkSessionParent,
@@ -613,6 +697,7 @@ module.exports = {
   internals: {
     SESSIONS,
     SESSIONS_DRAFTS,
+    RESERVED_SESSION_IDS,
     findChildren,
     readSession,
     readTrackLetters,

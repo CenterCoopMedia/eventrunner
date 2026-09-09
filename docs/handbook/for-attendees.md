@@ -4,6 +4,8 @@ You registered for an event. This page is what the site is supposed to let you d
 
 ## Sign in
 
+The last item in the site navigation is your account control. It reads **Sign in** until you are signed in, and **Your profile** after that. It is in the same place on every page, in the top row or in the side rail, whichever the site uses.
+
 You can sign in with Google or with a 6-digit code we email you. University and nonprofit inboxes often quarantine the code. Check junk, and wait a minute before requesting another.
 
 There is no password to remember. If the code never arrives, ask in [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) or email the event organizer.
@@ -19,6 +21,10 @@ Session files and links stay closed until the session is over, unless staff rele
 ## Profile and directory
 
 Your public profile is the slice other attendees can see. The rest stays on your account. You pick badges from the list the event offers. You cannot invent a free-text badge.
+
+## FAQ and long pages
+
+An FAQ page always shows a filter box and a list of its sections near the top, and any other page with enough content, such as a long travel guide, shows the same tools. Type a keyword to narrow the page to matching content, or select a section in the list to jump straight to it.
 
 ## When something is wrong
 

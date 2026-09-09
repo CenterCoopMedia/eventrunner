@@ -13,8 +13,13 @@ const { MAX_TOTAL_BADGES } = require('../badges.cjs');
 const {
   VENUE_PLACE_KEYS,
   VENUE_MOVEMENT_KEYS,
+  VENUE_MAP_KEYS,
+  VENUE_MARKER_KEYS,
   PLACE_ID_RE,
   MAX_WALKING_MINUTES,
+  MEDIA_LIBRARY_PREFIXES,
+  storageObjectPath,
+  isMediaLibraryPath,
 } = require('../venue.cjs');
 const {
   THEME_DOC_KEYS,
@@ -331,6 +336,101 @@ function validateEventConfig(event) {
               errors.push(`${at}.accessibleRoute: must be null or a nonempty string`);
             }
           });
+        }
+      }
+
+      // THE MAP: an uploaded picture of the building, its alt text, and
+      // where the places above sit on it (shared/venue.cjs states the whole
+      // contract). Optional — a venue with no uploaded map records none.
+      //
+      // TWO REFUSALS CARRY THE WHOLE FEATURE. An image with no alt text is
+      // refused, because it renders for the readers who can see it and
+      // states nothing to the ones who cannot, and the save is the last
+      // moment somebody can still type the sentence. A marker naming an
+      // undefined place is refused BY NAME, for the same reason a movement
+      // is: the operator renamed a room, and a coordinate now points at
+      // nothing.
+      const map = venue.map;
+      if (map != null) {
+        if (typeof map !== 'object' || Array.isArray(map)) {
+          errors.push('venue.map: must be an object or null');
+        } else {
+          for (const key of Object.keys(map)) {
+            if (!VENUE_MAP_KEYS.includes(key)) errors.push(`venue.map.${key}: unknown map field`);
+          }
+          // The stored value is a Storage object path, not a download URL —
+          // the same identity the media library and theme.logos speak. A URL
+          // pasted in here would render as a broken image on the public
+          // page, so it is refused where somebody can still fix it.
+          if (!isNonEmptyString(map.image)) {
+            errors.push('venue.map.image: must be a nonempty storage path');
+          } else if (!storageObjectPath(map.image)) {
+            errors.push(
+              'venue.map.image: must be a storage object path from the media library, ' +
+              'not a URL',
+            );
+          } else if (!isMediaLibraryPath(storageObjectPath(map.image))) {
+            // The other namespaces are not the library's to publish from —
+            // a profile photo is owner bound, session materials are closed
+            // to public reads, and neither is a picture of a building.
+            errors.push(
+              `venue.map.image: must be under ${MEDIA_LIBRARY_PREFIXES.join(' or ')} — ` +
+              'choose the image from the media library',
+            );
+          }
+          if (!isNonEmptyString(map.alt)) {
+            errors.push(
+              'venue.map.alt: must be a nonempty string describing what the map shows',
+            );
+          }
+          if (map.markers != null) {
+            if (!Array.isArray(map.markers)) {
+              errors.push('venue.map.markers: must be an array');
+            } else {
+              const markedPlaces = new Set();
+              map.markers.forEach((marker, i) => {
+                const at = `venue.map.markers[${i}]`;
+                if (!marker || typeof marker !== 'object' || Array.isArray(marker)) {
+                  errors.push(`${at}: must be an object`);
+                  return;
+                }
+                for (const key of Object.keys(marker)) {
+                  if (!VENUE_MARKER_KEYS.includes(key)) {
+                    errors.push(`${at}.${key}: unknown marker field`);
+                  }
+                }
+                const placeId = marker.placeId;
+                if (typeof placeId !== 'string' || !PLACE_ID_RE.test(placeId)) {
+                  errors.push(`${at}.placeId: must be a place id, got ${JSON.stringify(placeId)}`);
+                } else if (!placeIds.has(placeId)) {
+                  errors.push(
+                    `${at}.placeId: "${placeId}" is not one of this venue's places — ` +
+                    'add it to venue.places, or correct the id',
+                  );
+                } else if (markedPlaces.has(placeId)) {
+                  errors.push(
+                    `${at}.placeId: "${placeId}" is already marked on this map — ` +
+                    'a room sits in one spot',
+                  );
+                } else {
+                  markedPlaces.add(placeId);
+                }
+                // Percentages of the image's own width and height, so the
+                // marker stays put at every size the picture is served at.
+                // 0 and 100 are the edges and both are real answers.
+                for (const axis of ['x', 'y']) {
+                  const value = marker[axis];
+                  if (typeof value !== 'number' || !Number.isFinite(value)
+                    || value < 0 || value > 100) {
+                    errors.push(
+                      `${at}.${axis}: must be a number from 0 to 100 (a percentage of the ` +
+                      `image), got ${JSON.stringify(value)}`,
+                    );
+                  }
+                }
+              });
+            }
+          }
         }
       }
     }
