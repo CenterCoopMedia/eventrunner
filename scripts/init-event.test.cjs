@@ -10,6 +10,7 @@ const { runInit, runCheck, runAttestAuth } = require('./init-event.cjs');
 const { makeFakeDb } = require('../functions/src/cms/firestoreFake.cjs');
 const store = require('../functions/src/cms/store.cjs');
 const { buildConfigDocs } = require('./lib/answers.cjs');
+const { seedCollection } = require('./lib/write.cjs');
 
 const TIER_A = Object.freeze({
   slug: 'test-event',
@@ -523,4 +524,75 @@ test('--attest-auth records the operator attestation the Auth row reads', async 
   assert.equal(auth.googleProviderEnabled, true);
   assert.equal(auth.authorizedDomainsConfigured, true);
   assert.ok(auth.attestedAt);
+});
+
+// UPGRADING A SITE THAT WAS SEEDED BY AN OLDER RELEASE (Codex review of the
+// configured registration action: P1). Dropping the hero cta from the seed
+// changes nothing on a deployment that already ran init: seedCollection only
+// writes, so the old document keeps drawing the control — usually pointed at
+// the example.org destination the old seed invented. The --force re-run an
+// operator is already told to do after an upgrade is where it gets removed.
+test('a --force re-run removes the legacy registration cta the seed no longer ships', async () => {
+  const db = makeFakeDb();
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  // The document as an older release seeded it, in both revisions.
+  await quietly(() => seedCollection({
+    db,
+    store,
+    collection: 'cmsContent',
+    docs: [{
+      id: 'hero__register_cta',
+      section: 'hero',
+      field: 'register_cta',
+      blockType: 'cta',
+      label: 'Register',
+      url: 'https://example.org',
+      visible: true,
+      order: 2,
+      seeded: true,
+      seededAt: 'T0',
+    }],
+    now: () => 0,
+  }));
+
+  const { value, output } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+
+  assert.equal(value, 0);
+  assert.equal((await db.collection('cmsContent').doc('hero__register_cta').get()).exists, false);
+  assert.equal((await db.collection('cmsContent_drafts').doc('hero__register_cta').get()).exists, false);
+  assert.match(output, /hero__register_cta/, 'what was removed is reported, not silently deleted');
+});
+
+test('a --force re-run keeps a registration cta an editor wrote themselves', async () => {
+  const db = makeFakeDb();
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  // An editor's own hero action: the seed removed its block, not the slot.
+  await db.collection('cmsContent').doc('hero__register_cta').set({
+    section: 'hero',
+    field: 'register_cta',
+    blockType: 'cta',
+    label: 'Get a ticket',
+    url: 'https://tickets.example.org',
+    visible: true,
+    order: 2,
+    seeded: false,
+  });
+
+  await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+
+  const kept = await db.collection('cmsContent').doc('hero__register_cta').get();
+  assert.equal(kept.exists, true, 'an editor-authored block is not the platform\'s to delete');
+  assert.equal(kept.data().label, 'Get a ticket');
+});
+
+test('a fresh init has no legacy document to remove and says nothing about one', async () => {
+  const db = makeFakeDb();
+  const { value, output } = await quietly(() =>
+    runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  assert.equal(value, 0);
+  assert.doesNotMatch(output, /hero__register_cta/);
 });

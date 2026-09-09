@@ -109,6 +109,26 @@ test('validateEventConfig: the registration destination must be an https URL', (
   }
 });
 
+// Codex review of the configured registration action (P2): `new
+// URL('https:register.example.org').protocol` is 'https:' — the WHATWG
+// parser reads a special scheme with no `//` as a relative reference — so
+// the protocol test alone passed a string that is not an absolute URL at
+// all. Stored and put in an `href`, it resolves against the page it sits
+// on: a reader clicking Register lands on /register.example.org on the
+// event's own domain, not on the registration form. The authority form is
+// required, the same way shared/urlSafety already requires it of every
+// other link that leaves the site.
+test('validateEventConfig: a registration destination with no authority is refused', () => {
+  for (const url of ['https:register.example.org', 'https:/register.example.org']) {
+    const result = validateEventConfig({
+      ...VALID_EVENT,
+      registration: { opensAt: null, closesAt: null, externalUrl: url },
+    });
+    assert.equal(result.ok, false, `expected ${JSON.stringify(url)} to be refused`);
+    assert.ok(result.errors.some((e) => e.includes('registration.externalUrl')));
+  }
+});
+
 test('validateEventConfig: a stored registration label is never empty', () => {
   const result = validateEventConfig({
     ...VALID_EVENT,

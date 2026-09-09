@@ -15,7 +15,7 @@
  * with them.
  */
 
-const { isHttpsUrl } = require('./config/schema.cjs');
+const { httpsUrlHref } = require('./config/schema.cjs');
 
 /** The four registration statuses, in lifecycle order. */
 const REGISTRATION_STATUSES = ['pending', 'ticketed', 'approved', 'revoked'];
@@ -100,6 +100,14 @@ function hasAttendeeAccess(profile) {
  * with the same function, because a second opinion about what counts as a
  * safe destination is how the surfaces drift apart again.
  *
+ * THE URL COMES BACK CANONICAL, not as the string that was stored (Codex
+ * review: P2). The stored value is unvalidated Firestore data and may be
+ * anything an older rule allowed, so what every surface renders is the
+ * href `httpsUrlHref` parsed and approved — not the raw text beside it. A
+ * value that validates as one URL and resolves as another is the whole
+ * hazard here: `https:register.example.org` reads as https to a protocol
+ * test and resolves against the current page in an `href`.
+ *
  * THE LABEL COMES BACK UNRESOLVED, as null where a client has written none.
  * The wording around the action is not the same sentence everywhere — a
  * page draws a button, an email writes a line of its own — so each surface
@@ -111,11 +119,11 @@ function hasAttendeeAccess(profile) {
  */
 function resolveRegistrationAction(eventConfig) {
   const registration = eventConfig?.registration;
-  const url = registration?.externalUrl;
-  if (!isHttpsUrl(url)) return null;
+  const url = httpsUrlHref(registration?.externalUrl);
+  if (!url) return null;
   const stated = registration?.actionLabel;
   return {
-    url: url.trim(),
+    url,
     label: typeof stated === 'string' && stated.trim() ? stated.trim() : null,
   };
 }
