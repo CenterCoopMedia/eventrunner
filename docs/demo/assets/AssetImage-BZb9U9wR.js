@@ -1,5 +1,0 @@
-<<<<<<<< HEAD:docs/demo/assets/AssetImage-Y-J5ynHJ.js
-import{aw as o,r as a,j as n}from"./index-eZQlYD03.js";function c({path:e,alt:i="",className:s=""}){const t=o(e),[f,r]=a.useState(!1);return a.useEffect(()=>{r(!1)},[e]),!t||f?n.jsx("span",{className:`flex items-center justify-center bg-brand-surface-alt p-2 text-center text-xs text-brand-ink-muted ${s}`,children:"This file is missing from storage."}):n.jsx("img",{src:t,alt:i,loading:"lazy",className:s,onError:()=>r(!0)})}export{c as A};
-========
-import{aR as o,r as a,j as n}from"./index-CGpSwv9j.js";function c({path:e,alt:i="",className:s=""}){const t=o(e),[f,r]=a.useState(!1);return a.useEffect(()=>{r(!1)},[e]),!t||f?n.jsx("span",{className:`flex items-center justify-center bg-brand-surface-alt p-2 text-center text-xs text-brand-ink-muted ${s}`,children:"This file is missing from storage."}):n.jsx("img",{src:t,alt:i,loading:"lazy",className:s,onError:()=>r(!0)})}export{c as A};
->>>>>>>> aac6f1b (Answer when and where on the home page itself):docs/demo/assets/AssetImage-BZb9U9wR.js

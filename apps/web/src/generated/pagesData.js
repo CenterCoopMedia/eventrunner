@@ -75,7 +75,7 @@ export const pagesData = [
           {
             field: 'where_transit',
             blockType: 'list_item',
-            description: 'How to reach the venue on public transit, labelled.',
+            description: 'The nearest transit to the venue, labelled.',
           },
         ],
       },
