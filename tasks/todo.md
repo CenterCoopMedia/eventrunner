@@ -7,24 +7,35 @@ Stack the PRs on branches `claude/repo-milestone-completion-sbpk7w-<issue>`, PR 
 
 ### Wave 1
 
-- [ ] #147 Render the navigation from page documents
-- [ ] #150 Serve per route metadata from the server
-- [ ] #151 Generate a sitemap, a robots file, and a web manifest at publish time
-- [ ] #153 Add a countdown and a lifecycle aware home lead
-- [ ] #157 Seed a recap page and a guidelines page
-- [ ] #160 Add search and a section index to long content pages
-- [ ] #161 Add a session recording link field
+- [x] #147 Render the navigation from page documents (PR #220)
+- [x] #150 Serve per route metadata from the server (PR #229)
+- [x] #151 Generate a sitemap, a robots file, and a web manifest at publish time (PR #221)
+- [x] #153 Add a countdown and a lifecycle aware home lead (PR #222)
+- [x] #157 Seed a recap page and a guidelines page (PR #223)
+- [x] #160 Add search and a section index to long content pages (PR #224)
+- [x] #161 Add a session recording link field (PR #228)
+
+Stack order for the waterfall merge: #229 into -161, #228 into -160, #224 into -157, #223 into -153, #222 into -151, #221 into -147, #220 into main.
 
 ### Wave 2
 
-- [ ] #148 Add the sign-in and account control to the header
-- [ ] #149 Build the footer link list and organizer links
-- [ ] #152 Reset scroll position on route change and add a back to top control
-- [ ] #154 Add a configured registration action
-- [ ] #155 Add an information card arrangement to the home page
-- [ ] #156 Add a sponsor strip section to the home page
-- [ ] #158 Seed a city guide page
-- [ ] #159 Add an uploaded venue map with labelled rooms
+- [ ] Shell branch (one agent, three commits): #148, #149, #152
+- [ ] Home branch (one agent, three commits): #154, #155, #156
+- [ ] #158 city guide
+- [ ] #159 venue map (in rework after review)
+
+## Follow-ups filed
+
+- #218 raster app icons (M7)
+- #219 admin save buttons stay enabled (M10)
+- #226 places and movements docs (M10)
+- #227 blank number field in the venue editor (M10)
+
+## Final tip work
+
+- Shorten the seeded page labels (Home, Travel, FAQ, Conduct, Contact, Privacy, Terms, Recap, Guidelines, City guide) and regenerate
+- One shared visible predicate across navigation, sitemap, and routeMeta
+- CHANGELOG entry for M7
 
 ## Review
 
