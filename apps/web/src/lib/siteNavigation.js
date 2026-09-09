@@ -3,45 +3,65 @@
 // The navigation used to be a fixed list in the shell, so the six seeded
 // content pages — travel, FAQ, conduct, contact, privacy, terms — existed,
 // rendered, and were reachable only by typing their URL. Every cmsPages doc
-// already carries what a nav item needs (`label`, `path`, `order`,
-// `visible`), so the list is data now: an operator who adds a page gets a
-// link, and one who hides a page loses it, with no code change either way.
+// already carries what a nav item needs (`label`, `order`, `visible`), so
+// the list is data now: an operator who adds a page gets a link, and one who
+// hides a page loses it, with no code change either way.
+//
+// A SYSTEM PAGE IS ADDRESSED BY IDENTITY, NOT BY ITS PATH.
+//
+// The two kinds of page answer "where does this live" in opposite
+// directions. A generic page IS its path: the catch-all route resolves the
+// URL against the stored `path`, so the document decides where it is served.
+// A system page is not — the route it renders through is declared in
+// App.jsx, and the document only describes it. Its `path` is therefore a
+// copy of a fact that lives in code, and a copy can drift: the server now
+// refuses to move it (functions/src/cms/pages.cjs) and the editor renders
+// the field read-only, but documents written before either guard existed,
+// and documents written straight into Firestore, can still carry a path no
+// route mounts. So system pages are looked up HERE by their stable `id` and
+// linked to the route SYSTEM_PAGES names, with only the label taken from
+// the document. A renamed system page renames its link; a system page whose
+// path was edited still points at the schedule.
 //
 // TWO GATES, NOT ONE. `visible` is the editor's answer and it covers every
-// page. A SYSTEM page — one with a dedicated React route — is additionally
-// gated on the feature flag that route already checks for itself: the seed
-// ships every system page `visible: true` while `features.updates` is off by
-// default, so visibility alone would offer a link to a route that renders
-// "not available". The feature map below is the same set of flags the routes
-// check (apps/web/src/pages/Schedule.jsx and friends), keyed by the route
-// each system page owns.
+// page. A system page is additionally gated on the feature flag that its
+// route already checks for itself: the seed ships every system page
+// `visible: true` while `features.updates` is off by default, so visibility
+// alone would offer a link to a route that renders "not available".
 //
 // The builder is forgiving in the way every reader in this app is forgiving:
 // it meets whatever is stored, including documents written before the path
 // rules landed and documents hand-edited straight in Firestore. Anything it
-// cannot turn into a working link — a system page at a path no route mounts,
-// a content page squatting a reserved segment, a page with no label — is
-// dropped rather than rendered as a link to a 404.
-import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
+// cannot turn into a working link — an unknown system id, a generic page on
+// a reserved segment, a path that is not a path at all — is dropped rather
+// than rendered as a link to a 404 or, worse, off the site.
+import { firstPathSegment, isCanonicalPagePath, isReservedPathSegment } from 'shared/routing';
 
 /**
- * The routes system pages own, and the feature flag each one is gated on.
+ * The system pages, by the stable document id the seed writes, and for each
+ * one: the route App.jsx mounts, the feature flag that route checks, and
+ * whether the route owns children.
  *
- * `null` for the home page: the index route is always mounted and there is
- * no flag that turns the event's front door off.
+ * `feature: null` for the home page — the index route is always mounted and
+ * no flag turns the event's front door off.
+ *
+ * `children: true` marks a route with descendants (/schedule/:sessionId,
+ * /speakers/:slug, /updates/:id, /attendees/:uid). Those keep prefix
+ * matching so the section stays marked while a reader is inside it; every
+ * other item matches its own URL exactly.
  *
  * Keep in sync by hand with the static <Route path="..."> list in
  * apps/web/src/App.jsx and with the `systemPage: true` docs in
- * scripts/lib/seed.cjs. A system page whose stored path is not a key here
- * has no route to link to, so it is left out of the navigation entirely.
+ * scripts/lib/seed.cjs; siteNavigation.test.js reads App.jsx and pins both
+ * directions.
  */
-export const SYSTEM_PAGE_FEATURES = Object.freeze({
-  '/': null,
-  '/schedule': 'schedule',
-  '/speakers': 'speakers',
-  '/sponsors': 'sponsors',
-  '/attendees': 'attendeeDirectory',
-  '/updates': 'updates',
+export const SYSTEM_PAGES = Object.freeze({
+  home: Object.freeze({ to: '/', feature: null, children: false }),
+  schedule: Object.freeze({ to: '/schedule', feature: 'schedule', children: true }),
+  speakers: Object.freeze({ to: '/speakers', feature: 'speakers', children: true }),
+  sponsors: Object.freeze({ to: '/sponsors', feature: 'sponsors', children: false }),
+  attendees: Object.freeze({ to: '/attendees', feature: 'attendeeDirectory', children: true }),
+  updates: Object.freeze({ to: '/updates', feature: 'updates', children: true }),
 });
 
 /** @param {unknown} v @returns {boolean} */
@@ -50,32 +70,46 @@ function isNonEmptyString(v) {
 }
 
 /**
- * Whether this document can be offered as a link at all — the same rules the
- * renderers apply when they meet it at its own URL.
+ * The nav item a page document becomes, or null when it cannot become one.
  *
  * @param {unknown} page a cmsPages document
- * @param {object} features config/features
- * @returns {boolean}
+ * @param {object|null|undefined} features config/features
+ * @returns {{ to: string, label: string, end: boolean }|null}
  */
-function isNavigable(page, features) {
-  if (!page || typeof page !== 'object') return false;
+function navItemFor(page, features) {
+  if (!page || typeof page !== 'object') return null;
   // `visible !== false` rather than `visible === true`: a document written
   // before the field existed is visible, which is what getPage assumes too.
-  if (page.visible === false) return false;
-  if (!isNonEmptyString(page.label)) return false;
-  if (!isNonEmptyString(page.path) || !page.path.startsWith('/')) return false;
+  if (page.visible === false) return null;
+  if (!isNonEmptyString(page.label)) return null;
 
   if (page.systemPage === true) {
-    // Only the routes App.jsx actually mounts, and only while the feature
-    // behind the route is on.
-    if (!Object.prototype.hasOwnProperty.call(SYSTEM_PAGE_FEATURES, page.path)) return false;
-    const feature = SYSTEM_PAGE_FEATURES[page.path];
-    return feature === null || Boolean(features?.[feature]);
+    // By id, not by path — see the note at the top of this file.
+    const system = Object.prototype.hasOwnProperty.call(SYSTEM_PAGES, page.id)
+      ? SYSTEM_PAGES[page.id]
+      : null;
+    // A systemPage doc with an id no route answers to has nothing to link
+    // to. That is hand-written data, not something the editor can produce.
+    if (!system) return null;
+    if (system.feature !== null && !features?.[system.feature]) return null;
+    return { to: system.to, label: page.label, end: !system.children };
   }
 
-  // A generic page at a reserved segment is pre-#52 or hand-edited data:
+  // A generic page IS its stored path, so the path has to hold up on its
+  // own. isCanonicalPagePath is the shape the validator writes, asked again
+  // here because a renderer meets data the validator never saw: '/travel'
+  // passes, '//example.org' and 'https://example.org' are not paths at all
+  // and would take a reader off the site from inside the site's own nav.
+  if (!isCanonicalPagePath(page.path) || page.path === '/') return null;
+  // A generic page on a reserved segment is pre-#52 or hand-edited data:
   // ContentPage 404s it, so the navigation must not offer it.
-  return !isReservedPathSegment(firstPathSegment(page.path));
+  if (isReservedPathSegment(firstPathSegment(page.path))) return null;
+
+  // `end: true`, always. A generic page owns no child routes, so prefix
+  // matching would mark /about as current while the reader is on
+  // /about/team — two items claiming aria-current at once, which is worse
+  // than none: it tells a screen reader the reader is in two places.
+  return { to: page.path, label: page.label, end: true };
 }
 
 /**
@@ -92,24 +126,20 @@ function isNavigable(page, features) {
 export function buildNavItems(pages, features) {
   const seen = new Set();
   return (pages ?? [])
-    .filter((page) => isNavigable(page, features))
+    .map((page) => ({ order: page?.order, item: navItemFor(page, features) }))
+    .filter((entry) => entry.item !== null)
     .sort(
       (a, b) =>
-        (a.order ?? 0) - (b.order ?? 0) || String(a.label).localeCompare(String(b.label)),
+        (a.order ?? 0) - (b.order ?? 0) || a.item.label.localeCompare(b.item.label),
     )
-    .filter((page) => {
-      // Two documents can claim one route (a duplicate written straight into
-      // Firestore). Render the first in reading order; a repeated link is
-      // noise a reader has to resolve.
-      if (seen.has(page.path)) return false;
-      seen.add(page.path);
+    .map((entry) => entry.item)
+    .filter((item) => {
+      // Two documents can resolve to one route: a duplicate path written
+      // straight into Firestore, or two docs claiming the same system id.
+      // Render the first in reading order; a repeated link is noise a reader
+      // has to resolve.
+      if (seen.has(item.to)) return false;
+      seen.add(item.to);
       return true;
-    })
-    .map((page) => ({
-      to: page.path,
-      label: page.label,
-      // `end` only for the home page: without it '/' matches every URL, and
-      // with it '/schedule' would stop being current on '/schedule/:id'.
-      end: page.path === '/',
-    }));
+    });
 }

@@ -8,7 +8,7 @@
 // defensively, independent of the write-boundary fix in
 // packages/shared/src/config/schema.cjs.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 
 let eventConfig;
 let heroBlocks;
@@ -138,6 +138,13 @@ describe('Home lead image', () => {
 // The lifecycle-aware countdown (M7 issue 7) lives inside the same lead
 // section as the heading and tagline above — this proves it actually
 // renders there, rather than only unit-testing EventCountdown in isolation.
+//
+// This describe block's own render schedules a real setInterval whenever it
+// escapes the fake clock still mounted, so its afterEach unmounts (via
+// cleanup()) BEFORE switching timers back: afterEach hooks run in reverse
+// registration order, so a bare `vi.useRealTimers()` here would run before
+// the global test setup's own cleanup() call, restoring native timers while
+// this block's render was still mounted and its interval still pending.
 describe('Home lead countdown', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -151,11 +158,22 @@ describe('Home lead countdown', () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
   });
 
   it('renders the countdown in the lead, ahead of a future event', () => {
     render(<Home />);
     expect(screen.getByText('Time until the event starts')).toBeInTheDocument();
+  });
+
+  it('clears its interval on unmount rather than leaving it for the real clock', () => {
+    const clearSpy = vi.spyOn(globalThis, 'clearInterval');
+    const { unmount } = render(<Home />);
+    expect(screen.getByText('Time until the event starts')).toBeInTheDocument();
+    expect(clearSpy).not.toHaveBeenCalled();
+    unmount();
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+    clearSpy.mockRestore();
   });
 });
