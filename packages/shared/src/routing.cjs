@@ -53,6 +53,23 @@ const RESERVED_PATH_SEGMENTS = Object.freeze([
 ]);
 
 /**
+ * The first path segment of a route or a stored page path — the part this
+ * list is about. `''` for '/' and for anything with no segment at all, so a
+ * caller can compare it without a null check.
+ *
+ * It lives here rather than beside each caller because every caller derives
+ * it for the same purpose: to ask isReservedPathSegment about it. Two copies
+ * of the same three lines is two places to disagree about what a leading
+ * slash, a trailing slash, or an empty path means.
+ *
+ * @param {string} path a route or page path, e.g. '/travel' or '/p/faq'
+ * @returns {string}
+ */
+function firstPathSegment(path) {
+  return String(path ?? '').split('/').filter(Boolean)[0] ?? '';
+}
+
+/**
  * True when `segment` (a single path segment, no slashes) collides with a
  * statically mounted route.
  *
@@ -63,4 +80,4 @@ function isReservedPathSegment(segment) {
   return RESERVED_PATH_SEGMENTS.includes(segment);
 }
 
-module.exports = { RESERVED_PATH_SEGMENTS, isReservedPathSegment };
+module.exports = { RESERVED_PATH_SEGMENTS, firstPathSegment, isReservedPathSegment };

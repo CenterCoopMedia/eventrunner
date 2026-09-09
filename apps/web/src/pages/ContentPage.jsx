@@ -17,7 +17,7 @@
 // itself, on both the requested URL and the matched doc's stored path, and
 // 404s rather than trusting stored data to already be clean.
 import { Link, useLocation } from 'react-router-dom';
-import { isReservedPathSegment } from 'shared/routing';
+import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -25,11 +25,6 @@ import NotFound from './NotFound.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
-
-/** First path segment ('' for '/'), no leading/trailing slash. */
-function firstSegment(path) {
-  return path.split('/').filter(Boolean)[0] ?? '';
-}
 
 // Pages seeded from the §5.5 legal templates. While
 // config/event.legal.reviewRequired is set, both carry a visible public
@@ -46,13 +41,13 @@ export default function ContentPage() {
 
   // The requested URL itself may be reserved territory (a stale /p/... link,
   // a guess at /signin/help) even before a page lookup happens.
-  const page = isReservedPathSegment(firstSegment(pathname)) ? null : getPage(pathname);
+  const page = isReservedPathSegment(firstPathSegment(pathname)) ? null : getPage(pathname);
 
   // A non-system page whose STORED path starts with a reserved segment is
   // pre-#52 or hand-edited data, not something the current admin UI could
   // save today — treat it as unreachable rather than rendering it.
   const pageReserved =
-    page && page.systemPage !== true && isReservedPathSegment(firstSegment(page.path));
+    page && page.systemPage !== true && isReservedPathSegment(firstPathSegment(page.path));
 
   if (!page || page.systemPage || pageReserved) {
     return <NotFound />;

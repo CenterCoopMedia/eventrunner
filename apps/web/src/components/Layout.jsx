@@ -43,7 +43,7 @@
 // So: what the page states, then what the site states, then the default.
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
 import { useContent } from '../contexts/ContentContext.jsx';
@@ -134,7 +134,10 @@ export default function Layout() {
   // travel, FAQ, conduct, contact, privacy, and terms pages are reachable
   // from the header instead of only by a typed URL, and an operator adding
   // a page gets a link without a deploy.
-  const navItems = buildNavItems(pages, features);
+  // Memoized because the shell re-renders on every route change and every
+  // config or content snapshot, and the list only changes when the pages or
+  // the flags do.
+  const navItems = useMemo(() => buildNavItems(pages, features), [pages, features]);
 
   // One nav, placed two ways. The list, its labels, its landmark, and its
   // position in the document are identical either way — `side` only moves

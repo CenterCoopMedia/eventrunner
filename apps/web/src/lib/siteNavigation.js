@@ -22,7 +22,7 @@
 // cannot turn into a working link — a system page at a path no route mounts,
 // a content page squatting a reserved segment, a page with no label — is
 // dropped rather than rendered as a link to a 404.
-import { isReservedPathSegment } from 'shared/routing';
+import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
 
 /**
  * The routes system pages own, and the feature flag each one is gated on.
@@ -43,11 +43,6 @@ export const SYSTEM_PAGE_FEATURES = Object.freeze({
   '/attendees': 'attendeeDirectory',
   '/updates': 'updates',
 });
-
-/** First path segment ('' for '/'), no leading or trailing slash. */
-function firstSegment(path) {
-  return path.split('/').filter(Boolean)[0] ?? '';
-}
 
 /** @param {unknown} v @returns {boolean} */
 function isNonEmptyString(v) {
@@ -80,7 +75,7 @@ function isNavigable(page, features) {
 
   // A generic page at a reserved segment is pre-#52 or hand-edited data:
   // ContentPage 404s it, so the navigation must not offer it.
-  return !isReservedPathSegment(firstSegment(page.path));
+  return !isReservedPathSegment(firstPathSegment(page.path));
 }
 
 /**

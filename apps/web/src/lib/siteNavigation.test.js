@@ -3,9 +3,39 @@
 // page, a page with no order, a system page whose feature is off, and the
 // hand-edited shapes the validator would refuse today but Firestore still
 // holds.
+import fs from 'node:fs';
+import nodePath from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { KNOWN_FEATURE_KEYS } from 'shared/config';
+import { RESERVED_PATH_SEGMENTS, firstPathSegment } from 'shared/routing';
 import { SYSTEM_PAGE_FEATURES, buildNavItems } from './siteNavigation.js';
+
+const here = nodePath.dirname(fileURLToPath(import.meta.url));
+const APP_JSX = nodePath.join(here, '..', 'App.jsx');
+
+/**
+ * Every route App.jsx statically mounts, as an absolute path.
+ *
+ * Read out of the source rather than imported, because the list lives in JSX
+ * that only React can evaluate — and reading it is the whole point: three
+ * lists kept by hand (the routes, SYSTEM_PAGE_FEATURES, and
+ * RESERVED_PATH_SEGMENTS) are exactly what drifts, silently, the next time
+ * someone adds a route.
+ *
+ * `<Route index>` is the home page and carries no `path`, so '/' is added
+ * here. `admin/*` is a subtree: the splat is dropped and the prefix stands.
+ * The bare `*` is the catch-all, which is not a mounted route at all — it is
+ * what ContentPage renders when none of these matched.
+ */
+function mountedRoutes() {
+  const source = fs.readFileSync(APP_JSX, 'utf8');
+  const declared = [...source.matchAll(/path="([^"]+)"/g)].map((match) => match[1]);
+  const routes = declared
+    .filter((route) => route !== '*')
+    .map((route) => `/${route.replace(/\/\*$/, '')}`);
+  return ['/', ...routes];
+}
 
 const HOME = { id: 'home', label: 'Home page', path: '/', order: 0, visible: true, systemPage: true };
 const SCHEDULE = { id: 'schedule', label: 'Schedule', path: '/schedule', order: 1, visible: true, systemPage: true };
@@ -25,8 +55,8 @@ const paths = (items) => items.map((item) => item.to);
 describe('the system page routes', () => {
   it('names a feature for every system route except the home page', () => {
     expect(SYSTEM_PAGE_FEATURES['/']).toBeNull();
-    for (const [path, feature] of Object.entries(SYSTEM_PAGE_FEATURES)) {
-      if (path === '/') continue;
+    for (const [routePath, feature] of Object.entries(SYSTEM_PAGE_FEATURES)) {
+      if (routePath === '/') continue;
       expect(typeof feature).toBe('string');
     }
   });
@@ -38,6 +68,31 @@ describe('the system page routes', () => {
     for (const feature of Object.values(SYSTEM_PAGE_FEATURES)) {
       if (feature === null) continue;
       expect(KNOWN_FEATURE_KEYS).toContain(feature);
+    }
+  });
+
+  // Every key here becomes an <a href>. A key App.jsx does not mount is a
+  // link into the catch-all, and the catch-all 404s a system page — the same
+  // dead end buildNavItems drops hand-edited data to avoid, arrived at
+  // through code instead of through data.
+  it('names only routes App.jsx actually mounts', () => {
+    const mounted = mountedRoutes();
+    expect(mounted).toContain('/');
+    for (const routePath of Object.keys(SYSTEM_PAGE_FEATURES)) {
+      expect(mounted).toContain(routePath);
+    }
+  });
+
+  // The other direction, one list further out: a statically mounted route
+  // owns its first segment outright, so a generic page must never be able to
+  // claim it. RESERVED_PATH_SEGMENTS is what enforces that — on write in
+  // functions/src/cms/pages.cjs, and in both renderers — and nothing but
+  // this test notices a new route landing without its segment being added.
+  it('leaves no mounted route segment out of RESERVED_PATH_SEGMENTS', () => {
+    const segments = [...new Set(mountedRoutes().map(firstPathSegment))].filter(Boolean);
+    expect(segments.length).toBeGreaterThan(0);
+    for (const segment of segments) {
+      expect(RESERVED_PATH_SEGMENTS).toContain(segment);
     }
   });
 });
