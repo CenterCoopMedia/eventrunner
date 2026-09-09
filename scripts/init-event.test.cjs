@@ -9,6 +9,7 @@ const path = require('node:path');
 const { runInit, runCheck, runAttestAuth } = require('./init-event.cjs');
 const { makeFakeDb } = require('../functions/src/cms/firestoreFake.cjs');
 const store = require('../functions/src/cms/store.cjs');
+const { buildConfigDocs } = require('./lib/answers.cjs');
 
 const TIER_A = Object.freeze({
   slug: 'test-event',
@@ -192,6 +193,80 @@ test('--force re-runs the seed but leaves client-edited documents alone', async 
   assert.equal(value, 0);
   assert.equal((await db.collection('cmsContent').doc('hero__title').get()).data().value, 'Client copy');
   assert.equal((await db.collection('cmsContent').doc('hero__subtitle').get()).data().seeded, true);
+});
+
+test('a page path already owned by a different page id is skipped, not duplicated (Codex review P1)', async () => {
+  // An existing deployment, upgraded to a version of Eventrunner that adds
+  // the 'recap' seeded page id for the first time — 'recap' has never
+  // existed here. The operator's OWN page already sits at /recap under a
+  // different id, from before this upgrade. seedCollection alone would
+  // never catch this: it decides purely by doc id, and 'recap' is new.
+  const db = makeFakeDb();
+  const built = buildConfigDocs({ answers: { ...ANSWERS, adminEmails: ['ops@example.org'] }, tierA: TIER_A, now: () => 0 });
+  assert.equal(built.ok, true, built.errors.join('; '));
+  await db.collection('config').doc('event').set(built.docs.event); // marks the project already-initialized
+  const operator = { uid: 'operator', email: 'operator@example.org' };
+  await store.writeDraft({
+    db,
+    collection: 'cmsPages',
+    docId: 'about-us',
+    fields: {
+      label: 'About us', path: '/recap', icon: null, order: 99,
+      visible: true, systemPage: false, sections: [],
+    },
+    visible: true,
+    actor: operator,
+    now: () => 1,
+  });
+  await store.publishDocs({ db, collection: 'cmsPages', docIds: ['about-us'], actor: operator, now: () => 1 });
+
+  const { value, output } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 2,
+  }));
+
+  assert.equal(value, 0, 'a path collision is reported, not a fatal error');
+  assert.match(output, /path \/recap is already owned by page 'about-us' — not seeded/);
+  assert.equal((await db.collection('cmsPages').doc('recap').get()).exists, false,
+    'the seeded page must never be written at a path another page already owns');
+  assert.equal((await db.collection('cmsPages').doc('about-us').get()).data().path, '/recap',
+    "the operator's own page keeps the route");
+  // Every OTHER seeded page, with no collision of its own, still seeds
+  // normally — the preflight must not skip more than the colliding one.
+  assert.equal((await db.collection('cmsPages').doc('home').get()).exists, true);
+  assert.equal((await db.collection('cmsPages').doc('guidelines').get()).exists, true);
+});
+
+test('a page path claimed only by an unpublished draft still blocks the seed', async () => {
+  const db = makeFakeDb();
+  const built = buildConfigDocs({ answers: { ...ANSWERS, adminEmails: ['ops@example.org'] }, tierA: TIER_A, now: () => 0 });
+  assert.equal(built.ok, true, built.errors.join('; '));
+  await db.collection('config').doc('event').set(built.docs.event);
+
+  // Drafted, never published: seedCollection's OWN existing-doc check
+  // (which reads both revisions) would still write 'guidelines' fine by
+  // id, so only the path-collision preflight catches this.
+  await store.writeDraft({
+    db,
+    collection: 'cmsPages',
+    docId: 'speaker-notes',
+    fields: {
+      label: 'Speaker notes', path: '/guidelines', icon: null, order: 50,
+      visible: true, systemPage: false, sections: [],
+    },
+    visible: true,
+    actor: { uid: 'operator', email: 'operator@example.org' },
+    now: () => 1,
+  });
+
+  const { value, output } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 2,
+  }));
+
+  assert.equal(value, 0);
+  assert.match(output, /path \/guidelines is already owned by page 'speaker-notes' — not seeded/);
+  assert.equal((await db.collection('cmsPages').doc('guidelines').get()).exists, false);
+  assert.equal((await db.collection('cmsPages').doc('recap').get()).exists, true,
+    'a collision on one page must not block the rest of the seed');
 });
 
 test('--dry-run writes nothing', async () => {

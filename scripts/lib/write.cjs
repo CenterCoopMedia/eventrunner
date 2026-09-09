@@ -116,6 +116,57 @@ async function seedCollection({ db, store, collection, docs, dryRun = false, now
 }
 
 /**
+ * Path-collision preflight for the page seed (Codex review, seed a recap
+ * page and a guidelines page: P1).
+ *
+ * `seedCollection`'s existing-document check only ever looks at
+ * `cmsPages/{id}` — it decides purely by DOC ID. A page's route is its
+ * `path`, not its id, so that check is blind to the one collision that
+ * actually breaks the site: an operator who has moved a live page to a
+ * different id but kept the SAME path, or drafted a brand-new page at a
+ * path a seeded id also wants. Nothing stops `seedCollection` from writing
+ * a second `cmsPages` document at that path, and `getPage`
+ * (apps/web/src/contexts/ContentContext.jsx) resolves the collision
+ * arbitrarily from then on — whichever of the two documents its snapshot
+ * happens to read first.
+ *
+ * Reads BOTH live and draft `cmsPages`, because a path claimed only in an
+ * unpublished draft becomes a live collision the moment that draft
+ * publishes, and this preflight is the only chance to catch it before a
+ * seed write ever lands. Live ownership wins when a path is claimed in
+ * both revisions — that is the route as it actually resolves today.
+ *
+ * @param {{ db: object, pages: object[] }} args pages carry at least
+ *   `{ id, path }` — the DEFAULT_PAGES() shape, or any subset of it.
+ * @returns {Promise<Map<string, { path: string, ownerId: string }>>}
+ *   keyed by the SEEDED page id that collides; empty when nothing does.
+ */
+async function findPagePathCollisions({ db, pages }) {
+  const [liveSnap, draftSnap] = await Promise.all([
+    db.collection('cmsPages').get(),
+    db.collection('cmsPages_drafts').get(),
+  ]);
+  const owners = new Map(); // path -> the doc id that currently owns it
+  for (const snap of [liveSnap, draftSnap]) {
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      const docPath = data?.path;
+      if (typeof docPath === 'string' && !owners.has(docPath)) {
+        owners.set(docPath, doc.id);
+      }
+    }
+  }
+  const collisions = new Map();
+  for (const page of pages) {
+    const ownerId = owners.get(page.path);
+    if (ownerId && ownerId !== page.id) {
+      collisions.set(page.id, { path: page.path, ownerId });
+    }
+  }
+  return collisions;
+}
+
+/**
  * Seed the `email_templates/{id}` overrides (spec §5.1 step f). A flat
  * document write, not the CMS draft/publish path `seedCollection` uses —
  * `email_templates` is a code-default registry with an OPTIONAL override
@@ -190,6 +241,7 @@ async function readConfig({ db }) {
 module.exports = {
   writeConfigDocs,
   seedCollection,
+  findPagePathCollisions,
   seedEmailTemplateOverrides,
   countSeeded,
   readConfig,

@@ -333,18 +333,25 @@ function demoExtraDoc(section, field, blockType, fields, order) {
  * established above.
  */
 const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
+  // This recap is deliberately about the PREVIOUS edition, not the one
+  // DEMO_ANSWERS configures (14-16 October 2026, still upcoming as far as
+  // the demo's own lifecycle is concerned — see DEMO_EVENT_OVERRIDES
+  // above). A recap describing an event `config/event.days` has not
+  // happened yet is a real contradiction, not a demo-flavor choice, so the
+  // heading and every date below say "previous edition" and land in 2025,
+  // a year ahead of the configured days rather than inside them.
   demoExtraDoc('recap_summary', 'body', 'richtext', {
     value:
-      '<p>The [Demo] Harborlight Media Summit closed its third year with three days of shared ' +
-      'sessions and hands-on workshops. Turnout was the highest yet, and the workshop tracks ' +
+      '<p>A look back at the previous edition of the [Demo] Harborlight Media Summit, held ' +
+      'over three days in October 2025. Turnout was the highest yet, and the workshop tracks ' +
       'filled within a day of registration opening.</p>',
   }, 0),
   demoExtraDoc('recap_stats', 'attendees', 'stat', {
     value: '438',
-    label: 'people attended',
+    label: 'people attended the previous edition',
     takeaway: 'Attendance topped four hundred for the first time',
-    description: 'Checked-in badges across all three days of the summit.',
-    source: 'Summit registration desk count, read 16 May 2026.',
+    description: 'Checked-in badges across all three days of the previous edition.',
+    source: 'Summit registration desk count, read 20 October 2025.',
     alt: 'Attendance reached 438 people across the three-day summit.',
   }, 0),
   demoExtraDoc('recap_stats', 'sessions', 'stat', {
@@ -352,47 +359,47 @@ const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
     label: 'sessions held',
     takeaway: 'Nearly every planned session ran on schedule',
     description: 'Sessions that ran on the published programme, counting workshops, panels, and plenaries.',
-    source: 'Summit programme, read 16 May 2026.',
+    source: 'Summit programme, read 20 October 2025.',
     alt: '36 of the 38 planned sessions ran as scheduled.',
   }, 1),
   demoExtraDoc('recap_highlights', 'first', 'list_item', {
     text: 'The workshop on audience research on a small budget filled within a day of opening.',
   }, 0),
   demoExtraDoc('recap_highlights', 'second', 'list_item', {
-    text: 'Attendees asked for a longer unconference block next year, and the organizing ' +
-      'committee is considering it.',
+    text: 'Attendees asked for a longer unconference block at the next summit, and the ' +
+      'organizing committee is considering it.',
   }, 1),
   demoExtraDoc('recap_highlights', 'third', 'list_item', {
     text: 'Two newsroom partnerships announced a shared beat during the closing plenary.',
   }, 2),
   demoExtraDoc('recap_media', 'photos', 'link_group', {
     group: 'Media',
-    label: 'Photos from all three days',
-    url: 'https://example.org/harborlight-2026-photos',
+    label: 'Photos from the previous edition',
+    url: 'https://example.org/harborlight-2025-photos',
   }, 0),
   demoExtraDoc('recap_media', 'recordings', 'link_group', {
     group: 'Media',
-    label: 'Session recordings',
-    url: 'https://example.org/harborlight-2026-recordings',
+    label: 'Session recordings from the previous edition',
+    url: 'https://example.org/harborlight-2025-recordings',
   }, 1),
   demoExtraDoc('recap_next', 'schedule', 'link_group', {
     group: 'Continue exploring',
-    label: 'Browse the full schedule',
+    label: 'Browse the current schedule',
     url: '/schedule',
   }, 0),
   demoExtraDoc('recap_next', 'speakers', 'link_group', {
     group: 'Continue exploring',
-    label: 'See who spoke',
+    label: 'See who is speaking next',
     url: '/speakers',
   }, 1),
   demoExtraDoc('recap_next', 'program', 'link_group', {
     group: 'Continue exploring',
-    label: 'Download the program PDF',
-    url: 'https://example.org/harborlight-2026-program.pdf',
+    label: 'Download the previous edition program PDF',
+    url: 'https://example.org/harborlight-2025-program.pdf',
   }, 2),
   demoExtraDoc('recap_survey', 'link', 'cta', {
-    label: 'Share your feedback',
-    url: 'https://example.org/harborlight-2026-survey',
+    label: 'Share your feedback on the previous edition',
+    url: 'https://example.org/harborlight-2025-survey',
     external: true,
   }, 0),
   demoExtraDoc('guidelines_intro', 'welcome', 'richtext', {

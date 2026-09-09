@@ -67,7 +67,7 @@ const { manualChecklist, formatChecklist } = require('./lib/checklist.cjs');
 const { validateDeployEnv } = require('shared/config');
 const { uploadPlaceholderBranding } = require('./lib/branding.cjs');
 const {
-  writeConfigDocs, seedCollection, seedEmailTemplateOverrides, countSeeded, readConfig,
+  writeConfigDocs, seedCollection, findPagePathCollisions, seedEmailTemplateOverrides, countSeeded, readConfig,
 } = require('./lib/write.cjs');
 
 const FLAGS = [
@@ -335,7 +335,24 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   // as if Google sign-in had never been enabled.
   const content = buildSeedContent({ pages, docs: effective, tierA, seededAt });
 
-  const pageResult = await seedCollection({ db, store, collection: 'cmsPages', docs: pageDocs, dryRun, now, force });
+  // Path-collision preflight (Codex review, seed a recap page and a
+  // guidelines page: P1): seedCollection decides purely by doc id, so it
+  // cannot see a DIFFERENT page id already sitting on the path a seeded
+  // page wants — including under --force, which only relaxes the
+  // already-initialized refusal, never this. Every seeded page is
+  // checked, not only the two most recently added ones: a client's own
+  // page reassignment could just as easily collide with 'travel' or
+  // 'faq'. A colliding page is left out of the write entirely and
+  // reported the same way every other skip already is.
+  const pathCollisions = await findPagePathCollisions({ db, pages: pageDocs });
+  const collisionSkips = [...pathCollisions].map(([id, collision]) => ({
+    id,
+    reason: `path ${collision.path} is already owned by page '${collision.ownerId}' — not seeded`,
+  }));
+  const seedablePages = pageDocs.filter((page) => !pathCollisions.has(page.id));
+
+  const pageResult = await seedCollection({ db, store, collection: 'cmsPages', docs: seedablePages, dryRun, now, force });
+  pageResult.skipped = [...collisionSkips, ...pageResult.skipped];
   console.log(
     `  cmsPages          ${pageResult.created.length} created, ${pageResult.refreshed.length} refreshed, ` +
     `${pageResult.skipped.length} left alone`,
