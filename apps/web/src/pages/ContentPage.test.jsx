@@ -65,9 +65,13 @@ describe('Home', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: siteContent.hero__title.value }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: siteContent.hero__register_cta.label }),
-    ).toHaveAttribute('href', siteContent.hero__register_cta.url);
+    // The registration action is configuration, not content (M7 issue 8),
+    // and the demo configures none: it is a static build with no ticket
+    // provider behind it, so it ships the empty case. Nothing anywhere on
+    // the page opens a registration destination — no dead button in the
+    // lead, and none in the header it would otherwise repeat on every page.
+    expect(eventConfig.registration.externalUrl).toBeNull();
+    expect(document.querySelectorAll('a[target="_blank"]')).toHaveLength(0);
     // Generic sections render with their labels from the pages snapshot.
     const home = pagesData.find((p) => p.id === 'home');
     const statsSection = home.sections.find((s) => s.id === 'stats');

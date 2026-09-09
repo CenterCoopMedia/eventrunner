@@ -44,11 +44,6 @@ export const pagesData = [
             blockType: 'text',
             description: 'One warm supporting sentence.',
           },
-          {
-            field: 'register_cta',
-            blockType: 'cta',
-            description: 'Primary registration action.',
-          },
         ],
       },
       {

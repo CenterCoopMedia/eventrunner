@@ -88,11 +88,19 @@ function defaultPages() {
       visible: true,
       systemPage: true,
       sections: [
+        // No registration action seeds here any more (M7 issue 8). The
+        // event's own registration action is configuration, not content:
+        // `config/event.registration` holds the destination and the label,
+        // the home lead and the header both draw it from there, and an
+        // unset destination draws nothing. A seeded cta block could not do
+        // that — it had to invent a URL to be a valid block at all, and the
+        // one it invented pointed at example.org, which is the dead button
+        // the issue exists to remove. `cta` stays in the allowed list, so an
+        // editor can still add an action of their own beside it.
         section('hero', 'Hero', 'The opening headline, one supporting line, and the primary action.',
           ['text', 'cta', 'image'], 4, [
             block('title', 'text', 'Event name headline.'),
             block('subtitle', 'text', 'One warm supporting sentence.'),
-            block('register_cta', 'cta', 'Primary registration action.'),
           ]),
         section('details', 'Details', 'Body copy describing what happens at the event.',
           ['richtext', 'image'], 6, [
@@ -435,11 +443,6 @@ function statContract(subject) {
 
 const CONFIG_SEEDS = Object.freeze({
   'hero.title': ({ event }) => ({ value: event.name }),
-  'hero.register_cta': ({ event, tierA }) => ({
-    label: 'Register',
-    url: event.registration?.externalUrl || tierA?.publicUrl || 'https://example.org',
-    external: true,
-  }),
   // A stat carries the four-part contract from PR3 on (design brief
   // §2.1.1), and a seeded stat is no exception: the figure and its caption
   // are correct as seeded, and the four parts arrive as the instruction for

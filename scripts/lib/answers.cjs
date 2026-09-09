@@ -272,7 +272,12 @@ function buildEvent({ answers, tierA }) {
     registration: {
       opensAt: orDefault(registration.opensAt, null),
       closesAt: orDefault(registration.closesAt, null),
+      // The registration action (M7 issue 8): where the site's own register
+      // control sends a reader, and what it says. Both null on a fresh
+      // deployment — a client who has not been handed a link yet gets no
+      // control at all rather than one that goes nowhere.
       externalUrl: orDefault(registration.externalUrl, null),
+      actionLabel: orDefault(registration.actionLabel, null),
     },
     venue: {
       name: orDefault(venue.name, ''),

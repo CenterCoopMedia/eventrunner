@@ -447,6 +447,70 @@ describe('event settings', () => {
     expect(screen.getByLabelText('Sender email')).toHaveAttribute('aria-invalid', 'true');
   });
 
+  // THE REGISTRATION ACTION (M7 issue 8). Two fields drive one control the
+  // site draws on the home lead and in the header, so both have to reach
+  // the save, and both have to be able to say why the server refused them —
+  // the URL field had no error binding at all before this issue.
+  it('round-trips the registration action, and clears the label when it is emptied', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      registration: {
+        opensAt: null,
+        closesAt: null,
+        externalUrl: 'https://register.example.org/summit',
+        actionLabel: 'Get a ticket',
+      },
+    });
+
+    expect(screen.getByLabelText('External registration URL')).toHaveValue(
+      'https://register.example.org/summit',
+    );
+    expect(screen.getByLabelText('Register button label')).toHaveValue('Get a ticket');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.change(screen.getByLabelText('Register button label'), { target: { value: '  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const registration = bodyOf(0).event.registration;
+    expect(registration.externalUrl).toBe('https://register.example.org/summit');
+    // Emptied means "clear this", which is null — never a stored blank that
+    // would draw a control with no words on it.
+    expect(registration.actionLabel).toBeNull();
+  });
+
+  it('marks the registration fields the server refused, each against its own control', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+
+    fetch.mockResolvedValueOnce(
+      errorResponse(
+        400,
+        'bad-request',
+        'registration.externalUrl: must be null or an https:// URL, got "http://register.example.org"; ' +
+          'registration.actionLabel: must be null or a nonempty string',
+      ),
+    );
+    fireEvent.change(screen.getByLabelText('External registration URL'), {
+      target: { value: 'http://register.example.org' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('registration.externalUrl: must be null or an https:// URL');
+    expect(screen.getByLabelText('External registration URL')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.getByLabelText('Register button label')).toHaveAttribute('aria-invalid', 'true');
+    // A rejected save keeps what the operator typed, so they can correct it
+    // rather than retype it.
+    expect(screen.getByLabelText('External registration URL')).toHaveValue(
+      'http://register.example.org',
+    );
+  });
+
   it('refuses to lose a rejected save: the edited value stays in the form', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);

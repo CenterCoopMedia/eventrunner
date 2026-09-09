@@ -59,6 +59,30 @@ const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 // that cannot be a From address at all.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * True when the string is a URL a browser may be sent to over TLS.
+ *
+ * Stricter than shared/urlSafety's `isSafeUrl`, on purpose. That helper
+ * gates a link a person typed into the CMS and allows http: as well, because
+ * refusing an operator's own plain-http link would be refusing their own
+ * content. This one gates a value the SITE renders as its own action — the
+ * registration destination on the home lead and in the header — and a
+ * plain-http destination there would send a reader off the event's own
+ * TLS-served site to type their name and their email in clear. A provider
+ * that cannot serve https is a provider this field refuses.
+ *
+ * @param {*} v
+ * @returns {boolean}
+ */
+function isHttpsUrl(v) {
+  if (typeof v !== 'string' || !v.trim()) return false;
+  try {
+    return new URL(v.trim()).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 // Every key config/features may carry (spec §2.2). Unknown keys are
 // rejected so a typo'd toggle fails loudly instead of silently defaulting.
 const KNOWN_FEATURE_KEYS = [
@@ -470,6 +494,34 @@ function validateEventConfig(event) {
       if (opensOk && closesOk && reg.opensAt >= reg.closesAt) {
         errors.push('registration: opensAt must be before closesAt');
       }
+      // THE REGISTRATION ACTION (M7 issue 8). Two fields, both optional and
+      // both nullable, because a provider that sells no tickets and a client
+      // who has not been handed a link yet are the ordinary starting state:
+      //
+      //   externalUrl   where the action sends a reader. This is the same
+      //                 field the manual ticket provider already reads for
+      //                 its "some clients register through their own form"
+      //                 email (functions/src/ticketing/providers/manual.cjs),
+      //                 so the destination in that email and the destination
+      //                 on the page are one value and cannot disagree.
+      //   actionLabel   what the control says. Absent means the site's own
+      //                 stated wording stands in; it is never stored empty,
+      //                 because an empty label draws a blank control.
+      //
+      // Validated here rather than at the renderer because a destination
+      // reaching the page at all is the thing worth refusing: a control the
+      // site draws itself must not be able to carry a javascript: or a
+      // plain-http target, and the save is the only moment that can say so
+      // while an operator is still looking at the field.
+      if (reg.externalUrl != null && !isHttpsUrl(reg.externalUrl)) {
+        errors.push(
+          'registration.externalUrl: must be null or an https:// URL, got ' +
+          `${JSON.stringify(reg.externalUrl)}`,
+        );
+      }
+      if (reg.actionLabel != null && !isNonEmptyString(reg.actionLabel)) {
+        errors.push('registration.actionLabel: must be null or a nonempty string');
+      }
     }
   }
 
@@ -805,4 +857,5 @@ module.exports = {
   validateFeatures,
   KNOWN_FEATURE_KEYS,
   TRACK_LETTER_RE,
+  isHttpsUrl,
 };

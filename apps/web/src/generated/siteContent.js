@@ -269,17 +269,6 @@ export const siteContent = {
     order: 0,
     seeded: true,
   },
-  hero__register_cta: {
-    section: 'hero',
-    field: 'register_cta',
-    blockType: 'cta',
-    label: 'Register for the summit',
-    url: 'https://example.org/register',
-    external: true,
-    visible: true,
-    order: 2,
-    seeded: true,
-  },
   hero__subtitle: {
     section: 'hero',
     field: 'subtitle',

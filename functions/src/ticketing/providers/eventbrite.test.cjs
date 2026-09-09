@@ -467,3 +467,42 @@ test('getRegistrationPrompt: no externalUrl configured → still sends, ctaUrl n
   assert.equal(prompt.send, true);
   assert.equal(prompt.ctaUrl, null);
 });
+
+// M7 issue 8: this row and the site's own register control read one field,
+// through one reader (shared/registration). A config/event written before
+// the https rule existed reaches here unvalidated, so a destination the
+// page refuses is refused here too — in an email, nobody sees the address
+// before they click it.
+test('getRegistrationPrompt: a non-https destination is refused, the same as on the page', async () => {
+  for (const externalUrl of [
+    'http://eventbrite.com/e/demo',
+    'javascript:alert(1)',
+    'eventbrite.com/e/demo',
+    '   ',
+    42,
+  ]) {
+    const p = provider({ getConfig: async () => ({ event: { registration: { externalUrl } } }) });
+    const prompt = await p.getRegistrationPrompt({ trigger: 'account_created' });
+    assert.equal(prompt.send, true);
+    assert.equal(prompt.ctaUrl, null, `expected ${JSON.stringify(externalUrl)} to be refused`);
+  }
+});
+
+test('getRegistrationPrompt: the label stays this provider’s own, not the client’s form wording', async () => {
+  // `actionLabel` is what a client calls their OWN registration form. This
+  // row sends a reader to an Eventbrite checkout instead, so the provider
+  // states its own words for it.
+  const p = provider({
+    getConfig: async () => ({
+      event: {
+        registration: {
+          externalUrl: 'https://eventbrite.com/e/demo',
+          actionLabel: 'Register on our site',
+        },
+      },
+    }),
+  });
+  const prompt = await p.getRegistrationPrompt({ trigger: 'account_created' });
+  assert.equal(prompt.ctaLabel, 'Get your ticket');
+  assert.equal(prompt.ctaUrl, 'https://eventbrite.com/e/demo');
+});

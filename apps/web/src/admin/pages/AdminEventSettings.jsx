@@ -86,6 +86,7 @@ function toForm(eventConfig) {
       opensAt: registration.opensAt ?? '',
       closesAt: registration.closesAt ?? '',
       externalUrl: registration.externalUrl ?? '',
+      actionLabel: registration.actionLabel ?? '',
     },
     legal: {
       operatorName: legal.operatorName ?? '',
@@ -147,6 +148,7 @@ function toPayload(form) {
       opensAt: orNull(form.registration.opensAt),
       closesAt: orNull(form.registration.closesAt),
       externalUrl: orNull(form.registration.externalUrl),
+      actionLabel: orNull(form.registration.actionLabel),
     },
     legal: {
       operatorName: orNull(form.legal.operatorName),
@@ -522,7 +524,7 @@ export default function AdminEventSettings() {
 
       <Panel
         title="Registration"
-        description="Naive local datetimes (YYYY-MM-DDTHH:MM) in the event’s timezone."
+        description="Dates are naive local datetimes (YYYY-MM-DDTHH:MM) in the event’s timezone. The URL and label below are the register control the site shows."
       >
         <div className="grid gap-sm sm:grid-cols-2">
           <TextField
@@ -539,11 +541,27 @@ export default function AdminEventSettings() {
             onChange={(value) => setGroup('registration', { closesAt: value })}
             error={errorFor('registration.closesAt')}
           />
+          {/* The registration action (M7 issue 8). One destination, used
+              both by the control the site draws and by the registration
+              email the manual ticket provider sends, so the two can never
+              point at different places. Leaving the URL empty is a real
+              answer: no control is drawn anywhere. */}
           <div className="sm:col-span-2">
             <TextField
               label="External registration URL"
               value={form.registration.externalUrl}
               onChange={(value) => setGroup('registration', { externalUrl: value })}
+              error={errorFor('registration.externalUrl')}
+              hint="Must start with https://. Leave it empty and no register control is shown."
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <TextField
+              label="Register button label"
+              value={form.registration.actionLabel}
+              onChange={(value) => setGroup('registration', { actionLabel: value })}
+              error={errorFor('registration.actionLabel')}
+              hint="What the register control says. Empty means it says Register."
             />
           </div>
         </div>

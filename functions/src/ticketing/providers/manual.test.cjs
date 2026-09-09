@@ -118,6 +118,57 @@ test('getRegistrationPrompt: account_created with an external registration URL c
   assert.equal(prompt.ctaUrl, 'https://register.example/');
 });
 
+// M7 issue 8: this email and the site's own register control read one
+// field, through one reader (shared/registration). A config/event written
+// before the https rule existed still validates nowhere and reaches here
+// unvalidated, so a destination this email would put in front of a reader
+// is refused here exactly as it is refused on the page.
+test('getRegistrationPrompt: a non-https destination is refused, the same as on the page', async () => {
+  for (const externalUrl of [
+    'http://register.example.org',
+    'javascript:alert(1)',
+    'register.example.org',
+    '   ',
+    42,
+  ]) {
+    const provider = createManualProvider({
+      db: makeFakeDb(),
+      getConfig: async () => ({ event: { registration: { externalUrl } } }),
+    });
+    const prompt = await provider.getRegistrationPrompt({ trigger: 'account_created' });
+    assert.equal(prompt.ctaUrl, null, `expected ${JSON.stringify(externalUrl)} to be refused`);
+    assert.equal(prompt.action, 'await_approval');
+  }
+});
+
+test('getRegistrationPrompt: the button says what the client called the action', async () => {
+  const provider = createManualProvider({
+    db: makeFakeDb(),
+    getConfig: async () => ({
+      event: {
+        registration: { externalUrl: 'https://register.example/', actionLabel: 'Get a ticket' },
+      },
+    }),
+  });
+  const prompt = await provider.getRegistrationPrompt({ trigger: 'account_created' });
+  assert.equal(prompt.ctaLabel, 'Get a ticket');
+  assert.equal(prompt.ctaUrl, 'https://register.example/');
+});
+
+test('getRegistrationPrompt: an unset label leaves this provider stating its own', async () => {
+  for (const registration of [
+    { externalUrl: 'https://register.example/' },
+    { externalUrl: 'https://register.example/', actionLabel: '   ' },
+  ]) {
+    const provider = createManualProvider({
+      db: makeFakeDb(),
+      getConfig: async () => ({ event: { registration } }),
+    });
+    const prompt = await provider.getRegistrationPrompt({ trigger: 'account_created' });
+    assert.equal(prompt.ctaLabel, 'Register for the event');
+  }
+});
+
 test('getRegistrationPrompt: account_created with no external URL → await_approval, no CTA (§3.5)', async () => {
   const provider = createManualProvider({ db: makeFakeDb(), getConfig: async () => ({}) });
   const prompt = await provider.getRegistrationPrompt({ trigger: 'account_created' });

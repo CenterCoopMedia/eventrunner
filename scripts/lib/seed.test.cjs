@@ -367,13 +367,29 @@ test('dates and venue come from config, so they are right the moment init runs (
   assert.equal(content.get('footer__contact_link').url, 'mailto:support@example.org');
 });
 
+// M7 issue 8: the registration action is configuration, not content. A
+// seeded cta block had to invent a destination to be a valid block, and the
+// one it invented pointed at example.org — the dead button the issue exists
+// to remove. The hero still ALLOWS a cta, so an editor can add their own.
+test('the hero seeds no registration action of its own (M7 issue 8)', () => {
+  const home = defaultPages().find((page) => page.id === 'home');
+  const hero = home.sections.find((section) => section.id === 'hero');
+  assert.ok(hero.allowedBlocks.includes('cta'), 'an editor can still add an action');
+  assert.deepEqual(
+    hero.defaultBlocks.filter((def) => def.blockType === 'cta'),
+    [],
+  );
+  const content = buildSeedContent({ pages: defaultPages(), docs: configDocs(), tierA: TIER_A });
+  assert.equal(content.some((doc) => doc.section === 'hero' && doc.blockType === 'cta'), false);
+});
+
 test('placeholder copy is a [Replace] instruction, never another event copy', () => {
   const docs = configDocs();
   const content = buildSeedContent({ pages: defaultPages(), docs, tierA: TIER_A });
   const placeholderish = content.filter(
     // Config-derived blocks are correct as seeded, so they carry no
     // [Replace] marker by design (§5.4).
-    (d) => !['hero__title', 'hero__register_cta', 'stats__attendees', 'stats__sessions'].includes(d.id) &&
+    (d) => !['hero__title', 'stats__attendees', 'stats__sessions'].includes(d.id) &&
       !d.section.startsWith('privacy_') && !d.section.startsWith('terms_') &&
       !d.id.startsWith('travel_venue__venue_name') && !d.id.startsWith('travel_venue__venue_address') &&
       !d.id.startsWith('footer__') && !d.id.startsWith('contact_channels__'),

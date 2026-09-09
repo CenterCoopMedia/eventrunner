@@ -18,6 +18,9 @@ import CtaBlock from '../components/blocks/CtaBlock.jsx';
 import EventCountdown from '../components/EventCountdown.jsx';
 import LeadImage from '../components/LeadImage.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
+import RegistrationAction, {
+  resolveRegistrationLink,
+} from '../components/RegistrationAction.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
 
@@ -52,6 +55,10 @@ export default function Home() {
     typeof eventConfig.tagline === 'string' && eventConfig.tagline.trim()
       ? eventConfig.tagline
       : null;
+  // The event's own registration action (M7 issue 8), or null where no
+  // destination is configured. Resolved here as well as inside the control
+  // because the action row around it is drawn only when it holds something.
+  const registrationAction = resolveRegistrationLink(eventConfig);
   const heroBlocks = getSectionBlocks('hero');
   const heroCtas = heroBlocks.filter((block) => block.blockType === 'cta');
   // One lead image at most. An editor who stores several images in the
@@ -113,8 +120,15 @@ export default function Home() {
               </p>
             ) : null}
             <EventCountdown eventConfig={eventConfig} />
-            {heroCtas.length ? (
+            {/* The registration action leads the row: it is the event's own
+                configured action, and the hero's cta blocks are whatever
+                else an editor wanted beside it. The row itself is drawn
+                only when something is in it — an empty flex row is a stray
+                gap down the page, and an unset registration destination is
+                the ordinary state of a fresh deployment. */}
+            {registrationAction || heroCtas.length ? (
               <div className="mt-lg flex flex-wrap gap-sm">
+                <RegistrationAction placement="lead" />
                 {heroCtas.map((block) => (
                   <CtaBlock key={`${block.section}__${block.field}`} block={block} />
                 ))}

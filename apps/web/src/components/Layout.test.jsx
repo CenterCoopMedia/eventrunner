@@ -898,3 +898,59 @@ describe('Layout variants (brief §6.1)', () => {
     expect(container.querySelector('nav').className).not.toContain('lg:');
   });
 });
+
+// M7 issue 8: the event's configured registration action is a control in the
+// header. It is mounted here and nowhere else in the shell, so the shell's
+// own tests hold both halves of the rule — a configured destination puts one
+// control in the header, and no destination puts none. A header never
+// carries a register control that goes nowhere.
+describe('Layout registration action (M7 issue 8)', () => {
+  const withAction = (registration) => ({ ...FIXTURE_EVENT, registration });
+
+  it('renders the configured action in the header, under the label the client set', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: withAction({
+          externalUrl: 'https://register.example.org/tickets',
+          actionLabel: 'Get a ticket',
+        }),
+      },
+    );
+    const link = container.querySelector('header a[href="https://register.example.org/tickets"]');
+    expect(link).not.toBeNull();
+    expect(link.textContent).toBe('Get a ticket');
+  });
+
+  it('keeps its own distance from the navigation in the one row treatment', () => {
+    // `minimal` puts the identity, the navigation and this control in ONE
+    // flex row, and the shell's sign-in control goes at the END of that
+    // navigation — so a register control with no separation of its own
+    // would sit one gap from a sign-in link and the two would read as one
+    // pair. It is a sibling of the nav, never inside it, and it takes the
+    // trailing edge of the row.
+    const { container } = renderShell(
+      {},
+      {
+        header: 'minimal',
+        event: withAction({ externalUrl: 'https://register.example.org/tickets' }),
+      },
+    );
+    const link = container.querySelector('header a[href="https://register.example.org/tickets"]');
+    expect(link.closest('nav')).toBeNull();
+    expect(link.parentElement.className).toContain('ms-auto');
+    const row = container.querySelector('header nav').parentElement;
+    expect(row.className).toContain('flex');
+    expect(row).toContainElement(link);
+  });
+
+  it('renders no control at all when no destination is configured', () => {
+    for (const registration of [undefined, {}, { externalUrl: null }, { actionLabel: 'Register' }]) {
+      const { container, unmount } = renderShell({}, { event: withAction(registration) });
+      const header = container.querySelector('header');
+      expect(header.textContent).not.toContain('Register');
+      expect(header.querySelectorAll('a[target="_blank"]')).toHaveLength(0);
+      unmount();
+    }
+  });
+});

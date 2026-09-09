@@ -87,7 +87,24 @@ const DEMO_ANSWERS = Object.freeze({
     registration: {
       opensAt: '2026-06-01T09:00:00',
       closesAt: '2026-10-09T23:59:00',
-      externalUrl: 'https://example.org/register',
+      // NO REGISTRATION DESTINATION, ON PURPOSE (M7 issue 8). The demo is a
+      // static build with no ticket provider behind it, and the register
+      // control is rendered on every page — so any value here would put a
+      // button on the whole demo site that goes somewhere a reader cannot
+      // use. example.org was exactly that. The demo's own routes are no
+      // better: the site is served from a GitHub Pages subpath the content
+      // generator never sees (scripts/build-demo.cjs derives it from
+      // --base at build time, and `generate-content.cjs --demo` runs
+      // without it) and it runs under HashRouter, so a self-link would have
+      // to hardcode a domain in a fixture that has none.
+      //
+      // So the demo ships the empty case, which is the state most
+      // deployments start in and the one worth showing: no control at all,
+      // anywhere. The configured case is covered by tests
+      // (components/RegistrationAction.test.jsx, components/Layout.test.jsx,
+      // admin/pages/AdminSettings.test.jsx) rather than by the demo.
+      externalUrl: null,
+      actionLabel: null,
     },
     venue: {
       name: '[Demo] Harborlight Hall',
@@ -228,7 +245,6 @@ const DEMO_CONTENT = Object.freeze({
     value:
       'Sessions and workshops for people who operate local and cooperative newsrooms.',
   },
-  hero__register_cta: { label: 'Register for the summit' },
   details__intro: {
     value:
       '<p>The summit has shared sessions and two workshop tracks. Day one includes registration ' +

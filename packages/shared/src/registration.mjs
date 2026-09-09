@@ -3,4 +3,5 @@ export {
   isValidTransition,
   computeEntitlement,
   hasAttendeeAccess,
+  resolveRegistrationAction,
 } from './registration.cjs';

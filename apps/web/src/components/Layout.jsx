@@ -61,6 +61,7 @@ import BackToTop from './BackToTop.jsx';
 import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
+import RegistrationAction from './RegistrationAction.jsx';
 import FeedbackModal from './FeedbackModal.jsx';
 import DemoBanner from './DemoBanner.jsx';
 import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
@@ -420,6 +421,11 @@ export default function Layout() {
             }
           >
             {navPlacement === 'side' ? null : nav}
+            {/* The event's configured registration action (M7 issue 8).
+                It owns its own row and renders nothing at all when no
+                destination is configured, so mounting it is this one line
+                and no other control in the header has to move. */}
+            <RegistrationAction placement="header" />
           </Header>
         </div>
       </header>

@@ -62,6 +62,62 @@ test('validateEventConfig: opensAt must precede closesAt; nulls allowed', () => 
   assert.equal(nulls.ok, true);
 });
 
+// THE REGISTRATION ACTION (M7 issue 8). The destination is the field the
+// manual ticket provider already reads, so these cases are the shapes a
+// deployment actually arrives in: nothing configured, a provider's https
+// link with a label, and the two ways an operator can get it wrong.
+test('validateEventConfig: the registration action is optional and nullable', () => {
+  const absent = validateEventConfig({ ...VALID_EVENT, registration: { opensAt: null, closesAt: null } });
+  assert.equal(absent.ok, true);
+  const nulls = validateEventConfig({
+    ...VALID_EVENT,
+    registration: { opensAt: null, closesAt: null, externalUrl: null, actionLabel: null },
+  });
+  assert.equal(nulls.ok, true);
+});
+
+test('validateEventConfig: the registration action accepts an https destination and a label', () => {
+  // The shape the manual ticket provider reads for its own registration
+  // email (functions/src/ticketing/providers/manual.cjs) — one destination,
+  // shared by that email and by the control the site draws.
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    registration: {
+      opensAt: null,
+      closesAt: null,
+      externalUrl: 'https://register.example.org/summit',
+      actionLabel: 'Register',
+    },
+  });
+  assert.deepEqual(result, { ok: true, errors: [] });
+});
+
+test('validateEventConfig: the registration destination must be an https URL', () => {
+  for (const url of [
+    'http://register.example.org',
+    'javascript:alert(1)',
+    'register.example.org',
+    '   ',
+    42,
+  ]) {
+    const result = validateEventConfig({
+      ...VALID_EVENT,
+      registration: { opensAt: null, closesAt: null, externalUrl: url },
+    });
+    assert.equal(result.ok, false, `expected ${JSON.stringify(url)} to be refused`);
+    assert.ok(result.errors.some((e) => e.includes('registration.externalUrl')));
+  }
+});
+
+test('validateEventConfig: a stored registration label is never empty', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    registration: { opensAt: null, closesAt: null, externalUrl: 'https://register.example.org', actionLabel: '   ' },
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes('registration.actionLabel')));
+});
+
 test('validateEventConfig rejects days[] dates that are not strictly ascending', () => {
   const outOfOrder = validateEventConfig({
     ...VALID_EVENT,

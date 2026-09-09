@@ -7,6 +7,7 @@ const {
   isValidTransition,
   computeEntitlement,
   hasAttendeeAccess,
+  resolveRegistrationAction,
 } = require('./registration.cjs');
 
 test('status vocabulary is exactly the four spec values', () => {
@@ -70,4 +71,66 @@ test('hasAttendeeAccess: approved, speaker, admin; everyone else false', () => {
   assert.equal(hasAttendeeAccess({ speakerId: null }), false);
   assert.equal(hasAttendeeAccess(null), false);
   assert.equal(hasAttendeeAccess(undefined), false);
+});
+
+// THE REGISTRATION ACTION (M7 issue 8). One reader for three surfaces: the
+// control on the home lead, the control in the header, and the button in
+// the registration email a ticket provider sends. They each used to read
+// the field for themselves, which is how a destination the page refused
+// still reached a reader in an email.
+test('resolveRegistrationAction: an https destination, with the label the client wrote', () => {
+  assert.deepEqual(
+    resolveRegistrationAction({
+      registration: {
+        externalUrl: '  https://register.example.org/summit  ',
+        actionLabel: ' Get a ticket ',
+      },
+    }),
+    { url: 'https://register.example.org/summit', label: 'Get a ticket' },
+  );
+});
+
+test('resolveRegistrationAction: no label of its own, so each surface states its default', () => {
+  for (const registration of [
+    { externalUrl: 'https://register.example.org' },
+    { externalUrl: 'https://register.example.org', actionLabel: null },
+    { externalUrl: 'https://register.example.org', actionLabel: '   ' },
+    { externalUrl: 'https://register.example.org', actionLabel: 42 },
+  ]) {
+    assert.equal(resolveRegistrationAction({ registration }).label, null);
+  }
+});
+
+test('resolveRegistrationAction: nothing to send anybody to reads as nothing', () => {
+  for (const eventConfig of [
+    undefined,
+    null,
+    {},
+    { registration: null },
+    { registration: {} },
+    { registration: { externalUrl: null } },
+    { registration: { externalUrl: '   ' } },
+    // A label with no destination is not an action.
+    { registration: { actionLabel: 'Register' } },
+  ]) {
+    assert.equal(resolveRegistrationAction(eventConfig), null);
+  }
+});
+
+test('resolveRegistrationAction: refuses every destination that is not https', () => {
+  for (const externalUrl of [
+    'http://register.example.org',
+    'javascript:alert(1)',
+    'data:text/html,<p>hi</p>',
+    'mailto:hello@example.org',
+    'register.example.org',
+    42,
+    {},
+  ]) {
+    assert.equal(
+      resolveRegistrationAction({ registration: { externalUrl } }),
+      null,
+      `expected ${JSON.stringify(externalUrl)} to be refused`,
+    );
+  }
 });
