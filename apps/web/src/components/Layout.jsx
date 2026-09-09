@@ -57,6 +57,7 @@ import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
 import { buildNavItems } from '../lib/siteNavigation.js';
 import { brandingSrc } from '../lib/mediaSource.js';
+import BackToTop from './BackToTop.jsx';
 import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
@@ -178,6 +179,22 @@ function accountClass({ isActive }) {
     ? `${QUIET_ACTION_UNWEIGHTED} font-semibold underline underline-offset-4`
     : quietActionClass;
 }
+
+// The banner at the top of the shell, named so the back-to-top control can
+// move focus to it (M7 issue 6). Landing there puts the keyboard at the top
+// of the page, with the identity and the whole navigation still ahead of it
+// — which is what "back to top" means to a reader who is not looking at the
+// screen. The skip link stays the first focusable element on the page:
+// tabIndex={-1} makes the banner a focus TARGET without joining the tab
+// order, and the ring is drawn on the attribute the control sets, never on
+// bare :focus — a header carrying tabindex="-1" takes focus from a click
+// anywhere inside it, so :focus would outline the whole thing the moment a
+// reader clicked the nameplate (lib/scrollToTop.js, index.css).
+const TOP_LANDMARK_ID = 'site-top';
+
+// The footer, named so the back-to-top control can withdraw while it is on
+// screen instead of sitting on top of its last row (BackToTop.jsx).
+const FOOTER_ID = 'site-footer';
 
 // One treatment for every link in the footer: an underlined word at the
 // caption size, at the full touch target. The footer is a dense block of
@@ -358,7 +375,10 @@ export default function Layout() {
         Skip to main content
       </a>
       <DemoBanner />
-      <header className="bg-surface">
+      {/* The top of the page, by name: the back-to-top control moves focus
+          here so a reader who is not looking at the screen arrives with the
+          keyboard where the picture is (M7 issue 6). */}
+      <header id={TOP_LANDMARK_ID} tabIndex={-1} className="bg-surface">
         <div className="mx-auto w-full max-w-5xl px-md">
           <Header
             variant={headerVariant}
@@ -397,7 +417,7 @@ export default function Layout() {
       ) : (
         main
       )}
-      <footer className="bg-surface">
+      <footer id={FOOTER_ID} className="bg-surface">
         <div className="mx-auto w-full max-w-5xl px-md">
           <div className="section-rule pb-xl pt-md font-data text-caption text-text-secondary">
             <p className="font-heading text-body font-semibold text-text-primary">
@@ -468,6 +488,9 @@ export default function Layout() {
           </div>
         </div>
       </footer>
+      {/* Last in the document, so a keyboard reader meets it after the
+          content it offers to leave rather than in front of it. */}
+      <BackToTop targetId={TOP_LANDMARK_ID} footerId={FOOTER_ID} />
       {feedbackOpen ? <FeedbackModal onClose={() => setFeedbackOpen(false)} /> : null}
     </div>
   );

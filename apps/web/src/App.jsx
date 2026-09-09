@@ -15,6 +15,7 @@ import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
 import ProfileSetupRedirect from './components/ProfileSetupRedirect.jsx';
 import RouteTitle from './components/RouteTitle.jsx';
+import ScrollReset from './components/ScrollReset.jsx';
 import Home from './pages/Home.jsx';
 import Login from './pages/Login.jsx';
 import LoadingState from './components/LoadingState.jsx';
@@ -146,6 +147,14 @@ export default function App() {
         <ProfileProvider>
           <ContentGate>
             <ToastProvider>
+              {/* Beside the router, not inside a page: every route change
+                  decides where the reader lands — the top of the new page,
+                  or the element its fragment names, which React Router
+                  resolves for nobody on a client navigation, and which on
+                  these lazy routes does not exist yet when the navigation
+                  happens (M7 issue 6). ContentPage's own filter reset is a
+                  page's state and is left alone. */}
+              <ScrollReset />
               <ProfileSetupRedirect />
               <RouteTitle />
               <AppRoutes />

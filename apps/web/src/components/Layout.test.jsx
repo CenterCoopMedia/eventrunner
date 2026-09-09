@@ -7,9 +7,18 @@
 // serving that Hosting-relative (what the shell did before the media library)
 // 404s the header logo. A value that is not a usable path, or an object that
 // has since been deleted, must degrade to the wordmark.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+// jsdom applies no CSS, so a rule the shell depends on is asserted against
+// the stylesheet itself (the device components/editorial/stamp.test.js uses).
+const indexCss = fs.readFileSync(path.resolve(here, '..', 'index.css'), 'utf8');
 
 let theme;
 let eventConfig;
@@ -593,6 +602,88 @@ describe('Layout footer', () => {
       expect(link.hasAttribute('tabindex')).toBe(false);
       expect(link.className).toContain('touch-target');
     }
+  });
+});
+
+// BACK TO TOP (M7 issue 6). The shell names the top of the page and the
+// footer, and mounts the control between them; BackToTop.test.jsx covers
+// what the control itself does.
+describe('Layout back-to-top', () => {
+  const backToTop = (root) =>
+    [...root.querySelectorAll('button')].find((b) => b.textContent === 'Back to top');
+
+  function renderScrolled() {
+    window.innerHeight = 800;
+    window.scrollY = 2000;
+    window.scrollTo = vi.fn();
+    return renderShell({});
+  }
+
+  it('names the top of the page as a focus target, outside the tab order', () => {
+    const { container } = renderShell({});
+    const banner = container.querySelector('header#site-top');
+    expect(banner).not.toBeNull();
+    expect(banner).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('keeps the skip link first, ahead of the banner it names', () => {
+    const { container } = renderShell({});
+    const skip = container.querySelector('a.skip-link');
+    const banner = container.querySelector('header#site-top');
+    expect(skip.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+  });
+
+  it('names the footer, so the control can withdraw over it', () => {
+    const { container } = renderShell({});
+    expect(container.querySelector('footer#site-footer')).not.toBeNull();
+  });
+
+  it('offers no control to a reader who has not scrolled', () => {
+    const { container } = renderShell({});
+    expect(backToTop(container)).toBeUndefined();
+  });
+
+  it('puts the control last, after the content it offers to leave', () => {
+    try {
+      const { container } = renderScrolled();
+      const button = backToTop(container);
+      expect(button).not.toBeUndefined();
+      const footer = container.querySelector('footer#site-footer');
+      expect(footer.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)
+        .toBeTruthy();
+    } finally {
+      window.scrollY = 0;
+    }
+  });
+
+  it('moves focus to the shell’s own banner when a reader uses it', () => {
+    try {
+      const { container } = renderScrolled();
+      fireEvent.click(backToTop(container));
+      const banner = container.querySelector('header#site-top');
+      expect(document.activeElement).toBe(banner);
+      expect(banner).toHaveAttribute(FOCUS_RING_ATTRIBUTE);
+    } finally {
+      window.scrollY = 0;
+    }
+  });
+
+  // THE RING MUST NOT OVERSHOOT. tabindex="-1" makes the banner take focus
+  // from a click anywhere inside it, so a rule keyed to bare :focus would
+  // outline the whole header the moment a reader clicked the nameplate.
+  it('does not mark the banner when a reader clicks inside the header', () => {
+    const { container } = renderShell({});
+    const banner = container.querySelector('header#site-top');
+    fireEvent.click(banner.querySelector('a[href="/"]'));
+    fireEvent.click(banner);
+    expect(banner).not.toHaveAttribute(FOCUS_RING_ATTRIBUTE);
+  });
+
+  it('draws the ring on that mark rather than on the banner’s own focus', () => {
+    // A property of the stylesheet, which jsdom does not apply.
+    expect(indexCss).toMatch(/\[data-focus-ring\]:focus\s*\{[^}]*outline[^}]*\}/);
+    expect(indexCss).not.toMatch(/#site-top:focus\s*\{/);
   });
 });
 
