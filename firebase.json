@@ -24,7 +24,22 @@
           "region": "us-central1"
         }
       },
-      { "source": "**", "destination": "/index.html" }
+      { "source": "/signin", "destination": "/index.html" },
+      { "source": "/profile", "destination": "/index.html" },
+      { "source": "/attendees", "destination": "/index.html" },
+      { "source": "/attendees/**", "destination": "/index.html" },
+      { "source": "/schedule/mine", "destination": "/index.html" },
+      { "source": "/speaker/**", "destination": "/index.html" },
+      { "source": "/ticket/**", "destination": "/index.html" },
+      { "source": "/admin", "destination": "/index.html" },
+      { "source": "/admin/**", "destination": "/index.html" },
+      {
+        "source": "**",
+        "function": {
+          "functionId": "routeMeta",
+          "region": "us-central1"
+        }
+      }
     ]
   },
   "emulators": {

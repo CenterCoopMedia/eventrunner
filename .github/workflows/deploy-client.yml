@@ -665,16 +665,19 @@ jobs:
         run: >-
           npx firebase target:apply hosting site "$EVENT_HOSTING_SITE"
           --project "$EVENT_FIREBASE_PROJECT_ID"
-      - name: Set the updatesMeta rewrite region for this project
-        # firebase.json's /updates/** rewrite names a function region
+      - name: Set the function rewrite regions for this project
+        # firebase.json's function rewrites (/updates/** -> updatesMeta and
+        # the ** catch-all -> routeMeta) each name a function region
         # (object-form "function": { functionId, region }, not the bare
         # string form — the string form silently defaults to us-central1,
-        # which routes every non-default-region client's /updates/** at a
+        # which routes every non-default-region client's public traffic at a
         # backend that does not exist there). Region is per-client env
         # (EVENT_FIREBASE_REGION), while firebase.json is one file shared by
         # every client's deploy — same shape of problem as the hosting
         # target above, same fix: patch the WORKING COPY in place for this
         # run only, right before the deploy step reads it. Never committed.
+        # Every object-form rewrite is patched, so a rewrite added later
+        # cannot be left behind on the placeholder region.
         env:
           EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
         run: |
@@ -682,13 +685,13 @@ jobs:
           region="${EVENT_FIREBASE_REGION:-us-central1}"
           jq --arg region "$region" '
             .hosting.rewrites |= map(
-              if (.function | type) == "object" and .function.functionId == "updatesMeta"
+              if (.function | type) == "object"
               then .function.region = $region
               else . end
             )
           ' firebase.json > firebase.json.tmp
           mv firebase.json.tmp firebase.json
-          echo "updatesMeta rewrite region set to: $region"
+          echo "function rewrite regions set to: $region"
       - name: Deploy hosting
         env:
           EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
@@ -699,15 +702,18 @@ jobs:
           --non-interactive
 
   post:
-    name: Refresh updatesMeta after hosting (self-fetch template ordering)
-    # updatesMeta (functions/src/public/og.cjs) self-fetches the deployed
-    # hosting index.html as its SSR template and caches it per container
-    # (spec §9 "Updates + SSR OG", issue #27). A container that cold-started
-    # — and so cached its template — BEFORE this run's hosting deploy went
-    # out would keep serving crawlers the PREVIOUS build's asset references
-    # for the rest of its cache TTL. Redeploying just this one function here
-    # forces a fresh cold start, which fetches the just-published template
-    # immediately, rather than waiting on natural container recycling.
+    name: Refresh the SSR meta functions after hosting (template ordering)
+    # updatesMeta and routeMeta (functions/src/public/og.cjs) self-fetch the
+    # deployed hosting index.html as their SSR template and cache it per
+    # container (spec §9 "Updates + SSR OG", issue #27; M7 issue 4). A
+    # container that cold-started — and so cached its template — BEFORE this
+    # run's hosting deploy went out would keep serving the PREVIOUS build's
+    # asset references for the rest of its cache TTL. routeMeta is the
+    # catch-all rewrite, so for it that stale template is not only a bad
+    # crawl: it is the first HTML every visitor gets. Redeploying both
+    # functions here forces a fresh cold start, which fetches the
+    # just-published template immediately, rather than waiting on natural
+    # container recycling.
     # Unconditional on `hosting` succeeding — hosting always changes the
     # template on every run, whether or not `functions/**` did.
     needs: [guard, hosting]
@@ -732,9 +738,9 @@ jobs:
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
       - name: Write the functions runtime env for this project
         # Same shape as the `functions` job's env file (spec §2.1 Tier A) —
-        # `firebase deploy --only functions:updatesMeta` still bakes
+        # a `firebase deploy --only functions:<name>` still bakes
         # `functions/.env.<project-id>` at deploy time even for a
-        # single-function deploy.
+        # partial deploy.
         env:
           EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
           EVENT_SLUG: ${{ vars.EVENT_SLUG }}
@@ -776,12 +782,12 @@ jobs:
               echo "EVENT_SITE_PUBLISHER_JOB=site-publisher"
             fi
           } > "functions/.env.${EVENT_FIREBASE_PROJECT_ID}"
-      - name: Redeploy updatesMeta only
+      - name: Redeploy the SSR meta functions only
         env:
           EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
         run: >-
           npx firebase deploy
-          --only functions:updatesMeta
+          --only functions:updatesMeta,functions:routeMeta
           --project "$EVENT_FIREBASE_PROJECT_ID"
           --non-interactive
 

@@ -434,27 +434,59 @@
           the <code>smoke</code> job and pass — it OPTIONS-preflights every endpoint in <code>.github/smoke-endpoints.json</code>
           against <code>https://&lt;EVENT_FIREBASE_REGION&gt;-&lt;EVENT_FIREBASE_PROJECT_ID&gt;.cloudfunctions.net</code> and GETs
           <code>EVENT_PUBLIC_URL</code>.</li>
-          <li>Between <code>hosting</code> and <code>smoke</code>, the <code>post</code> job redeploys <code>updatesMeta</code> (<code>functions/src/public/og.cjs</code>)
-          alone. That function self-fetches the deployed hosting <code>index.html</code> as its SSR OG-tag template and
-          caches it per container (issue #27) — a container that cold-started before THIS run&#39;s hosting
-          deploy would otherwise keep serving crawlers the previous build&#39;s asset references until its cache
-          TTL or a natural recycle. Forcing a redeploy here forces a fresh cold start immediately after the
-          new template exists. This was the ADR&#39;s <code>post</code> step (§8.1), deferred at the M2 deploy PR pending
-          <code>functions/src/public/og.cjs</code> landing (this issue) — <code>smoke</code>&#39;s OPTIONS-preflight of <code>updatesMeta</code>
-          now runs against the freshly-redeployed instance, not the one from the <code>functions</code> job earlier in
-          the same run.</li>
-          <li><code>firebase.json</code>&#39;s <code>/updates/**</code> hosting rewrite names <code>updatesMeta</code>&#39;s Cloud Functions <strong>region</strong> in
-          object form (<code>&quot;function&quot;: { &quot;functionId&quot;: &quot;updatesMeta&quot;, &quot;region&quot;: &quot;...&quot; }</code>) — the shorthand string
-          form (<code>&quot;function&quot;: &quot;updatesMeta&quot;</code>) silently defaults to <code>us-central1</code>, which would route every
-          non-default-region client&#39;s <code>/updates/**</code> requests at a backend that does not exist there (a 404
-          from Hosting, not from the function). Region is per-client (<code>EVENT_FIREBASE_REGION</code>), while
+          <li>Between <code>hosting</code> and <code>smoke</code>, the <code>post</code> job redeploys <code>updatesMeta</code> and <code>routeMeta</code>
+          (<code>functions/src/public/og.cjs</code>) alone. Both self-fetch the deployed hosting <code>index.html</code> as their
+          SSR template and cache it per container (issue #27; M7 issue 4) — a container that cold-started
+          before THIS run&#39;s hosting deploy would otherwise keep serving the previous build&#39;s asset
+          references until its cache TTL or a natural recycle. <strong><code>routeMeta</code> is the catch-all rewrite, so
+          for it a stale template is not only a bad crawl: it is the first HTML every visitor gets, naming
+          Vite-hashed asset files that this deploy has already replaced.</strong> Forcing a redeploy here forces a
+          fresh cold start immediately after the new template exists. Anyone who deploys hosting by hand,
+          outside this workflow, has to redeploy these two functions afterwards for the same reason. This
+          was the ADR&#39;s <code>post</code> step (§8.1), deferred at the M2 deploy PR pending
+          <code>functions/src/public/og.cjs</code> landing — <code>smoke</code>&#39;s OPTIONS-preflight of both functions now runs
+          against the freshly-redeployed instances, not the ones from the <code>functions</code> job earlier in the
+          same run.</li>
+          <li><strong>What <code>routeMeta</code> costs, and the cache header that bounds it.</strong> Every public route that is not a
+          static file now reaches a function on its first uncached load, rather than being rewritten
+          straight to <code>index.html</code>. Three things bound that. The response carries
+          <code>Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=60</code>, so the Hosting CDN —
+          not the function — answers repeat traffic for the same URL, and <code>max-age=0</code> keeps a reader&#39;s own
+          browser from holding a shell that names asset files a later deploy removed. The template is the
+          per-container cache above, so a warm container does no network work of its own. And the config
+          read is <code>core/config.cjs</code>&#39;s shared 5-minute container cache. <code>s-maxage</code> is set to that same five
+          minutes on purpose: nothing a reader gets is staler than what the container already held, and a
+          publish reaches search and social previews within that window instead of at the next cold start.
+          If a client reports a page preview that will not update, five minutes is the number to wait
+          before looking for a real fault. The one cost the CDN does not absorb is scanner traffic:
+          requests for addresses that do not exist (<code>/wp-login.php</code> and its friends) each miss the cache
+          and reach the function, where they cost one Firestore page lookup and return the plain shell.
+          That is a line on the functions invocation graph, not an incident; if a client&#39;s graph is
+          dominated by it, the answer is a Cloud Functions max-instances limit, not a rewrite change.</li>
+          <li><code>firebase.json</code>&#39;s rewrite <strong>order</strong> is load-bearing. <code>/updates/**</code> goes to <code>updatesMeta</code> first;
+          then the account and staff routes (<code>/signin</code>, <code>/profile</code>, <code>/attendees</code>, <code>/attendees/**</code>,
+          <code>/schedule/mine</code>, <code>/speaker/**</code>, <code>/ticket/**</code>, <code>/admin</code>, <code>/admin/**</code>) are rewritten straight to
+          <code>/index.html</code>, because they carry nothing a crawler should index and spending a function
+          invocation to say so is waste; then the <code>**</code> catch-all goes to <code>routeMeta</code>. Adding a public route
+          needs nothing here — the catch-all already covers it. Adding an authenticated one means adding it
+          to that middle block, <strong>above</strong> the catch-all. Hosting serves an existing static file before it
+          applies any rewrite, which is what keeps <code>/assets/**</code>, <code>/branding/**</code>, and <code>routeMeta</code>&#39;s own
+          self-fetch of <code>/index.html</code> from re-entering the function.</li>
+          <li>Both hosting rewrites name their function&#39;s Cloud Functions <strong>region</strong> in object form
+          (<code>&quot;function&quot;: { &quot;functionId&quot;: &quot;...&quot;, &quot;region&quot;: &quot;...&quot; }</code>) — the shorthand string form
+          (<code>&quot;function&quot;: &quot;routeMeta&quot;</code>) silently defaults to <code>us-central1</code>, which would route every
+          non-default-region client&#39;s public requests at a backend that does not exist there (a 404 from
+          Hosting, not from the function). Region is per-client (<code>EVENT_FIREBASE_REGION</code>), while
           <code>firebase.json</code> is one file shared by every client&#39;s deploy — the same shape of problem
-          <code>EVENT_HOSTING_SITE</code> is (target names, not literal site ids), and the same fix: the <code>hosting</code> job&#39;s
-          &quot;Set the updatesMeta rewrite region for this project&quot; step patches the <strong>working copy</strong> of
+          <code>EVENT_HOSTING_SITE</code> is (target names, not literal site ids), and the same fix: the <code>hosting</code>
+          job&#39;s &quot;Set the function rewrite regions for this project&quot; step patches the <strong>working copy</strong> of
           <code>firebase.json</code> with <code>jq</code> immediately before <code>firebase deploy --only hosting:site</code> reads it,
           defaulting to <code>us-central1</code> when <code>EVENT_FIREBASE_REGION</code> is unset (matching every other region
-          default in this pipeline). Nothing is committed back — the committed file keeps <code>us-central1</code> as
-          its placeholder, correct for that value and every client that doesn&#39;t override the region.</li>
+          default in this pipeline). It patches every object-form rewrite, so a rewrite added later cannot
+          be left behind on the placeholder. Nothing is committed back — the committed file keeps
+          <code>us-central1</code> as its placeholder, correct for that value and every client that doesn&#39;t override
+          the region. The site publisher applies the same patch in code (<code>patchHostingRegion</code>,
+          <code>scripts/publish-site.cjs</code>).</li>
           <li>If <code>google-github-actions/auth</code> fails with <code>permission_denied</code> on a run you expected to succeed
           (dispatched from <code>main</code>), the attribute condition (§1) or the repository+ref binding (§2) is the
           first thing to re-check — copy the exact <code>repository</code> and <code>ref</code> claims GitHub sent from the failed
@@ -694,6 +726,18 @@
           the new commit SHA and updates the job, so the next publish uses the rolled-back code. The old
           image stays in Artifact Registry under its own SHA tag; nothing is overwritten.</li>
           </ul>
+          <h3 id="931-the-publisher-does-not-redeploy-the-ssr-meta-functions">9.3.1 The publisher does not redeploy the SSR meta functions<a class="heading-anchor" href="#931-the-publisher-does-not-redeploy-the-ssr-meta-functions" aria-label="Link to this section">#</a></h3>
+          <p><code>deploy-client.yml</code>&#39;s <code>post</code> job redeploys <code>updatesMeta</code> and <code>routeMeta</code> after every hosting deploy,
+          for the template-cache reason in §6. <strong>The publisher job does not, and cannot</strong> — its service
+          account holds <code>firebasehosting.admin</code> and nothing else, on purpose (§9.1). So for up to
+          <code>TEMPLATE_CACHE_TTL_MS</code> (five minutes, <code>functions/src/public/og.cjs</code>) after a CMS publish, a
+          <code>routeMeta</code> container that cold-started before that publish is still serving the previous build&#39;s
+          <code>index.html</code>, whose Vite-hashed asset filenames the new release no longer has. A visitor who lands
+          in that window gets a shell whose scripts 404 until the cache expires and the container refetches.</p>
+          <p>Nothing has to be done about it in the ordinary case — it clears itself within five minutes. If a
+          client reports a blank page immediately after a publish, that is the first thing to check, and
+          redeploying the two functions (<code>firebase deploy --only functions:updatesMeta,functions:routeMeta</code>)
+          clears it at once.</p>
           <p>Stranded rows are not an incident. If neither <code>cmsPublish</code> nor the job reports a result, the
           <code>cleanupStrandedPublishRows</code> sweep (<code>functions/src/maintenance/cleanup.cjs</code>, every 30 minutes) marks
           the row failed after 90 minutes and alerts once — a failed publish row is resumable from the CMS,

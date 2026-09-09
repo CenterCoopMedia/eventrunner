@@ -114,6 +114,15 @@ test('buildOgHtml: escapes meta content — a title with quotes/angle-brackets c
   assert.ok(!html.includes('<b>now</b>'));
 });
 
+test('buildOgHtml: a $-pattern in a post title is inserted literally, not read as a replacement', () => {
+  const html = buildOgHtml({
+    template: TEMPLATE,
+    meta: { title: 'Lot $& lot $1', description: 'D', url: 'https://example.org', siteName: 'S' },
+  });
+  assert.ok(html.includes('<title>Lot $&amp; lot $1</title>'));
+  assert.ok(!html.includes('Default SPA title'));
+});
+
 test('buildOgHtml: a template with no </head> still appends the tags rather than throwing', () => {
   const html = buildOgHtml({
     template: '<html><body>no head here</body></html>',
@@ -325,4 +334,414 @@ test('createUpdatesMetaHandler: visible: true (not just truthy) is required', as
   await handler({ method: 'GET', path: '/updates/truthy', query: {} }, res);
   assert.equal(res.statusCode, 200);
   assert.ok(!res.sent.includes('Truthy but not true'));
+});
+
+// ============================================================== routeMeta
+//
+// The per-route metadata function (M7 issue 4). These assert against the
+// HTML the handler RETURNS, never against a rendered app: the whole point
+// of the function is that no client code runs for the reader that matters
+// here.
+
+const {
+  createRouteMetaHandler,
+  internals: {
+    requestedRoutePath,
+    resolveRouteSubject,
+    resolveRouteMeta,
+    buildRouteHtml,
+    buildEventJsonLd,
+    brandingObjectUrl,
+    ROUTE_CACHE_CONTROL,
+  },
+} = require('./og.cjs');
+
+const SITE_EVENT = {
+  name: '[Fixture] Harborlight Media Summit',
+  tagline: 'A synthetic gathering',
+  timezone: 'America/New_York',
+  days: [
+    { id: 'day-1', label: 'Day one', date: '2026-10-14', startTime: '09:00', endTime: '17:00' },
+    { id: 'day-2', label: 'Day two', date: '2026-10-15', startTime: '09:00', endTime: '16:00' },
+  ],
+  venue: {
+    name: '[Fixture] Harborlight Hall',
+    addressLine1: '1 Harborlight Way',
+    addressLine2: null,
+    city: 'Millhaven',
+    region: 'MH',
+    postalCode: '58211',
+    country: 'US',
+  },
+  seo: {
+    description: 'Schedule, speaker, and travel information for a synthetic event.',
+    defaultOgImagePath: 'branding/og-default.svg',
+    organizerName: '[Fixture] Harborlight Cooperative',
+    organizerUrl: 'https://example.org',
+  },
+};
+
+function siteConfig(overrides = {}) {
+  return {
+    event: SITE_EVENT,
+    features: { schedule: true, speakers: true, sponsors: true },
+    theme: { logos: { ogDefault: 'branding/og-default.svg' } },
+    tierA: { publicUrl: 'https://example.org', storageBucket: 'fixture-bucket.appspot.com' },
+    ...overrides,
+  };
+}
+
+const SITE_DOCS = {
+  'cmsPages/home': { id: 'home', label: 'Home page', path: '/', order: 0, visible: true, systemPage: true },
+  'cmsPages/schedule': { id: 'schedule', label: 'Schedule', path: '/schedule', order: 1, visible: true, systemPage: true },
+  'cmsPages/speakers': { id: 'speakers', label: 'Speakers', path: '/speakers', order: 2, visible: true, systemPage: true },
+  'cmsPages/sponsors': { id: 'sponsors', label: 'Sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true },
+  'cmsPages/travel': { id: 'travel', label: 'Travel and venue', path: '/travel', order: 4, visible: true, systemPage: false },
+  'cmsPages/hidden': { id: 'hidden', label: 'Unfinished page', path: '/hidden', order: 5, visible: false, systemPage: false },
+  'speakers_public/sp-1': {
+    slug: 'rae-okonkwo',
+    displayName: 'Rae Okonkwo',
+    firstName: 'Rae',
+    lastName: 'Okonkwo',
+    bio: 'Runs the audience desk at a cooperative newsroom.',
+    jobTitle: 'Audience editor',
+    organization: '[Fixture] Riverside Weekly',
+  },
+  'cmsSchedule/s-101': {
+    title: 'Opening remarks',
+    description: 'How the three days fit together.',
+    visible: true,
+    dayId: 'day-1',
+  },
+};
+
+function routeHandler(configOverrides = {}, docs = SITE_DOCS) {
+  return createRouteMetaHandler({
+    db: makeFakeDb(docs),
+    getConfig: async () => siteConfig(configOverrides),
+    fetchTemplateFn,
+  });
+}
+
+async function getRoute(handler, path) {
+  const res = fakeRes();
+  await handler({ method: 'GET', path, query: {} }, res);
+  return res;
+}
+
+// ------------------------------------------------------ requestedRoutePath
+
+test('requestedRoutePath: normalizes the trailing slash, the query, and repeated separators', () => {
+  assert.equal(requestedRoutePath({ path: '/' }), '/');
+  assert.equal(requestedRoutePath({ path: '/travel' }), '/travel');
+  assert.equal(requestedRoutePath({ path: '/travel/' }), '/travel');
+  assert.equal(requestedRoutePath({ path: '//travel//' }), '/travel');
+  assert.equal(requestedRoutePath({ path: '/speakers/rae-okonkwo?utm=x' }), '/speakers/rae-okonkwo');
+  assert.equal(requestedRoutePath({ url: '/travel?from=mail' }), '/travel');
+  assert.equal(requestedRoutePath({}), '/');
+  // Case survives: a session id may carry capitals, and a page path is
+  // matched exactly against the stored value.
+  assert.equal(requestedRoutePath({ path: '/schedule/S-101' }), '/schedule/S-101');
+});
+
+// ----------------------------------------------------------- page routes
+
+test('routeMeta: a content page route returns that page\'s own title, canonical, and card tags', async () => {
+  const res = await getRoute(routeHandler(), '/travel');
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Content-Type'], 'text/html; charset=utf-8');
+  assert.ok(res.sent.includes('<title>Travel and venue · [Fixture] Harborlight Media Summit</title>'));
+  assert.ok(res.sent.includes('<link rel="canonical" href="https://example.org/travel">'));
+  assert.ok(res.sent.includes('<meta property="og:title" content="Travel and venue · [Fixture] Harborlight Media Summit">'));
+  assert.ok(res.sent.includes('<meta property="og:url" content="https://example.org/travel">'));
+  assert.ok(res.sent.includes('<meta name="description" content="Schedule, speaker, and travel information for a synthetic event.">'));
+  assert.ok(!res.sent.includes('noindex'));
+  // The template it self-fetched is served whole, hashed assets and all.
+  assert.ok(res.sent.includes('/assets/index-abc123.js'));
+  assert.equal((res.sent.match(/<title>/g) || []).length, 1);
+});
+
+test('routeMeta: the schedule route carries the schedule page tags, not the home page ones', async () => {
+  const res = await getRoute(routeHandler(), '/schedule');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('<title>Schedule · [Fixture] Harborlight Media Summit</title>'));
+  assert.ok(res.sent.includes('<meta property="og:url" content="https://example.org/schedule">'));
+  assert.ok(!res.sent.includes('Travel and venue'));
+});
+
+test('routeMeta: the home route is titled with the event alone, never with the page label', async () => {
+  const res = await getRoute(routeHandler(), '/');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('<title>[Fixture] Harborlight Media Summit</title>'));
+  assert.ok(!res.sent.includes('Home page'));
+  assert.ok(res.sent.includes('<link rel="canonical" href="https://example.org/">'));
+});
+
+test('routeMeta: a session detail route is described by its own session', async () => {
+  const res = await getRoute(routeHandler(), '/schedule/s-101');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('<title>Opening remarks · [Fixture] Harborlight Media Summit</title>'));
+  assert.ok(res.sent.includes('How the three days fit together.'));
+  assert.ok(res.sent.includes('<meta property="og:url" content="https://example.org/schedule/s-101">'));
+});
+
+test('routeMeta: an invisible session is not described, and its route is not offered for indexing', async () => {
+  const docs = { ...SITE_DOCS, 'cmsSchedule/s-102': { title: 'Draft session', description: 'x', visible: false } };
+  const res = await getRoute(routeHandler({}, docs), '/schedule/s-102');
+  assert.equal(res.statusCode, 200);
+  assert.ok(!res.sent.includes('Draft session'));
+  assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
+});
+
+// -------------------------------------------------------- speaker routes
+
+test('routeMeta: a speaker route returns that speaker\'s own tags', async () => {
+  const res = await getRoute(routeHandler(), '/speakers/rae-okonkwo');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('<title>Rae Okonkwo · [Fixture] Harborlight Media Summit</title>'));
+  assert.ok(res.sent.includes('Runs the audience desk at a cooperative newsroom.'));
+  assert.ok(res.sent.includes('<meta property="og:url" content="https://example.org/speakers/rae-okonkwo">'));
+  assert.ok(res.sent.includes('<meta property="og:type" content="profile">'));
+});
+
+test('routeMeta: a speaker slug nobody holds is a shell, never the directory page under a person\'s URL', async () => {
+  const res = await getRoute(routeHandler(), '/speakers/nobody-here');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('<title>[Fixture] Harborlight Media Summit</title>'));
+  assert.ok(!res.sent.includes('<title>Speakers'));
+  assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
+});
+
+// -------------------------------------------------------- unknown routes
+
+test('routeMeta: a route with no page doc still returns the plain shell', async () => {
+  const res = await getRoute(routeHandler(), '/no-such-page');
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Content-Type'], 'text/html; charset=utf-8');
+  assert.ok(res.sent.includes('<title>[Fixture] Harborlight Media Summit</title>'));
+  assert.ok(res.sent.includes('/assets/index-abc123.js')); // the shell itself is intact
+  assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
+  assert.ok(!res.sent.includes('rel="canonical"')); // claims no canonical it cannot name
+});
+
+test('routeMeta: a hidden page is never described, and its route reads as unindexable', async () => {
+  const res = await getRoute(routeHandler(), '/hidden');
+  assert.equal(res.statusCode, 200);
+  assert.ok(!res.sent.includes('Unfinished page'));
+  assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
+});
+
+test('routeMeta: a page whose feature flag is off is not described', async () => {
+  const res = await getRoute(
+    routeHandler({ features: { schedule: true, speakers: true, sponsors: false } }),
+    '/sponsors',
+  );
+  assert.equal(res.statusCode, 200);
+  assert.ok(!res.sent.includes('<title>Sponsors'));
+  assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
+});
+
+test('routeMeta: a page doc with `visible` omitted is treated as unpublished', async () => {
+  const docs = { ...SITE_DOCS, 'cmsPages/no-flag': { id: 'no-flag', label: 'No visible field', path: '/no-flag' } };
+  const res = await getRoute(routeHandler({}, docs), '/no-flag');
+  assert.ok(!res.sent.includes('No visible field'));
+});
+
+// --------------------------------------------------------- structured data
+
+test('buildEventJsonLd: describes the event from config/event, and omits what is not configured', () => {
+  const data = buildEventJsonLd({
+    event: SITE_EVENT,
+    url: 'https://example.org',
+    imageUrl: 'https://example.org/branding/og-default.svg',
+  });
+  assert.equal(data['@type'], 'Event');
+  assert.equal(data.name, SITE_EVENT.name);
+  assert.equal(data.startDate, '2026-10-14T09:00');
+  assert.equal(data.endDate, '2026-10-15T16:00');
+  assert.equal(data.location['@type'], 'Place');
+  assert.equal(data.location.address.postalCode, '58211');
+  assert.equal(data.organizer.name, '[Fixture] Harborlight Cooperative');
+  assert.equal(data.image, 'https://example.org/branding/og-default.svg');
+
+  const bare = buildEventJsonLd({ event: { name: 'A' }, url: 'https://example.org', imageUrl: null });
+  assert.equal('startDate' in bare, false);
+  assert.equal('location' in bare, false);
+  assert.equal('image' in bare, false);
+  assert.equal(buildEventJsonLd({ event: null, url: 'https://example.org' }), null);
+});
+
+test('routeMeta: the served HTML carries a parseable Event block that cannot close its own script tag', async () => {
+  const handler = createRouteMetaHandler({
+    db: makeFakeDb(SITE_DOCS),
+    getConfig: async () => siteConfig({
+      event: { ...SITE_EVENT, name: 'Summit </script><script>alert(1)</script>' },
+    }),
+    fetchTemplateFn,
+  });
+  const res = await getRoute(handler, '/travel');
+  const match = res.sent.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  assert.ok(match, 'an Event block is present');
+  const parsed = JSON.parse(match[1]);
+  assert.equal(parsed['@type'], 'Event');
+  assert.ok(!match[1].includes('</script>'));
+  assert.ok(!res.sent.includes('<script>alert(1)</script>'));
+});
+
+// --------------------------------------------------------------- social image
+
+test('brandingObjectUrl: a flat branding path resolves against the site, an uploaded one against the bucket', () => {
+  assert.equal(
+    brandingObjectUrl('branding/og-default.svg', { base: 'https://example.org', bucket: 'b' }),
+    'https://example.org/branding/og-default.svg',
+  );
+  assert.ok(
+    brandingObjectUrl('branding/abc123/card.png', { base: 'https://example.org', bucket: 'b' })
+      .startsWith('https://firebasestorage.googleapis.com/v0/b/b/o/'),
+  );
+  assert.equal(brandingObjectUrl('branding/abc123/card.png', { base: 'https://example.org', bucket: null }), null);
+  assert.equal(brandingObjectUrl('/branding/x.svg', { base: 'https://example.org', bucket: 'b' }), null);
+  assert.equal(brandingObjectUrl('', { base: 'https://example.org', bucket: 'b' }), null);
+  assert.equal(brandingObjectUrl(null, { base: 'https://example.org', bucket: 'b' }), null);
+});
+
+test('routeMeta: the social image comes from the theme slot, falling back to the event seo path', async () => {
+  const withSlot = await getRoute(routeHandler(), '/travel');
+  assert.ok(withSlot.sent.includes('<meta property="og:image" content="https://example.org/branding/og-default.svg">'));
+  assert.ok(withSlot.sent.includes('<meta name="twitter:card" content="summary_large_image">'));
+
+  const noSlot = await getRoute(routeHandler({ theme: { logos: {} } }), '/travel');
+  assert.ok(noSlot.sent.includes('<meta property="og:image" content="https://example.org/branding/og-default.svg">'));
+
+  const noImage = await getRoute(
+    routeHandler({ theme: { logos: {} }, event: { ...SITE_EVENT, seo: { description: 'A line.' } } }),
+    '/travel',
+  );
+  assert.ok(!noImage.sent.includes('og:image'));
+  assert.ok(noImage.sent.includes('<meta name="twitter:card" content="summary">'));
+});
+
+// ---------------------------------------------------------------- escaping
+
+test('buildRouteHtml: escapes injected values, and a $-pattern in a title is inserted literally', () => {
+  const html = buildRouteHtml({
+    template: TEMPLATE,
+    meta: {
+      title: 'Say "hi" <b>$& $` now</b>',
+      description: 'A & B',
+      url: 'https://example.org/x',
+      siteName: 'S & S',
+      ogType: 'website',
+      imageUrl: null,
+      noindex: false,
+      jsonLd: null,
+    },
+  });
+  assert.ok(html.includes('<title>Say &quot;hi&quot; &lt;b&gt;$&amp; $` now&lt;/b&gt;</title>'));
+  assert.ok(html.includes('content="A &amp; B"'));
+  assert.ok(!html.includes('<b>'));
+  assert.ok(html.includes('/assets/index-abc123.js'));
+});
+
+// ----------------------------------------------------------------- headers
+
+test('routeMeta: sets a cache header so the edge, not the function, answers repeat traffic', async () => {
+  const res = await getRoute(routeHandler(), '/travel');
+  assert.equal(res.headers['Cache-Control'], ROUTE_CACHE_CONTROL);
+  // Browsers revalidate; a shared cache holds it for the same window the
+  // function's own template and config caches use.
+  assert.ok(/max-age=0/.test(ROUTE_CACHE_CONTROL));
+  assert.ok(/s-maxage=300/.test(ROUTE_CACHE_CONTROL));
+});
+
+// -------------------------------------------------------------- resilience
+
+test('routeMeta: 405 on a method that is not GET or HEAD', async () => {
+  const res = fakeRes();
+  await routeHandler()({ method: 'POST' }, res);
+  assert.equal(res.statusCode, 405);
+});
+
+test('routeMeta: HEAD is answered like GET — link checkers ask for pages that way', async () => {
+  const res = fakeRes();
+  await routeHandler()({ method: 'HEAD', path: '/travel', query: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Cache-Control'], ROUTE_CACHE_CONTROL);
+});
+
+test('routeMeta: no configured public URL -> 500, and no template is fetched from nowhere', async () => {
+  let called = false;
+  const handler = createRouteMetaHandler({
+    db: makeFakeDb(SITE_DOCS),
+    getConfig: async () => siteConfig({ tierA: {} }),
+    fetchTemplateFn: async () => { called = true; return TEMPLATE; },
+  });
+  const res = await getRoute(handler, '/travel');
+  assert.equal(res.statusCode, 500);
+  assert.equal(called, false);
+});
+
+test('routeMeta: a lookup failure still serves the shell — the whole site sits behind this route', async () => {
+  const db = makeFakeDb(SITE_DOCS);
+  db.collection = () => { throw new Error('firestore is unavailable'); };
+  const errors = [];
+  const handler = createRouteMetaHandler({
+    db,
+    getConfig: async () => siteConfig(),
+    fetchTemplateFn,
+    log: { error: (...args) => errors.push(args) },
+  });
+  const res = await getRoute(handler, '/travel');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('/assets/index-abc123.js'));
+  assert.ok(res.sent.includes('[Fixture] Harborlight Media Summit'));
+  // A read that failed is not a route that does not exist: an outage must
+  // not hand every page a noindex.
+  assert.ok(!res.sent.includes('noindex'));
+  assert.equal(errors.length, 1);
+});
+
+test('routeMeta: a template that cannot be fetched at all is a 500, never fabricated HTML', async () => {
+  const handler = createRouteMetaHandler({
+    db: makeFakeDb(SITE_DOCS),
+    getConfig: async () => siteConfig(),
+    fetchTemplateFn: async () => { throw new Error('self-fetch failed'); },
+    log: { error: () => {} },
+  });
+  const res = await getRoute(handler, '/travel');
+  assert.equal(res.statusCode, 500);
+});
+
+// -------------------------------------------------------------- the seams
+
+test('resolveRouteSubject: reads live docs only, and strictly by visibility', async () => {
+  const db = makeFakeDb(SITE_DOCS);
+  const config = siteConfig();
+  assert.equal((await resolveRouteSubject({ db, config, path: '/travel' })).kind, 'page');
+  assert.equal((await resolveRouteSubject({ db, config, path: '/speakers/rae-okonkwo' })).kind, 'speaker');
+  assert.equal((await resolveRouteSubject({ db, config, path: '/schedule/s-101' })).kind, 'session');
+  assert.equal(await resolveRouteSubject({ db, config, path: '/hidden' }), null);
+  assert.equal(await resolveRouteSubject({ db, config, path: '/travel/deeper/still' }), null);
+});
+
+test('resolveRouteSubject: a page saved at a nested path is matched on its whole path', async () => {
+  const db = makeFakeDb({
+    ...SITE_DOCS,
+    'cmsPages/team': { id: 'team', label: 'Who runs it', path: '/about/team', order: 6, visible: true, systemPage: false },
+  });
+  const subject = await resolveRouteSubject({ db, config: siteConfig(), path: '/about/team' });
+  assert.equal(subject.kind, 'page');
+  assert.equal(subject.doc.label, 'Who runs it');
+});
+
+test('resolveRouteMeta: the shell falls back to the event, never to an empty title', () => {
+  const meta = resolveRouteMeta({
+    config: siteConfig({ event: { name: '  ' } }),
+    subject: null,
+    path: '/nope',
+    base: 'https://example.org',
+  });
+  assert.equal(meta.title, 'Event site');
+  assert.equal(meta.noindex, true);
+  assert.equal(meta.url, null);
 });
