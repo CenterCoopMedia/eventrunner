@@ -47,8 +47,9 @@
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
 import { useMemo, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
+import { isSafeUrl } from 'shared/urlSafety';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -178,6 +179,64 @@ function accountClass({ isActive }) {
     : quietActionClass;
 }
 
+// One treatment for every link in the footer: an underlined word at the
+// caption size, at the full touch target. The footer is a dense block of
+// links and a reader has to be able to hit them.
+const FOOTER_LINK_CLASS =
+  'touch-target inline-flex items-center underline underline-offset-2 hover:text-text-primary';
+
+/**
+ * The longest platform name the footer will render. The same 40 as
+ * `MAX_SOCIAL_LABEL_LENGTH` in packages/shared/src/speaker.cjs, which caps
+ * the same kind of value on a speaker record; it is repeated rather than
+ * imported because the shared package's ESM entry does not re-export it and
+ * a footer is not a reason to widen that surface.
+ */
+const MAX_SOCIAL_PLATFORM_LENGTH = 40;
+
+/**
+ * The event's social accounts, as links (M7 issue 3).
+ *
+ * config/event.social.handles is `{ platform, url }[]` — the shape the mail
+ * footer already reads (functions/src/email/render.cjs), so the site and the
+ * mail say the same thing from one field rather than each learning its own.
+ * NOTHING IS ADDED TO THE SCHEMA HERE: an event that has recorded no
+ * accounts has an empty list, and an empty list renders no block at all.
+ *
+ * A RUNTIME config/event DOC IS UNVALIDATED FIRESTORE DATA (§2.4 fail-soft
+ * overlay) and validateEventConfig does not describe this field at all, so
+ * nothing upstream has bounded what arrives here. Every entry is therefore
+ * met as it is AND normalized before it renders:
+ *
+ *   • not an object, no platform, or a URL that is not http(s) → dropped,
+ *     rather than a link with no name or a link that is not a link
+ *   • the platform is trimmed and cut to MAX_SOCIAL_PLATFORM_LENGTH, so one
+ *     bad write cannot hand itself the whole bottom of the site
+ *   • an entry recorded twice renders once — a repeated link is noise a
+ *     reader has to resolve (the rule buildNavItems applies to a duplicated
+ *     route), and it also keeps the render key unique
+ *
+ * @param {unknown} social config/event.social
+ * @returns {Array<{ platform: string, url: string }>}
+ */
+function socialAccounts(social) {
+  const handles = Array.isArray(social?.handles) ? social.handles : [];
+  const seen = new Set();
+  const accounts = [];
+  for (const handle of handles) {
+    if (!handle || typeof handle !== 'object') continue;
+    if (typeof handle.platform !== 'string' || typeof handle.url !== 'string') continue;
+    if (!isSafeUrl(handle.url)) continue;
+    const platform = handle.platform.trim().slice(0, MAX_SOCIAL_PLATFORM_LENGTH);
+    if (!platform) continue;
+    const key = `${platform}:${handle.url}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    accounts.push({ platform, url: handle.url });
+  }
+  return accounts;
+}
+
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage } = useContent();
@@ -223,6 +282,9 @@ export default function Layout() {
   // config or content snapshot, and the list only changes when the pages or
   // the flags do.
   const navItems = useMemo(() => buildNavItems(pages, features), [pages, features]);
+
+  // The event's own social accounts, if it has recorded any (M7 issue 3).
+  const socialLinks = useMemo(() => socialAccounts(eventConfig?.social), [eventConfig?.social]);
 
   // Two destinations, one control. An unfinished handshake is the
   // signed-out answer, said explicitly (see ACCOUNT_SIGNED_OUT above).
@@ -341,20 +403,59 @@ export default function Layout() {
             <p className="font-heading text-body font-semibold text-text-primary">
               {eventConfig?.name}
             </p>
+            {/* THE SAME PAGE LIST THE NAVIGATION CARRIES (M7 issue 3), from
+                the same buildNavItems call above — one gate, read once, so
+                a page hidden in the editor or a system page whose feature
+                is off cannot leave the header and stay in the footer.
+                <Link>, not <a>: the demo runs under HashRouter, where a raw
+                href reloads a path the static host does not serve. */}
+            {navItems.length === 0 ? null : (
+              <nav aria-label="Site pages" className="mt-md">
+                <ul className="flex flex-wrap gap-x-md">
+                  {navItems.map((item) => (
+                    <li key={item.to}>
+                      <Link to={item.to} className={FOOTER_LINK_CLASS}>
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            )}
             {operatorName || supportEmail ? (
-              <p className="mt-2xs">
+              <p className="mt-md">
                 {operatorName ? `Operated by ${operatorName}` : null}
                 {operatorName && supportEmail ? ' · ' : null}
                 {supportEmail ? (
-                  <a
-                    href={`mailto:${supportEmail}`}
-                    className="underline underline-offset-2 hover:text-text-primary"
-                  >
+                  <a href={`mailto:${supportEmail}`} className={FOOTER_LINK_CLASS}>
                     Contact support
                   </a>
                 ) : null}
               </p>
             ) : null}
+            {/* An event that has recorded no social account renders no
+                block, no heading, and no empty list. */}
+            {socialLinks.length === 0 ? null : (
+              <nav aria-label="Social accounts" className="mt-md">
+                <ul className="flex flex-wrap gap-x-md">
+                  {/* Keyed on both halves: an event can record two accounts
+                      that share a URL (one platform, two labels) or two
+                      platforms pointing at one profile page, and either
+                      would collide on a key made from one half alone. */}
+                  {socialLinks.map((handle) => (
+                    <li key={`${handle.platform}:${handle.url}`}>
+                      {/* No target: a social account opens in the tab the
+                          reader is already in, which is what a link off the
+                          site is meant to do. rel="noreferrer" then withholds
+                          the referrer, since there is no opener to sever. */}
+                      <a href={handle.url} rel="noreferrer" className={FOOTER_LINK_CLASS}>
+                        {handle.platform}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            )}
             {features.feedbackInbox ? (
               <button
                 type="button"
