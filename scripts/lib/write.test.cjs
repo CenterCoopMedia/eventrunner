@@ -5,7 +5,9 @@ const assert = require('node:assert/strict');
 
 const { makeFakeDb } = require('../../functions/src/cms/firestoreFake.cjs');
 const store = require('../../functions/src/cms/store.cjs');
-const { writeConfigDocs, seedCollection, findPagePathCollisions, countSeeded, readConfig } = require('./write.cjs');
+const {
+  writeConfigDocs, seedCollection, findPagePathCollisions, findPageSectionCollisions, countSeeded, readConfig,
+} = require('./write.cjs');
 const { defaultPages, buildSeedContent } = require('./seed.cjs');
 const { buildConfigDocs } = require('./answers.cjs');
 
@@ -90,6 +92,90 @@ test('findPagePathCollisions does not flag a page reclaiming its own path', asyn
 
   const collisions = await findPagePathCollisions({ db, pages });
   assert.equal(collisions.size, 0);
+});
+
+test('findPageSectionCollisions finds nothing on a fresh project', async () => {
+  const db = makeFakeDb();
+  const pages = defaultPages().map((p) => ({ ...p, seeded: true }));
+  const collisions = await findPageSectionCollisions({ db, pages });
+  assert.equal(collisions.size, 0);
+});
+
+test('findPageSectionCollisions does not flag a page reclaiming its own sections', async () => {
+  const db = makeFakeDb();
+  const pages = defaultPages().map((p) => ({ ...p, seeded: true }));
+  // A normal re-run: the seeded page's own prior live doc already lists
+  // its own section ids as its own — that is a refresh, not a collision.
+  await seedCollection({ db, store, collection: 'cmsPages', docs: pages, now });
+
+  const collisions = await findPageSectionCollisions({ db, pages });
+  assert.equal(collisions.size, 0);
+});
+
+test('findPageSectionCollisions flags a page whose section id a DIFFERENT live page already lists as its own', async () => {
+  // A client-created page (or one reassigned by an operator) that happens
+  // to reuse the exact section id a newly-added seeded page wants —
+  // 'city_guide_eat' here, chosen at random from a client's own page.
+  const db = makeFakeDb();
+  await db.collection('cmsPages').doc('neighborhood-picks').set({
+    label: 'Neighborhood picks', path: '/neighborhood-picks', icon: null, order: 99,
+    visible: true, systemPage: false,
+    sections: [{ id: 'city_guide_eat', label: 'Where we eat', description: '', allowedBlocks: ['richtext'], maxBlocks: 5, reorderable: true, defaultBlocks: [] }],
+    seeded: false,
+  });
+  const pages = defaultPages().map((p) => ({ ...p, seeded: true }));
+
+  const collisions = await findPageSectionCollisions({ db, pages });
+
+  assert.equal(collisions.size, 1);
+  assert.deepEqual(collisions.get('city_guide'), { sectionId: 'city_guide_eat', ownerId: 'neighborhood-picks' });
+});
+
+test('findPageSectionCollisions also reads the draft revision — an unpublished section claim still collides', async () => {
+  const db = makeFakeDb();
+  await db.collection('cmsPages_drafts').doc('food-list').set({
+    label: 'Food list', path: '/food-list', icon: null, order: 50,
+    visible: true, systemPage: false,
+    sections: [{ id: 'city_guide_see', label: 'Sights', description: '', allowedBlocks: ['richtext'], maxBlocks: 5, reorderable: true, defaultBlocks: [] }],
+    status: 'dirty',
+  });
+  const pages = defaultPages().map((p) => ({ ...p, seeded: true }));
+
+  const collisions = await findPageSectionCollisions({ db, pages });
+
+  assert.equal(collisions.size, 1);
+  assert.deepEqual(collisions.get('city_guide'), { sectionId: 'city_guide_see', ownerId: 'food-list' });
+});
+
+test('findPageSectionCollisions flags a section id orphaned by a deleted page — content with no current owner', async () => {
+  // cmsDeletePage removes the page document, not the cmsContent filed
+  // under its sections — a doc can be sitting there, ownerless, under a
+  // section id a newly-added seeded page also wants.
+  const db = makeFakeDb();
+  await db.collection('cmsContent').doc('city_guide_around__note').set({
+    section: 'city_guide_around', field: 'note', blockType: 'richtext',
+    value: '<p>Left over from a page that no longer exists.</p>', visible: true, order: 0, seeded: false,
+  });
+  const pages = defaultPages().map((p) => ({ ...p, seeded: true }));
+
+  const collisions = await findPageSectionCollisions({ db, pages });
+
+  assert.equal(collisions.size, 1);
+  assert.deepEqual(collisions.get('city_guide'), { sectionId: 'city_guide_around' });
+});
+
+test('findPageSectionCollisions treats orphaned draft-only content the same way', async () => {
+  const db = makeFakeDb();
+  await db.collection('cmsContent_drafts').doc('city_guide_intro__welcome').set({
+    section: 'city_guide_intro', field: 'welcome', blockType: 'richtext',
+    value: '<p>An unpublished edit to a page that was since deleted.</p>', status: 'dirty',
+  });
+  const pages = defaultPages().map((p) => ({ ...p, seeded: true }));
+
+  const collisions = await findPageSectionCollisions({ db, pages });
+
+  assert.equal(collisions.size, 1);
+  assert.deepEqual(collisions.get('city_guide'), { sectionId: 'city_guide_intro' });
 });
 
 test('re-running is a no-op for untouched seeds and never clobbers an edited doc', async () => {

@@ -269,6 +269,78 @@ test('a page path claimed only by an unpublished draft still blocks the seed', a
     'a collision on one page must not block the rest of the seed');
 });
 
+test('a section id already owned by a different page is skipped, not exposed on the seeded page (Codex review P2)', async () => {
+  // An existing deployment, upgraded to a version of Eventrunner that adds
+  // the 'city_guide' seeded page for the first time. A client's own page
+  // already lists 'city_guide_eat' among its own sections — cmsContent is
+  // keyed globally by section id, so seeding city_guide over that id would
+  // make the client's own content show up on, and become editable from,
+  // the new seeded page.
+  const db = makeFakeDb();
+  const built = buildConfigDocs({ answers: { ...ANSWERS, adminEmails: ['ops@example.org'] }, tierA: TIER_A, now: () => 0 });
+  assert.equal(built.ok, true, built.errors.join('; '));
+  await db.collection('config').doc('event').set(built.docs.event);
+  const operator = { uid: 'operator', email: 'operator@example.org' };
+  await store.writeDraft({
+    db,
+    collection: 'cmsPages',
+    docId: 'neighborhood-picks',
+    fields: {
+      label: 'Neighborhood picks', path: '/neighborhood-picks', icon: null, order: 99,
+      visible: true, systemPage: false,
+      sections: [{
+        id: 'city_guide_eat', label: 'Where we eat', description: '',
+        allowedBlocks: ['richtext'], maxBlocks: 5, reorderable: true, defaultBlocks: [],
+      }],
+    },
+    visible: true,
+    actor: operator,
+    now: () => 1,
+  });
+  await store.publishDocs({ db, collection: 'cmsPages', docIds: ['neighborhood-picks'], actor: operator, now: () => 1 });
+
+  const { value, output } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 2,
+  }));
+
+  assert.equal(value, 0, 'a section collision is reported, not a fatal error');
+  assert.match(output, /section 'city_guide_eat' is already owned by page 'neighborhood-picks' — not seeded/);
+  assert.equal((await db.collection('cmsPages').doc('city_guide').get()).exists, false,
+    'the seeded page must never be written over a section id another page already owns');
+  assert.equal((await db.collection('cmsPages').doc('neighborhood-picks').get()).data().sections[0].id, 'city_guide_eat',
+    "the operator's own page keeps its section");
+  // Every OTHER seeded page, with no collision of its own, still seeds
+  // normally — the preflight must not skip more than the colliding one.
+  assert.equal((await db.collection('cmsPages').doc('home').get()).exists, true);
+  assert.equal((await db.collection('cmsPages').doc('recap').get()).exists, true);
+});
+
+test('a section id orphaned by a deleted page also blocks the seed', async () => {
+  // cmsDeletePage removes the page document, not the cmsContent filed
+  // under its sections (spec §5.2), so a doc can be sitting there,
+  // ownerless, under a section id a newly-added seeded page also wants —
+  // seedCollection's own existing-doc check never sees this, because it
+  // only ever looks at cmsPages.
+  const db = makeFakeDb();
+  const built = buildConfigDocs({ answers: { ...ANSWERS, adminEmails: ['ops@example.org'] }, tierA: TIER_A, now: () => 0 });
+  assert.equal(built.ok, true, built.errors.join('; '));
+  await db.collection('config').doc('event').set(built.docs.event);
+  await db.collection('cmsContent').doc('city_guide_around__note').set({
+    section: 'city_guide_around', field: 'note', blockType: 'richtext',
+    value: '<p>Left over from a page that no longer exists.</p>', visible: true, order: 0, seeded: false,
+  });
+
+  const { value, output } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 2,
+  }));
+
+  assert.equal(value, 0);
+  assert.match(output, /section 'city_guide_around' is orphaned content from a deleted page — not seeded/);
+  assert.equal((await db.collection('cmsPages').doc('city_guide').get()).exists, false);
+  assert.equal((await db.collection('cmsPages').doc('guidelines').get()).exists, true,
+    'a collision on one page must not block the rest of the seed');
+});
+
 test('--dry-run writes nothing', async () => {
   const db = makeFakeDb();
   const { value } = await quietly(() => runInit({

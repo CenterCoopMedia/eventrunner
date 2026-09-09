@@ -67,7 +67,8 @@ const { manualChecklist, formatChecklist } = require('./lib/checklist.cjs');
 const { validateDeployEnv } = require('shared/config');
 const { uploadPlaceholderBranding } = require('./lib/branding.cjs');
 const {
-  writeConfigDocs, seedCollection, findPagePathCollisions, seedEmailTemplateOverrides, countSeeded, readConfig,
+  writeConfigDocs, seedCollection, findPagePathCollisions, findPageSectionCollisions,
+  seedEmailTemplateOverrides, countSeeded, readConfig,
 } = require('./lib/write.cjs');
 
 const FLAGS = [
@@ -345,11 +346,28 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   // 'faq'. A colliding page is left out of the write entirely and
   // reported the same way every other skip already is.
   const pathCollisions = await findPagePathCollisions({ db, pages: pageDocs });
-  const collisionSkips = [...pathCollisions].map(([id, collision]) => ({
-    id,
-    reason: `path ${collision.path} is already owned by page '${collision.ownerId}' — not seeded`,
-  }));
-  const seedablePages = pageDocs.filter((page) => !pathCollisions.has(page.id));
+  // Section-id collision preflight (Codex review, seed a city guide page:
+  // P2): cmsContent is keyed globally by section id, so a seeded page's
+  // section ids can just as easily collide with a DIFFERENT page's own
+  // sections, or with content orphaned by an earlier page's deletion, as a
+  // path can. Same treatment as the path check: a colliding page is left
+  // out of the write entirely, checked across every seeded page.
+  const sectionCollisions = await findPageSectionCollisions({ db, pages: pageDocs });
+  const collisionSkips = [
+    ...[...pathCollisions].map(([id, collision]) => ({
+      id,
+      reason: `path ${collision.path} is already owned by page '${collision.ownerId}' — not seeded`,
+    })),
+    ...[...sectionCollisions].map(([id, collision]) => ({
+      id,
+      reason: collision.ownerId
+        ? `section '${collision.sectionId}' is already owned by page '${collision.ownerId}' — not seeded`
+        : `section '${collision.sectionId}' is orphaned content from a deleted page — not seeded`,
+    })),
+  ];
+  const seedablePages = pageDocs.filter(
+    (page) => !pathCollisions.has(page.id) && !sectionCollisions.has(page.id),
+  );
 
   const pageResult = await seedCollection({ db, store, collection: 'cmsPages', docs: seedablePages, dryRun, now, force });
   pageResult.skipped = [...collisionSkips, ...pageResult.skipped];

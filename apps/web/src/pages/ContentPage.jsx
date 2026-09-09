@@ -63,6 +63,33 @@ const SECTION_INDEX_MIN_BLOCKS = 8;
 // every letter typed.
 const STATUS_SETTLE_MS = 300;
 
+/**
+ * A section that stands in for the page's own title rather than presenting
+ * real content of its own — data-driven, not "whichever section happens to
+ * render first". A page's actual first section used to get this treatment
+ * purely by position (`baseSections[0]`), which also hid a page's real
+ * first content — recap's "Summary", or the city guide's "Places to eat"
+ * once it has content — the moment that page shipped with no literal intro
+ * section to occupy the slot instead.
+ *
+ * The two clauses below are read straight off how the seed itself names
+ * this shape: every generic page that opens on a stand-in section either
+ * gives it a label identical to the page's own (an admin could author this
+ * by hand too) or ends its id in `_intro` (faq, conduct, contact, privacy,
+ * terms, guidelines, city_guide) or `_header` (travel, whose header section
+ * carries a "Page headline" block that restates the title in its own
+ * content). A page with no such section — recap's `recap_summary`, any
+ * custom page an operator builds — keeps its first section's heading
+ * visible and in the index, same as every other section.
+ */
+function isTitleRepeatingSection(section, page) {
+  return (
+    section.label === page.label ||
+    /_intro$/.test(section.id) ||
+    /_header$/.test(section.id)
+  );
+}
+
 /** The page's sections whose block list still has something matching `query`
  * (an empty query matches every block, so this is the identity map then).
  * A block matches on its own text OR its section's label, so a query for
@@ -215,17 +242,11 @@ export default function ContentPage() {
       ? `No items match “${settledTrimmedQuery}”.`
       : `${settledMatchedBlocks} of ${totalBlocks} items match “${settledTrimmedQuery}”.`;
 
-  // The page's own first section, independent of what the filter currently
-  // shows. Its heading renders screen-reader only below (it usually repeats
-  // the page title), so this id is the one thing that decides that — never
-  // "whichever section a filter happens to put first" (see the render loop).
-  const firstSectionId = baseSections[0]?.section.id ?? null;
-
   // The invisible heading's own section is left out of the index: a sighted
   // keyboard user who activates it would land on a heading with nothing to
   // see, which reads as a bug, not a jump.
   const indexSections = filteredSections
-    .filter(({ section }) => section.id !== firstSectionId)
+    .filter(({ section }) => !isTitleRepeatingSection(section, page))
     .map(({ section }) => ({ id: `section-${section.id}`, label: section.label }));
 
   const clearFilter = () => {
@@ -318,17 +339,18 @@ export default function ContentPage() {
               aria-labelledby={`section-${section.id}`}
               className={index === 0 ? undefined : 'mt-2xl'}
             >
-              {/* The first section's label usually repeats the page title;
-                  keep it for screen readers only — and with no visible heading
-                  there is no section boundary to draw either. Anchored to the
-                  PAGE's own first section id (firstSectionId), never to render
-                  position: a filter can put a different section at index 0,
-                  and that section still needs its real, visible heading.
-                  tabIndex={-1} on both heading forms lets the section index
-                  (above) move focus here without pulling either into the tab
-                  order (interface guidelines: Accessibility — only tabindex 0
-                  and -1). */}
-              {section.id === firstSectionId ? (
+              {/* A section whose label repeats the page title, or whose id
+                  marks it as an intro/header stand-in
+                  (isTitleRepeatingSection above), keeps it for screen readers
+                  only — and with no visible heading there is no section
+                  boundary to draw either. Data-driven, never render position:
+                  a filter can put a different section at index 0, and that
+                  section still needs its real, visible heading. tabIndex={-1}
+                  on both heading forms lets the section index (above) move
+                  focus here without pulling either into the tab order
+                  (interface guidelines: Accessibility — only tabindex 0 and
+                  -1). */}
+              {isTitleRepeatingSection(section, page) ? (
                 <h2 id={`section-${section.id}`} tabIndex={-1} className="sr-only">
                   {section.label}
                 </h2>

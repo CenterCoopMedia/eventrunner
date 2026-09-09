@@ -664,6 +664,93 @@ describe('ContentPage — search and section index on long pages', () => {
     expect(within(index).getByRole('link', { name: 'Closing' })).toBeInTheDocument();
   });
 
+  // isTitleRepeatingSection (ContentPage.jsx) reads a section's own label
+  // and id, not its render position, so these four exercise it directly
+  // against the real seeded pages plus one synthetic page shaped to have
+  // NO title-repeating section at all — the case the old positional rule
+  // got wrong (it hid whichever section rendered first, full stop).
+  it('hides the seeded FAQ page\'s intro heading and omits it from the index, by its "_intro" id', async () => {
+    renderAt('/faq');
+    const faqPage = pagesData.find((p) => p.id === 'faq');
+    const introSection = faqPage.sections.find((s) => s.id === 'faq_intro');
+    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+
+    expect(screen.getByRole('heading', { name: introSection.label }).className).toMatch(/sr-only/);
+    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
+    expect(within(index).queryByRole('link', { name: introSection.label })).not.toBeInTheDocument();
+  });
+
+  it('hides the seeded travel page\'s header heading, by its "_header" id, and keeps its real sections visible', async () => {
+    renderAt('/travel');
+    const travelPage = pagesData.find((p) => p.id === 'travel');
+    const headerSection = travelPage.sections.find((s) => s.id === 'travel_header');
+    const venueSection = travelPage.sections.find((s) => s.id === 'travel_venue');
+    await screen.findByRole('heading', { level: 1, name: travelPage.label });
+
+    expect(screen.getByRole('heading', { name: headerSection.label }).className).toMatch(/sr-only/);
+    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
+    expect(within(index).queryByRole('link', { name: headerSection.label })).not.toBeInTheDocument();
+    // Venue is real content, not a title stand-in — visible heading, in the index.
+    expect(screen.getByRole('heading', { name: venueSection.label }).className).not.toMatch(/sr-only/);
+    expect(within(index).getByRole('link', { name: venueSection.label })).toBeInTheDocument();
+  });
+
+  it('hides the seeded city guide page\'s intro heading and shows "Places to eat" as a real, indexed section', async () => {
+    // The regression this whole rule exists to fix: the old positional rule
+    // hid whichever section rendered first, so a demo with no
+    // city_guide_intro content hid "Places to eat" — real content — right
+    // along with it. The demo overlay now seeds city_guide_intro (see
+    // demo-event.cjs), so this exercises the fixed shape end to end.
+    renderAt('/city-guide');
+    const cityGuidePage = pagesData.find((p) => p.id === 'city_guide');
+    const introSection = cityGuidePage.sections.find((s) => s.id === 'city_guide_intro');
+    const eatSection = cityGuidePage.sections.find((s) => s.id === 'city_guide_eat');
+    await screen.findByRole('heading', { level: 1, name: cityGuidePage.label });
+
+    expect(screen.getByRole('heading', { name: introSection.label }).className).toMatch(/sr-only/);
+    expect(screen.getByRole('heading', { name: eatSection.label }).className).not.toMatch(/sr-only/);
+    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
+    expect(within(index).queryByRole('link', { name: introSection.label })).not.toBeInTheDocument();
+    expect(within(index).getByRole('link', { name: eatSection.label })).toBeInTheDocument();
+  });
+
+  it('gives a real, visible heading to a page whose first section is not an intro/header at all', async () => {
+    // No section here ends in "_intro" or "_header", and no section's label
+    // repeats the page's own label — a page an operator built from scratch
+    // whose first section is just its first real content. The old
+    // positional rule (`baseSections[0]`) would have hidden this section's
+    // heading unconditionally, for no reason but its render position.
+    const page = {
+      id: 'no-intro-page',
+      label: 'No intro fixture',
+      path: '/no-intro-page',
+      icon: null,
+      order: 99,
+      visible: true,
+      systemPage: false,
+      sections: [
+        pageSection('ni_first', 'First topic'),
+        pageSection('ni_second', 'Second topic'),
+        pageSection('ni_third', 'Third topic'),
+      ],
+    };
+    const blocks = [
+      textBlock('ni_first', 'body', 'The first real thing on this page.'),
+      textBlock('ni_second', 'body', 'The second real thing on this page.'),
+      textBlock('ni_third', 'body', 'The third real thing on this page.'),
+    ];
+    renderAt('/no-intro-page');
+    pushPage(page);
+    pushContent(blocks);
+
+    await screen.findByRole('heading', { level: 1, name: 'No intro fixture' });
+    expect(screen.getByRole('heading', { name: 'First topic' }).className).not.toMatch(/sr-only/);
+    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
+    expect(within(index).getByRole('link', { name: 'First topic' })).toBeInTheDocument();
+    expect(within(index).getByRole('link', { name: 'Second topic' })).toBeInTheDocument();
+    expect(within(index).getByRole('link', { name: 'Third topic' })).toBeInTheDocument();
+  });
+
   it('moves focus to the target section heading when a section link is activated', async () => {
     renderLongSectionsPage();
     await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });

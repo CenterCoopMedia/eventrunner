@@ -66,6 +66,15 @@ export const siteContent = {
     order: 2,
     seeded: true,
   },
+  city_guide_intro__welcome: {
+    section: 'city_guide_intro',
+    field: 'welcome',
+    blockType: 'richtext',
+    value: '<p>A short guide to Millhaven for anyone staying a few extra days around the summit. Everything below is an easy walk or a short ride from Harborlight Hall.</p>',
+    visible: true,
+    order: 0,
+    seeded: true,
+  },
   city_guide_see__exchange_museum: {
     section: 'city_guide_see',
     field: 'exchange_museum',
