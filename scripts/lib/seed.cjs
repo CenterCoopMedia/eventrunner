@@ -602,6 +602,12 @@ function buildLegalContentDocs({ docs, seededAt = new Date(0).toISOString(), pag
  * content" an answerable question (the launch-readiness seeded-content row
  * counts exactly these).
  *
+ * `pages` is the set actually being seeded, not necessarily every default
+ * page: content is keyed by section id alone, so a page the caller has
+ * decided not to write (init-event's path- and section-collision
+ * preflights drop one whose ids another page already owns) must not be
+ * passed here either, or its blocks land under the other page's sections.
+ *
  * @param {{ pages: object[], docs: { event: object, providers: object, features?: object },
  *           tierA?: object, seededAt?: string }} args
  * @returns {Array<object>} content docs, each with an `id`

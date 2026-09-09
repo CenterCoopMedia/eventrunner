@@ -94,6 +94,10 @@ test('init seeds config, pages, and content, and exits 0 despite unmet readiness
   assert.equal((await db.collection('config').doc('bootstrap').get()).data().adminEmails[0], 'ops@example.org');
   assert.equal((await db.collection('cmsPages').doc('privacy').get()).exists, true);
   assert.equal((await db.collection('cmsContent').doc('hero__title').get()).data().value, 'Test Gathering');
+  // Every seeded section's blocks are written, the sponsor strip's lede
+  // included — this is the baseline the collision test below is a
+  // departure from.
+  assert.equal((await db.collection('cmsContent').doc('sponsors__lede').get()).exists, true);
   assert.match(output, /UNMET/, 'unmet rows are reported as warnings');
   assert.match(output, /Legal review/);
 });
@@ -339,6 +343,54 @@ test('a section id orphaned by a deleted page also blocks the seed', async () =>
   assert.equal((await db.collection('cmsPages').doc('city_guide').get()).exists, false);
   assert.equal((await db.collection('cmsPages').doc('guidelines').get()).exists, true,
     'a collision on one page must not block the rest of the seed');
+});
+
+test('a page skipped for a section collision seeds none of its content either (Codex review, the sponsor strip)', async () => {
+  // The section-collision preflight leaves the colliding page out of the
+  // cmsPages write, but cmsContent is a separate write — and content built
+  // from the full default page set would still file every block of the
+  // skipped page under section ids the OTHER page owns. For the home page
+  // that means the sponsor strip's lede, and the hero, and the key facts,
+  // landing on somebody else's page as editable content nobody asked for.
+  const db = makeFakeDb();
+  const built = buildConfigDocs({ answers: { ...ANSWERS, adminEmails: ['ops@example.org'] }, tierA: TIER_A, now: () => 0 });
+  assert.equal(built.ok, true, built.errors.join('; '));
+  await db.collection('config').doc('event').set(built.docs.event);
+  const operator = { uid: 'operator', email: 'operator@example.org' };
+  await store.writeDraft({
+    db,
+    collection: 'cmsPages',
+    docId: 'our-supporters',
+    fields: {
+      label: 'Our supporters', path: '/our-supporters', icon: null, order: 98,
+      visible: true, systemPage: false,
+      sections: [{
+        id: 'sponsors', label: 'Who backs us', description: '',
+        allowedBlocks: ['richtext'], maxBlocks: 5, reorderable: true, defaultBlocks: [],
+      }],
+    },
+    visible: true,
+    actor: operator,
+    now: () => 1,
+  });
+  await store.publishDocs({ db, collection: 'cmsPages', docIds: ['our-supporters'], actor: operator, now: () => 1 });
+
+  const { value, output } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 2,
+  }));
+
+  assert.equal(value, 0);
+  assert.match(output, /section 'sponsors' is already owned by page 'our-supporters' — not seeded/);
+  assert.equal((await db.collection('cmsPages').doc('home').get()).exists, false);
+  // Not one block of the skipped page is written: not the strip's lede
+  // under the id the other page owns, and not the home page's own
+  // sections either — the page was not seeded, so it has no content.
+  for (const id of ['sponsors__lede', 'hero__title', 'info__when', 'footer__contact_link']) {
+    assert.equal((await db.collection('cmsContent').doc(id).get()).exists, false, id);
+  }
+  // Every other page still seeds its own content in full.
+  assert.equal((await db.collection('cmsPages').doc('travel').get()).exists, true);
+  assert.equal((await db.collection('cmsContent').doc('travel_venue__venue_name').get()).exists, true);
 });
 
 test('--dry-run writes nothing', async () => {

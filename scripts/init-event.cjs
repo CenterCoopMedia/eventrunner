@@ -329,13 +329,6 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   const { results: configResults, effective } = await writeConfigDocs({ db, docs, force, dryRun, now });
   for (const r of configResults) console.log(`  config/${r.docId.padEnd(9)} ${r.action} (${r.reason})`);
 
-  // Content is derived from the EFFECTIVE config, not from what was
-  // proposed: on a --force re-run the merge rules keep the stored auth
-  // attestation and legal review flag, and the §5.5 legal templates read
-  // exactly those. Building from `docs` would regenerate the privacy page
-  // as if Google sign-in had never been enabled.
-  const content = buildSeedContent({ pages, docs: effective, tierA, seededAt });
-
   // Path-collision preflight (Codex review, seed a recap page and a
   // guidelines page: P1): seedCollection decides purely by doc id, so it
   // cannot see a DIFFERENT page id already sitting on the path a seeded
@@ -368,6 +361,21 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   const seedablePages = pageDocs.filter(
     (page) => !pathCollisions.has(page.id) && !sectionCollisions.has(page.id),
   );
+
+  // Content is derived from the EFFECTIVE config, not from what was
+  // proposed: on a --force re-run the merge rules keep the stored auth
+  // attestation and legal review flag, and the §5.5 legal templates read
+  // exactly those. Building from `docs` would regenerate the privacy page
+  // as if Google sign-in had never been enabled.
+  //
+  // AND FROM THE PAGES ACTUALLY BEING SEEDED, not from every default page
+  // (Codex review, the sponsor strip). cmsContent is a separate write from
+  // cmsPages, so content built from the full default set would still file
+  // every block of a page the preflight just skipped — and the reason it
+  // was skipped is precisely that somebody else owns those section ids,
+  // which is where those blocks would land: editable content on a page
+  // nobody seeded. A page left out of the seed is left out of it whole.
+  const content = buildSeedContent({ pages: seedablePages, docs: effective, tierA, seededAt });
 
   const pageResult = await seedCollection({ db, store, collection: 'cmsPages', docs: seedablePages, dryRun, now, force });
   pageResult.skipped = [...collisionSkips, ...pageResult.skipped];

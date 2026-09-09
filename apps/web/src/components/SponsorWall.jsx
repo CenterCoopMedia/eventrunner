@@ -61,11 +61,31 @@ function tierLabel(tier) {
  * means: a wall that hid a different set from the page's own empty state
  * would say "none yet" over a wall of marks.
  *
+ * AND ABOUT WHAT "THEIR OWN ORDER" MEANS. The wall reads position as
+ * standing — the group order and the mark sizes both come out of it — so
+ * the order has to be the operator's, not whatever order the documents
+ * happened to arrive in. The committed snapshot is written sorted (the
+ * generator's `emitOrganizationsData`), but the runtime cmsOrganizations
+ * listener replaces it with Firestore's query order, and the moment it
+ * lands a wall reading raw array order would regroup the tiers and resize
+ * the marks behind the operator's back. So the sort is here, next to the
+ * filter, where both surfaces already come for the published set.
+ *
+ * The key is the `order` field the admin list sorts by, which is the
+ * control the operator actually has. The id breaks ties so that two
+ * organizations at the same (or no) order still draw the same way twice.
+ *
  * @param {Array<object>} organizations the cmsOrganizations documents
  * @returns {Array<object>}
  */
 export function visibleOrganizations(organizations) {
-  return (Array.isArray(organizations) ? organizations : []).filter((org) => org?.visible);
+  return (Array.isArray(organizations) ? organizations : [])
+    .filter((org) => org?.visible)
+    .sort(
+      (a, b) =>
+        (Number.isFinite(a?.order) ? a.order : 0) - (Number.isFinite(b?.order) ? b.order : 0) ||
+        String(a?.id ?? '').localeCompare(String(b?.id ?? '')),
+    );
 }
 
 /**

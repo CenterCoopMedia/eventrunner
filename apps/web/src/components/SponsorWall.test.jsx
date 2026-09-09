@@ -42,6 +42,23 @@ describe('visibleOrganizations', () => {
       .toHaveLength(3);
     expect(visibleOrganizations(undefined)).toEqual([]);
   });
+
+  // The committed snapshot arrives sorted by `order`; the runtime listener
+  // does not — Firestore hands the documents back in its own query order.
+  // The wall reads position as standing, so an unsorted list would regroup
+  // the tiers and resize the marks behind the operator's back.
+  it('puts the organizations back in the operator’s order, whatever order they arrive in', () => {
+    const reversed = [
+      org('two', 'Second Supporter', 'Partner', { order: 2 }),
+      org('one', 'First Supporter', 'Presenting', { order: 1 }),
+    ];
+    expect(visibleOrganizations(reversed).map((o) => o.id)).toEqual(['one', 'two']);
+  });
+
+  it('breaks a tie on the id, so an unset order is still a stable order', () => {
+    const tied = [org('c', 'C', 'Gold'), org('a', 'A', 'Gold'), org('b', 'B', 'Gold', { order: 0 })];
+    expect(visibleOrganizations(tied).map((o) => o.id)).toEqual(['a', 'b', 'c']);
+  });
 });
 
 describe('groupByTier', () => {
@@ -120,6 +137,32 @@ describe('SponsorStrip', () => {
     for (const name of ['First Supporter', 'Second Supporter', 'Third Supporter']) {
       expect(within(section).getByRole('link', { name })).toBeInTheDocument();
     }
+  });
+
+  // The strip reads whatever the runtime listener last handed the context,
+  // and that is Firestore's query order, not the operator's. The tier heads
+  // and the mark sizes both come out of position, so this is the difference
+  // between "Presenting" being the largest wall and it being the second one.
+  it('draws the operator’s order even when the runtime documents arrive reversed', () => {
+    organizationsData = [
+      org('three', 'Third Supporter', 'Partner', { order: 3 }),
+      org('two', 'Second Supporter', 'Presenting', { order: 2 }),
+      org('one', 'First Supporter', 'Presenting', { order: 1 }),
+    ];
+    const { container } = render(<SponsorStrip id="section-sponsors" title="Sponsors" />);
+    const section = screen.getByRole('region', { name: 'Sponsors' });
+    expect(
+      within(section)
+        .getAllByRole('heading', { level: 3 })
+        .map((node) => node.textContent),
+    ).toEqual(['Presenting', 'Partner']);
+    // The first group is the operator's first, so it is the one drawn largest.
+    expect(
+      container.querySelector('.logo-wall').style.getPropertyValue('--logo-wall-mark-size'),
+    ).toBe('calc(var(--space-3xl) * 2)');
+    expect(
+      [...container.querySelectorAll('.logo-wall h4')].map((node) => node.textContent),
+    ).toEqual(['First Supporter', 'Second Supporter', 'Third Supporter']);
   });
 
   it('is the acknowledgement wall: marks and names, never the descriptions', () => {

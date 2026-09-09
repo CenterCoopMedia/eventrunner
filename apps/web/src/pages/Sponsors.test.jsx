@@ -84,15 +84,19 @@ describe('Sponsors', () => {
     // Nothing here knows that "Presenting" outranks "Partner", and nothing
     // should: the tier is free text an operator wrote, and ranking those
     // words would be a guess about meaning dressed as a fact. The group
-    // that appears FIRST in the operator's ordering gets the largest mark.
+    // that comes FIRST in the operator's own `order` gets the largest mark.
+    //
+    // The documents arrive here in the opposite order on purpose: the
+    // runtime listener hands them over in Firestore's query order, so the
+    // wall has to put them back in the operator's before it groups them.
     organizationsData = [
-      { id: 'org-2', name: 'Second', tier: 'Partner', logoPath: 'b.svg', visible: true },
-      { id: 'org-1', name: 'First', tier: 'Presenting', logoPath: 'a.svg', visible: true },
+      { id: 'org-1', name: 'First', tier: 'Presenting', logoPath: 'a.svg', visible: true, order: 2 },
+      { id: 'org-2', name: 'Second', tier: 'Partner', logoPath: 'b.svg', visible: true, order: 1 },
     ];
     const { container } = renderSponsors();
     const walls = [...container.querySelectorAll('.logo-wall')];
     expect(walls).toHaveLength(2);
-    // Partner came first in the list, so Partner is the big wall.
+    // Partner is first in the operator's order, so Partner is the big wall.
     expect(walls[0].style.getPropertyValue('--logo-wall-mark-size')).toBe(
       'calc(var(--space-3xl) * 2)',
     );
