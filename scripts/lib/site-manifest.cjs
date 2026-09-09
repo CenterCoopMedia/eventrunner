@@ -50,24 +50,66 @@ const SYSTEM_PAGE_FEATURE_GATES = Object.freeze({
 const SYSTEM_PAGES_WITH_CHILDREN = new Set(['schedule', 'speakers', 'attendees', 'updates']);
 
 /**
+ * Session ids App.jsx's static route tree already claims under `/schedule`.
+ * `/schedule/mine` (the signed-in visitor's personal schedule,
+ * MySchedule.jsx) is mounted as its own `<Route>`, ahead of the dynamic
+ * `/schedule/:sessionId` route only in the sense that react-router matches
+ * declaration order — a session whose id is `mine` does not merely collide
+ * with a sitemap entry, it is unreachable as itself, because that path
+ * always renders the personal schedule instead. The admin editor derives a
+ * new session's id from its title (apps/web/src/admin/sessionDoc.js
+ * `sessionIdFromTitle`), so a session titled "Mine" is the ordinary way an
+ * operator would produce this id by accident — rejected at the source in
+ * functions/src/schedule/sessions.cjs `validateSessionShape`, and filtered
+ * here too as a second, independent guard against a document written before
+ * that rule existed, or by anything else that writes `cmsSchedule` directly.
+ */
+const RESERVED_SESSION_IDS = new Set(['mine']);
+
+/**
  * Routes that carry no `cmsPages` document at all, so `classifyPages` can
  * never see or gate them from Firestore alone — either the admin panel's
  * own route tree (apps/web/src/admin), or a signed-in-only or single-use
  * page under the public `Layout` route tree (apps/web/src/App.jsx) whose
  * component itself checks `useAuth()` before rendering (Login.jsx,
  * MySchedule.jsx, Profile.jsx, SpeakerAccept.jsx, SpeakerProfile.jsx,
- * TicketClaim.jsx). None of these has content worth a search result, and
- * `/speaker/accept` and `/ticket/claim` additionally carry a one-time
- * token in the query string that a search index must never retain.
+ * TicketClaim.jsx). None of these has content worth a search result.
+ *
+ * `tokenBearing` marks the two whose real URL carries a one-time value in
+ * the query string — `/speaker/accept?token=...`
+ * (functions/src/speakers/inviteTokens.cjs) and, potentially, `/ticket/
+ * claim` the same way. robots.txt matches the PATH AND QUERY of a request
+ * URL against the rule as a plain prefix (Google's robots.txt extension,
+ * which every crawler that matters implements) UNLESS the rule ends in
+ * `$`, which anchors it to end exactly there — so an anchored
+ * `/speaker/accept$` would refuse to match `/speaker/accept?token=…` at
+ * all, defeating the very rule meant to keep that token out of a search
+ * index. These two rules are therefore left unanchored on purpose; every
+ * other static route here is a plain page with nothing after it, so the
+ * anchor stays.
  */
 const STATIC_PRIVATE_ROUTES = Object.freeze([
-  Object.freeze({ path: '/admin', access: 'admin', hasChildren: true }),
-  Object.freeze({ path: '/signin', access: 'account', hasChildren: false }),
-  Object.freeze({ path: '/profile', access: 'authenticated', hasChildren: false }),
-  Object.freeze({ path: '/schedule/mine', access: 'authenticated', hasChildren: false }),
-  Object.freeze({ path: '/speaker/profile', access: 'authenticated', hasChildren: false }),
-  Object.freeze({ path: '/speaker/accept', access: 'token', hasChildren: false }),
-  Object.freeze({ path: '/ticket/claim', access: 'token', hasChildren: false }),
+  Object.freeze({
+    path: '/admin', access: 'admin', hasChildren: true, tokenBearing: false,
+  }),
+  Object.freeze({
+    path: '/signin', access: 'account', hasChildren: false, tokenBearing: false,
+  }),
+  Object.freeze({
+    path: '/profile', access: 'authenticated', hasChildren: false, tokenBearing: false,
+  }),
+  Object.freeze({
+    path: '/schedule/mine', access: 'authenticated', hasChildren: false, tokenBearing: false,
+  }),
+  Object.freeze({
+    path: '/speaker/profile', access: 'authenticated', hasChildren: false, tokenBearing: false,
+  }),
+  Object.freeze({
+    path: '/speaker/accept', access: 'token', hasChildren: false, tokenBearing: true,
+  }),
+  Object.freeze({
+    path: '/ticket/claim', access: 'token', hasChildren: false, tokenBearing: true,
+  }),
 ]);
 
 /**
@@ -129,7 +171,8 @@ function classifyPage({ page, features = {} }) {
  * @returns {{ public: Array<{ id: string, path: string }>,
  *             excluded: Array<{ id: string|null, path: string,
  *                                access: string, visible: boolean,
- *                                featureOn: boolean, hasChildren: boolean }> }}
+ *                                featureOn: boolean, hasChildren: boolean,
+ *                                tokenBearing: boolean }> }}
  */
 function classifyPages({ pages = [], features = {} }) {
   const publicRoutes = [];
@@ -141,14 +184,14 @@ function classifyPages({ pages = [], features = {} }) {
     else {
       excluded.push({
         id: c.id, path: c.path, access: c.access, visible: c.visible,
-        featureOn: c.featureOn, hasChildren: c.hasChildren,
+        featureOn: c.featureOn, hasChildren: c.hasChildren, tokenBearing: false,
       });
     }
   }
   for (const route of STATIC_PRIVATE_ROUTES) {
     excluded.push({
       id: null, path: route.path, access: route.access, visible: true,
-      featureOn: true, hasChildren: route.hasChildren,
+      featureOn: true, hasChildren: route.hasChildren, tokenBearing: route.tokenBearing,
     });
   }
   return { public: publicRoutes, excluded };
@@ -156,36 +199,53 @@ function classifyPages({ pages = [], features = {} }) {
 
 /**
  * Published session detail routes (`/schedule/:sessionId`,
- * apps/web/src/pages/SessionDetail.jsx). Gated on `features.schedule`
- * alone — the detail route checks nothing about the `schedule` cmsPages
- * doc's own `visible` field, so neither does this. `visible` on the
- * session record itself is read STRICTLY `=== true`, the same rule as
- * every other cms* collection.
+ * apps/web/src/pages/SessionDetail.jsx).
  *
- * @param {{ sessions: object[], features: object }} args
+ * `parentPublic` — whether the `schedule` cmsPages page itself is
+ * classified public — is the whole gate, not a feature-flag check of its
+ * own: `classifyPage`'s `publishable` already requires `features.schedule`
+ * to be on, so re-checking the flag here separately would only invite the
+ * two checks to disagree. A page that is `visible: false` while its
+ * feature is on is exactly the case this closes: the route is unreachable
+ * from anywhere public, robots.txt disallows the whole `/schedule/*`
+ * subtree (SYSTEM_PAGES_WITH_CHILDREN), and the sitemap must not
+ * contradict that by listing session detail pages under it anyway.
+ *
+ * `visible` on the session record itself is read STRICTLY `=== true`, the
+ * same rule as every other cms* collection. `mine` is refused outright: it
+ * is the personal-schedule route, not a session id at all (see
+ * RESERVED_SESSION_IDS) — filtered here as well as rejected at the source
+ * in functions/src/schedule/sessions.cjs, because a document written
+ * before that rule existed must not surface in a sitemap either.
+ *
+ * @param {{ sessions: object[], parentPublic: boolean }} args
  * @returns {Array<{ id: string, path: string }>}
  */
-function buildSessionRoutes({ sessions = [], features = {} }) {
-  if (features.schedule !== true) return [];
+function buildSessionRoutes({ sessions = [], parentPublic }) {
+  if (!parentPublic) return [];
   return sessions
-    .filter((s) => s?.visible === true && typeof s?.id === 'string' && s.id)
+    .filter((s) => (
+      s?.visible === true && typeof s?.id === 'string' && s.id && !RESERVED_SESSION_IDS.has(s.id)
+    ))
     .map((s) => ({ id: s.id, path: `/schedule/${s.id}` }));
 }
 
 /**
  * Approved speaker detail routes (`/speakers/:slug`,
- * apps/web/src/pages/SpeakerDetail.jsx). Gated on `features.speakers`
- * alone. No `status` filter is needed beyond that: `speakers_public` is a
- * one-way projection that exists ONLY for a speaker whose `status` is
- * `approved` (functions/src/speakers/projection.cjs) — a draft, invited,
+ * apps/web/src/pages/SpeakerDetail.jsx). Gated on the `speakers` cmsPages
+ * page being classified public — see `buildSessionRoutes` for why that
+ * subsumes a bare feature-flag check. No `status` filter is needed beyond
+ * that: `speakers_public` is a one-way projection that exists ONLY for a
+ * speaker whose `status` is `approved`
+ * (functions/src/speakers/projection.cjs) — a draft, invited,
  * accepted-but-unapproved, or removed speaker has no document there at
  * all, so the caller supplying that collection is what does the filtering.
  *
- * @param {{ speakers: object[], features: object }} args
+ * @param {{ speakers: object[], parentPublic: boolean }} args
  * @returns {Array<{ id: string, path: string }>}
  */
-function buildSpeakerRoutes({ speakers = [], features = {} }) {
-  if (features.speakers !== true) return [];
+function buildSpeakerRoutes({ speakers = [], parentPublic }) {
+  if (!parentPublic) return [];
   return speakers
     .filter((s) => typeof s?.slug === 'string' && s.slug)
     .map((s) => ({ id: s.slug, path: `/speakers/${s.slug}` }));
@@ -193,15 +253,16 @@ function buildSpeakerRoutes({ speakers = [], features = {} }) {
 
 /**
  * Published update routes (`/updates/:id`,
- * apps/web/src/pages/UpdateDetail.jsx). Gated on `features.updates` alone,
- * same as the `updates` list page. `visible` read STRICTLY `=== true`,
+ * apps/web/src/pages/UpdateDetail.jsx). Gated on the `updates` cmsPages
+ * page being classified public — see `buildSessionRoutes` for why that
+ * subsumes a bare feature-flag check. `visible` read STRICTLY `=== true`,
  * the same rule `updatesMeta` applies (functions/src/public/og.cjs).
  *
- * @param {{ updates: object[], features: object }} args
+ * @param {{ updates: object[], parentPublic: boolean }} args
  * @returns {Array<{ id: string, path: string }>}
  */
-function buildUpdateRoutes({ updates = [], features = {} }) {
-  if (features.updates !== true) return [];
+function buildUpdateRoutes({ updates = [], parentPublic }) {
+  if (!parentPublic) return [];
   return updates
     .filter((u) => u?.visible === true && typeof u?.id === 'string' && u.id)
     .map((u) => ({ id: u.id, path: `/updates/${u.id}` }));
@@ -209,7 +270,8 @@ function buildUpdateRoutes({ updates = [], features = {} }) {
 
 /**
  * Every route the sitemap may list: the public `cmsPages` routes plus the
- * three detail-record kinds.
+ * three detail-record kinds, each gated on its own parent page's
+ * classification (see `buildSessionRoutes`).
  *
  * @param {{ pages: object[], features: object, sessions: object[],
  *           speakers: object[], updates: object[] }} args
@@ -217,17 +279,42 @@ function buildUpdateRoutes({ updates = [], features = {} }) {
  */
 function collectPublicRoutes({ pages, features, sessions, speakers, updates }) {
   const { public: pageRoutes } = classifyPages({ pages, features });
+  const publicPageIds = new Set(pageRoutes.map((r) => r.id));
   return [
     ...pageRoutes,
-    ...buildSessionRoutes({ sessions, features }),
-    ...buildSpeakerRoutes({ speakers, features }),
-    ...buildUpdateRoutes({ updates, features }),
+    ...buildSessionRoutes({ sessions, parentPublic: publicPageIds.has('schedule') }),
+    ...buildSpeakerRoutes({ speakers, parentPublic: publicPageIds.has('speakers') }),
+    ...buildUpdateRoutes({ updates, parentPublic: publicPageIds.has('updates') }),
   ];
 }
 
-/** Strip a trailing slash so `${base}${path}` never doubles one. */
+/**
+ * The configured public URL, normalized to `origin + pathname` with no
+ * trailing slash, tolerant of surrounding whitespace.
+ *
+ * `EVENT_PUBLIC_URL` is trimmed only FOR VALIDATION by `validateDeployEnv`
+ * (packages/shared/src/config/deploy.cjs) — the raw, possibly padded value
+ * is what callers actually receive back — so this has to trim it again
+ * itself rather than trust it arrives clean. Routing the value through
+ * `new URL` also drops a query string or hash a misconfigured value might
+ * carry, neither of which belongs in a sitemap or robots.txt base.
+ *
+ * @param {string} publicUrl
+ * @returns {string}
+ */
 function normalizedBaseUrl(publicUrl) {
-  return typeof publicUrl === 'string' ? publicUrl.replace(/\/+$/, '') : '';
+  if (typeof publicUrl !== 'string') return '';
+  const trimmed = publicUrl.trim();
+  if (!trimmed) return '';
+  try {
+    const url = new URL(trimmed);
+    return `${url.origin}${url.pathname}`.replace(/\/+$/, '');
+  } catch {
+    // Not a parseable URL at all — fall back to the plain trim-and-strip
+    // this function always did, rather than silently emptying every
+    // artifact's base over a value `validateDeployEnv` already accepted.
+    return trimmed.replace(/\/+$/, '');
+  }
 }
 
 /**
@@ -295,22 +382,32 @@ function buildSitemapXml({
  * @param {{ publicUrl: string, pages: object[], features: object }} args
  * @returns {string} robots.txt content
  *
- * Every disallow rule is `$`-anchored to the excluded route's exact path —
- * a bare `Disallow: /travel` also blocks `/travel-guide`, since robots.txt
- * matching is a plain prefix test with no implied path boundary, and a
- * bare `Disallow: /` for a hidden HOME page would disallow the entire
- * site (every path starts with `/`). `Disallow: /$` matches only the
- * exact root and nothing else. A route whose own subtree carries further
- * pages (`hasChildren`, e.g. `/schedule/:sessionId` under `/schedule`)
- * gets a second `/path/*` rule so an excluded parent still shields the
- * detail pages under it.
+ * Every disallow rule is `$`-anchored to the excluded route's exact path,
+ * with two exceptions below — a bare `Disallow: /travel` also blocks
+ * `/travel-guide`, since robots.txt matching is a plain prefix test with
+ * no implied path boundary, and a bare `Disallow: /` for a hidden HOME
+ * page would disallow the entire site (every path starts with `/`).
+ * `Disallow: /$` matches only the exact root and nothing else. A route
+ * whose own subtree carries further pages (`hasChildren`, e.g.
+ * `/schedule/:sessionId` under `/schedule`) gets a second `/path/*` rule
+ * so an excluded parent still shields the detail pages under it.
+ *
+ * A `tokenBearing` route (`/speaker/accept`, `/ticket/claim`) is the
+ * opposite problem: its real URL carries a one-time token in the query
+ * string, e.g. `/speaker/accept?token=…`
+ * (functions/src/speakers/inviteTokens.cjs), and the PATH+QUERY is what a
+ * crawler matches a robots rule against — so an anchored `/speaker/
+ * accept$` would refuse to match the query-string form at all, letting
+ * the exact URL that matters through. These two get the plain, unanchored
+ * prefix rule instead, which covers the bare path, the token form, and
+ * anything else under it in one line.
  */
 function buildRobotsTxt({ publicUrl, pages, features }) {
   const base = normalizedBaseUrl(publicUrl);
   const { excluded } = classifyPages({ pages, features });
   const disallowLines = new Set();
   for (const route of excluded) {
-    disallowLines.add(`Disallow: ${route.path}$`);
+    disallowLines.add(route.tokenBearing ? `Disallow: ${route.path}` : `Disallow: ${route.path}$`);
     if (route.hasChildren) disallowLines.add(`Disallow: ${route.path}/*`);
   }
   const lines = ['User-agent: *', 'Allow: /', ...[...disallowLines].sort()];
@@ -319,8 +416,18 @@ function buildRobotsTxt({ publicUrl, pages, features }) {
 }
 
 /**
- * The web app manifest. Icons reuse the branding slots every deployment
- * ships — `apps/web/public/branding/mark.svg` and `favicon.svg`
+ * The web app manifest. Every URL in it is written MANIFEST-RELATIVE —
+ * `start_url`/`scope` as `./` and each icon `src` with no leading slash —
+ * rather than origin-root-relative: a manifest is resolved against its OWN
+ * url, not the document's, so an origin-root value (`/`, `/branding/…`)
+ * is wrong the moment the manifest is not served from the domain root,
+ * which the demo always is not (`/eventrunner/demo/manifest.webmanifest`
+ * on GitHub Pages). `./` and a bare relative path resolve correctly
+ * whether the manifest sits at the origin root or under a base path,
+ * because both stay relative to wherever the manifest itself is.
+ *
+ * Icons reuse the branding slots every deployment ships —
+ * `apps/web/public/branding/mark.svg` and `favicon.svg`
  * (scripts/lib/branding.cjs) — never a client's uploaded Storage asset:
  * those slots are the one pair guaranteed to exist in `apps/web/dist` on
  * every deployment, customized or not.
@@ -348,12 +455,12 @@ function buildWebManifest({ event = {}, theme = {} }) {
   const manifest = {
     name,
     short_name: shortName,
-    start_url: '/',
-    scope: '/',
+    start_url: './',
+    scope: './',
     display: 'standalone',
     icons: [
-      { src: '/branding/mark.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-      { src: '/branding/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
+      { src: 'branding/mark.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+      { src: 'branding/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
     ],
   };
   if (typeof event?.tagline === 'string' && event.tagline.trim()) {
@@ -389,6 +496,7 @@ module.exports = {
   SYSTEM_PAGE_FEATURE_GATES,
   SYSTEM_PAGES_WITH_CHILDREN,
   STATIC_PRIVATE_ROUTES,
+  RESERVED_SESSION_IDS,
   classifyPage,
   classifyPages,
   buildSessionRoutes,

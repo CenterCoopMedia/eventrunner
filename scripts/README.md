@@ -166,12 +166,47 @@ sitemap and disallowed in robots.txt until an operator turns the flag on. The ma
 reuse the branding slots every deployment ships (`apps/web/public/branding/mark.svg`,
 `favicon.svg`), never a client's uploaded Storage asset.
 
+This job only runs when a CMS publish triggers it (`functions/src/cms/publisher.cjs`) — a fresh
+deployment, and every ordinary code deploy, never runs it at all. `write-site-files.cjs`, below,
+covers that other path with the same builders, so a site never goes without a sitemap and a robots
+file between the first deploy and the first content publish.
+
+### `write-site-files.cjs`
+
+Writes sitemap.xml, robots.txt, and the web manifest from a generated content snapshot rather than
+a live Firestore read — the ordinary code-deploy path's counterpart to `publish-site.cjs`'s Cloud
+Run job. Both call the same builders in `scripts/lib/site-manifest.cjs`, so there is one source of
+truth for what belongs in each file; only where the input documents come from differs.
+
+```sh
+node scripts/write-site-files.cjs --dist apps/web/dist --public-url https://example.org
+node scripts/write-site-files.cjs --dist apps/web/dist --generated /tmp/generated --public-url https://example.org
+```
+
+`--generated` defaults to the committed `apps/web/src/generated` (the demo's own source of truth —
+`build-demo.cjs` calls this with no `--generated` for exactly that reason). `deploy-client.yml`'s
+`build` job instead points `--generated` at the real, out-of-tree per-client snapshot
+`generate-content.cjs` already wrote earlier in the same workflow run, right after `npm run build`
+produces `apps/web/dist` from that same snapshot.
+
+`apps/web/src/generated/*.js` are Vite's own ES modules, not CommonJS, so they are loaded with
+dynamic `import()` rather than `require()`. `cmsUpdates` has no generated-snapshot counterpart at
+all (`Updates.jsx` reads it through a live Firestore listener, never the build-time snapshot — see
+`scripts/lib/emit.cjs`), so update detail routes are always empty from this path; only the Cloud
+Run publisher, which does have a live read, can list them. A generated snapshot's `theme` export is
+also a projection with no `colors` field (they go to `theme.css` as RGB triples instead), so a
+manifest built from it never carries `theme_color`/`background_color` — `buildWebManifest`'s
+existing "only when configured" behavior doing the right thing with what this path can see.
+
 ### `build-demo.cjs`
 
 Builds the public click-through demo and syncs it into `docs/demo/`, which GitHub Pages serves at
 `https://centercoopmedia.github.io/eventrunner/demo/`. The one script here that touches no
 Firestore at all: it is `vite build` with `VITE_DEMO_MODE=1` and `--base /eventrunner/demo/`, run
-against the committed synthetic snapshot.
+against the committed synthetic snapshot, followed by `write-site-files.cjs` writing a real
+sitemap.xml/robots.txt/manifest into the same output (public URL: GitHub Pages' own origin plus
+`--base`) — so the published demo carries real ones, not only the neutral fallback Vite copies from
+`apps/web/public/manifest.webmanifest`.
 
 ```sh
 npm run build:demo                              # build + sync into docs/demo/

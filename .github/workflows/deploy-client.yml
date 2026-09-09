@@ -600,6 +600,19 @@ jobs:
           VITE_ENABLE_CLIENT_ERROR_REPORTING: ${{ vars.VITE_ENABLE_CLIENT_ERROR_REPORTING }}
           VITE_EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
         run: npm run build
+      - name: Write sitemap.xml, robots.txt, and the web manifest
+        # scripts/publish-site.cjs writes the same three files from a live
+        # Firestore read, but only inside the Cloud Run job a CMS publish
+        # triggers — this ordinary build/deploy path never runs it, so
+        # without this step a fresh deployment served none of them until
+        # the first publish. Reads the SAME generated snapshot the build
+        # above just used, straight from this job's own artifact download,
+        # not the committed demo copy.
+        run: >
+          node scripts/write-site-files.cjs
+          --dist apps/web/dist
+          --generated "${{ runner.temp }}/generated"
+          --public-url "${{ vars.EVENT_PUBLIC_URL }}"
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist-${{ inputs.client }}

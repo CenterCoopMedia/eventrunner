@@ -27,6 +27,27 @@ function dbWithTracks(letters, seed = {}) {
   });
 }
 
+// --- reserved docId ("mine" collides with /schedule/mine, App.jsx) ---------
+
+test('a docId of "mine" is refused, naming the reserved route', () => {
+  const { ok, errors } = validateSessionShape(session(), 'mine');
+  assert.equal(ok, false);
+  assert.match(errors[0], /^docId: "mine" is reserved for the personal schedule route \(\/schedule\/mine\)/);
+});
+
+test('an ordinary docId is unaffected by the reserved-id check', () => {
+  assert.equal(validateSessionShape(session(), 'session-1').ok, true);
+  assert.equal(validateSessionShape(session(), 'mine-workshop').ok, true);
+  assert.equal(validateSessionShape(session(), 'schedule-mine').ok, true);
+});
+
+test('the reserved-id check runs through validateSessionStructure too, and reports before any Firestore read', async () => {
+  const db = makeFakeDb();
+  const result = await validateSessionStructure({ db, docId: 'mine', fields: session() });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /docId: "mine" is reserved/);
+});
+
 // --- track (design brief §4.6) ----------------------------------------------
 
 test('a session may carry no track at all', () => {
