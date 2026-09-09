@@ -7,8 +7,9 @@ const { makeFakeDb } = require('../../functions/src/cms/firestoreFake.cjs');
 const store = require('../../functions/src/cms/store.cjs');
 const {
   writeConfigDocs, seedCollection, findPagePathCollisions, findPageSectionCollisions, countSeeded, readConfig,
+  removeObsoleteSeeds,
 } = require('./write.cjs');
-const { defaultPages, buildSeedContent } = require('./seed.cjs');
+const { defaultPages, buildSeedContent, OBSOLETE_CONTENT_IDS } = require('./seed.cjs');
 const { buildConfigDocs } = require('./answers.cjs');
 
 const TIER_A = { publicUrl: 'https://example.org', emailProvider: 'console', ticketingProvider: 'none' };
@@ -312,4 +313,125 @@ test('countSeeded counts the live seeded blocks the readiness table reports', as
   const content = buildSeedContent({ pages: defaultPages(), docs: config, tierA: TIER_A, seededAt: 'T0' });
   await seedCollection({ db, store, collection: 'cmsContent', docs: content, now });
   assert.equal(await countSeeded({ db }), content.length);
+});
+
+// REMOVING A SEED THE PLATFORM NO LONGER SHIPS (Codex review of the
+// configured registration action: P1).
+//
+// `seedCollection` only ever writes. Dropping a block from `defaultPages()`
+// therefore changes nothing on a deployment that was already initialized:
+// the document the old seed wrote is still live, still published, and still
+// drawing the control the release removed. Removing it is the same
+// ownership question every other seed write asks, so it asks it with the
+// same function — `decideSeedWrite` — and a document a human has touched is
+// not the platform's to delete.
+
+/** The legacy hero cta doc, as the removed seed wrote it. */
+function legacyCta(overrides = {}) {
+  return {
+    section: 'hero',
+    field: 'register_cta',
+    blockType: 'cta',
+    label: 'Register',
+    url: 'https://example.org',
+    visible: true,
+    order: 2,
+    seeded: true,
+    seededAt: 'T0',
+    ...overrides,
+  };
+}
+
+test('removeObsoleteSeeds deletes a still-seeded legacy doc from BOTH revisions', async () => {
+  const db = makeFakeDb();
+  await seedCollection({
+    db, store, collection: 'cmsContent', docs: [{ id: 'hero__register_cta', ...legacyCta() }], now,
+  });
+  assert.equal((await db.collection('cmsContent').doc('hero__register_cta').get()).exists, true);
+  assert.equal((await db.collection('cmsContent_drafts').doc('hero__register_cta').get()).exists, true);
+
+  const result = await removeObsoleteSeeds({
+    db, store, collection: 'cmsContent', docIds: OBSOLETE_CONTENT_IDS,
+  });
+
+  assert.deepEqual(result.removed, ['hero__register_cta']);
+  assert.deepEqual(result.kept, []);
+  assert.equal((await db.collection('cmsContent').doc('hero__register_cta').get()).exists, false);
+  assert.equal(
+    (await db.collection('cmsContent_drafts').doc('hero__register_cta').get()).exists,
+    false,
+    'the draft revision goes too, or the next publish restores the block',
+  );
+});
+
+test('removeObsoleteSeeds leaves an editor-authored doc at the same id alone', async () => {
+  // Nothing stops an editor from adding their own cta block to the hero
+  // section — the release removed the seeded block, not the slot — and an
+  // editor-authored one lands at exactly this id.
+  const db = makeFakeDb();
+  await db.collection('cmsContent').doc('hero__register_cta').set(
+    legacyCta({ label: 'Get a ticket', url: 'https://tickets.example.org', seeded: false }),
+  );
+
+  const result = await removeObsoleteSeeds({
+    db, store, collection: 'cmsContent', docIds: OBSOLETE_CONTENT_IDS,
+  });
+
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(result.kept.map((k) => k.id), ['hero__register_cta']);
+  const kept = await db.collection('cmsContent').doc('hero__register_cta').get();
+  assert.equal(kept.exists, true);
+  assert.equal(kept.data().label, 'Get a ticket');
+});
+
+test('removeObsoleteSeeds leaves a seeded doc an editor has rewritten but not published alone', async () => {
+  const db = makeFakeDb();
+  await seedCollection({
+    db, store, collection: 'cmsContent', docs: [{ id: 'hero__register_cta', ...legacyCta() }], now,
+  });
+  // The live doc still looks seeded; the editor's work exists only in the
+  // draft (§8.4), which is exactly the case a live-flag-only check misses.
+  await store.writeDraft({
+    db,
+    collection: 'cmsContent',
+    docId: 'hero__register_cta',
+    fields: legacyCta({ label: 'Get a ticket', url: 'https://tickets.example.org', seeded: false }),
+    visible: true,
+    actor: { uid: 'editor', email: 'editor@example.org' },
+    now,
+  });
+
+  const result = await removeObsoleteSeeds({
+    db, store, collection: 'cmsContent', docIds: OBSOLETE_CONTENT_IDS,
+  });
+
+  assert.deepEqual(result.removed, []);
+  assert.equal(result.kept[0].reason, 'unpublished editor draft');
+  assert.equal((await db.collection('cmsContent').doc('hero__register_cta').get()).exists, true);
+  assert.equal(
+    (await db.collection('cmsContent_drafts').doc('hero__register_cta').get()).data().label,
+    'Get a ticket',
+  );
+});
+
+test('removeObsoleteSeeds is a no-op on a site that never had the document', async () => {
+  const db = makeFakeDb();
+  const result = await removeObsoleteSeeds({
+    db, store, collection: 'cmsContent', docIds: OBSOLETE_CONTENT_IDS,
+  });
+  assert.deepEqual(result, { removed: [], kept: [] });
+});
+
+test('removeObsoleteSeeds under --dry-run reports without deleting', async () => {
+  const db = makeFakeDb();
+  await seedCollection({
+    db, store, collection: 'cmsContent', docs: [{ id: 'hero__register_cta', ...legacyCta() }], now,
+  });
+
+  const result = await removeObsoleteSeeds({
+    db, store, collection: 'cmsContent', docIds: OBSOLETE_CONTENT_IDS, dryRun: true,
+  });
+
+  assert.deepEqual(result.removed, ['hero__register_cta']);
+  assert.equal((await db.collection('cmsContent').doc('hero__register_cta').get()).exists, true);
 });

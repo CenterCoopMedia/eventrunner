@@ -640,6 +640,35 @@ function buildEmailTemplateSeeds({ seededAt = new Date(0).toISOString(), ids = E
   });
 }
 
+/**
+ * cmsContent documents an EARLIER release seeded and this one no longer
+ * emits (Codex review of the configured registration action: P1).
+ *
+ * Dropping a block from `defaultPages()` only stops new sites from getting
+ * it. `seedCollection` writes and refreshes; it never deletes, and it
+ * decides purely by the ids it was handed, so a document nothing seeds any
+ * more is a document nothing ever looks at again. On every site that ran
+ * init before the change it stays live, stays published, and keeps drawing
+ * the control the release removed — for `hero__register_cta` that is the
+ * dead Register button, usually still pointed at the example.org
+ * destination the old seed invented when a client had no link of their own.
+ *
+ * init removes these on a re-run (`removeObsoleteSeeds`, scripts/lib/write.cjs)
+ * under the same ownership rule every seed write follows: only while the
+ * document is still seed-owned in both revisions. An editor's own cta at
+ * this id, or a seeded one they have since edited, is theirs and stays.
+ *
+ * Entries are permanent once added. A site can be upgraded from any older
+ * release, so the list is what this release must clean up, not what the
+ * last one did.
+ */
+const OBSOLETE_CONTENT_IDS = Object.freeze([
+  // M7 issue 8: the hero's seeded registration action. The destination is
+  // configuration now (`config/event.registration`), read by the page and
+  // by the ticket provider's email alike, and an unset one draws nothing.
+  'hero__register_cta',
+]);
+
 module.exports = {
   defaultPages,
   buildSeedContent,
@@ -647,6 +676,7 @@ module.exports = {
   buildEmailTemplateSeeds,
   placeholderBlock,
   LEGAL_PAGE_IDS,
+  OBSOLETE_CONTENT_IDS,
   EMAIL_TEMPLATE_OVERRIDE_IDS,
   internals: { venueAddress, CONFIG_SEEDS },
 };
