@@ -10,3 +10,4 @@ Rules written after user corrections. Read at session start.
 - Fable directs. Opus, Sonnet, and Haiku agents write code, tests, and docs.
 - Builders report "all green" from a run made before their last edit. The brief now says: run every check as the last step, after docs and generated output. The reviewer must re-run `npm test` itself and not trust the report.
 - Any branch that edits a rendered Markdown file must regenerate docs/docs, and any branch that touches apps/web, packages/shared, or the seed must regenerate docs/demo, because the web bundle imports shared modules directly and the CI classifier selects demo hygiene for shared changes. Stacked branches conflict on docs/demo hashed assets; regenerate on the stacked tip, never hand-merge.
+- Agents share one machine and one process table. A builder ran `pkill -f` and killed a sibling's test run. The brief now forbids killing processes the agent did not start.
