@@ -1,5 +1,0 @@
-<<<<<<<< HEAD:docs/demo/assets/AssetImage-I3xMaLIb.js
-import{aF as o,r as a,j as n}from"./index-BJhEf9km.js";function c({path:e,alt:i="",className:s=""}){const t=o(e),[f,r]=a.useState(!1);return a.useEffect(()=>{r(!1)},[e]),!t||f?n.jsx("span",{className:`flex items-center justify-center bg-brand-surface-alt p-2 text-center text-xs text-brand-ink-muted ${s}`,children:"This file is missing from storage."}):n.jsx("img",{src:t,alt:i,loading:"lazy",className:s,onError:()=>r(!0)})}export{c as A};
-========
-import{aC as o,r as a,j as n}from"./index-BPvnHWic.js";function c({path:e,alt:i="",className:s=""}){const t=o(e),[f,r]=a.useState(!1);return a.useEffect(()=>{r(!1)},[e]),!t||f?n.jsx("span",{className:`flex items-center justify-center bg-brand-surface-alt p-2 text-center text-xs text-brand-ink-muted ${s}`,children:"This file is missing from storage."}):n.jsx("img",{src:t,alt:i,loading:"lazy",className:s,onError:()=>r(!0)})}export{c as A};
->>>>>>>> 4fcf663 (Fix review findings on the long-page filter and section index):docs/demo/assets/AssetImage-Cd8JMVGh.js
