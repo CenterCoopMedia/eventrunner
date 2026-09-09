@@ -45,6 +45,7 @@ import App from '../App.jsx';
 import siteContent from '@generated/siteContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import pagesData from '@generated/pagesData.js';
+import { VENUE_MAP_SECTION_ID } from 'shared/venue';
 
 function renderAt(path) {
   return render(
@@ -522,6 +523,77 @@ describe('ContentPage — search and section index on long pages', () => {
     expect(
       screen.queryByRole('navigation', { name: 'Sections on this page' }),
     ).not.toBeInTheDocument();
+  });
+
+  // WHERE THE TWO M7 FEATURES MEET. The venue map is not a block, so a
+  // section that states it carries a block count of zero — and the long-page
+  // gate, the section index, and the "Nothing here yet" empty state all ask
+  // "is this section populated?". A map is content, so all three have to
+  // answer yes, or a page that publishes a floor plan reads as a blank page
+  // with an index that will not name the one thing on it.
+  it('counts a map-only section as populated, for the gate and for the index', async () => {
+    renderAt('/map-gate');
+    await screen.findByRole('heading', { name: 'Page not found' });
+    pushPage({
+      id: 'map-gate',
+      label: 'Map gate fixture',
+      path: '/map-gate',
+      icon: null,
+      order: 99,
+      visible: true,
+      systemPage: false,
+      // Two sections carrying one block each, plus the map section. On block
+      // count alone this page is well under every threshold (two blocks
+      // against SECTION_INDEX_MIN_BLOCKS); it is the map section counting as
+      // the third populated section that puts it over the line.
+      sections: [
+        pageSection('mg_intro', 'Introduction'),
+        pageSection('mg_notes', 'Notes'),
+        pageSection(VENUE_MAP_SECTION_ID, 'Venue map'),
+      ],
+    });
+    pushContent([
+      textBlock('mg_intro', 'summary', 'Welcome to the fixture page for these tests.'),
+      textBlock('mg_notes', 'note', 'The ramp is at the north door, a fact worth knowing.'),
+    ]);
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Map gate fixture' }),
+    ).toBeInTheDocument();
+    // The map itself rendered, with no block of its own to render.
+    expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
+    // The gate opened: without the map section this page has two populated
+    // sections and two blocks, which crosses neither size rule.
+    expect(screen.getByRole('searchbox', { name: 'Filter by keyword' })).toBeInTheDocument();
+    const index = screen.getByRole('navigation', { name: 'Sections on this page' });
+    expect(within(index).getByRole('link', { name: 'Venue map' })).toHaveAttribute(
+      'href',
+      `#section-${VENUE_MAP_SECTION_ID}`,
+    );
+  });
+
+  it('shows no empty state on a page whose only content is the map', async () => {
+    renderAt('/map-only');
+    await screen.findByRole('heading', { name: 'Page not found' });
+    pushPage({
+      id: 'map-only',
+      label: 'Map only fixture',
+      path: '/map-only',
+      icon: null,
+      order: 99,
+      visible: true,
+      systemPage: false,
+      sections: [pageSection(VENUE_MAP_SECTION_ID, 'Venue map')],
+    });
+    pushContent([]);
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Map only fixture' }),
+    ).toBeInTheDocument();
+    expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
+    // Neither empty state: there IS something here, and no filter ran.
+    expect(screen.queryByText('Nothing here yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nothing matches that filter')).not.toBeInTheDocument();
   });
 
   it('narrows blocks by keyword and drops a section with no remaining match', async () => {
