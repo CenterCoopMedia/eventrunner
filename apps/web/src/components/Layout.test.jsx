@@ -724,13 +724,16 @@ describe('Layout back-to-top', () => {
     expect(backToTop(container)).toBeUndefined();
   });
 
-  it('puts the control last, after the content it offers to leave', () => {
+  it('puts the control ahead of the footer, so a reader tabbing forward reaches it', () => {
+    // Sequential order is the whole point. Behind the footer, the control
+    // was unreachable by keyboard: tabbing to a footer link scrolls the
+    // footer into view, and the control withdraws for the footer.
     try {
       const { container } = renderScrolled();
       const button = backToTop(container);
       expect(button).not.toBeUndefined();
       const footer = container.querySelector('footer#site-footer');
-      expect(footer.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)
+      expect(button.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING)
         .toBeTruthy();
     } finally {
       window.scrollY = 0;

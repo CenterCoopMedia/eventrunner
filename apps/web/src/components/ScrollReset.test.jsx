@@ -152,6 +152,7 @@ describe('ScrollReset, at a fragment that has not rendered yet', () => {
       <MemoryRouter initialEntries={['/faq']} future={ROUTER_FUTURE}>
         <ScrollReset />
         <Link to="/travel#section-rooms">Travel, at a section</Link>
+        <Link to="/faq">Back to the FAQ</Link>
         <Routes>
           <Route path="/faq" element={<p>FAQ</p>} />
           <Route
@@ -207,14 +208,16 @@ describe('ScrollReset, at a fragment that has not rendered yet', () => {
     vi.useFakeTimers();
     renderLazyApp();
     fireEvent.click(screen.getByText('Travel, at a section'));
-    // A second navigation, this one with no fragment: it resets to the top
-    // and the abandoned wait must not fire a second time behind it.
-    fireEvent.click(screen.getByText('Travel, at a section'));
+    // A second navigation, this one to another page with no fragment: it
+    // resets to the top on its own account, and the abandoned wait must not
+    // fire behind it and move the reader a second time.
+    fireEvent.click(screen.getByText('Back to the FAQ'));
+    expect(scrollTo).toHaveBeenCalledTimes(1);
     scrollTo.mockClear();
     act(() => {
       vi.advanceTimersByTime(FRAGMENT_WINDOW_MS * 2);
     });
-    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 
   it('answers now on a host with no MutationObserver', () => {
@@ -288,8 +291,22 @@ describe('ScrollReset, on a POP navigation', () => {
   });
 });
 
-describe('ScrollReset, on a move that is not a navigation', () => {
-  it('keeps the reader’s place when only the fragment changes', () => {
+describe('ScrollReset, on a move within one page', () => {
+  it('takes the reader to a fragment on the page they are already on', () => {
+    // A hash-only move is still a navigation the router performs and the
+    // browser does not resolve. Reacting to the pathname alone left the
+    // reader where they were, which is the one thing the link did not ask
+    // for.
+    renderAt('/travel');
+    fireEvent.click(screen.getByText('Another page, at a heading'));
+    expect(scrollIntoView.mock.instances[0]).toBe(document.getElementById('rooms'));
+    // ...and not to the top as well: the page under them has not changed.
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('keeps the reader’s place when the new fragment names nothing', () => {
+    // The top reset belongs to arriving somewhere new. On the page the
+    // reader is already reading there is nothing to reset.
     renderAt('/faq');
     fireEvent.click(screen.getByText('This page, at a fragment'));
     expect(scrollTo).not.toHaveBeenCalled();
@@ -301,6 +318,22 @@ describe('ScrollReset, on a move that is not a navigation', () => {
     fireEvent.click(screen.getByText('This page, filtered'));
     expect(scrollTo).not.toHaveBeenCalled();
     expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('drops a fragment still waiting when the reader moves to another', () => {
+    // The stale window was the bug: /travel#gone starts the three second
+    // wait, a link to /travel#rooms takes the reader to Rooms, and the
+    // timer that belonged to the abandoned fragment then yanked them to the
+    // top of the page they were reading.
+    vi.useFakeTimers();
+    renderAt('/faq');
+    fireEvent.click(screen.getByText('Another page, at a fragment naming nothing'));
+    fireEvent.click(screen.getByText('Another page, at a heading'));
+    expect(scrollIntoView.mock.instances[0]).toBe(document.getElementById('rooms'));
+    act(() => {
+      vi.advanceTimersByTime(FRAGMENT_WINDOW_MS * 2);
+    });
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 });
 

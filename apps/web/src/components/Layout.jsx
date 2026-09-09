@@ -435,6 +435,13 @@ export default function Layout() {
       ) : (
         main
       )}
+      {/* AFTER the content it offers to leave and BEFORE the footer, because
+          the control withdraws for the footer: behind the footer links a
+          keyboard reader could never reach it, since tabbing to a footer
+          link scrolls the footer on screen and takes the control away.
+          BackToTop.jsx states the rest. It renders fixed at the corner
+          either way, so its place here is a sequential one only. */}
+      <BackToTop targetId={TOP_LANDMARK_ID} footerId={FOOTER_ID} />
       <footer id={FOOTER_ID} className="bg-surface">
         <div className="mx-auto w-full max-w-5xl px-md">
           <div className="section-rule pb-xl pt-md font-data text-caption text-text-secondary">
@@ -506,9 +513,6 @@ export default function Layout() {
           </div>
         </div>
       </footer>
-      {/* Last in the document, so a keyboard reader meets it after the
-          content it offers to leave rather than in front of it. */}
-      <BackToTop targetId={TOP_LANDMARK_ID} footerId={FOOTER_ID} />
       {feedbackOpen ? <FeedbackModal onClose={() => setFeedbackOpen(false)} /> : null}
     </div>
   );

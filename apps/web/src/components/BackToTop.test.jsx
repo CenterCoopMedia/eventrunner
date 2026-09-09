@@ -73,6 +73,8 @@ function withBanner() {
 }
 
 const control = () => screen.queryByRole('button', { name: 'Back to top' });
+/** The wrapper that positions the control, or withdraws it from the picture. */
+const wrapperClasses = () => [...control().parentElement.classList];
 
 function renderControl() {
   return render(<BackToTop targetId="banner" footerId="site-footer" />);
@@ -107,21 +109,41 @@ describe('BackToTop, when it is offered', () => {
 });
 
 describe('BackToTop, over the footer', () => {
-  it('withdraws while the footer is on screen, so it covers no footer link', () => {
+  it('withdraws from the picture while the footer is on screen, so it covers no link', () => {
     window.scrollY = 2000;
     renderControl();
-    expect(control()).not.toBeNull();
+    expect(wrapperClasses()).toContain('fixed');
+    expect(wrapperClasses()).not.toContain('sr-only');
 
     footerOnScreen(true);
-    expect(control()).toBeNull();
+    expect(wrapperClasses()).toContain('sr-only');
+    expect(wrapperClasses()).not.toContain('fixed');
   });
 
-  it('comes back when the reader scrolls up off the footer', () => {
+  it('stays on the keyboard path while the footer is on screen', () => {
+    // The withdrawal used to unmount the control, and that made it
+    // unreachable: tabbing to a footer link scrolls the footer into view, so
+    // the control a reader was tabbing towards vanished before they got to
+    // it. It withdraws from the picture now and keeps its place in the tab
+    // order, drawn in full the moment it takes focus — the same treatment
+    // the skip link gets.
+    window.scrollY = 2000;
+    renderControl();
+    footerOnScreen(true);
+    const button = control();
+    expect(button).not.toBeNull();
+    button.focus();
+    expect(document.activeElement).toBe(button);
+    expect(wrapperClasses()).toContain('focus-within:not-sr-only');
+  });
+
+  it('comes back into the picture when the reader scrolls up off the footer', () => {
     window.scrollY = 2000;
     renderControl();
     footerOnScreen(true);
     footerOnScreen(false);
     expect(control()).not.toBeNull();
+    expect(wrapperClasses()).toContain('fixed');
   });
 
   it('watches the footer the shell named', () => {

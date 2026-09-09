@@ -50,17 +50,28 @@
 // its own keyword filter on the same `pathname` change and is deliberately
 // left alone: that is a page's own state, not the shell's scroll position.
 //
-// ONE CASE IT MUST NOT TOUCH: a same-page hash change. `pathname` is the
-// only thing this reacts to, so moving from #travel to #rooms on one page
-// never runs at all — that is an in-page anchor, which the browser and
-// SectionIndexNav already handle, and re-running here would fight them. A
-// query string is the same page too (a filter, a shared search), so it is
-// not a dependency either.
+// EVERY NAVIGATION IS ONE, INCLUDING A MOVE WITHIN ONE PAGE. This used to
+// react to `pathname` alone, on the reasoning that a hash-only or
+// query-only move is not a page change. It is not, but it IS a navigation
+// the router performs and the browser does not resolve, and skipping it
+// went wrong twice. A link from /travel#gone to /travel#rooms resolved
+// nothing, so the reader stayed put; and worse, the abandoned #gone window
+// was still open, so three seconds later its timer took a reader who was
+// reading Rooms to the top of the page. So the effect is keyed on the
+// location's own key: every navigation cancels the one before it and
+// resolves its own fragment.
+//
+// WHAT A MOVE WITHIN ONE PAGE MUST STILL NOT DO is reset to the top. The
+// top reset belongs to arriving somewhere new; on the page the reader is
+// already reading there is nothing to reset, and doing it anyway would
+// throw away their place on a filter change or an in-page anchor. So the
+// reset is gated on the pathname having actually changed, which is the
+// half of the old rule that was right.
 //
 // NOTHING ANIMATES, IN ANY MOTION SETTING — lib/scrollToTop.js states why,
 // and both this and the back-to-top control go through it so there is one
 // answer rather than two.
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
 import { scrollToElement, scrollToTop } from '../lib/scrollToTop.js';
 
@@ -118,16 +129,35 @@ function focusFragmentTarget(element) {
 }
 
 export default function ScrollReset() {
-  const { pathname, hash } = useLocation();
+  const { pathname, hash, key } = useLocation();
   const navigationType = useNavigationType();
+  // The navigation this effect last ran for, and whether it was a move
+  // within one page. Keyed on the location key rather than recomputed every
+  // run, so an effect that re-runs for the SAME navigation — which is what
+  // React does under StrictMode — does not mistake the repeat for a
+  // same-page move and swallow the top reset.
+  const lastRun = useRef({ key: null, pathname: null, samePage: false });
 
   useEffect(() => {
+    if (lastRun.current.key !== key) {
+      lastRun.current = { key, pathname, samePage: lastRun.current.pathname === pathname };
+    }
+    const { samePage } = lastRun.current;
     const id = fragmentId(hash);
 
+    /**
+     * Open the page at its beginning — but only when it IS another page,
+     * and only when the reader was not restored to a place of their own.
+     * POP is a back, a forward, or a reload: the browser restores the
+     * position the reader left, and this must not throw that away.
+     */
+    const openAtTop = () => {
+      if (samePage || navigationType === 'POP') return;
+      scrollToTop();
+    };
+
     if (!id) {
-      // POP is a back, a forward, or a reload: the browser restores the
-      // position the reader left, and this must not throw that away.
-      if (navigationType !== 'POP') scrollToTop();
+      openAtTop();
       return undefined;
     }
 
@@ -147,7 +177,7 @@ export default function ScrollReset() {
     // to an absent API: the refinement does not happen, and the reader gets
     // the answer that is available now.
     if (typeof ObserverType !== 'function' || typeof document === 'undefined') {
-      scrollToTop();
+      openAtTop();
       return undefined;
     }
 
@@ -166,18 +196,15 @@ export default function ScrollReset() {
       close();
       // The window shut with nothing to show for it: the fragment names
       // nothing that is going to exist, so open the page at its beginning.
-      scrollToTop();
+      openAtTop();
     }, FRAGMENT_WINDOW_MS);
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
     // The next navigation cancels this one. A reader who has moved on is not
-    // waiting for the previous page's fragment.
+    // waiting for the previous page's fragment — and the key changes on
+    // every navigation, so "the next one" includes a move within one page.
     return close;
-    // `hash` and `navigationType` are read, not reacted to: a hash change on
-    // one page must not re-run this, and both describe the navigation that
-    // brought the reader to this pathname.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [key, pathname, hash, navigationType]);
 
   return null;
 }

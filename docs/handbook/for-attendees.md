@@ -16,7 +16,7 @@ Every page the event publishes has a link in the site navigation and again in th
 
 Every page you open starts at the top. A link that points at a section of a page takes you to that section instead, and waits a moment for the section to load before it moves you. If that section no longer exists, the page opens at the top. Your browser's back and forward buttons keep the position you left.
 
-On a long page, a **Back to top** button appears in the bottom corner once you are a screen down. It hides again when you reach the footer, so it never covers a footer link. Select it to return to the top of the page; if you are using the keyboard, the next Tab continues from the site identity and then the navigation.
+On a long page, a **Back to top** button appears in the bottom corner once you are a screen down. It hides from view again when you reach the footer, so it never covers a footer link, and it stays on the keyboard path: tab to it and it reappears in the corner. Select it to return to the top of the page; if you are using the keyboard, the next Tab continues from the site identity and then the navigation.
 
 ## Schedule
 

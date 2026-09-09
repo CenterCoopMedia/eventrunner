@@ -8,8 +8,9 @@
 // IT IS A BUTTON, WITH ITS ERRAND IN WORDS. Not an icon, not a chevron: an
 // icon-only control here would need an aria-label saying exactly what the
 // visible text says instead (docs/interface-guidelines.md, Accessibility).
-// It is the last thing in the document, so a keyboard reader reaches it
-// after the content it offers to leave rather than in front of it.
+// It sits just before the footer in the document, so a keyboard reader
+// reaches it after the content it offers to leave and before the footer's
+// own links — which is what makes it reachable at all, see below.
 //
 // IT IS FIXED, SO IT SITS OVER SOMETHING. Over the middle of a long page
 // that is the point — the reader is passing through. Over the FOOTER it is
@@ -17,8 +18,16 @@
 // viewport the control lands on top of it, covering a link. So the control
 // withdraws while the footer is on screen. By then the reader has arrived
 // at the bottom of the page and the footer's own content is what they came
-// for; the browser's Home key still works, and scrolling up by any amount
-// brings the control back.
+// for; scrolling up by any amount brings it back into the picture.
+//
+// THE WITHDRAWAL IS FROM THE PICTURE, NOT FROM THE PAGE. It used to unmount
+// the control, and that made the control unreachable by keyboard: tabbing
+// towards it scrolls whatever gets focus into view, so reaching the footer
+// links scrolled the footer on screen and removed the control the reader
+// was tabbing towards — with no way back to it short of the mouse. So the
+// withdrawal is now the treatment .skip-link already uses: out of the
+// picture, still in the tab order, and drawn in full the moment it takes
+// focus. A pointer reader sees exactly what they saw before.
 //
 // A HOST WITH NO IntersectionObserver KEEPS THE CONTROL. Same rule as
 // SectionIndexNav: the observer is a refinement, and its absence means the
@@ -88,6 +97,23 @@ function topFocusTarget(targetId) {
 }
 
 /**
+ * Where the control sits while the footer is off screen: fixed at the
+ * trailing edge so it does not take a column away from the content, and
+ * gone on paper.
+ */
+const OFFERED_CLASS = 'fixed bottom-md end-md z-40 print:hidden';
+
+/**
+ * ...and while the footer is on screen: out of the picture, still on the
+ * keyboard path, and back at the corner in full the moment it takes focus.
+ * The wrapper carries this rather than the button, so the button's own
+ * shape survives `not-sr-only` resetting padding and borders to nothing.
+ */
+const WITHDRAWN_CLASS =
+  'sr-only focus-within:not-sr-only focus-within:fixed focus-within:bottom-md ' +
+  'focus-within:end-md focus-within:z-40 print:hidden';
+
+/**
  * @param {{ targetId: string, footerId: string }} props the id of the
  *   element focus lands on, and of the region the control withdraws for
  */
@@ -124,21 +150,21 @@ export default function BackToTop({ targetId, footerId }) {
     return () => observer.disconnect();
   }, [footerId]);
 
-  if (!past || footerInView) return null;
+  if (!past) return null;
 
   return (
-    <button
-      type="button"
-      // Fixed at the trailing edge so it does not take a column away from
-      // the content, on its own ground so the text under it never shows
-      // through, and gone on paper.
-      className={`${quietActionClass} fixed bottom-md end-md z-40 bg-surface print:hidden`}
-      onClick={() => {
-        scrollToTop();
-        focusAsDestination(topFocusTarget(targetId));
-      }}
-    >
-      Back to top
-    </button>
+    <div className={footerInView ? WITHDRAWN_CLASS : OFFERED_CLASS}>
+      <button
+        type="button"
+        // On its own ground, so the text under it never shows through.
+        className={`${quietActionClass} bg-surface`}
+        onClick={() => {
+          scrollToTop();
+          focusAsDestination(topFocusTarget(targetId));
+        }}
+      >
+        Back to top
+      </button>
+    </div>
   );
 }
