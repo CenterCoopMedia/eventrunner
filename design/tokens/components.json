@@ -38,6 +38,10 @@
     "--lead-image-aspect": "3 / 2",
     "--lead-image-width": "22rem"
   },
+  "$venue-map-note": "The uploaded venue map (config/event.venue.map). The frame is fixed so the room markers, which sit on it at percentage coordinates, do not move between first paint and the picture arriving. Wider than tall because a floor plan usually is; a preset may retune it.",
+  "venue-map": {
+    "--venue-map-aspect": "4 / 3"
+  },
   "$section-rule-note": "The section boundary (brief §2.1): the rule, then the gap, then the head. The gap is one of the three surfaces config/theme.density reaches, so index.css multiplies it by --density-step.",
   "section-rule": {
     "--section-rule-rgb": "--rule-strong-rgb",

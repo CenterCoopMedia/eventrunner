@@ -321,6 +321,26 @@ test('validateEventConfig refuses a map image with no alt text', () => {
     assert.equal(result.ok, false, `alt ${JSON.stringify(alt)}`);
     assert.ok(result.errors.some((e) => e.startsWith('venue.map.alt:')));
   }
+  // Only the media library's own namespaces. A profile photo is owner bound
+  // and session materials are closed to public reads; neither is a picture
+  // an operator picked out of the library.
+  for (const image of ['profile-photos/abc/photo.png', 'session-materials/a/deck.png', 'plan.png']) {
+    const result = validateEventConfig({
+      ...VALID_EVENT,
+      venue: { places: MAP_PLACES, map: { image, alt: 'A floor plan.' } },
+    });
+    assert.equal(result.ok, false, image);
+    assert.ok(result.errors.some((e) => e.startsWith('venue.map.image:')), image);
+  }
+  // Both library namespaces are accepted: branding carries the seeded
+  // placeholders, cms-images everything an operator uploads.
+  for (const image of ['cms-images/a/plan.png', 'branding/plan.svg']) {
+    const result = validateEventConfig({
+      ...VALID_EVENT,
+      venue: { places: MAP_PLACES, map: { image, alt: 'A floor plan.' } },
+    });
+    assert.equal(result.ok, true, `${image}: ${result.errors.join('; ')}`);
+  }
   // A URL in the image field renders as a broken image on the public page,
   // because the app builds a Storage URL from the stored path.
   for (const image of ['https://example.org/plan.png', '/plan.png', '../plan.png']) {

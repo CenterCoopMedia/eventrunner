@@ -203,14 +203,37 @@ test('resolveVenueMap numbers the placed rooms and still lists the unplaced ones
   const map = resolveVenueMap(MAP_CONFIG);
   assert.equal(map.image, 'cms-images/abc/plan.png');
   assert.equal(map.alt, 'Floor plan of the two levels, with the hall on the ground floor.');
-  // Rooms read in the venue's own order; marker numbers follow the order the
-  // markers were recorded in, so the number on the image and the number in
-  // the list are the same number.
+  // Rooms read in the venue's own order, and the NUMBERS RUN DOWN THAT LIST
+  // — not in the order the markers happen to be stored in. Room A's marker
+  // was recorded first and it still numbers 2, because it is the second room
+  // a reader meets.
   assert.deepEqual(map.rooms, [
-    { id: 'main-hall', name: 'Main hall', floor: 'Ground floor', number: 2, x: 60, y: 80 },
-    { id: 'room-a', name: 'Room A', floor: 'First floor', number: 1, x: 20, y: 30.5 },
+    { id: 'main-hall', name: 'Main hall', floor: 'Ground floor', number: 1, x: 60, y: 80 },
+    { id: 'room-a', name: 'Room A', floor: 'First floor', number: 2, x: 20, y: 30.5 },
     { id: 'room-b', name: 'Room B', floor: null, number: null, x: null, y: null },
   ]);
+});
+
+test('resolveVenueMap skips a number for a room nobody placed', () => {
+  // main-hall is unmarked, so the two rooms that are drawn number 1 and 2 —
+  // a list that jumped from 1 to 3 would read as a lost marker.
+  const map = resolveVenueMap({
+    venue: {
+      places: MAP_CONFIG.venue.places,
+      map: {
+        image: 'cms-images/abc/plan.png',
+        alt: 'A plan.',
+        markers: [
+          { placeId: 'room-b', x: 10, y: 10 },
+          { placeId: 'room-a', x: 20, y: 20 },
+        ],
+      },
+    },
+  });
+  assert.deepEqual(
+    map.rooms.map((room) => [room.id, room.number]),
+    [['main-hall', null], ['room-a', 1], ['room-b', 2]],
+  );
 });
 
 test('resolveVenueMap answers null unless there is both an image and words for it', () => {

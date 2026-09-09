@@ -113,23 +113,23 @@ export const eventConfig = {
       },
     ],
     map: {
-      image: 'branding/og-default.svg',
-      alt: 'Placeholder image standing in for an uploaded plan of the building.',
+      image: 'branding/venue-plan-placeholder.svg',
+      alt: 'Placeholder floor plan: an outline with a corridor across it and rooms off both sides, standing in for a plan of the building.',
       markers: [
         {
           placeId: 'main-hall',
-          x: 50,
-          y: 42,
+          x: 52,
+          y: 27,
         },
         {
           placeId: 'room-a',
-          x: 34,
-          y: 68,
+          x: 20,
+          y: 27,
         },
         {
           placeId: 'room-b',
-          x: 66,
-          y: 68,
+          x: 17,
+          y: 79,
         },
       ],
     },

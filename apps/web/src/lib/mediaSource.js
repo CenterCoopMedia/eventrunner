@@ -38,6 +38,7 @@
 // to the rules. `allow get: if true` on the public namespaces is what makes
 // it work for anonymous visitors, `session-materials/` stays closed, and a
 // thumbnail costs no metadata round trip.
+import { storageObjectPath } from 'shared/venue';
 import { storageBucketName, storageDownloadOrigin } from '../firebase.js';
 import { IS_DEMO } from './demoMode.js';
 
@@ -122,15 +123,15 @@ export function fileToBase64(file) {
  * absolute URL, a leading slash, a parent traversal — so every caller can
  * treat "not a path" and "no path" the same way.
  *
+ * The rule itself lives in `shared/venue` (storageObjectPath), because the
+ * config validator has to refuse at the save exactly what this refuses at
+ * the render. Two copies of that regex would eventually be two rules.
+ *
  * @param {unknown} value
  * @returns {string|null}
  */
 export function storagePath(value) {
-  if (typeof value !== 'string') return null;
-  const path = value.trim();
-  if (path.length === 0) return null;
-  if (path.startsWith('/') || path.includes('..') || /^[a-z][a-z0-9+.-]*:/i.test(path)) return null;
-  return path;
+  return storageObjectPath(value);
 }
 
 /**

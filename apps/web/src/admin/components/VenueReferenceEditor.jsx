@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { storageObjectPath } from 'shared/venue';
+import { MEDIA_LIBRARY_PREFIXES, isMediaLibraryPath, storageObjectPath } from 'shared/venue';
 import {
   Panel,
   SelectField,
@@ -80,6 +80,22 @@ const optional = (value) => {
 };
 
 /**
+ * A typed coordinate as a number, or `null` for one nobody typed.
+ *
+ * NOT `Number('')`, WHICH IS 0. Zero is the left or top edge of the picture
+ * — a real answer an operator can mean — so coercing an empty field to it
+ * silently places a marker in a corner and calls that the operator's
+ * decision. `null` is refused by the shared validator, and submit refuses it
+ * before that, so a blank stays a blank all the way down.
+ */
+function coordinate(value) {
+  const raw = String(value ?? '').trim();
+  if (raw === '') return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
  * The map, or null.
  *
  * No image is no map, and null is the server's "clear this" — so an operator
@@ -94,8 +110,8 @@ function venueMapPayload(map) {
     alt: String(map?.alt ?? '').trim(),
     markers: (map?.markers ?? []).map((marker) => ({
       placeId: marker.placeId,
-      x: Number(marker.x),
-      y: Number(marker.y),
+      x: coordinate(marker.x),
+      y: coordinate(marker.y),
     })),
   };
 }
@@ -153,35 +169,60 @@ export function validateVenueReferences(venue) {
       errors.set(`${at}.walkingMinutes`, 'Enter a whole number from 0 to 120.');
     }
   }
+  return errors;
+}
 
-  // The map. Nothing is checked until an image is chosen, because until then
-  // there is no map to be wrong about.
+/**
+ * The map's own problems, SEPARATE FROM validateVenueReferences ABOVE.
+ *
+ * Two validators because they are used at two different moments, and issue
+ * #219 is why. The places and movements above disable the save button while
+ * they are wrong; growing that set is how a form ends up with a dead button
+ * and no way for the person in front of it to find out which field did it.
+ * The map's fields are checked at SUBMIT instead: the button stays live, the
+ * offending field is marked, focus moves there, and nothing is sent.
+ *
+ * Nothing is checked until an image is chosen, because until then there is
+ * no map to be wrong about.
+ *
+ * @param {object} venue the form's venue slice
+ * @returns {Map<string, string>} field path → message
+ */
+export function validateVenueMap(venue) {
+  const errors = new Map();
   const map = venue?.map;
-  if (String(map?.image ?? '').trim()) {
-    // The picker's path stays editable as text, so a URL can be typed into
-    // it — and a URL cannot be resolved against the bucket.
-    if (!storageObjectPath(map.image)) {
-      errors.set('venue.map.image', 'Use a path from the media library, not a URL.');
+  if (!String(map?.image ?? '').trim()) return errors;
+
+  const ids = new Set(
+    (venue?.places ?? []).map((place) => String(place.id ?? '').trim()).filter(Boolean),
+  );
+
+  // The picker's path stays editable as text, so a URL can be typed into it
+  // — and a URL cannot be resolved against the bucket.
+  const path = storageObjectPath(map.image);
+  if (!path || !isMediaLibraryPath(path)) {
+    errors.set(
+      'venue.map.image',
+      `Choose an image from the media library. The path starts with ${MEDIA_LIBRARY_PREFIXES.join(' or ')}.`,
+    );
+  }
+  if (!String(map.alt ?? '').trim()) {
+    errors.set('venue.map.alt', 'Enter alt text saying what the map shows.');
+  }
+  const marked = new Set();
+  for (const [index, marker] of (map.markers ?? []).entries()) {
+    const at = `venue.map.markers[${index}]`;
+    if (!ids.has(marker.placeId)) {
+      errors.set(`${at}.placeId`, 'Select a defined place.');
+    } else if (marked.has(marker.placeId)) {
+      errors.set(`${at}.placeId`, 'This room is already marked on the map.');
+    } else {
+      marked.add(marker.placeId);
     }
-    if (!String(map.alt ?? '').trim()) {
-      errors.set('venue.map.alt', 'Enter alt text saying what the map shows.');
-    }
-    const marked = new Set();
-    for (const [index, marker] of (map.markers ?? []).entries()) {
-      const at = `venue.map.markers[${index}]`;
-      if (!ids.has(marker.placeId)) {
-        errors.set(`${at}.placeId`, 'Select a defined place.');
-      } else if (marked.has(marker.placeId)) {
-        errors.set(`${at}.placeId`, 'This room is already marked on the map.');
-      } else {
-        marked.add(marker.placeId);
-      }
-      for (const axis of ['x', 'y']) {
-        const raw = String(marker[axis] ?? '').trim();
-        const value = Number(raw);
-        if (raw === '' || !Number.isFinite(value) || value < 0 || value > 100) {
-          errors.set(`${at}.${axis}`, 'Enter a number from 0 to 100.');
-        }
+    for (const axis of ['x', 'y']) {
+      const value = coordinate(marker[axis]);
+      if (value === null || value < 0 || value > 100) {
+        errors.set(`${at}.${axis}`, 'Enter a number from 0 to 100.');
       }
     }
   }

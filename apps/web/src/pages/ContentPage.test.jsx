@@ -143,6 +143,27 @@ describe('ContentPage (catch-all route)', () => {
     }
   });
 
+  it('still renders the map on a travel page seeded before the section existed', async () => {
+    // The deployment that upgrades into this feature has a travel page with
+    // no venue-map section, and re-running init leaves an edited page alone.
+    // Uploading a map there has to publish something, or the operator has
+    // filled in a form that does nothing and no way to find out why. The
+    // section POSITIONS the map; it is not what makes the map exist.
+    renderAt('/travel');
+    await screen.findByRole('heading', { name: 'Venue map' });
+    const travel = pagesData.find((p) => p.id === 'travel');
+    act(() => {
+      subscriptions.get('cmsPages')([
+        ...pagesData.filter((page) => page.id !== 'travel'),
+        { ...travel, sections: travel.sections.filter((s) => s.id !== 'travel_map') },
+      ]);
+    });
+    const headings = screen.getAllByRole('heading', { level: 2 });
+    expect(headings.at(-1)).toHaveTextContent('Venue map');
+    expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
+    expect(screen.getByText(eventConfig.venue.places[0].name)).toBeInTheDocument();
+  });
+
   it('404s cleanly on an unknown path', async () => {
     renderAt('/definitely-not-published');
     expect(
@@ -180,7 +201,13 @@ describe('ContentPage (catch-all route)', () => {
     // Schedule is a dedicated route (spec §2.4), not routed through
     // ContentPage — its own page renders, not a 404 and not the generic
     // content article wrapper.
-    expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
+    //
+    // It also arrives through DeferredPage, so this waits on a dynamic
+    // import rather than on a render: the default one-second window is a
+    // measure of how busy the machine is, not of whether the route resolved.
+    expect(
+      await screen.findByRole('heading', { name: 'Schedule' }, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument();
   });
 

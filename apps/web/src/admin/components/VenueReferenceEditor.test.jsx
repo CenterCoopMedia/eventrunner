@@ -15,6 +15,7 @@ vi.mock('../../firebase.js', () => ({
 import VenueReferenceEditor, {
   normalizeVenueReferences,
   placeIdFromName,
+  validateVenueMap,
   validateVenueReferences,
   venueReferencesPayload,
 } from './VenueReferenceEditor.jsx';
@@ -119,28 +120,56 @@ describe('venue map helpers', () => {
     });
   });
 
+  it('sends a blank coordinate as null rather than calling it zero', () => {
+    // Number('') is 0, and 0 is the left edge of the picture — a real answer
+    // an operator can mean. A blank must never become one.
+    const payload = venueReferencesPayload({
+      places: PLACES,
+      map: {
+        image: 'cms-images/a/plan.png',
+        alt: 'A floor plan.',
+        markers: [{ placeId: 'studio', x: '', y: '  ' }],
+      },
+    });
+    expect(payload.map.markers[0]).toEqual({ placeId: 'studio', x: null, y: null });
+  });
+
+  it('keeps the map out of the errors that disable the save button', () => {
+    // Issue #219: the disabled-while-invalid set does not grow. A map with
+    // nothing but problems still leaves validateVenueReferences empty.
+    const venue = {
+      places: PLACES,
+      movements: [],
+      map: { image: 'https://example.org/plan.png', alt: '', markers: [{ placeId: '', x: '', y: '' }] },
+    };
+    expect(validateVenueReferences(venue).size).toBe(0);
+    expect(validateVenueMap(venue).size).toBeGreaterThan(0);
+  });
+
   it('asks for alt text as soon as an image is chosen', () => {
-    const errors = validateVenueReferences({
+    const errors = validateVenueMap({
       places: PLACES,
       map: { image: 'cms-images/a/plan.png', alt: '  ', markers: [] },
     });
     expect(errors.get('venue.map.alt')).toMatch(/alt text/i);
     // No image is no map, so there is nothing to describe and no error.
     expect(
-      validateVenueReferences({ places: PLACES, map: { image: '', alt: '', markers: [] } }).size,
+      validateVenueMap({ places: PLACES, map: { image: '', alt: '', markers: [] } }).size,
     ).toBe(0);
   });
 
-  it('refuses a URL typed into the image path', () => {
-    const errors = validateVenueReferences({
-      places: PLACES,
-      map: { image: 'https://example.org/plan.png', alt: 'A floor plan.', markers: [] },
-    });
-    expect(errors.get('venue.map.image')).toMatch(/media library/);
+  it('refuses a URL or a path outside the media library', () => {
+    for (const image of ['https://example.org/plan.png', 'profile-photos/abc/photo.png']) {
+      const errors = validateVenueMap({
+        places: PLACES,
+        map: { image, alt: 'A floor plan.', markers: [] },
+      });
+      expect(errors.get('venue.map.image')).toMatch(/media library/);
+    }
   });
 
-  it('refuses a marker off the places list, out of range, or twice for one room', () => {
-    const errors = validateVenueReferences({
+  it('refuses a marker off the places list, out of range, blank, or twice for one room', () => {
+    const errors = validateVenueMap({
       places: PLACES,
       map: {
         image: 'cms-images/a/plan.png',

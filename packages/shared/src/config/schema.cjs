@@ -17,7 +17,9 @@ const {
   VENUE_MARKER_KEYS,
   PLACE_ID_RE,
   MAX_WALKING_MINUTES,
+  MEDIA_LIBRARY_PREFIXES,
   storageObjectPath,
+  isMediaLibraryPath,
 } = require('../venue.cjs');
 const {
   THEME_DOC_KEYS,
@@ -366,6 +368,14 @@ function validateEventConfig(event) {
             errors.push(
               'venue.map.image: must be a storage object path from the media library, ' +
               'not a URL',
+            );
+          } else if (!isMediaLibraryPath(storageObjectPath(map.image))) {
+            // The other namespaces are not the library's to publish from —
+            // a profile photo is owner bound, session materials are closed
+            // to public reads, and neither is a picture of a building.
+            errors.push(
+              `venue.map.image: must be under ${MEDIA_LIBRARY_PREFIXES.join(' or ')} — ` +
+              'choose the image from the media library',
             );
           }
           if (!isNonEmptyString(map.alt)) {

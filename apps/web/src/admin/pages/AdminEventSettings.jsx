@@ -29,9 +29,13 @@ import AdminPageHeader from '../components/adminChrome.jsx';
 import { subscribeAdminCollection } from '../adminSource.js';
 import VenueReferenceEditor, {
   normalizeVenueReferences,
+  validateVenueMap,
   validateVenueReferences,
   venueReferencesPayload,
 } from '../components/VenueReferenceEditor.jsx';
+
+/** Shared empty result, so a render with no errors is not a new Map. */
+const NO_ERRORS = new Map();
 
 const blankDay = () => ({ id: '', label: '', date: '', startTime: '', endTime: '' });
 const blankTrack = () => ({ letter: '', name: '' });
@@ -170,6 +174,8 @@ export default function AdminEventSettings() {
   const [liveSessions, setLiveSessions] = useState([]);
   const [draftSessions, setDraftSessions] = useState([]);
   const errorRef = useRef(null);
+  // Submit reaches into the form to find the first field it marked invalid.
+  const formRef = useRef(null);
   // Adopt runtime config once CONFIG/EVENT itself arrives (the snapshot
   // renders first), then stop — later listener echoes must not overwrite
   // in-progress edits. Keyed on this document's own readiness, not the
@@ -209,7 +215,20 @@ export default function AdminEventSettings() {
     () => validateVenueReferences(form.venue),
     [form.venue],
   );
-  const errorFor = (field) => localVenueErrors.get(field) ?? fieldErrors.get(field);
+  // THE MAP IS CHECKED AT SUBMIT, NOT WHILE TYPING (issue #219). The places
+  // and movements above disable the save button while they are wrong; that
+  // set does not grow, because a dead button is a form telling somebody "no"
+  // without telling them which field said it. So the map's problems appear
+  // only once a save has been attempted — then they mark their fields, focus
+  // moves to the first of them, and nothing is sent. They clear themselves
+  // as the fields are fixed, so nobody is arguing with a stale message.
+  const [mapChecked, setMapChecked] = useState(false);
+  const mapErrors = useMemo(
+    () => (mapChecked ? validateVenueMap(form.venue) : NO_ERRORS),
+    [mapChecked, form.venue],
+  );
+  const errorFor = (field) =>
+    localVenueErrors.get(field) ?? mapErrors.get(field) ?? fieldErrors.get(field);
   const placeUsage = useMemo(() => {
     const usage = new Map();
     for (const session of [...liveSessions, ...draftSessions]) {
@@ -237,6 +256,17 @@ export default function AdminEventSettings() {
 
   async function submit(event) {
     event.preventDefault();
+    // Nothing is sent while the map is wrong, and the person is put in front
+    // of the field that is wrong rather than left to hunt for it.
+    setMapChecked(true);
+    if (validateVenueMap(form.venue).size > 0) {
+      setStatus('');
+      window.setTimeout(() => {
+        const invalid = formRef.current?.querySelector('[aria-invalid="true"]');
+        invalid?.focus();
+      }, 0);
+      return;
+    }
     setSaving(true);
     setError(null);
     setStatus('');
@@ -261,7 +291,7 @@ export default function AdminEventSettings() {
   const verified = eventConfig?.sender?.domainVerified === true;
 
   return (
-    <form className="flex flex-col gap-md" onSubmit={submit}>
+    <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit}>
       <AdminPageHeader
         title="Event"
         description="Name, dates, venue, and the addresses the site and its email use."

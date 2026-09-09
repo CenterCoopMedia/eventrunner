@@ -159,7 +159,11 @@ describe('event settings', () => {
     expect(payload.sender).not.toHaveProperty('domainVerified');
 
     expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
-  });
+    // The whole settings page — three forms, every panel — renders twice
+    // here, and this one asserts against all of it. It runs close to the
+    // 5s default on a loaded machine, so it states its own budget rather
+    // than failing as a flake somebody has to re-run to understand.
+  }, 20000);
 
   // The event's concurrent tracks (design brief §4.6): a letter and a name,
   // set here once, so a session names a line by its letter alone.
@@ -243,6 +247,61 @@ describe('event settings', () => {
       markers: [{ placeId: 'main-hall', x: 25, y: 75 }],
     });
   });
+
+  it('refuses a map save at submit without ever disabling the button', async () => {
+    // Issue #219: the map's fields do NOT join the set that disables "Save
+    // event settings". A save is attempted, refused, and the person is put
+    // in front of the field that refused it — from the keyboard, which is
+    // the only way some people reach that button at all.
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [{ id: 'main-hall', name: 'Main hall' }],
+        movements: [],
+        map: { image: 'cms-images/a/plan.png', alt: 'A plan.', markers: [] },
+      },
+    });
+
+    fireEvent.change(screen.getByLabelText('Map alt text'), { target: { value: '  ' } });
+    const save = screen.getByRole('button', { name: 'Save event settings' });
+    expect(save).toBeEnabled();
+    save.focus();
+    fireEvent.click(save);
+
+    const alt = screen.getByLabelText('Map alt text');
+    await waitFor(() => expect(document.activeElement).toBe(alt));
+    expect(alt).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText(/alt text saying what the map shows/i)).toBeInTheDocument();
+    // Nothing was sent.
+    expect(fetch).not.toHaveBeenCalled();
+
+    // A blank coordinate is refused the same way rather than becoming 0.
+    fireEvent.change(alt, { target: { value: 'A plan.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add marker' }));
+    fireEvent.change(screen.getByLabelText('Marker 1 room'), {
+      target: { value: 'main-hall' },
+    });
+    fireEvent.change(screen.getByLabelText('Marker 1 across (%)'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    const across = screen.getByLabelText('Marker 1 across (%)');
+    await waitFor(() => expect(across).toHaveAttribute('aria-invalid', 'true'));
+    expect(fetch).not.toHaveBeenCalled();
+
+    // Fixed, and the same button now saves.
+    fireEvent.change(across, { target: { value: '40' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.venue.map.markers[0]).toEqual({
+      placeId: 'main-hall',
+      x: 40,
+      y: 50,
+    });
+    // Three save attempts against the whole settings page, so it states its
+    // own budget rather than failing as a flake on a busy machine.
+  }, 20000);
 
   it('blocks removal when a live or draft revision uses a place', async () => {
     await renderAt('/admin/settings');

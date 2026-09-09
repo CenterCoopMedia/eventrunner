@@ -108,6 +108,28 @@ const VENUE_MAP_KEYS = Object.freeze(['image', 'alt', 'markers']);
 const VENUE_MARKER_KEYS = Object.freeze(['placeId', 'x', 'y']);
 
 /**
+ * The Storage namespaces the media library writes, and therefore the only
+ * ones a map image may come out of. Mirrors `functions/src/media/upload.cjs`
+ * FOLDERS — keep in step.
+ *
+ * The other namespaces are not the library's: `profile-photos/` is owner
+ * bound, `speakers/` is keyed by speaker, `session-materials/` is closed to
+ * public reads. A path into one of those is not a picture an operator picked
+ * out of the library, and saying so at the save is the difference between an
+ * error message that is true and one that is merely discouraging.
+ */
+const MEDIA_LIBRARY_PREFIXES = Object.freeze(['cms-images/', 'branding/']);
+
+/**
+ * True when `path` names an object inside a media-library namespace.
+ *
+ * @param {unknown} path a value already through storageObjectPath
+ */
+function isMediaLibraryPath(path) {
+  return typeof path === 'string' && MEDIA_LIBRARY_PREFIXES.some((p) => path.startsWith(p));
+}
+
+/**
  * The seeded travel-page section the public map renders in.
  *
  * Named here rather than in either caller because two of them have to agree
@@ -116,6 +138,16 @@ const VENUE_MARKER_KEYS = Object.freeze(['placeId', 'x', 'y']);
  * where a page states a section with this id.
  */
 const VENUE_MAP_SECTION_ID = 'travel_map';
+
+/**
+ * The page the map falls back onto when no section asks for it.
+ *
+ * A deployment seeded before that section existed has a travel page without
+ * it, and re-running init leaves an edited page alone — so an operator there
+ * could upload a map, fill in the alt text, and publish nothing at all. The
+ * section positions the map; this id is what makes it appear regardless.
+ */
+const VENUE_MAP_PAGE_ID = 'travel';
 
 /**
  * A place id: lowercase, digits, single hyphens. The same slug shape the
@@ -363,8 +395,6 @@ function resolveVenueMap(eventConfig) {
 
   const places = resolveVenuePlaces(eventConfig);
   const placeIds = new Set(places.map((place) => place.id));
-  // A number is spent only on a marker that ends up drawn, so the numbers a
-  // reader sees run 1, 2, 3 with no gap where a dropped marker was.
   const placed = new Map();
   if (Array.isArray(map.markers)) {
     for (const marker of map.markers) {
@@ -372,17 +402,24 @@ function resolveVenueMap(eventConfig) {
       if (typeof marker.placeId !== 'string' || !placeIds.has(marker.placeId)) continue;
       if (placed.has(marker.placeId)) continue;
       if (!isCoordinate(marker.x) || !isCoordinate(marker.y)) continue;
-      placed.set(marker.placeId, { number: placed.size + 1, x: marker.x, y: marker.y });
+      placed.set(marker.placeId, { x: marker.x, y: marker.y });
     }
   }
 
+  // NUMBERED IN THE VENUE'S OWN ORDER, not the order the markers happen to
+  // be stored in. The list a reader scans is the places list, so its numbers
+  // have to run 1, 2, 3 down that list — a list that started at 2 because an
+  // operator marked the second room first would read as a mistake. Only a
+  // room that ends up drawn spends a number, so there is no gap either.
+  let counter = 0;
   const rooms = places.map((place) => {
     const marker = placed.get(place.id) ?? null;
+    if (marker) counter += 1;
     return {
       id: place.id,
       name: place.name,
       floor: place.floor ?? null,
-      number: marker ? marker.number : null,
+      number: marker ? counter : null,
       x: marker ? marker.x : null,
       y: marker ? marker.y : null,
     };
@@ -397,6 +434,8 @@ module.exports = {
   VENUE_MAP_KEYS,
   VENUE_MARKER_KEYS,
   VENUE_MAP_SECTION_ID,
+  VENUE_MAP_PAGE_ID,
+  MEDIA_LIBRARY_PREFIXES,
   PLACE_ID_RE,
   MAX_WALKING_MINUTES,
   resolveVenuePlaces,
@@ -405,5 +444,6 @@ module.exports = {
   resolveMovement,
   sessionMovement,
   storageObjectPath,
+  isMediaLibraryPath,
   resolveVenueMap,
 };

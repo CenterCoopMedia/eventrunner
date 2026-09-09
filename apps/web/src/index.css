@@ -253,6 +253,18 @@
     }
   }
 
+  /* Venue map: the uploaded plan of the building. The frame is fixed by
+     token, like the lead image, so the numbered markers sitting on it at
+     percentage coordinates are in place on first paint rather than stacking
+     at the top and jumping when the picture loads. `contain`, not `cover`:
+     a cropped plan is a plan with rooms cut off it. */
+  .venue-map__image {
+    display: block;
+    inline-size: 100%;
+    aspect-ratio: var(--venue-map-aspect);
+    object-fit: contain;
+  }
+
   /* Folio: a small-caps plain-text label that sits ON a rule. Never above a
      heading — the eyebrow ban is absolute. */
   .folio {

@@ -19,12 +19,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
-import { VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
+import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
-import VenueMap from '../components/VenueMap.jsx';
+import VenueMap, { useVenueMapImage } from '../components/VenueMap.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import SectionIndexNav from '../components/SectionIndexNav.jsx';
@@ -113,6 +113,20 @@ export default function ContentPage() {
     return () => clearTimeout(id);
   }, [query]);
 
+  // THE VENUE MAP IS NOT A BLOCK. It is a picture of the building plus the
+  // rooms the schedule already points at, so it lives on config/event beside
+  // the address (shared/venue.cjs) rather than being retyped into CMS
+  // content. Resolved before the 404 checks below because the image hook has
+  // to run on every render, whatever this route decides afterwards; the map
+  // is null on all but one page anyway.
+  const venueMap = resolveVenueMap(eventConfig);
+  // An object path that will not resolve, or a picture the browser cannot
+  // load, means there is no map — and this page is the one that must know,
+  // because it draws the heading. A heading over nothing is the empty
+  // section the page model exists to avoid.
+  const venueMapImage = useVenueMapImage(venueMap);
+  const map = venueMapImage ? venueMap : null;
+
   // The requested URL itself may be reserved territory (a stale /p/... link,
   // a guess at /signin/help) even before a page lookup happens.
   const page = isReservedPathSegment(firstPathSegment(pathname)) ? null : getPage(pathname);
@@ -138,25 +152,34 @@ export default function ContentPage() {
   const showLegalNotice =
     LEGAL_PAGE_IDS.includes(page.id) && eventConfig?.legal?.reviewRequired === true;
 
-  // THE VENUE MAP IS NOT A BLOCK. It is a picture of the building plus the
-  // rooms the schedule already points at, so it lives on config/event beside
-  // the address (shared/venue.cjs) rather than being retyped into CMS
-  // content. A page ASKS for it by stating a section with this id — the
-  // seeded travel page does, and any page an operator adds one to gets it
-  // too — which keeps the page a document and this route its renderer.
-  const venueMap = resolveVenueMap(eventConfig);
-
+  // A PAGE POSITIONS THE MAP BY ASKING FOR IT. Stating a section with this
+  // id is what puts the map at that point in the page — the seeded travel
+  // page does, and so does any page an operator adds the section to, which
+  // keeps the page a document and this route its renderer.
   const baseSections = (page.sections ?? [])
     .map((section) => ({
       section,
       blocks: getSectionBlocks(section.id),
-      map: section.id === VENUE_MAP_SECTION_ID ? venueMap : null,
+      map: section.id === VENUE_MAP_SECTION_ID ? map : null,
     }))
     // A section with nothing in it renders nothing, and a map is something.
     // A map section carries no blocks, so this is the one place that decides
     // it counts as populated — which is also what carries it into the
     // long-page gate and the section index below.
-    .filter(({ blocks, map }) => blocks.length > 0 || map);
+    .filter(({ blocks, map: sectionMap }) => blocks.length > 0 || sectionMap);
+
+  // AND A PAGE THAT NEVER ASKED STILL GETS IT, at the end. A deployment
+  // seeded before that section existed has a travel page without it, and
+  // re-running init leaves an edited page alone — so an operator there would
+  // upload a map, write the alt text, and publish nothing, with no way to
+  // tell why. The section is how the map is POSITIONED; it is not what makes
+  // the map exist. It is not a section, so it is not in baseSections: it
+  // never reaches the long-page gate, the filter, or the section index.
+  const trailingMap =
+    map && page.id === VENUE_MAP_PAGE_ID
+      && !(page.sections ?? []).some((section) => section.id === VENUE_MAP_SECTION_ID)
+      ? map
+      : null;
 
   const totalBlocks = baseSections.reduce((sum, { blocks }) => sum + blocks.length, 0);
   const hasFaqItem = baseSections.some(({ blocks }) =>
@@ -267,7 +290,7 @@ export default function ContentPage() {
           <SectionIndexNav sections={indexSections} />
         </div>
       ) : null}
-      {baseSections.length === 0 ? (
+      {baseSections.length === 0 && !trailingMap ? (
         <EmptyState
           title="Nothing here yet"
           description="This page is published but has no visible content. Check back soon."
@@ -277,7 +300,7 @@ export default function ContentPage() {
             </Link>
           }
         />
-      ) : filteredSections.length === 0 ? (
+      ) : baseSections.length > 0 && filteredSections.length === 0 ? (
         <EmptyState
           title="Nothing matches that filter"
           description="Try a different word, or clear the filter to see the whole page."
@@ -288,40 +311,65 @@ export default function ContentPage() {
           }
         />
       ) : (
-        filteredSections.map(({ section, blocks, map }, index) => (
-          <section
-            key={section.id}
-            aria-labelledby={`section-${section.id}`}
-            className={index === 0 ? undefined : 'mt-2xl'}
-          >
-            {/* The first section's label usually repeats the page title;
-                keep it for screen readers only — and with no visible heading
-                there is no section boundary to draw either. Anchored to the
-                PAGE's own first section id (firstSectionId), never to render
-                position: a filter can put a different section at index 0,
-                and that section still needs its real, visible heading.
-                tabIndex={-1} on both heading forms lets the section index
-                (above) move focus here without pulling either into the tab
-                order (interface guidelines: Accessibility — only tabindex 0
-                and -1). */}
-            {section.id === firstSectionId ? (
-              <h2 id={`section-${section.id}`} tabIndex={-1} className="sr-only">
-                {section.label}
-              </h2>
-            ) : (
+        <>
+          {filteredSections.map(({ section, blocks, map: sectionMap }, index) => (
+            <section
+              key={section.id}
+              aria-labelledby={`section-${section.id}`}
+              className={index === 0 ? undefined : 'mt-2xl'}
+            >
+              {/* The first section's label usually repeats the page title;
+                  keep it for screen readers only — and with no visible heading
+                  there is no section boundary to draw either. Anchored to the
+                  PAGE's own first section id (firstSectionId), never to render
+                  position: a filter can put a different section at index 0,
+                  and that section still needs its real, visible heading.
+                  tabIndex={-1} on both heading forms lets the section index
+                  (above) move focus here without pulling either into the tab
+                  order (interface guidelines: Accessibility — only tabindex 0
+                  and -1). */}
+              {section.id === firstSectionId ? (
+                <h2 id={`section-${section.id}`} tabIndex={-1} className="sr-only">
+                  {section.label}
+                </h2>
+              ) : (
+                <SectionHead
+                  level={2}
+                  id={`section-${section.id}`}
+                  title={section.label}
+                  tabIndex={-1}
+                />
+              )}
+              <div className={index === 0 ? undefined : 'mt-md'}>
+                <SectionBlocks blocks={blocks} />
+                <VenueMap
+                  map={sectionMap}
+                  image={venueMapImage}
+                  className={blocks.length > 0 ? 'mt-md' : undefined}
+                />
+              </div>
+            </section>
+          ))}
+          {trailingMap ? (
+            // The same words the seeded section carries, because this is the
+            // same device standing in the one place a page with no section
+            // for it can put it.
+            <section
+              aria-labelledby={`section-${VENUE_MAP_SECTION_ID}`}
+              className={filteredSections.length === 0 ? undefined : 'mt-2xl'}
+            >
               <SectionHead
                 level={2}
-                id={`section-${section.id}`}
-                title={section.label}
+                id={`section-${VENUE_MAP_SECTION_ID}`}
+                title="Venue map"
                 tabIndex={-1}
               />
-            )}
-            <div className={index === 0 ? undefined : 'mt-md'}>
-              <SectionBlocks blocks={blocks} />
-              <VenueMap map={map} className={blocks.length > 0 ? 'mt-md' : undefined} />
-            </div>
-          </section>
-        ))
+              <div className="mt-md">
+                <VenueMap map={trailingMap} image={venueMapImage} />
+              </div>
+            </section>
+          ) : null}
+        </>
       )}
     </article>
   );

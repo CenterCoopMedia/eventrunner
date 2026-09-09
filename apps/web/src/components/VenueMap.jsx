@@ -13,11 +13,48 @@
 // floor plan rather than a house-style diagram of a building nobody has
 // seen. A hand-drawn SVG per deployment is exactly what this replaces.
 //
+// A MISSING PICTURE IS NOT A MESSAGE. AssetImage prints "This file is
+// missing from storage." where an object has gone, which is the right thing
+// in the admin media library — an operator can act on it — and the wrong
+// thing on a public page, where it is a maintenance note addressed to
+// somebody the reader has never met. So this reads the URL itself, and an
+// object path that cannot be resolved, or an image the browser fails to
+// load, takes the WHOLE device with it: no heading, no room list, and above
+// all no markers, because numbered dots floating over nothing are a diagram
+// of a building that is not there.
+//
 // LIKE TransferLine, IT IS HANDED A FACT OR IT IS HANDED NOTHING. The
 // resolving is shared/venue.cjs resolveVenueMap's job, including the rule
-// that a picture with no alt text does not render at all; given `null` this
-// renders nothing and the section around it disappears with it.
-import AssetImage from './media/AssetImage.jsx';
+// that a picture with no alt text does not render at all.
+import { useCallback, useEffect, useState } from 'react';
+import { assetUrl } from '../lib/mediaSource.js';
+
+/**
+ * The map's image, or `null` when there is nothing to draw.
+ *
+ * A HOOK RATHER THAN STATE INSIDE THE COMPONENT, because the caller has to
+ * know the answer too: it is the one that renders the section heading around
+ * this device, and a heading over a picture that never arrives is the empty
+ * section the whole page model exists to avoid. Called unconditionally, so
+ * it obeys the rules of hooks whatever the caller decides afterwards.
+ *
+ * @param {{ image: string } | null} map a resolved venue map
+ * @returns {{ src: string, onError: () => void } | null}
+ */
+export function useVenueMapImage(map) {
+  const src = map ? assetUrl(map.image) : null;
+  const [failedSrc, setFailedSrc] = useState(null);
+  const onError = useCallback(() => setFailedSrc(src), [src]);
+
+  // A new picture is a new chance: clear a previous failure so one deleted
+  // object does not hide every map chosen after it.
+  useEffect(() => {
+    setFailedSrc((current) => (current === src ? current : null));
+  }, [src]);
+
+  if (!src || failedSrc === src) return null;
+  return { src, onError };
+}
 
 /**
  * @param {{
@@ -29,25 +66,32 @@ import AssetImage from './media/AssetImage.jsx';
  *       number: number|null, x: number|null, y: number|null,
  *     }>,
  *   } | null,
+ *   image: { src: string, onError: () => void } | null,
  *   className?: string,
  * }} props
  */
-export default function VenueMap({ map, className = '' }) {
-  if (!map) return null;
+export default function VenueMap({ map, image, className = '' }) {
+  if (!map || !image) return null;
   const marked = map.rooms.filter((room) => room.number !== null);
 
   return (
     <div className={['venue-map grid gap-lg md:grid-cols-3', className].filter(Boolean).join(' ')}>
       <div className="relative md:col-span-2">
-        <AssetImage
-          path={map.image}
+        {/* The frame holds its ratio before the bytes arrive, so the markers
+            land where they belong on first paint instead of stacking at the
+            top and jumping down when the picture loads. `contain` inside it,
+            because a cropped plan is a plan with rooms cut off it. */}
+        <img
+          src={image.src}
           alt={map.alt}
-          className="h-auto w-full rounded-brand outline outline-1 -outline-offset-1 outline-text-primary/[0.08]"
+          loading="lazy"
+          onError={image.onError}
+          className="venue-map__image rounded-brand outline outline-1 -outline-offset-1 outline-text-primary/[0.08]"
         />
         {/* Decoration for the reader who can see the plan: the same numbers
             the list carries, sitting where the operator placed them. The
-            coordinates are percentages, so a marker holds its spot at every
-            size the picture is served at. */}
+            coordinates are percentages of the frame, so a marker holds its
+            spot at every size the picture is served at. */}
         {marked.map((room) => (
           <span
             key={room.id}
@@ -69,7 +113,7 @@ export default function VenueMap({ map, className = '' }) {
             {map.rooms.map((room) => (
               <li
                 key={room.id}
-                className="flex gap-xs border-rule-hairline border-t-hairline pt-2xs mt-2xs first:mt-0 first:border-t-0 first:pt-0"
+                className="mt-2xs flex gap-xs border-rule-hairline border-t-hairline pt-2xs first:mt-0 first:border-t-0 first:pt-0"
               >
                 {/* The number is real text in both places, which is what
                     ties a dot on the plan to a name in the list. A room

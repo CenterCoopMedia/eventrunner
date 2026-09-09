@@ -165,6 +165,9 @@
   --lead-image-aspect: 3 / 2;
   --lead-image-width: 22rem;
 
+  /* Tier 3 — venue-map contract (brief §3.1). */
+  --venue-map-aspect: 4 / 3;
+
   /* Tier 3 — section-rule contract (brief §3.1). */
   --section-rule-width: var(--rule-strong-width);
   --section-rule-gap: var(--space-sm);
