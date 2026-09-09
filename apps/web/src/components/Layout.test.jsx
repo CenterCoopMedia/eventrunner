@@ -188,7 +188,10 @@ describe('Layout header', () => {
 });
 
 describe('Layout navigation (built from page documents)', () => {
-  const navLabels = (root) => [...root.querySelectorAll('nav a')].map((a) => a.textContent);
+  // Scoped to the main nav by its landmark label: the footer carries the
+  // same page list (M7 issue 3), so a bare `nav a` would count both.
+  const MAIN_NAV = 'nav[aria-label="Main"] a';
+  const navLabels = (root) => [...root.querySelectorAll(MAIN_NAV)].map((a) => a.textContent);
 
   it('lists a seeded content page and leaves a hidden one out', () => {
     const { container } = renderShell(
@@ -215,7 +218,7 @@ describe('Layout navigation (built from page documents)', () => {
       'Frequently asked questions',
       'Sign in',
     ]);
-    expect([...container.querySelectorAll('nav a')].map((a) => a.getAttribute('href'))).toEqual([
+    expect([...container.querySelectorAll(MAIN_NAV)].map((a) => a.getAttribute('href'))).toEqual([
       '/',
       '/schedule',
       '/travel',
@@ -250,7 +253,7 @@ describe('Layout navigation (built from page documents)', () => {
   // beyond the element still being a link.
   it('gives every item a keyboard path at the full touch target size', () => {
     const { container } = renderShell({});
-    for (const link of container.querySelectorAll('nav a')) {
+    for (const link of container.querySelectorAll(MAIN_NAV)) {
       expect(link.tagName).toBe('A');
       expect(link).toHaveAttribute('href');
       expect(link.hasAttribute('tabindex')).toBe(false);
@@ -277,7 +280,9 @@ describe('Layout navigation (built from page documents)', () => {
 // path rather than being a second control the shell has to place twice.
 describe('Layout account control', () => {
   const accountLink = (root) =>
-    root.querySelector('nav a[href="/signin"], nav a[href="/profile"]');
+    root.querySelector(
+      'nav[aria-label="Main"] a[href="/signin"], nav[aria-label="Main"] a[href="/profile"]',
+    );
 
   it('offers sign-in to a visitor who is not signed in', () => {
     const { container } = renderShell({});
@@ -285,7 +290,7 @@ describe('Layout account control', () => {
     expect(link).toHaveAttribute('href', '/signin');
     expect(link.textContent).toBe('Sign in');
     // One control, not two: a signed-out reader is never offered a profile.
-    expect(container.querySelectorAll('nav a[href="/profile"]')).toHaveLength(0);
+    expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/profile"]')).toHaveLength(0);
   });
 
   it('offers the profile to a reader who is signed in', () => {
@@ -293,7 +298,7 @@ describe('Layout account control', () => {
     const link = accountLink(container);
     expect(link).toHaveAttribute('href', '/profile');
     expect(link.textContent).toBe('Your profile');
-    expect(container.querySelectorAll('nav a[href="/signin"]')).toHaveLength(0);
+    expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/signin"]')).toHaveLength(0);
   });
 
   it('offers sign-in while the auth handshake is still in flight', () => {
@@ -314,14 +319,14 @@ describe('Layout account control', () => {
 
   it('sits at the end of the navigation, after every page', () => {
     const { container } = renderShell({});
-    const links = [...container.querySelectorAll('nav a')];
+    const links = [...container.querySelectorAll('nav[aria-label="Main"] a')];
     expect(links.at(-1)).toBe(accountLink(container));
   });
 
   it('is reachable in both nav placements, as the same one control', () => {
     for (const navPlacement of ['top', 'side']) {
       const { container } = renderShell({}, { path: '/schedule', themeDoc: { navPlacement } });
-      expect(container.querySelectorAll('nav a[href="/signin"]')).toHaveLength(1);
+      expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/signin"]')).toHaveLength(1);
     }
   });
 
@@ -368,6 +373,226 @@ describe('Layout account control', () => {
   it('does not claim a route that merely starts with the sign-in path', () => {
     const { container } = renderShell({}, { path: '/signin/help' });
     expect(accountLink(container)).not.toHaveAttribute('aria-current');
+  });
+});
+
+// THE FOOTER (M7 issue 3). The same page list the navigation carries, the
+// organization that operates the event, how to reach it, and whatever social
+// accounts the event has recorded — every one of them read from data, none of
+// them written here.
+describe('Layout footer', () => {
+  const footer = (root) => root.querySelector('footer');
+  // Both footer lists are navigation landmarks, told apart by their label —
+  // the same way a reader's landmark list tells them apart.
+  const PAGE_NAV = 'nav[aria-label="Site pages"]';
+  const SOCIAL_NAV = 'nav[aria-label="Social accounts"]';
+  const socialNav = (root) => footer(root).querySelector(SOCIAL_NAV);
+  const socialLinks = (root) => socialNav(root).querySelectorAll('a');
+  const footerLinks = (root) =>
+    [...footer(root).querySelectorAll(`${PAGE_NAV} a`)].map((a) => ({
+      label: a.textContent,
+      href: a.getAttribute('href'),
+    }));
+
+  it('lists the same pages the navigation lists, in the same order', () => {
+    const { container } = renderShell({});
+    expect(footerLinks(container)).toEqual([
+      { label: 'Home page', href: '/' },
+      { label: 'Schedule', href: '/schedule' },
+      { label: 'Travel and venue', href: '/travel' },
+      { label: 'Frequently asked questions', href: '/faq' },
+    ]);
+  });
+
+  it('applies the navigation’s own gates rather than a second set', () => {
+    const { container } = renderShell(
+      {},
+      {
+        featureFlags: {},
+        pageDocs: [
+          ...FIXTURE_PAGES,
+          { id: 'draft', label: 'Draft page', path: '/draft', order: 6, visible: false },
+        ],
+      },
+    );
+    const labels = footerLinks(container).map((link) => link.label);
+    // Hidden by the editor, and a system page whose feature is switched off.
+    expect(labels).not.toContain('Draft page');
+    expect(labels).not.toContain('Schedule');
+    expect(labels).toContain('Travel and venue');
+  });
+
+  it('renders no page list at all when no page is navigable', () => {
+    const { container } = renderShell({}, { pageDocs: [] });
+    expect(footer(container).querySelector(PAGE_NAV)).toBeNull();
+  });
+
+  it('names the operator and links the support address from config/event', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          legal: { operatorName: '[Fixture] Example Trust', supportEmail: 'help@example.org' },
+        },
+      },
+    );
+    expect(footer(container).textContent).toContain('[Fixture] Example Trust');
+    expect(footer(container).querySelector('a[href="mailto:help@example.org"]')).not.toBeNull();
+  });
+
+  it('renders the social accounts config/event records, and nothing else', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', url: 'https://example.org/@fixture' },
+              { platform: 'Bluesky', url: 'https://example.net/fixture' },
+            ],
+          },
+        },
+      },
+    );
+    const links = [...socialLinks(container)];
+    expect(links.map((a) => a.textContent)).toEqual(['Mastodon', 'Bluesky']);
+    expect(links[0]).toHaveAttribute('href', 'https://example.org/@fixture');
+    // No target: the account opens in the tab the reader is already in, so
+    // there is no opener to sever — rel="noreferrer" is here to withhold
+    // the referrer, which is the whole of what it does on a same-tab link.
+    expect(links[0]).not.toHaveAttribute('target');
+    expect(links[0]).toHaveAttribute('rel', 'noreferrer');
+  });
+
+  it('renders no social block when the event sets no handles', () => {
+    // The common case: config/event carries `social.handles: []` on a fresh
+    // deployment, and a runtime document can drop the field entirely.
+    for (const social of [undefined, {}, { handles: [] }, { handles: 'nope' }]) {
+      const { container } = renderShell({}, { event: { ...FIXTURE_EVENT, social } });
+      expect(socialNav(container)).toBeNull();
+    }
+  });
+
+  it('drops a handle it cannot turn into a safe link', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', url: 'https://example.org/@fixture' },
+              { platform: 'Bad', url: 'javascript:alert(1)' },
+              { platform: 'No address' },
+              { url: 'https://example.org/unnamed' },
+              'not an object',
+            ],
+          },
+        },
+      },
+    );
+    expect([...socialLinks(container)].map((a) => a.textContent)).toEqual(['Mastodon']);
+  });
+
+  it('trims a platform name and caps how long it can be', () => {
+    // config/event is an unvalidated fail-soft overlay (§2.4): a runtime
+    // document can carry a platform name of any length, and a footer that
+    // renders it verbatim hands one bad write the whole bottom of the site.
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: '  Mastodon  ', url: 'https://example.org/@fixture' },
+              { platform: 'M'.repeat(400), url: 'https://example.net/fixture' },
+            ],
+          },
+        },
+      },
+    );
+    const labels = [...socialLinks(container)].map((a) => a.textContent);
+    expect(labels[0]).toBe('Mastodon');
+    expect(labels[1]).toHaveLength(40);
+    expect(labels[1]).toBe('M'.repeat(40));
+  });
+
+  it('drops a platform name that is only whitespace', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: { handles: [{ platform: '   ', url: 'https://example.org/@fixture' }] },
+        },
+      },
+    );
+    expect(socialNav(container)).toBeNull();
+  });
+
+  it('renders one link for a handle recorded twice', () => {
+    // Two identical entries are one account said twice; a repeated link is
+    // noise a reader has to resolve (the rule buildNavItems already applies
+    // to a duplicated route).
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', url: 'https://example.org/@fixture' },
+              { platform: 'Mastodon', url: 'https://example.org/@fixture' },
+            ],
+          },
+        },
+      },
+    );
+    expect([...socialLinks(container)]).toHaveLength(1);
+  });
+
+  it('keeps two accounts that share one address', () => {
+    // One profile page can be reached under two names, and two names can
+    // point at one page. Neither half of the pair is a key on its own.
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', url: 'https://example.org/@fixture' },
+              { platform: 'Fediverse', url: 'https://example.org/@fixture' },
+            ],
+          },
+        },
+      },
+    );
+    expect([...socialLinks(container)].map((a) => a.textContent)).toEqual([
+      'Mastodon',
+      'Fediverse',
+    ]);
+  });
+
+  it('gives every footer link a keyboard path at the full touch target size', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          legal: { operatorName: '[Fixture] Example Trust', supportEmail: 'help@example.org' },
+          social: { handles: [{ platform: 'Mastodon', url: 'https://example.org/@fixture' }] },
+        },
+      },
+    );
+    for (const link of footer(container).querySelectorAll('a')) {
+      expect(link).toHaveAttribute('href');
+      expect(link.hasAttribute('tabindex')).toBe(false);
+      expect(link.className).toContain('touch-target');
+    }
   });
 });
 
@@ -427,7 +652,8 @@ describe('Layout variants (brief §6.1)', () => {
 
     // Same landmark, same items, same order — the rail is a placement, not
     // a different navigation (§8.1).
-    const labels = (root) => [...root.querySelectorAll('nav a')].map((a) => a.textContent);
+    const labels = (root) =>
+      [...root.querySelectorAll('nav[aria-label="Main"] a')].map((a) => a.textContent);
     expect(labels(side)).toEqual(labels(top));
     expect(side.querySelector('nav')).toHaveAttribute('aria-label', 'Main');
 

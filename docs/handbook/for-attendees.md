@@ -10,6 +10,10 @@ You can sign in with Google or with a 6-digit code we email you. University and 
 
 There is no password to remember. If the code never arrives, ask in [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) or email the event organizer.
 
+## Finding a page
+
+Every page the event publishes has a link in the site navigation and again in the footer at the bottom of the page. The footer also names the organization running the event, links its support address, and lists the event's social accounts if it has any.
+
 ## Schedule
 
 The schedule is grouped by day. You can bookmark sessions and download a calendar file (ICS) or open a calendar link. The site does not write directly into Google Calendar for you.

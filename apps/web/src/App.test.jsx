@@ -181,7 +181,8 @@ describe('app shell', () => {
     expect(
       await screen.findByRole('heading', { name: 'Sign in to see who’s attending' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Attendees' })).toBeInTheDocument();
+    // Twice: the navigation and the footer list share one gate (M7 issue 3).
+    expect(screen.queryAllByRole('link', { name: 'Attendees' })).toHaveLength(2);
 
     act(() => {
       configSubscriptions.get('features')({ attendeeDirectory: false });
@@ -189,7 +190,7 @@ describe('app shell', () => {
     expect(
       screen.getByRole('heading', { name: 'This event doesn’t have an attendee directory' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Attendees' })).toBeNull();
+    expect(screen.queryAllByRole('link', { name: 'Attendees' })).toHaveLength(0);
   });
 
   it('?preview=1 alone (signed out) does not select the draft read source', async () => {

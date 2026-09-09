@@ -57,6 +57,8 @@ Every page document (About, Travel, Conduct, and anything else seeded or added) 
 
 **One item is not a page.** The navigation ends with the account control, which the site adds itself. It reads **Sign in** for a reader who is not signed in and **Your profile** for one who is. You cannot remove it or reorder it, and it needs no page document.
 
+**The footer lists the same pages.** The footer repeats the page list under the same rules, so a page you hide leaves both places at once and a page you rename is renamed in both. Below it the footer names the organization that operates the event and links its support address, both from the event configuration, and lists the event's social accounts if the configuration records any. An event with no social accounts gets no social block, not an empty one. Social account links are set when the site is created and have no editor here yet.
+
 **Pick what kind of page this is.** Six named tasks, and picking one shapes the page:
 
 | Template | For |
