@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { KNOWN_FEATURE_KEYS } from 'shared/config';
 import { RESERVED_PATH_SEGMENTS, firstPathSegment } from 'shared/routing';
-import { SYSTEM_PAGE_FEATURES, buildNavItems } from './siteNavigation.js';
+import { SYSTEM_PAGES, buildNavItems } from './siteNavigation.js';
 
 const here = nodePath.dirname(fileURLToPath(import.meta.url));
 const APP_JSX = nodePath.join(here, '..', 'App.jsx');
@@ -19,9 +19,8 @@ const APP_JSX = nodePath.join(here, '..', 'App.jsx');
  *
  * Read out of the source rather than imported, because the list lives in JSX
  * that only React can evaluate — and reading it is the whole point: three
- * lists kept by hand (the routes, SYSTEM_PAGE_FEATURES, and
- * RESERVED_PATH_SEGMENTS) are exactly what drifts, silently, the next time
- * someone adds a route.
+ * lists kept by hand (the routes, SYSTEM_PAGES, and RESERVED_PATH_SEGMENTS)
+ * are exactly what drifts, silently, the next time someone adds a route.
  *
  * `<Route index>` is the home page and carries no `path`, so '/' is added
  * here. `admin/*` is a subtree: the splat is dropped and the prefix stands.
@@ -53,11 +52,22 @@ const labels = (items) => items.map((item) => item.label);
 const paths = (items) => items.map((item) => item.to);
 
 describe('the system page routes', () => {
-  it('names a feature for every system route except the home page', () => {
-    expect(SYSTEM_PAGE_FEATURES['/']).toBeNull();
-    for (const [routePath, feature] of Object.entries(SYSTEM_PAGE_FEATURES)) {
-      if (routePath === '/') continue;
-      expect(typeof feature).toBe('string');
+  it('is keyed by the seeded document id, never by an editable path', () => {
+    // The whole point of keying by id: the key is the document's identity,
+    // which nothing in the editor can change, while `path` on a system page
+    // is a copy of a fact that lives in App.jsx.
+    for (const [id, system] of Object.entries(SYSTEM_PAGES)) {
+      expect(id).toMatch(/^[a-z]+$/);
+      expect(system.to.startsWith('/')).toBe(true);
+      expect(typeof system.children).toBe('boolean');
+    }
+  });
+
+  it('names a feature for every system page except the home page', () => {
+    expect(SYSTEM_PAGES.home.feature).toBeNull();
+    for (const [id, system] of Object.entries(SYSTEM_PAGES)) {
+      if (id === 'home') continue;
+      expect(typeof system.feature).toBe('string');
     }
   });
 
@@ -65,21 +75,34 @@ describe('the system page routes', () => {
   // would hide the page for every deployment with no way to tell why. Pin
   // the map to the flags config/features actually accepts.
   it('gates only on flags config/features knows', () => {
-    for (const feature of Object.values(SYSTEM_PAGE_FEATURES)) {
-      if (feature === null) continue;
-      expect(KNOWN_FEATURE_KEYS).toContain(feature);
+    for (const system of Object.values(SYSTEM_PAGES)) {
+      if (system.feature === null) continue;
+      expect(KNOWN_FEATURE_KEYS).toContain(system.feature);
     }
   });
 
-  // Every key here becomes an <a href>. A key App.jsx does not mount is a
-  // link into the catch-all, and the catch-all 404s a system page — the same
-  // dead end buildNavItems drops hand-edited data to avoid, arrived at
+  // Every route here becomes an <a href>. A route App.jsx does not mount is
+  // a link into the catch-all, and the catch-all 404s a system page — the
+  // same dead end buildNavItems drops hand-edited data to avoid, arrived at
   // through code instead of through data.
   it('names only routes App.jsx actually mounts', () => {
     const mounted = mountedRoutes();
     expect(mounted).toContain('/');
-    for (const routePath of Object.keys(SYSTEM_PAGE_FEATURES)) {
-      expect(mounted).toContain(routePath);
+    for (const system of Object.values(SYSTEM_PAGES)) {
+      expect(mounted).toContain(system.to);
+    }
+  });
+
+  // `children` decides whether the item keeps prefix matching, so a wrong
+  // answer either loses the marker inside a section or marks two items at
+  // once. Read the child routes out of App.jsx rather than trusting the map.
+  it('marks a route as having children only when App.jsx mounts some', () => {
+    const mounted = mountedRoutes();
+    for (const system of Object.values(SYSTEM_PAGES)) {
+      const hasChildren = mounted.some(
+        (route) => route !== system.to && route.startsWith(`${system.to}/`),
+      );
+      expect(system.children).toBe(hasChildren);
     }
   });
 
@@ -132,15 +155,51 @@ describe('buildNavItems', () => {
     expect(paths(buildNavItems([HOME, SCHEDULE, TRAVEL], undefined))).toEqual(['/', '/travel']);
   });
 
-  it('ends the match on the home page only', () => {
+  // Prefix matching belongs only to a route that owns children, because
+  // that is the only case where the reader is genuinely still inside the
+  // section. Everywhere else it marks two items at once, which tells a
+  // screen reader the reader is in two places.
+  it('keeps prefix matching for a section with child routes', () => {
     const items = buildNavItems([HOME, SCHEDULE], ALL_ON);
     expect(items.find((item) => item.to === '/').end).toBe(true);
     expect(items.find((item) => item.to === '/schedule').end).toBe(false);
   });
 
-  it('drops a system page whose path is not a route the app mounts', () => {
-    // Hand-edited data: systemPage true with a path no <Route> owns. The
-    // catch-all renders NotFound for it, so a link would be a dead end.
+  it('matches a generic page exactly, so a nested pair never both mark', () => {
+    const items = buildNavItems(
+      [
+        { id: 'about', label: 'About', path: '/about', order: 1, visible: true, systemPage: false },
+        { id: 'team', label: 'Team', path: '/about/team', order: 2, visible: true, systemPage: false },
+      ],
+      ALL_ON,
+    );
+    expect(paths(items)).toEqual(['/about', '/about/team']);
+    expect(items.every((item) => item.end)).toBe(true);
+  });
+
+  it('matches a system page with no child routes exactly too', () => {
+    const sponsors = { id: 'sponsors', label: 'Sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true };
+    const [item] = buildNavItems([sponsors], ALL_ON);
+    expect(item.end).toBe(true);
+  });
+
+  // The defect this replaced: SYSTEM_PAGE_FEATURES was keyed by path, so a
+  // system page whose Path an operator had edited fell out of the
+  // navigation while App.jsx went on mounting /schedule.
+  it('links a system page to its mounted route whatever its stored path says', () => {
+    const items = buildNavItems([HOME, { ...SCHEDULE, path: '/agenda' }], ALL_ON);
+    expect(paths(items)).toEqual(['/', '/schedule']);
+    // And the label is still the operator's.
+    expect(labels(items)).toEqual(['Home page', 'Schedule']);
+  });
+
+  it('takes the label a renamed system page carries', () => {
+    const items = buildNavItems([{ ...SCHEDULE, label: 'Programme' }], ALL_ON);
+    expect(labels(items)).toEqual(['Programme']);
+  });
+
+  it('drops a system page whose id names no mounted route', () => {
+    // Hand-written data: systemPage true with an id nothing answers to.
     const items = buildNavItems([HOME, { ...SCHEDULE, id: 'ghost', path: '/ghost' }], ALL_ON);
     expect(paths(items)).toEqual(['/']);
   });
@@ -152,6 +211,24 @@ describe('buildNavItems', () => {
     expect(paths(items)).toEqual(['/']);
   });
 
+  // A value that is not a path is not a cosmetic problem: rendered into an
+  // href it takes the reader off the site, from inside the site's own
+  // navigation. Neither shape can be saved through the editor; both can sit
+  // in Firestore.
+  it('drops a page whose path points at another origin', () => {
+    const items = buildNavItems(
+      [
+        HOME,
+        { id: 'protorel', label: 'Protocol relative', path: '//example.org', visible: true },
+        { id: 'protorel2', label: 'Protocol relative deep', path: '//example.org/travel', visible: true },
+        { id: 'absolute', label: 'Absolute', path: 'https://example.org', visible: true },
+        { id: 'scheme', label: 'Scheme', path: 'javascript:alert(1)', visible: true },
+      ],
+      ALL_ON,
+    );
+    expect(paths(items)).toEqual(['/']);
+  });
+
   it('drops a page with no usable label or path', () => {
     const items = buildNavItems(
       [
@@ -159,6 +236,12 @@ describe('buildNavItems', () => {
         { id: 'nolabel', label: '   ', path: '/nolabel', visible: true },
         { id: 'nopath', label: 'No path', path: '', visible: true },
         { id: 'relative', label: 'Relative', path: 'travel', visible: true },
+        { id: 'trailing', label: 'Trailing', path: '/travel/', visible: true },
+        { id: 'spaced', label: 'Spaced', path: '/tra vel', visible: true },
+        { id: 'shouty', label: 'Shouty', path: '/Travel', visible: true },
+        // '/' belongs to the home route; a generic page there would link to
+        // the home page, not to itself.
+        { id: 'root', label: 'Root', path: '/', visible: true, systemPage: false },
         null,
       ],
       ALL_ON,
