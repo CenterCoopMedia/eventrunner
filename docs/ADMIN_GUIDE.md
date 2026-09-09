@@ -70,6 +70,8 @@ The individual settings behind that — header, arrangement, spacing — are sti
 
 One page can still differ. **Change the individual settings** also carries **Navigation on this page**: Leave it on *Follow the site setting* — which names what the site is currently set to — or overrule it for this page alone. Use it sparingly and on purpose: A rail beside one long directory is a decision; a rail on three pages out of nine is an accident. It is not part of a template, so setting it leaves the template alone.
 
+**The site navigation is this list.** Every page that is visible gets a link in the header, in the order the list shows, under the label you gave it — so adding a page adds its link, hiding a page removes it, and renaming a page renames it in the navigation too. Nobody has to deploy anything for that to happen. Two things keep a visible page out: a system page whose feature is switched off on the Features tab (an Updates page is still a page when *Updates* is off, it just has nowhere to send a reader), and a page saved at an address the site reserves for something else.
+
 **A system page** — home, schedule, speakers, sponsors, attendees, updates — keeps its built-in feature and lets you put sections around it. Each section on one of those pages picks where it is inserted: **Before the main feature** or **After the main feature**. Custom pages have no built-in feature, so they have no insertion point to pick.
 
 ## Content (Pages → Content editor)

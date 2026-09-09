@@ -14,11 +14,13 @@ import { MemoryRouter } from 'react-router-dom';
 let theme;
 let eventConfig;
 let page;
+let features;
+let pages;
 
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({
     eventConfig,
-    features: {},
+    features,
     theme,
   }),
 }));
@@ -26,8 +28,13 @@ vi.mock('../contexts/EventConfigContext.jsx', () => ({
 // variants it owns: which nameplate treatment the page takes, and where its
 // navigation sits (brief §6.1). A route with no document keeps the shell's
 // own rule, which is what these tests render unless they set one.
+// The shell also reads the whole page list: the navigation IS that list
+// (lib/siteNavigation.js), so a test that wants nav items supplies pages.
 vi.mock('../contexts/ContentContext.jsx', () => ({
-  useContent: () => ({ getPage: (key) => (page && page.path === key ? page : null) }),
+  useContent: () => ({
+    pages,
+    getPage: (key) => (page && page.path === key ? page : null),
+  }),
 }));
 
 const { default: Layout } = await import('./Layout.jsx');
@@ -41,13 +48,33 @@ const FIXTURE_EVENT = {
   legal: {},
 };
 
+// The pages a seeded deployment ships, trimmed to what the shell reads.
+const FIXTURE_PAGES = [
+  { id: 'home', label: 'Home page', path: '/', order: 0, visible: true, systemPage: true },
+  { id: 'schedule', label: 'Schedule', path: '/schedule', order: 1, visible: true, systemPage: true },
+  { id: 'travel', label: 'Travel and venue', path: '/travel', order: 4, visible: true, systemPage: false },
+  { id: 'faq', label: 'Frequently asked questions', path: '/faq', order: 5, visible: true, systemPage: false },
+];
+
+const FIXTURE_FEATURES = { schedule: true };
+
 function renderShell(
   logos,
-  { path = '/', event = FIXTURE_EVENT, pageDoc = null, themeDoc = null, header } = {},
+  {
+    path = '/',
+    event = FIXTURE_EVENT,
+    pageDoc = null,
+    themeDoc = null,
+    header,
+    pageDocs = FIXTURE_PAGES,
+    featureFlags = FIXTURE_FEATURES,
+  } = {},
 ) {
   theme = { logos, header, ...themeDoc };
   eventConfig = event;
   page = pageDoc;
+  pages = pageDocs;
+  features = featureFlags;
   return render(
     <MemoryRouter
       initialEntries={[path]}
@@ -146,6 +173,81 @@ describe('Layout header', () => {
   it('renders the shell with no dateline when config/event carries no days', () => {
     const { container } = renderShell({}, { event: { shortName: 'EX2027', legal: {} } });
     expect(container.querySelector('header').textContent).toContain('EX2027');
+  });
+});
+
+describe('Layout navigation (built from page documents)', () => {
+  const navLabels = (root) => [...root.querySelectorAll('nav a')].map((a) => a.textContent);
+
+  it('lists a seeded content page and leaves a hidden one out', () => {
+    const { container } = renderShell(
+      {},
+      {
+        pageDocs: [
+          ...FIXTURE_PAGES,
+          { id: 'draft', label: 'Draft page', path: '/draft', order: 6, visible: false },
+        ],
+      },
+    );
+    expect(navLabels(container)).toContain('Travel and venue');
+    expect(navLabels(container)).not.toContain('Draft page');
+  });
+
+  it('reads the labels and the order from the page documents', () => {
+    const { container } = renderShell({});
+    expect(navLabels(container)).toEqual([
+      'Home page',
+      'Schedule',
+      'Travel and venue',
+      'Frequently asked questions',
+    ]);
+    expect([...container.querySelectorAll('nav a')].map((a) => a.getAttribute('href'))).toEqual([
+      '/',
+      '/schedule',
+      '/travel',
+      '/faq',
+    ]);
+  });
+
+  it('still gates a system page on its feature flag', () => {
+    const { container } = renderShell({}, { featureFlags: {} });
+    expect(navLabels(container)).not.toContain('Schedule');
+    expect(navLabels(container)).toContain('Travel and venue');
+  });
+
+  it('marks the page in view, and only that one, on a content page', () => {
+    const { container } = renderShell({}, { path: '/travel' });
+    const current = [...container.querySelectorAll('nav a[aria-current="page"]')];
+    expect(current).toHaveLength(1);
+    expect(current[0].textContent).toBe('Travel and venue');
+    expect(current[0]).toHaveClass('font-semibold', 'border-b-rule-strong');
+  });
+
+  it('keeps a system page marked on the routes below it', () => {
+    const { container } = renderShell({}, { path: '/schedule/session-1' });
+    const current = container.querySelector('nav a[aria-current="page"]');
+    expect(current.textContent).toBe('Schedule');
+  });
+
+  // The keyboard path is the anchor itself: a real href, in document order,
+  // with no tabindex overriding it. Focus is drawn by the global
+  // :focus-visible rule in index.css, so there is nothing per-item to assert
+  // beyond the element still being a link.
+  it('gives every item a keyboard path at the full touch target size', () => {
+    const { container } = renderShell({});
+    for (const link of container.querySelectorAll('nav a')) {
+      expect(link.tagName).toBe('A');
+      expect(link).toHaveAttribute('href');
+      expect(link.hasAttribute('tabindex')).toBe(false);
+      expect(link.className).toContain('touch-target');
+    }
+  });
+
+  it('renders no nav landmark at all when no page is navigable', () => {
+    const { container } = renderShell({}, { pageDocs: [] });
+    expect(container.querySelector('nav')).toBeNull();
+    // The identity still links home, so the site is never a dead end.
+    expect(container.querySelector('header a[href="/"]')).not.toBeNull();
   });
 });
 

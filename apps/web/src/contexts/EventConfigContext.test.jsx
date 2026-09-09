@@ -192,6 +192,16 @@ describe('EventConfigProvider', () => {
 });
 
 describe('Layout nav', () => {
+  // The navigation is the page list (lib/siteNavigation.js). These tests are
+  // about the config subscriptions under it, so the pages are fixed here and
+  // only the feature flags move.
+  const NAV_PAGES = [
+    { id: 'home', label: 'Home page', path: '/', order: 0, visible: true, systemPage: true },
+    { id: 'schedule', label: 'Schedule', path: '/schedule', order: 1, visible: true, systemPage: true },
+    { id: 'speakers', label: 'Speakers', path: '/speakers', order: 2, visible: true, systemPage: true },
+    { id: 'sponsors', label: 'Sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true },
+  ];
+
   function renderShell() {
     return render(
       <MemoryRouter
@@ -202,7 +212,7 @@ describe('Layout nav', () => {
               layout variants it owns (brief §6.1). These tests are about
               the config subscriptions, so the page lookup answers nothing
               and the shell keeps its own rule. */}
-          <ContentContext.Provider value={{ getPage: () => null }}>
+          <ContentContext.Provider value={{ pages: NAV_PAGES, getPage: () => null }}>
             <Layout />
           </ContentContext.Provider>
         </EventConfigProvider>
@@ -223,7 +233,8 @@ describe('Layout nav', () => {
     expect(screen.queryByRole('link', { name: 'Speakers' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Sponsors' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Schedule' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument();
+    // The home page carries no feature flag, so it survives every clearing.
+    expect(screen.getByRole('link', { name: 'Home page' })).toBeInTheDocument();
   });
 
   it('applies the page-surface class on the shell', () => {

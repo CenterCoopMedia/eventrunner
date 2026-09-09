@@ -19,6 +19,11 @@
 // screen reader, the two placements are the same nav in the same place in
 // the document.
 //
+// WHAT IS IN THE LIST IS DATA, NOT CODE. The items are the visible cmsPages
+// documents in their own `order`, built by lib/siteNavigation.js — see that
+// module for the two gates (an editor's `visible`, plus the feature flag a
+// system page's route already checks).
+//
 // WHERE THE PLACEMENT COMES FROM, IN ORDER — THE PAGE, THEN THE SITE.
 //
 // The navigation is the part of the shell that tells a reader where they
@@ -45,6 +50,7 @@ import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
+import { buildNavItems } from '../lib/siteNavigation.js';
 import { brandingSrc } from '../lib/mediaSource.js';
 import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
@@ -79,15 +85,6 @@ const MARK_SIZE = {
   running: { className: 'h-6 w-6', px: 24 },
 };
 
-const NAV_ITEMS = [
-  { to: '/', label: 'Home', end: true },
-  { to: '/schedule', label: 'Schedule', feature: 'schedule' },
-  { to: '/speakers', label: 'Speakers', feature: 'speakers' },
-  { to: '/sponsors', label: 'Sponsors', feature: 'sponsors' },
-  { to: '/attendees', label: 'Attendees', feature: 'attendeeDirectory' },
-  { to: '/updates', label: 'Updates', feature: 'updates' },
-];
-
 function navClass({ isActive }) {
   return [
     'touch-target inline-flex items-center border-b-strong px-2xs py-xs font-data text-caption',
@@ -99,7 +96,7 @@ function navClass({ isActive }) {
 
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
-  const { getPage } = useContent();
+  const { pages, getPage } = useContent();
   const { pathname } = useLocation();
   // Branding slots come from config/theme (spec §7.2 logos). A slot holds
   // either a flat seeded path (`branding/mark.svg`, which also ships in the
@@ -131,11 +128,24 @@ export default function Layout() {
   const plate = buildNameplate(eventConfig, { compact: headerVariant === 'compact' });
   const markSize = headerVariant === 'masthead' ? MARK_SIZE.masthead : MARK_SIZE.running;
 
+  // The navigation IS the page list (lib/siteNavigation.js). Every visible
+  // page document becomes a link, in its own `order`, with system pages
+  // still gated on the feature flag their route checks — so the seeded
+  // travel, FAQ, conduct, contact, privacy, and terms pages are reachable
+  // from the header instead of only by a typed URL, and an operator adding
+  // a page gets a link without a deploy.
+  const navItems = buildNavItems(pages, features);
+
   // One nav, placed two ways. The list, its labels, its landmark, and its
   // position in the document are identical either way — `side` only moves
   // it to the leading edge at wide viewports, where there is room for a
   // rail beside the page (brief §6.1).
-  const nav = (
+  //
+  // No items means no landmark: a deployment whose pages are all hidden (or
+  // one that has not been seeded yet) must not ship an empty "Main" nav for
+  // a screen reader to land in. The identity in the header links home
+  // either way, so the front door is never lost.
+  const nav = navItems.length === 0 ? null : (
     <nav
       aria-label="Main"
       className={
@@ -151,7 +161,7 @@ export default function Layout() {
             : 'flex flex-wrap items-center gap-x-md'
         }
       >
-        {NAV_ITEMS.filter((item) => !item.feature || features[item.feature]).map((item) => (
+        {navItems.map((item) => (
           <li key={item.to}>
             <NavLink to={item.to} end={item.end} className={navClass}>
               {item.label}
