@@ -58,7 +58,9 @@ const path = require('node:path');
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { PROMPTS, parseAnswersFile, buildConfigDocs } = require('./lib/answers.cjs');
-const { defaultPages, buildSeedContent, buildLegalContentDocs, buildEmailTemplateSeeds } = require('./lib/seed.cjs');
+const {
+  defaultPages, buildSeedContent, buildLegalContentDocs, buildEmailTemplateSeeds, OBSOLETE_CONTENT_IDS,
+} = require('./lib/seed.cjs');
 const { validatePageDoc } = require('../functions/src/cms/pages.cjs');
 const { getTierA } = require('../functions/src/core/config.cjs');
 const { evaluateReadiness, allReady, formatReadinessTable, DEFAULT_SEEDED_THRESHOLD } =
@@ -67,7 +69,7 @@ const { manualChecklist, formatChecklist } = require('./lib/checklist.cjs');
 const { validateDeployEnv } = require('shared/config');
 const { uploadPlaceholderBranding } = require('./lib/branding.cjs');
 const {
-  writeConfigDocs, seedCollection, findPagePathCollisions, findPageSectionCollisions,
+  writeConfigDocs, seedCollection, removeObsoleteSeeds, findPagePathCollisions, findPageSectionCollisions,
   seedEmailTemplateOverrides, countSeeded, readConfig,
 } = require('./lib/write.cjs');
 
@@ -329,13 +331,6 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   const { results: configResults, effective } = await writeConfigDocs({ db, docs, force, dryRun, now });
   for (const r of configResults) console.log(`  config/${r.docId.padEnd(9)} ${r.action} (${r.reason})`);
 
-  // Content is derived from the EFFECTIVE config, not from what was
-  // proposed: on a --force re-run the merge rules keep the stored auth
-  // attestation and legal review flag, and the §5.5 legal templates read
-  // exactly those. Building from `docs` would regenerate the privacy page
-  // as if Google sign-in had never been enabled.
-  const content = buildSeedContent({ pages, docs: effective, tierA, seededAt });
-
   // Path-collision preflight (Codex review, seed a recap page and a
   // guidelines page: P1): seedCollection decides purely by doc id, so it
   // cannot see a DIFFERENT page id already sitting on the path a seeded
@@ -369,6 +364,21 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
     (page) => !pathCollisions.has(page.id) && !sectionCollisions.has(page.id),
   );
 
+  // Content is derived from the EFFECTIVE config, not from what was
+  // proposed: on a --force re-run the merge rules keep the stored auth
+  // attestation and legal review flag, and the §5.5 legal templates read
+  // exactly those. Building from `docs` would regenerate the privacy page
+  // as if Google sign-in had never been enabled.
+  //
+  // AND FROM THE PAGES ACTUALLY BEING SEEDED, not from every default page
+  // (Codex review, the sponsor strip). cmsContent is a separate write from
+  // cmsPages, so content built from the full default set would still file
+  // every block of a page the preflight just skipped — and the reason it
+  // was skipped is precisely that somebody else owns those section ids,
+  // which is where those blocks would land: editable content on a page
+  // nobody seeded. A page left out of the seed is left out of it whole.
+  const content = buildSeedContent({ pages: seedablePages, docs: effective, tierA, seededAt });
+
   const pageResult = await seedCollection({ db, store, collection: 'cmsPages', docs: seedablePages, dryRun, now, force });
   pageResult.skipped = [...collisionSkips, ...pageResult.skipped];
   console.log(
@@ -382,6 +392,25 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
     `  cmsContent        ${contentResult.created.length} created, ${contentResult.refreshed.length} refreshed, ` +
     `${contentResult.skipped.length} left alone`,
   );
+
+  // (e, continued) UPGRADE CLEANUP. A block this release no longer seeds is
+  // still sitting on every site an earlier release initialized: seeding
+  // writes and refreshes, it never deletes, and it only looks at the ids it
+  // was handed. Left alone, `hero__register_cta` keeps drawing the dead
+  // Register button the configured registration action replaced. Only
+  // seed-owned documents go — `removeObsoleteSeeds` asks `decideSeedWrite`,
+  // the same question every seed write asks — and what went is printed,
+  // because a delete an operator cannot see in the output is a delete they
+  // cannot undo.
+  const obsolete = await removeObsoleteSeeds({
+    db, store, collection: 'cmsContent', docIds: OBSOLETE_CONTENT_IDS, dryRun,
+  });
+  for (const id of obsolete.removed) {
+    console.log(`    - ${id}: removed (this release no longer seeds it)`);
+  }
+  for (const k of obsolete.kept) {
+    console.log(`    - ${k.id}: no longer seeded, kept (${k.reason})`);
+  }
 
   // (f) email_templates overrides for the two client-visible templates
   // (§5.1 step f, §6.3). Same idempotency rule as every other seed: a

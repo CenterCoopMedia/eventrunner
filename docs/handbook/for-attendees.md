@@ -10,6 +10,14 @@ You can sign in with Google or with a 6-digit code we email you. University and 
 
 There is no password to remember. If the code never arrives, ask in [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) or email the event organizer.
 
+## Finding a page
+
+Every page the event publishes has a link in the site navigation and again in the footer at the bottom of the page. The footer also names the organization running the event, links its support address, and lists the event's social accounts if it has any.
+
+Every page you open starts at the top. A link that points at a section of a page takes you to that section instead, and waits a moment for the section to load before it moves you. If that section no longer exists, the page opens at the top. Your browser's back and forward buttons keep the position you left.
+
+On a long page, a **Back to top** button appears in the bottom corner once you are a screen down. It hides from view again when you reach the footer, so it never covers a footer link, and it stays on the keyboard path: tab to it and it reappears in the corner. Select it to return to the top of the page; if you are using the keyboard, the next Tab continues from the site identity and then the navigation.
+
 ## Schedule
 
 The schedule is grouped by day. You can bookmark sessions and download a calendar file (ICS) or open a calendar link. The site does not write directly into Google Calendar for you.

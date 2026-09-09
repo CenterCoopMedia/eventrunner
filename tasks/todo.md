@@ -19,23 +19,38 @@ Stack order for the waterfall merge: #229 into -161, #228 into -160, #224 into -
 
 ### Wave 2
 
-- [ ] Shell branch (one agent, three commits): #148, #149, #152
-- [ ] Home branch (one agent, three commits): #154, #155, #156
-- [ ] #158 city guide
-- [ ] #159 venue map (in rework after review)
+- [x] #148 Add the sign-in and account control to the header
+- [x] #149 Build the footer link list and organizer links
+- [x] #152 Reset scroll position on route change and add a back to top control
+- [x] #154 Add a configured registration action
+- [x] #155 Add an information card arrangement to the home page
+- [x] #156 Add a sponsor strip section to the home page
+- [x] #158 Seed a city guide page
+- [x] #159 Add an uploaded venue map with labelled rooms
 
-## Follow-ups filed
+Branch grouping: the shell branch carried #148, #149, and #152; the home branch carried #154, #155, and #156; #158 and #159 each had a branch of its own.
 
-- #218 raster app icons (M7)
-- #219 admin save buttons stay enabled (M10)
-- #226 places and movements docs (M10)
-- #227 blank number field in the venue editor (M10)
+### Final tip
 
-## Final tip work
+- [x] Shorten the seeded page labels (Home, Travel, FAQ, Conduct, Contact, Privacy, Terms, Recap, Guidelines, City guide) and regenerate, and let a page state a heading of its own
+- [x] One shared visible predicate for whether a page is public, across navigation, sitemap, and routeMeta
+- [x] CHANGELOG entry for M7, roadmap update, regenerated docs
+- [x] Lessons from the milestone
 
-- Shorten the seeded page labels (Home, Travel, FAQ, Conduct, Contact, Privacy, Terms, Recap, Guidelines, City guide) and regenerate
-- One shared visible predicate across navigation, sitemap, and routeMeta
-- CHANGELOG entry for M7
+## Follow-ups filed during M7
+
+Filed rather than fixed in place: each is outside the issue that surfaced it,
+and each is carried into a later milestone.
+
+- [ ] #218 raster app icons (M7)
+- [ ] #219 admin save buttons stay enabled (M10)
+- [ ] #226 places and movements docs (M10)
+- [ ] #227 blank number field in the venue editor (M10)
+- [ ] #230
+- [ ] #231
+- [ ] #233
+- [ ] #234
+- [ ] #236
 
 ## Review
 

@@ -341,9 +341,16 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('node_modules/@playwright/test/package.json') }}
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          # Chromium does not need the Google Chrome apt source the runner ships, and its index is sometimes out of sync, which fails apt-get update.
+          grep -rl 'dl.google.com' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true
+          sudo rm -f /etc/apt/sources.list.d/*google*
+          sudo sed -i '/dl\.google\.com/d' /etc/apt/sources.list 2>/dev/null || true
+          grep -r 'dl.google.com' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null && echo "google source still present" && exit 1 || true
+          npx playwright install --with-deps chromium
       - name: Cache Firebase emulators
         uses: actions/cache@v4
         with:

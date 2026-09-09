@@ -42,6 +42,8 @@
  *     number they type in.
  */
 
+const { resolveRegistrationAction } = require('shared/registration');
+
 const TICKETS = 'tickets';
 const PROVIDER_NAME = 'manual';
 
@@ -201,19 +203,25 @@ function createManualProvider({ env = process.env, db = null, getConfig = null }
       // trigger === 'account_created' (or unset, treated the same as the
       // common case §3.5's table describes).
       const config = typeof getConfig === 'function' ? await getConfig() : null;
-      const externalUrl = typeof config?.event?.registration?.externalUrl === 'string'
-        ? config.event.registration.externalUrl.trim()
-        : '';
+      // THE SAME READER THE PAGE USES (shared/registration, M7 issue 8).
+      // This used to be a `typeof === 'string'` check of its own, which
+      // meant a legacy config/event written before the https rule existed
+      // was refused by the page and still put in front of a reader here —
+      // in an email, where nobody can see the address before they click.
+      // The reader also carries the client's own wording for the action, so
+      // the button in this email and the control on the site say the same
+      // words.
+      const action = resolveRegistrationAction(config?.event);
 
-      if (externalUrl) {
+      if (action) {
         // "some clients register through their own form" (§3.5) — the same
         // shape eventbrite's no-ticket row uses, pointed at the client's
         // own external registration URL instead of a ticket checkout.
         return {
           send: true,
           templateId: 'ticket.get_ticket',
-          ctaLabel: 'Register for the event',
-          ctaUrl: externalUrl,
+          ctaLabel: action.label ?? 'Register for the event',
+          ctaUrl: action.url,
           action: 'purchase',
           bodyNote: null,
         };

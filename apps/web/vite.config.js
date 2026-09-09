@@ -29,6 +29,7 @@ export default defineConfig({
       'shared/registration',
       'shared/config',
       'shared/routing',
+      'shared/page',
       'shared/profile',
       'shared/badges',
       'shared/speaker',

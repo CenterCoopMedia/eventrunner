@@ -15,6 +15,7 @@ const {
   buildSiteArtifacts,
   internals: { normalizedBaseUrl },
 } = require('./site-manifest.cjs');
+const { isPublicPage } = require('shared/page');
 
 const PUBLIC_URL = 'https://example.org';
 
@@ -63,6 +64,36 @@ const PAGES = [
 ];
 
 // --- classifyPage / classifyPages ------------------------------------------
+
+test('a page is publishable only when the shared predicate calls it public and its route needs no sign-in', () => {
+  // One rule, three readers: the header navigation
+  // (apps/web/src/lib/siteNavigation.js), this sitemap, and the route
+  // metadata the server writes (functions/src/public/og.cjs). What is
+  // local to this file is `access`: a route that shows a signed-out
+  // visitor a sign-in prompt is still linked in the navigation, but it is
+  // not a page to put in a sitemap.
+  const features = { ...FEATURES, updates: true, publicAttendeeProfiles: false };
+  for (const p of PAGES) {
+    const c = classifyPage({ page: p, features });
+    assert.equal(
+      c.publishable,
+      isPublicPage(p, features) && c.access === 'public',
+      `${p.id}: publishable disagrees with isPublicPage`,
+    );
+  }
+  // The attendees route is the case where the two answers differ.
+  const attendees = PAGES.find((p) => p.id === 'attendees');
+  assert.equal(isPublicPage(attendees, features), true);
+  assert.equal(classifyPage({ page: attendees, features }).publishable, false);
+});
+
+test('a page that never stated whether it is visible is not published', () => {
+  const stateless = { id: 'about', label: 'About', path: '/about', order: 1, systemPage: false };
+  assert.equal(isPublicPage(stateless, FEATURES), false);
+  const c = classifyPage({ page: stateless, features: FEATURES });
+  assert.equal(c.visible, false);
+  assert.equal(c.publishable, false);
+});
 
 test('a visible page with no feature gate is public', () => {
   const c = classifyPage({ page: page({ id: 'travel', path: '/travel' }), features: FEATURES });

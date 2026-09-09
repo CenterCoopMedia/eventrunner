@@ -71,8 +71,22 @@ describe('toEditablePage', () => {
 
   it('normalizes missing values so controlled inputs never see undefined', () => {
     const page = toEditablePage({});
-    expect(page).toMatchObject({ id: '', label: '', path: '', order: 0, visible: true });
+    expect(page).toMatchObject({ id: '', label: '', title: '', path: '', order: 0, visible: true });
     expect(page.sections).toEqual([]);
+  });
+
+  it('round-trips a page heading, and sends null rather than an empty one', () => {
+    // A page that states no heading is headed by its label (shared/page
+    // pageHeading), so "no heading" has to survive a load-and-save as
+    // absence — an empty string sent back would be a heading nobody wrote.
+    expect(toEditablePage({ ...STORED, title: 'Frequently asked questions' }).title)
+      .toBe('Frequently asked questions');
+    expect(toPagePayload(toEditablePage({ ...STORED, title: 'Frequently asked questions' })).title)
+      .toBe('Frequently asked questions');
+
+    expect(toEditablePage(STORED).title).toBe('');
+    expect(toPagePayload(toEditablePage(STORED)).title).toBe(null);
+    expect(backend.validatePageDoc(toPagePayload(toEditablePage(STORED))).errors).toEqual([]);
   });
 });
 

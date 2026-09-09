@@ -21,8 +21,8 @@ describe('useDocumentTitle', () => {
   });
 
   it('names the route while it is mounted and clears the name when it leaves', () => {
-    const view = render(<Page part="Travel and venue" />);
-    expect(getRouteTitlePart()).toBe('Travel and venue');
+    const view = render(<Page part="Travel" />);
+    expect(getRouteTitlePart()).toBe('Travel');
     view.unmount();
     expect(getRouteTitlePart()).toBeNull();
   });
@@ -79,11 +79,12 @@ describe('useDocumentTitle', () => {
 
 describe('routeTitlePartFor', () => {
   const PAGES = [
-    { id: 'home', label: 'Home page', path: '/', visible: true, systemPage: true },
+    { id: 'home', label: 'Home', path: '/', visible: true, systemPage: true },
     { id: 'schedule', label: 'Schedule', path: '/schedule', visible: true, systemPage: true },
     { id: 'speakers', label: 'Speakers', path: '/speakers', visible: true, systemPage: true },
     { id: 'sponsors', label: 'Sponsors', path: '/sponsors', visible: true, systemPage: true },
-    { id: 'travel', label: 'Travel and venue', path: '/travel', visible: true, systemPage: false },
+    { id: 'travel', label: 'Travel', path: '/travel', visible: true, systemPage: false },
+    { id: 'faq', label: 'FAQ', title: 'Frequently asked questions', path: '/faq', visible: true, systemPage: false },
     { id: 'hidden', label: 'Unfinished', path: '/hidden', visible: false, systemPage: false },
   ];
   const FEATURES = { schedule: true, speakers: true, sponsors: true, updates: false };
@@ -99,8 +100,16 @@ describe('routeTitlePartFor', () => {
   });
 
   it('names a generic page from its stored path', () => {
-    expect(partFor('/travel')).toBe('Travel and venue');
-    expect(partFor('/travel/')).toBe('Travel and venue');
+    expect(partFor('/travel')).toBe('Travel');
+    expect(partFor('/travel/')).toBe('Travel');
+  });
+
+  it('names a page by its heading, not by its short navigation label', () => {
+    // The tab has to match the <h1> the reader is looking at and the title
+    // the server already sent, both of which read the page's heading
+    // (shared/page pageHeading). A tab saying "FAQ" over a page headed
+    // "Frequently asked questions" would be a third name for one page.
+    expect(partFor('/faq')).toBe('Frequently asked questions');
   });
 
   it('names a system page by its id even when its stored path drifted', () => {
@@ -131,7 +140,7 @@ describe('routeTitlePartFor', () => {
 
   it('names the home page nothing, so the event name stands alone there', () => {
     // The server titles '/' with the event name alone for the same reason:
-    // "Home page" names the document for an editor, not the site.
+    // "Home" names the document for an editor, not the site.
     expect(partFor('/')).toBeNull();
     expect(partFor('')).toBeNull();
   });

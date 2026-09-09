@@ -79,6 +79,13 @@ documents are skipped on re-run unless `--force`, and even then the fields anoth
 (sender verification, the legal review flag, `announcedAt`/`archivedAt`, the auth attestation,
 ticketing webhook stamps) are preserved. `config/bootstrap.adminEmails` is always additive.
 
+**A re-run also removes a block this release no longer seeds.** Seeding writes and refreshes; it
+never deletes, so a block dropped from the defaults keeps drawing on every site an earlier release
+set up — `hero__register_cta`, the old home page Register button, is the one this release drops.
+A re-run deletes it in both revisions and names what it deleted in the output. The ownership rule is
+the one above, unchanged: a document you have edited, or one you wrote yourself at the same id, is
+kept and reported as kept.
+
 The answers file is JSON:
 
 ```json

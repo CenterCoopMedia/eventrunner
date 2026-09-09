@@ -10,6 +10,7 @@ const { runInit, runCheck, runAttestAuth } = require('./init-event.cjs');
 const { makeFakeDb } = require('../functions/src/cms/firestoreFake.cjs');
 const store = require('../functions/src/cms/store.cjs');
 const { buildConfigDocs } = require('./lib/answers.cjs');
+const { seedCollection } = require('./lib/write.cjs');
 
 const TIER_A = Object.freeze({
   slug: 'test-event',
@@ -94,6 +95,10 @@ test('init seeds config, pages, and content, and exits 0 despite unmet readiness
   assert.equal((await db.collection('config').doc('bootstrap').get()).data().adminEmails[0], 'ops@example.org');
   assert.equal((await db.collection('cmsPages').doc('privacy').get()).exists, true);
   assert.equal((await db.collection('cmsContent').doc('hero__title').get()).data().value, 'Test Gathering');
+  // Every seeded section's blocks are written, the sponsor strip's lede
+  // included — this is the baseline the collision test below is a
+  // departure from.
+  assert.equal((await db.collection('cmsContent').doc('sponsors__lede').get()).exists, true);
   assert.match(output, /UNMET/, 'unmet rows are reported as warnings');
   assert.match(output, /Legal review/);
 });
@@ -341,6 +346,54 @@ test('a section id orphaned by a deleted page also blocks the seed', async () =>
     'a collision on one page must not block the rest of the seed');
 });
 
+test('a page skipped for a section collision seeds none of its content either (Codex review, the sponsor strip)', async () => {
+  // The section-collision preflight leaves the colliding page out of the
+  // cmsPages write, but cmsContent is a separate write — and content built
+  // from the full default page set would still file every block of the
+  // skipped page under section ids the OTHER page owns. For the home page
+  // that means the sponsor strip's lede, and the hero, and the key facts,
+  // landing on somebody else's page as editable content nobody asked for.
+  const db = makeFakeDb();
+  const built = buildConfigDocs({ answers: { ...ANSWERS, adminEmails: ['ops@example.org'] }, tierA: TIER_A, now: () => 0 });
+  assert.equal(built.ok, true, built.errors.join('; '));
+  await db.collection('config').doc('event').set(built.docs.event);
+  const operator = { uid: 'operator', email: 'operator@example.org' };
+  await store.writeDraft({
+    db,
+    collection: 'cmsPages',
+    docId: 'our-supporters',
+    fields: {
+      label: 'Our supporters', path: '/our-supporters', icon: null, order: 98,
+      visible: true, systemPage: false,
+      sections: [{
+        id: 'sponsors', label: 'Who backs us', description: '',
+        allowedBlocks: ['richtext'], maxBlocks: 5, reorderable: true, defaultBlocks: [],
+      }],
+    },
+    visible: true,
+    actor: operator,
+    now: () => 1,
+  });
+  await store.publishDocs({ db, collection: 'cmsPages', docIds: ['our-supporters'], actor: operator, now: () => 1 });
+
+  const { value, output } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 2,
+  }));
+
+  assert.equal(value, 0);
+  assert.match(output, /section 'sponsors' is already owned by page 'our-supporters' — not seeded/);
+  assert.equal((await db.collection('cmsPages').doc('home').get()).exists, false);
+  // Not one block of the skipped page is written: not the strip's lede
+  // under the id the other page owns, and not the home page's own
+  // sections either — the page was not seeded, so it has no content.
+  for (const id of ['sponsors__lede', 'hero__title', 'info__when', 'footer__contact_link']) {
+    assert.equal((await db.collection('cmsContent').doc(id).get()).exists, false, id);
+  }
+  // Every other page still seeds its own content in full.
+  assert.equal((await db.collection('cmsPages').doc('travel').get()).exists, true);
+  assert.equal((await db.collection('cmsContent').doc('travel_venue__venue_name').get()).exists, true);
+});
+
 test('--dry-run writes nothing', async () => {
   const db = makeFakeDb();
   const { value } = await quietly(() => runInit({
@@ -523,4 +576,75 @@ test('--attest-auth records the operator attestation the Auth row reads', async 
   assert.equal(auth.googleProviderEnabled, true);
   assert.equal(auth.authorizedDomainsConfigured, true);
   assert.ok(auth.attestedAt);
+});
+
+// UPGRADING A SITE THAT WAS SEEDED BY AN OLDER RELEASE (Codex review of the
+// configured registration action: P1). Dropping the hero cta from the seed
+// changes nothing on a deployment that already ran init: seedCollection only
+// writes, so the old document keeps drawing the control — usually pointed at
+// the example.org destination the old seed invented. The --force re-run an
+// operator is already told to do after an upgrade is where it gets removed.
+test('a --force re-run removes the legacy registration cta the seed no longer ships', async () => {
+  const db = makeFakeDb();
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  // The document as an older release seeded it, in both revisions.
+  await quietly(() => seedCollection({
+    db,
+    store,
+    collection: 'cmsContent',
+    docs: [{
+      id: 'hero__register_cta',
+      section: 'hero',
+      field: 'register_cta',
+      blockType: 'cta',
+      label: 'Register',
+      url: 'https://example.org',
+      visible: true,
+      order: 2,
+      seeded: true,
+      seededAt: 'T0',
+    }],
+    now: () => 0,
+  }));
+
+  const { value, output } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+
+  assert.equal(value, 0);
+  assert.equal((await db.collection('cmsContent').doc('hero__register_cta').get()).exists, false);
+  assert.equal((await db.collection('cmsContent_drafts').doc('hero__register_cta').get()).exists, false);
+  assert.match(output, /hero__register_cta/, 'what was removed is reported, not silently deleted');
+});
+
+test('a --force re-run keeps a registration cta an editor wrote themselves', async () => {
+  const db = makeFakeDb();
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  // An editor's own hero action: the seed removed its block, not the slot.
+  await db.collection('cmsContent').doc('hero__register_cta').set({
+    section: 'hero',
+    field: 'register_cta',
+    blockType: 'cta',
+    label: 'Get a ticket',
+    url: 'https://tickets.example.org',
+    visible: true,
+    order: 2,
+    seeded: false,
+  });
+
+  await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+
+  const kept = await db.collection('cmsContent').doc('hero__register_cta').get();
+  assert.equal(kept.exists, true, 'an editor-authored block is not the platform\'s to delete');
+  assert.equal(kept.data().label, 'Get a ticket');
+});
+
+test('a fresh init has no legacy document to remove and says nothing about one', async () => {
+  const db = makeFakeDb();
+  const { value, output } = await quietly(() =>
+    runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  assert.equal(value, 0);
+  assert.doesNotMatch(output, /hero__register_cta/);
 });

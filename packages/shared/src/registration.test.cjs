@@ -7,6 +7,7 @@ const {
   isValidTransition,
   computeEntitlement,
   hasAttendeeAccess,
+  resolveRegistrationAction,
 } = require('./registration.cjs');
 
 test('status vocabulary is exactly the four spec values', () => {
@@ -70,4 +71,110 @@ test('hasAttendeeAccess: approved, speaker, admin; everyone else false', () => {
   assert.equal(hasAttendeeAccess({ speakerId: null }), false);
   assert.equal(hasAttendeeAccess(null), false);
   assert.equal(hasAttendeeAccess(undefined), false);
+});
+
+// THE REGISTRATION ACTION (M7 issue 8). One reader for three surfaces: the
+// control on the home lead, the control in the header, and the button in
+// the registration email a ticket provider sends. They each used to read
+// the field for themselves, which is how a destination the page refused
+// still reached a reader in an email.
+test('resolveRegistrationAction: an https destination, with the label the client wrote', () => {
+  assert.deepEqual(
+    resolveRegistrationAction({
+      registration: {
+        externalUrl: '  https://register.example.org/summit  ',
+        actionLabel: ' Get a ticket ',
+      },
+    }),
+    { url: 'https://register.example.org/summit', label: 'Get a ticket' },
+  );
+});
+
+test('resolveRegistrationAction: no label of its own, so each surface states its default', () => {
+  for (const registration of [
+    { externalUrl: 'https://register.example.org' },
+    { externalUrl: 'https://register.example.org', actionLabel: null },
+    { externalUrl: 'https://register.example.org', actionLabel: '   ' },
+    { externalUrl: 'https://register.example.org', actionLabel: 42 },
+  ]) {
+    assert.equal(resolveRegistrationAction({ registration }).label, null);
+  }
+});
+
+test('resolveRegistrationAction: nothing to send anybody to reads as nothing', () => {
+  for (const eventConfig of [
+    undefined,
+    null,
+    {},
+    { registration: null },
+    { registration: {} },
+    { registration: { externalUrl: null } },
+    { registration: { externalUrl: '   ' } },
+    // A label with no destination is not an action.
+    { registration: { actionLabel: 'Register' } },
+  ]) {
+    assert.equal(resolveRegistrationAction(eventConfig), null);
+  }
+});
+
+test('resolveRegistrationAction: refuses every destination that is not https', () => {
+  for (const externalUrl of [
+    'http://register.example.org',
+    'javascript:alert(1)',
+    'data:text/html,<p>hi</p>',
+    'mailto:hello@example.org',
+    'register.example.org',
+    42,
+    {},
+  ]) {
+    assert.equal(
+      resolveRegistrationAction({ registration: { externalUrl } }),
+      null,
+      `expected ${JSON.stringify(externalUrl)} to be refused`,
+    );
+  }
+});
+
+// Codex review of the configured registration action (P2). Two halves of
+// one bug: what the reader ACCEPTS, and what it hands back.
+//
+// `new URL('https:register.example.org').protocol` is 'https:' — the WHATWG
+// parser reads a special scheme with no `//` as a relative reference — so a
+// protocol test alone let a string through that is not an absolute URL at
+// all. In an `href` it resolves against the page it sits on, and a reader
+// clicking Register lands on the event's own domain; in an email it is
+// worse, because nobody sees the address before they click.
+test('resolveRegistrationAction: a destination with no authority is not a destination', () => {
+  for (const externalUrl of [
+    'https:register.example.org',
+    'https:/register.example.org',
+    'http:register.example.org',
+    '//register.example.org',
+  ]) {
+    assert.equal(
+      resolveRegistrationAction({ registration: { externalUrl } }),
+      null,
+      `expected ${JSON.stringify(externalUrl)} to be refused`,
+    );
+  }
+});
+
+test('resolveRegistrationAction: hands back the canonical href, not the raw string', () => {
+  // What the page puts in an `href` and what the email puts in its button
+  // is exactly the string this reader approved — host lower-cased, path
+  // present, every component encoded the way the parser read it. Handing
+  // back the raw text is what lets a value validate as one URL and resolve
+  // as another.
+  assert.equal(
+    resolveRegistrationAction({
+      registration: { externalUrl: '  HTTPS://Register.Example.ORG  ' },
+    }).url,
+    'https://register.example.org/',
+  );
+  assert.equal(
+    resolveRegistrationAction({
+      registration: { externalUrl: 'https://register.example.org/summit tickets' },
+    }).url,
+    'https://register.example.org/summit%20tickets',
+  );
 });

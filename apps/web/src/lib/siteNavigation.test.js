@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { KNOWN_FEATURE_KEYS } from 'shared/config';
 import { RESERVED_PATH_SEGMENTS, firstPathSegment } from 'shared/routing';
+import { isPublicPage } from 'shared/page';
 import { SYSTEM_PAGES, buildNavItems } from './siteNavigation.js';
 
 const here = nodePath.dirname(fileURLToPath(import.meta.url));
@@ -36,9 +37,9 @@ function mountedRoutes() {
   return ['/', ...routes];
 }
 
-const HOME = { id: 'home', label: 'Home page', path: '/', order: 0, visible: true, systemPage: true };
+const HOME = { id: 'home', label: 'Home', path: '/', order: 0, visible: true, systemPage: true };
 const SCHEDULE = { id: 'schedule', label: 'Schedule', path: '/schedule', order: 1, visible: true, systemPage: true };
-const TRAVEL = { id: 'travel', label: 'Travel and venue', path: '/travel', order: 4, visible: true, systemPage: false };
+const TRAVEL = { id: 'travel', label: 'Travel', path: '/travel', order: 4, visible: true, systemPage: false };
 
 const ALL_ON = Object.freeze({
   schedule: true,
@@ -126,7 +127,38 @@ describe('buildNavItems', () => {
       [HOME, TRAVEL, { ...TRAVEL, id: 'draft', label: 'Draft page', path: '/draft', order: 5, visible: false }],
       ALL_ON,
     );
-    expect(labels(items)).toEqual(['Home page', 'Travel and venue']);
+    expect(labels(items)).toEqual(['Home', 'Travel']);
+  });
+
+  it('links exactly the pages the shared predicate calls public', () => {
+    // One rule, three readers: this list, the sitemap
+    // (scripts/lib/site-manifest.cjs), and the route metadata the server
+    // writes for a link unfurler (functions/src/public/og.cjs). A page
+    // linked here but absent from the sitemap, or described in a card and
+    // then 404ing, is those three disagreeing.
+    const pages = [
+      HOME,
+      SCHEDULE,
+      TRAVEL,
+      { ...TRAVEL, id: 'draft', label: 'Draft', path: '/draft', order: 5, visible: false },
+      { id: 'updates', label: 'Updates', path: '/updates', order: 6, visible: true, systemPage: true },
+    ];
+    const features = { ...ALL_ON, updates: false };
+    const linked = new Set(paths(buildNavItems(pages, features)));
+    for (const page of pages) {
+      const expected = isPublicPage(page, features);
+      expect(linked.has(page.path)).toBe(expected);
+    }
+  });
+
+  it('drops a page that never stated whether it is visible', () => {
+    // The shared contract is `visible === true`, not `!== false`: a
+    // document mid-write or hand-written straight into Firestore must not
+    // read as published anywhere — and the sitemap and the server already
+    // read it that way, so the navigation was the odd one out.
+    const stateless = { id: 'about', label: 'About', path: '/about', order: 1 };
+    expect(isPublicPage(stateless, ALL_ON)).toBe(false);
+    expect(paths(buildNavItems([HOME, stateless], ALL_ON))).toEqual(['/']);
   });
 
   it('orders by the page order field, not by document order', () => {
@@ -190,7 +222,7 @@ describe('buildNavItems', () => {
     const items = buildNavItems([HOME, { ...SCHEDULE, path: '/agenda' }], ALL_ON);
     expect(paths(items)).toEqual(['/', '/schedule']);
     // And the label is still the operator's.
-    expect(labels(items)).toEqual(['Home page', 'Schedule']);
+    expect(labels(items)).toEqual(['Home', 'Schedule']);
   });
 
   it('takes the label a renamed system page carries', () => {
@@ -256,7 +288,7 @@ describe('buildNavItems', () => {
     );
     // One link, and it is the first of the two in reading order.
     expect(paths(items)).toEqual(['/', '/travel']);
-    expect(labels(items)).toEqual(['Home page', 'Travel and venue']);
+    expect(labels(items)).toEqual(['Home', 'Travel']);
   });
 
   it('returns an empty list for no pages at all', () => {
@@ -271,11 +303,11 @@ describe('buildNavItems', () => {
       { id: 'speakers', label: 'Speakers', path: '/speakers', order: 2, visible: true, systemPage: true },
       { id: 'sponsors', label: 'Sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true },
       TRAVEL,
-      { id: 'faq', label: 'Frequently asked questions', path: '/faq', order: 5, visible: true, systemPage: false },
-      { id: 'conduct', label: 'Code of conduct', path: '/conduct', order: 6, visible: true, systemPage: false },
+      { id: 'faq', label: 'FAQ', path: '/faq', order: 5, visible: true, systemPage: false },
+      { id: 'conduct', label: 'Conduct', path: '/conduct', order: 6, visible: true, systemPage: false },
       { id: 'contact', label: 'Contact', path: '/contact', order: 7, visible: true, systemPage: false },
-      { id: 'privacy', label: 'Privacy policy', path: '/privacy', order: 8, visible: true, systemPage: false },
-      { id: 'terms', label: 'Terms of service', path: '/terms', order: 9, visible: true, systemPage: false },
+      { id: 'privacy', label: 'Privacy', path: '/privacy', order: 8, visible: true, systemPage: false },
+      { id: 'terms', label: 'Terms', path: '/terms', order: 9, visible: true, systemPage: false },
       { id: 'attendees', label: 'Attendees', path: '/attendees', order: 10, visible: true, systemPage: true },
       { id: 'updates', label: 'Updates', path: '/updates', order: 11, visible: true, systemPage: true },
     ];

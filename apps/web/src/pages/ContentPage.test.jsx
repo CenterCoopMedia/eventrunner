@@ -32,7 +32,11 @@ vi.mock('../lib/contentSource.js', () => ({
 vi.mock('../firebase.js', () => ({
   app: {}, auth: {}, db: {}, storage: {},
   // The travel page resolves the venue map's Storage path to a URL; the
-  // bucket is named so the resolve succeeds, and nothing is fetched.
+  // bucket is named so the resolve succeeds, and nothing is fetched. The
+  // home page's sponsor strip resolves each organization's mark the same
+  // way (lib/mediaSource.js), so its marks build a URL too — a mark is
+  // decorative either way, so the wall says nothing about it and the names
+  // under the marks are what this test reads.
   storageBucketName: 'demo.appspot.com',
   storageDownloadOrigin: 'https://firebasestorage.example',
   // App Check is unconfigured in a credential-free run, which is also its
@@ -45,7 +49,9 @@ import App from '../App.jsx';
 import siteContent from '@generated/siteContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import pagesData from '@generated/pagesData.js';
+import organizationsData from '@generated/organizationsData.js';
 import { VENUE_MAP_SECTION_ID } from 'shared/venue';
+import { pageHeading } from 'shared/page';
 
 function renderAt(path) {
   return render(
@@ -65,11 +71,34 @@ describe('Home', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: siteContent.hero__title.value }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: siteContent.hero__register_cta.label }),
-    ).toHaveAttribute('href', siteContent.hero__register_cta.url);
+    // The registration action is configuration, not content (M7 issue 8),
+    // and the demo configures none: it is a static build with no ticket
+    // provider behind it, so it ships the empty case. Nothing anywhere on
+    // the page opens a registration destination — no dead button in the
+    // lead, and none in the header it would otherwise repeat on every page.
+    expect(eventConfig.registration.externalUrl).toBeNull();
+    // The header carries no outbound control at all — the register control
+    // is the only one it would hold — and the lead offers nothing to click.
+    expect(document.querySelector('header a[target="_blank"]')).toBeNull();
+    expect(screen.queryByRole('link', { name: /register/i })).toBeNull();
     // Generic sections render with their labels from the pages snapshot.
     const home = pagesData.find((p) => p.id === 'home');
+    // The key facts group (M7 issue 9) is drawn by the core, under its own
+    // heading, and exactly once: the slot renderer must not draw the same
+    // section a second time further down the page.
+    const infoSection = home.sections.find((s) => s.id === 'info');
+    expect(screen.getAllByRole('heading', { name: infoSection.label })).toHaveLength(1);
+    expect(screen.getByText(siteContent.info__when.takeaway)).toBeInTheDocument();
+    expect(screen.getByText(siteContent.info__where_venue.text)).toBeInTheDocument();
+    // The sponsor strip (M7 issue 10) draws the demo's own published
+    // organizations on the home page, in the section's own place: it comes
+    // after the History section, which is where the seed puts it.
+    expect(screen.getByText(siteContent.sponsors__lede.value)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: organizationsData[0].name })).toBeInTheDocument();
+    const sectionOrder = home.sections
+      .filter((s) => screen.queryByRole('heading', { name: s.label }))
+      .map((s) => s.id);
+    expect(sectionOrder.indexOf('sponsors')).toBeGreaterThan(sectionOrder.indexOf('stats'));
     const statsSection = home.sections.find((s) => s.id === 'stats');
     expect(
       screen.getByRole('heading', { name: statsSection.label }),
@@ -88,10 +117,40 @@ describe('ContentPage (catch-all route)', () => {
     renderAt('/faq');
     const faqPage = pagesData.find((p) => p.id === 'faq');
     expect(
-      await screen.findByRole('heading', { level: 1, name: faqPage.label }),
+      await screen.findByRole('heading', { level: 1, name: pageHeading(faqPage) }),
     ).toBeInTheDocument();
     // The FAQ item renders as a disclosure with its question.
     expect(screen.getByText(siteContent.faq_items__what_is_this.question)).toBeInTheDocument();
+  });
+
+  it('heads the page with its full title while the navigation keeps the short label', async () => {
+    // Two names for one page: the header nav and the footer both have to
+    // fit fifteen labels on one row, so the FAQ page is labelled "FAQ" —
+    // but "FAQ" alone reads oddly as the page's own heading, so the
+    // document states a `title` and the <h1> uses it. A page that states
+    // no title is headed by its label, which is every other seeded page.
+    renderAt('/faq');
+    const faqPage = pagesData.find((p) => p.id === 'faq');
+    expect(faqPage.label).toBe('FAQ');
+    expect(faqPage.title).toBe('Frequently asked questions');
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Frequently asked questions' }),
+    ).toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    expect(within(nav).getByRole('link', { name: 'FAQ' })).toHaveAttribute('href', '/faq');
+    expect(within(nav).queryByRole('link', { name: 'Frequently asked questions' })).not.toBeInTheDocument();
+    const footer = screen.getByRole('navigation', { name: 'Site pages' });
+    expect(within(footer).getByRole('link', { name: 'FAQ' })).toHaveAttribute('href', '/faq');
+  });
+
+  it('heads a page that states no title with its label, unchanged', async () => {
+    renderAt('/contact');
+    const contactPage = pagesData.find((p) => p.id === 'contact');
+    expect(contactPage.title).toBeUndefined();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Contact' }),
+    ).toBeInTheDocument();
   });
 
   it('names itself in the document title, in the shape the server already sent', async () => {
@@ -101,8 +160,8 @@ describe('ContentPage (catch-all route)', () => {
     // it the same way, or the title changes the moment the app boots.
     renderAt('/faq');
     const faqPage = pagesData.find((p) => p.id === 'faq');
-    await screen.findByRole('heading', { level: 1, name: faqPage.label });
-    expect(document.title).toBe(`${faqPage.label} · ${eventConfig.name}`);
+    await screen.findByRole('heading', { level: 1, name: pageHeading(faqPage) });
+    expect(document.title).toBe(`${pageHeading(faqPage)} · ${eventConfig.name}`);
   });
 
   it('leaves the event name standing alone on a page that does not resolve', async () => {
@@ -246,6 +305,40 @@ describe('ContentPage (catch-all route)', () => {
     expect(screen.queryByRole('heading', { name: 'Legacy FAQ' })).not.toBeInTheDocument();
   });
 
+  it('404s a page whose `visible` field is absent, not just one set to false', async () => {
+    // The navigation, the sitemap, and the served link card all read
+    // `visible === true` (shared/page isPublicPage), so a document that
+    // never stated the field is listed nowhere. Before this the route
+    // lookup read `visible !== false` and opened it anyway, which made a
+    // typed address the way around every list on the site.
+    renderAt('/unlisted');
+    await screen.findByRole('heading', { name: 'Page not found' });
+    const unlisted = {
+      id: 'unlisted',
+      label: 'Unlisted',
+      path: '/unlisted',
+      icon: null,
+      order: 99,
+      systemPage: false,
+      sections: [],
+    };
+    act(() => {
+      subscriptions.get('cmsPages')([...pagesData, unlisted]);
+    });
+    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+
+    // The same document, once it says it is visible, is a page again.
+    act(() => {
+      subscriptions.get('cmsPages')([...pagesData, { ...unlisted, visible: true }]);
+    });
+    expect(screen.getByRole('heading', { level: 1, name: 'Unlisted' })).toBeInTheDocument();
+
+    act(() => {
+      subscriptions.get('cmsPages')([...pagesData, { ...unlisted, visible: false }]);
+    });
+    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+  });
+
   it('404s a doc saved under a reserved prefix like /signin/help', async () => {
     renderAt('/signin/help');
     await screen.findByRole('heading', { name: 'Page not found' });
@@ -276,7 +369,7 @@ describe('ContentPage (catch-all route)', () => {
     });
     const faqPage = pagesData.find((p) => p.id === 'faq');
     expect(
-      screen.getByRole('heading', { level: 1, name: faqPage.label }),
+      screen.getByRole('heading', { level: 1, name: pageHeading(faqPage) }),
     ).toBeInTheDocument();
   });
 });
@@ -455,7 +548,7 @@ describe('ContentPage — search and section index on long pages', () => {
     expect(faqPage.sections.length).toBe(2);
 
     renderAt('/faq');
-    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+    await screen.findByRole('heading', { level: 1, name: pageHeading(faqPage) });
 
     expect(screen.getByRole('searchbox', { name: 'Filter by keyword' })).toBeInTheDocument();
 
@@ -471,7 +564,7 @@ describe('ContentPage — search and section index on long pages', () => {
     expect(contactPage.sections.length).toBe(2);
 
     renderAt('/contact');
-    await screen.findByRole('heading', { level: 1, name: contactPage.label });
+    await screen.findByRole('heading', { level: 1, name: pageHeading(contactPage) });
 
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
     expect(
@@ -723,7 +816,7 @@ describe('ContentPage — search and section index on long pages', () => {
     renderAt('/faq');
     const faqPage = pagesData.find((p) => p.id === 'faq');
     const introSection = faqPage.sections.find((s) => s.id === 'faq_intro');
-    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+    await screen.findByRole('heading', { level: 1, name: pageHeading(faqPage) });
 
     expect(screen.getByRole('heading', { name: introSection.label }).className).toMatch(/sr-only/);
     const index = screen.getByRole('navigation', { name: 'Sections on this page' });
@@ -735,7 +828,7 @@ describe('ContentPage — search and section index on long pages', () => {
     const travelPage = pagesData.find((p) => p.id === 'travel');
     const headerSection = travelPage.sections.find((s) => s.id === 'travel_header');
     const venueSection = travelPage.sections.find((s) => s.id === 'travel_venue');
-    await screen.findByRole('heading', { level: 1, name: travelPage.label });
+    await screen.findByRole('heading', { level: 1, name: pageHeading(travelPage) });
 
     expect(screen.getByRole('heading', { name: headerSection.label }).className).toMatch(/sr-only/);
     const index = screen.getByRole('navigation', { name: 'Sections on this page' });
@@ -755,7 +848,7 @@ describe('ContentPage — search and section index on long pages', () => {
     const cityGuidePage = pagesData.find((p) => p.id === 'city_guide');
     const introSection = cityGuidePage.sections.find((s) => s.id === 'city_guide_intro');
     const eatSection = cityGuidePage.sections.find((s) => s.id === 'city_guide_eat');
-    await screen.findByRole('heading', { level: 1, name: cityGuidePage.label });
+    await screen.findByRole('heading', { level: 1, name: pageHeading(cityGuidePage) });
 
     expect(screen.getByRole('heading', { name: introSection.label }).className).toMatch(/sr-only/);
     expect(screen.getByRole('heading', { name: eatSection.label }).className).not.toMatch(/sr-only/);

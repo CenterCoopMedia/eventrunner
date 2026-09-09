@@ -23,11 +23,16 @@
 // the document. A renamed system page renames its link; a system page whose
 // path was edited still points at the schedule.
 //
-// TWO GATES, NOT ONE. `visible` is the editor's answer and it covers every
-// page. A system page is additionally gated on the feature flag that its
-// route already checks for itself: the seed ships every system page
-// `visible: true` while `features.updates` is off by default, so visibility
-// alone would offer a link to a route that renders "not available".
+// TWO GATES, NOT ONE, AND THEY ARE NOT THIS FILE'S TO STATE. `visible` is
+// the editor's answer and it covers every page; a system page is gated
+// again on the feature flag that its route already checks for itself,
+// because the seed ships every system page `visible: true` while
+// `features.updates` is off by default, so visibility alone would offer a
+// link to a route that renders "not available". Both live in
+// `shared/page isPublicPage`, which the sitemap and the server-rendered
+// route metadata read too — a page linked here but missing from the
+// sitemap, or described in a link card and then 404ing, is three copies of
+// one rule disagreeing.
 //
 // The builder is forgiving in the way every reader in this app is forgiving:
 // it meets whatever is stored, including documents written before the path
@@ -41,6 +46,7 @@ import {
   isCanonicalPagePath,
   isReservedPathSegment,
 } from 'shared/routing';
+import { isPublicPage } from 'shared/page';
 
 /**
  * The system pages, by the stable document id the seed writes, and for each
@@ -69,9 +75,9 @@ function isNonEmptyString(v) {
  */
 function navItemFor(page, features) {
   if (!page || typeof page !== 'object') return null;
-  // `visible !== false` rather than `visible === true`: a document written
-  // before the field existed is visible, which is what getPage assumes too.
-  if (page.visible === false) return null;
+  // Visible, and its feature on — the shared read, so this list and the
+  // sitemap cannot disagree about which pages a stranger can see.
+  if (!isPublicPage(page, features)) return null;
   if (!isNonEmptyString(page.label)) return null;
 
   if (page.systemPage === true) {
@@ -82,7 +88,6 @@ function navItemFor(page, features) {
     // A systemPage doc with an id no route answers to has nothing to link
     // to. That is hand-written data, not something the editor can produce.
     if (!system) return null;
-    if (system.feature !== null && !features?.[system.feature]) return null;
     return { to: system.to, label: page.label, end: !system.children };
   }
 

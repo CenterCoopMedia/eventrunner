@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   masthead, the favicon, and both regenerated social cards. Section boundaries now vary by weight
   instead of drawing one identical rule each, and the folio floor is caption size.
 - Updated canonical repository and GitHub Pages paths to `CenterCoopMedia/eventrunner` (#97).
+- Whether a page is public — visible, with its route's feature on — is one predicate in the shared
+  package, read by the header navigation, the sitemap and robots builders, and the server-rendered
+  route metadata. The contract is the strict `visible === true` the sitemap and the server already
+  applied; the navigation now reads the field the same way. No generated output changed.
 
 ### Fixed
 
@@ -78,13 +82,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Credential-free secret scanning: a `secrets` CI job runs the gitleaks CLI (checksum-verified download, no marketplace action, no license secret) over the pull request range and, on push to `main`, the full history; `.gitleaks.toml` allowlists two known-synthetic test fixture values by exact string match (#39 sliver).
 - Playwright end-to-end suite on the Firebase emulators (#38): four critical journeys — OTP sign-in, CMS publish/isolation, the speaker invite pipeline, and ticket-claim-to-bookmark — seeded once per run via the same `init-event.cjs`/`seed-demo-event.cjs` operator scripts a real deployment uses, driven through `scripts/dev/run-e2e.sh` (`firebase emulators:exec` wrapping `vite`) and a new `e2e` CI job that clones the rules job's emulator/Java setup. OTP and invite-token capture reads a dedicated `E2E_MAIL_FILE` sink the console email provider appends to, replacing an unreliable scrape of colorized emulator stdout.
 - `docs/POSTMARK_PROVISIONING.md`: an end-to-end Postmark account/server/stream provisioning runbook plus the missing `EMAIL_ACCOUNT_API_KEY` secret documentation in `.env.example` and the ADR/deploy-runbook secret tables (#4).
-- A long content page (FAQ, Travel, Privacy, and any other CMS page shaped like them) now shows a
-  keyword filter and a same-page section index above its content once the page has at least three
-  populated sections, or two sections carrying eight or more blocks between them: the filter
-  narrows the page to matching blocks and states plainly when nothing matches, and the index marks
-  the section currently in view and moves keyboard/screen-reader focus to a section when it is
-  chosen. The behavior is generic to any long content page, not specific to FAQ (CJS parity plan,
-  M7 issue 14).
+- M7, public site completeness (CJS parity plan): a visitor can now reach and read every page the
+  seed creates, and the site presents itself correctly to search engines and link unfurlers.
+  - The header navigation is built from the page documents, ordered by each page's `order`, with
+    system pages still gated on their own feature flags (#147).
+  - One account control ends the navigation on every page: sign in when signed out, your profile
+    when signed in (#148).
+  - The footer lists the same pages under the same rules, and names the operator, the support
+    address, and any social accounts the event configuration records (#149).
+  - Every public route is served with its own title, description, canonical URL, Open Graph tags,
+    and Event structured data, injected server-side so a crawler that never runs the app still
+    reads them (#150).
+  - A publish writes `sitemap.xml`, `robots.txt`, and a web manifest, listing only routes a
+    stranger can actually reach and disallowing the rest (#151).
+  - Navigation resets the scroll position to the top, and a back-to-top control appears after a
+    scroll threshold. Both respect reduced motion (#152).
+  - The home lead follows the event's lifecycle phase: it counts down before the event, says the
+    event is running during it, and states that it has finished afterwards (#153).
+  - A registration action is configuration, not content: set a destination and a label in
+    `config/event.registration` and the control appears on the home lead and in the header. Leave
+    it unset and nothing is rendered — never a dead button (#154).
+  - The home page seeds a card group for the event's own facts, built from the existing `stat` and
+    `list_item` blocks rather than a new block type (#155).
+  - The home page seeds a sponsor strip drawing the same tiered logo wall the sponsors page does,
+    and rendering nothing when there are no published organizations (#156).
+  - The seed ships a recap page and a speaker guidelines page, both empty sections and placeholder
+    descriptions, with no event-specific copy (#157).
+  - The seed ships a city guide page for places to eat, things to see, and getting around — empty
+    lists, and no copy about any city (#158).
+  - An operator can upload a venue map through the media library and attach it to the travel page;
+    the rooms it shows are listed as text beside it, so a reader with images off learns every room
+    name (#159).
+  - A long content page shows a keyword filter and a same-page section index once it has at least
+    three populated sections, or two sections carrying eight or more blocks between them. The
+    filter narrows the page to matching blocks and says so plainly when nothing matches; the index
+    marks the section in view and moves focus to a chosen section. Generic to any long content
+    page, not specific to FAQ (#160).
+  - A session can carry an optional recording URL, validated as a safe link and shown on the
+    session row and the session detail page as a plain labelled link (#161).
+- Seeded page labels are short — Home, Travel, FAQ, Conduct, Privacy, Terms, Recap, Guidelines —
+  so fifteen of them fit the header navigation and the footer page list. A page may now state a
+  `title` beside its `label`, which is what heads the page, titles the browser tab, and titles a
+  shared link; the four whose short label reads oddly as a heading state one.
 
 ### Fixed
 

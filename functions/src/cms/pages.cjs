@@ -49,7 +49,7 @@ const DOC_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 // straight into Firestore around it.
 
 /** Keys a cmsPages doc may carry — anything else is rejected by name. */
-const PAGE_KEYS = Object.freeze(['id', 'label', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template']);
+const PAGE_KEYS = Object.freeze(['id', 'label', 'title', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template']);
 const SECTION_KEYS = Object.freeze(['id', 'label', 'description', 'allowedBlocks', 'maxBlocks', 'reorderable', 'defaultBlocks', 'slot']);
 const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
 
@@ -136,6 +136,13 @@ function validatePageDoc(doc) {
     errors.push('id: must be 1-64 chars of letters, digits, hyphen, underscore');
   }
   if (!isNonEmptyString(doc.label)) errors.push('label: must be a non-empty string');
+  // The heading, and OPTIONAL: a page that states no title is headed by its
+  // label (shared/page pageHeading). `null` is how the editor sends "no
+  // title", so it has to be accepted as readily as the key being absent —
+  // otherwise clearing the field would be the one edit nobody could save.
+  if (doc.title !== undefined && doc.title !== null && !isNonEmptyString(doc.title)) {
+    errors.push('title: must be a non-empty string or null');
+  }
   if (!isNonEmptyString(doc.path) || !doc.path.startsWith('/')) {
     errors.push("path: must be a string starting with '/'");
   } else if (doc.path === '/') {

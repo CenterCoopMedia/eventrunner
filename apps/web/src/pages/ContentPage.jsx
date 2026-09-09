@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
+import { pageHeading } from 'shared/page';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -81,10 +82,18 @@ const STATUS_SETTLE_MS = 300;
  * content). A page with no such section — recap's `recap_summary`, any
  * custom page an operator builds — keeps its first section's heading
  * visible and in the index, same as every other section.
+ *
+ * A page can now name itself twice — a short `label` for the navigation
+ * and a full `title` for the heading — so the first clause asks about
+ * both. A section labelled "Code of conduct" repeats the conduct page's
+ * heading whether or not that page's nav label still says so, and the
+ * whole point of this rule is that a reader never meets the same words
+ * twice in a row.
  */
 function isTitleRepeatingSection(section, page) {
   return (
     section.label === page.label ||
+    section.label === pageHeading(page) ||
     /_intro$/.test(section.id) ||
     /_header$/.test(section.id)
   );
@@ -114,8 +123,8 @@ function filterSections(sections, query) {
 
 export default function ContentPage() {
   const { pathname } = useLocation();
-  const { getPage, getSectionBlocks } = useContent();
-  const { eventConfig } = useEventConfig();
+  const { getPublicPage, getSectionBlocks } = useContent();
+  const { eventConfig, features } = useEventConfig();
   // Declared before the early return below so hook order stays fixed across
   // renders regardless of which page (or no page) this URL resolves to
   // (react-hooks/rules-of-hooks).
@@ -156,7 +165,16 @@ export default function ContentPage() {
 
   // The requested URL itself may be reserved territory (a stale /p/... link,
   // a guess at /signin/help) even before a page lookup happens.
-  const page = isReservedPathSegment(firstPathSegment(pathname)) ? null : getPage(pathname);
+  //
+  // getPublicPage, not getPage: this is the lookup a READER's address goes
+  // through, so it asks the one predicate the navigation, the sitemap, and
+  // the server's link-card metadata ask (shared/page isPublicPage). A page
+  // those three drop — including one whose `visible` field is merely absent
+  // rather than false — must 404 here too, or hiding a page from every list
+  // would still leave it open to anyone who knows the URL.
+  const page = isReservedPathSegment(firstPathSegment(pathname))
+    ? null
+    : getPublicPage(pathname, features);
 
   // A non-system page whose STORED path starts with a reserved segment is
   // pre-#52 or hand-edited data, not something the current admin UI could
@@ -167,7 +185,7 @@ export default function ContentPage() {
   // Called ahead of the early return below, unconditionally, as the rules
   // of hooks require. A page that does not resolve names nothing, which
   // leaves the event name standing alone.
-  useDocumentTitle(!page || page.systemPage || pageReserved ? null : page.label);
+  useDocumentTitle(!page || page.systemPage || pageReserved ? null : pageHeading(page));
 
   if (!page || page.systemPage || pageReserved) {
     return <NotFound />;
@@ -272,7 +290,7 @@ export default function ContentPage() {
   return (
     <article>
       <h1 className="pb-lg font-heading text-h1 font-semibold text-text-primary">
-        {page.label}
+        {pageHeading(page)}
       </h1>
       {showLegalNotice ? (
         <p

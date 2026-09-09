@@ -87,7 +87,24 @@ const DEMO_ANSWERS = Object.freeze({
     registration: {
       opensAt: '2026-06-01T09:00:00',
       closesAt: '2026-10-09T23:59:00',
-      externalUrl: 'https://example.org/register',
+      // NO REGISTRATION DESTINATION, ON PURPOSE (M7 issue 8). The demo is a
+      // static build with no ticket provider behind it, and the register
+      // control is rendered on every page — so any value here would put a
+      // button on the whole demo site that goes somewhere a reader cannot
+      // use. example.org was exactly that. The demo's own routes are no
+      // better: the site is served from a GitHub Pages subpath the content
+      // generator never sees (scripts/build-demo.cjs derives it from
+      // --base at build time, and `generate-content.cjs --demo` runs
+      // without it) and it runs under HashRouter, so a self-link would have
+      // to hardcode a domain in a fixture that has none.
+      //
+      // So the demo ships the empty case, which is the state most
+      // deployments start in and the one worth showing: no control at all,
+      // anywhere. The configured case is covered by tests
+      // (components/RegistrationAction.test.jsx, components/Layout.test.jsx,
+      // admin/pages/AdminSettings.test.jsx) rather than by the demo.
+      externalUrl: null,
+      actionLabel: null,
     },
     venue: {
       name: '[Demo] Harborlight Hall',
@@ -228,7 +245,29 @@ const DEMO_CONTENT = Object.freeze({
     value:
       'Sessions and workshops for people who operate local and cooperative newsrooms.',
   },
-  hero__register_cta: { label: 'Register for the summit' },
+  // The key facts card (M7 issue 9): one figure, then the lines a reader
+  // needs beside it. The figure carries the six-part stat contract, the
+  // same as the two figures further down the page, because the demo is
+  // what a filled-in deployment looks like rather than a template — and
+  // because the dates really are a number somebody counted, from a source
+  // that can be named.
+  info__when: {
+    value: '3 days',
+    label: 'When',
+    takeaway: 'The summit runs from Wednesday to Friday',
+    description: '14 to 16 October 2026, in the Eastern timezone. Doors open at 09:00 each day.',
+    source: 'Summit programme, read 1 September 2026.',
+    alt: 'The summit runs for three days, 14 to 16 October 2026.',
+  },
+  // Where the summit happens is a name, an address, and a way to get there.
+  // They are labelled lines, not statistics: a venue is not a number, and
+  // the only way to dress one as a stat is to invent a count ("1 venue")
+  // and a source line to cite it to. Neither is a fact anyone measured.
+  info__where_venue: { text: 'Venue: Harborlight Hall' },
+  info__where_address: { text: 'Address: 1 Harborlight Way, Millhaven, MH 58211' },
+  info__where_transit: {
+    text: 'Nearest transit: Millhaven Central station, ten minutes on foot',
+  },
   details__intro: {
     value:
       '<p>The summit has shared sessions and two workshop tracks. Day one includes registration ' +
@@ -262,6 +301,9 @@ const DEMO_CONTENT = Object.freeze({
     source: 'Summit programme, read 1 September 2026.',
     alt: 'Of 38 planned sessions, 25 are workshops and 13 are panels or plenaries.',
   },
+  // The line above the home page's sponsor strip (M7 issue 10). The marks
+  // themselves come from the demo's own organizations.
+  sponsors__lede: { value: 'These organizations pay for the rooms, the food, and the travel grants.' },
   faq_items__what_is_this: {
     question: 'What is the Harborlight Media Summit?',
     answer:

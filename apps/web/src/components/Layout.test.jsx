@@ -7,9 +7,18 @@
 // serving that Hosting-relative (what the shell did before the media library)
 // 404s the header logo. A value that is not a usable path, or an object that
 // has since been deleted, must degrade to the wordmark.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+// jsdom applies no CSS, so a rule the shell depends on is asserted against
+// the stylesheet itself (the device components/editorial/stamp.test.js uses).
+const indexCss = fs.readFileSync(path.resolve(here, '..', 'index.css'), 'utf8');
 
 let theme;
 let eventConfig;
@@ -57,10 +66,10 @@ const FIXTURE_EVENT = {
 
 // The pages a seeded deployment ships, trimmed to what the shell reads.
 const FIXTURE_PAGES = [
-  { id: 'home', label: 'Home page', path: '/', order: 0, visible: true, systemPage: true },
+  { id: 'home', label: 'Home', path: '/', order: 0, visible: true, systemPage: true },
   { id: 'schedule', label: 'Schedule', path: '/schedule', order: 1, visible: true, systemPage: true },
-  { id: 'travel', label: 'Travel and venue', path: '/travel', order: 4, visible: true, systemPage: false },
-  { id: 'faq', label: 'Frequently asked questions', path: '/faq', order: 5, visible: true, systemPage: false },
+  { id: 'travel', label: 'Travel', path: '/travel', order: 4, visible: true, systemPage: false },
+  { id: 'faq', label: 'FAQ', path: '/faq', order: 5, visible: true, systemPage: false },
 ];
 
 const FIXTURE_FEATURES = { schedule: true };
@@ -188,7 +197,10 @@ describe('Layout header', () => {
 });
 
 describe('Layout navigation (built from page documents)', () => {
-  const navLabels = (root) => [...root.querySelectorAll('nav a')].map((a) => a.textContent);
+  // Scoped to the main nav by its landmark label: the footer carries the
+  // same page list (M7 issue 3), so a bare `nav a` would count both.
+  const MAIN_NAV = 'nav[aria-label="Main"] a';
+  const navLabels = (root) => [...root.querySelectorAll(MAIN_NAV)].map((a) => a.textContent);
 
   it('lists a seeded content page and leaves a hidden one out', () => {
     const { container } = renderShell(
@@ -200,7 +212,7 @@ describe('Layout navigation (built from page documents)', () => {
         ],
       },
     );
-    expect(navLabels(container)).toContain('Travel and venue');
+    expect(navLabels(container)).toContain('Travel');
     expect(navLabels(container)).not.toContain('Draft page');
   });
 
@@ -209,13 +221,13 @@ describe('Layout navigation (built from page documents)', () => {
     // The page documents in their own order, then the account control the
     // shell adds at the end of the list (M7 issue 2).
     expect(navLabels(container)).toEqual([
-      'Home page',
+      'Home',
       'Schedule',
-      'Travel and venue',
-      'Frequently asked questions',
+      'Travel',
+      'FAQ',
       'Sign in',
     ]);
-    expect([...container.querySelectorAll('nav a')].map((a) => a.getAttribute('href'))).toEqual([
+    expect([...container.querySelectorAll(MAIN_NAV)].map((a) => a.getAttribute('href'))).toEqual([
       '/',
       '/schedule',
       '/travel',
@@ -227,14 +239,14 @@ describe('Layout navigation (built from page documents)', () => {
   it('still gates a system page on its feature flag', () => {
     const { container } = renderShell({}, { featureFlags: {} });
     expect(navLabels(container)).not.toContain('Schedule');
-    expect(navLabels(container)).toContain('Travel and venue');
+    expect(navLabels(container)).toContain('Travel');
   });
 
   it('marks the page in view, and only that one, on a content page', () => {
     const { container } = renderShell({}, { path: '/travel' });
     const current = [...container.querySelectorAll('nav a[aria-current="page"]')];
     expect(current).toHaveLength(1);
-    expect(current[0].textContent).toBe('Travel and venue');
+    expect(current[0].textContent).toBe('Travel');
     expect(current[0]).toHaveClass('font-semibold', 'border-b-rule-strong');
   });
 
@@ -250,7 +262,7 @@ describe('Layout navigation (built from page documents)', () => {
   // beyond the element still being a link.
   it('gives every item a keyboard path at the full touch target size', () => {
     const { container } = renderShell({});
-    for (const link of container.querySelectorAll('nav a')) {
+    for (const link of container.querySelectorAll(MAIN_NAV)) {
       expect(link.tagName).toBe('A');
       expect(link).toHaveAttribute('href');
       expect(link.hasAttribute('tabindex')).toBe(false);
@@ -277,7 +289,9 @@ describe('Layout navigation (built from page documents)', () => {
 // path rather than being a second control the shell has to place twice.
 describe('Layout account control', () => {
   const accountLink = (root) =>
-    root.querySelector('nav a[href="/signin"], nav a[href="/profile"]');
+    root.querySelector(
+      'nav[aria-label="Main"] a[href="/signin"], nav[aria-label="Main"] a[href="/profile"]',
+    );
 
   it('offers sign-in to a visitor who is not signed in', () => {
     const { container } = renderShell({});
@@ -285,7 +299,7 @@ describe('Layout account control', () => {
     expect(link).toHaveAttribute('href', '/signin');
     expect(link.textContent).toBe('Sign in');
     // One control, not two: a signed-out reader is never offered a profile.
-    expect(container.querySelectorAll('nav a[href="/profile"]')).toHaveLength(0);
+    expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/profile"]')).toHaveLength(0);
   });
 
   it('offers the profile to a reader who is signed in', () => {
@@ -293,7 +307,7 @@ describe('Layout account control', () => {
     const link = accountLink(container);
     expect(link).toHaveAttribute('href', '/profile');
     expect(link.textContent).toBe('Your profile');
-    expect(container.querySelectorAll('nav a[href="/signin"]')).toHaveLength(0);
+    expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/signin"]')).toHaveLength(0);
   });
 
   it('offers sign-in while the auth handshake is still in flight', () => {
@@ -314,14 +328,14 @@ describe('Layout account control', () => {
 
   it('sits at the end of the navigation, after every page', () => {
     const { container } = renderShell({});
-    const links = [...container.querySelectorAll('nav a')];
+    const links = [...container.querySelectorAll('nav[aria-label="Main"] a')];
     expect(links.at(-1)).toBe(accountLink(container));
   });
 
   it('is reachable in both nav placements, as the same one control', () => {
     for (const navPlacement of ['top', 'side']) {
       const { container } = renderShell({}, { path: '/schedule', themeDoc: { navPlacement } });
-      expect(container.querySelectorAll('nav a[href="/signin"]')).toHaveLength(1);
+      expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/signin"]')).toHaveLength(1);
     }
   });
 
@@ -368,6 +382,391 @@ describe('Layout account control', () => {
   it('does not claim a route that merely starts with the sign-in path', () => {
     const { container } = renderShell({}, { path: '/signin/help' });
     expect(accountLink(container)).not.toHaveAttribute('aria-current');
+  });
+});
+
+// THE FOOTER (M7 issue 3). The same page list the navigation carries, the
+// organization that operates the event, how to reach it, and whatever social
+// accounts the event has recorded — every one of them read from data, none of
+// them written here.
+describe('Layout footer', () => {
+  const footer = (root) => root.querySelector('footer');
+  // Both footer lists are navigation landmarks, told apart by their label —
+  // the same way a reader's landmark list tells them apart.
+  const PAGE_NAV = 'nav[aria-label="Site pages"]';
+  const SOCIAL_NAV = 'nav[aria-label="Social accounts"]';
+  const socialNav = (root) => footer(root).querySelector(SOCIAL_NAV);
+  const socialLinks = (root) => socialNav(root).querySelectorAll('a');
+  const footerLinks = (root) =>
+    [...footer(root).querySelectorAll(`${PAGE_NAV} a`)].map((a) => ({
+      label: a.textContent,
+      href: a.getAttribute('href'),
+    }));
+
+  it('lists the same pages the navigation lists, in the same order', () => {
+    const { container } = renderShell({});
+    expect(footerLinks(container)).toEqual([
+      { label: 'Home', href: '/' },
+      { label: 'Schedule', href: '/schedule' },
+      { label: 'Travel', href: '/travel' },
+      { label: 'FAQ', href: '/faq' },
+    ]);
+  });
+
+  it('applies the navigation’s own gates rather than a second set', () => {
+    const { container } = renderShell(
+      {},
+      {
+        featureFlags: {},
+        pageDocs: [
+          ...FIXTURE_PAGES,
+          { id: 'draft', label: 'Draft page', path: '/draft', order: 6, visible: false },
+        ],
+      },
+    );
+    const labels = footerLinks(container).map((link) => link.label);
+    // Hidden by the editor, and a system page whose feature is switched off.
+    expect(labels).not.toContain('Draft page');
+    expect(labels).not.toContain('Schedule');
+    expect(labels).toContain('Travel');
+  });
+
+  it('renders no page list at all when no page is navigable', () => {
+    const { container } = renderShell({}, { pageDocs: [] });
+    expect(footer(container).querySelector(PAGE_NAV)).toBeNull();
+  });
+
+  it('names the operator and links the support address from config/event', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          legal: { operatorName: '[Fixture] Example Trust', supportEmail: 'help@example.org' },
+        },
+      },
+    );
+    expect(footer(container).textContent).toContain('[Fixture] Example Trust');
+    expect(footer(container).querySelector('a[href="mailto:help@example.org"]')).not.toBeNull();
+  });
+
+  it('renders the social accounts config/event records, and nothing else', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', url: 'https://example.org/@fixture' },
+              { platform: 'Bluesky', url: 'https://example.net/fixture' },
+            ],
+          },
+        },
+      },
+    );
+    const links = [...socialLinks(container)];
+    expect(links.map((a) => a.textContent)).toEqual(['Mastodon', 'Bluesky']);
+    expect(links[0]).toHaveAttribute('href', 'https://example.org/@fixture');
+    // No target: the account opens in the tab the reader is already in, so
+    // there is no opener to sever — rel="noreferrer" is here to withhold
+    // the referrer, which is the whole of what it does on a same-tab link.
+    expect(links[0]).not.toHaveAttribute('target');
+    expect(links[0]).toHaveAttribute('rel', 'noreferrer');
+  });
+
+  it('renders no social block when the event sets no handles', () => {
+    // The common case: config/event carries `social.handles: []` on a fresh
+    // deployment, and a runtime document can drop the field entirely.
+    for (const social of [undefined, {}, { handles: [] }, { handles: 'nope' }]) {
+      const { container } = renderShell({}, { event: { ...FIXTURE_EVENT, social } });
+      expect(socialNav(container)).toBeNull();
+    }
+  });
+
+  it('drops a handle it cannot turn into a safe link', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', url: 'https://example.org/@fixture' },
+              { platform: 'Bad', url: 'javascript:alert(1)' },
+              { platform: 'No address' },
+              { url: 'https://example.org/unnamed' },
+              'not an object',
+            ],
+          },
+        },
+      },
+    );
+    expect([...socialLinks(container)].map((a) => a.textContent)).toEqual(['Mastodon']);
+  });
+
+  it('trims a platform name and caps how long it can be', () => {
+    // config/event is an unvalidated fail-soft overlay (§2.4): a runtime
+    // document can carry a platform name of any length, and a footer that
+    // renders it verbatim hands one bad write the whole bottom of the site.
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: '  Mastodon  ', url: 'https://example.org/@fixture' },
+              { platform: 'M'.repeat(400), url: 'https://example.net/fixture' },
+            ],
+          },
+        },
+      },
+    );
+    const labels = [...socialLinks(container)].map((a) => a.textContent);
+    expect(labels[0]).toBe('Mastodon');
+    expect(labels[1]).toHaveLength(40);
+    expect(labels[1]).toBe('M'.repeat(40));
+  });
+
+  it('drops a platform name that is only whitespace', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: { handles: [{ platform: '   ', url: 'https://example.org/@fixture' }] },
+        },
+      },
+    );
+    expect(socialNav(container)).toBeNull();
+  });
+
+  it('renders one link for a handle recorded twice', () => {
+    // Two identical entries are one account said twice; a repeated link is
+    // noise a reader has to resolve (the rule buildNavItems already applies
+    // to a duplicated route).
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', url: 'https://example.org/@fixture' },
+              { platform: 'Mastodon', url: 'https://example.org/@fixture' },
+            ],
+          },
+        },
+      },
+    );
+    expect([...socialLinks(container)]).toHaveLength(1);
+  });
+
+  it('renders one link for two spellings of one address', () => {
+    // A URL is a string in the document but an address to a reader, and
+    // `https://example.org` and `https://example.org/` are the same address.
+    // The dedupe therefore runs on the canonical href, not on the raw text
+    // an operator happened to type.
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', handle: '@fixture', url: 'https://example.org' },
+              { platform: 'Mastodon', handle: '@fixture', url: 'https://example.org/' },
+            ],
+          },
+        },
+      },
+    );
+    const links = [...socialLinks(container)];
+    expect(links).toHaveLength(1);
+    // And the href is the canonical form, so the check and the link agree.
+    expect(links[0]).toHaveAttribute('href', 'https://example.org/');
+  });
+
+  it('names the handle beside the platform, so two accounts read apart', () => {
+    // config/event records `{ platform, handle, url }` (ADR 0001 §config).
+    // An event with two accounts on one service is the case that needs the
+    // handle: without it both links read “Mastodon” and a reader cannot tell
+    // which is which.
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/@summit' },
+              { platform: 'Mastodon', handle: '@newsroom', url: 'https://example.org/@newsroom' },
+              // No handle recorded: the platform name stands alone.
+              { platform: 'Bluesky', url: 'https://example.net/fixture' },
+            ],
+          },
+        },
+      },
+    );
+    expect([...socialLinks(container)].map((a) => a.textContent)).toEqual([
+      'Mastodon @summit',
+      'Mastodon @newsroom',
+      'Bluesky',
+    ]);
+  });
+
+  it('trims a handle and caps how long it can be', () => {
+    // Same fail-soft rule the platform name gets (§2.4): a runtime document
+    // can carry a handle of any length, and a handle that is only whitespace
+    // is not a handle.
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', handle: '  @fixture  ', url: 'https://example.org/a' },
+              { platform: 'Bluesky', handle: '   ', url: 'https://example.org/b' },
+              { platform: 'Long', handle: 'h'.repeat(400), url: 'https://example.org/c' },
+              { platform: 'Wrong type', handle: 42, url: 'https://example.org/d' },
+            ],
+          },
+        },
+      },
+    );
+    const labels = [...socialLinks(container)].map((a) => a.textContent);
+    expect(labels[0]).toBe('Mastodon @fixture');
+    expect(labels[1]).toBe('Bluesky');
+    expect(labels[2]).toBe(`Long ${'h'.repeat(40)}`);
+    expect(labels[3]).toBe('Wrong type');
+  });
+
+  it('keeps two accounts that share one address', () => {
+    // One profile page can be reached under two names, and two names can
+    // point at one page. Neither half of the pair is a key on its own.
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', url: 'https://example.org/@fixture' },
+              { platform: 'Fediverse', url: 'https://example.org/@fixture' },
+            ],
+          },
+        },
+      },
+    );
+    expect([...socialLinks(container)].map((a) => a.textContent)).toEqual([
+      'Mastodon',
+      'Fediverse',
+    ]);
+  });
+
+  it('gives every footer link a keyboard path at the full touch target size', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          legal: { operatorName: '[Fixture] Example Trust', supportEmail: 'help@example.org' },
+          social: { handles: [{ platform: 'Mastodon', url: 'https://example.org/@fixture' }] },
+        },
+      },
+    );
+    for (const link of footer(container).querySelectorAll('a')) {
+      expect(link).toHaveAttribute('href');
+      expect(link.hasAttribute('tabindex')).toBe(false);
+      expect(link.className).toContain('touch-target');
+    }
+  });
+});
+
+// BACK TO TOP (M7 issue 6). The shell names the top of the page and the
+// footer, and mounts the control between them; BackToTop.test.jsx covers
+// what the control itself does.
+describe('Layout back-to-top', () => {
+  const backToTop = (root) =>
+    [...root.querySelectorAll('button')].find((b) => b.textContent === 'Back to top');
+
+  function renderScrolled() {
+    window.innerHeight = 800;
+    window.scrollY = 2000;
+    window.scrollTo = vi.fn();
+    return renderShell({});
+  }
+
+  it('names the top of the page as a focus target, outside the tab order', () => {
+    const { container } = renderShell({});
+    const banner = container.querySelector('header#site-top');
+    expect(banner).not.toBeNull();
+    expect(banner).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('keeps the skip link first, ahead of the banner it names', () => {
+    const { container } = renderShell({});
+    const skip = container.querySelector('a.skip-link');
+    const banner = container.querySelector('header#site-top');
+    expect(skip.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+  });
+
+  it('names the footer, so the control can withdraw over it', () => {
+    const { container } = renderShell({});
+    expect(container.querySelector('footer#site-footer')).not.toBeNull();
+  });
+
+  it('offers no control to a reader who has not scrolled', () => {
+    const { container } = renderShell({});
+    expect(backToTop(container)).toBeUndefined();
+  });
+
+  it('puts the control ahead of the footer, so a reader tabbing forward reaches it', () => {
+    // Sequential order is the whole point. Behind the footer, the control
+    // was unreachable by keyboard: tabbing to a footer link scrolls the
+    // footer into view, and the control withdraws for the footer.
+    try {
+      const { container } = renderScrolled();
+      const button = backToTop(container);
+      expect(button).not.toBeUndefined();
+      const footer = container.querySelector('footer#site-footer');
+      expect(button.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING)
+        .toBeTruthy();
+    } finally {
+      window.scrollY = 0;
+    }
+  });
+
+  it('moves focus to the shell’s own banner when a reader uses it', () => {
+    try {
+      const { container } = renderScrolled();
+      fireEvent.click(backToTop(container));
+      const banner = container.querySelector('header#site-top');
+      expect(document.activeElement).toBe(banner);
+      expect(banner).toHaveAttribute(FOCUS_RING_ATTRIBUTE);
+    } finally {
+      window.scrollY = 0;
+    }
+  });
+
+  // THE RING MUST NOT OVERSHOOT. tabindex="-1" makes the banner take focus
+  // from a click anywhere inside it, so a rule keyed to bare :focus would
+  // outline the whole header the moment a reader clicked the nameplate.
+  it('does not mark the banner when a reader clicks inside the header', () => {
+    const { container } = renderShell({});
+    const banner = container.querySelector('header#site-top');
+    fireEvent.click(banner.querySelector('a[href="/"]'));
+    fireEvent.click(banner);
+    expect(banner).not.toHaveAttribute(FOCUS_RING_ATTRIBUTE);
+  });
+
+  it('draws the ring on that mark rather than on the banner’s own focus', () => {
+    // A property of the stylesheet, which jsdom does not apply.
+    expect(indexCss).toMatch(/\[data-focus-ring\]:focus\s*\{[^}]*outline[^}]*\}/);
+    expect(indexCss).not.toMatch(/#site-top:focus\s*\{/);
   });
 });
 
@@ -427,7 +826,8 @@ describe('Layout variants (brief §6.1)', () => {
 
     // Same landmark, same items, same order — the rail is a placement, not
     // a different navigation (§8.1).
-    const labels = (root) => [...root.querySelectorAll('nav a')].map((a) => a.textContent);
+    const labels = (root) =>
+      [...root.querySelectorAll('nav[aria-label="Main"] a')].map((a) => a.textContent);
     expect(labels(side)).toEqual(labels(top));
     expect(side.querySelector('nav')).toHaveAttribute('aria-label', 'Main');
 
@@ -496,5 +896,61 @@ describe('Layout variants (brief §6.1)', () => {
   it('puts the nav across the top when neither the site nor the page says', () => {
     const { container } = renderShell({}, { path: '/schedule' });
     expect(container.querySelector('nav').className).not.toContain('lg:');
+  });
+});
+
+// M7 issue 8: the event's configured registration action is a control in the
+// header. It is mounted here and nowhere else in the shell, so the shell's
+// own tests hold both halves of the rule — a configured destination puts one
+// control in the header, and no destination puts none. A header never
+// carries a register control that goes nowhere.
+describe('Layout registration action (M7 issue 8)', () => {
+  const withAction = (registration) => ({ ...FIXTURE_EVENT, registration });
+
+  it('renders the configured action in the header, under the label the client set', () => {
+    const { container } = renderShell(
+      {},
+      {
+        event: withAction({
+          externalUrl: 'https://register.example.org/tickets',
+          actionLabel: 'Get a ticket',
+        }),
+      },
+    );
+    const link = container.querySelector('header a[href="https://register.example.org/tickets"]');
+    expect(link).not.toBeNull();
+    expect(link.textContent).toBe('Get a ticket');
+  });
+
+  it('keeps its own distance from the navigation in the one row treatment', () => {
+    // `minimal` puts the identity, the navigation and this control in ONE
+    // flex row, and the shell's sign-in control goes at the END of that
+    // navigation — so a register control with no separation of its own
+    // would sit one gap from a sign-in link and the two would read as one
+    // pair. It is a sibling of the nav, never inside it, and it takes the
+    // trailing edge of the row.
+    const { container } = renderShell(
+      {},
+      {
+        header: 'minimal',
+        event: withAction({ externalUrl: 'https://register.example.org/tickets' }),
+      },
+    );
+    const link = container.querySelector('header a[href="https://register.example.org/tickets"]');
+    expect(link.closest('nav')).toBeNull();
+    expect(link.parentElement.className).toContain('ms-auto');
+    const row = container.querySelector('header nav').parentElement;
+    expect(row.className).toContain('flex');
+    expect(row).toContainElement(link);
+  });
+
+  it('renders no control at all when no destination is configured', () => {
+    for (const registration of [undefined, {}, { externalUrl: null }, { actionLabel: 'Register' }]) {
+      const { container, unmount } = renderShell({}, { event: withAction(registration) });
+      const header = container.querySelector('header');
+      expect(header.textContent).not.toContain('Register');
+      expect(header.querySelectorAll('a[target="_blank"]')).toHaveLength(0);
+      unmount();
+    }
   });
 });

@@ -25,6 +25,7 @@
 
 const { configuredThemeColor } = require('./shared-theme.cjs');
 const { SYSTEM_PAGE_ROUTES } = require('shared/routing');
+const { isPublicPage, pageFeatureGate } = require('shared/page');
 
 /**
  * A `cmsPages` system page id -> the `config/features` key its own route
@@ -35,7 +36,9 @@ const { SYSTEM_PAGE_ROUTES } = require('shared/routing');
  * Derived from the one system page map in the shared package rather than
  * restated here: the navigation and the server-rendered per-route metadata
  * read the same map, and a gate that disagreed with the route's own check
- * would put a page in the sitemap that renders "not available".
+ * would put a page in the sitemap that renders "not available". Kept as an
+ * exported map because the robots-file reporting names the gate that
+ * excluded a route; `shared/page isPublicPage` is what actually applies it.
  */
 const SYSTEM_PAGE_FEATURE_GATES = Object.freeze(
   Object.fromEntries(
@@ -146,10 +149,17 @@ function routeAccess({ id, features }) {
 /**
  * Classify one `cmsPages` document.
  *
- * `visible` is read STRICTLY `=== true`, not `!== false`: a doc with the
- * field merely absent (mid-write, before it is set) must not read as
- * published — the same rule `updatesMeta` applies for the same reason
- * (functions/src/public/og.cjs).
+ * Whether the page is public at all — visible, with its route's feature on
+ * — is `shared/page isPublicPage`, the same read the header navigation and
+ * the server-rendered route metadata make. A sitemap that listed a page the
+ * navigation does not link, or that named a route the server describes as
+ * missing, would be three copies of one rule disagreeing. `visible` and
+ * `featureOn` are still reported separately here because robots.txt says
+ * WHY each excluded route is excluded.
+ *
+ * `access` is this file's own extra question and stays here: a route that
+ * renders a sign-in prompt to a signed-out visitor is still a page the
+ * navigation links, but it is not a page to put in a sitemap.
  *
  * @param {{ page: object, features: object }} args
  * @returns {{ id: string, path: string, access: 'public'|'authenticated',
@@ -159,8 +169,8 @@ function routeAccess({ id, features }) {
 function classifyPage({ page, features = {} }) {
   const id = page?.id;
   const routePath = page?.path;
-  const gate = SYSTEM_PAGE_FEATURE_GATES[id];
-  const featureOn = !gate || features[gate] === true;
+  const gate = pageFeatureGate(page);
+  const featureOn = gate === null || features[gate] === true;
   const access = routeAccess({ id, features });
   const visible = page?.visible === true;
   return {
@@ -169,7 +179,7 @@ function classifyPage({ page, features = {} }) {
     access,
     visible,
     featureOn,
-    publishable: visible && featureOn && access === 'public',
+    publishable: isPublicPage(page, features) && access === 'public',
     hasChildren: SYSTEM_PAGES_WITH_CHILDREN.has(id),
   };
 }

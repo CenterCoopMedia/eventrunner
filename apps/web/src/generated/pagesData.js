@@ -15,7 +15,7 @@
 export const pagesData = [
   {
     id: 'home',
-    label: 'Home page',
+    label: 'Home',
     path: '/',
     icon: null,
     order: 0,
@@ -44,10 +44,38 @@ export const pagesData = [
             blockType: 'text',
             description: 'One warm supporting sentence.',
           },
+        ],
+      },
+      {
+        id: 'info',
+        label: 'Key facts',
+        description: 'The event’s own short answers. A stat opens a card; the list items after it are that card’s lines.',
+        allowedBlocks: [
+          'stat',
+          'list_item',
+        ],
+        maxBlocks: 12,
+        reorderable: true,
+        defaultBlocks: [
           {
-            field: 'register_cta',
-            blockType: 'cta',
-            description: 'Primary registration action.',
+            field: 'when',
+            blockType: 'stat',
+            description: 'When the event runs.',
+          },
+          {
+            field: 'where_venue',
+            blockType: 'list_item',
+            description: 'The venue’s name, labelled.',
+          },
+          {
+            field: 'where_address',
+            blockType: 'list_item',
+            description: 'The venue’s street address, labelled.',
+          },
+          {
+            field: 'where_transit',
+            blockType: 'list_item',
+            description: 'The nearest transit to the venue, labelled.',
           },
         ],
       },
@@ -122,6 +150,23 @@ export const pagesData = [
         defaultBlocks: [],
       },
       {
+        id: 'sponsors',
+        label: 'Sponsors',
+        description: 'One line above the logo wall. The organizations come from the Organizations list, not from here.',
+        allowedBlocks: [
+          'text',
+        ],
+        maxBlocks: 1,
+        reorderable: true,
+        defaultBlocks: [
+          {
+            field: 'lede',
+            blockType: 'text',
+            description: 'One line thanking the organizations that support the event.',
+          },
+        ],
+      },
+      {
         id: 'footer',
         label: 'Footer links',
         description: 'Grouped links rendered in the page footer.',
@@ -176,7 +221,7 @@ export const pagesData = [
   },
   {
     id: 'travel',
-    label: 'Travel and venue',
+    label: 'Travel',
     path: '/travel',
     icon: null,
     order: 4,
@@ -322,7 +367,8 @@ export const pagesData = [
   },
   {
     id: 'faq',
-    label: 'Frequently asked questions',
+    label: 'FAQ',
+    title: 'Frequently asked questions',
     path: '/faq',
     icon: null,
     order: 5,
@@ -369,7 +415,8 @@ export const pagesData = [
   },
   {
     id: 'conduct',
-    label: 'Code of conduct',
+    label: 'Conduct',
+    title: 'Code of conduct',
     path: '/conduct',
     icon: null,
     order: 6,
@@ -481,7 +528,8 @@ export const pagesData = [
   },
   {
     id: 'privacy',
-    label: 'Privacy policy',
+    label: 'Privacy',
+    title: 'Privacy policy',
     path: '/privacy',
     icon: null,
     order: 8,
@@ -559,7 +607,8 @@ export const pagesData = [
   },
   {
     id: 'terms',
-    label: 'Terms of service',
+    label: 'Terms',
+    title: 'Terms of service',
     path: '/terms',
     icon: null,
     order: 9,
@@ -659,7 +708,7 @@ export const pagesData = [
   },
   {
     id: 'recap',
-    label: 'Event recap',
+    label: 'Recap',
     path: '/recap',
     icon: null,
     order: 12,
@@ -740,7 +789,7 @@ export const pagesData = [
   },
   {
     id: 'guidelines',
-    label: 'Speaker guidelines',
+    label: 'Guidelines',
     path: '/guidelines',
     icon: null,
     order: 13,

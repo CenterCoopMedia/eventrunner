@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { defaultPages, buildSeedContent, placeholderBlock, LEGAL_PAGE_IDS } = require('./seed.cjs');
+const { pageHeading } = require('shared/page');
 const { buildConfigDocs } = require('./answers.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
 const { BLOCK_TYPES } = require('../../functions/src/cms/blockTypes.cjs');
@@ -96,6 +97,78 @@ test('the fifteen default pages are seeded, with the six system pages marked', (
     pages.filter((p) => p.systemPage).map((p) => p.id),
     ['home', 'schedule', 'speakers', 'sponsors', 'attendees', 'updates'],
   );
+});
+
+test('every seeded label is short enough to sit on one navigation row', () => {
+  // The header nav and the footer page list both print `label`, all fifteen
+  // of them, on one row. The old labels ("Frequently asked questions",
+  // "Terms of service") wrapped the header on a phone. Twelve characters is
+  // the widest label that fits, which "City guide" and "Guidelines" both
+  // sit inside; the number exists so a new seeded page cannot quietly
+  // reintroduce the problem.
+  for (const page of defaultPages()) {
+    assert.ok(
+      page.label.length <= 12,
+      `page "${page.id}" has a ${page.label.length}-character nav label: "${page.label}"`,
+    );
+  }
+});
+
+test('the four pages whose short label reads oddly as a heading state their full title', () => {
+  const byId = new Map(defaultPages().map((p) => [p.id, p]));
+  assert.deepEqual(
+    [...byId.values()].filter((p) => p.title !== undefined).map((p) => p.id),
+    ['faq', 'conduct', 'privacy', 'terms'],
+  );
+  assert.equal(pageHeading(byId.get('faq')), 'Frequently asked questions');
+  assert.equal(pageHeading(byId.get('conduct')), 'Code of conduct');
+  assert.equal(pageHeading(byId.get('privacy')), 'Privacy policy');
+  assert.equal(pageHeading(byId.get('terms')), 'Terms of service');
+  // Every other page names itself once: the label IS the heading.
+  for (const page of byId.values()) {
+    if (page.title !== undefined) continue;
+    assert.equal(pageHeading(page), page.label, `page "${page.id}" should be headed by its label`);
+  }
+});
+
+test('shortening the labels moved no page path and no section id', () => {
+  // A label is copy. A path is an address a reader may have bookmarked and
+  // a section id is the key every cmsContent block is filed under, so
+  // neither may travel with a rename.
+  const paths = Object.fromEntries(defaultPages().map((p) => [p.id, p.path]));
+  assert.deepEqual(paths, {
+    home: '/', schedule: '/schedule', speakers: '/speakers', sponsors: '/sponsors',
+    travel: '/travel', faq: '/faq', conduct: '/conduct', contact: '/contact',
+    privacy: '/privacy', terms: '/terms', attendees: '/attendees', updates: '/updates',
+    recap: '/recap', guidelines: '/guidelines', city_guide: '/city-guide',
+  });
+});
+
+test('no seeded section is hidden or revealed by the shortened labels', () => {
+  // ContentPage hides a section whose heading repeats the page's own
+  // (isTitleRepeatingSection). Two of its three clauses read the label and
+  // the heading, so a rename could silently hide a section of real content
+  // or expose a stand-in one. Nothing in the seed matches by name at all —
+  // every stand-in section is matched by its `_intro`/`_header` id — so the
+  // set is unchanged, and this pins that.
+  for (const page of defaultPages()) {
+    for (const section of page.sections) {
+      assert.notEqual(
+        section.label, page.label,
+        `section "${section.id}" is hidden by matching its page's nav label`,
+      );
+      assert.notEqual(
+        section.label, pageHeading(page),
+        `section "${section.id}" is hidden by matching its page's heading`,
+      );
+    }
+  }
+  const standIns = defaultPages().flatMap((page) =>
+    page.sections.filter((s) => /_intro$|_header$/.test(s.id)).map((s) => s.id));
+  assert.deepEqual(standIns, [
+    'travel_header', 'faq_intro', 'conduct_intro', 'contact_intro',
+    'privacy_intro', 'terms_intro', 'guidelines_intro', 'city_guide_intro',
+  ]);
 });
 
 test('every page a SystemPage route asks for is actually seeded', () => {
@@ -367,13 +440,92 @@ test('dates and venue come from config, so they are right the moment init runs (
   assert.equal(content.get('footer__contact_link').url, 'mailto:support@example.org');
 });
 
+// M7 issue 8: the registration action is configuration, not content. A
+// seeded cta block had to invent a destination to be a valid block, and the
+// one it invented pointed at example.org — the dead button the issue exists
+// to remove. The hero still ALLOWS a cta, so an editor can add their own.
+test('the hero seeds no registration action of its own (M7 issue 8)', () => {
+  const home = defaultPages().find((page) => page.id === 'home');
+  const hero = home.sections.find((section) => section.id === 'hero');
+  assert.ok(hero.allowedBlocks.includes('cta'), 'an editor can still add an action');
+  assert.deepEqual(
+    hero.defaultBlocks.filter((def) => def.blockType === 'cta'),
+    [],
+  );
+  const content = buildSeedContent({ pages: defaultPages(), docs: configDocs(), tierA: TIER_A });
+  assert.equal(content.some((doc) => doc.section === 'hero' && doc.blockType === 'cta'), false);
+});
+
+// M7 issue 9: the key facts group. The seed supplies the section and its
+// placeholder blocks, using the two block types that already exist — a
+// stat opens a card and the list items after it are that card's lines.
+//
+// ONE STAT, THREE LINES. A stat is six [Replace] instructions (the stat
+// contract), so three of them would put fifteen of them under the hero of a
+// site nobody has edited yet. One figure and three lines is one short card
+// an operator can finish, and the section takes twelve blocks.
+test('the home page seeds a key facts section built from stat and list_item blocks', () => {
+  const home = defaultPages().find((page) => page.id === 'home');
+  const info = home.sections.find((section) => section.id === 'info');
+  assert.ok(info, 'the home page seeds an info section');
+  assert.deepEqual(info.allowedBlocks, ['stat', 'list_item'], 'no new block type');
+  assert.deepEqual(
+    info.defaultBlocks.map((def) => [def.field, def.blockType]),
+    [
+      ['when', 'stat'],
+      ['where_venue', 'list_item'],
+      ['where_address', 'list_item'],
+      ['where_transit', 'list_item'],
+    ],
+    'one stat opens the card and its lines follow it',
+  );
+  assert.equal(
+    info.defaultBlocks.filter((def) => def.blockType === 'stat').length,
+    1,
+    'a fresh site opens one short card, not one per fact',
+  );
+  const content = new Map(
+    buildSeedContent({ pages: defaultPages(), docs: configDocs(), tierA: TIER_A }).map((d) => [d.id, d]),
+  );
+  // Seeded in the order the card reads in, so the positional grouping the
+  // renderer applies is the one an editor sees in the admin.
+  assert.deepEqual(
+    info.defaultBlocks.map((def) => content.get(`info__${def.field}`).order),
+    [0, 1, 2, 3],
+  );
+  // The seeded stat carries the six-part contract, so the section can be
+  // published without an editor first filling in four more fields.
+  for (const part of ['value', 'label', 'takeaway', 'description', 'source', 'alt']) {
+    assert.ok(content.get('info__when')[part], `info__when.${part} is seeded`);
+  }
+});
+
+// M7 issue 10: the sponsor strip. The section is the operator's own switch
+// for it — deleting it turns the strip off without turning the sponsors
+// feature off everywhere — so the seed has to create it. The organizations
+// themselves are never seeded here: they live in the Organizations list.
+test('the home page seeds a sponsors section holding one line above the wall', () => {
+  const home = defaultPages().find((page) => page.id === 'home');
+  const sponsors = home.sections.find((section) => section.id === 'sponsors');
+  assert.ok(sponsors, 'the home page seeds a sponsors section');
+  assert.deepEqual(sponsors.allowedBlocks, ['text']);
+  assert.deepEqual(
+    sponsors.defaultBlocks.map((def) => [def.field, def.blockType]),
+    [['lede', 'text']],
+  );
+  const content = new Map(
+    buildSeedContent({ pages: defaultPages(), docs: configDocs(), tierA: TIER_A }).map((d) => [d.id, d]),
+  );
+  assert.match(content.get('sponsors__lede').value, /\[Replace\]/);
+});
+
 test('placeholder copy is a [Replace] instruction, never another event copy', () => {
   const docs = configDocs();
   const content = buildSeedContent({ pages: defaultPages(), docs, tierA: TIER_A });
   const placeholderish = content.filter(
     // Config-derived blocks are correct as seeded, so they carry no
     // [Replace] marker by design (§5.4).
-    (d) => !['hero__title', 'hero__register_cta', 'stats__attendees', 'stats__sessions'].includes(d.id) &&
+    (d) => !['hero__title', 'stats__attendees', 'stats__sessions'].includes(d.id) &&
       !d.section.startsWith('privacy_') && !d.section.startsWith('terms_') &&
       !d.id.startsWith('travel_venue__venue_name') && !d.id.startsWith('travel_venue__venue_address') &&
       !d.id.startsWith('footer__') && !d.id.startsWith('contact_channels__'),

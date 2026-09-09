@@ -48,6 +48,7 @@ import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotScheduleData, { speakers as snapshotSpeakers } from '@generated/scheduleData.js';
 import snapshotOrganizationsData from '@generated/organizationsData.js';
 import snapshotPages from '@generated/pagesData.js';
+import { isPublicPage } from 'shared/page';
 import { subscribeContentCollection, subscribeSpeakersPublic } from '../lib/contentSource.js';
 
 const ContentContext = createContext(null);
@@ -200,11 +201,40 @@ export function ContentProvider({ readSource = 'published', children }) {
         .filter((block) => block.section === section && block.visible !== false)
         .sort(byOrder);
 
+    // THE DOCUMENT BEHIND A ROUTE THAT RENDERS ITSELF. A system route is
+    // mounted by App.jsx and gated by its own feature flag; the page
+    // document only describes it — the layout it renders under and the
+    // sections an operator hung around it (SystemPage.jsx, Home.jsx,
+    // Layout.jsx). This lookup answers "which document describes this
+    // route", so it stays as forgiving as it has always been.
     const getPage = (idOrPath) =>
       pages.find(
         (page) =>
           (page.id === idOrPath || page.path === idOrPath) &&
           page.visible !== false,
+      ) ?? null;
+
+    // THE PAGE A READER'S URL RESOLVES TO, and the only lookup that decides
+    // whether a stranger sees one. It asks `isPublicPage` — the same
+    // predicate the header navigation (lib/siteNavigation.js), the sitemap
+    // (scripts/lib/site-manifest.cjs), and the server's per-route metadata
+    // (functions/src/public/og.cjs) ask — because a page missing from all
+    // three of those and still opening on a typed address is those copies
+    // disagreeing about who may see it.
+    //
+    // The difference that matters is `visible` absent. The old route lookup
+    // read `visible !== false`, so a document written mid-save, written
+    // straight into Firestore, or older than the field, was unlinked
+    // everywhere and reachable anyway. `isPublicPage` reads `=== true`.
+    //
+    // `features` is the caller's because this provider does not read config
+    // (ContentPage.jsx and its siblings already hold it): a system page is
+    // gated on the flag its own route checks, and without the flags a
+    // gated page reads as not public.
+    const getPublicPage = (idOrPath, features) =>
+      pages.find(
+        (page) =>
+          (page.id === idOrPath || page.path === idOrPath) && isPublicPage(page, features),
       ) ?? null;
 
     return {
@@ -222,6 +252,7 @@ export function ContentProvider({ readSource = 'published', children }) {
       getBlock,
       getSectionBlocks,
       getPage,
+      getPublicPage,
     };
   }, [readSource, overlay]);
 
@@ -243,8 +274,8 @@ export function useContent(section, field) {
 
 /** The cmsPages surface: ordered visible-aware pages plus lookups. */
 export function usePages() {
-  const { pages, getPage, loading } = useContent();
-  return { pages, getPage, loading };
+  const { pages, getPage, getPublicPage, loading } = useContent();
+  return { pages, getPage, getPublicPage, loading };
 }
 
 export default ContentContext;

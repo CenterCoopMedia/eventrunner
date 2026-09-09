@@ -211,6 +211,36 @@ test('validatePageDoc accepts a normalized multi-segment root-level path', () =>
   assert.equal(ok, true);
 });
 
+test('validatePageDoc accepts a page heading, absent, null, or written', () => {
+  // `title` is the heading, and it is optional: a page that states none is
+  // headed by its `label` (shared/page pageHeading). The editor sends null
+  // for a blank field, so null has to be as acceptable as the key being
+  // absent — otherwise clearing a heading is the one edit nobody can save.
+  assert.equal(validatePageDoc(validPage()).ok, true);
+  assert.equal(validatePageDoc(validPage({ title: null })).ok, true);
+  assert.equal(validatePageDoc(validPage({ title: 'Frequently asked questions' })).ok, true);
+});
+
+test('validatePageDoc still accepts a heading on a system page', () => {
+  // The editor no longer offers the heading field for a system page — that
+  // page draws its own <h1> in its route's code, so the field could only
+  // rename the tab. A document written while the field WAS offered still
+  // carries a title, and the editor sends the document back whole: refusing
+  // it here would make such a page the one page nobody could save again.
+  const { ok } = validatePageDoc(
+    validPage({ id: 'schedule', path: '/schedule', systemPage: true, title: 'The full programme' }),
+  );
+  assert.equal(ok, true);
+});
+
+test('validatePageDoc refuses a page heading that is not a heading', () => {
+  for (const title of ['', '   ', 3, true, {}]) {
+    const { ok, errors } = validatePageDoc(validPage({ title }));
+    assert.equal(ok, false, JSON.stringify(title));
+    assert.ok(errors.includes('title: must be a non-empty string or null'));
+  }
+});
+
 test('validatePageDoc names unknown top-level and section fields', () => {
   const page = validPage({ published: true });
   page.sections[0].extra = 1;

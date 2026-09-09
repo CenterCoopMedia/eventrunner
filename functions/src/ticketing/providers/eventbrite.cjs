@@ -76,6 +76,7 @@
  */
 
 const crypto = require('node:crypto');
+const { resolveRegistrationAction } = require('shared/registration');
 
 const API_BASE = 'https://www.eventbriteapi.com/v3';
 
@@ -437,14 +438,21 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       }
 
       const config = typeof getConfig === 'function' ? await getConfig() : null;
-      const externalUrl = typeof config?.event?.registration?.externalUrl === 'string'
-        ? config.event.registration.externalUrl.trim()
-        : null;
+      // THE SAME READER THE PAGE USES (shared/registration, M7 issue 8).
+      // This used to be a `typeof === 'string'` check of its own, which
+      // meant a legacy config/event written before the https rule existed
+      // was refused by the page and still put in front of a reader here —
+      // in an email, where nobody can see the address before they click.
+      //
+      // The LABEL is this provider's own and stays that way: the client's
+      // `actionLabel` is the wording for their own registration form, and
+      // this row sends a reader to an Eventbrite checkout instead.
+      const action = resolveRegistrationAction(config?.event);
       return {
         send: true,
         templateId: 'ticket.get_ticket',
         ctaLabel: 'Get your ticket',
-        ctaUrl: externalUrl || null,
+        ctaUrl: action?.url ?? null,
         action: 'purchase',
         bodyNote: null,
       };

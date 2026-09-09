@@ -197,7 +197,7 @@ describe('page editor', () => {
     await renderAt('/admin/pages/new');
 
     fireEvent.change(screen.getByLabelText('Page id'), { target: { value: 'scholarships' } });
-    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Scholarships' } });
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Scholarships' } });
     fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/scholarships' } });
 
     // One section, one block, driven by the registry palette.
@@ -273,12 +273,41 @@ describe('page editor', () => {
         'sections',
         'systemPage',
         'template',
+        'title',
         'visible',
       ].sort(),
     );
     expect(page).not.toHaveProperty('seeded');
     expect(page).not.toHaveProperty('status');
     expect(page).not.toHaveProperty('revision');
+  });
+
+  it('sends no page heading for a page that states none, and the written one once an operator writes it', async () => {
+    // Two names, and the second is optional: `label` is what the header nav
+    // and the footer print, `title` the heading at the top of the page. A
+    // page that leaves the heading blank is headed by its label, so a blank
+    // field has to reach the server as null rather than as '' — otherwise
+    // every page saved through this form would claim an empty heading.
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+    await renderAt('/admin/pages/scholarships');
+
+    const heading = await screen.findByLabelText('Page heading');
+    expect(heading).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page.title).toBe(null);
+
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+    fireEvent.change(screen.getByLabelText('Page heading'), {
+      target: { value: 'Scholarships and bursaries' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).page).toMatchObject({
+      label: 'Scholarships',
+      title: 'Scholarships and bursaries',
+    });
   });
 
   it('surfaces the server’s validation message verbatim, per field', async () => {
@@ -362,7 +391,34 @@ describe('page editor', () => {
       .toBeInTheDocument();
 
     // Everything else about the page is still the operator's to change.
-    expect(screen.getByLabelText('Title')).not.toHaveAttribute('readonly');
+    expect(screen.getByLabelText('Navigation label')).not.toHaveAttribute('readonly');
+  });
+
+  it('offers no page heading for a system page, and says why', async () => {
+    // A system page writes its own <h1> in its route's code — Schedule.jsx
+    // writes "Schedule" — so a heading typed here would rename the browser
+    // tab and the link card and leave the page's own heading alone. The
+    // room does not offer a control that cannot do what it says.
+    draftDocs = [{
+      ...SCHOLARSHIPS_DRAFT,
+      id: 'schedule',
+      label: 'Schedule',
+      path: '/schedule',
+      systemPage: true,
+    }];
+    await renderAt('/admin/pages/schedule');
+
+    await screen.findByLabelText('Navigation label');
+    expect(screen.queryByLabelText('Page heading')).toBeNull();
+    expect(screen.getByText('This page draws its own heading.')).toBeInTheDocument();
+  });
+
+  it('offers the page heading on a content page, whose heading it sets', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+
+    expect(await screen.findByLabelText('Page heading')).toBeInTheDocument();
+    expect(screen.queryByText('This page draws its own heading.')).toBeNull();
   });
 
   it('leaves a regular page’s address editable', async () => {
@@ -757,7 +813,7 @@ describe('publish results and recovery', () => {
     await renderAt('/admin/pages/new');
 
     fireEvent.change(screen.getByLabelText('Page id'), { target: { value: 'scholarships' } });
-    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Scholarships' } });
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Scholarships' } });
     fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/scholarships' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
 

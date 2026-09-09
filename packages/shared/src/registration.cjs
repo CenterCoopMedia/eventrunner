@@ -15,6 +15,8 @@
  * with them.
  */
 
+const { httpsUrlHref } = require('./config/schema.cjs');
+
 /** The four registration statuses, in lifecycle order. */
 const REGISTRATION_STATUSES = ['pending', 'ticketed', 'approved', 'revoked'];
 
@@ -80,9 +82,56 @@ function hasAttendeeAccess(profile) {
   return profile.role === 'admin' || profile.role === 'super_admin';
 }
 
+/**
+ * The event's configured registration action (M7 issue 8), or null when
+ * there is nowhere to send anybody.
+ *
+ * ONE READER, THREE SURFACES. `config/event.registration` holds the
+ * destination and the wording for the control the site draws on the home
+ * lead and in the header, AND for the registration email a ticket provider
+ * sends (functions/src/ticketing/providers/*). Each of those used to read
+ * the field for itself with a `typeof === 'string'` check of its own, which
+ * is how the page came to refuse a plain-http destination while the email
+ * still put one in front of a reader.
+ *
+ * THE https CHECK IS THE VALIDATOR'S OWN. `config/event` is validated at the
+ * save (config/schema.cjs), but a runtime document is unvalidated Firestore
+ * data that may predate the rule, so every reader checks again — and checks
+ * with the same function, because a second opinion about what counts as a
+ * safe destination is how the surfaces drift apart again.
+ *
+ * THE URL COMES BACK CANONICAL, not as the string that was stored (Codex
+ * review: P2). The stored value is unvalidated Firestore data and may be
+ * anything an older rule allowed, so what every surface renders is the
+ * href `httpsUrlHref` parsed and approved — not the raw text beside it. A
+ * value that validates as one URL and resolves as another is the whole
+ * hazard here: `https:register.example.org` reads as https to a protocol
+ * test and resolves against the current page in an `href`.
+ *
+ * THE LABEL COMES BACK UNRESOLVED, as null where a client has written none.
+ * The wording around the action is not the same sentence everywhere — a
+ * page draws a button, an email writes a line of its own — so each surface
+ * states its own default rather than inheriting one from here. What they
+ * must agree on is the destination, and that is what this returns.
+ *
+ * @param {object|null|undefined} eventConfig the config/event document
+ * @returns {{ url: string, label: string|null } | null}
+ */
+function resolveRegistrationAction(eventConfig) {
+  const registration = eventConfig?.registration;
+  const url = httpsUrlHref(registration?.externalUrl);
+  if (!url) return null;
+  const stated = registration?.actionLabel;
+  return {
+    url,
+    label: typeof stated === 'string' && stated.trim() ? stated.trim() : null,
+  };
+}
+
 module.exports = {
   REGISTRATION_STATUSES,
   isValidTransition,
   computeEntitlement,
   hasAttendeeAccess,
+  resolveRegistrationAction,
 };

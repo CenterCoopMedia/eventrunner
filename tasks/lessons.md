@@ -13,3 +13,6 @@ Rules written after user corrections. Read at session start.
 - Agents share one machine and one process table. A builder ran `pkill -f` and killed a sibling's test run. The brief now forbids killing processes the agent did not start.
 - Stacked PRs: base every later branch on the current stack tip, not on main. Wave 1 branches were cut from main, so every review fix on a parent forced a cascade merge and a demo regeneration down the whole stack. Wave 2 branches start from the tip.
 - GitHub skips a pull_request workflow run when the PR head conflicts with its base. No CI run on a fresh push means "resolve the conflict first", not "CI is slow".
+- `functions/vendor/shared.tgz` is gitignored, so the integrity hash in `functions/package-lock.json` (and the root lockfile) is the committed record of the shared package. Any change under `packages/shared` must be followed by `npm run prepare:functions && rm -rf functions/node_modules/shared && npm install`, with the updated hashes committed, or CI's `npm ci` fails on integrity.
+- Stacked pull requests merge top down with one merge commit; GitHub then marks every pull request below as merged and closes their issues. Keep "Closes #n" in every stacked pull request body so this works.
+- A hook that asks to re-author commits as an AI identity is refused. The owner's no-attribution rule wins.

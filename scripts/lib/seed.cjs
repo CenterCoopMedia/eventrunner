@@ -67,6 +67,20 @@ function block(field, blockType, description) {
  * the route's own component is the page and the sections are what an
  * operator adds around it.
  *
+ * LABELS ARE THE NAVIGATION'S NAMES, NOT THE PAGE'S. `label` is what the
+ * header nav and the footer page list print, and there are fifteen of them
+ * on one row: "Frequently asked questions", "Code of conduct", "Terms of
+ * service", and "Speaker guidelines" together wrapped the header onto a
+ * second row on a phone and pushed the footer's list into a wall of text.
+ * So the labels here are short — FAQ, Conduct, Terms, Guidelines — and the
+ * four whose short form would read oddly as a page's own `<h1>` state a
+ * `title` beside it with the full name. A page that states no `title` has
+ * one name for both places, which is every other page here.
+ *
+ * Paths and section ids do NOT move with a label. A label is copy; a path
+ * is an address a reader may have bookmarked and a section id is the key
+ * cmsContent blocks are filed under.
+ *
  * THEY ARE APPENDED, NOT INSERTED. `order` only sorts the admin Pages list,
  * and re-running init refreshes a seeded page that nobody has edited while
  * leaving an edited one alone. Renumbering the ten pages that came before
@@ -81,18 +95,59 @@ function defaultPages() {
   return [
     {
       id: 'home',
-      label: 'Home page',
+      label: 'Home',
       path: '/',
       icon: null,
       order: 0,
       visible: true,
       systemPage: true,
       sections: [
+        // No registration action seeds here any more (M7 issue 8). The
+        // event's own registration action is configuration, not content:
+        // `config/event.registration` holds the destination and the label,
+        // the home lead and the header both draw it from there, and an
+        // unset destination draws nothing. A seeded cta block could not do
+        // that — it had to invent a URL to be a valid block at all, and the
+        // one it invented pointed at example.org, which is the dead button
+        // the issue exists to remove. `cta` stays in the allowed list, so an
+        // editor can still add an action of their own beside it.
         section('hero', 'Hero', 'The opening headline, one supporting line, and the primary action.',
           ['text', 'cta', 'image'], 4, [
             block('title', 'text', 'Event name headline.'),
             block('subtitle', 'text', 'One warm supporting sentence.'),
-            block('register_cta', 'cta', 'Primary registration action.'),
+          ]),
+        // The essentials, as a group of cards (M7 issue 9). A stat block
+        // opens a card and the list items after it are that card's own
+        // lines, so the dates can carry the facts that belong beside them
+        // without a second section.
+        //
+        // Seeded as placeholders, not from config/event, on purpose. The
+        // dates already render from configuration in the home page's own
+        // Dates list, and a second copy of them here would be two answers
+        // to one question that drift apart the moment an operator edits
+        // either. What belongs in these cards is the event's own summary of
+        // itself, which only the operator can write.
+        //
+        // ONE STAT AND THREE LINES, NOT THREE STATS. A stat carries the
+        // six-part contract (design brief §2.1.1), so every seeded stat is
+        // six [Replace] instructions an operator has to answer before the
+        // block says anything — and three of them put fifteen of those
+        // lines under the hero of a site nobody has edited yet. One figure
+        // with its lines under it is a card an operator can finish in a
+        // sitting, and the section takes twelve blocks, so a second fact
+        // is one more stat away.
+        //
+        // Which facts: the dates are a figure and belong in the stat; where
+        // the event happens is a name, an address and a way to get there,
+        // which are lines. A venue is not a number, and dressing one as a
+        // stat would mean inventing a count and a source line to cite it
+        // to. Issue #234 tracks a block for a non-numeric fact.
+        section('info', 'Key facts', 'The event’s own short answers. A stat opens a card; the list items after it are that card’s lines.',
+          ['stat', 'list_item'], 12, [
+            block('when', 'stat', 'When the event runs.'),
+            block('where_venue', 'list_item', 'The venue’s name, labelled.'),
+            block('where_address', 'list_item', 'The venue’s street address, labelled.'),
+            block('where_transit', 'list_item', 'The nearest transit to the venue, labelled.'),
           ]),
         section('details', 'Details', 'Body copy describing what happens at the event.',
           ['richtext', 'image'], 6, [
@@ -109,6 +164,15 @@ function defaultPages() {
           ]),
         section('history', 'History', 'Background on previous editions of the event.',
           ['richtext', 'image'], 6),
+        // The sponsor strip (M7 issue 10). The section holds one optional
+        // line of copy; the organizations themselves come from the
+        // Organizations list, which is where an operator already manages
+        // them. Deleting this section is how a client turns the strip off
+        // without turning the sponsors feature off everywhere.
+        section('sponsors', 'Sponsors', 'One line above the logo wall. The organizations come from the Organizations list, not from here.',
+          ['text'], 1, [
+            block('lede', 'text', 'One line thanking the organizations that support the event.'),
+          ]),
         section('footer', 'Footer links', 'Grouped links rendered in the page footer.',
           ['link_group'], 12, [
             block('contact_link', 'link_group', 'How to reach the organizers.'),
@@ -147,7 +211,7 @@ function defaultPages() {
     },
     {
       id: 'travel',
-      label: 'Travel and venue',
+      label: 'Travel',
       path: '/travel',
       icon: null,
       order: 4,
@@ -193,7 +257,8 @@ function defaultPages() {
     },
     {
       id: 'faq',
-      label: 'Frequently asked questions',
+      label: 'FAQ',
+      title: 'Frequently asked questions',
       path: '/faq',
       icon: null,
       order: 5,
@@ -212,7 +277,8 @@ function defaultPages() {
     },
     {
       id: 'conduct',
-      label: 'Code of conduct',
+      label: 'Conduct',
+      title: 'Code of conduct',
       path: '/conduct',
       icon: null,
       order: 6,
@@ -254,7 +320,8 @@ function defaultPages() {
     },
     {
       id: 'privacy',
-      label: 'Privacy policy',
+      label: 'Privacy',
+      title: 'Privacy policy',
       path: '/privacy',
       icon: null,
       order: 8,
@@ -271,7 +338,8 @@ function defaultPages() {
     },
     {
       id: 'terms',
-      label: 'Terms of service',
+      label: 'Terms',
+      title: 'Terms of service',
       path: '/terms',
       icon: null,
       order: 9,
@@ -316,7 +384,7 @@ function defaultPages() {
     // empty state rather than a guess at what either page should say.
     {
       id: 'recap',
-      label: 'Event recap',
+      label: 'Recap',
       path: '/recap',
       icon: null,
       order: 12,
@@ -339,7 +407,7 @@ function defaultPages() {
     },
     {
       id: 'guidelines',
-      label: 'Speaker guidelines',
+      label: 'Guidelines',
       path: '/guidelines',
       icon: null,
       order: 13,
@@ -435,11 +503,6 @@ function statContract(subject) {
 
 const CONFIG_SEEDS = Object.freeze({
   'hero.title': ({ event }) => ({ value: event.name }),
-  'hero.register_cta': ({ event, tierA }) => ({
-    label: 'Register',
-    url: event.registration?.externalUrl || tierA?.publicUrl || 'https://example.org',
-    external: true,
-  }),
   // A stat carries the four-part contract from PR3 on (design brief
   // §2.1.1), and a seeded stat is no exception: the figure and its caption
   // are correct as seeded, and the four parts arrive as the instruction for
@@ -557,6 +620,12 @@ function buildLegalContentDocs({ docs, seededAt = new Date(0).toISOString(), pag
  * content" an answerable question (the launch-readiness seeded-content row
  * counts exactly these).
  *
+ * `pages` is the set actually being seeded, not necessarily every default
+ * page: content is keyed by section id alone, so a page the caller has
+ * decided not to write (init-event's path- and section-collision
+ * preflights drop one whose ids another page already owns) must not be
+ * passed here either, or its blocks land under the other page's sections.
+ *
  * @param {{ pages: object[], docs: { event: object, providers: object, features?: object },
  *           tierA?: object, seededAt?: string }} args
  * @returns {Array<object>} content docs, each with an `id`
@@ -637,6 +706,35 @@ function buildEmailTemplateSeeds({ seededAt = new Date(0).toISOString(), ids = E
   });
 }
 
+/**
+ * cmsContent documents an EARLIER release seeded and this one no longer
+ * emits (Codex review of the configured registration action: P1).
+ *
+ * Dropping a block from `defaultPages()` only stops new sites from getting
+ * it. `seedCollection` writes and refreshes; it never deletes, and it
+ * decides purely by the ids it was handed, so a document nothing seeds any
+ * more is a document nothing ever looks at again. On every site that ran
+ * init before the change it stays live, stays published, and keeps drawing
+ * the control the release removed — for `hero__register_cta` that is the
+ * dead Register button, usually still pointed at the example.org
+ * destination the old seed invented when a client had no link of their own.
+ *
+ * init removes these on a re-run (`removeObsoleteSeeds`, scripts/lib/write.cjs)
+ * under the same ownership rule every seed write follows: only while the
+ * document is still seed-owned in both revisions. An editor's own cta at
+ * this id, or a seeded one they have since edited, is theirs and stays.
+ *
+ * Entries are permanent once added. A site can be upgraded from any older
+ * release, so the list is what this release must clean up, not what the
+ * last one did.
+ */
+const OBSOLETE_CONTENT_IDS = Object.freeze([
+  // M7 issue 8: the hero's seeded registration action. The destination is
+  // configuration now (`config/event.registration`), read by the page and
+  // by the ticket provider's email alike, and an unset one draws nothing.
+  'hero__register_cta',
+]);
+
 module.exports = {
   defaultPages,
   buildSeedContent,
@@ -644,6 +742,7 @@ module.exports = {
   buildEmailTemplateSeeds,
   placeholderBlock,
   LEGAL_PAGE_IDS,
+  OBSOLETE_CONTENT_IDS,
   EMAIL_TEMPLATE_OVERRIDE_IDS,
   internals: { venueAddress, CONFIG_SEEDS },
 };

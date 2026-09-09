@@ -277,6 +277,7 @@ const {
   isCanonicalPagePath,
   systemPageIdForPath,
 } = require('shared/routing');
+const { pageHeading, isPublicPage } = require('shared/page');
 
 /**
  * @param {{ db: FirebaseFirestore.Firestore, getConfig: () => Promise<object>,
@@ -443,10 +444,14 @@ function requestedRoutePath(req) {
  * built-in route as a page that does not exist — noindex, no canonical,
  * no title — which is worse than the drift itself.
  *
- * Visibility is checked STRICTLY (`=== true`) everywhere, for the reason
- * updatesMeta states: this runs on the Admin SDK, which bypasses
- * firestore.rules, so a document with the field merely absent must not
- * read as published.
+ * Whether a page is public at all — visible, with its route's feature on —
+ * is `shared/page isPublicPage`, the same read the header navigation and
+ * the sitemap builder make. Visibility is checked STRICTLY (`=== true`)
+ * there, for the reason updatesMeta states: this runs on the Admin SDK,
+ * which bypasses firestore.rules, so a document with the field merely
+ * absent must not read as published. The route's own feature gate is still
+ * applied ahead of every lookup below, because the detail routes have no
+ * page document to ask.
  *
  * A detail route whose record does not resolve returns null rather than
  * falling back to its parent listing — a link to a speaker who has been
@@ -492,7 +497,7 @@ async function resolveRouteSubject({ db, config, path }) {
   if (systemId && segments.length <= 1) {
     const snap = await db.collection('cmsPages').doc(systemId).get();
     const page = snap.exists ? snap.data() : null;
-    return page && page.visible === true ? { kind: 'page', doc: page } : null;
+    return isPublicPage(page, features) ? { kind: 'page', doc: page } : null;
   }
 
   // A generic page IS its stored path, so the path is the lookup key — and
@@ -504,7 +509,7 @@ async function resolveRouteSubject({ db, config, path }) {
   const snap = await db.collection('cmsPages').where('path', '==', path).limit(1).get();
   const doc = snap.docs[0];
   const page = doc ? doc.data() : null;
-  if (!page || page.visible !== true) return null;
+  if (!isPublicPage(page, features)) return null;
   // A document that claims to be a system page but was found by path is
   // one whose path drifted onto a generic route. It is not served there —
   // App.jsx mounts system pages at their own routes and the catch-all
@@ -817,7 +822,14 @@ function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
   }
   // A page. The home page is titled with the event alone: its label names
   // the document for an editor, not the site for a reader.
-  return { ...described, title: path === '/' ? siteName : titled(subject.doc.label) };
+  //
+  // Titled by the page's HEADING, not its navigation label: a page that
+  // states both is headed by the full name, and a tab that read "FAQ" over
+  // a page headed "Frequently asked questions" would be a third name for
+  // one page. shared/page pageHeading is the same read the app's own tab
+  // title makes (apps/web/src/lib/useDocumentTitle.js), which is what keeps
+  // the served title from changing on the first in-app navigation.
+  return { ...described, title: path === '/' ? siteName : titled(pageHeading(subject.doc)) };
 }
 
 /**

@@ -197,7 +197,7 @@ describe('Layout nav', () => {
   // about the config subscriptions under it, so the pages are fixed here and
   // only the feature flags move.
   const NAV_PAGES = [
-    { id: 'home', label: 'Home page', path: '/', order: 0, visible: true, systemPage: true },
+    { id: 'home', label: 'Home', path: '/', order: 0, visible: true, systemPage: true },
     { id: 'schedule', label: 'Schedule', path: '/schedule', order: 1, visible: true, systemPage: true },
     { id: 'speakers', label: 'Speakers', path: '/speakers', order: 2, visible: true, systemPage: true },
     { id: 'sponsors', label: 'Sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true },
@@ -226,20 +226,26 @@ describe('Layout nav', () => {
   }
 
   it('hides nav items whose feature is disabled at runtime', () => {
+    // Every page link is rendered TWICE — once in the navigation and once in
+    // the footer list, which reuses the same builder and therefore the same
+    // gate (M7 issue 3) — so these count links rather than expecting one.
+    const links = (name) => screen.queryAllByRole('link', { name });
+
     renderShell();
     // Snapshot features enable all three sections.
-    expect(screen.getByRole('link', { name: 'Speakers' })).toBeInTheDocument();
+    expect(links('Speakers')).toHaveLength(2);
 
     // A live config/features doc is authoritative: any flag it omits (here,
     // schedule) defaults to false along with the flags it explicitly clears.
     act(() => {
       subscriptions.get('features')({ speakers: false, sponsors: false });
     });
-    expect(screen.queryByRole('link', { name: 'Speakers' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Sponsors' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Schedule' })).toBeNull();
+    // Gone from both places at once: one gate, read once.
+    expect(links('Speakers')).toHaveLength(0);
+    expect(links('Sponsors')).toHaveLength(0);
+    expect(links('Schedule')).toHaveLength(0);
     // The home page carries no feature flag, so it survives every clearing.
-    expect(screen.getByRole('link', { name: 'Home page' })).toBeInTheDocument();
+    expect(links('Home')).toHaveLength(2);
   });
 
   it('applies the page-surface class on the shell', () => {

@@ -47,8 +47,9 @@
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
 import { useMemo, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
+import { safeUrlHref } from 'shared/urlSafety';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -56,9 +57,11 @@ import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
 import { buildNavItems } from '../lib/siteNavigation.js';
 import { brandingSrc } from '../lib/mediaSource.js';
+import BackToTop from './BackToTop.jsx';
 import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
+import RegistrationAction from './RegistrationAction.jsx';
 import FeedbackModal from './FeedbackModal.jsx';
 import DemoBanner from './DemoBanner.jsx';
 import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
@@ -178,6 +181,98 @@ function accountClass({ isActive }) {
     : quietActionClass;
 }
 
+// The banner at the top of the shell, named so the back-to-top control can
+// move focus to it (M7 issue 6). Landing there puts the keyboard at the top
+// of the page, with the identity and the whole navigation still ahead of it
+// — which is what "back to top" means to a reader who is not looking at the
+// screen. The skip link stays the first focusable element on the page:
+// tabIndex={-1} makes the banner a focus TARGET without joining the tab
+// order, and the ring is drawn on the attribute the control sets, never on
+// bare :focus — a header carrying tabindex="-1" takes focus from a click
+// anywhere inside it, so :focus would outline the whole thing the moment a
+// reader clicked the nameplate (lib/scrollToTop.js, index.css).
+const TOP_LANDMARK_ID = 'site-top';
+
+// The footer, named so the back-to-top control can withdraw while it is on
+// screen instead of sitting on top of its last row (BackToTop.jsx).
+const FOOTER_ID = 'site-footer';
+
+// One treatment for every link in the footer: an underlined word at the
+// caption size, at the full touch target. The footer is a dense block of
+// links and a reader has to be able to hit them.
+const FOOTER_LINK_CLASS =
+  'touch-target inline-flex items-center underline underline-offset-2 hover:text-text-primary';
+
+/**
+ * The longest platform name — and the longest handle — the footer will
+ * render. The same 40 as `MAX_SOCIAL_LABEL_LENGTH` in
+ * packages/shared/src/speaker.cjs, which caps the same kind of value on a
+ * speaker record; it is repeated rather than imported because the shared
+ * package's ESM entry does not re-export it and a footer is not a reason to
+ * widen that surface.
+ */
+const MAX_SOCIAL_LABEL_LENGTH = 40;
+
+/**
+ * The event's social accounts, as links (M7 issue 3).
+ *
+ * config/event.social.handles is `{ platform, handle, url }[]` (ADR 0001) —
+ * the shape the mail footer already reads (functions/src/email/render.cjs),
+ * so the site and the mail say the same thing from one field rather than
+ * each learning its own. NOTHING IS ADDED TO THE SCHEMA HERE: an event that
+ * has recorded no accounts has an empty list, and an empty list renders no
+ * block at all.
+ *
+ * A RUNTIME config/event DOC IS UNVALIDATED FIRESTORE DATA (§2.4 fail-soft
+ * overlay) and validateEventConfig does not describe this field at all, so
+ * nothing upstream has bounded what arrives here. Every entry is therefore
+ * met as it is AND normalized before it renders:
+ *
+ *   • not an object, no platform, or a URL that is not http(s) → dropped,
+ *     rather than a link with no name or a link that is not a link
+ *   • the platform AND the handle are trimmed and cut to
+ *     MAX_SOCIAL_LABEL_LENGTH, so one bad write cannot hand itself the whole
+ *     bottom of the site
+ *   • the URL is CANONICALIZED, not merely approved: safeUrlHref returns the
+ *     parsed href, so `https://example.org` and `https://example.org/` are
+ *     one address rather than two — which is what a reader sees — and the
+ *     string that is rendered is exactly the string that passed the check
+ *   • an entry recorded twice renders once — a repeated link is noise a
+ *     reader has to resolve (the rule buildNavItems applies to a duplicated
+ *     route), and it also keeps the render key unique
+ *
+ * The handle is kept because it is the only thing that tells two accounts on
+ * one service apart: an event with a summit account and a newsroom account
+ * on the same platform would otherwise render two links both reading
+ * "Mastodon", and a reader cannot choose between them.
+ *
+ * @param {unknown} social config/event.social
+ * @returns {Array<{ platform: string, handle: string, url: string }>}
+ */
+function socialAccounts(social) {
+  const handles = Array.isArray(social?.handles) ? social.handles : [];
+  const seen = new Set();
+  const accounts = [];
+  for (const entry of handles) {
+    if (!entry || typeof entry !== 'object') continue;
+    if (typeof entry.platform !== 'string' || typeof entry.url !== 'string') continue;
+    // The canonical href, or '' when this is not a link target at all.
+    const url = safeUrlHref(entry.url);
+    if (!url) continue;
+    const platform = entry.platform.trim().slice(0, MAX_SOCIAL_LABEL_LENGTH);
+    if (!platform) continue;
+    // A handle is optional in the record and in the label; anything that is
+    // not a non-empty string is simply absent.
+    const handle =
+      typeof entry.handle === 'string' ? entry.handle.trim().slice(0, MAX_SOCIAL_LABEL_LENGTH) : '';
+    const key = `${platform}:${url}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    accounts.push({ platform, handle, url });
+  }
+  return accounts;
+}
+
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage } = useContent();
@@ -223,6 +318,9 @@ export default function Layout() {
   // config or content snapshot, and the list only changes when the pages or
   // the flags do.
   const navItems = useMemo(() => buildNavItems(pages, features), [pages, features]);
+
+  // The event's own social accounts, if it has recorded any (M7 issue 3).
+  const socialLinks = useMemo(() => socialAccounts(eventConfig?.social), [eventConfig?.social]);
 
   // Two destinations, one control. An unfinished handshake is the
   // signed-out answer, said explicitly (see ACCOUNT_SIGNED_OUT above).
@@ -296,7 +394,10 @@ export default function Layout() {
         Skip to main content
       </a>
       <DemoBanner />
-      <header className="bg-surface">
+      {/* The top of the page, by name: the back-to-top control moves focus
+          here so a reader who is not looking at the screen arrives with the
+          keyboard where the picture is (M7 issue 6). */}
+      <header id={TOP_LANDMARK_ID} tabIndex={-1} className="bg-surface">
         <div className="mx-auto w-full max-w-5xl px-md">
           <Header
             variant={headerVariant}
@@ -320,6 +421,11 @@ export default function Layout() {
             }
           >
             {navPlacement === 'side' ? null : nav}
+            {/* The event's configured registration action (M7 issue 8).
+                It owns its own row and renders nothing at all when no
+                destination is configured, so mounting it is this one line
+                and no other control in the header has to move. */}
+            <RegistrationAction placement="header" />
           </Header>
         </div>
       </header>
@@ -335,26 +441,72 @@ export default function Layout() {
       ) : (
         main
       )}
-      <footer className="bg-surface">
+      {/* AFTER the content it offers to leave and BEFORE the footer, because
+          the control withdraws for the footer: behind the footer links a
+          keyboard reader could never reach it, since tabbing to a footer
+          link scrolls the footer on screen and takes the control away.
+          BackToTop.jsx states the rest. It renders fixed at the corner
+          either way, so its place here is a sequential one only. */}
+      <BackToTop targetId={TOP_LANDMARK_ID} footerId={FOOTER_ID} />
+      <footer id={FOOTER_ID} className="bg-surface">
         <div className="mx-auto w-full max-w-5xl px-md">
           <div className="section-rule pb-xl pt-md font-data text-caption text-text-secondary">
             <p className="font-heading text-body font-semibold text-text-primary">
               {eventConfig?.name}
             </p>
+            {/* THE SAME PAGE LIST THE NAVIGATION CARRIES (M7 issue 3), from
+                the same buildNavItems call above — one gate, read once, so
+                a page hidden in the editor or a system page whose feature
+                is off cannot leave the header and stay in the footer.
+                <Link>, not <a>: the demo runs under HashRouter, where a raw
+                href reloads a path the static host does not serve. */}
+            {navItems.length === 0 ? null : (
+              <nav aria-label="Site pages" className="mt-md">
+                <ul className="flex flex-wrap gap-x-md">
+                  {navItems.map((item) => (
+                    <li key={item.to}>
+                      <Link to={item.to} className={FOOTER_LINK_CLASS}>
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            )}
             {operatorName || supportEmail ? (
-              <p className="mt-2xs">
+              <p className="mt-md">
                 {operatorName ? `Operated by ${operatorName}` : null}
                 {operatorName && supportEmail ? ' · ' : null}
                 {supportEmail ? (
-                  <a
-                    href={`mailto:${supportEmail}`}
-                    className="underline underline-offset-2 hover:text-text-primary"
-                  >
+                  <a href={`mailto:${supportEmail}`} className={FOOTER_LINK_CLASS}>
                     Contact support
                   </a>
                 ) : null}
               </p>
             ) : null}
+            {/* An event that has recorded no social account renders no
+                block, no heading, and no empty list. */}
+            {socialLinks.length === 0 ? null : (
+              <nav aria-label="Social accounts" className="mt-md">
+                <ul className="flex flex-wrap gap-x-md">
+                  {/* Keyed on both halves: an event can record two accounts
+                      that share a URL (one platform, two labels) or two
+                      platforms pointing at one profile page, and either
+                      would collide on a key made from one half alone. */}
+                  {socialLinks.map((handle) => (
+                    <li key={`${handle.platform}:${handle.url}`}>
+                      {/* No target: a social account opens in the tab the
+                          reader is already in, which is what a link off the
+                          site is meant to do. rel="noreferrer" then withholds
+                          the referrer, since there is no opener to sever. */}
+                      <a href={handle.url} rel="noreferrer" className={FOOTER_LINK_CLASS}>
+                        {handle.handle ? `${handle.platform} ${handle.handle}` : handle.platform}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            )}
             {features.feedbackInbox ? (
               <button
                 type="button"

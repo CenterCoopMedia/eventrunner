@@ -34,6 +34,26 @@
     @apply outline outline-2 outline-offset-2 outline-accent;
   }
 
+  /* WHERE A CONTROL SENT THE READER. The back-to-top control moves focus to
+     the banner after it jumps (components/BackToTop.jsx), and neither of the
+     obvious rules draws that correctly:
+
+       :focus-visible is a heuristic about how the reader is working, and a
+       reader who pressed the button with a pointer fails it — so the one
+       person who just asked to be moved would be moved with nothing on
+       screen saying where to.
+
+       :focus on the banner overshoots. The landmarks worth landing on carry
+       tabindex="-1", which makes them take focus from a click ANYWHERE
+       inside them, so a reader clicking the nameplate would get a 2px
+       outline around the whole header.
+
+     So the ring is keyed to an attribute that only lib/scrollToTop.js
+     focusAsDestination sets, and that clears itself on blur. */
+  [data-focus-ring]:focus {
+    @apply outline outline-2 outline-offset-2 outline-accent;
+  }
+
   [id] {
     scroll-margin-top: 5rem;
   }
