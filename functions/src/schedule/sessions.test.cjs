@@ -213,6 +213,9 @@ test('an unsafe or malformed recording link is rejected by name', () => {
     'data:text/html,x',
     'mailto:someone@example.org',
     'file:///etc/passwd',
+    // Protocol-relative. It parses in a browser against whatever page it
+    // sits on, so it must never be stored as "a link the operator meant".
+    '//evil.com',
     'video.example.org/abc',
     'not a url',
     42,

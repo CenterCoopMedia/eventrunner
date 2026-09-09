@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { emitAll, internals } = require('./emit.cjs');
+const { emitAll, emitScheduleData, internals } = require('./emit.cjs');
 const { demoSnapshot, demoEvent } = require('./demo-event.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
 const {
@@ -65,6 +65,22 @@ test('publish bookkeeping is stripped, and seeded is kept', () => {
   const out = emitAll(noisy)['siteContent.js'];
   assert.doesNotMatch(out, /revision|publishedAt|publishedBy|basedOnRevision|seededAt/);
   assert.match(out, /seeded: true/);
+});
+
+test('a session carries its recording link into the generated snapshot', () => {
+  // The emitter is a DENYLIST (STRIPPED_FIELDS), so a new session field
+  // reaches the bundle by default rather than by being listed. That is the
+  // right default and it is also invisible: nothing here would fail if
+  // `recordingUrl` were added to the strip list by accident, and the only
+  // symptom would be a link that renders in the admin preview and vanishes
+  // on the built site. So the seam is pinned.
+  const base = demoSnapshot();
+  const [first, ...rest] = base.sessions;
+  const out = emitScheduleData({
+    sessions: [{ ...first, recordingUrl: 'https://video.example.org/watch?v=demo' }, ...rest],
+    speakers: base.speakers,
+  });
+  assert.match(out, /recordingUrl: 'https:\/\/video\.example\.org\/watch\?v=demo'/);
 });
 
 test('config/bootstrap is never emitted into the bundle', () => {

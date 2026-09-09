@@ -45,6 +45,12 @@ export default function RecordingLink({ session }) {
   return (
     <a href={url} target="_blank" rel="noreferrer" className={rowActionClass}>
       Watch the recording
+      {/* Which session's recording. A schedule day can list thirty rows,
+          and a reader pulling up the links on the page would otherwise
+          meet thirty identical "Watch the recording" entries with nothing
+          to tell them apart. The row says it by position to anyone who can
+          see it; this says it to everyone else. */}
+      {session?.title ? <span className="sr-only">{` of ${session.title}`}</span> : null}
     </a>
   );
 }

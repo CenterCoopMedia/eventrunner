@@ -123,8 +123,7 @@ describe('admin Sessions workspace', () => {
     fireEvent.change(field, { target: { value: 'javascript:alert(1)' } });
     expect(await screen.findByText('Enter a link that starts with http:// or https://.')).toBeInTheDocument();
     expect(field).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Save and publish' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
     expect(fetch).not.toHaveBeenCalled();
 

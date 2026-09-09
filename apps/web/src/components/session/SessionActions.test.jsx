@@ -437,20 +437,31 @@ describe('RecordingLink', () => {
 
   it('links a recorded session on the row', () => {
     renderActions({ surface: 'row', session: recorded });
-    const link = screen.getByRole('link', { name: 'Watch the recording' });
+    const link = screen.getByRole('link', { name: /^Watch the recording/ });
     expect(link).toHaveAttribute('href', 'https://video.example.org/watch?v=fx1');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', expect.stringContaining('noreferrer'));
   });
 
+  it('names the session in the link, so thirty rows are thirty distinct links', () => {
+    // The visible words are the same on every row. A reader pulling up the
+    // links on the page hears which session each one belongs to.
+    renderActions({ surface: 'row', session: recorded });
+    const link = screen.getByRole('link', { name: /^Watch the recording/ });
+    expect(link).toHaveAccessibleName('Watch the recording of [Fixture] Morning kickoff');
+    // The title is heard, not seen: the visible words stay the same three
+    // on every row, so the programme keeps its rhythm.
+    expect(link.querySelector('.sr-only')).toHaveTextContent('of [Fixture] Morning kickoff');
+  });
+
   it('links a recorded session on its detail page', () => {
     renderActions({ surface: 'detail', session: recorded });
-    expect(screen.getByRole('link', { name: 'Watch the recording' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Watch the recording/ })).toBeInTheDocument();
   });
 
   it('keeps the recording on a back issue, where the recording is the point', () => {
     renderActions({ surface: 'row', session: recorded, backIssue: true });
-    expect(screen.getByRole('link', { name: 'Watch the recording' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Watch the recording/ })).toBeInTheDocument();
   });
 
   it('renders nothing for an unsafe or blank stored link', () => {

@@ -195,10 +195,9 @@ describe('SessionDetail', () => {
     // reaches the page even on a deployment that runs none of the optional
     // session features.
     renderDetail('fx-recorded');
-    expect(screen.getByRole('link', { name: 'Watch the recording' })).toHaveAttribute(
-      'href',
-      'https://video.example.org/watch?v=fx-recorded',
-    );
+    expect(
+      screen.getByRole('link', { name: 'Watch the recording of [Fixture] Recorded panel' }),
+    ).toHaveAttribute('href', 'https://video.example.org/watch?v=fx-recorded');
   });
 
   it('says nothing about a recording on a session without one', () => {
