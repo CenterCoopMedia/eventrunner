@@ -49,7 +49,7 @@
 import { useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
-import { isSafeUrl } from 'shared/urlSafety';
+import { safeUrlHref } from 'shared/urlSafety';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -203,22 +203,24 @@ const FOOTER_LINK_CLASS =
   'touch-target inline-flex items-center underline underline-offset-2 hover:text-text-primary';
 
 /**
- * The longest platform name the footer will render. The same 40 as
- * `MAX_SOCIAL_LABEL_LENGTH` in packages/shared/src/speaker.cjs, which caps
- * the same kind of value on a speaker record; it is repeated rather than
- * imported because the shared package's ESM entry does not re-export it and
- * a footer is not a reason to widen that surface.
+ * The longest platform name — and the longest handle — the footer will
+ * render. The same 40 as `MAX_SOCIAL_LABEL_LENGTH` in
+ * packages/shared/src/speaker.cjs, which caps the same kind of value on a
+ * speaker record; it is repeated rather than imported because the shared
+ * package's ESM entry does not re-export it and a footer is not a reason to
+ * widen that surface.
  */
-const MAX_SOCIAL_PLATFORM_LENGTH = 40;
+const MAX_SOCIAL_LABEL_LENGTH = 40;
 
 /**
  * The event's social accounts, as links (M7 issue 3).
  *
- * config/event.social.handles is `{ platform, url }[]` — the shape the mail
- * footer already reads (functions/src/email/render.cjs), so the site and the
- * mail say the same thing from one field rather than each learning its own.
- * NOTHING IS ADDED TO THE SCHEMA HERE: an event that has recorded no
- * accounts has an empty list, and an empty list renders no block at all.
+ * config/event.social.handles is `{ platform, handle, url }[]` (ADR 0001) —
+ * the shape the mail footer already reads (functions/src/email/render.cjs),
+ * so the site and the mail say the same thing from one field rather than
+ * each learning its own. NOTHING IS ADDED TO THE SCHEMA HERE: an event that
+ * has recorded no accounts has an empty list, and an empty list renders no
+ * block at all.
  *
  * A RUNTIME config/event DOC IS UNVALIDATED FIRESTORE DATA (§2.4 fail-soft
  * overlay) and validateEventConfig does not describe this field at all, so
@@ -227,29 +229,45 @@ const MAX_SOCIAL_PLATFORM_LENGTH = 40;
  *
  *   • not an object, no platform, or a URL that is not http(s) → dropped,
  *     rather than a link with no name or a link that is not a link
- *   • the platform is trimmed and cut to MAX_SOCIAL_PLATFORM_LENGTH, so one
- *     bad write cannot hand itself the whole bottom of the site
+ *   • the platform AND the handle are trimmed and cut to
+ *     MAX_SOCIAL_LABEL_LENGTH, so one bad write cannot hand itself the whole
+ *     bottom of the site
+ *   • the URL is CANONICALIZED, not merely approved: safeUrlHref returns the
+ *     parsed href, so `https://example.org` and `https://example.org/` are
+ *     one address rather than two — which is what a reader sees — and the
+ *     string that is rendered is exactly the string that passed the check
  *   • an entry recorded twice renders once — a repeated link is noise a
  *     reader has to resolve (the rule buildNavItems applies to a duplicated
  *     route), and it also keeps the render key unique
  *
+ * The handle is kept because it is the only thing that tells two accounts on
+ * one service apart: an event with a summit account and a newsroom account
+ * on the same platform would otherwise render two links both reading
+ * "Mastodon", and a reader cannot choose between them.
+ *
  * @param {unknown} social config/event.social
- * @returns {Array<{ platform: string, url: string }>}
+ * @returns {Array<{ platform: string, handle: string, url: string }>}
  */
 function socialAccounts(social) {
   const handles = Array.isArray(social?.handles) ? social.handles : [];
   const seen = new Set();
   const accounts = [];
-  for (const handle of handles) {
-    if (!handle || typeof handle !== 'object') continue;
-    if (typeof handle.platform !== 'string' || typeof handle.url !== 'string') continue;
-    if (!isSafeUrl(handle.url)) continue;
-    const platform = handle.platform.trim().slice(0, MAX_SOCIAL_PLATFORM_LENGTH);
+  for (const entry of handles) {
+    if (!entry || typeof entry !== 'object') continue;
+    if (typeof entry.platform !== 'string' || typeof entry.url !== 'string') continue;
+    // The canonical href, or '' when this is not a link target at all.
+    const url = safeUrlHref(entry.url);
+    if (!url) continue;
+    const platform = entry.platform.trim().slice(0, MAX_SOCIAL_LABEL_LENGTH);
     if (!platform) continue;
-    const key = `${platform}:${handle.url}`;
+    // A handle is optional in the record and in the label; anything that is
+    // not a non-empty string is simply absent.
+    const handle =
+      typeof entry.handle === 'string' ? entry.handle.trim().slice(0, MAX_SOCIAL_LABEL_LENGTH) : '';
+    const key = `${platform}:${url}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    accounts.push({ platform, url: handle.url });
+    accounts.push({ platform, handle, url });
   }
   return accounts;
 }
@@ -469,7 +487,7 @@ export default function Layout() {
                           site is meant to do. rel="noreferrer" then withholds
                           the referrer, since there is no opener to sever. */}
                       <a href={handle.url} rel="noreferrer" className={FOOTER_LINK_CLASS}>
-                        {handle.platform}
+                        {handle.handle ? `${handle.platform} ${handle.handle}` : handle.platform}
                       </a>
                     </li>
                   ))}

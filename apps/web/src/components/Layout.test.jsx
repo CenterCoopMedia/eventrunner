@@ -563,6 +563,86 @@ describe('Layout footer', () => {
     expect([...socialLinks(container)]).toHaveLength(1);
   });
 
+  it('renders one link for two spellings of one address', () => {
+    // A URL is a string in the document but an address to a reader, and
+    // `https://example.org` and `https://example.org/` are the same address.
+    // The dedupe therefore runs on the canonical href, not on the raw text
+    // an operator happened to type.
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', handle: '@fixture', url: 'https://example.org' },
+              { platform: 'Mastodon', handle: '@fixture', url: 'https://example.org/' },
+            ],
+          },
+        },
+      },
+    );
+    const links = [...socialLinks(container)];
+    expect(links).toHaveLength(1);
+    // And the href is the canonical form, so the check and the link agree.
+    expect(links[0]).toHaveAttribute('href', 'https://example.org/');
+  });
+
+  it('names the handle beside the platform, so two accounts read apart', () => {
+    // config/event records `{ platform, handle, url }` (ADR 0001 §config).
+    // An event with two accounts on one service is the case that needs the
+    // handle: without it both links read “Mastodon” and a reader cannot tell
+    // which is which.
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/@summit' },
+              { platform: 'Mastodon', handle: '@newsroom', url: 'https://example.org/@newsroom' },
+              // No handle recorded: the platform name stands alone.
+              { platform: 'Bluesky', url: 'https://example.net/fixture' },
+            ],
+          },
+        },
+      },
+    );
+    expect([...socialLinks(container)].map((a) => a.textContent)).toEqual([
+      'Mastodon @summit',
+      'Mastodon @newsroom',
+      'Bluesky',
+    ]);
+  });
+
+  it('trims a handle and caps how long it can be', () => {
+    // Same fail-soft rule the platform name gets (§2.4): a runtime document
+    // can carry a handle of any length, and a handle that is only whitespace
+    // is not a handle.
+    const { container } = renderShell(
+      {},
+      {
+        event: {
+          ...FIXTURE_EVENT,
+          social: {
+            handles: [
+              { platform: 'Mastodon', handle: '  @fixture  ', url: 'https://example.org/a' },
+              { platform: 'Bluesky', handle: '   ', url: 'https://example.org/b' },
+              { platform: 'Long', handle: 'h'.repeat(400), url: 'https://example.org/c' },
+              { platform: 'Wrong type', handle: 42, url: 'https://example.org/d' },
+            ],
+          },
+        },
+      },
+    );
+    const labels = [...socialLinks(container)].map((a) => a.textContent);
+    expect(labels[0]).toBe('Mastodon @fixture');
+    expect(labels[1]).toBe('Bluesky');
+    expect(labels[2]).toBe(`Long ${'h'.repeat(40)}`);
+    expect(labels[3]).toBe('Wrong type');
+  });
+
   it('keeps two accounts that share one address', () => {
     // One profile page can be reached under two names, and two names can
     // point at one page. Neither half of the pair is a key on its own.
