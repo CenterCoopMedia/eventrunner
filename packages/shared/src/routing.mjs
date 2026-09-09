@@ -1,1 +1,7 @@
-export { RESERVED_PATH_SEGMENTS, firstPathSegment, isReservedPathSegment } from './routing.cjs';
+export {
+  RESERVED_PATH_SEGMENTS,
+  PAGE_PATH_SEGMENT_RE,
+  firstPathSegment,
+  isReservedPathSegment,
+  isCanonicalPagePath,
+} from './routing.cjs';

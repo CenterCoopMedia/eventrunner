@@ -442,6 +442,60 @@ test('cmsSavePage still allows editing a system page that stays systemPage', asy
   assert.equal(d.store.writes.length, 1);
 });
 
+// ------------------------------------- cmsSavePage system page path drift
+
+test('cmsSavePage refuses to move a system page off its mounted route', async () => {
+  const db = fakeDb({ 'cmsPages/schedule': { id: 'schedule', path: '/schedule', systemPage: true } });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(
+    adminReq({ page: validPage({ id: 'schedule', path: '/agenda', systemPage: true }) }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+  assert.ok(res.body.error.message.includes('/schedule'), res.body.error.message);
+  assert.equal(d.store.writes.length, 0);
+});
+
+test('cmsSavePage refuses the move when only the DRAFT stores the path', async () => {
+  const db = fakeDb({
+    'cmsPages_drafts/schedule': { id: 'schedule', path: '/schedule', systemPage: true },
+  });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(
+    adminReq({ page: validPage({ id: 'schedule', path: '/agenda', systemPage: true }) }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+  assert.equal(d.store.writes.length, 0);
+});
+
+test('cmsSavePage still saves a system page edited at the path it already has', async () => {
+  // Everything else about a system page stays editable — the label the
+  // navigation renders most of all.
+  const db = fakeDb({ 'cmsPages/schedule': { id: 'schedule', path: '/schedule', systemPage: true } });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(
+    adminReq({
+      page: validPage({ id: 'schedule', path: '/schedule', label: 'Programme', systemPage: true }),
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(d.store.writes.length, 1);
+});
+
+test('cmsSavePage leaves a generic page free to change its path', async () => {
+  const db = fakeDb({ 'cmsPages/scholarships': { id: 'scholarships', path: '/scholarships', systemPage: false } });
+  const d = deps({ db });
+  const res = fakeRes();
+  await createSavePageHandler(d)(adminReq({ page: validPage({ path: '/bursaries' }) }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(d.store.writes.length, 1);
+});
+
 test('cmsSavePage allows systemPage:false on brand-new and non-system pages', async () => {
   const db = fakeDb({ 'cmsPages/extra': { id: 'extra', systemPage: false } });
   const d = deps({ db });
