@@ -7,13 +7,15 @@ Stack the PRs on branches `claude/repo-milestone-completion-sbpk7w-<issue>`, PR 
 
 ### Wave 1
 
-- [x] #147 Render the navigation from page documents
-- [x] #150 Serve per route metadata from the server
-- [x] #151 Generate a sitemap, a robots file, and a web manifest at publish time
-- [x] #153 Add a countdown and a lifecycle aware home lead
-- [x] #157 Seed a recap page and a guidelines page
-- [x] #160 Add search and a section index to long content pages
-- [x] #161 Add a session recording link field
+- [x] #147 Render the navigation from page documents (PR #220)
+- [x] #150 Serve per route metadata from the server (PR #229)
+- [x] #151 Generate a sitemap, a robots file, and a web manifest at publish time (PR #221)
+- [x] #153 Add a countdown and a lifecycle aware home lead (PR #222)
+- [x] #157 Seed a recap page and a guidelines page (PR #223)
+- [x] #160 Add search and a section index to long content pages (PR #224)
+- [x] #161 Add a session recording link field (PR #228)
+
+Stack order for the waterfall merge: #229 into -161, #228 into -160, #224 into -157, #223 into -153, #222 into -151, #221 into -147, #220 into main.
 
 ### Wave 2
 
@@ -26,11 +28,13 @@ Stack the PRs on branches `claude/repo-milestone-completion-sbpk7w-<issue>`, PR 
 - [x] #158 Seed a city guide page
 - [x] #159 Add an uploaded venue map with labelled rooms
 
+Branch grouping: the shell branch carried #148, #149, and #152; the home branch carried #154, #155, and #156; #158 and #159 each had a branch of its own.
+
 ### Final tip
 
-- [x] Shorten the seeded page labels, and let a page state a heading of its own
-- [x] One shared predicate for whether a page is public
-- [x] CHANGELOG entry, roadmap update, regenerated docs
+- [x] Shorten the seeded page labels (Home, Travel, FAQ, Conduct, Contact, Privacy, Terms, Recap, Guidelines, City guide) and regenerate, and let a page state a heading of its own
+- [x] One shared visible predicate for whether a page is public, across navigation, sitemap, and routeMeta
+- [x] CHANGELOG entry for M7, roadmap update, regenerated docs
 - [x] Lessons from the milestone
 
 ## Follow-ups filed during M7
@@ -38,10 +42,10 @@ Stack the PRs on branches `claude/repo-milestone-completion-sbpk7w-<issue>`, PR 
 Filed rather than fixed in place: each is outside the issue that surfaced it,
 and each is carried into a later milestone.
 
-- [ ] #218
-- [ ] #219
-- [ ] #226
-- [ ] #227
+- [ ] #218 raster app icons (M7)
+- [ ] #219 admin save buttons stay enabled (M10)
+- [ ] #226 places and movements docs (M10)
+- [ ] #227 blank number field in the venue editor (M10)
 - [ ] #230
 - [ ] #231
 - [ ] #233
