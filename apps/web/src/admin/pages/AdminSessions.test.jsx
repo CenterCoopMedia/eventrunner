@@ -110,6 +110,32 @@ describe('admin Sessions workspace', () => {
     });
   });
 
+  it('sends the recording link, and refuses an unsafe one before it reaches the server', async () => {
+    await renderAt('/admin/sessions/new/session');
+    await screen.findByRole('heading', { name: 'New session' });
+    fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Opening session' } });
+    fireEvent.change(screen.getByLabelText('Public description'), { target: { value: 'Welcome everyone.' } });
+    fireEvent.change(screen.getByLabelText('Event day'), { target: { value: 'day-1' } });
+    fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:00' } });
+    fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:00' } });
+
+    const field = screen.getByLabelText('Recording link');
+    fireEvent.change(field, { target: { value: 'javascript:alert(1)' } });
+    expect(await screen.findByText('Enter a link that starts with http:// or https://.')).toBeInTheDocument();
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save and publish' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    expect(fetch).not.toHaveBeenCalled();
+
+    fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
+    fireEvent.change(field, { target: { value: 'https://video.example.org/watch?v=abc' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields.recordingUrl).toBe('https://video.example.org/watch?v=abc');
+  });
+
   it('does not save or publish until required fields are valid', async () => {
     await renderAt('/admin/sessions/new/session');
     await screen.findByRole('heading', { name: 'New session' });

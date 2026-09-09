@@ -41,6 +41,16 @@
  *             free-text `location` stays exactly what it was, a label an
  *             operator writes for a reader, and is not touched here.
  *
+ *   recordingUrl  where the session can be watched afterwards. One http or
+ *             https link, checked against the same protocol allowlist every
+ *             other operator-supplied link goes through (shared/urlSafety
+ *             isSafeUrl). It sits ON THE SESSION rather than in a lookup
+ *             table keyed by session id: the recording is a fact about this
+ *             session, and a separate table goes stale the moment a session
+ *             is renamed or removed. No embargo applies — an operator adds
+ *             the link when the recording is public, and a session with no
+ *             link says nothing.
+ *
  * WALKING MINUTES ARE STILL NOT HERE, and now there is somewhere they are.
  * "Transfer to Line B · Hall 2 · 6 min walk" (brief §4.6) is a fact about a
  * PAIR of rooms in a building, not about a session, and a per-session
@@ -53,6 +63,7 @@
 
 const { TRACK_LETTER_RE } = require('shared/config');
 const { PLACE_ID_RE } = require('shared/venue');
+const { isSafeUrl } = require('shared/urlSafety');
 const { isValidDocId } = require('../cms/store.cjs');
 
 /** The live sessions collection and its draft sibling (§8.4). */
@@ -123,6 +134,22 @@ function validateSessionShape(fields, docId) {
       errors.push(
         'placeId: must be a place id — lowercase letters, digits and single hyphens — ' +
         `got ${JSON.stringify(placeId)}`,
+      );
+    }
+  }
+
+  const recordingUrl = fields?.recordingUrl;
+  if (recordingUrl !== undefined && recordingUrl !== null && recordingUrl !== '') {
+    // The protocol allowlist is the whole check, and it runs HERE rather
+    // than only in the editor: the client is one of several writers, and a
+    // javascript: or data: target that reaches Firestore is rendered by
+    // every reader from then on. Nothing is checked about the host — an
+    // operator may host a recording anywhere, and a domain list would be a
+    // guess about one deployment's video provider.
+    if (typeof recordingUrl !== 'string' || !isSafeUrl(recordingUrl)) {
+      errors.push(
+        'recordingUrl: must be a link that starts with http:// or https://, ' +
+        `got ${JSON.stringify(recordingUrl)}`,
       );
     }
   }

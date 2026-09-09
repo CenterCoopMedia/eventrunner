@@ -49,6 +49,17 @@ const fixtureSessions = [
     visible: true,
   },
   {
+    id: 'fx-recorded',
+    dayId: 'fx-day-1',
+    startTime: '10:00',
+    endTime: '10:45',
+    title: '[Fixture] Recorded panel',
+    type: 'panel',
+    speakerIds: [],
+    recordingUrl: 'https://video.example.org/watch?v=fx-recorded',
+    visible: true,
+  },
+  {
     id: 'fx-hidden',
     dayId: 'fx-day-1',
     startTime: '11:00',
@@ -177,6 +188,22 @@ describe('SessionDetail', () => {
   it('renders no pill row when every relevant feature flag is off', () => {
     renderDetail('fx-early');
     expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
+  });
+
+  it('links the recording on a session that has one, with every feature flag off', () => {
+    // The recording is a field on the session record, not a feature, so it
+    // reaches the page even on a deployment that runs none of the optional
+    // session features.
+    renderDetail('fx-recorded');
+    expect(screen.getByRole('link', { name: 'Watch the recording' })).toHaveAttribute(
+      'href',
+      'https://video.example.org/watch?v=fx-recorded',
+    );
+  });
+
+  it('says nothing about a recording on a session without one', () => {
+    renderDetail('fx-early');
+    expect(screen.queryByText(/recording/i)).toBeNull();
   });
 
   it('offers a signed-out visitor the sign-in path when features.sessionBookmarks is on', () => {

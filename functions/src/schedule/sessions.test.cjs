@@ -193,6 +193,49 @@ test('the place is read fresh from config/event, not from a cached config', asyn
   assert.equal((await checkSessionPlace({ db, fields: session({ placeId: 'room-a' }) })).ok, true);
 });
 
+// --- recordingUrl: where a finished session can be watched ------------------
+
+test('a session may carry no recording link at all', () => {
+  for (const recordingUrl of [undefined, null, '']) {
+    assert.equal(validateSessionShape(session({ recordingUrl }), 'session-1').ok, true);
+  }
+});
+
+test('a recording link may be http or https', () => {
+  for (const url of ['https://video.example.org/watch?v=abc', 'http://video.example.org/abc']) {
+    assert.equal(validateSessionShape(session({ recordingUrl: url }), 'session-1').ok, true, url);
+  }
+});
+
+test('an unsafe or malformed recording link is rejected by name', () => {
+  const bad = [
+    'javascript:alert(1)',
+    'data:text/html,x',
+    'mailto:someone@example.org',
+    'file:///etc/passwd',
+    'video.example.org/abc',
+    'not a url',
+    42,
+    {},
+  ];
+  for (const value of bad) {
+    const { ok, errors } = validateSessionShape(session({ recordingUrl: value }), 'session-1');
+    assert.equal(ok, false, `accepted ${JSON.stringify(value)}`);
+    assert.match(errors[0], /^recordingUrl: /);
+  }
+});
+
+test('a bad recording link fails the whole structure check', async () => {
+  const db = dbWithTracks(['A']);
+  const verdict = await validateSessionStructure({
+    db,
+    docId: 'session-1',
+    fields: session({ recordingUrl: 'javascript:alert(1)' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^recordingUrl: /);
+});
+
 // --- parentId ---------------------------------------------------------------
 
 test('a parentId must be a document id, and never the session itself', () => {

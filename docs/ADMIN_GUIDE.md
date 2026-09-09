@@ -74,6 +74,12 @@ One page can still differ. **Change the individual settings** also carries **Nav
 
 **A system page** — home, schedule, speakers, sponsors, attendees, updates — keeps its built-in feature and lets you put sections around it. Each section on one of those pages picks where it is inserted: **Before the main feature** or **After the main feature**. Custom pages have no built-in feature, so they have no insertion point to pick.
 
+## Sessions
+
+The schedule itself: Create, edit, publish, and delete a session. Saving writes a draft, and publishing sends it to the public schedule, the same two steps every other content tab uses. Use **Preview draft** to read the session's public page with the draft applied before you publish it.
+
+**Recording link.** One optional field on a session, in the **Public session** panel. Enter the address where attendees can watch the session afterwards. The link must start with `http://` or `https://`; the editor and the server both refuse anything else, so a session cannot store an address a reader's browser would treat as a script. Leave the field empty until the recording is public. A session with a recording link shows **Watch the recording** on its schedule row and on its session page, and the link opens in a new tab. A session with no link shows nothing at all, so an empty field does not promise a recording later. The link stays on the page after the event, when a past day becomes a back issue and the live controls come off.
+
 ## Content (Pages → Content editor)
 
 Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections, which block types each allows, its default blocks — is set in the page editor above; this tree of screens is for the block *content*. All eight block types are editable here.

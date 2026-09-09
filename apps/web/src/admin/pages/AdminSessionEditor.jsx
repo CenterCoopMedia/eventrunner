@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { isSafeUrl } from 'shared/urlSafety';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -39,6 +40,7 @@ const EMPTY = {
   placeId: '',
   location: '',
   parentId: '',
+  recordingUrl: '',
   visible: true,
 };
 
@@ -55,6 +57,7 @@ function toForm(row) {
     placeId: session.placeId ?? '',
     location: session.location ?? '',
     parentId: session.parentId ?? '',
+    recordingUrl: session.recordingUrl ?? '',
     visible: session.visible !== false,
   };
 }
@@ -71,6 +74,15 @@ function validateForm(form, mode) {
   if (!form.endTime) errors.set('endTime', 'Enter an end time.');
   if (form.startTime && form.endTime && form.startTime >= form.endTime) {
     errors.set('endTime', 'End time must be after start time.');
+  }
+  // The recording link is optional, so an empty box is valid. A filled one
+  // goes through the same protocol allowlist the server applies
+  // (functions/src/schedule/sessions.cjs), so the editor names the problem
+  // while the operator is still looking at the field rather than after a
+  // failed save.
+  const recordingUrl = String(form.recordingUrl ?? '').trim();
+  if (recordingUrl && !isSafeUrl(recordingUrl)) {
+    errors.set('recordingUrl', 'Enter a link that starts with http:// or https://.');
   }
   return errors;
 }
@@ -265,6 +277,14 @@ export default function AdminSessionEditor({ mode }) {
             onChange={(value) => set({ description: value })}
             error={errorFor('description')}
             required
+          />
+          <TextField
+            label="Recording link"
+            type="url"
+            hint="Where attendees can watch this session afterwards. Leave it empty until the recording is public. The public pages show the link only when it is filled in."
+            value={form.recordingUrl}
+            onChange={(value) => set({ recordingUrl: value })}
+            error={errorFor('recordingUrl')}
           />
         </div>
       </Panel>

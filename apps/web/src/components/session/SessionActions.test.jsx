@@ -424,6 +424,53 @@ describe('MaterialsLink', () => {
   });
 });
 
+describe('RecordingLink', () => {
+  const recorded = {
+    ...fixtureSession,
+    recordingUrl: 'https://video.example.org/watch?v=fx1',
+  };
+
+  it('says nothing when a session has no recording', () => {
+    renderActions({ surface: 'row' });
+    expect(screen.queryByRole('link', { name: /recording/i })).toBeNull();
+  });
+
+  it('links a recorded session on the row', () => {
+    renderActions({ surface: 'row', session: recorded });
+    const link = screen.getByRole('link', { name: 'Watch the recording' });
+    expect(link).toHaveAttribute('href', 'https://video.example.org/watch?v=fx1');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noreferrer'));
+  });
+
+  it('links a recorded session on its detail page', () => {
+    renderActions({ surface: 'detail', session: recorded });
+    expect(screen.getByRole('link', { name: 'Watch the recording' })).toBeInTheDocument();
+  });
+
+  it('keeps the recording on a back issue, where the recording is the point', () => {
+    renderActions({ surface: 'row', session: recorded, backIssue: true });
+    expect(screen.getByRole('link', { name: 'Watch the recording' })).toBeInTheDocument();
+  });
+
+  it('renders nothing for an unsafe or blank stored link', () => {
+    for (const recordingUrl of ['javascript:alert(1)', 'video.example.org/x', '   ', null]) {
+      const { unmount } = render(
+        actionsTree({ surface: 'detail', session: { ...fixtureSession, recordingUrl } }),
+      );
+      expect(screen.queryByRole('link', { name: /recording/i })).toBeNull();
+      unmount();
+    }
+  });
+
+  it('draws no bordered box around the recording link', () => {
+    const { container } = renderActions({ surface: 'row', session: recorded });
+    const link = container.querySelector('a[href^="https://video.example.org"]');
+    expect([...link.classList]).not.toContain('rounded-full');
+    expect([...link.classList]).not.toContain('border-hairline');
+  });
+});
+
 describe('ReactionGroup, on the detail surface', () => {
   const onDetail = (props) => renderActions({ surface: 'detail', ...props });
 
