@@ -115,9 +115,18 @@ describe('ContentPage (catch-all route)', () => {
     // /schedule renders its own component and never calls useDocumentTitle,
     // so before the central resolver a direct load showed the server's
     // title and then dropped to the bare event name.
+    //
+    // Waited on the same 5s window as the routing test below, and for the
+    // same reason: /schedule arrives through DeferredPage, so this is a
+    // dynamic import, and the default one second measures how busy the
+    // machine is rather than whether the route resolved.
     renderAt('/schedule');
     const schedulePage = pagesData.find((p) => p.id === 'schedule');
-    await screen.findByRole('heading', { level: 1, name: schedulePage.label });
+    await screen.findByRole(
+      'heading',
+      { level: 1, name: schedulePage.label },
+      { timeout: 5000 },
+    );
     expect(document.title).toBe(`${schedulePage.label} · ${eventConfig.name}`);
   });
 
