@@ -438,25 +438,25 @@ const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
     value: '<p>Email speakers@example.org with questions before the summit.</p>',
   }, 0),
   demoExtraDoc('city_guide_eat', 'diner', 'list_item', {
-    text: 'The Tidewater Diner: a short walk from Harborlight Hall, open for breakfast and lunch every day of the summit.',
+    text: '[Demo] Foghorn Diner: a short walk from Harborlight Hall, open for breakfast and lunch every day of the summit.',
   }, 0),
   demoExtraDoc('city_guide_eat', 'bakery', 'list_item', {
-    text: 'Cedar Street Bakery: coffee and pastries, with seating for a quick working breakfast before the first session.',
+    text: '[Demo] Cedar Street Bakery: coffee and pastries, with seating for a quick working breakfast before the first session.',
   }, 1),
   demoExtraDoc('city_guide_eat', 'noodle_house', 'list_item', {
-    text: 'Old Mill Noodle House: a sit-down dinner option a few blocks from the venue, busiest after the last session of the day.',
+    text: '[Demo] Old Mill Noodle House: a sit-down dinner option a few blocks from the venue, busiest after the last session of the day.',
   }, 2),
   demoExtraDoc('city_guide_see', 'harbor_walk', 'list_item', {
-    text: 'Millhaven Harbor Walk: a paved path along the water, level the whole way and about twenty minutes end to end.',
+    text: '[Demo] Millhaven Harbor Walk: a paved path along the water, level the whole way and about twenty minutes end to end.',
   }, 0),
   demoExtraDoc('city_guide_see', 'exchange_museum', 'list_item', {
-    text: 'The Grain Exchange Museum: a small local-history museum in the old exchange building, open afternoons.',
+    text: '[Demo] Grain Exchange Museum: a small local-history museum in the old exchange building, open afternoons.',
   }, 1),
   demoExtraDoc('city_guide_see', 'sculpture_park', 'list_item', {
-    text: 'Riverside Sculpture Park: an outdoor gallery of local artists’ work, free to enter.',
+    text: '[Demo] Riverside Sculpture Park: an outdoor gallery of local artists’ work, free to enter.',
   }, 2),
   demoExtraDoc('city_guide_around', 'streetcar', 'list_item', {
-    text: 'The Millhaven streetcar stops directly outside Harborlight Hall and runs every fifteen minutes on weekdays.',
+    text: '[Demo] Millhaven Streetcar stops directly outside Harborlight Hall and runs every fifteen minutes on weekdays.',
   }, 0),
   demoExtraDoc('city_guide_around', 'rideshare', 'list_item', {
     text: 'Rideshare pickup and drop-off is at the east entrance of Harborlight Hall, away from the main doors.',

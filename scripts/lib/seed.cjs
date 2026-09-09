@@ -358,6 +358,10 @@ function defaultPages() {
     // pattern: a section's description is the only placeholder text there
     // is, and no copy about any city appears here or anywhere else in this
     // seed — an operator's own writing is what fills it in.
+    //
+    // Directions to and around the venue itself already live on the travel
+    // page ("Around the venue" and "Getting here" — travel_local and
+    // travel_transit above); this page is the wider city, not the venue.
     {
       id: 'city_guide',
       label: 'City guide',
@@ -367,6 +371,14 @@ function defaultPages() {
       visible: true,
       systemPage: false,
       sections: [
+        // Every generic page's first section renders its heading offscreen
+        // (ContentPage.jsx treats it as repeating the page title), so a page
+        // whose real first section is actual content — Places to eat here —
+        // needs a leading intro section the way faq, conduct, and contact
+        // already have one, or that first content section loses both its
+        // visible heading and its entry in the section index.
+        section('city_guide_intro', 'Introduction', 'One paragraph before the city guide.',
+          ['richtext'], 2),
         section('city_guide_eat', 'Places to eat', 'One entry per restaurant, cafe, or other place to eat near the venue.',
           ['list_item', 'richtext'], 20),
         section('city_guide_see', 'Things to see', 'One entry per sight, attraction, or activity near the venue.',

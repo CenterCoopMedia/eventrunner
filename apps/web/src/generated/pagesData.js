@@ -819,6 +819,17 @@ export const pagesData = [
     systemPage: false,
     sections: [
       {
+        id: 'city_guide_intro',
+        label: 'Introduction',
+        description: 'One paragraph before the city guide.',
+        allowedBlocks: [
+          'richtext',
+        ],
+        maxBlocks: 2,
+        reorderable: true,
+        defaultBlocks: [],
+      },
+      {
         id: 'city_guide_eat',
         label: 'Places to eat',
         description: 'One entry per restaurant, cafe, or other place to eat near the venue.',

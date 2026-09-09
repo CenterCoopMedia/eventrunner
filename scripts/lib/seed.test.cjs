@@ -10,8 +10,49 @@ const { buildConfigDocs } = require('./answers.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
 const { BLOCK_TYPES } = require('../../functions/src/cms/blockTypes.cjs');
 const { RESERVED_PATH_SEGMENTS } = require('shared/routing');
+const {
+  DEMO_ANSWERS, DEMO_ORGANIZATIONS, DEMO_SPEAKERS, DEMO_PAGE_EXTRA_CONTENT,
+} = require('./demo-event.cjs');
 
 const TIER_A = { publicUrl: 'https://example.org', ticketingProvider: 'none', emailProvider: 'console' };
+
+/**
+ * Generic institutional words that show up inside the demo fixture's own
+ * invented names (an event called a "Summit", a sponsor with "Media" in
+ * its name, a venue that is a "Hall") but are ordinary English words the
+ * real, event-neutral seed is free to use on its own — `recap_media`'s
+ * "other event media" is exactly that. Excluding them keeps the derived
+ * list below to the fixture's actual invented names, not their generic
+ * descriptor words.
+ */
+const GENERIC_INSTITUTIONAL_WORDS = new Set(['demo', 'hall', 'media']);
+
+/**
+ * The demo fixture's own invented proper nouns — event, venue, city,
+ * operator, sponsors, and speakers — derived from `demo-event.cjs` rather
+ * than copied by hand, so a renamed fixture entity updates this list on
+ * its own instead of silently going unchecked.
+ */
+function demoFixtureProperNouns() {
+  const phrases = [
+    DEMO_ANSWERS.event.name,
+    DEMO_ANSWERS.event.venue.name,
+    DEMO_ANSWERS.event.venue.city,
+    DEMO_ANSWERS.event.legal.operatorName,
+    ...DEMO_ORGANIZATIONS.map((org) => org.name),
+    ...DEMO_SPEAKERS.flatMap((speaker) => [speaker.firstName, speaker.lastName, speaker.organization]),
+  ];
+  const words = new Set();
+  for (const phrase of phrases) {
+    for (const word of String(phrase).replace(/\[Demo\]/gi, '').split(/[^A-Za-z]+/)) {
+      if (word.length < 3) continue;
+      const lower = word.toLowerCase();
+      if (GENERIC_INSTITUTIONAL_WORDS.has(lower)) continue;
+      words.add(lower);
+    }
+  }
+  return [...words];
+}
 
 function isNonEmptyDescription(value) {
   return typeof value === 'string' && value.trim().length > 0;
@@ -187,7 +228,7 @@ test('no content doc is seeded for the recap or guidelines pages', () => {
   }
 });
 
-test('the city guide page seeds three empty variable-length sections (issue: seed a city guide page)', () => {
+test('the city guide page has an intro section, then three empty variable-length sections (issue: seed a city guide page)', () => {
   // Same shape as the travel page's variable-length lists (§5.3), and the
   // same shape recap and guidelines already established: every section
   // carries a description that instructs the operator, and NO seeded
@@ -198,11 +239,14 @@ test('the city guide page seeds three empty variable-length sections (issue: see
   assert.equal(page.systemPage, false, 'city_guide is a generic content page, not a system route');
   assert.deepEqual(
     page.sections.map((s) => s.id),
-    ['city_guide_eat', 'city_guide_see', 'city_guide_around'],
+    ['city_guide_intro', 'city_guide_eat', 'city_guide_see', 'city_guide_around'],
   );
   for (const section of page.sections) {
     assert.deepEqual(section.defaultBlocks, [], `city_guide.${section.id} must seed empty so it renders nothing`);
     assert.ok(isNonEmptyDescription(section.description), `city_guide.${section.id} needs a placeholder description`);
+  }
+  const [intro, ...contentSections] = page.sections;
+  for (const section of contentSections) {
     assert.ok(section.maxBlocks >= 20, `city_guide.${section.id} must accept a variable number of entries`);
     assert.deepEqual(
       section.allowedBlocks,
@@ -210,6 +254,24 @@ test('the city guide page seeds three empty variable-length sections (issue: see
       `city_guide.${section.id} should allow only list_item and richtext blocks`,
     );
   }
+  assert.deepEqual(intro.allowedBlocks, ['richtext'], 'city_guide_intro should allow only richtext');
+});
+
+test('the city guide page\'s first section is the intro, ahead of its three content sections', () => {
+  // ContentPage.jsx renders a page's own first section (`baseSections[0]`,
+  // independent of any active filter) with an sr-only heading and leaves it
+  // out of the section index, on the assumption that it repeats the page
+  // title (faq_intro, conduct_intro, contact_intro, and guidelines_intro
+  // already rely on this). Without a leading intro section here, "Places to
+  // eat" — real content, not a repeated title — would silently lose its
+  // visible heading and its section-index entry.
+  const page = defaultPages().find((p) => p.id === 'city_guide');
+  assert.equal(page.sections[0].id, 'city_guide_intro', 'city_guide_intro must be the first section');
+  assert.deepEqual(
+    page.sections.slice(1).map((s) => s.id),
+    ['city_guide_eat', 'city_guide_see', 'city_guide_around'],
+    'the three content sections must follow the intro, in this order',
+  );
 });
 
 test('no content doc is seeded for the city guide page', () => {
@@ -224,17 +286,46 @@ test('no content doc is seeded for the city guide page', () => {
   }
 });
 
-test('no page or section carries copy naming a city (issue: seed a city guide page)', () => {
-  // The city guide page in particular must never guess at a real city's
-  // restaurants, sights, or transit — the whole page is generic-content
-  // instructions to an operator, the same way travel's lodging and transit
-  // lists carry no hotel or airline names.
-  const forbidden = ['millhaven', 'harborlight', 'new york', 'brooklyn', 'downtown'];
+test('no demo fixture copy leaks into the shared seed', () => {
+  // The shared seed (defaultPages() and what buildSeedContent() renders
+  // from it) ships to every real deployment, so none of it may carry the
+  // demo fixture's own invented event, venue, city, operator, sponsor, or
+  // speaker names — the same way it may never carry a real one. This is
+  // checked against the derived list (demoFixtureProperNouns above), not a
+  // hand-typed one, so a renamed or added fixture entity is covered
+  // automatically rather than needing this test updated by hand.
+  const docs = configDocs();
+  const content = buildSeedContent({ pages: defaultPages(), docs, tierA: TIER_A });
+  const haystack = `${JSON.stringify(defaultPages())} ${JSON.stringify(content)}`.toLowerCase();
+  for (const word of demoFixtureProperNouns()) {
+    const re = new RegExp(`\\b${word}\\b`);
+    assert.equal(re.test(haystack), false, `the shared seed mentions the demo fixture's "${word}"`);
+  }
+});
+
+test('every DEMO_PAGE_EXTRA_CONTENT entry targets a real section, an allowed block type, and stays within maxBlocks', () => {
+  const sectionsById = new Map();
   for (const page of defaultPages()) {
-    const haystack = JSON.stringify(page).toLowerCase();
-    for (const word of forbidden) {
-      assert.equal(haystack.includes(word), false, `${page.id} page doc mentions "${word}"`);
+    for (const section of page.sections) {
+      sectionsById.set(section.id, section);
     }
+  }
+  const countBySection = new Map();
+  for (const doc of DEMO_PAGE_EXTRA_CONTENT) {
+    const section = sectionsById.get(doc.section);
+    assert.ok(section, `${doc.id}: section "${doc.section}" does not exist in defaultPages()`);
+    assert.ok(
+      section.allowedBlocks.includes(doc.blockType),
+      `${doc.id}: blockType "${doc.blockType}" is not allowed on section "${doc.section}" (allows ${section.allowedBlocks.join(', ')})`,
+    );
+    countBySection.set(doc.section, (countBySection.get(doc.section) ?? 0) + 1);
+  }
+  for (const [sectionId, count] of countBySection) {
+    const section = sectionsById.get(sectionId);
+    assert.ok(
+      count <= section.maxBlocks,
+      `section "${sectionId}" has ${count} DEMO_PAGE_EXTRA_CONTENT entries, over its maxBlocks of ${section.maxBlocks}`,
+    );
   }
 });
 
