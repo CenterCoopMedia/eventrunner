@@ -97,6 +97,12 @@ export default function EventCountdown({ eventConfig }) {
         ? RUNNING_CHECK_MS
         : null;
     if (delayMs === null) return undefined;
+    // The one interval this component ever runs, and its callback touches
+    // nothing but this component's own state: no window, no document, no
+    // DOM read of any kind, so there is nothing here for an unmounted
+    // instance's stray tick to fail against. React runs this same cleanup
+    // both when the delay changes (phase moved) and on unmount, so a timer
+    // this effect started is never the one left running past either.
     const id = setInterval(() => setNow(new Date()), delayMs);
     return () => clearInterval(id);
   }, [counting, watchingRunning, watchingDraft]);

@@ -8,8 +8,20 @@
 // matching low frequency check that brings the lead up on its own once a
 // future announcedAt passes, and that the ticking interval is cleared on
 // unmount.
+//
+// Timer hygiene matters here specifically because this component schedules
+// real setInterval calls whenever it renders outside a test's own fake
+// clock: `afterEach` hooks run in reverse registration order (a describe's
+// own hooks before the ones the global test setup registers), so a bare
+// `afterEach(() => vi.useRealTimers())` here would restore native timers
+// BEFORE @testing-library's own global cleanup() unmounts whatever this
+// file last rendered — an interval scheduled under the fake clock, orphaned
+// rather than cleared, with no render left mounted to ever clear it. Every
+// test below renders under `vi.useFakeTimers()`, and the shared afterEach
+// unmounts before switching the clock back, so a real timer is never the
+// one left holding the id.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { getEventPhase } from 'shared/config';
 import EventCountdown from './EventCountdown.jsx';
 
@@ -37,6 +49,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Order matters: unmount (clearing any interval this file's render
+  // scheduled) while the fake clock this file is still active, THEN
+  // restore native timers. Reversed, a still-mounted render's interval
+  // would be orphaned under the fake clock rather than cleared.
+  cleanup();
   vi.useRealTimers();
 });
 
@@ -89,6 +106,27 @@ describe('EventCountdown', () => {
 
   it('clears the ticking interval on unmount', () => {
     vi.setSystemTime(new Date(BEFORE_START));
+    const clearSpy = vi.spyOn(globalThis, 'clearInterval');
+    const { unmount } = render(<EventCountdown eventConfig={BASE_CONFIG} />);
+    expect(clearSpy).not.toHaveBeenCalled();
+    unmount();
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+    clearSpy.mockRestore();
+  });
+
+  it('clears the once-a-minute draft poll on unmount, the same way', () => {
+    vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'));
+    const draftConfig = { ...BASE_CONFIG, announcedAt: '2026-06-01T00:01' };
+    const clearSpy = vi.spyOn(globalThis, 'clearInterval');
+    const { unmount } = render(<EventCountdown eventConfig={draftConfig} />);
+    expect(clearSpy).not.toHaveBeenCalled();
+    unmount();
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+    clearSpy.mockRestore();
+  });
+
+  it('clears the once-a-minute running poll on unmount, the same way', () => {
+    vi.setSystemTime(new Date('2026-06-10T12:00:00.000Z'));
     const clearSpy = vi.spyOn(globalThis, 'clearInterval');
     const { unmount } = render(<EventCountdown eventConfig={BASE_CONFIG} />);
     expect(clearSpy).not.toHaveBeenCalled();
