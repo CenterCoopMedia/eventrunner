@@ -191,12 +191,15 @@ describe('ContentPage (catch-all route)', () => {
 });
 
 // Search and a section index on long content pages (issue #14, spec M7-14).
-// Generic behaviour: the real seeded pages (FAQ has two sections, three
-// blocks total) sit well under the threshold, so every scenario here uses a
-// synthetic page pushed the same way the reserved-path tests above do —
-// full control over section and block counts is the point, to pin the
-// threshold's actual boundary rather than whatever the demo fixture
-// currently happens to contain.
+// Generic behaviour: an FAQ block makes a page a search surface by itself,
+// at any size (the seeded FAQ page qualifies at two sections and two
+// blocks — see the FAQ-specific test below), which is one of three
+// independent ways in. The other two are pure size rules, and the real
+// seeded pages other than FAQ (Contact included) sit well under both of
+// them, so most scenarios here use a synthetic page pushed the same way the
+// reserved-path tests above do — full control over section and block
+// counts is the point, to pin the size rule's actual boundary rather than
+// whatever the demo fixture currently happens to contain.
 describe('ContentPage — search and section index on long pages', () => {
   /** A page section shaped the way cmsPages actually stores one. */
   function pageSection(id, label) {
@@ -350,6 +353,72 @@ describe('ContentPage — search and section index on long pages', () => {
     expect(
       screen.queryByRole('navigation', { name: 'Sections on this page' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('qualifies the seeded FAQ page even though it sits under the size rule, because it carries a faq_item block', async () => {
+    // The seeded FAQ page (scripts/lib/seed.cjs) has two sections and two
+    // blocks total — under both size branches — but an FAQ is a set of
+    // independent questions a reader scans for one of, by nature a search
+    // surface regardless of how few questions are seeded so far.
+    const faqPage = pagesData.find((p) => p.id === 'faq');
+    expect(faqPage.sections.length).toBe(2);
+
+    renderAt('/faq');
+    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+
+    expect(screen.getByRole('searchbox', { name: 'Filter by keyword' })).toBeInTheDocument();
+
+    const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
+    fireEvent.change(filter, { target: { value: siteContent.faq_items__what_is_this.question } });
+    expect(
+      screen.getByText(siteContent.faq_items__what_is_this.question),
+    ).toBeInTheDocument();
+  });
+
+  it('does not qualify the seeded Contact page — two sections, two blocks, no faq_item', async () => {
+    const contactPage = pagesData.find((p) => p.id === 'contact');
+    expect(contactPage.sections.length).toBe(2);
+
+    renderAt('/contact');
+    await screen.findByRole('heading', { level: 1, name: contactPage.label });
+
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Sections on this page' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('qualifies any page carrying a faq_item block, even a single section far under the size rule', async () => {
+    const page = {
+      id: 'one-faq',
+      label: 'One FAQ fixture',
+      path: '/one-faq',
+      icon: null,
+      order: 99,
+      visible: true,
+      systemPage: false,
+      sections: [pageSection('of_only', 'Questions')],
+    };
+    const blocks = [
+      {
+        id: 'of_only__q1',
+        section: 'of_only',
+        field: 'q1',
+        blockType: 'faq_item',
+        question: 'Is this searchable?',
+        answer: 'Yes.',
+        visible: true,
+        order: 0,
+      },
+    ];
+    renderAt('/one-faq');
+    pushPage(page);
+    pushContent(blocks);
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'One FAQ fixture' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Filter by keyword' })).toBeInTheDocument();
   });
 
   it('renders no filter box or section index on a page with only one section', async () => {
@@ -508,6 +577,35 @@ describe('ContentPage — search and section index on long pages', () => {
         vi.advanceTimersByTime(1);
       });
       expect(status).toHaveTextContent('1 of 3 items match');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears the announced status text at once on Clear filter, not 300ms later', async () => {
+    renderLongSectionsPage();
+    await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' });
+
+    const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
+    const status = screen.getByRole('status');
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(filter, { target: { value: 'Zzyzx' } });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(status).toHaveTextContent('1 of 3 items match');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
+      // Cleared immediately — no stale "1 of 3 items match" hanging around
+      // for the next 300ms while the debounce catches up.
+      expect(status).toHaveTextContent('');
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(status).toHaveTextContent('');
     } finally {
       vi.useRealTimers();
     }

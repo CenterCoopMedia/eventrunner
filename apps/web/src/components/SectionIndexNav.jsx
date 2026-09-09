@@ -58,6 +58,16 @@ export default function SectionIndexNav({ sections }) {
       .filter(Boolean);
     if (targets.length === 0) return undefined;
 
+    // Per-target intersection state, accumulated across callbacks: a single
+    // IntersectionObserver callback reports only the entries whose state
+    // CHANGED since the last one — never every observed target — so
+    // deriving "what's current" from one callback's own entries alone
+    // silently drops any section that didn't just change. This map is
+    // instead the full, current picture: it starts empty (nothing has
+    // reported in yet) and each callback updates only the ids it was told
+    // about, leaving every other id's last known state untouched.
+    const intersecting = new Map();
+
     // The band a heading has to cross to count as "in view": past the same
     // fixed-header allowance the site already gives every in-page anchor
     // (`[id] { scroll-margin-top: 5rem }`, index.css) — so a jump from this
@@ -67,21 +77,22 @@ export default function SectionIndexNav({ sections }) {
     // whatever merely touches the viewport edge.
     const observer = new ObserverType(
       (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting);
-        if (visible.length === 0) {
-          // Nothing crossed the band this tick — scrolled above the first
-          // section's mark, past the last one, or between two that don't
-          // meet — so nothing is current, not whatever was last.
-          setActiveId(null);
-          return;
+        for (const entry of entries) {
+          intersecting.set(entry.target.id, {
+            isIntersecting: entry.isIntersecting,
+            top: entry.boundingClientRect.top,
+          });
         }
-        // Two sections can cross the band in the same tick; observer entry
-        // order is not guaranteed, so the topmost heading wins rather than
-        // whichever entry the browser happened to report last.
-        const topmost = visible.reduce((best, entry) =>
-          entry.boundingClientRect.top < best.boundingClientRect.top ? entry : best,
-        );
-        setActiveId(topmost.target.id);
+        // Two sections can be intersecting at once; iteration order over the
+        // map is insertion order, not screen order, so the topmost heading
+        // wins on its own recorded position rather than whichever id
+        // happened to be inserted (or updated) last.
+        let winner = null;
+        for (const [id, state] of intersecting) {
+          if (!state.isIntersecting) continue;
+          if (!winner || state.top < winner.top) winner = { id, top: state.top };
+        }
+        setActiveId(winner ? winner.id : null);
       },
       { rootMargin: '-80px 0px -70% 0px' },
     );

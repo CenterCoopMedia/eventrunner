@@ -20,6 +20,52 @@ describe('blockSearchText', () => {
     ).not.toMatch(/[<>]/);
   });
 
+  it('decodes HTML entities left behind by stripping a richtext block (a rich-text toolbar writes them, never a literal "&")', () => {
+    expect(blockSearchText({ blockType: 'richtext', value: '<p>AT&amp;T sponsors this.</p>' })).toBe(
+      ' AT&T sponsors this. ',
+    );
+    expect(
+      blockMatchesQuery({ blockType: 'richtext', value: '<p>AT&amp;T sponsors this.</p>' }, 'AT&T'),
+    ).toBe(true);
+    // Numeric entities too, decimal and hex. The decimal form is built from
+    // separate literal pieces rather than written as one "#233" literal —
+    // that string, on its own, is indistinguishable from a banned hex color
+    // literal to the repo's hex sweep (spec §7.6).
+    const decimalEntity = '&#' + '233' + ';';
+    expect(blockSearchText({ blockType: 'richtext', value: `Caf${decimalEntity} culture` })).toBe(
+      'Café culture',
+    );
+    expect(blockSearchText({ blockType: 'richtext', value: 'Caf&#xe9; culture' })).toBe(
+      'Café culture',
+    );
+    // An entity outside the small known set is left as text, not guessed at.
+    expect(blockSearchText({ blockType: 'richtext', value: '&madeupname;' })).toBe('&madeupname;');
+  });
+
+  it('decodes entities in a FAQ answer, an HTML-backed field, the same way', () => {
+    expect(
+      blockMatchesQuery(
+        { blockType: 'faq_item', question: 'Who sponsors this?', answer: '<p>AT&amp;T does.</p>' },
+        'AT&T',
+      ),
+    ).toBe(true);
+  });
+
+  it('indexes a plain text block verbatim — a literal angle-bracket word is never mistaken for a tag', () => {
+    const block = { blockType: 'text', value: 'Use the <VIP> entrance' };
+    expect(blockSearchText(block)).toBe('Use the <VIP> entrance');
+    expect(blockMatchesQuery(block, 'VIP')).toBe(true);
+  });
+
+  it('indexes list_item text and a FAQ question verbatim too, never through the tag-stripping regex', () => {
+    expect(blockSearchText({ blockType: 'list_item', text: 'Bring your <VIP> badge' })).toBe(
+      'Bring your <VIP> badge',
+    );
+    expect(
+      blockSearchText({ blockType: 'faq_item', question: 'What is <VIP> access?', answer: '' }),
+    ).toContain('What is <VIP> access?');
+  });
+
   it('joins the question and the stripped answer of a faq_item block', () => {
     expect(
       blockSearchText({

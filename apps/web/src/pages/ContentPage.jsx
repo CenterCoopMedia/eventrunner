@@ -38,12 +38,18 @@ import { inputClass, primaryActionClass, quietActionClass } from '../components/
 const LEGAL_PAGE_IDS = ['privacy', 'terms'];
 
 // Search and a section index on a long content page (issue #14, spec
-// M7-14). Generic over every content page, not FAQ-specific: any page
-// rendered through this route gets the same treatment once it is long
-// enough for an index to earn its place — either shape counts as long:
-// three or more populated sections, or two sections carrying a real amount
-// of content between them. A page under both bars has nothing worth
-// jumping to or narrowing.
+// M7-14). Generic over every content page, not FAQ-specific: the gate below
+// asks "is this page shaped like a search surface", not "is this the FAQ
+// page" — an FAQ block just happens to be the one block type that answers
+// that question by itself, on any page, at any length. Three ways in:
+//   - the page carries at least one faq_item block. An FAQ is a set of
+//     independent questions a reader scans for one of, by nature a search
+//     surface, even at the seeded size (two sections, two blocks) that the
+//     size rule below would otherwise turn the feature off for; or
+//   - three or more populated sections; or
+//   - two sections carrying a real amount of content between them.
+// A page that matches none of the three has nothing worth jumping to or
+// narrowing.
 const SECTION_INDEX_MIN_SECTIONS = 3;
 const SECTION_INDEX_MIN_SECTIONS_WITH_BLOCKS = 2;
 const SECTION_INDEX_MIN_BLOCKS = 8;
@@ -122,11 +128,15 @@ export default function ContentPage() {
     .filter(({ blocks }) => blocks.length > 0);
 
   const totalBlocks = baseSections.reduce((sum, { blocks }) => sum + blocks.length, 0);
+  const hasFaqItem = baseSections.some(({ blocks }) =>
+    blocks.some((block) => block.blockType === 'faq_item'),
+  );
 
   // This is the ONLY thing that gates the feature, and it reads baseSections
   // (never the filtered list), so typing a query that thins the result list
   // can never make the filter box that produced it disappear.
   const isLongPage =
+    hasFaqItem ||
     baseSections.length >= SECTION_INDEX_MIN_SECTIONS ||
     (baseSections.length >= SECTION_INDEX_MIN_SECTIONS_WITH_BLOCKS &&
       totalBlocks >= SECTION_INDEX_MIN_BLOCKS);
@@ -166,6 +176,11 @@ export default function ContentPage() {
 
   const clearFilter = () => {
     setQuery('');
+    // Clear the settled status at once, the same way the pathname-change
+    // effect above does — otherwise the debounce (STATUS_SETTLE_MS) leaves
+    // the live region announcing the old, now-wrong count for 300ms after
+    // the list itself has already gone back to showing everything.
+    setSettledQuery('');
     filterInputRef.current?.focus();
   };
 

@@ -229,4 +229,63 @@ describe('SectionIndexNav', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('keeps the section that is still in view when a callback reports only the one that left', () => {
+    // A real IntersectionObserver callback carries only the entries whose
+    // state CHANGED since the last callback — not every observed target.
+    // Deriving "what's current" from that one batch alone would lose
+    // whichever section didn't just change, even though it never left.
+    const instances = [];
+    class FakeIntersectionObserver {
+      constructor(callback) {
+        this.callback = callback;
+        instances.push(this);
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
+
+    render(
+      <>
+        <Target id="s1" />
+        <Target id="s2" />
+        <SectionIndexNav
+          sections={[
+            { id: 's1', label: 'Venue' },
+            { id: 's2', label: 'Travel' },
+          ]}
+        />
+      </>,
+    );
+
+    const observer = instances[0];
+    const s1 = document.getElementById('s1');
+    const s2 = document.getElementById('s2');
+
+    // Both cross the band together — s1 (top 5) is topmost, so it's current.
+    act(() => {
+      observer.callback([
+        { isIntersecting: true, boundingClientRect: { top: 5 }, target: s1 },
+        { isIntersecting: true, boundingClientRect: { top: 200 }, target: s2 },
+      ]);
+    });
+    expect(screen.getByRole('link', { name: 'Venue' })).toHaveAttribute('aria-current', 'location');
+
+    // s1 leaves; the callback reports ONLY s1 — real IntersectionObserver
+    // behavior, since s2's own intersection state has not changed. s2 must
+    // still be recognized as current from its last known (retained) state.
+    act(() => {
+      observer.callback([
+        { isIntersecting: false, boundingClientRect: { top: -50 }, target: s1 },
+      ]);
+    });
+    expect(screen.getByRole('link', { name: 'Venue' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Travel' })).toHaveAttribute(
+      'aria-current',
+      'location',
+    );
+
+    vi.unstubAllGlobals();
+  });
 });
