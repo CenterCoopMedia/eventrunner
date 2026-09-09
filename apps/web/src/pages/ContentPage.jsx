@@ -123,8 +123,8 @@ function filterSections(sections, query) {
 
 export default function ContentPage() {
   const { pathname } = useLocation();
-  const { getPage, getSectionBlocks } = useContent();
-  const { eventConfig } = useEventConfig();
+  const { getPublicPage, getSectionBlocks } = useContent();
+  const { eventConfig, features } = useEventConfig();
   // Declared before the early return below so hook order stays fixed across
   // renders regardless of which page (or no page) this URL resolves to
   // (react-hooks/rules-of-hooks).
@@ -165,7 +165,16 @@ export default function ContentPage() {
 
   // The requested URL itself may be reserved territory (a stale /p/... link,
   // a guess at /signin/help) even before a page lookup happens.
-  const page = isReservedPathSegment(firstPathSegment(pathname)) ? null : getPage(pathname);
+  //
+  // getPublicPage, not getPage: this is the lookup a READER's address goes
+  // through, so it asks the one predicate the navigation, the sitemap, and
+  // the server's link-card metadata ask (shared/page isPublicPage). A page
+  // those three drop — including one whose `visible` field is merely absent
+  // rather than false — must 404 here too, or hiding a page from every list
+  // would still leave it open to anyone who knows the URL.
+  const page = isReservedPathSegment(firstPathSegment(pathname))
+    ? null
+    : getPublicPage(pathname, features);
 
   // A non-system page whose STORED path starts with a reserved segment is
   // pre-#52 or hand-edited data, not something the current admin UI could

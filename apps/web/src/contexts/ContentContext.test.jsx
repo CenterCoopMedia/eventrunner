@@ -37,7 +37,7 @@ function Probe() {
   const { source, getBlock, getSectionBlocks, scheduleData, organizationsData, speakers, loading } =
     useContent();
   const heroTitle = useContent('hero', 'title');
-  const { pages, getPage } = usePages();
+  const { pages, getPage, getPublicPage } = usePages();
   return (
     <>
       <span data-testid="source">{source}</span>
@@ -46,6 +46,7 @@ function Probe() {
       <span data-testid="hero-block-count">{getSectionBlocks('hero').length}</span>
       <span data-testid="page-count">{pages.length}</span>
       <span data-testid="faq-page-label">{getPage('faq')?.label ?? ''}</span>
+      <span data-testid="faq-public-label">{getPublicPage('/faq', {})?.label ?? ''}</span>
       <span data-testid="schedule-count">{scheduleData.length}</span>
       <span data-testid="schedule-first-title">{scheduleData[0]?.title ?? ''}</span>
       <span data-testid="organizations-count">{organizationsData.length}</span>
@@ -436,6 +437,39 @@ describe('ContentProvider', () => {
     expect(screen.getByTestId('hero-title')).toHaveTextContent('');
     expect(screen.getByTestId('hero-block-count')).toHaveTextContent('0');
     expect(screen.getByTestId('faq-page-label')).toHaveTextContent('');
+  });
+
+  it('serves a page to a reader only when it says it is visible', () => {
+    // The route lookup and the navigation now answer the same question the
+    // same way (shared/page isPublicPage): a page that is not linked
+    // anywhere must not still open when its address is typed. `visible`
+    // absent is the case that used to slip through — the old read was
+    // `visible !== false`, so a document mid-write, hand-written straight
+    // into Firestore, or older than the field, was unlinked and reachable.
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    const faq = snapshotPages.find((p) => p.id === 'faq');
+    expect(screen.getByTestId('faq-public-label')).toHaveTextContent(faq.label);
+
+    const { visible, ...noVisibleField } = faq;
+    expect(visible).toBe(true);
+    act(() => {
+      subscriptions.get('cmsPages').onNext([noVisibleField]);
+    });
+    expect(screen.getByTestId('faq-public-label')).toHaveTextContent('');
+
+    act(() => {
+      subscriptions.get('cmsPages').onNext([{ ...faq, visible: false }]);
+    });
+    expect(screen.getByTestId('faq-public-label')).toHaveTextContent('');
+
+    act(() => {
+      subscriptions.get('cmsPages').onNext([{ ...faq, visible: true }]);
+    });
+    expect(screen.getByTestId('faq-public-label')).toHaveTextContent(faq.label);
   });
 
   it('resolves pages by id or path via getPage', () => {

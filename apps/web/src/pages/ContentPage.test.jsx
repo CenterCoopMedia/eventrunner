@@ -305,6 +305,40 @@ describe('ContentPage (catch-all route)', () => {
     expect(screen.queryByRole('heading', { name: 'Legacy FAQ' })).not.toBeInTheDocument();
   });
 
+  it('404s a page whose `visible` field is absent, not just one set to false', async () => {
+    // The navigation, the sitemap, and the served link card all read
+    // `visible === true` (shared/page isPublicPage), so a document that
+    // never stated the field is listed nowhere. Before this the route
+    // lookup read `visible !== false` and opened it anyway, which made a
+    // typed address the way around every list on the site.
+    renderAt('/unlisted');
+    await screen.findByRole('heading', { name: 'Page not found' });
+    const unlisted = {
+      id: 'unlisted',
+      label: 'Unlisted',
+      path: '/unlisted',
+      icon: null,
+      order: 99,
+      systemPage: false,
+      sections: [],
+    };
+    act(() => {
+      subscriptions.get('cmsPages')([...pagesData, unlisted]);
+    });
+    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+
+    // The same document, once it says it is visible, is a page again.
+    act(() => {
+      subscriptions.get('cmsPages')([...pagesData, { ...unlisted, visible: true }]);
+    });
+    expect(screen.getByRole('heading', { level: 1, name: 'Unlisted' })).toBeInTheDocument();
+
+    act(() => {
+      subscriptions.get('cmsPages')([...pagesData, { ...unlisted, visible: false }]);
+    });
+    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+  });
+
   it('404s a doc saved under a reserved prefix like /signin/help', async () => {
     renderAt('/signin/help');
     await screen.findByRole('heading', { name: 'Page not found' });
