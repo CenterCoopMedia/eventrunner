@@ -5,13 +5,25 @@
  * Site publisher entrypoint — the command the `site-publisher` Cloud Run
  * job runs (spec §8.4 phase 5, issue #36).
  *
- * Three steps, in the order §8.4 names them:
+ * Three steps, in the order §8.4 names them, plus one write of static
+ * artifacts between the second and third:
  *
  *   1. `generate-content.cjs --out <dir>`  the PUBLISHED collections of the
  *                                          project this job runs in, read
  *                                          through the Admin SDK.
  *   2. `npm run build -w apps/web`         the bundle, against that snapshot
  *                                          and this client's VITE_* values.
+ *      sitemap.xml, robots.txt, and        written straight into the built
+ *      the web manifest                    `apps/web/dist` (scripts/lib/
+ *                                          site-manifest.cjs, M7 issue 5) so
+ *                                          they deploy as ordinary hosting
+ *                                          files. Not a spawned step: it
+ *                                          reads this project's own
+ *                                          config/event, config/features,
+ *                                          config/theme, and cmsPages
+ *                                          documents through the same `db`
+ *                                          handle the queue-status write
+ *                                          already uses.
  *   3. `firebase deploy --only hosting`    under the job's own service
  *                                          account (ADC from the Cloud Run
  *                                          metadata server). No cross-project
@@ -40,6 +52,7 @@
  *   3  snapshot generation failed
  *   4  web build failed
  *   5  hosting deploy failed
+ *   6  writing sitemap.xml, robots.txt, or the web manifest failed
  *
  * When PUBLISH_QUEUE_ID is set (cmsPublish passes it as a per-execution
  * override), the terminal outcome is written back to that `cmsPublishQueue`
@@ -60,8 +73,10 @@ const { spawnSync } = require('node:child_process');
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { validateDeployEnv } = require('../packages/shared/src/config/deploy.cjs');
+const { buildSiteArtifacts } = require('./lib/site-manifest.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
+const DIST_DIR = path.join(ROOT, 'apps', 'web', 'dist');
 const FLAGS = ['out', 'dry-run', 'help'];
 
 const EXIT = Object.freeze({
@@ -71,6 +86,7 @@ const EXIT = Object.freeze({
   GENERATE: 3,
   BUILD: 4,
   DEPLOY: 5,
+  SITEMAP: 6,
 });
 
 /** Stage name → exit code, for the status row and the log line. */
@@ -268,6 +284,57 @@ async function writeQueueStatus({ db, queueId, patch, log = console }) {
 }
 
 /**
+ * Read the documents `buildSiteArtifacts` needs, straight through the
+ * Admin SDK — cmsPages UNFILTERED, unlike `generate-content.cjs`'s
+ * `readVisibleCollection`: a hidden page (`visible: false`) has to reach
+ * `buildSiteArtifacts` so it can be named in robots.txt, not merely
+ * dropped as if it never existed.
+ *
+ * @param {{ db: object }} args
+ * @returns {Promise<{ event: object, features: object, theme: object, pages: object[] }>}
+ */
+async function readSiteDocs({ db }) {
+  const configIds = ['event', 'features', 'theme'];
+  const configSnaps = await db.getAll(...configIds.map((id) => db.collection('config').doc(id)));
+  const config = {};
+  configIds.forEach((id, i) => {
+    config[id] = configSnaps[i].exists ? configSnaps[i].data() : null;
+  });
+  if (!config.event) throw new Error('config/event is missing — run scripts/init-event.cjs first');
+
+  const pagesSnap = await db.collection('cmsPages').get();
+  const pages = pagesSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+
+  return { event: config.event, features: config.features || {}, theme: config.theme || {}, pages };
+}
+
+/**
+ * Write sitemap.xml, robots.txt, and the web manifest into the built
+ * hosting directory (M7 issue 5). Runs after the build stage — `distDir`
+ * must already hold the vite build's output — and before the two deploy
+ * stages, so the three files ship as ordinary hosting files with no
+ * separate rewrite or function.
+ *
+ * @param {{ db: object, distDir: string, publicUrl: string,
+ *           log?: Console }} args
+ * @returns {Promise<void>}
+ */
+async function generateSiteFiles({ db, distDir, publicUrl, log = console }) {
+  if (!db) throw new Error('generateSiteFiles: no Firestore handle available');
+  const { event, features, theme, pages } = await readSiteDocs({ db });
+  const artifacts = buildSiteArtifacts({ event, features, theme, pages, publicUrl });
+
+  fs.mkdirSync(distDir, { recursive: true });
+  fs.writeFileSync(path.join(distDir, 'sitemap.xml'), artifacts.sitemapXml);
+  fs.writeFileSync(path.join(distDir, 'robots.txt'), artifacts.robotsTxt);
+  fs.writeFileSync(
+    path.join(distDir, 'manifest.webmanifest'),
+    `${JSON.stringify(artifacts.manifest, null, 2)}\n`,
+  );
+  log.log(`publish-site: wrote sitemap.xml, robots.txt, and manifest.webmanifest to ${distDir}`);
+}
+
+/**
  * Run the plan.
  *
  * @param {{
@@ -277,6 +344,8 @@ async function writeQueueStatus({ db, queueId, patch, log = console }) {
  *   readFirebaseJson?: () => object,
  *   writeFirebaseJson?: (config: object) => void,
  *   getDb?: () => object,
+ *   generateSiteFiles?: (args: { db: object, distDir: string,
+ *                                publicUrl: string, log: Console }) => Promise<void>,
  *   now?: () => number,
  *   log?: Console,
  * }} deps
@@ -289,6 +358,7 @@ async function main({
   readFirebaseJson,
   writeFirebaseJson,
   getDb,
+  generateSiteFiles: generateSiteFilesFn = generateSiteFiles,
   now = Date.now,
   log = console,
 } = {}) {
@@ -321,6 +391,12 @@ async function main({
     log.log('publish-site: plan (dry run, nothing executed)');
     for (const step of plan) {
       log.log(`  [${step.stage}] ${step.label}: ${step.command} ${step.args.join(' ')}`);
+      // Not a spawned step (see generateSiteFiles below), so it carries no
+      // command/args of its own — printed here so a dry run still shows an
+      // operator every effect a real run would have, in the order it runs.
+      if (step.stage === 'build') {
+        log.log('  [sitemap] Write sitemap.xml, robots.txt, and the web manifest into apps/web/dist');
+      }
     }
     return EXIT.OK;
   }
@@ -368,12 +444,23 @@ async function main({
   const exec = runStep || defaultRunStep;
   for (const step of plan) {
     log.log(`publish-site: [${step.stage}] ${step.label}`);
-    const result = exec(step, { env: resolved });
+    const result = await exec(step, { env: resolved });
     if (result.status !== 0) {
       const reason = result.error
         ? result.error.message
         : `${step.command} exited ${result.status === null ? 'on a signal' : result.status}`;
       return finish(STAGE_EXIT[step.stage] || EXIT.UNEXPECTED, step.stage, reason);
+    }
+    // Not a spawned step: sitemap.xml, robots.txt, and the web manifest are
+    // written straight into apps/web/dist right after the build produces
+    // it, and before either deploy step ships that directory to hosting.
+    if (step.stage === 'build') {
+      log.log('publish-site: [sitemap] Write sitemap.xml, robots.txt, and the web manifest');
+      try {
+        await generateSiteFilesFn({ db, distDir: DIST_DIR, publicUrl: resolved.EVENT_PUBLIC_URL, log });
+      } catch (err) {
+        return finish(EXIT.SITEMAP, 'sitemap', err?.message || err);
+      }
     }
   }
   return finish(EXIT.OK);
@@ -416,6 +503,8 @@ module.exports = {
   resolvePublisherEnv,
   publisherStatusPatch,
   writeQueueStatus,
+  readSiteDocs,
+  generateSiteFiles,
   EXIT,
-  internals: { usage, defaultRunStep, STAGE_EXIT, FLAGS },
+  internals: { usage, defaultRunStep, STAGE_EXIT, FLAGS, DIST_DIR },
 };

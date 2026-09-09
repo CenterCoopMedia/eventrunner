@@ -659,6 +659,7 @@
           <tr><td><code>2</code></td><td>the job&#39;s environment is invalid — nothing ran; compare <code>gcloud run jobs describe</code> against §3</td></tr>
           <tr><td><code>3</code></td><td><code>generate-content.cjs</code> failed — usually <code>datastore.user</code> missing, or <code>config/event</code> absent</td></tr>
           <tr><td><code>4</code></td><td>the vite build failed — a missing <code>VITE_*</code> value, or the task ran out of memory</td></tr>
+          <tr><td><code>6</code></td><td>writing sitemap.xml, robots.txt, or the web manifest failed — usually <code>config/event</code> or <code>cmsPages</code> unreadable; runs after the build, before hosting deploys</td></tr>
           <tr><td><code>5</code></td><td><code>firebase deploy --only hosting</code> failed — usually <code>firebasehosting.admin</code> missing</td></tr>
           <tr><td><code>1</code></td><td>an unexpected error in the entrypoint itself</td></tr>
           </tbody>

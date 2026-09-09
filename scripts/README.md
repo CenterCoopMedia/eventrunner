@@ -133,9 +133,10 @@ and the committed snapshot cannot drift apart.
 ### `publish-site.cjs`
 
 The entrypoint of the `site-publisher` Cloud Run job (§8.4 phase 5, issue #36): generate the
-content snapshot from this project's published collections, build the web app against it, deploy
-hosting. It is the only script here that normally runs inside a container rather than from a
-laptop — `publisher/Dockerfile` is a packaging of this repository whose `ENTRYPOINT` is this file.
+content snapshot from this project's published collections, build the web app against it, write
+sitemap.xml/robots.txt/the web manifest into the built output, deploy hosting. It is the only
+script here that normally runs inside a container rather than from a laptop —
+`publisher/Dockerfile` is a packaging of this repository whose `ENTRYPOINT` is this file.
 
 ```sh
 node scripts/publish-site.cjs             # what the job runs
@@ -148,9 +149,22 @@ than a second that can drift. `PUBLISH_QUEUE_ID`, which `cmsPublish` passes as a
 override, names the `cmsPublishQueue` row the terminal status is written back to; without it the
 job publishes and writes no status, which is what makes a hand-started execution safe.
 
-Exit codes name the stage — `2` configuration, `3` generation, `4` build, `5` hosting deploy — so
-`gcloud run jobs executions describe` is usually enough to triage without opening the log. Setup,
-verification, and the rollback interaction: `docs/DEPLOY_RUNBOOK.md` §9.
+Exit codes name the stage — `2` configuration, `3` generation, `4` build, `6` sitemap/robots/
+manifest, `5` hosting deploy — so `gcloud run jobs executions describe` is usually enough to
+triage without opening the log. Setup, verification, and the rollback interaction:
+`docs/DEPLOY_RUNBOOK.md` §9.
+
+The sitemap/robots/manifest write (`scripts/lib/site-manifest.cjs`) is not a spawned step: it
+reads this project's own `config/event`, `config/features`, `config/theme`, and every `cmsPages`
+document — unfiltered, unlike the content snapshot, because a hidden page still has to be named in
+robots.txt — straight through the same `db` handle the queue-status write already uses. Visibility
+alone does not decide what is public: a system page's own feature flag (`features.schedule`,
+`features.updates`, …) can be off while `visible: true`, and the attendee directory
+(`Attendees.jsx`) additionally requires the viewer be signed in whenever
+`features.publicAttendeeProfiles` is off — the default — so that route is excluded from the
+sitemap and disallowed in robots.txt until an operator turns the flag on. The manifest's icons
+reuse the branding slots every deployment ships (`apps/web/public/branding/mark.svg`,
+`favicon.svg`), never a client's uploaded Storage asset.
 
 ### `build-demo.cjs`
 
