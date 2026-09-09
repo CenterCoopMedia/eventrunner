@@ -63,7 +63,7 @@
 
 const { TRACK_LETTER_RE } = require('shared/config');
 const { PLACE_ID_RE } = require('shared/venue');
-const { isSafeUrl } = require('shared/urlSafety');
+const { isSafeUrl, safeUrlHref } = require('shared/urlSafety');
 const { isValidDocId } = require('../cms/store.cjs');
 
 /** The live sessions collection and its draft sibling (§8.4). */
@@ -146,6 +146,13 @@ function validateSessionShape(fields, docId) {
     // every reader from then on. Nothing is checked about the host — an
     // operator may host a recording anywhere, and a domain list would be a
     // guess about one deployment's video provider.
+    //
+    // isSafeUrl requires the two slashes as well as the scheme
+    // (shared/urlSafety): `https:video.example.org/watch` parses, reports
+    // protocol `https:`, and then resolves as a path on the EVENT's own
+    // domain the moment a reader clicks it. What survives this check is
+    // stored in canonical form — see normalizeSessionRecordingUrl, which
+    // the content-write seam applies.
     if (typeof recordingUrl !== 'string' || !isSafeUrl(recordingUrl)) {
       errors.push(
         'recordingUrl: must be a link that starts with http:// or https://, ' +
@@ -650,8 +657,35 @@ async function validateSessionStructure({ db, tx = null, docId, fields }) {
   return { ok: true };
 }
 
+/**
+ * The session's fields with `recordingUrl` in canonical form.
+ *
+ * Validation says whether a string MAY be stored; this says what gets
+ * stored. Keeping the two apart is what lets validateSessionStructure stay
+ * a pure verdict — it is called for its answer, not its output — while the
+ * write seam still persists exactly the string the check approved, host
+ * lower-cased and every component percent-encoded the way a browser will
+ * read it back (shared/urlSafety safeUrlHref).
+ *
+ * Every other value passes through untouched, including `null` (an editor
+ * clearing the field) and an unset key (a merge patch that never mentioned
+ * it). A value this returns unchanged is one validateSessionShape has
+ * already refused, so nothing unsafe is normalized into looking safe.
+ *
+ * @param {object} fields the session's fields as they will be stored
+ * @returns {object} the same fields, or a copy with a canonical recordingUrl
+ */
+function normalizeSessionRecordingUrl(fields) {
+  const raw = fields?.recordingUrl;
+  if (typeof raw !== 'string' || raw.trim() === '') return fields;
+  const href = safeUrlHref(raw);
+  if (!href || href === raw) return fields;
+  return { ...fields, recordingUrl: href };
+}
+
 module.exports = {
   validateSessionShape,
+  normalizeSessionRecordingUrl,
   checkSessionTrack,
   checkSessionPlace,
   checkSessionParent,

@@ -150,6 +150,25 @@ describe('the schedule grid', () => {
     expect(closed, 'the list is hidden, not removed').not.toBeNull();
     expect(closed).toHaveAttribute('hidden');
   });
+
+  it('links a recording from the grid, with the same name the list row gives it', () => {
+    // A wide screen with tracks gets the grid and never the list, so a
+    // desktop reader had no way to see that a session was recorded without
+    // opening its page first.
+    renderGrid([
+      ...SESSIONS.slice(0, 1),
+      { ...SESSIONS[1], recordingUrl: 'https://video.example.org/watch?v=practice' },
+      ...SESSIONS.slice(2),
+    ]);
+    expect(
+      screen.getByRole('link', { name: 'Watch the recording of [Fixture] Reporting workshop' }),
+    ).toHaveAttribute('href', 'https://video.example.org/watch?v=practice');
+  });
+
+  it('adds nothing to a cell whose session has no recording', () => {
+    renderGrid();
+    expect(screen.queryByRole('link', { name: /recording/i })).toBeNull();
+  });
 });
 
 describe('the column that comes forward', () => {

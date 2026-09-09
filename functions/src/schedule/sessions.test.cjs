@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   validateSessionShape,
+  normalizeSessionRecordingUrl,
   checkSessionTrack,
   checkSessionPlace,
   checkSessionParent,
@@ -216,6 +217,13 @@ test('an unsafe or malformed recording link is rejected by name', () => {
     // Protocol-relative. It parses in a browser against whatever page it
     // sits on, so it must never be stored as "a link the operator meant".
     '//evil.com',
+    // The scheme with no slashes. `new URL()` ACCEPTS this and reports
+    // protocol 'https:', so the old protocol-only check let it through;
+    // rendered in an href it resolves as a path on the event's own site,
+    // and the reader never reaches video.example.org at all.
+    'https:video.example.org/watch',
+    'http:video.example.org',
+    'https:/video.example.org/watch',
     'video.example.org/abc',
     'not a url',
     42,
@@ -237,6 +245,47 @@ test('a bad recording link fails the whole structure check', async () => {
   });
   assert.equal(verdict.ok, false);
   assert.match(verdict.message, /^recordingUrl: /);
+});
+
+test('a scheme without its slashes fails the whole structure check too', async () => {
+  const db = dbWithTracks(['A']);
+  const verdict = await validateSessionStructure({
+    db,
+    docId: 'session-1',
+    fields: session({ recordingUrl: 'https:video.example.org/watch' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^recordingUrl: /);
+});
+
+test('what is stored is the canonical href, not the string as typed', () => {
+  assert.deepEqual(
+    normalizeSessionRecordingUrl(session({ recordingUrl: 'HTTPS://Video.Example.ORG/watch?v=abc' })),
+    session({ recordingUrl: 'https://video.example.org/watch?v=abc' }),
+  );
+  assert.equal(
+    normalizeSessionRecordingUrl(session({ recordingUrl: 'https://video.example.org' })).recordingUrl,
+    'https://video.example.org/',
+  );
+});
+
+test('normalizing leaves every other session alone, and never repairs a refused link', () => {
+  // An unset key, a cleared field, and a link already in canonical form all
+  // come back as the SAME object, so a merge patch cannot gain a key it
+  // never mentioned.
+  for (const fields of [
+    session(),
+    session({ recordingUrl: null }),
+    session({ recordingUrl: '' }),
+    session({ recordingUrl: 'https://video.example.org/watch' }),
+  ]) {
+    assert.equal(normalizeSessionRecordingUrl(fields), fields);
+  }
+  // A value validateSessionShape refuses is passed through untouched rather
+  // than tidied into something that looks safe. The write never reaches
+  // here, and if it ever did, the bad value would still be visible as bad.
+  const bad = session({ recordingUrl: 'https:video.example.org/watch' });
+  assert.equal(normalizeSessionRecordingUrl(bad), bad);
 });
 
 // --- parentId ---------------------------------------------------------------

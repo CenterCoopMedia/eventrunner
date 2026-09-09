@@ -51,5 +51,5 @@ export {
   buildPublicSpeaker,
   validateSpeaker,
 } from './speaker.cjs';
-export { isSafeUrl, looksLikeUrl, scrubLinkLabel } from './urlSafety.cjs';
+export { isSafeUrl, safeUrlHref, looksLikeUrl, scrubLinkLabel } from './urlSafety.cjs';
 export { RESERVED_PATH_SEGMENTS, isReservedPathSegment } from './routing.cjs';
