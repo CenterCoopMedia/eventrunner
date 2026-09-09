@@ -27,7 +27,7 @@ import { useToast } from '../contexts/ToastContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ProfilePhotoField from '../components/media/ProfilePhotoField.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
-import { deleteOwnPhoto } from '../lib/mediaSource.js';
+import { deleteOwnPhoto } from '../lib/photoUpload.js';
 import { inputClass, primaryActionClass } from '../components/controlClasses.js';
 
 const VISIBILITY_COPY = {

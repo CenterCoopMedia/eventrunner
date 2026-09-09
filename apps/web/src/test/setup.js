@@ -10,7 +10,7 @@ vi.mock('@/firebase.js', () => ({
   app: {},
   auth: {},
   db: {},
-  storage: {},
+  useEmulators: false,
   // lib/mediaSource.js builds object URLs from these two rather than calling
   // getDownloadURL (Admin-SDK-written objects carry no download token), so a
   // test run needs them or every asset resolves to "missing".
@@ -40,6 +40,8 @@ vi.mock('firebase/auth', () => ({
 // configuration for. Individual tests override this per file when they need
 // to assert on an upload.
 vi.mock('firebase/storage', () => ({
+  getStorage: vi.fn(() => ({})),
+  connectStorageEmulator: vi.fn(),
   ref: vi.fn((_storage, path) => ({ path })),
   getDownloadURL: vi.fn(async (reference) => `https://example.test/${reference?.path ?? ''}`),
   uploadBytes: vi.fn(async () => ({})),

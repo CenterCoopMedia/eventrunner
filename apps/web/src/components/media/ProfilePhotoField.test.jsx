@@ -14,6 +14,8 @@ const uploadBytes = vi.fn(async () => ({}));
 const deleteObject = vi.fn(async () => {});
 
 vi.mock('firebase/storage', () => ({
+  getStorage: vi.fn(() => ({})),
+  connectStorageEmulator: vi.fn(),
   ref: vi.fn((_storage, path) => ({ path })),
   uploadBytes: (...args) => uploadBytes(...args),
   deleteObject: (...args) => deleteObject(...args),
