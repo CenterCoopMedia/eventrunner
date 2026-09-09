@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * The fourteen default pages and their placeholder content (spec §5.3, §5.4).
+ * The fifteen default pages and their placeholder content (spec §5.3, §5.4).
  *
  * Pure. `defaultPages()` returns cmsPages documents in exactly the shape
  * `validatePageDoc` (functions/src/cms/pages.cjs) accepts — init runs that
@@ -42,16 +42,19 @@ function block(field, blockType, description) {
 }
 
 /**
- * The fourteen seeded pages (§5.3): home, schedule, speakers, sponsors,
+ * The fifteen seeded pages (§5.3): home, schedule, speakers, sponsors,
  * attendees, updates (system pages, each owning a dedicated React route),
- * then travel, faq, conduct, contact, privacy, terms, recap, guidelines as
- * generic content pages at their own root-level paths.
+ * then travel, faq, conduct, contact, privacy, terms, recap, guidelines,
+ * city_guide as generic content pages at their own root-level paths.
  *
- * recap and guidelines follow the travel page's empty-section pattern all
- * the way through, not just for its repeating lists: every section on both
- * pages seeds with zero default blocks, so both pages render the site's
- * empty state until an operator writes something. Neither may carry a real
- * event's copy, the way every other placeholder here already does not.
+ * recap, guidelines, and city_guide follow the travel page's empty-section
+ * pattern all the way through, not just for its repeating lists: every
+ * section on all three pages seeds with zero default blocks, so each page
+ * renders the site's empty state until an operator writes something.
+ * None of the three may carry a real event's copy, the way every other
+ * placeholder here already does not — city_guide in particular names no
+ * city, no restaurant, no attraction, and no transit line; the section
+ * descriptions instruct an operator without guessing at their answer.
  *
  * EVERY SYSTEM ROUTE GETS A DOCUMENT, INCLUDING THE TWO THAT SEED NO
  * CONTENT. Attendees and Updates own dedicated routes (shared/routing
@@ -346,6 +349,30 @@ function defaultPages() {
           ['richtext'], 10),
         section('guidelines_help', 'Questions', 'Who a speaker can contact with questions before the event.',
           ['richtext', 'link_group'], 6),
+      ],
+    },
+    // Issue "Seed a city guide page": a third generic content page appended
+    // after guidelines for the same reason recap and guidelines sit after
+    // updates (see the comment above `defaultPages`). Every section seeds
+    // with zero default blocks, the travel page's variable-length-list
+    // pattern: a section's description is the only placeholder text there
+    // is, and no copy about any city appears here or anywhere else in this
+    // seed — an operator's own writing is what fills it in.
+    {
+      id: 'city_guide',
+      label: 'City guide',
+      path: '/city-guide',
+      icon: null,
+      order: 14,
+      visible: true,
+      systemPage: false,
+      sections: [
+        section('city_guide_eat', 'Places to eat', 'One entry per restaurant, cafe, or other place to eat near the venue.',
+          ['list_item', 'richtext'], 20),
+        section('city_guide_see', 'Things to see', 'One entry per sight, attraction, or activity near the venue.',
+          ['list_item', 'richtext'], 20),
+        section('city_guide_around', 'Getting around', 'One entry per transit option, parking note, or way to move between places.',
+          ['list_item', 'richtext'], 20),
       ],
     },
   ];

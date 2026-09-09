@@ -42,13 +42,13 @@ function configDocs(overrides = {}) {
   return built.docs;
 }
 
-test('the fourteen default pages are seeded, with the six system pages marked', () => {
+test('the fifteen default pages are seeded, with the six system pages marked', () => {
   const pages = defaultPages();
   assert.deepEqual(
     pages.map((p) => p.id),
     [
       'home', 'schedule', 'speakers', 'sponsors', 'travel', 'faq', 'conduct', 'contact',
-      'privacy', 'terms', 'attendees', 'updates', 'recap', 'guidelines',
+      'privacy', 'terms', 'attendees', 'updates', 'recap', 'guidelines', 'city_guide',
     ],
   );
   assert.deepEqual(
@@ -184,6 +184,57 @@ test('no content doc is seeded for the recap or guidelines pages', () => {
       !doc.section.startsWith('recap_') && !doc.section.startsWith('guidelines_'),
       `${doc.id} would render placeholder copy on a page that must ship empty`,
     );
+  }
+});
+
+test('the city guide page seeds three empty variable-length sections (issue: seed a city guide page)', () => {
+  // Same shape as the travel page's variable-length lists (§5.3), and the
+  // same shape recap and guidelines already established: every section
+  // carries a description that instructs the operator, and NO seeded
+  // content, so the page renders the site's empty state until an operator
+  // adds something. The page may not carry copy about any city.
+  const page = defaultPages().find((p) => p.id === 'city_guide');
+  assert.ok(page, 'city_guide page missing from defaultPages()');
+  assert.equal(page.systemPage, false, 'city_guide is a generic content page, not a system route');
+  assert.deepEqual(
+    page.sections.map((s) => s.id),
+    ['city_guide_eat', 'city_guide_see', 'city_guide_around'],
+  );
+  for (const section of page.sections) {
+    assert.deepEqual(section.defaultBlocks, [], `city_guide.${section.id} must seed empty so it renders nothing`);
+    assert.ok(isNonEmptyDescription(section.description), `city_guide.${section.id} needs a placeholder description`);
+    assert.ok(section.maxBlocks >= 20, `city_guide.${section.id} must accept a variable number of entries`);
+    assert.deepEqual(
+      section.allowedBlocks,
+      ['list_item', 'richtext'],
+      `city_guide.${section.id} should allow only list_item and richtext blocks`,
+    );
+  }
+});
+
+test('no content doc is seeded for the city guide page', () => {
+  const docs = configDocs();
+  const content = buildSeedContent({ pages: defaultPages(), docs, tierA: TIER_A });
+  for (const doc of content) {
+    assert.equal(
+      doc.section.startsWith('city_guide_'),
+      false,
+      `${doc.id} would render placeholder copy on a page that must ship empty`,
+    );
+  }
+});
+
+test('no page or section carries copy naming a city (issue: seed a city guide page)', () => {
+  // The city guide page in particular must never guess at a real city's
+  // restaurants, sights, or transit — the whole page is generic-content
+  // instructions to an operator, the same way travel's lodging and transit
+  // lists carry no hotel or airline names.
+  const forbidden = ['millhaven', 'harborlight', 'new york', 'brooklyn', 'downtown'];
+  for (const page of defaultPages()) {
+    const haystack = JSON.stringify(page).toLowerCase();
+    for (const word of forbidden) {
+      assert.equal(haystack.includes(word), false, `${page.id} page doc mentions "${word}"`);
+    }
   }
 });
 

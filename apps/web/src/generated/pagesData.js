@@ -809,6 +809,54 @@ export const pagesData = [
     ],
     seeded: true,
   },
+  {
+    id: 'city_guide',
+    label: 'City guide',
+    path: '/city-guide',
+    icon: null,
+    order: 14,
+    visible: true,
+    systemPage: false,
+    sections: [
+      {
+        id: 'city_guide_eat',
+        label: 'Places to eat',
+        description: 'One entry per restaurant, cafe, or other place to eat near the venue.',
+        allowedBlocks: [
+          'list_item',
+          'richtext',
+        ],
+        maxBlocks: 20,
+        reorderable: true,
+        defaultBlocks: [],
+      },
+      {
+        id: 'city_guide_see',
+        label: 'Things to see',
+        description: 'One entry per sight, attraction, or activity near the venue.',
+        allowedBlocks: [
+          'list_item',
+          'richtext',
+        ],
+        maxBlocks: 20,
+        reorderable: true,
+        defaultBlocks: [],
+      },
+      {
+        id: 'city_guide_around',
+        label: 'Getting around',
+        description: 'One entry per transit option, parking note, or way to move between places.',
+        allowedBlocks: [
+          'list_item',
+          'richtext',
+        ],
+        maxBlocks: 20,
+        reorderable: true,
+        defaultBlocks: [],
+      },
+    ],
+    seeded: true,
+  },
 ];
 
 export default pagesData;

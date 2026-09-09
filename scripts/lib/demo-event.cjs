@@ -314,23 +314,25 @@ function demoExtraDoc(section, field, blockType, fields, order) {
 }
 
 /**
- * Demo-only content for the recap and guidelines pages.
+ * Demo-only content for the recap, guidelines, and city guide pages.
  *
- * Both pages seed with zero default blocks in `defaultPages()` (§5.3): a
- * real client's recap and guidelines pages must never carry a guess at
- * event copy, so the seed leaves every one of their sections empty for an
- * operator to fill. `DEMO_CONTENT` above only overlays fields onto docs
- * `buildSeedContent` already produced, so it has nothing to overlay for
- * either page — with no docs of its own, the demo showed "Nothing here
- * yet" on both, which is correct for a fresh deployment but wrong for a
- * fixture whose whole point is to look like a well-run, finished event
- * (issue #109's point, applied here).
+ * All three pages seed with zero default blocks in `defaultPages()` (§5.3):
+ * a real client's recap, guidelines, and city guide pages must never carry
+ * a guess at event or city copy, so the seed leaves every one of their
+ * sections empty for an operator to fill. `DEMO_CONTENT` above only
+ * overlays fields onto docs `buildSeedContent` already produced, so it has
+ * nothing to overlay for any of the three — with no docs of its own, the
+ * demo showed "Nothing here yet" on all three, which is correct for a fresh
+ * deployment but wrong for a fixture whose whole point is to look like a
+ * well-run, finished event (issue #109's point, applied here).
  *
  * These are extra docs, not overlays, built directly against the section
- * ids and allowed block types `defaultPages()` declares for `recap` and
- * `guidelines` — fictional throughout, no real names, places, or
- * organizations, following the [Demo] Harborlight Media Summit already
- * established above.
+ * ids and allowed block types `defaultPages()` declares for `recap`,
+ * `guidelines`, and `city_guide` — fictional throughout, no real names,
+ * places, or organizations, following the [Demo] Harborlight Media Summit
+ * already established above. The city guide entries name fictional
+ * establishments in the fixture's own fictional town (Millhaven), never a
+ * real restaurant, attraction, or transit line.
  */
 const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
   // This recap is deliberately about the PREVIOUS edition, not the one
@@ -435,6 +437,33 @@ const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
   demoExtraDoc('guidelines_help', 'contact', 'richtext', {
     value: '<p>Email speakers@example.org with questions before the summit.</p>',
   }, 0),
+  demoExtraDoc('city_guide_eat', 'diner', 'list_item', {
+    text: 'The Tidewater Diner: a short walk from Harborlight Hall, open for breakfast and lunch every day of the summit.',
+  }, 0),
+  demoExtraDoc('city_guide_eat', 'bakery', 'list_item', {
+    text: 'Cedar Street Bakery: coffee and pastries, with seating for a quick working breakfast before the first session.',
+  }, 1),
+  demoExtraDoc('city_guide_eat', 'noodle_house', 'list_item', {
+    text: 'Old Mill Noodle House: a sit-down dinner option a few blocks from the venue, busiest after the last session of the day.',
+  }, 2),
+  demoExtraDoc('city_guide_see', 'harbor_walk', 'list_item', {
+    text: 'Millhaven Harbor Walk: a paved path along the water, level the whole way and about twenty minutes end to end.',
+  }, 0),
+  demoExtraDoc('city_guide_see', 'exchange_museum', 'list_item', {
+    text: 'The Grain Exchange Museum: a small local-history museum in the old exchange building, open afternoons.',
+  }, 1),
+  demoExtraDoc('city_guide_see', 'sculpture_park', 'list_item', {
+    text: 'Riverside Sculpture Park: an outdoor gallery of local artists’ work, free to enter.',
+  }, 2),
+  demoExtraDoc('city_guide_around', 'streetcar', 'list_item', {
+    text: 'The Millhaven streetcar stops directly outside Harborlight Hall and runs every fifteen minutes on weekdays.',
+  }, 0),
+  demoExtraDoc('city_guide_around', 'rideshare', 'list_item', {
+    text: 'Rideshare pickup and drop-off is at the east entrance of Harborlight Hall, away from the main doors.',
+  }, 1),
+  demoExtraDoc('city_guide_around', 'bike_share', 'list_item', {
+    text: 'A bike share dock sits beside the harbor walk, about five minutes on foot from the venue.',
+  }, 2),
 ]);
 
 /** Fictional sessions across the three demo days. */
