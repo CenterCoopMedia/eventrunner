@@ -427,6 +427,25 @@ test('the home page seeds a key facts section built from stat and list_item bloc
   }
 });
 
+// M7 issue 10: the sponsor strip. The section is the operator's own switch
+// for it — deleting it turns the strip off without turning the sponsors
+// feature off everywhere — so the seed has to create it. The organizations
+// themselves are never seeded here: they live in the Organizations list.
+test('the home page seeds a sponsors section holding one line above the wall', () => {
+  const home = defaultPages().find((page) => page.id === 'home');
+  const sponsors = home.sections.find((section) => section.id === 'sponsors');
+  assert.ok(sponsors, 'the home page seeds a sponsors section');
+  assert.deepEqual(sponsors.allowedBlocks, ['text']);
+  assert.deepEqual(
+    sponsors.defaultBlocks.map((def) => [def.field, def.blockType]),
+    [['lede', 'text']],
+  );
+  const content = new Map(
+    buildSeedContent({ pages: defaultPages(), docs: configDocs(), tierA: TIER_A }).map((d) => [d.id, d]),
+  );
+  assert.match(content.get('sponsors__lede').value, /\[Replace\]/);
+});
+
 test('placeholder copy is a [Replace] instruction, never another event copy', () => {
   const docs = configDocs();
   const content = buildSeedContent({ pages: defaultPages(), docs, tierA: TIER_A });

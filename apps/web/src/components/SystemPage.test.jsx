@@ -163,3 +163,82 @@ describe('SystemPage', () => {
     expect(screen.getByText('one label')).toBeInTheDocument();
   });
 });
+
+// A page may draw one of its own sections itself (M7 issue 10: the home
+// page's sponsor strip reads a different collection entirely). The point of
+// `renderSection` over excluding the section and rendering it in the core
+// is that the section STAYS IN THE ORDER — an operator who drags it in the
+// admin, or moves it to another slot, moves it on the page.
+describe('SystemPage renderSection', () => {
+  const custom = (section) =>
+    section.id === 'custom' ? <p>{`custom: ${section.label}`}</p> : undefined;
+
+  it('draws the section in its own place in the order, not at a fixed point', () => {
+    page = { id: 'schedule', sections: [section('one'), section('custom'), section('two')] };
+    blocksBySection = { one: [textBlock('one')], two: [textBlock('two')] };
+    const first = renderPage({ renderSection: custom });
+    expect(readingOrder(first.container)).toEqual([
+      'Core',
+      'one label',
+      'one body',
+      'custom: custom label',
+      'two label',
+      'two body',
+    ]);
+    first.unmount();
+
+    // The same page with the section moved: the page moves with it.
+    page = { id: 'schedule', sections: [section('custom'), section('one'), section('two')] };
+    const moved = renderPage({ renderSection: custom });
+    expect(readingOrder(moved.container)).toEqual([
+      'Core',
+      'custom: custom label',
+      'one label',
+      'one body',
+      'two label',
+      'two body',
+    ]);
+  });
+
+  it('honours the slot the section states', () => {
+    page = { id: 'schedule', sections: [section('custom', 'above'), section('one')] };
+    blocksBySection = { one: [textBlock('one')] };
+    const { container } = renderPage({ renderSection: custom });
+    expect(readingOrder(container)).toEqual([
+      'custom: custom label',
+      'Core',
+      'one label',
+      'one body',
+    ]);
+  });
+
+  it('draws a custom section that stores no blocks at all', () => {
+    // Its content does not come from the section's blocks, so the
+    // empty-section skip must not reach it.
+    page = { id: 'schedule', sections: [section('custom')] };
+    blocksBySection = {};
+    const { container } = renderPage({ renderSection: custom });
+    expect(readingOrder(container)).toEqual(['Core', 'custom: custom label']);
+  });
+
+  it('draws nothing for every falsy answer, not only null', () => {
+    // React renders all of them as nothing anyway, and a renderer that
+    // ends a `&&` chain on a falsy left side means "nothing here" — so
+    // only `undefined` is special, and it is the one that means "not mine".
+    for (const answer of [null, false, '', 0]) {
+      page = { id: 'schedule', sections: [section('custom'), section('one')] };
+      blocksBySection = { custom: [textBlock('custom')], one: [textBlock('one')] };
+      const { container, unmount } = renderPage({ renderSection: () => answer });
+      expect(readingOrder(container)).toEqual(['Core']);
+      unmount();
+    }
+  });
+
+  it('leaves every other section exactly as it was', () => {
+    page = { id: 'schedule', sections: [section('one'), section('empty')] };
+    blocksBySection = { one: [textBlock('one')] };
+    const { container } = renderPage({ renderSection: custom });
+    // The generic section still renders, and the empty one still does not.
+    expect(readingOrder(container)).toEqual(['Core', 'one label', 'one body']);
+  });
+});

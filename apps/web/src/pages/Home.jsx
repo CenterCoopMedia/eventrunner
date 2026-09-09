@@ -23,6 +23,7 @@ import RegistrationAction, {
   resolveRegistrationLink,
 } from '../components/RegistrationAction.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import { SponsorStrip } from '../components/SponsorWall.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
 
 export default function Home() {
@@ -61,18 +62,58 @@ export default function Home() {
   // because the action row around it is drawn only when it holds something.
   const registrationAction = resolveRegistrationLink(eventConfig);
   const heroBlocks = getSectionBlocks('hero');
-  // The key facts group (M7 issue 9). Its heading is the page document's
-  // own label for the section, with a stated fallback for a deployment
-  // whose page doc predates the section but whose content does not.
-  //
-  // Grouped here as well as inside the component because the section around
-  // it is drawn only when it holds something: a section whose blocks are
-  // all of some type this arrangement does not draw would otherwise print
-  // its heading over nothing.
-  const infoCards = groupIntoCards(getSectionBlocks('info'));
-  const infoLabel =
-    page?.sections?.find((section) => section.id === 'info')?.label ?? 'Key facts';
   const heroCtas = heroBlocks.filter((block) => block.blockType === 'cta');
+  // TWO SECTIONS THIS PAGE DRAWS ITSELF, AND BOTH STAY IN THE OPERATOR'S
+  // ORDER. Neither is a list of blocks the generic renderer can draw — the
+  // key facts group is an arrangement of its section's blocks (M7 issue 9)
+  // and the sponsor strip reads cmsOrganizations entirely (M7 issue 10) —
+  // but "the page draws it" used to mean "excluded from the section list
+  // and rendered at a fixed point in the core", which silently took both
+  // out of the ordering. An operator could drag either one anywhere in the
+  // admin, or move it to another slot, and nothing on the page moved.
+  //
+  // `renderSection` replaces only what is drawn INSIDE a section's own
+  // place. Every other section gets `undefined` and renders exactly as it
+  // did before, and either of these deleted from the page document is
+  // simply gone, like any other deleted section.
+  const renderHomeSection = (section, blocks) => {
+    if (section.id === 'info') {
+      // Grouped before the section is opened, because a section whose
+      // blocks are all of some type this arrangement does not draw would
+      // otherwise print its heading over nothing.
+      const cards = groupIntoCards(blocks);
+      if (cards.length === 0) return null;
+      return (
+        <section aria-labelledby={`section-${section.id}`} className="page-section">
+          <SectionHead level={2} id={`section-${section.id}`} title={section.label} />
+          <div className="mt-md">
+            <InfoCards cards={cards} />
+          </div>
+        </section>
+      );
+    }
+    if (section.id === 'sponsors') {
+      // The feature is off: no strip, and no empty heading standing in for
+      // one either.
+      if (!features?.sponsors) return null;
+      // The section's one text block is an optional line above the wall.
+      // Tested for content, not for the type: an editor who cleared it
+      // leaves an empty string behind, and an empty paragraph renders as
+      // its own margin — a stray gap between the heading and the wall.
+      const lede = blocks.find(
+        (block) =>
+          block.blockType === 'text' && typeof block.value === 'string' && block.value.trim(),
+      );
+      return (
+        <SponsorStrip
+          id={`section-${section.id}`}
+          title={section.label}
+          lede={lede?.value ?? null}
+        />
+      );
+    }
+    return undefined;
+  };
   // One lead image at most. An editor who stores several images in the
   // opening section gets the first one, never a gallery.
   const lead = heroBlocks.find((block) => block.blockType === 'image') ?? null;
@@ -93,13 +134,13 @@ export default function Home() {
     // snapshot render identical text by construction (spec §8.6 hygiene).
     //
     // The lead is the core (brief §6.2), so the `hero` section is the core's
-    // own and never renders again as a slot section. `info` is the core's
-    // too: it is the group of cards directly under the lead (M7 issue 9),
-    // an arrangement the generic block renderer has no way to draw, so the
-    // core draws it and the slot renderer must not draw it a second time.
+    // own and never renders again as a slot section. It is the only one:
+    // every other section this page draws itself is drawn through
+    // `renderSection`, in its own place in the operator's order.
     <SystemPage
       pageId={['home', '/']}
-      exclude={['hero', 'info']}
+      exclude={['hero']}
+      renderSection={renderHomeSection}
       data-content-source={source}
     >
       <section
@@ -156,20 +197,6 @@ export default function Home() {
           {lead ? <LeadImage block={lead} /> : null}
         </div>
       </section>
-
-      {/* The key facts, directly under the lead: when the event runs, where
-          it happens, and who it is for (M7 issue 9). The section renders
-          only when an editor has put something in it, and its heading is
-          the label the page document states, so the group is named by the
-          same words the admin Pages list shows. */}
-      {infoCards.length ? (
-        <section aria-labelledby="section-info" className="page-section">
-          <SectionHead level={2} id="section-info" title={infoLabel} />
-          <div className="mt-md">
-            <InfoCards cards={infoCards} />
-          </div>
-        </section>
-      ) : null}
 
       {features?.liveUpdates ? (
         <div className="mb-xl">

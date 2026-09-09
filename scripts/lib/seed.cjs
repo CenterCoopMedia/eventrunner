@@ -102,10 +102,10 @@ function defaultPages() {
             block('title', 'text', 'Event name headline.'),
             block('subtitle', 'text', 'One warm supporting sentence.'),
           ]),
-        // The essentials, as one group of cards (M7 issue 9). Each stat
-        // block opens a card and the list items after it are that card's
-        // own lines, so "When" can carry the dates and then the two facts
-        // about them without a second section.
+        // The essentials, as a group of cards (M7 issue 9). A stat block
+        // opens a card and the list items after it are that card's own
+        // lines, so the dates can carry the facts that belong beside them
+        // without a second section.
         //
         // Seeded as placeholders, not from config/event, on purpose. The
         // dates already render from configuration in the home page's own
@@ -113,6 +113,7 @@ function defaultPages() {
         // to one question that drift apart the moment an operator edits
         // either. What belongs in these cards is the event's own summary of
         // itself, which only the operator can write.
+        //
         // ONE STAT AND THREE LINES, NOT THREE STATS. A stat carries the
         // six-part contract (design brief §2.1.1), so every seeded stat is
         // six [Replace] instructions an operator has to answer before the
@@ -149,6 +150,15 @@ function defaultPages() {
           ]),
         section('history', 'History', 'Background on previous editions of the event.',
           ['richtext', 'image'], 6),
+        // The sponsor strip (M7 issue 10). The section holds one optional
+        // line of copy; the organizations themselves come from the
+        // Organizations list, which is where an operator already manages
+        // them. Deleting this section is how a client turns the strip off
+        // without turning the sponsors feature off everywhere.
+        section('sponsors', 'Sponsors', 'One line above the logo wall. The organizations come from the Organizations list, not from here.',
+          ['text'], 1, [
+            block('lede', 'text', 'One line thanking the organizations that support the event.'),
+          ]),
         section('footer', 'Footer links', 'Grouped links rendered in the page footer.',
           ['link_group'], 12, [
             block('contact_link', 'link_group', 'How to reach the organizers.'),

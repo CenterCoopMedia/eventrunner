@@ -150,6 +150,23 @@ export const pagesData = [
         defaultBlocks: [],
       },
       {
+        id: 'sponsors',
+        label: 'Sponsors',
+        description: 'One line above the logo wall. The organizations come from the Organizations list, not from here.',
+        allowedBlocks: [
+          'text',
+        ],
+        maxBlocks: 1,
+        reorderable: true,
+        defaultBlocks: [
+          {
+            field: 'lede',
+            blockType: 'text',
+            description: 'One line thanking the organizations that support the event.',
+          },
+        ],
+      },
+      {
         id: 'footer',
         label: 'Footer links',
         description: 'Grouped links rendered in the page footer.',

@@ -19,16 +19,24 @@ let theme;
 // test above renders exactly the page it rendered before the group existed.
 let infoBlocks;
 let pageDoc;
+// The sponsor strip (M7 issue 10) is a section of this page drawn through
+// the page's own ordered section flow, so it reads the feature flags, the
+// page document's section list, and the published organizations. Each
+// defaults to the state that draws no strip.
+let features;
+let organizationsData;
+let sectionBlocks;
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
-  useEventConfig: () => ({ eventConfig, theme }),
+  useEventConfig: () => ({ eventConfig, theme, features }),
 }));
 vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({
+    organizationsData,
     getPage: () => pageDoc,
     getSectionBlocks: (section) => {
       if (section === 'hero') return heroBlocks;
       if (section === 'info') return infoBlocks;
-      return [];
+      return sectionBlocks[section] ?? [];
     },
     getBlock: (section, field) =>
       section === 'hero' && field === 'title' ? { value: 'Fallback title' } : null,
@@ -50,6 +58,9 @@ beforeEach(() => {
   theme = undefined;
   infoBlocks = [];
   pageDoc = null;
+  features = {};
+  organizationsData = [];
+  sectionBlocks = {};
 });
 
 describe('Home', () => {
@@ -237,5 +248,146 @@ describe('Home key facts', () => {
   it('writes no heading for an empty section', () => {
     render(<Home />);
     expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();
+  });
+
+  // The group is a section of this page like any other, drawn through the
+  // page's own ordered section flow (M7 issue 10 gave the shell the hook
+  // for it). Rendering it at a fixed point in the core made the admin's
+  // reorder control look like it worked on this section and do nothing.
+  it('moves when an operator reorders the section', () => {
+    infoBlocks = [stat];
+    const other = { id: 'details', label: 'Details' };
+    sectionBlocks = {
+      details: [{ section: 'details', field: 'body', blockType: 'text', value: 'Details body' }],
+    };
+    const headings = (container) =>
+      [...container.querySelectorAll('h2')].map((el) => el.textContent.trim());
+
+    pageDoc = { ...pageDoc, sections: [other, { id: 'info', label: 'Key facts' }] };
+    const before = render(<Home />);
+    expect(headings(before.container)).toEqual(['Details', 'Key facts']);
+    before.unmount();
+
+    pageDoc = { ...pageDoc, sections: [{ id: 'info', label: 'Key facts' }, other] };
+    const after = render(<Home />);
+    expect(headings(after.container)).toEqual(['Key facts', 'Details']);
+  });
+
+  it('draws nothing when an operator has deleted the section from the page', () => {
+    // The blocks are still in cmsContent — deleting a section does not
+    // delete them — so this is the case that proves the cards follow the
+    // page document rather than the content.
+    infoBlocks = [stat];
+    pageDoc = { ...pageDoc, sections: [] };
+    render(<Home />);
+    expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();
+    expect(screen.queryByText('The event runs from Wednesday to Friday')).toBeNull();
+  });
+});
+
+// The sponsor strip (M7 issue 10). The wall's own rules live with the wall
+// (components/SponsorWall.test.jsx). What the page owns is where the strip
+// goes and whether it is drawn at all.
+//
+// WHERE IT GOES IS THE OPERATOR'S. The strip is a section of this page like
+// any other, drawn through the page's own ordered section flow, so dragging
+// it in the admin moves it on the page. Rendering it at a fixed point in
+// the core — which is what this did first — made that control look like it
+// worked and do nothing.
+describe('Home sponsor strip', () => {
+  const sponsors = { id: 'sponsors', label: 'Sponsors' };
+  const other = { id: 'details', label: 'Details' };
+  const PUBLISHED = [
+    {
+      id: 'one',
+      name: 'First Supporter',
+      tier: 'Presenting',
+      url: 'https://one.example.org',
+      visible: true,
+    },
+  ];
+
+  /** The page's section headings, in document order. */
+  const headings = (container) =>
+    [...container.querySelectorAll('h2')].map((el) => el.textContent.trim());
+
+  beforeEach(() => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    features = { sponsors: true };
+    pageDoc = { id: 'home', path: '/', label: 'Home page', sections: [sponsors] };
+    organizationsData = PUBLISHED;
+    sectionBlocks = {
+      details: [{ section: 'details', field: 'body', blockType: 'text', value: 'Details body' }],
+    };
+  });
+
+  it('draws the tiered wall under the section’s own label', () => {
+    render(<Home />);
+    expect(screen.getByRole('region', { name: 'Sponsors' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'First Supporter' })).toBeInTheDocument();
+  });
+
+  it('moves when an operator reorders the section', () => {
+    pageDoc = { ...pageDoc, sections: [other, sponsors] };
+    const before = render(<Home />);
+    expect(headings(before.container)).toEqual(['Details', 'Sponsors']);
+    before.unmount();
+
+    pageDoc = { ...pageDoc, sections: [sponsors, other] };
+    const after = render(<Home />);
+    expect(headings(after.container)).toEqual(['Sponsors', 'Details']);
+  });
+
+  it('moves above the lead when the section states that slot', () => {
+    pageDoc = { ...pageDoc, sections: [{ ...sponsors, slot: 'above' }] };
+    const { container } = render(<Home />);
+    const strip = screen.getByRole('region', { name: 'Sponsors' });
+    const lead = screen.getByRole('heading', { level: 1 });
+    expect(strip.compareDocumentPosition(lead) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('.logo-wall')).not.toBeNull();
+  });
+
+  it('draws the section’s own line above the wall, and nothing when it is cleared', () => {
+    sectionBlocks = {
+      sponsors: [{ section: 'sponsors', field: 'lede', blockType: 'text', value: 'Thank you.' }],
+    };
+    const withLede = render(<Home />);
+    expect(screen.getByText('Thank you.')).toBeInTheDocument();
+    withLede.unmount();
+
+    // An empty paragraph renders as its own margin: a stray gap between the
+    // heading and the wall.
+    sectionBlocks = {
+      sponsors: [{ section: 'sponsors', field: 'lede', blockType: 'text', value: '   ' }],
+    };
+    render(<Home />);
+    const strip = screen.getByRole('region', { name: 'Sponsors' });
+    expect(strip.querySelector(':scope > p')).toBeNull();
+  });
+
+  it('draws nothing when the sponsors feature is off', () => {
+    features = { sponsors: false };
+    render(<Home />);
+    expect(screen.queryByRole('region', { name: 'Sponsors' })).toBeNull();
+    expect(screen.queryByText('First Supporter')).toBeNull();
+  });
+
+  it('draws nothing when an operator has deleted the section from the page', () => {
+    pageDoc = { ...pageDoc, sections: [] };
+    render(<Home />);
+    expect(screen.queryByRole('region', { name: 'Sponsors' })).toBeNull();
+  });
+
+  it('draws no heading over an empty wall when nothing is published yet', () => {
+    for (const organizations of [
+      [],
+      [{ id: 'x', name: 'Hidden', tier: 'Partner', url: 'https://x.example.org', visible: false }],
+    ]) {
+      organizationsData = organizations;
+      const { unmount } = render(<Home />);
+      expect(screen.queryByRole('region', { name: 'Sponsors' })).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'Sponsors' })).toBeNull();
+      unmount();
+    }
   });
 });

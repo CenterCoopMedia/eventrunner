@@ -530,6 +530,15 @@ export const siteContent = {
     order: 0,
     seeded: true,
   },
+  sponsors__lede: {
+    section: 'sponsors',
+    field: 'lede',
+    blockType: 'text',
+    value: 'These organizations pay for the rooms, the food, and the travel grants.',
+    visible: true,
+    order: 0,
+    seeded: true,
+  },
   stats__attendees: {
     section: 'stats',
     field: 'attendees',

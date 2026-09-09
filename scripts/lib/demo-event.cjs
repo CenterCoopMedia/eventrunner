@@ -301,6 +301,9 @@ const DEMO_CONTENT = Object.freeze({
     source: 'Summit programme, read 1 September 2026.',
     alt: 'Of 38 planned sessions, 25 are workshops and 13 are panels or plenaries.',
   },
+  // The line above the home page's sponsor strip (M7 issue 10). The marks
+  // themselves come from the demo's own organizations.
+  sponsors__lede: { value: 'These organizations pay for the rooms, the food, and the travel grants.' },
   faq_items__what_is_this: {
     question: 'What is the Harborlight Media Summit?',
     answer:

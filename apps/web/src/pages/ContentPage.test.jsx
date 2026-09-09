@@ -32,7 +32,11 @@ vi.mock('../lib/contentSource.js', () => ({
 vi.mock('../firebase.js', () => ({
   app: {}, auth: {}, db: {}, storage: {},
   // The travel page resolves the venue map's Storage path to a URL; the
-  // bucket is named so the resolve succeeds, and nothing is fetched.
+  // bucket is named so the resolve succeeds, and nothing is fetched. The
+  // home page's sponsor strip resolves each organization's mark the same
+  // way (lib/mediaSource.js), so its marks build a URL too — a mark is
+  // decorative either way, so the wall says nothing about it and the names
+  // under the marks are what this test reads.
   storageBucketName: 'demo.appspot.com',
   storageDownloadOrigin: 'https://firebasestorage.example',
   // App Check is unconfigured in a credential-free run, which is also its
@@ -45,6 +49,7 @@ import App from '../App.jsx';
 import siteContent from '@generated/siteContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import pagesData from '@generated/pagesData.js';
+import organizationsData from '@generated/organizationsData.js';
 import { VENUE_MAP_SECTION_ID } from 'shared/venue';
 
 function renderAt(path) {
@@ -71,7 +76,10 @@ describe('Home', () => {
     // the page opens a registration destination — no dead button in the
     // lead, and none in the header it would otherwise repeat on every page.
     expect(eventConfig.registration.externalUrl).toBeNull();
-    expect(document.querySelectorAll('a[target="_blank"]')).toHaveLength(0);
+    // The header carries no outbound control at all — the register control
+    // is the only one it would hold — and the lead offers nothing to click.
+    expect(document.querySelector('header a[target="_blank"]')).toBeNull();
+    expect(screen.queryByRole('link', { name: /register/i })).toBeNull();
     // Generic sections render with their labels from the pages snapshot.
     const home = pagesData.find((p) => p.id === 'home');
     // The key facts group (M7 issue 9) is drawn by the core, under its own
@@ -81,6 +89,15 @@ describe('Home', () => {
     expect(screen.getAllByRole('heading', { name: infoSection.label })).toHaveLength(1);
     expect(screen.getByText(siteContent.info__when.takeaway)).toBeInTheDocument();
     expect(screen.getByText(siteContent.info__where_venue.text)).toBeInTheDocument();
+    // The sponsor strip (M7 issue 10) draws the demo's own published
+    // organizations on the home page, in the section's own place: it comes
+    // after the History section, which is where the seed puts it.
+    expect(screen.getByText(siteContent.sponsors__lede.value)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: organizationsData[0].name })).toBeInTheDocument();
+    const sectionOrder = home.sections
+      .filter((s) => screen.queryByRole('heading', { name: s.label }))
+      .map((s) => s.id);
+    expect(sectionOrder.indexOf('sponsors')).toBeGreaterThan(sectionOrder.indexOf('stats'));
     const statsSection = home.sections.find((s) => s.id === 'stats');
     expect(
       screen.getByRole('heading', { name: statsSection.label }),
