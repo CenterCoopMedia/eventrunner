@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { defaultPages, buildSeedContent, placeholderBlock, LEGAL_PAGE_IDS } = require('./seed.cjs');
+const { pageHeading } = require('shared/page');
 const { buildConfigDocs } = require('./answers.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
 const { BLOCK_TYPES } = require('../../functions/src/cms/blockTypes.cjs');
@@ -96,6 +97,78 @@ test('the fifteen default pages are seeded, with the six system pages marked', (
     pages.filter((p) => p.systemPage).map((p) => p.id),
     ['home', 'schedule', 'speakers', 'sponsors', 'attendees', 'updates'],
   );
+});
+
+test('every seeded label is short enough to sit on one navigation row', () => {
+  // The header nav and the footer page list both print `label`, all fifteen
+  // of them, on one row. The old labels ("Frequently asked questions",
+  // "Terms of service") wrapped the header on a phone. Twelve characters is
+  // the widest label that fits, which "City guide" and "Guidelines" both
+  // sit inside; the number exists so a new seeded page cannot quietly
+  // reintroduce the problem.
+  for (const page of defaultPages()) {
+    assert.ok(
+      page.label.length <= 12,
+      `page "${page.id}" has a ${page.label.length}-character nav label: "${page.label}"`,
+    );
+  }
+});
+
+test('the four pages whose short label reads oddly as a heading state their full title', () => {
+  const byId = new Map(defaultPages().map((p) => [p.id, p]));
+  assert.deepEqual(
+    [...byId.values()].filter((p) => p.title !== undefined).map((p) => p.id),
+    ['faq', 'conduct', 'privacy', 'terms'],
+  );
+  assert.equal(pageHeading(byId.get('faq')), 'Frequently asked questions');
+  assert.equal(pageHeading(byId.get('conduct')), 'Code of conduct');
+  assert.equal(pageHeading(byId.get('privacy')), 'Privacy policy');
+  assert.equal(pageHeading(byId.get('terms')), 'Terms of service');
+  // Every other page names itself once: the label IS the heading.
+  for (const page of byId.values()) {
+    if (page.title !== undefined) continue;
+    assert.equal(pageHeading(page), page.label, `page "${page.id}" should be headed by its label`);
+  }
+});
+
+test('shortening the labels moved no page path and no section id', () => {
+  // A label is copy. A path is an address a reader may have bookmarked and
+  // a section id is the key every cmsContent block is filed under, so
+  // neither may travel with a rename.
+  const paths = Object.fromEntries(defaultPages().map((p) => [p.id, p.path]));
+  assert.deepEqual(paths, {
+    home: '/', schedule: '/schedule', speakers: '/speakers', sponsors: '/sponsors',
+    travel: '/travel', faq: '/faq', conduct: '/conduct', contact: '/contact',
+    privacy: '/privacy', terms: '/terms', attendees: '/attendees', updates: '/updates',
+    recap: '/recap', guidelines: '/guidelines', city_guide: '/city-guide',
+  });
+});
+
+test('no seeded section is hidden or revealed by the shortened labels', () => {
+  // ContentPage hides a section whose heading repeats the page's own
+  // (isTitleRepeatingSection). Two of its three clauses read the label and
+  // the heading, so a rename could silently hide a section of real content
+  // or expose a stand-in one. Nothing in the seed matches by name at all —
+  // every stand-in section is matched by its `_intro`/`_header` id — so the
+  // set is unchanged, and this pins that.
+  for (const page of defaultPages()) {
+    for (const section of page.sections) {
+      assert.notEqual(
+        section.label, page.label,
+        `section "${section.id}" is hidden by matching its page's nav label`,
+      );
+      assert.notEqual(
+        section.label, pageHeading(page),
+        `section "${section.id}" is hidden by matching its page's heading`,
+      );
+    }
+  }
+  const standIns = defaultPages().flatMap((page) =>
+    page.sections.filter((s) => /_intro$|_header$/.test(s.id)).map((s) => s.id));
+  assert.deepEqual(standIns, [
+    'travel_header', 'faq_intro', 'conduct_intro', 'contact_intro',
+    'privacy_intro', 'terms_intro', 'guidelines_intro', 'city_guide_intro',
+  ]);
 });
 
 test('every page a SystemPage route asks for is actually seeded', () => {

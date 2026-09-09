@@ -197,7 +197,7 @@ describe('Layout nav', () => {
   // about the config subscriptions under it, so the pages are fixed here and
   // only the feature flags move.
   const NAV_PAGES = [
-    { id: 'home', label: 'Home page', path: '/', order: 0, visible: true, systemPage: true },
+    { id: 'home', label: 'Home', path: '/', order: 0, visible: true, systemPage: true },
     { id: 'schedule', label: 'Schedule', path: '/schedule', order: 1, visible: true, systemPage: true },
     { id: 'speakers', label: 'Speakers', path: '/speakers', order: 2, visible: true, systemPage: true },
     { id: 'sponsors', label: 'Sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true },
@@ -245,7 +245,7 @@ describe('Layout nav', () => {
     expect(links('Sponsors')).toHaveLength(0);
     expect(links('Schedule')).toHaveLength(0);
     // The home page carries no feature flag, so it survives every clearing.
-    expect(links('Home page')).toHaveLength(2);
+    expect(links('Home')).toHaveLength(2);
   });
 
   it('applies the page-surface class on the shell', () => {

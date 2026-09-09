@@ -224,7 +224,7 @@ describe('Home key facts', () => {
     pageDoc = {
       id: 'home',
       path: '/',
-      label: 'Home page',
+      label: 'Home',
       sections: [{ id: 'info', label: 'Key facts' }],
     };
   });
@@ -326,7 +326,7 @@ describe('Home sponsor strip', () => {
   beforeEach(() => {
     eventConfig = { name: 'Demo Event', days: [] };
     features = { sponsors: true };
-    pageDoc = { id: 'home', path: '/', label: 'Home page', sections: [sponsors] };
+    pageDoc = { id: 'home', path: '/', label: 'Home', sections: [sponsors] };
     organizationsData = PUBLISHED;
     sectionBlocks = {
       details: [{ section: 'details', field: 'body', blockType: 'text', value: 'Details body' }],

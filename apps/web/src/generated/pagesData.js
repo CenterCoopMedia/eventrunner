@@ -15,7 +15,7 @@
 export const pagesData = [
   {
     id: 'home',
-    label: 'Home page',
+    label: 'Home',
     path: '/',
     icon: null,
     order: 0,
@@ -221,7 +221,7 @@ export const pagesData = [
   },
   {
     id: 'travel',
-    label: 'Travel and venue',
+    label: 'Travel',
     path: '/travel',
     icon: null,
     order: 4,
@@ -367,7 +367,8 @@ export const pagesData = [
   },
   {
     id: 'faq',
-    label: 'Frequently asked questions',
+    label: 'FAQ',
+    title: 'Frequently asked questions',
     path: '/faq',
     icon: null,
     order: 5,
@@ -414,7 +415,8 @@ export const pagesData = [
   },
   {
     id: 'conduct',
-    label: 'Code of conduct',
+    label: 'Conduct',
+    title: 'Code of conduct',
     path: '/conduct',
     icon: null,
     order: 6,
@@ -526,7 +528,8 @@ export const pagesData = [
   },
   {
     id: 'privacy',
-    label: 'Privacy policy',
+    label: 'Privacy',
+    title: 'Privacy policy',
     path: '/privacy',
     icon: null,
     order: 8,
@@ -604,7 +607,8 @@ export const pagesData = [
   },
   {
     id: 'terms',
-    label: 'Terms of service',
+    label: 'Terms',
+    title: 'Terms of service',
     path: '/terms',
     icon: null,
     order: 9,
@@ -704,7 +708,7 @@ export const pagesData = [
   },
   {
     id: 'recap',
-    label: 'Event recap',
+    label: 'Recap',
     path: '/recap',
     icon: null,
     order: 12,
@@ -785,7 +789,7 @@ export const pagesData = [
   },
   {
     id: 'guidelines',
-    label: 'Speaker guidelines',
+    label: 'Guidelines',
     path: '/guidelines',
     icon: null,
     order: 13,

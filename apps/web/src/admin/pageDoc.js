@@ -14,6 +14,7 @@ import { templateOf } from '../lib/pageTemplates.js';
 export const PAGE_KEYS = Object.freeze([
   'id',
   'label',
+  'title',
   'path',
   'icon',
   'order',
@@ -74,6 +75,10 @@ export function toEditablePage(doc) {
   return {
     id: base.id ?? '',
     label: base.label ?? '',
+    // Optional, and absence is the common case: a page with no title of its
+    // own is headed by its label. The form carries '' for "unstated" so the
+    // input stays controlled; toPagePayload turns that back into null.
+    title: typeof base.title === 'string' ? base.title : '',
     path: base.path ?? '',
     icon: typeof base.icon === 'string' ? base.icon : null,
     order: typeof base.order === 'number' ? base.order : 0,
@@ -147,6 +152,10 @@ export function toPagePayload(page) {
   return {
     id: String(page.id ?? '').trim(),
     label: page.label ?? '',
+    // Sent as null when blank rather than as '', the same rule a section's
+    // description follows: the server accepts `string | null`, and an empty
+    // string is not a heading.
+    title: page.title ? String(page.title) : null,
     path: page.path ?? '',
     icon: page.icon ? String(page.icon) : null,
     order: Number.isFinite(order) ? order : page.order,

@@ -67,6 +67,20 @@ function block(field, blockType, description) {
  * the route's own component is the page and the sections are what an
  * operator adds around it.
  *
+ * LABELS ARE THE NAVIGATION'S NAMES, NOT THE PAGE'S. `label` is what the
+ * header nav and the footer page list print, and there are fifteen of them
+ * on one row: "Frequently asked questions", "Code of conduct", "Terms of
+ * service", and "Speaker guidelines" together wrapped the header onto a
+ * second row on a phone and pushed the footer's list into a wall of text.
+ * So the labels here are short — FAQ, Conduct, Terms, Guidelines — and the
+ * four whose short form would read oddly as a page's own `<h1>` state a
+ * `title` beside it with the full name. A page that states no `title` has
+ * one name for both places, which is every other page here.
+ *
+ * Paths and section ids do NOT move with a label. A label is copy; a path
+ * is an address a reader may have bookmarked and a section id is the key
+ * cmsContent blocks are filed under.
+ *
  * THEY ARE APPENDED, NOT INSERTED. `order` only sorts the admin Pages list,
  * and re-running init refreshes a seeded page that nobody has edited while
  * leaving an edited one alone. Renumbering the ten pages that came before
@@ -81,7 +95,7 @@ function defaultPages() {
   return [
     {
       id: 'home',
-      label: 'Home page',
+      label: 'Home',
       path: '/',
       icon: null,
       order: 0,
@@ -197,7 +211,7 @@ function defaultPages() {
     },
     {
       id: 'travel',
-      label: 'Travel and venue',
+      label: 'Travel',
       path: '/travel',
       icon: null,
       order: 4,
@@ -243,7 +257,8 @@ function defaultPages() {
     },
     {
       id: 'faq',
-      label: 'Frequently asked questions',
+      label: 'FAQ',
+      title: 'Frequently asked questions',
       path: '/faq',
       icon: null,
       order: 5,
@@ -262,7 +277,8 @@ function defaultPages() {
     },
     {
       id: 'conduct',
-      label: 'Code of conduct',
+      label: 'Conduct',
+      title: 'Code of conduct',
       path: '/conduct',
       icon: null,
       order: 6,
@@ -304,7 +320,8 @@ function defaultPages() {
     },
     {
       id: 'privacy',
-      label: 'Privacy policy',
+      label: 'Privacy',
+      title: 'Privacy policy',
       path: '/privacy',
       icon: null,
       order: 8,
@@ -321,7 +338,8 @@ function defaultPages() {
     },
     {
       id: 'terms',
-      label: 'Terms of service',
+      label: 'Terms',
+      title: 'Terms of service',
       path: '/terms',
       icon: null,
       order: 9,
@@ -366,7 +384,7 @@ function defaultPages() {
     // empty state rather than a guess at what either page should say.
     {
       id: 'recap',
-      label: 'Event recap',
+      label: 'Recap',
       path: '/recap',
       icon: null,
       order: 12,
@@ -389,7 +407,7 @@ function defaultPages() {
     },
     {
       id: 'guidelines',
-      label: 'Speaker guidelines',
+      label: 'Guidelines',
       path: '/guidelines',
       icon: null,
       order: 13,

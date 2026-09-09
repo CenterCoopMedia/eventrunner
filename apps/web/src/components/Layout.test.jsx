@@ -66,10 +66,10 @@ const FIXTURE_EVENT = {
 
 // The pages a seeded deployment ships, trimmed to what the shell reads.
 const FIXTURE_PAGES = [
-  { id: 'home', label: 'Home page', path: '/', order: 0, visible: true, systemPage: true },
+  { id: 'home', label: 'Home', path: '/', order: 0, visible: true, systemPage: true },
   { id: 'schedule', label: 'Schedule', path: '/schedule', order: 1, visible: true, systemPage: true },
-  { id: 'travel', label: 'Travel and venue', path: '/travel', order: 4, visible: true, systemPage: false },
-  { id: 'faq', label: 'Frequently asked questions', path: '/faq', order: 5, visible: true, systemPage: false },
+  { id: 'travel', label: 'Travel', path: '/travel', order: 4, visible: true, systemPage: false },
+  { id: 'faq', label: 'FAQ', path: '/faq', order: 5, visible: true, systemPage: false },
 ];
 
 const FIXTURE_FEATURES = { schedule: true };
@@ -212,7 +212,7 @@ describe('Layout navigation (built from page documents)', () => {
         ],
       },
     );
-    expect(navLabels(container)).toContain('Travel and venue');
+    expect(navLabels(container)).toContain('Travel');
     expect(navLabels(container)).not.toContain('Draft page');
   });
 
@@ -221,10 +221,10 @@ describe('Layout navigation (built from page documents)', () => {
     // The page documents in their own order, then the account control the
     // shell adds at the end of the list (M7 issue 2).
     expect(navLabels(container)).toEqual([
-      'Home page',
+      'Home',
       'Schedule',
-      'Travel and venue',
-      'Frequently asked questions',
+      'Travel',
+      'FAQ',
       'Sign in',
     ]);
     expect([...container.querySelectorAll(MAIN_NAV)].map((a) => a.getAttribute('href'))).toEqual([
@@ -239,14 +239,14 @@ describe('Layout navigation (built from page documents)', () => {
   it('still gates a system page on its feature flag', () => {
     const { container } = renderShell({}, { featureFlags: {} });
     expect(navLabels(container)).not.toContain('Schedule');
-    expect(navLabels(container)).toContain('Travel and venue');
+    expect(navLabels(container)).toContain('Travel');
   });
 
   it('marks the page in view, and only that one, on a content page', () => {
     const { container } = renderShell({}, { path: '/travel' });
     const current = [...container.querySelectorAll('nav a[aria-current="page"]')];
     expect(current).toHaveLength(1);
-    expect(current[0].textContent).toBe('Travel and venue');
+    expect(current[0].textContent).toBe('Travel');
     expect(current[0]).toHaveClass('font-semibold', 'border-b-rule-strong');
   });
 
@@ -406,10 +406,10 @@ describe('Layout footer', () => {
   it('lists the same pages the navigation lists, in the same order', () => {
     const { container } = renderShell({});
     expect(footerLinks(container)).toEqual([
-      { label: 'Home page', href: '/' },
+      { label: 'Home', href: '/' },
       { label: 'Schedule', href: '/schedule' },
-      { label: 'Travel and venue', href: '/travel' },
-      { label: 'Frequently asked questions', href: '/faq' },
+      { label: 'Travel', href: '/travel' },
+      { label: 'FAQ', href: '/faq' },
     ]);
   });
 
@@ -428,7 +428,7 @@ describe('Layout footer', () => {
     // Hidden by the editor, and a system page whose feature is switched off.
     expect(labels).not.toContain('Draft page');
     expect(labels).not.toContain('Schedule');
-    expect(labels).toContain('Travel and venue');
+    expect(labels).toContain('Travel');
   });
 
   it('renders no page list at all when no page is navigable', () => {

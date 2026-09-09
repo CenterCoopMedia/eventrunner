@@ -51,6 +51,7 @@ import { eventConfig } from '@generated/eventConfig.js';
 import pagesData from '@generated/pagesData.js';
 import organizationsData from '@generated/organizationsData.js';
 import { VENUE_MAP_SECTION_ID } from 'shared/venue';
+import { pageHeading } from 'shared/page';
 
 function renderAt(path) {
   return render(
@@ -116,10 +117,40 @@ describe('ContentPage (catch-all route)', () => {
     renderAt('/faq');
     const faqPage = pagesData.find((p) => p.id === 'faq');
     expect(
-      await screen.findByRole('heading', { level: 1, name: faqPage.label }),
+      await screen.findByRole('heading', { level: 1, name: pageHeading(faqPage) }),
     ).toBeInTheDocument();
     // The FAQ item renders as a disclosure with its question.
     expect(screen.getByText(siteContent.faq_items__what_is_this.question)).toBeInTheDocument();
+  });
+
+  it('heads the page with its full title while the navigation keeps the short label', async () => {
+    // Two names for one page: the header nav and the footer both have to
+    // fit fifteen labels on one row, so the FAQ page is labelled "FAQ" —
+    // but "FAQ" alone reads oddly as the page's own heading, so the
+    // document states a `title` and the <h1> uses it. A page that states
+    // no title is headed by its label, which is every other seeded page.
+    renderAt('/faq');
+    const faqPage = pagesData.find((p) => p.id === 'faq');
+    expect(faqPage.label).toBe('FAQ');
+    expect(faqPage.title).toBe('Frequently asked questions');
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Frequently asked questions' }),
+    ).toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    expect(within(nav).getByRole('link', { name: 'FAQ' })).toHaveAttribute('href', '/faq');
+    expect(within(nav).queryByRole('link', { name: 'Frequently asked questions' })).not.toBeInTheDocument();
+    const footer = screen.getByRole('navigation', { name: 'Site pages' });
+    expect(within(footer).getByRole('link', { name: 'FAQ' })).toHaveAttribute('href', '/faq');
+  });
+
+  it('heads a page that states no title with its label, unchanged', async () => {
+    renderAt('/contact');
+    const contactPage = pagesData.find((p) => p.id === 'contact');
+    expect(contactPage.title).toBeUndefined();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Contact' }),
+    ).toBeInTheDocument();
   });
 
   it('names itself in the document title, in the shape the server already sent', async () => {
@@ -129,8 +160,8 @@ describe('ContentPage (catch-all route)', () => {
     // it the same way, or the title changes the moment the app boots.
     renderAt('/faq');
     const faqPage = pagesData.find((p) => p.id === 'faq');
-    await screen.findByRole('heading', { level: 1, name: faqPage.label });
-    expect(document.title).toBe(`${faqPage.label} · ${eventConfig.name}`);
+    await screen.findByRole('heading', { level: 1, name: pageHeading(faqPage) });
+    expect(document.title).toBe(`${pageHeading(faqPage)} · ${eventConfig.name}`);
   });
 
   it('leaves the event name standing alone on a page that does not resolve', async () => {
@@ -304,7 +335,7 @@ describe('ContentPage (catch-all route)', () => {
     });
     const faqPage = pagesData.find((p) => p.id === 'faq');
     expect(
-      screen.getByRole('heading', { level: 1, name: faqPage.label }),
+      screen.getByRole('heading', { level: 1, name: pageHeading(faqPage) }),
     ).toBeInTheDocument();
   });
 });
@@ -483,7 +514,7 @@ describe('ContentPage — search and section index on long pages', () => {
     expect(faqPage.sections.length).toBe(2);
 
     renderAt('/faq');
-    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+    await screen.findByRole('heading', { level: 1, name: pageHeading(faqPage) });
 
     expect(screen.getByRole('searchbox', { name: 'Filter by keyword' })).toBeInTheDocument();
 
@@ -499,7 +530,7 @@ describe('ContentPage — search and section index on long pages', () => {
     expect(contactPage.sections.length).toBe(2);
 
     renderAt('/contact');
-    await screen.findByRole('heading', { level: 1, name: contactPage.label });
+    await screen.findByRole('heading', { level: 1, name: pageHeading(contactPage) });
 
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
     expect(
@@ -751,7 +782,7 @@ describe('ContentPage — search and section index on long pages', () => {
     renderAt('/faq');
     const faqPage = pagesData.find((p) => p.id === 'faq');
     const introSection = faqPage.sections.find((s) => s.id === 'faq_intro');
-    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+    await screen.findByRole('heading', { level: 1, name: pageHeading(faqPage) });
 
     expect(screen.getByRole('heading', { name: introSection.label }).className).toMatch(/sr-only/);
     const index = screen.getByRole('navigation', { name: 'Sections on this page' });
@@ -763,7 +794,7 @@ describe('ContentPage — search and section index on long pages', () => {
     const travelPage = pagesData.find((p) => p.id === 'travel');
     const headerSection = travelPage.sections.find((s) => s.id === 'travel_header');
     const venueSection = travelPage.sections.find((s) => s.id === 'travel_venue');
-    await screen.findByRole('heading', { level: 1, name: travelPage.label });
+    await screen.findByRole('heading', { level: 1, name: pageHeading(travelPage) });
 
     expect(screen.getByRole('heading', { name: headerSection.label }).className).toMatch(/sr-only/);
     const index = screen.getByRole('navigation', { name: 'Sections on this page' });
@@ -783,7 +814,7 @@ describe('ContentPage — search and section index on long pages', () => {
     const cityGuidePage = pagesData.find((p) => p.id === 'city_guide');
     const introSection = cityGuidePage.sections.find((s) => s.id === 'city_guide_intro');
     const eatSection = cityGuidePage.sections.find((s) => s.id === 'city_guide_eat');
-    await screen.findByRole('heading', { level: 1, name: cityGuidePage.label });
+    await screen.findByRole('heading', { level: 1, name: pageHeading(cityGuidePage) });
 
     expect(screen.getByRole('heading', { name: introSection.label }).className).toMatch(/sr-only/);
     expect(screen.getByRole('heading', { name: eatSection.label }).className).not.toMatch(/sr-only/);

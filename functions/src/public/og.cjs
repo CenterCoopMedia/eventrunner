@@ -277,6 +277,7 @@ const {
   isCanonicalPagePath,
   systemPageIdForPath,
 } = require('shared/routing');
+const { pageHeading } = require('shared/page');
 
 /**
  * @param {{ db: FirebaseFirestore.Firestore, getConfig: () => Promise<object>,
@@ -817,7 +818,14 @@ function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
   }
   // A page. The home page is titled with the event alone: its label names
   // the document for an editor, not the site for a reader.
-  return { ...described, title: path === '/' ? siteName : titled(subject.doc.label) };
+  //
+  // Titled by the page's HEADING, not its navigation label: a page that
+  // states both is headed by the full name, and a tab that read "FAQ" over
+  // a page headed "Frequently asked questions" would be a third name for
+  // one page. shared/page pageHeading is the same read the app's own tab
+  // title makes (apps/web/src/lib/useDocumentTitle.js), which is what keeps
+  // the served title from changing on the first in-app navigation.
+  return { ...described, title: path === '/' ? siteName : titled(pageHeading(subject.doc)) };
 }
 
 /**

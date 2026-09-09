@@ -16,6 +16,7 @@
 
 import { useEffect } from 'react';
 import { SYSTEM_PAGE_ROUTES, isCanonicalPagePath, systemPageIdForPath } from 'shared/routing';
+import { pageHeading } from 'shared/page';
 
 // TWO LAYERS, AND THE MORE SPECIFIC ONE WINS.
 //
@@ -132,8 +133,8 @@ export function routeTitlePartFor({ pathname, pages, features }) {
   const visible = (page) => page && page.visible !== false;
 
   // The home page names nothing, exactly as the server titles '/' with the
-  // event name alone: "Home page" names the document for an editor, not
-  // the site for a reader.
+  // event name alone: "Home" names the document for an editor, not the
+  // site for a reader.
   if (path === '/') return null;
 
   const systemId = systemPageIdForPath(path);
@@ -141,12 +142,12 @@ export function routeTitlePartFor({ pathname, pages, features }) {
     const gate = SYSTEM_PAGE_ROUTES[systemId].feature;
     if (gate !== null && !features?.[gate]) return null;
     const page = all.find((candidate) => candidate?.id === systemId && candidate?.systemPage === true);
-    return visible(page) ? normalize(page.label) : null;
+    return visible(page) ? normalize(pageHeading(page)) : null;
   }
 
   if (!isCanonicalPagePath(path)) return null;
   const page = all.find((candidate) => candidate?.path === path && candidate?.systemPage !== true);
-  return visible(page) ? normalize(page.label) : null;
+  return visible(page) ? normalize(pageHeading(page)) : null;
 }
 
 /**

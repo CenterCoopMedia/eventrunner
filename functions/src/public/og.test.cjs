@@ -508,6 +508,9 @@ const SITE_DOCS = {
   'cmsPages/sponsors': { id: 'sponsors', label: 'Sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true },
   'cmsPages/travel': { id: 'travel', label: 'Travel and venue', path: '/travel', order: 4, visible: true, systemPage: false },
   'cmsPages/hidden': { id: 'hidden', label: 'Unfinished page', path: '/hidden', order: 5, visible: false, systemPage: false },
+  // Two names for one page: a short nav `label` and the full `title` the
+  // page is headed by. The served tags follow the heading.
+  'cmsPages/faq': { id: 'faq', label: 'FAQ', title: 'Frequently asked questions', path: '/faq', order: 6, visible: true, systemPage: false },
   'speakers_public/sp-1': {
     slug: 'rae-okonkwo',
     displayName: 'Rae Okonkwo',
@@ -569,6 +572,18 @@ test('routeMeta: a content page route returns that page\'s own title, canonical,
   // The template it self-fetched is served whole, hashed assets and all.
   assert.ok(res.sent.includes('/assets/index-abc123.js'));
   assert.equal((res.sent.match(/<title>/g) || []).length, 1);
+});
+
+test('routeMeta: a page that states a title is titled by it, not by its short nav label', async () => {
+  // The <h1> the reader lands on and the tab the app sets after boot both
+  // read the page's heading (shared/page pageHeading). A served title of
+  // "FAQ" would visibly change to "Frequently asked questions" the moment
+  // the app booted, which is exactly the flicker these tags exist to stop.
+  const res = await getRoute(routeHandler(), '/faq');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('<title>Frequently asked questions · [Fixture] Harborlight Media Summit</title>'));
+  assert.ok(res.sent.includes('<meta property="og:title" content="Frequently asked questions · [Fixture] Harborlight Media Summit">'));
+  assert.ok(!res.sent.includes('>FAQ ·'));
 });
 
 test('routeMeta: the schedule route carries the schedule page tags, not the home page ones', async () => {

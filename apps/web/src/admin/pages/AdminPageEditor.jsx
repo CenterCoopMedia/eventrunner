@@ -389,11 +389,23 @@ export default function AdminPageEditor({ mode }) {
             }
           />
           <TextField
-            label="Title"
+            label="Navigation label"
             value={page.label}
             onChange={(value) => update({ label: value })}
             error={errorFor('label')}
-            hint="Shown as the page heading and in navigation."
+            hint="Shown in the header navigation and the footer page list. Keep it short — every page shares one row."
+          />
+          {/* Optional, and empty is the normal answer: a page with no
+              heading of its own is headed by its navigation label. The
+              field exists for the pages whose short label reads oddly as a
+              heading — a nav that says FAQ over a page headed "Frequently
+              asked questions". */}
+          <TextField
+            label="Page heading"
+            value={page.title}
+            onChange={(value) => update({ title: value })}
+            error={errorFor('title')}
+            hint="Optional. The heading at the top of the page, when it differs from the navigation label. Leave blank to use the label."
           />
           {/* A system page's path names a route that is declared in the
               app's code, not in this document — the document only
