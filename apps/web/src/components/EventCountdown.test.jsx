@@ -4,8 +4,10 @@
 // allowlist of the phases before the event starts, not everything that
 // isn't in_progress/ended/archived), the boundary transition that proves
 // the lead never shows a negative figure, the running line's own low
-// frequency check that moves it on to "ended" without a reload, and that
-// the ticking interval is cleared on unmount.
+// frequency check that moves it on to "ended" without a reload, draft's
+// matching low frequency check that brings the lead up on its own once a
+// future announcedAt passes, and that the ticking interval is cleared on
+// unmount.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { getEventPhase } from 'shared/config';
@@ -101,8 +103,39 @@ describe('EventCountdown', () => {
     const at = new Date(BEFORE_START);
     vi.setSystemTime(at);
     expect(getEventPhase(draftConfig, at)).toBe('draft');
+    const intervalSpy = vi.spyOn(globalThis, 'setInterval');
     const { container } = render(<EventCountdown eventConfig={draftConfig} />);
     expect(container).toBeEmptyDOMElement();
+    // No announcedAt means no boundary ever arrives on the clock alone, so
+    // nothing here schedules a timer waiting for one.
+    expect(intervalSpy).not.toHaveBeenCalled();
+    intervalSpy.mockRestore();
+  });
+
+  it('polls about once a minute (never once a second) while draft with a future announcedAt, so the lead appears on its own once that boundary passes', () => {
+    const start = new Date('2026-06-01T00:00:00.000Z');
+    vi.setSystemTime(start);
+    // One minute ahead of "now" — draft until the clock reaches it. days
+    // stay far in the future so what follows draft is a counting phase,
+    // not in_progress, and the countdown is what proves the lead appeared.
+    const draftConfig = { ...BASE_CONFIG, announcedAt: '2026-06-01T00:01' };
+    expect(getEventPhase(draftConfig, start)).toBe('draft');
+
+    const intervalSpy = vi.spyOn(globalThis, 'setInterval');
+    render(<EventCountdown eventConfig={draftConfig} />);
+    expect(screen.queryByText('Time until the event starts')).toBeNull();
+    // A single low-frequency timer, not a once-a-second one: draft carries
+    // no figures a per-second tick would ever move.
+    expect(intervalSpy).toHaveBeenCalledTimes(1);
+    expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 60_000);
+    intervalSpy.mockRestore();
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(getEventPhase(draftConfig, new Date('2026-06-01T00:01:00.000Z'))).not.toBe('draft');
+    expect(screen.getByText('Time until the event starts')).toBeInTheDocument();
   });
 
   it('stops counting and states that the event is running at in_progress', () => {
