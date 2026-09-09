@@ -5,10 +5,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   zonedDateTime,
+  countdownParts,
   formatDayDate,
   formatEventDateRange,
   formatSessionStart,
   formatSessionTimeRange,
+  resolveEventStart,
 } from './eventTime.js';
 
 describe('zonedDateTime', () => {
@@ -126,5 +128,57 @@ describe('formatSessionStart', () => {
   it('fails soft the same way the range does', () => {
     expect(formatSessionStart(config, { dayId: 'nope', startTime: '09:00' })).toBeNull();
     expect(formatSessionStart(config, { dayId: 'd1', startTime: 'noon' })).toBeNull();
+  });
+});
+
+describe('resolveEventStart', () => {
+  const ZONE = 'America/New_York';
+
+  it('resolves the earliest configured day, not the first in array order', () => {
+    const eventConfig = {
+      timezone: ZONE,
+      days: [
+        { date: '2026-10-16', startTime: '09:00', endTime: '17:00' },
+        { date: '2026-10-14', startTime: '10:00', endTime: '17:00' },
+      ],
+    };
+    expect(resolveEventStart(eventConfig)).toEqual(zonedDateTime('2026-10-14', '10:00', ZONE));
+  });
+
+  it('is null with no timezone', () => {
+    expect(resolveEventStart({ days: [{ date: '2026-10-14', startTime: '09:00' }] })).toBeNull();
+  });
+
+  it('is null with no days', () => {
+    expect(resolveEventStart({ timezone: ZONE, days: [] })).toBeNull();
+    expect(resolveEventStart({ timezone: ZONE })).toBeNull();
+  });
+
+  it('is null for the whole list when just one day is malformed — the same fail-closed rule getEventPhase applies, so the countdown never targets a day the lifecycle clock does not recognize', () => {
+    const eventConfig = {
+      timezone: ZONE,
+      days: [
+        { date: '2026-10-14' }, // missing startTime
+        { date: '2026-10-15', startTime: '09:00', endTime: '17:00' },
+      ],
+    };
+    expect(resolveEventStart(eventConfig)).toBeNull();
+  });
+});
+
+describe('countdownParts', () => {
+  it('splits a duration into days, hours, minutes, seconds', () => {
+    const ms =
+      2 * 86_400_000 + 3 * 3_600_000 + 4 * 60_000 + 5 * 1000;
+    expect(countdownParts(ms)).toEqual({ days: 2, hours: 3, minutes: 4, seconds: 5 });
+  });
+
+  it('never returns a negative figure', () => {
+    expect(countdownParts(-1)).toEqual({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+    expect(countdownParts(-86_400_000)).toEqual({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  });
+
+  it('is zeroed for non-finite input', () => {
+    expect(countdownParts(NaN)).toEqual({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   });
 });

@@ -15,6 +15,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import CtaBlock from '../components/blocks/CtaBlock.jsx';
+import EventCountdown from '../components/EventCountdown.jsx';
 import LeadImage from '../components/LeadImage.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
@@ -111,6 +112,7 @@ export default function Home() {
                 {subtitle.value}
               </p>
             ) : null}
+            <EventCountdown eventConfig={eventConfig} />
             {heroCtas.length ? (
               <div className="mt-lg flex flex-wrap gap-sm">
                 {heroCtas.map((block) => (

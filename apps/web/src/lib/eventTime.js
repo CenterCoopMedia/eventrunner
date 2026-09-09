@@ -223,6 +223,58 @@ export function formatDayDate(day, timeZone) {
 }
 
 /**
+ * The event's own start instant — the earliest configured day's start time,
+ * resolved in the event's timezone — or null when it cannot be resolved (no
+ * timezone, or no valid days). This deliberately matches the lifecycle
+ * clock's own `validDays` (packages/shared/src/config/lifecycle.cjs)
+ * fail-CLOSED rule rather than filtering: ONE malformed day invalidates the
+ * whole list, rather than being dropped from it. `getEventPhase` treats a
+ * partially-malformed `days` the same way — a bad day can never move the
+ * in_progress/ended boundary, so it must never move the countdown's target
+ * either. A per-day filter here would let the countdown count down to a day
+ * the lifecycle clock does not recognize as the event's start.
+ *
+ * @param {object} eventConfig
+ * @returns {Date | null}
+ */
+export function resolveEventStart(eventConfig) {
+  const timeZone = eventConfig?.timezone;
+  if (typeof timeZone !== 'string' || !timeZone) return null;
+  const days = eventConfig?.days;
+  if (!Array.isArray(days) || days.length === 0) return null;
+  for (const day of days) {
+    if (!day || typeof day !== 'object') return null;
+    if (typeof day.date !== 'string' || !DATE_RE.test(day.date)) return null;
+    if (typeof day.startTime !== 'string' || !TIME_24H_RE.test(day.startTime)) return null;
+  }
+  const [first] = days
+    .slice()
+    .sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
+  return zonedDateTime(first.date, first.startTime, timeZone);
+}
+
+/**
+ * Split a duration in milliseconds into days/hours/minutes/seconds for a
+ * countdown display. Negative input clamps to zero throughout rather than
+ * counting down past the target — a caller ticking on a timer can render
+ * one more frame after the target passes before it re-reads the event
+ * phase and switches away from the countdown, and that frame must never
+ * read as a negative figure.
+ *
+ * @param {number} msRemaining
+ * @returns {{ days: number, hours: number, minutes: number, seconds: number }}
+ */
+export function countdownParts(msRemaining) {
+  const clamped = Number.isFinite(msRemaining) ? Math.max(0, msRemaining) : 0;
+  return {
+    days: Math.floor(clamped / 86_400_000),
+    hours: Math.floor(clamped / 3_600_000) % 24,
+    minutes: Math.floor(clamped / 60_000) % 60,
+    seconds: Math.floor(clamped / 1000) % 60,
+  };
+}
+
+/**
  * The configured days as one dateline for the masthead nameplate (design
  * brief §2.1): "October 14–16, 2026" within a month, "October 30 – November
  * 1, 2026" across one, "December 31, 2026 – January 1, 2027" across a year.

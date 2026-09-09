@@ -154,6 +154,8 @@ The event's own identity fields: Name, dates, timezone, venue, sender address, a
 
 **Past days become back issues.** When a day ends, its page keeps every word and quietens: The colour drops out, the day head says "Back issue", and the controls that act on a live event — bookmarking, reactions, adding to a calendar — go away. Nothing is hidden, and every link still works. Setting an **archive date** for the whole event does the same thing to every day at once.
 
+**The home page counts down on its own.** Before the first day starts, the home page shows a live countdown to that moment, reading the dates and timezone set here. Once the first day begins, the countdown stops and the page states that the event is running. After the last day ends — or once you set the archive date — it states that the event has ended. Nothing to configure: the page always reads the same dates, timezone, and archive date this section sets.
+
 **Printing.** Print any schedule page and you get the handout: Every day of the event, every session and every stop under it, tracks named by letter and name, no buttons. You do not have to prepare anything for it, and you get the light edition even if you print from a dark screen.
 
 ## Settings → Features
