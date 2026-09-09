@@ -437,6 +437,11 @@ const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
   demoExtraDoc('guidelines_help', 'contact', 'richtext', {
     value: '<p>Email speakers@example.org with questions before the summit.</p>',
   }, 0),
+  demoExtraDoc('city_guide_intro', 'welcome', 'richtext', {
+    value:
+      '<p>A short guide to Millhaven for anyone staying a few extra days around the summit. ' +
+      'Everything below is an easy walk or a short ride from Harborlight Hall.</p>',
+  }, 0),
   demoExtraDoc('city_guide_eat', 'diner', 'list_item', {
     text: '[Demo] Foghorn Diner: a short walk from Harborlight Hall, open for breakfast and lunch every day of the summit.',
   }, 0),
