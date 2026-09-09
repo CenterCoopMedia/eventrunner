@@ -13,6 +13,8 @@ const {
     fetchTemplate,
     requestedUpdateId,
     resetTemplateCacheForTest,
+    lastKnownTemplate,
+    TEMPLATE_REVALIDATE_FLOOR_MS,
   },
 } = require('./og.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
@@ -148,23 +150,126 @@ test('fetchTemplate: self-fetches index.html from the public URL and caches per 
   assert.equal(calls, 1); // second call served from cache
 });
 
-test('fetchTemplate: TTL expiry re-fetches; forceRefresh bypasses the cache immediately', async () => {
+test('fetchTemplate: past the floor it re-fetches; forceRefresh skips the floor immediately', async () => {
   resetTemplateCacheForTest();
   let calls = 0;
   const fetchImpl = async () => { calls += 1; return { ok: true, text: async () => `v${calls}` }; };
 
   await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 0 });
-  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 10 * 60 * 1000 }); // past TTL
+  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 30 * 1000 }); // past the floor
   assert.equal(calls, 2);
 
-  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 10 * 60 * 1000, forceRefresh: true });
+  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 30 * 1000, forceRefresh: true });
   assert.equal(calls, 3);
 });
 
-test('fetchTemplate: a non-ok self-fetch response throws rather than serving fabricated HTML', async () => {
+// -------------------------------------------- conditional revalidation
+
+const etagRes = (etag, body) => ({
+  ok: true,
+  status: 200,
+  headers: { get: (name) => (name.toLowerCase() === 'etag' ? etag : null) },
+  text: async () => body,
+});
+
+test('fetchTemplate: a burst inside the floor makes exactly one request', async () => {
   resetTemplateCacheForTest();
-  const fetchImpl = async () => ({ ok: false, status: 503, text: async () => '' });
-  await assert.rejects(() => fetchTemplate({ publicUrl: 'https://example.org', fetchImpl }));
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return etagRes('"v1"', 'FIRST'); };
+  const at = (t) => fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => t });
+
+  assert.equal(await at(0), 'FIRST');
+  for (const t of [1, 100, 5000, TEMPLATE_REVALIDATE_FLOOR_MS - 1]) {
+    assert.equal(await at(t), 'FIRST');
+  }
+  assert.equal(calls, 1);
+});
+
+test('fetchTemplate: revalidates with If-None-Match, and a 304 keeps the body and restarts the floor', async () => {
+  resetTemplateCacheForTest();
+  const sent = [];
+  let calls = 0;
+  const fetchImpl = async (url, init) => {
+    calls += 1;
+    sent.push(init?.headers?.['If-None-Match'] ?? null);
+    return calls === 1
+      ? etagRes('"v1"', 'FIRST')
+      : { ok: false, status: 304, headers: { get: () => null }, text: async () => '' };
+  };
+  const at = (t) => fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => t });
+
+  assert.equal(await at(0), 'FIRST');
+  assert.equal(await at(TEMPLATE_REVALIDATE_FLOOR_MS + 1), 'FIRST'); // 304, body reused
+  assert.deepEqual(sent, [null, '"v1"']);
+  assert.equal(calls, 2);
+
+  // The 304 restarted the floor, so a request right after it asks nothing.
+  assert.equal(await at(TEMPLATE_REVALIDATE_FLOOR_MS + 2), 'FIRST');
+  assert.equal(calls, 2);
+});
+
+test('fetchTemplate: a 200 replaces the held template — this is how a deploy is noticed', async () => {
+  resetTemplateCacheForTest();
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    return calls === 1 ? etagRes('"v1"', 'OLD BUILD') : etagRes('"v2"', 'NEW BUILD');
+  };
+  const at = (t) => fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => t });
+
+  assert.equal(await at(0), 'OLD BUILD');
+  assert.equal(await at(TEMPLATE_REVALIDATE_FLOOR_MS + 1), 'NEW BUILD');
+  // The new ETag is the one sent from here on.
+  let lastSent = null;
+  const capture = async (url, init) => { lastSent = init?.headers?.['If-None-Match'] ?? null; return etagRes('"v2"', 'NEW BUILD'); };
+  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl: capture, now: () => 60 * 1000 });
+  assert.equal(lastSent, '"v2"');
+});
+
+test('fetchTemplate: a non-ok response serves the held template rather than failing the site', async () => {
+  resetTemplateCacheForTest();
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    return calls === 1 ? etagRes('"v1"', 'HELD') : { ok: false, status: 503, headers: { get: () => null }, text: async () => '' };
+  };
+  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 0 });
+  const served = await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 60 * 1000 });
+  assert.equal(served, 'HELD');
+});
+
+test('fetchTemplate: a network failure serves the held template too', async () => {
+  resetTemplateCacheForTest();
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls === 1) return etagRes('"v1"', 'HELD');
+    throw new Error('ECONNRESET');
+  };
+  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 0 });
+  assert.equal(await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 60 * 1000 }), 'HELD');
+});
+
+test('fetchTemplate: with nothing ever fetched, a non-ok response and a network failure both throw', async () => {
+  resetTemplateCacheForTest();
+  await assert.rejects(() => fetchTemplate({
+    publicUrl: 'https://example.org',
+    fetchImpl: async () => ({ ok: false, status: 503, text: async () => '' }),
+  }));
+  resetTemplateCacheForTest();
+  await assert.rejects(() => fetchTemplate({
+    publicUrl: 'https://example.org',
+    fetchImpl: async () => { throw new Error('ECONNRESET'); },
+  }));
+});
+
+test('lastKnownTemplate: reports what the container holds, and nothing after a reset', async () => {
+  resetTemplateCacheForTest();
+  assert.equal(lastKnownTemplate(), null);
+  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl: async () => etagRes('"v1"', 'HELD') });
+  assert.equal(lastKnownTemplate(), 'HELD');
+  resetTemplateCacheForTest();
+  assert.equal(lastKnownTemplate(), null);
 });
 
 // ---------------------------------------------------------- requestedUpdateId
@@ -352,6 +457,7 @@ const {
     buildRouteHtml,
     buildEventJsonLd,
     brandingObjectUrl,
+    zoneOffset,
     ROUTE_CACHE_CONTROL,
   },
 } = require('./og.cjs');
@@ -557,8 +663,10 @@ test('buildEventJsonLd: describes the event from config/event, and omits what is
   });
   assert.equal(data['@type'], 'Event');
   assert.equal(data.name, SITE_EVENT.name);
-  assert.equal(data.startDate, '2026-10-14T09:00');
-  assert.equal(data.endDate, '2026-10-15T16:00');
+  // Offsets, not bare wall clocks: October in America/New_York is -04:00,
+  // and a figure without one names 24 different instants.
+  assert.equal(data.startDate, '2026-10-14T09:00-04:00');
+  assert.equal(data.endDate, '2026-10-15T16:00-04:00');
   assert.equal(data.location['@type'], 'Place');
   assert.equal(data.location.address.postalCode, '58211');
   assert.equal(data.organizer.name, '[Fixture] Harborlight Cooperative');
@@ -586,6 +694,38 @@ test('routeMeta: the served HTML carries a parseable Event block that cannot clo
   assert.equal(parsed['@type'], 'Event');
   assert.ok(!match[1].includes('</script>'));
   assert.ok(!res.sent.includes('<script>alert(1)</script>'));
+});
+
+test('zoneOffset: reads the offset in force on that day, on both sides of a daylight change', () => {
+  assert.equal(zoneOffset('2026-10-14', '09:00', 'America/New_York'), '-04:00');
+  assert.equal(zoneOffset('2026-01-14', '09:00', 'America/New_York'), '-05:00');
+  assert.equal(zoneOffset('2026-06-01', '09:00', 'Asia/Kolkata'), '+05:30');
+  assert.equal(zoneOffset('2026-06-01', '09:00', 'UTC'), '+00:00');
+  // Unusable inputs resolve to nothing, and the caller emits a bare wall
+  // clock rather than an invented offset.
+  assert.equal(zoneOffset('2026-06-01', '09:00', 'Not/AZone'), null);
+  assert.equal(zoneOffset('2026-06-01', '09:00', ''), null);
+});
+
+test('buildEventJsonLd: a day whose event names no timezone keeps the bare wall clock', () => {
+  const data = buildEventJsonLd({
+    event: {
+      name: 'A',
+      days: [{ id: 'd1', date: '2026-10-14', startTime: '09:00', endTime: '17:00' }],
+    },
+    url: 'https://example.org',
+  });
+  assert.equal(data.startDate, '2026-10-14T09:00');
+  assert.equal(data.endDate, '2026-10-14T17:00');
+});
+
+test('buildEventJsonLd: a day with no times at all stays a plain date', () => {
+  const data = buildEventJsonLd({
+    event: { name: 'A', timezone: 'America/New_York', days: [{ id: 'd1', date: '2026-10-14' }] },
+    url: 'https://example.org',
+  });
+  assert.equal(data.startDate, '2026-10-14');
+  assert.equal(data.endDate, '2026-10-14');
 });
 
 // --------------------------------------------------------------- social image
@@ -648,10 +788,13 @@ test('buildRouteHtml: escapes injected values, and a $-pattern in a title is ins
 test('routeMeta: sets a cache header so the edge, not the function, answers repeat traffic', async () => {
   const res = await getRoute(routeHandler(), '/travel');
   assert.equal(res.headers['Cache-Control'], ROUTE_CACHE_CONTROL);
-  // Browsers revalidate; a shared cache holds it for the same window the
-  // function's own template and config caches use.
+  // The browser always revalidates, because the shell names hashed asset
+  // files; the shared cache holds it for the config cache's own window.
   assert.ok(/max-age=0/.test(ROUTE_CACHE_CONTROL));
   assert.ok(/s-maxage=300/.test(ROUTE_CACHE_CONTROL));
+  // Nothing may be served stale afterwards either — that is the same
+  // reason max-age is zero.
+  assert.ok(!/stale-while-revalidate/.test(ROUTE_CACHE_CONTROL));
 });
 
 // -------------------------------------------------------------- resilience
@@ -669,16 +812,78 @@ test('routeMeta: HEAD is answered like GET — link checkers ask for pages that 
   assert.equal(res.headers['Cache-Control'], ROUTE_CACHE_CONTROL);
 });
 
-test('routeMeta: no configured public URL -> 500, and no template is fetched from nowhere', async () => {
+test('routeMeta: no configured public URL and nothing ever fetched -> 500, and nothing is fetched from nowhere', async () => {
   let called = false;
   const handler = createRouteMetaHandler({
     db: makeFakeDb(SITE_DOCS),
     getConfig: async () => siteConfig({ tierA: {} }),
     fetchTemplateFn: async () => { called = true; return TEMPLATE; },
+    lastTemplateFn: () => null,
+    log: { error: () => {} },
   });
   const res = await getRoute(handler, '/travel');
   assert.equal(res.statusCode, 500);
   assert.equal(called, false);
+});
+
+test('routeMeta: no configured public URL, but a template was held -> the shell, not a 500', async () => {
+  const errors = [];
+  const handler = createRouteMetaHandler({
+    db: makeFakeDb(SITE_DOCS),
+    getConfig: async () => siteConfig({ tierA: {} }),
+    fetchTemplateFn: async () => { throw new Error('never called'); },
+    lastTemplateFn: () => TEMPLATE,
+    log: { error: (...args) => errors.push(args) },
+  });
+  const res = await getRoute(handler, '/travel');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('/assets/index-abc123.js'));
+  assert.ok(!res.sent.includes('noindex')); // a misconfiguration is not a missing page
+  assert.equal(errors.length, 1);
+});
+
+test('routeMeta: a config read that fails serves the shell, and never a 500, while a template is held', async () => {
+  const errors = [];
+  const handler = createRouteMetaHandler({
+    db: makeFakeDb(SITE_DOCS),
+    getConfig: async () => { throw new Error('firestore is unavailable'); },
+    fetchTemplateFn: async () => { throw new Error('never called'); },
+    lastTemplateFn: () => TEMPLATE,
+    log: { error: (...args) => errors.push(args) },
+  });
+  const res = await getRoute(handler, '/travel');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('/assets/index-abc123.js'));
+  assert.ok(!res.sent.includes('noindex'));
+  assert.equal(errors.length, 1);
+});
+
+test('routeMeta: a config read that fails with nothing ever fetched is the one 500', async () => {
+  const handler = createRouteMetaHandler({
+    db: makeFakeDb(SITE_DOCS),
+    getConfig: async () => { throw new Error('firestore is unavailable'); },
+    fetchTemplateFn: async () => TEMPLATE,
+    lastTemplateFn: () => null,
+    log: { error: () => {} },
+  });
+  const res = await getRoute(handler, '/travel');
+  assert.equal(res.statusCode, 500);
+});
+
+test('routeMeta: a hosting fetch that fails falls back to the held template rather than 500ing the site', async () => {
+  const errors = [];
+  const handler = createRouteMetaHandler({
+    db: makeFakeDb(SITE_DOCS),
+    getConfig: async () => siteConfig(),
+    fetchTemplateFn: async () => { throw new Error('self-fetch failed'); },
+    lastTemplateFn: () => TEMPLATE,
+    log: { error: (...args) => errors.push(args) },
+  });
+  const res = await getRoute(handler, '/travel');
+  assert.equal(res.statusCode, 200);
+  // The config still resolved, so the page keeps its own tags.
+  assert.ok(res.sent.includes('<title>Travel and venue · [Fixture] Harborlight Media Summit</title>'));
+  assert.equal(errors.length, 1);
 });
 
 test('routeMeta: a lookup failure still serves the shell — the whole site sits behind this route', async () => {
@@ -701,11 +906,12 @@ test('routeMeta: a lookup failure still serves the shell — the whole site sits
   assert.equal(errors.length, 1);
 });
 
-test('routeMeta: a template that cannot be fetched at all is a 500, never fabricated HTML', async () => {
+test('routeMeta: a template that cannot be fetched, with none ever held, is a 500 and never fabricated HTML', async () => {
   const handler = createRouteMetaHandler({
     db: makeFakeDb(SITE_DOCS),
     getConfig: async () => siteConfig(),
     fetchTemplateFn: async () => { throw new Error('self-fetch failed'); },
+    lastTemplateFn: () => null,
     log: { error: () => {} },
   });
   const res = await getRoute(handler, '/travel');

@@ -89,6 +89,23 @@ describe('ContentPage (catch-all route)', () => {
     expect(screen.getByText(siteContent.faq_items__what_is_this.question)).toBeInTheDocument();
   });
 
+  it('names itself in the document title, in the shape the server already sent', async () => {
+    // The server writes "<page> · <event>" into the HTML it serves
+    // (functions/src/public/og.cjs). Client-side navigation asks the
+    // server nothing, so the app has to keep the tab in step and compose
+    // it the same way, or the title changes the moment the app boots.
+    renderAt('/faq');
+    const faqPage = pagesData.find((p) => p.id === 'faq');
+    await screen.findByRole('heading', { level: 1, name: faqPage.label });
+    expect(document.title).toBe(`${faqPage.label} · ${eventConfig.name}`);
+  });
+
+  it('leaves the event name standing alone on a page that does not resolve', async () => {
+    renderAt('/definitely-not-published');
+    await screen.findByRole('heading', { name: 'Page not found' });
+    expect(document.title).toBe(eventConfig.name);
+  });
+
   it('404s cleanly on an unknown path', async () => {
     renderAt('/definitely-not-published');
     expect(

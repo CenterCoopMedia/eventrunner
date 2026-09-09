@@ -215,3 +215,96 @@ test('no continue-on-error key anywhere, publisher included (spec §8.1)', () =>
   // is the key itself.
   assert.doesNotMatch(workflow, /^\s*continue-on-error:/m);
 });
+
+// ----------------------------------------------------------- firebase.json
+//
+// The hosting rewrites decide which requests reach a function and which
+// are answered by the static shell, and the deploy steps above patch that
+// same file, so the two are checked together.
+
+const firebaseJson = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '..', 'firebase.json'), 'utf8'),
+);
+
+/** The private routes that are answered by the shell, never by routeMeta. */
+const PRIVATE_SOURCES = [
+  '/signin',
+  '/profile',
+  '/attendees',
+  '/attendees/**',
+  '/schedule/mine',
+  '/speaker/**',
+  '/ticket/**',
+  '/admin',
+  '/admin/**',
+];
+
+test('every private route is rewritten to the static shell, above the routeMeta catch-all', () => {
+  const rewrites = firebaseJson.hosting.rewrites;
+  const catchAll = rewrites.findIndex((r) => r.source === '**');
+  assert.notEqual(catchAll, -1);
+  assert.equal(rewrites[catchAll].function.functionId, 'routeMeta');
+  assert.equal(catchAll, rewrites.length - 1, 'the catch-all must be last, or it swallows what follows');
+
+  for (const source of PRIVATE_SOURCES) {
+    const index = rewrites.findIndex((r) => r.source === source);
+    assert.notEqual(index, -1, `missing rewrite for ${source}`);
+    assert.equal(rewrites[index].destination, '/index.html', `${source} must not reach a function`);
+    assert.ok(index < catchAll, `${source} must come before the catch-all`);
+  }
+});
+
+test('every private route also carries X-Robots-Tag: noindex from hosting itself', () => {
+  // The shell those routes serve is the same bytes for every route, so it
+  // cannot carry a per-route robots meta. Hosting states it in the
+  // response header instead, which crawlers read the same way.
+  const headers = firebaseJson.hosting.headers || [];
+  for (const source of PRIVATE_SOURCES) {
+    const entry = headers.find((h) => h.source === source);
+    assert.ok(entry, `missing headers entry for ${source}`);
+    const tag = entry.headers.find((h) => h.key === 'X-Robots-Tag');
+    assert.ok(tag, `missing X-Robots-Tag for ${source}`);
+    assert.equal(tag.value, 'noindex');
+  }
+});
+
+test('both function rewrites name their region in object form, and the deploy patches every one', () => {
+  // The bare string form ("function": "routeMeta") silently defaults to
+  // us-central1, which routes a non-default-region client at a backend
+  // that does not exist there.
+  const functionRewrites = firebaseJson.hosting.rewrites.filter((r) => r.function);
+  assert.equal(functionRewrites.length, 2);
+  for (const rewrite of functionRewrites) {
+    assert.equal(typeof rewrite.function, 'object');
+    assert.ok(rewrite.function.functionId);
+    assert.ok(rewrite.function.region);
+  }
+  assert.deepEqual(
+    functionRewrites.map((r) => r.function.functionId).sort(),
+    ['routeMeta', 'updatesMeta'],
+  );
+
+  const patch = step('Set the function rewrite regions for this project');
+  assert.match(patch, /\(\.function \| type\) == "object"/);
+  assert.doesNotMatch(patch, /functionId == "/, 'the patch must not name one function by id');
+});
+
+test('the post job redeploys every function that self-fetches the hosting template', () => {
+  // A hosting deploy replaces index.html and its hashed asset names; a
+  // container holding the previous copy has to be restarted, or it keeps
+  // naming files the release no longer has.
+  const redeploy = step('Redeploy the SSR meta functions only');
+  assert.match(redeploy, /--only functions:updatesMeta,functions:routeMeta/);
+});
+
+test('every function rewrite names a function the smoke list preflights', () => {
+  const { endpoints } = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', '.github', 'smoke-endpoints.json'), 'utf8'),
+  );
+  for (const rewrite of firebaseJson.hosting.rewrites.filter((r) => r.function)) {
+    assert.ok(
+      endpoints.includes(rewrite.function.functionId),
+      `${rewrite.function.functionId} is rewritten to but never smoke-tested`,
+    );
+  }
+});

@@ -24,15 +24,14 @@
  * of `index.html` into the function — which would drift the moment a
  * frontend deploy changes a Vite-hashed asset filename — this fetches the
  * REAL deployed `index.html` from hosting at `EVENT_PUBLIC_URL` and treats
- * that as the template. The fetch result is cached per container with a
- * TTL (mirrors core/config.cjs's pattern) so a hot container is not
- * re-fetching the template on every crawl. That cache is exactly why the
- * deploy pipeline's `post` job (deploy-client.yml) redeploys this function
- * again AFTER hosting deploys: a container that cold-started (and so
- * cached its template) BEFORE the new hosting build went out would keep
- * serving crawlers the previous build's asset references for its whole
- * cache TTL otherwise. Forcing a fresh deploy forces a fresh cold start,
- * which fetches the just-published template immediately.
+ * that as the template. The copy is held per container and REVALIDATED
+ * against hosting's ETag rather than trusted for a fixed span, so a
+ * deploy is noticed within seconds and a hot container still does no
+ * body transfer between deploys ({@link fetchTemplate}).
+ *
+ * The deploy pipeline's `post` job (deploy-client.yml) still redeploys
+ * these functions AFTER hosting deploys, which makes the changeover
+ * immediate rather than merely quick.
  *
  * Gated behind `config/features.updates`, same flag-gate pattern as
  * buildSchedulePdf (functions/src/schedule/pdf.cjs) — a disabled feature
@@ -43,36 +42,86 @@
  * true) must not read as published.
  */
 
-const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000;
-let templateCache = null; // { loadedAt, html }
+/**
+ * How long a just-checked template is trusted without asking hosting
+ * again. Not a time-to-live: past the floor the cache is REVALIDATED, not
+ * discarded, so the usual answer is a 304 with no body.
+ *
+ * The floor exists only so a burst — a crawl, or a page that fans out into
+ * several requests — does not turn into one conditional request each. Ten
+ * seconds is the whole window in which a deploy's new `index.html` can go
+ * unnoticed, which is what makes a hosting deploy that does not redeploy
+ * these functions survivable rather than a five-minute outage.
+ */
+const TEMPLATE_REVALIDATE_FLOOR_MS = 10 * 1000;
+
+let templateCache = null; // { html, etag, loadedAt }
 
 /** Test hook: drop the per-container template cache. */
 function resetTemplateCacheForTest() {
   templateCache = null;
 }
 
+/** The last template this container fetched, or null. */
+function lastKnownTemplate() {
+  return templateCache ? templateCache.html : null;
+}
+
 /**
- * Self-fetch the deployed hosting `index.html` as the SSR template, cached
- * per container with a TTL. `forceRefresh` bypasses the cache (used by
+ * Self-fetch the deployed hosting `index.html` as the SSR template, held
+ * per container and revalidated against hosting with `If-None-Match`.
+ *
+ * The build stamps a new ETag on every hosting deploy, so a 304 means the
+ * held copy is still the live one and a 200 means it is not. That is what
+ * keeps a container from serving an `index.html` whose Vite-hashed asset
+ * files the current release no longer has — the failure the flat cache
+ * this replaces could sustain for its whole TTL.
+ *
+ * Stale-if-error: once a template has been fetched, a hosting request that
+ * fails or answers non-2xx serves the held copy rather than throwing.
+ * routeMeta is the catch-all rewrite, so a hiccup between the function and
+ * hosting must not take the site down; the held copy is at most one deploy
+ * behind, and the alternative is a 5xx for every page.
+ *
+ * `forceRefresh` skips both the floor and the conditional request (used by
  * tests, and available to an operator debugging a stale-template report).
  *
  * @param {{ publicUrl: string, now?: () => number, forceRefresh?: boolean,
  *           fetchImpl?: typeof fetch }} args
  * @returns {Promise<string>}
- * @throws when the template cannot be fetched at all (no fallback — a
- *   crawler is better served by a 5xx than by fabricated HTML)
+ * @throws only when nothing has ever been fetched — a first request that
+ *   cannot reach hosting has no honest answer, and fabricated HTML is not
+ *   one
  */
 async function fetchTemplate({ publicUrl, now = Date.now, forceRefresh = false, fetchImpl = fetch }) {
-  if (!forceRefresh && templateCache && now() - templateCache.loadedAt < TEMPLATE_CACHE_TTL_MS) {
+  if (!forceRefresh && templateCache && now() - templateCache.loadedAt < TEMPLATE_REVALIDATE_FLOOR_MS) {
     return templateCache.html;
   }
   const base = typeof publicUrl === 'string' ? publicUrl.replace(/\/+$/, '') : '';
-  const res = await fetchImpl(`${base}/index.html`);
+  const conditional = !forceRefresh && templateCache && isNonEmptyString(templateCache.etag);
+  const init = conditional ? { headers: { 'If-None-Match': templateCache.etag } } : undefined;
+
+  let res;
+  try {
+    res = await fetchImpl(`${base}/index.html`, init);
+  } catch (err) {
+    if (templateCache) return templateCache.html;
+    throw err;
+  }
+
+  if (res.status === 304 && templateCache) {
+    // Unchanged: keep the body, and restart the floor so the next burst
+    // does not revalidate again.
+    templateCache = { ...templateCache, loadedAt: now() };
+    return templateCache.html;
+  }
   if (!res.ok) {
+    if (templateCache) return templateCache.html;
     throw new Error(`self-fetch of index.html failed: HTTP ${res.status}`);
   }
   const html = await res.text();
-  templateCache = { loadedAt: now(), html };
+  const etag = typeof res.headers?.get === 'function' ? res.headers.get('etag') : null;
+  templateCache = { html, etag: isNonEmptyString(etag) ? etag : null, loadedAt: now() };
   return html;
 }
 
@@ -271,13 +320,15 @@ function createUpdatesMetaHandler({
  * path for the FIRST load of a public route. Three things keep that from
  * being a per-reader cost. The response carries {@link ROUTE_CACHE_CONTROL},
  * so the Hosting CDN answers repeat traffic for the same URL rather than
- * the function. The template is the same per-container cache updatesMeta
- * uses, so a hot container does no network work of its own. And the config
- * read is the shared 5-minute container cache (core/config.cjs). The
- * SECOND consequence of that template cache is the deploy ordering: this
- * function must redeploy AFTER hosting, exactly as updatesMeta does, or a
- * container that cold-started before the new build keeps serving the
- * previous build's asset references for its whole cache TTL.
+ * the function. The template is the revalidated per-container copy
+ * updatesMeta also uses, so a hot container transfers no body between
+ * deploys. And the config read is the shared 5-minute container cache
+ * (core/config.cjs).
+ *
+ * Nothing here answers 5xx once a template has been fetched. The site's
+ * whole front door is this function: a hosting hiccup, a config read that
+ * fails, or an unset `EVENT_PUBLIC_URL` each degrade to the plain shell,
+ * which still boots the app and reads its own configuration.
  *
  * Static files still win over rewrites in Hosting, which is what keeps the
  * self-fetch of `/index.html` from recursing back into this function.
@@ -293,28 +344,32 @@ function createUpdatesMetaHandler({
  *
  * `max-age=0` — the browser revalidates. The shell names hashed asset
  * files, so a copy held in one reader's browser across a deploy is the
- * classic way to serve a page whose scripts no longer exist.
+ * classic way to serve a page whose scripts no longer exist. Nothing
+ * permits serving it stale afterwards either, for the same reason.
  *
- * `s-maxage=300` — the Hosting CDN holds it for five minutes, which is the
- * same window the function's own template and config caches use. Nothing a
- * reader gets is staler than what the container already had, and a publish
- * reaches social previews within that window rather than at the next cold
- * start.
+ * `s-maxage=300` — the Hosting CDN holds it for five minutes, the same
+ * window the config container cache uses, and a hosting deploy clears it.
+ * A publish reaches social previews within that window rather than at the
+ * next cold start.
  */
-const ROUTE_CACHE_CONTROL = 'public, max-age=0, s-maxage=300, stale-while-revalidate=60';
+const ROUTE_CACHE_CONTROL = 'public, max-age=0, s-maxage=300';
 
 /**
  * The feature flag that gates each system route's first path segment. A
  * route whose flag is off describes nothing: the app renders a disabled
  * state there, and a card that advertises content the event has turned off
  * is worse than no card. Same reasoning as updatesMeta's `features.updates`
- * gate, and the same reasoning the sitemap generator applies.
+ * gate.
+ *
+ * `/attendees` is absent on purpose: the directory is behind sign-in, so
+ * `firebase.json` rewrites it to the static shell and no request for it
+ * ever reaches this function. `/updates` is present because the
+ * `/updates/**` rewrite does not claim the bare list route.
  */
 const SEGMENT_FEATURES = Object.freeze({
   schedule: 'schedule',
   speakers: 'speakers',
   sponsors: 'sponsors',
-  attendees: 'attendeeDirectory',
   updates: 'updates',
 });
 
@@ -438,9 +493,69 @@ function brandingObjectUrl(value, { base, bucket }) {
   return `${base}/${path}`;
 }
 
-/** `2026-10-14T09:00` when the day states a time, `2026-10-14` when it does not. */
-function dayMoment(date, time) {
-  return /^\d{2}:\d{2}$/.test(time || '') ? `${date}T${time}` : date;
+/**
+ * The UTC offset in force for one event-local wall clock, as `+05:30` or
+ * `-04:00`, or null when the zone or the wall clock cannot be resolved.
+ *
+ * Two passes, so a day on either side of a daylight-saving change carries
+ * the offset actually in force on that day rather than the one in force
+ * today. The same two-pass search apps/web's `zonedDateTime`
+ * (apps/web/src/lib/eventTime.js) runs for the same reason; that module is
+ * browser ESM and cannot be required here.
+ *
+ * @param {string} date `YYYY-MM-DD`
+ * @param {string} time `HH:MM`
+ * @param {string} timezone IANA zone name
+ * @returns {string|null}
+ */
+function zoneOffset(date, time, timezone) {
+  if (!isNonEmptyString(timezone)) return null;
+  const [y, mo, d] = date.split('-').map(Number);
+  const [h, mi] = time.split(':').map(Number);
+  const wallMs = Date.UTC(y, mo - 1, d, h, mi);
+  try {
+    const wallClockAsUtcMs = (instant) => {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false,
+      }).formatToParts(instant).reduce((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+      }, {});
+      // Some ICU builds render midnight as "24" in hour12:false mode.
+      const hour = parts.hour === '24' ? '00' : parts.hour;
+      return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +hour, +parts.minute, +parts.second);
+    };
+    const guess = wallMs - (wallClockAsUtcMs(new Date(wallMs)) - wallMs);
+    const utcMs = wallMs - (wallClockAsUtcMs(new Date(guess)) - guess);
+    // A wall clock inside a spring-forward gap names no instant at all.
+    if (wallClockAsUtcMs(new Date(utcMs)) !== wallMs) return null;
+    const offsetMinutes = Math.round((wallMs - utcMs) / 60000);
+    const sign = offsetMinutes < 0 ? '-' : '+';
+    const abs = Math.abs(offsetMinutes);
+    const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+    const mm = String(abs % 60).padStart(2, '0');
+    return `${sign}${hh}:${mm}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One end of the event as schema.org wants it: `2026-10-14T09:00-04:00`
+ * when the day states a time and the event names a resolvable timezone,
+ * `2026-10-14T09:00` when the offset cannot be worked out, and the bare
+ * `2026-10-14` when the day states no time at all.
+ *
+ * The offset is what makes the figure mean one instant rather than one of
+ * 24. A reader in another country is exactly who reads this.
+ */
+function dayMoment(date, time, timezone) {
+  if (!/^\d{2}:\d{2}$/.test(time || '')) return date;
+  const offset = zoneOffset(date, time, timezone);
+  return offset ? `${date}T${time}${offset}` : `${date}T${time}`;
 }
 
 /** Drop the keys whose value is not a non-empty string. */
@@ -480,8 +595,9 @@ function buildEventJsonLd({ event, url, imageUrl = null }) {
     .filter((day) => day && isNonEmptyString(day.date))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   if (days.length > 0) {
-    data.startDate = dayMoment(days[0].date, days[0].startTime);
-    data.endDate = dayMoment(days[days.length - 1].date, days[days.length - 1].endTime);
+    const zone = event.timezone;
+    data.startDate = dayMoment(days[0].date, days[0].startTime, zone);
+    data.endDate = dayMoment(days[days.length - 1].date, days[days.length - 1].endTime, zone);
   }
 
   const venue = (event.venue && typeof event.venue === 'object') ? event.venue : {};
@@ -645,6 +761,7 @@ function createRouteMetaHandler({
   db,
   getConfig,
   fetchTemplateFn = fetchTemplate,
+  lastTemplateFn = lastKnownTemplate,
   now = Date.now,
   log = console,
 }) {
@@ -658,24 +775,51 @@ function createRouteMetaHandler({
     }
 
     try {
-      const config = await getConfig();
-      const publicUrl = config?.tierA?.publicUrl;
-      if (!isNonEmptyString(publicUrl)) {
-        return internal(res, 'The site is not configured with a public URL.');
+      // Each of the three reads below can fail on its own, and none of
+      // them is worth a 5xx for the whole site: the shell alone still
+      // boots the app, which fetches its own configuration. `degraded`
+      // records that a route WOULD have had tags, so it is not marked
+      // noindex the way a route that genuinely does not exist is.
+      let config = null;
+      let degraded = false;
+      try {
+        config = await getConfig();
+      } catch (err) {
+        degraded = true;
+        log.error('routeMeta could not read the configuration', err);
       }
-      const base = publicUrl.replace(/\/+$/, '');
-      const template = await fetchTemplateFn({ publicUrl, now });
+
+      const publicUrl = config?.tierA?.publicUrl;
+      const base = isNonEmptyString(publicUrl) ? publicUrl.replace(/\/+$/, '') : '';
+      let template = null;
+      if (isNonEmptyString(publicUrl)) {
+        try {
+          template = await fetchTemplateFn({ publicUrl, now });
+        } catch (err) {
+          log.error('routeMeta could not fetch the template', err);
+        }
+      } else if (!degraded) {
+        degraded = true;
+        log.error('routeMeta has no configured public URL');
+      }
+      // Whatever this container last held, including across a failed
+      // config read that left no URL to fetch with.
+      if (!template) template = lastTemplateFn();
+      if (!template) {
+        // Nothing has ever been fetched, so there is no HTML to serve and
+        // no honest way to invent it.
+        return internal(res, 'The page could not be served.');
+      }
 
       const path = requestedRoutePath(req);
       let subject = null;
-      let degraded = false;
-      try {
-        subject = await resolveRouteSubject({ db, config, path });
-      } catch (err) {
-        // Every public route is served through this function, so a read
-        // that fails costs the page its own tags and nothing else.
-        degraded = true;
-        log.error('routeMeta could not resolve the route', err);
+      if (config && base) {
+        try {
+          subject = await resolveRouteSubject({ db, config, path });
+        } catch (err) {
+          degraded = true;
+          log.error('routeMeta could not resolve the route', err);
+        }
       }
 
       const meta = resolveRouteMeta({ config, subject, path, base, degraded });
@@ -736,13 +880,15 @@ module.exports = {
     fetchTemplate,
     requestedUpdateId,
     resetTemplateCacheForTest,
-    TEMPLATE_CACHE_TTL_MS,
+    lastKnownTemplate,
+    TEMPLATE_REVALIDATE_FLOOR_MS,
     requestedRoutePath,
     resolveRouteSubject,
     resolveRouteMeta,
     buildRouteHtml,
     buildEventJsonLd,
     brandingObjectUrl,
+    zoneOffset,
     ROUTE_CACHE_CONTROL,
   },
 };

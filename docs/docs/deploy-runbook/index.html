@@ -436,13 +436,14 @@
           <code>EVENT_PUBLIC_URL</code>.</li>
           <li>Between <code>hosting</code> and <code>smoke</code>, the <code>post</code> job redeploys <code>updatesMeta</code> and <code>routeMeta</code>
           (<code>functions/src/public/og.cjs</code>) alone. Both self-fetch the deployed hosting <code>index.html</code> as their
-          SSR template and cache it per container (issue #27; M7 issue 4) — a container that cold-started
-          before THIS run&#39;s hosting deploy would otherwise keep serving the previous build&#39;s asset
-          references until its cache TTL or a natural recycle. <strong><code>routeMeta</code> is the catch-all rewrite, so
-          for it a stale template is not only a bad crawl: it is the first HTML every visitor gets, naming
-          Vite-hashed asset files that this deploy has already replaced.</strong> Forcing a redeploy here forces a
-          fresh cold start immediately after the new template exists. Anyone who deploys hosting by hand,
-          outside this workflow, has to redeploy these two functions afterwards for the same reason. This
+          SSR template and hold it per container (issue #27; M7 issue 4). A container that cold-started
+          before THIS run&#39;s hosting deploy is holding the previous build&#39;s asset references, and
+          <strong><code>routeMeta</code> is the catch-all rewrite, so for it that stale copy is not only a bad crawl: it is
+          the first HTML every visitor gets, naming Vite-hashed asset files that this deploy has already
+          replaced.</strong> The held copy is revalidated against hosting&#39;s ETag every ten seconds
+          (<code>TEMPLATE_REVALIDATE_FLOOR_MS</code>), so it corrects itself quickly on its own; redeploying here
+          makes the changeover immediate instead. Anyone who deploys hosting by hand, outside this
+          workflow, gets the ten-second correction and can redeploy these two functions to skip it. This
           was the ADR&#39;s <code>post</code> step (§8.1), deferred at the M2 deploy PR pending
           <code>functions/src/public/og.cjs</code> landing — <code>smoke</code>&#39;s OPTIONS-preflight of both functions now runs
           against the freshly-redeployed instances, not the ones from the <code>functions</code> job earlier in the
@@ -450,28 +451,44 @@
           <li><strong>What <code>routeMeta</code> costs, and the cache header that bounds it.</strong> Every public route that is not a
           static file now reaches a function on its first uncached load, rather than being rewritten
           straight to <code>index.html</code>. Three things bound that. The response carries
-          <code>Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=60</code>, so the Hosting CDN —
-          not the function — answers repeat traffic for the same URL, and <code>max-age=0</code> keeps a reader&#39;s own
-          browser from holding a shell that names asset files a later deploy removed. The template is the
-          per-container cache above, so a warm container does no network work of its own. And the config
-          read is <code>core/config.cjs</code>&#39;s shared 5-minute container cache. <code>s-maxage</code> is set to that same five
-          minutes on purpose: nothing a reader gets is staler than what the container already held, and a
-          publish reaches search and social previews within that window instead of at the next cold start.
-          If a client reports a page preview that will not update, five minutes is the number to wait
+          <code>Cache-Control: public, max-age=0, s-maxage=300</code>, so the Hosting CDN — not the function — answers
+          repeat traffic for the same URL, and <code>max-age=0</code> keeps a reader&#39;s own browser from holding a
+          shell that names asset files a later deploy removed. There is deliberately no
+          <code>stale-while-revalidate</code>: permitting a stale copy to be served while it refreshes is the same
+          hazard <code>max-age=0</code> exists to close. The template is the revalidated per-container copy above, so
+          a warm container transfers no body between deploys. And the config read is <code>core/config.cjs</code>&#39;s
+          shared 5-minute container cache, which <code>s-maxage</code> matches: a publish reaches search and social
+          previews within that window instead of at the next cold start, and a hosting deploy clears the
+          CDN. If a client reports a page preview that will not update, five minutes is the number to wait
           before looking for a real fault. The one cost the CDN does not absorb is scanner traffic:
           requests for addresses that do not exist (<code>/wp-login.php</code> and its friends) each miss the cache
           and reach the function, where they cost one Firestore page lookup and return the plain shell.
           That is a line on the functions invocation graph, not an incident; if a client&#39;s graph is
           dominated by it, the answer is a Cloud Functions max-instances limit, not a rewrite change.</li>
+          <li><strong><code>routeMeta</code> does not answer 5xx once it has ever fetched a template.</strong> The site&#39;s whole front
+          door is this function, so each read it makes degrades on its own: a hosting request that fails or
+          answers non-2xx serves the held template, and a config read that fails — or an unset
+          <code>EVENT_PUBLIC_URL</code> — serves that template with the event-level tags and no <code>noindex</code>, because a
+          read that failed is not a page that does not exist. Only a container that has never fetched a
+          template at all answers 500. A run of 500s from this function therefore means the very first
+          self-fetch is failing: check <code>EVENT_PUBLIC_URL</code> and that hosting is actually serving
+          <code>/index.html</code>.</li>
           <li><code>firebase.json</code>&#39;s rewrite <strong>order</strong> is load-bearing. <code>/updates/**</code> goes to <code>updatesMeta</code> first;
           then the account and staff routes (<code>/signin</code>, <code>/profile</code>, <code>/attendees</code>, <code>/attendees/**</code>,
           <code>/schedule/mine</code>, <code>/speaker/**</code>, <code>/ticket/**</code>, <code>/admin</code>, <code>/admin/**</code>) are rewritten straight to
           <code>/index.html</code>, because they carry nothing a crawler should index and spending a function
           invocation to say so is waste; then the <code>**</code> catch-all goes to <code>routeMeta</code>. Adding a public route
           needs nothing here — the catch-all already covers it. Adding an authenticated one means adding it
-          to that middle block, <strong>above</strong> the catch-all. Hosting serves an existing static file before it
-          applies any rewrite, which is what keeps <code>/assets/**</code>, <code>/branding/**</code>, and <code>routeMeta</code>&#39;s own
-          self-fetch of <code>/index.html</code> from re-entering the function.</li>
+          to that middle block, <strong>above</strong> the catch-all, and to the <code>headers</code> block below it. Hosting
+          serves an existing static file before it applies any rewrite, which is what keeps <code>/assets/**</code>,
+          <code>/branding/**</code>, and <code>routeMeta</code>&#39;s own self-fetch of <code>/index.html</code> from re-entering the function.
+          <code>scripts/deploy-workflow.test.cjs</code> asserts the whole arrangement, so a rewrite added out of order
+          fails the suite rather than a deploy.</li>
+          <li>Those same private sources appear again under <code>hosting.headers</code>, setting
+          <code>X-Robots-Tag: noindex</code>. The shell they serve is one file for every route, so it cannot carry a
+          per-route robots meta the way a <code>routeMeta</code> response can; hosting states it in the response
+          header instead, which crawlers read the same way. Without it, the one part of the site with no
+          server-set tags would be the part that most needs them.</li>
           <li>Both hosting rewrites name their function&#39;s Cloud Functions <strong>region</strong> in object form
           (<code>&quot;function&quot;: { &quot;functionId&quot;: &quot;...&quot;, &quot;region&quot;: &quot;...&quot; }</code>) — the shorthand string form
           (<code>&quot;function&quot;: &quot;routeMeta&quot;</code>) silently defaults to <code>us-central1</code>, which would route every
@@ -728,16 +745,17 @@
           </ul>
           <h3 id="931-the-publisher-does-not-redeploy-the-ssr-meta-functions">9.3.1 The publisher does not redeploy the SSR meta functions<a class="heading-anchor" href="#931-the-publisher-does-not-redeploy-the-ssr-meta-functions" aria-label="Link to this section">#</a></h3>
           <p><code>deploy-client.yml</code>&#39;s <code>post</code> job redeploys <code>updatesMeta</code> and <code>routeMeta</code> after every hosting deploy,
-          for the template-cache reason in §6. <strong>The publisher job does not, and cannot</strong> — its service
-          account holds <code>firebasehosting.admin</code> and nothing else, on purpose (§9.1). So for up to
-          <code>TEMPLATE_CACHE_TTL_MS</code> (five minutes, <code>functions/src/public/og.cjs</code>) after a CMS publish, a
-          <code>routeMeta</code> container that cold-started before that publish is still serving the previous build&#39;s
-          <code>index.html</code>, whose Vite-hashed asset filenames the new release no longer has. A visitor who lands
-          in that window gets a shell whose scripts 404 until the cache expires and the container refetches.</p>
-          <p>Nothing has to be done about it in the ordinary case — it clears itself within five minutes. If a
-          client reports a blank page immediately after a publish, that is the first thing to check, and
-          redeploying the two functions (<code>firebase deploy --only functions:updatesMeta,functions:routeMeta</code>)
-          clears it at once.</p>
+          for the template reason in §6. <strong>The publisher job does not, and cannot</strong> — its service account
+          holds <code>firebasehosting.admin</code> and nothing else, on purpose (§9.1). So a CMS publish changes the
+          hosting release without restarting a single function container.</p>
+          <p>That is survivable rather than an outage because the held template is revalidated against hosting&#39;s
+          ETag rather than trusted for a fixed span: past <code>TEMPLATE_REVALIDATE_FLOOR_MS</code> (ten seconds,
+          <code>functions/src/public/og.cjs</code>) the next request revalidates, the changed build answers 200 with the
+          new body, and the container is current from then on. The exposure is that ten-second floor, not the
+          five minutes a flat cache would have cost.</p>
+          <p>If a client does report a blank page straight after a publish, that window is the first thing to
+          rule out — wait ten seconds and reload. Redeploying the two functions
+          (<code>firebase deploy --only functions:updatesMeta,functions:routeMeta</code>) clears it immediately.</p>
           <p>Stranded rows are not an incident. If neither <code>cmsPublish</code> nor the job reports a result, the
           <code>cleanupStrandedPublishRows</code> sweep (<code>functions/src/maintenance/cleanup.cjs</code>, every 30 minutes) marks
           the row failed after 90 minutes and alerts once — a failed publish row is resumable from the CMS,

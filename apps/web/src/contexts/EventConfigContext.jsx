@@ -23,6 +23,7 @@ import { subscribeConfigDoc } from '../lib/configSource.js';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeRuntime.js';
 import { startModeSync } from '../lib/modeRuntime.js';
+import { getRouteTitlePart, subscribeRouteTitle } from '../lib/useDocumentTitle.js';
 import { resolveShape } from 'shared/theme';
 
 const EventConfigContext = createContext(null);
@@ -166,9 +167,20 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
       : '';
   }, [runtimeThemeDoc]);
 
-  // Event-neutral shell title: snapshot name first, runtime name when it lands.
+  // Event-neutral shell title: snapshot name first, runtime name when it
+  // lands. A route that names itself (useDocumentTitle) composes in front
+  // of it, in the SAME shape the server writes into the served HTML
+  // (functions/src/public/og.cjs) — otherwise the tab would visibly change
+  // from the page's own title to the bare event name the moment the app
+  // finished booting.
   useEffect(() => {
-    document.title = value.eventConfig.name;
+    const apply = (part) => {
+      document.title = part
+        ? `${part} · ${value.eventConfig.name}`
+        : value.eventConfig.name;
+    };
+    apply(getRouteTitlePart());
+    return subscribeRouteTitle(apply);
   }, [value.eventConfig.name]);
 
   // Mirror the RESOLVED texture onto the document element so the

@@ -14,6 +14,7 @@ import SessionActions from '../components/session/SessionActions.jsx';
 import SessionFormat from '../components/session/SessionFormat.jsx';
 import SessionMaterialsList from '../components/SessionMaterialsList.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
+import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 
 function NotFoundState({ search }) {
@@ -49,6 +50,7 @@ export default function SessionDetail() {
   // calling it only on the "found" branch below.
   const session = scheduleData.find((s) => s.id === sessionId && s.visible);
   const speakerNames = useSessionSpeakerNames(session?.speakerIds);
+  useDocumentTitle(session?.title);
 
   if (!features.schedule) {
     return (

@@ -27,6 +27,7 @@ import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import SectionIndexNav from '../components/SectionIndexNav.jsx';
 import { blockMatchesQuery } from '../lib/blockSearchText.js';
+import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { inputClass, primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
 // Pages seeded from the §5.5 legal templates. While
@@ -112,6 +113,11 @@ export default function ContentPage() {
   // save today — treat it as unreachable rather than rendering it.
   const pageReserved =
     page && page.systemPage !== true && isReservedPathSegment(firstPathSegment(page.path));
+
+  // Called ahead of the early return below, unconditionally, as the rules
+  // of hooks require. A page that does not resolve names nothing, which
+  // leaves the event name standing alone.
+  useDocumentTitle(!page || page.systemPage || pageReserved ? null : page.label);
 
   if (!page || page.systemPage || pageReserved) {
     return <NotFound />;
