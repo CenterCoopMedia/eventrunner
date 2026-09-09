@@ -6,6 +6,9 @@ const assert = require('node:assert/strict');
 const {
   classifyPage,
   classifyPages,
+  buildSessionRoutes,
+  buildSpeakerRoutes,
+  buildUpdateRoutes,
   buildSitemapXml,
   buildRobotsTxt,
   buildWebManifest,
@@ -124,8 +127,23 @@ test('classifyPages splits public pages from excluded pages and appends the stat
   assert.ok(excludedIds.includes('updates'));
   assert.ok(excludedIds.includes('attendees'));
   assert.ok(excludedIds.includes('secret'));
-  // The static admin route carries no page id.
-  assert.ok(excluded.some((r) => r.path === '/admin' && r.id === null && r.access === 'admin'));
+
+  // Every static private route from apps/web/src/App.jsx is present, each
+  // carrying no cmsPages id.
+  const staticPaths = ['/admin', '/signin', '/profile', '/schedule/mine', '/speaker/profile', '/speaker/accept', '/ticket/claim'];
+  for (const path of staticPaths) {
+    assert.ok(excluded.some((r) => r.path === path && r.id === null), `${path} must be a static excluded route`);
+  }
+});
+
+test('only routes with their own subtree of further pages carry hasChildren', () => {
+  const { excluded } = classifyPages({ pages: PAGES, features: FEATURES });
+  const byPath = Object.fromEntries(excluded.map((r) => [r.path, r]));
+  assert.equal(byPath['/admin'].hasChildren, true);
+  assert.equal(byPath['/updates'].hasChildren, true);
+  assert.equal(byPath['/attendees'].hasChildren, true);
+  assert.equal(byPath['/profile'].hasChildren, false);
+  assert.equal(byPath['/signin'].hasChildren, false);
 });
 
 // --- buildSitemapXml --------------------------------------------------------
@@ -158,21 +176,69 @@ test('a trailing slash on the configured public URL is not doubled', () => {
   assert.doesNotMatch(xml, /example\.org\/\//);
 });
 
-test('a page label containing XML-sensitive characters cannot break the document', () => {
+test('an XML-sensitive character in a path segment is percent-encoded, never left as a raw XML special', () => {
   const withAmp = [...PAGES, page({ id: 'q-and-a', path: '/q&a' })];
   const xml = buildSitemapXml({ publicUrl: PUBLIC_URL, pages: withAmp, features: FEATURES });
-  assert.match(xml, /q&amp;a/);
+  // encodeURIComponent handles '&' itself (-> %26), so escapeXml never sees
+  // a raw '&' to turn into '&amp;' — percent-encoding runs first.
+  assert.match(xml, /<loc>https:\/\/example\.org\/q%26a<\/loc>/);
   assert.doesNotMatch(xml, /q&a</);
+  assert.doesNotMatch(xml, /q&amp;a/);
+});
+
+test('a route segment with a space is percent-encoded before it is XML-escaped', () => {
+  const sessions = [{ id: 'opening session', visible: true }];
+  const xml = buildSitemapXml({
+    publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES, sessions,
+  });
+  assert.match(xml, /<loc>https:\/\/example\.org\/schedule\/opening%20session<\/loc>/);
+  assert.doesNotMatch(xml, /opening session</);
+});
+
+test('a route segment with a non-ASCII character is percent-encoded', () => {
+  const speakers = [{ slug: 'josé-garcía' }];
+  const xml = buildSitemapXml({
+    publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES, speakers,
+  });
+  assert.match(xml, /<loc>https:\/\/example\.org\/speakers\/jos%C3%A9-garc%C3%ADa<\/loc>/);
 });
 
 // --- buildRobotsTxt ----------------------------------------------------------
 
-test('robots.txt names the hidden page, the flag-off system page, and the attendee route as disallowed', () => {
+test('robots.txt names the hidden page, the flag-off system page, and the attendee route, exact-path anchored', () => {
   const robots = buildRobotsTxt({ publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES });
-  assert.match(robots, /^Disallow: \/secret$/m);
-  assert.match(robots, /^Disallow: \/updates$/m);
-  assert.match(robots, /^Disallow: \/attendees$/m);
-  assert.match(robots, /^Disallow: \/admin$/m);
+  assert.match(robots, /^Disallow: \/secret\$$/m);
+  assert.match(robots, /^Disallow: \/updates\$$/m);
+  assert.match(robots, /^Disallow: \/attendees\$$/m);
+  assert.match(robots, /^Disallow: \/admin\$$/m);
+});
+
+test('robots.txt names every static private route, exact-path anchored', () => {
+  const robots = buildRobotsTxt({ publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES });
+  for (const path of ['/signin', '/profile', '/schedule/mine', '/speaker/profile', '/speaker/accept', '/ticket/claim']) {
+    assert.match(robots, new RegExp(`^Disallow: ${path.replace(/\//g, '\\/')}\\$$`, 'm'), path);
+  }
+});
+
+test('a route with children also gets a subtree wildcard rule', () => {
+  const robots = buildRobotsTxt({ publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES });
+  assert.match(robots, /^Disallow: \/admin\/\*$/m);
+  assert.match(robots, /^Disallow: \/updates\/\*$/m);
+  assert.match(robots, /^Disallow: \/attendees\/\*$/m);
+});
+
+test('a childless excluded route gets no subtree wildcard rule', () => {
+  const robots = buildRobotsTxt({ publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES });
+  assert.doesNotMatch(robots, /^Disallow: \/secret\/\*$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/signin\/\*$/m);
+});
+
+test('a hidden home page is disallowed as the exact root, never as a bare prefix that blocks the whole site', () => {
+  const withHiddenHome = PAGES.map((p) => (p.id === 'home' ? { ...p, visible: false } : p));
+  const robots = buildRobotsTxt({ publicUrl: PUBLIC_URL, pages: withHiddenHome, features: FEATURES });
+  assert.match(robots, /^Disallow: \/\$$/m);
+  // Never the unanchored form — that would read as "disallow everything".
+  assert.doesNotMatch(robots, /^Disallow: \/$/m);
 });
 
 test('robots.txt allows the site by default and names its sitemap', () => {
@@ -184,9 +250,84 @@ test('robots.txt allows the site by default and names its sitemap', () => {
 
 test('robots.txt never disallows a public route', () => {
   const robots = buildRobotsTxt({ publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES });
-  assert.doesNotMatch(robots, /^Disallow: \/travel$/m);
-  assert.doesNotMatch(robots, /^Disallow: \/schedule$/m);
-  assert.doesNotMatch(robots, /^Disallow: \/$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/travel\$$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/schedule\$$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/\$$/m);
+});
+
+test('an anchored disallow rule does not also block a look-alike sibling path', () => {
+  // The whole point of the $ anchor: /travel must not shadow /travel-guide.
+  const withGuide = [...PAGES, page({ id: 'travel-guide', path: '/travel-guide', visible: false })];
+  const robots = buildRobotsTxt({ publicUrl: PUBLIC_URL, pages: withGuide, features: FEATURES });
+  assert.match(robots, /^Disallow: \/travel-guide\$$/m);
+  // /travel itself stays public and undisallowed.
+  assert.doesNotMatch(robots, /^Disallow: \/travel\$$/m);
+});
+
+// --- buildSessionRoutes / buildSpeakerRoutes / buildUpdateRoutes ------------
+
+test('buildSessionRoutes lists a published session and drops a draft one', () => {
+  const sessions = [
+    { id: 'keynote', visible: true },
+    { id: 'draft-session', visible: false },
+  ];
+  const routes = buildSessionRoutes({ sessions, features: FEATURES });
+  assert.deepEqual(routes, [{ id: 'keynote', path: '/schedule/keynote' }]);
+});
+
+test('buildSessionRoutes lists nothing while features.schedule is off', () => {
+  const sessions = [{ id: 'keynote', visible: true }];
+  const routes = buildSessionRoutes({ sessions, features: { ...FEATURES, schedule: false } });
+  assert.deepEqual(routes, []);
+});
+
+test('buildSpeakerRoutes lists an approved speaker by slug', () => {
+  const speakers = [{ slug: 'rae-okonkwo' }];
+  const routes = buildSpeakerRoutes({ speakers, features: FEATURES });
+  assert.deepEqual(routes, [{ id: 'rae-okonkwo', path: '/speakers/rae-okonkwo' }]);
+});
+
+test('buildSpeakerRoutes lists nothing while features.speakers is off — the exclusion case for speakers', () => {
+  const speakers = [{ slug: 'rae-okonkwo' }];
+  const routes = buildSpeakerRoutes({ speakers, features: { ...FEATURES, speakers: false } });
+  assert.deepEqual(routes, []);
+});
+
+test('buildSpeakerRoutes drops a projection entry with no slug rather than emit a broken URL', () => {
+  const speakers = [{ slug: 'rae-okonkwo' }, { firstName: 'No Slug' }];
+  const routes = buildSpeakerRoutes({ speakers, features: FEATURES });
+  assert.deepEqual(routes, [{ id: 'rae-okonkwo', path: '/speakers/rae-okonkwo' }]);
+});
+
+test('buildUpdateRoutes lists a published update and drops a draft one', () => {
+  const updates = [
+    { id: 'week-one', visible: true },
+    { id: 'draft-update', visible: false },
+  ];
+  const routes = buildUpdateRoutes({ updates, features: { ...FEATURES, updates: true } });
+  assert.deepEqual(routes, [{ id: 'week-one', path: '/updates/week-one' }]);
+});
+
+test('buildUpdateRoutes lists nothing while features.updates is off (the default)', () => {
+  const updates = [{ id: 'week-one', visible: true }];
+  const routes = buildUpdateRoutes({ updates, features: FEATURES });
+  assert.deepEqual(routes, []);
+});
+
+test('the sitemap includes published session, speaker, and update detail routes', () => {
+  const xml = buildSitemapXml({
+    publicUrl: PUBLIC_URL,
+    pages: PAGES,
+    features: { ...FEATURES, updates: true },
+    sessions: [{ id: 'keynote', visible: true }, { id: 'draft', visible: false }],
+    speakers: [{ slug: 'rae-okonkwo' }],
+    updates: [{ id: 'week-one', visible: true }, { id: 'draft-update', visible: false }],
+  });
+  assert.match(xml, /<loc>https:\/\/example\.org\/schedule\/keynote<\/loc>/);
+  assert.match(xml, /<loc>https:\/\/example\.org\/speakers\/rae-okonkwo<\/loc>/);
+  assert.match(xml, /<loc>https:\/\/example\.org\/updates\/week-one<\/loc>/);
+  assert.doesNotMatch(xml, /\/schedule\/draft</);
+  assert.doesNotMatch(xml, /\/updates\/draft-update</);
 });
 
 // --- buildWebManifest ---------------------------------------------------------
@@ -230,6 +371,17 @@ test('a missing event name and short name still produce a valid, event-neutral m
   assert.equal(manifest.name, 'Event site');
   assert.equal(manifest.short_name, 'Event');
   assert.equal('description' in manifest, false);
+});
+
+// --- the checked-in fallback manifest (apps/web/public/manifest.webmanifest) -
+
+test('the checked-in fallback manifest matches the neutral shape buildWebManifest produces', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const fallbackPath = path.join(__dirname, '..', '..', 'apps', 'web', 'public', 'manifest.webmanifest');
+  const fallback = JSON.parse(fs.readFileSync(fallbackPath, 'utf8'));
+  const neutral = buildWebManifest({ event: {}, theme: {} });
+  assert.deepEqual(fallback, neutral);
 });
 
 // --- buildSiteArtifacts -------------------------------------------------------

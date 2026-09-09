@@ -149,8 +149,8 @@ than a second that can drift. `PUBLISH_QUEUE_ID`, which `cmsPublish` passes as a
 override, names the `cmsPublishQueue` row the terminal status is written back to; without it the
 job publishes and writes no status, which is what makes a hand-started execution safe.
 
-Exit codes name the stage — `2` configuration, `3` generation, `4` build, `6` sitemap/robots/
-manifest, `5` hosting deploy — so `gcloud run jobs executions describe` is usually enough to
+Exit codes name the stage — `2` configuration, `3` generation, `4` build, `5` hosting deploy,
+`6` sitemap/robots/manifest — so `gcloud run jobs executions describe` is usually enough to
 triage without opening the log. Setup, verification, and the rollback interaction:
 `docs/DEPLOY_RUNBOOK.md` §9.
 

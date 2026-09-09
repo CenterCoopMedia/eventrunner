@@ -349,26 +349,38 @@ test('the terminal patch is scoped under `publisher` and caps the error text', (
 
 // --- readSiteDocs / generateSiteFiles (scripts/lib/site-manifest.cjs) ---------
 
-/** A firestore-shaped double for readSiteDocs: config docs + cmsPages. */
-function fakeSiteDb({ event, features, theme, pages }) {
+/** Docs as `{ id, data() }` pairs, the shape every fake collection needs. */
+function asFakeDocs(records) {
+  return records.map((r) => {
+    const { id, ...rest } = r;
+    return { id, data: () => rest };
+  });
+}
+
+/**
+ * A firestore-shaped double for readSiteDocs: config docs, cmsPages
+ * (unfiltered), and cmsSchedule/speakers_public/cmsUpdates — the latter two
+ * collections support the one `.where('visible', '==', true)` query
+ * `readSiteDocs` actually runs.
+ */
+function fakeSiteDb({
+  event, features, theme, pages, sessions = [], speakers = [], updates = [],
+}) {
   const configDocs = { event, features, theme };
+  const filterableCollection = (records) => ({
+    async get() { return { docs: asFakeDocs(records) }; },
+    where(field, op, value) {
+      if (field !== 'visible' || op !== '==') throw new Error(`fakeSiteDb: unexpected where(${field}, ${op})`);
+      return { async get() { return { docs: asFakeDocs(records.filter((r) => r.visible === value)) }; } };
+    },
+  });
   return {
     collection(name) {
-      if (name === 'config') {
-        return { doc: (id) => ({ __configId: id }) };
-      }
-      if (name === 'cmsPages') {
-        return {
-          async get() {
-            return {
-              docs: pages.map((p) => {
-                const { id, ...rest } = p;
-                return { id, data: () => rest };
-              }),
-            };
-          },
-        };
-      }
+      if (name === 'config') return { doc: (id) => ({ __configId: id }) };
+      if (name === 'cmsPages') return { async get() { return { docs: asFakeDocs(pages) }; } };
+      if (name === 'cmsSchedule') return filterableCollection(sessions);
+      if (name === 'cmsUpdates') return filterableCollection(updates);
+      if (name === 'speakers_public') return { async get() { return { docs: asFakeDocs(speakers) }; } };
       throw new Error(`fakeSiteDb: unexpected collection ${name}`);
     },
     async getAll(...refs) {
@@ -392,6 +404,12 @@ const SITE_DOCS = {
     // Hidden.
     { id: 'secret', path: '/secret', order: 20, visible: false, systemPage: false },
   ],
+  sessions: [
+    { id: 'keynote', visible: true },
+    { id: 'draft-session', visible: false },
+  ],
+  speakers: [{ slug: 'rae-okonkwo' }],
+  updates: [{ id: 'week-one', visible: true }],
 };
 
 test('readSiteDocs reads cmsPages unfiltered, including a hidden page', async () => {
@@ -400,6 +418,18 @@ test('readSiteDocs reads cmsPages unfiltered, including a hidden page', async ()
   assert.equal(docs.event.name, 'Harborlight Summit');
   assert.equal(docs.features.updates, false);
   assert.ok(docs.pages.some((p) => p.id === 'secret' && p.visible === false));
+});
+
+test('readSiteDocs filters cmsSchedule and cmsUpdates to visible === true, but not speakers_public', () => {
+  return (async () => {
+    const db = fakeSiteDb(SITE_DOCS);
+    const docs = await readSiteDocs({ db });
+    assert.deepEqual(docs.sessions.map((s) => s.id), ['keynote']);
+    assert.deepEqual(docs.speakers.map((s) => s.slug), ['rae-okonkwo']);
+    // updates is off in SITE_DOCS.features, but readSiteDocs itself applies
+    // no feature gate — that is buildSiteArtifacts's job.
+    assert.deepEqual(docs.updates.map((u) => u.id), ['week-one']);
+  })();
 });
 
 test('readSiteDocs refuses to run against a project with no config/event doc', async () => {
@@ -415,12 +445,19 @@ test('generateSiteFiles writes all three files, and the sitemap and robots agree
 
     const sitemap = fs.readFileSync(path.join(distDir, 'sitemap.xml'), 'utf8');
     assert.match(sitemap, /<loc>https:\/\/example\.org\/travel<\/loc>/);
+    assert.match(sitemap, /<loc>https:\/\/example\.org\/schedule\/keynote<\/loc>/);
+    assert.match(sitemap, /<loc>https:\/\/example\.org\/speakers\/rae-okonkwo<\/loc>/);
+    assert.doesNotMatch(sitemap, /\/schedule\/draft-session</);
+    // features.updates is off in SITE_DOCS, so no update route at all,
+    // even though a published cmsUpdates doc exists.
+    assert.doesNotMatch(sitemap, /\/updates\/week-one</);
     assert.doesNotMatch(sitemap, /\/updates</);
     assert.doesNotMatch(sitemap, /\/secret</);
 
     const robots = fs.readFileSync(path.join(distDir, 'robots.txt'), 'utf8');
-    assert.match(robots, /^Disallow: \/updates$/m);
-    assert.match(robots, /^Disallow: \/secret$/m);
+    assert.match(robots, /^Disallow: \/updates\$$/m);
+    assert.match(robots, /^Disallow: \/updates\/\*$/m);
+    assert.match(robots, /^Disallow: \/secret\$$/m);
     assert.match(robots, /^Sitemap: https:\/\/example\.org\/sitemap\.xml$/m);
 
     const manifest = JSON.parse(fs.readFileSync(path.join(distDir, 'manifest.webmanifest'), 'utf8'));

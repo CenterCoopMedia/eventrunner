@@ -4,9 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/branding/favicon.svg" />
-    <!-- Written at publish time next to the built bundle
-         (scripts/lib/site-manifest.cjs, M7 issue 5); absent from a local
-         dev server or a build that never ran the publisher. -->
+    <!-- apps/web/public/manifest.webmanifest ships a neutral fallback so
+         this resolves under a non-root base (Vite rewrites a root-relative
+         href against `base` for any file it finds in publicDir, same as
+         the favicon above) and so a hand deploy that never runs
+         scripts/publish-site.cjs serves real JSON here rather than the
+         SPA shell (Firebase Hosting serves a matching static file before
+         it falls through to the `**` rewrite). The publisher overwrites
+         this file with the event's own manifest at publish time
+         (scripts/lib/site-manifest.cjs, M7 issue 5). -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <!-- Event-neutral shell title; EventConfigProvider sets document.title
          from the generated snapshot before first paint (spec §2.4). The SEO

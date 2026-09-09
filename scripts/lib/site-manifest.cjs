@@ -19,7 +19,8 @@
  *
  * This module is pure: no filesystem, no network, no Firestore. The caller
  * (scripts/publish-site.cjs) supplies the already-read config/event,
- * config/features, config/theme, and cmsPages documents.
+ * config/features, config/theme, cmsPages, cmsSchedule, speakers_public,
+ * and cmsUpdates documents.
  */
 
 const { configuredThemeColor } = require('./shared-theme.cjs');
@@ -39,12 +40,34 @@ const SYSTEM_PAGE_FEATURE_GATES = Object.freeze({
 });
 
 /**
- * Routes that carry no `cmsPages` document at all — the admin panel is its
- * own route tree (apps/web/src/admin), never a CMS document — but that a
- * crawler must never index or list all the same.
+ * System page ids whose own React route tree owns further paths under it
+ * (apps/web/src/App.jsx): `/schedule/:sessionId` and `/schedule/mine`,
+ * `/speakers/:slug`, `/attendees/:uid`, `/updates/:id`. When one of these
+ * pages is excluded, robots.txt has to disallow the whole subtree — an
+ * exact-path rule for `/schedule` alone would leave every session detail
+ * page reachable. `sponsors` and `home` carry no such subtree today.
+ */
+const SYSTEM_PAGES_WITH_CHILDREN = new Set(['schedule', 'speakers', 'attendees', 'updates']);
+
+/**
+ * Routes that carry no `cmsPages` document at all, so `classifyPages` can
+ * never see or gate them from Firestore alone — either the admin panel's
+ * own route tree (apps/web/src/admin), or a signed-in-only or single-use
+ * page under the public `Layout` route tree (apps/web/src/App.jsx) whose
+ * component itself checks `useAuth()` before rendering (Login.jsx,
+ * MySchedule.jsx, Profile.jsx, SpeakerAccept.jsx, SpeakerProfile.jsx,
+ * TicketClaim.jsx). None of these has content worth a search result, and
+ * `/speaker/accept` and `/ticket/claim` additionally carry a one-time
+ * token in the query string that a search index must never retain.
  */
 const STATIC_PRIVATE_ROUTES = Object.freeze([
-  Object.freeze({ path: '/admin', access: 'admin' }),
+  Object.freeze({ path: '/admin', access: 'admin', hasChildren: true }),
+  Object.freeze({ path: '/signin', access: 'account', hasChildren: false }),
+  Object.freeze({ path: '/profile', access: 'authenticated', hasChildren: false }),
+  Object.freeze({ path: '/schedule/mine', access: 'authenticated', hasChildren: false }),
+  Object.freeze({ path: '/speaker/profile', access: 'authenticated', hasChildren: false }),
+  Object.freeze({ path: '/speaker/accept', access: 'token', hasChildren: false }),
+  Object.freeze({ path: '/ticket/claim', access: 'token', hasChildren: false }),
 ]);
 
 /**
@@ -54,9 +77,9 @@ const STATIC_PRIVATE_ROUTES = Object.freeze([
  * `attendees` is the one page in the seed whose route is authenticated by
  * default: Attendees.jsx shows a sign-in prompt instead of the directory to
  * a signed-out visitor whenever `config/features.publicAttendeeProfiles` is
- * off (the default — packages/shared config/schema.cjs `DEFAULT_ON_FEATURES`
- * does not include it), so the route stays authenticated-only until an
- * operator turns that flag on.
+ * off (the default — scripts/lib/answers.cjs `DEFAULT_ON_FEATURES` does not
+ * include it), so the route stays authenticated-only until an operator
+ * turns that flag on.
  *
  * @param {{ id: string, features: object }} args
  * @returns {'public'|'authenticated'}
@@ -76,7 +99,8 @@ function routeAccess({ id, features }) {
  *
  * @param {{ page: object, features: object }} args
  * @returns {{ id: string, path: string, access: 'public'|'authenticated',
- *             visible: boolean, featureOn: boolean, publishable: boolean }}
+ *             visible: boolean, featureOn: boolean, publishable: boolean,
+ *             hasChildren: boolean }}
  */
 function classifyPage({ page, features = {} }) {
   const id = page?.id;
@@ -92,6 +116,7 @@ function classifyPage({ page, features = {} }) {
     visible,
     featureOn,
     publishable: visible && featureOn && access === 'public',
+    hasChildren: SYSTEM_PAGES_WITH_CHILDREN.has(id),
   };
 }
 
@@ -104,7 +129,7 @@ function classifyPage({ page, features = {} }) {
  * @returns {{ public: Array<{ id: string, path: string }>,
  *             excluded: Array<{ id: string|null, path: string,
  *                                access: string, visible: boolean,
- *                                featureOn: boolean }> }}
+ *                                featureOn: boolean, hasChildren: boolean }> }}
  */
 function classifyPages({ pages = [], features = {} }) {
   const publicRoutes = [];
@@ -115,19 +140,109 @@ function classifyPages({ pages = [], features = {} }) {
     if (c.publishable) publicRoutes.push({ id: c.id, path: c.path });
     else {
       excluded.push({
-        id: c.id, path: c.path, access: c.access, visible: c.visible, featureOn: c.featureOn,
+        id: c.id, path: c.path, access: c.access, visible: c.visible,
+        featureOn: c.featureOn, hasChildren: c.hasChildren,
       });
     }
   }
   for (const route of STATIC_PRIVATE_ROUTES) {
-    excluded.push({ id: null, path: route.path, access: route.access, visible: true, featureOn: true });
+    excluded.push({
+      id: null, path: route.path, access: route.access, visible: true,
+      featureOn: true, hasChildren: route.hasChildren,
+    });
   }
   return { public: publicRoutes, excluded };
+}
+
+/**
+ * Published session detail routes (`/schedule/:sessionId`,
+ * apps/web/src/pages/SessionDetail.jsx). Gated on `features.schedule`
+ * alone — the detail route checks nothing about the `schedule` cmsPages
+ * doc's own `visible` field, so neither does this. `visible` on the
+ * session record itself is read STRICTLY `=== true`, the same rule as
+ * every other cms* collection.
+ *
+ * @param {{ sessions: object[], features: object }} args
+ * @returns {Array<{ id: string, path: string }>}
+ */
+function buildSessionRoutes({ sessions = [], features = {} }) {
+  if (features.schedule !== true) return [];
+  return sessions
+    .filter((s) => s?.visible === true && typeof s?.id === 'string' && s.id)
+    .map((s) => ({ id: s.id, path: `/schedule/${s.id}` }));
+}
+
+/**
+ * Approved speaker detail routes (`/speakers/:slug`,
+ * apps/web/src/pages/SpeakerDetail.jsx). Gated on `features.speakers`
+ * alone. No `status` filter is needed beyond that: `speakers_public` is a
+ * one-way projection that exists ONLY for a speaker whose `status` is
+ * `approved` (functions/src/speakers/projection.cjs) — a draft, invited,
+ * accepted-but-unapproved, or removed speaker has no document there at
+ * all, so the caller supplying that collection is what does the filtering.
+ *
+ * @param {{ speakers: object[], features: object }} args
+ * @returns {Array<{ id: string, path: string }>}
+ */
+function buildSpeakerRoutes({ speakers = [], features = {} }) {
+  if (features.speakers !== true) return [];
+  return speakers
+    .filter((s) => typeof s?.slug === 'string' && s.slug)
+    .map((s) => ({ id: s.slug, path: `/speakers/${s.slug}` }));
+}
+
+/**
+ * Published update routes (`/updates/:id`,
+ * apps/web/src/pages/UpdateDetail.jsx). Gated on `features.updates` alone,
+ * same as the `updates` list page. `visible` read STRICTLY `=== true`,
+ * the same rule `updatesMeta` applies (functions/src/public/og.cjs).
+ *
+ * @param {{ updates: object[], features: object }} args
+ * @returns {Array<{ id: string, path: string }>}
+ */
+function buildUpdateRoutes({ updates = [], features = {} }) {
+  if (features.updates !== true) return [];
+  return updates
+    .filter((u) => u?.visible === true && typeof u?.id === 'string' && u.id)
+    .map((u) => ({ id: u.id, path: `/updates/${u.id}` }));
+}
+
+/**
+ * Every route the sitemap may list: the public `cmsPages` routes plus the
+ * three detail-record kinds.
+ *
+ * @param {{ pages: object[], features: object, sessions: object[],
+ *           speakers: object[], updates: object[] }} args
+ * @returns {Array<{ id: string, path: string }>}
+ */
+function collectPublicRoutes({ pages, features, sessions, speakers, updates }) {
+  const { public: pageRoutes } = classifyPages({ pages, features });
+  return [
+    ...pageRoutes,
+    ...buildSessionRoutes({ sessions, features }),
+    ...buildSpeakerRoutes({ speakers, features }),
+    ...buildUpdateRoutes({ updates, features }),
+  ];
 }
 
 /** Strip a trailing slash so `${base}${path}` never doubles one. */
 function normalizedBaseUrl(publicUrl) {
   return typeof publicUrl === 'string' ? publicUrl.replace(/\/+$/, '') : '';
+}
+
+/**
+ * Percent-encode a route path one segment at a time, so a session id,
+ * speaker slug, or update id containing a space, `&`, or a non-ASCII
+ * character produces a valid URL instead of a broken or double-escaped
+ * one. The leading/trailing empty segments around each `/` are left as
+ * `/` — only segment CONTENT is encoded, never the separator.
+ *
+ * @param {string} routePath
+ * @returns {string}
+ */
+function encodeRoutePath(routePath) {
+  if (typeof routePath !== 'string') return '';
+  return routePath.split('/').map((segment) => (segment === '' ? '' : encodeURIComponent(segment))).join('/');
 }
 
 /**
@@ -150,15 +265,21 @@ function escapeXml(value) {
 }
 
 /**
- * @param {{ publicUrl: string, pages: object[], features: object }} args
+ * @param {{ publicUrl: string, pages: object[], features: object,
+ *           sessions?: object[], speakers?: object[], updates?: object[] }} args
  * @returns {string} sitemap.xml content
  */
-function buildSitemapXml({ publicUrl, pages, features }) {
+function buildSitemapXml({
+  publicUrl, pages, features, sessions = [], speakers = [], updates = [],
+}) {
   const base = normalizedBaseUrl(publicUrl);
-  const { public: publicRoutes } = classifyPages({ pages, features });
+  const publicRoutes = collectPublicRoutes({
+    pages, features, sessions, speakers, updates,
+  });
   const sorted = [...publicRoutes].sort((a, b) => a.path.localeCompare(b.path));
   const urls = sorted.map((route) => {
-    const loc = route.path === '/' ? `${base}/` : `${base}${route.path}`;
+    const encoded = encodeRoutePath(route.path);
+    const loc = route.path === '/' ? `${base}/` : `${base}${encoded}`;
     return `  <url>\n    <loc>${escapeXml(loc)}</loc>\n  </url>`;
   });
   return [
@@ -173,12 +294,26 @@ function buildSitemapXml({ publicUrl, pages, features }) {
 /**
  * @param {{ publicUrl: string, pages: object[], features: object }} args
  * @returns {string} robots.txt content
+ *
+ * Every disallow rule is `$`-anchored to the excluded route's exact path —
+ * a bare `Disallow: /travel` also blocks `/travel-guide`, since robots.txt
+ * matching is a plain prefix test with no implied path boundary, and a
+ * bare `Disallow: /` for a hidden HOME page would disallow the entire
+ * site (every path starts with `/`). `Disallow: /$` matches only the
+ * exact root and nothing else. A route whose own subtree carries further
+ * pages (`hasChildren`, e.g. `/schedule/:sessionId` under `/schedule`)
+ * gets a second `/path/*` rule so an excluded parent still shields the
+ * detail pages under it.
  */
 function buildRobotsTxt({ publicUrl, pages, features }) {
   const base = normalizedBaseUrl(publicUrl);
   const { excluded } = classifyPages({ pages, features });
-  const disallowPaths = [...new Set(excluded.map((route) => route.path))].sort();
-  const lines = ['User-agent: *', 'Allow: /', ...disallowPaths.map((p) => `Disallow: ${p}`)];
+  const disallowLines = new Set();
+  for (const route of excluded) {
+    disallowLines.add(`Disallow: ${route.path}$`);
+    if (route.hasChildren) disallowLines.add(`Disallow: ${route.path}/*`);
+  }
+  const lines = ['User-agent: *', 'Allow: /', ...[...disallowLines].sort()];
   lines.push('', `Sitemap: ${base}/sitemap.xml`, '');
   return lines.join('\n');
 }
@@ -194,6 +329,10 @@ function buildRobotsTxt({ publicUrl, pages, features }) {
  * configured them (`config/theme.colors`, via `configuredThemeColor` —
  * packages/shared/src/theme.cjs, both stored spellings), so an
  * unconfigured deployment ships a manifest with no invented color.
+ *
+ * This is also, field for field, the shape of the checked-in fallback at
+ * `apps/web/public/manifest.webmanifest` (see its own test) — the neutral
+ * placeholder Vite ships when a build never runs the publisher.
  *
  * @param {{ event: object, theme: object }} args
  * @returns {object} the manifest, ready for `JSON.stringify`
@@ -226,15 +365,21 @@ function buildWebManifest({ event = {}, theme = {} }) {
 }
 
 /**
- * All three artifacts, from one read of the deployment's config and pages.
+ * All three artifacts, from one read of the deployment's config, pages,
+ * and published detail records.
  *
  * @param {{ event: object, features: object, theme: object,
- *           pages: object[], publicUrl: string }} args
+ *           pages: object[], sessions?: object[], speakers?: object[],
+ *           updates?: object[], publicUrl: string }} args
  * @returns {{ sitemapXml: string, robotsTxt: string, manifest: object }}
  */
-function buildSiteArtifacts({ event, features, theme, pages, publicUrl }) {
+function buildSiteArtifacts({
+  event, features, theme, pages, sessions = [], speakers = [], updates = [], publicUrl,
+}) {
   return {
-    sitemapXml: buildSitemapXml({ publicUrl, pages, features }),
+    sitemapXml: buildSitemapXml({
+      publicUrl, pages, features, sessions, speakers, updates,
+    }),
     robotsTxt: buildRobotsTxt({ publicUrl, pages, features }),
     manifest: buildWebManifest({ event, theme }),
   };
@@ -242,12 +387,19 @@ function buildSiteArtifacts({ event, features, theme, pages, publicUrl }) {
 
 module.exports = {
   SYSTEM_PAGE_FEATURE_GATES,
+  SYSTEM_PAGES_WITH_CHILDREN,
   STATIC_PRIVATE_ROUTES,
   classifyPage,
   classifyPages,
+  buildSessionRoutes,
+  buildSpeakerRoutes,
+  buildUpdateRoutes,
+  collectPublicRoutes,
   buildSitemapXml,
   buildRobotsTxt,
   buildWebManifest,
   buildSiteArtifacts,
-  internals: { escapeXml, normalizedBaseUrl, routeAccess },
+  internals: {
+    escapeXml, normalizedBaseUrl, routeAccess, encodeRoutePath,
+  },
 };

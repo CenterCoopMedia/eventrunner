@@ -285,13 +285,25 @@ async function writeQueueStatus({ db, queueId, patch, log = console }) {
 
 /**
  * Read the documents `buildSiteArtifacts` needs, straight through the
- * Admin SDK — cmsPages UNFILTERED, unlike `generate-content.cjs`'s
+ * Admin SDK.
+ *
+ * cmsPages is read UNFILTERED, unlike `generate-content.cjs`'s
  * `readVisibleCollection`: a hidden page (`visible: false`) has to reach
  * `buildSiteArtifacts` so it can be named in robots.txt, not merely
  * dropped as if it never existed.
  *
+ * cmsSchedule and cmsUpdates ARE filtered to `visible == true` — the same
+ * query `generate-content.cjs` runs — because a draft session or update
+ * detail page is never linked from anywhere public, so unlike a hidden
+ * cmsPages page there is no robots.txt entry to build for it either; only
+ * the sitemap needs to know about these at all. `speakers_public` needs no
+ * filter: that projection exists only for a speaker whose status is
+ * `approved` (functions/src/speakers/projection.cjs).
+ *
  * @param {{ db: object }} args
- * @returns {Promise<{ event: object, features: object, theme: object, pages: object[] }>}
+ * @returns {Promise<{ event: object, features: object, theme: object,
+ *                     pages: object[], sessions: object[],
+ *                     speakers: object[], updates: object[] }>}
  */
 async function readSiteDocs({ db }) {
   const configIds = ['event', 'features', 'theme'];
@@ -302,10 +314,23 @@ async function readSiteDocs({ db }) {
   });
   if (!config.event) throw new Error('config/event is missing — run scripts/init-event.cjs first');
 
-  const pagesSnap = await db.collection('cmsPages').get();
-  const pages = pagesSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+  const [pagesSnap, sessionsSnap, speakersSnap, updatesSnap] = await Promise.all([
+    db.collection('cmsPages').get(),
+    db.collection('cmsSchedule').where('visible', '==', true).get(),
+    db.collection('speakers_public').get(),
+    db.collection('cmsUpdates').where('visible', '==', true).get(),
+  ]);
+  const asDocs = (snap) => snap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
 
-  return { event: config.event, features: config.features || {}, theme: config.theme || {}, pages };
+  return {
+    event: config.event,
+    features: config.features || {},
+    theme: config.theme || {},
+    pages: asDocs(pagesSnap),
+    sessions: asDocs(sessionsSnap),
+    speakers: asDocs(speakersSnap),
+    updates: asDocs(updatesSnap),
+  };
 }
 
 /**
@@ -321,8 +346,12 @@ async function readSiteDocs({ db }) {
  */
 async function generateSiteFiles({ db, distDir, publicUrl, log = console }) {
   if (!db) throw new Error('generateSiteFiles: no Firestore handle available');
-  const { event, features, theme, pages } = await readSiteDocs({ db });
-  const artifacts = buildSiteArtifacts({ event, features, theme, pages, publicUrl });
+  const {
+    event, features, theme, pages, sessions, speakers, updates,
+  } = await readSiteDocs({ db });
+  const artifacts = buildSiteArtifacts({
+    event, features, theme, pages, sessions, speakers, updates, publicUrl,
+  });
 
   fs.mkdirSync(distDir, { recursive: true });
   fs.writeFileSync(path.join(distDir, 'sitemap.xml'), artifacts.sitemapXml);

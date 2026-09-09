@@ -615,12 +615,12 @@ The exit code names the stage, so triage rarely needs the log:
 | Exit | Meaning |
 |---|---|
 | `0` | published |
+| `1` | an unexpected error in the entrypoint itself |
 | `2` | the job's environment is invalid — nothing ran; compare `gcloud run jobs describe` against §3 |
 | `3` | `generate-content.cjs` failed — usually `datastore.user` missing, or `config/event` absent |
 | `4` | the vite build failed — a missing `VITE_*` value, or the task ran out of memory |
-| `6` | writing sitemap.xml, robots.txt, or the web manifest failed — usually `config/event` or `cmsPages` unreadable; runs after the build, before hosting deploys |
 | `5` | `firebase deploy --only hosting` failed — usually `firebasehosting.admin` missing |
-| `1` | an unexpected error in the entrypoint itself |
+| `6` | writing sitemap.xml, robots.txt, or the web manifest failed — usually `config/event` or `cmsPages` unreadable; runs after the build, before hosting deploys |
 
 Common failures on the invoke side, from the queue row's `publisher.invoke.error`:
 
