@@ -10,6 +10,7 @@
  */
 
 const { MAX_TOTAL_BADGES } = require('../badges.cjs');
+const { safeUrlHref } = require('../urlSafety.cjs');
 const {
   VENUE_PLACE_KEYS,
   VENUE_MOVEMENT_KEYS,
@@ -60,27 +61,51 @@ const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * True when the string is a URL a browser may be sent to over TLS.
+ * The canonical href of an https URL a browser may be sent to, or '' when
+ * the value is not one.
  *
- * Stricter than shared/urlSafety's `isSafeUrl`, on purpose. That helper
- * gates a link a person typed into the CMS and allows http: as well, because
- * refusing an operator's own plain-http link would be refusing their own
- * content. This one gates a value the SITE renders as its own action — the
- * registration destination on the home lead and in the header — and a
- * plain-http destination there would send a reader off the event's own
- * TLS-served site to type their name and their email in clear. A provider
- * that cannot serve https is a provider this field refuses.
+ * BUILT ON `safeUrlHref`, NOT ON A PARSE OF ITS OWN (Codex review of the
+ * configured registration action: P2). The protocol test this used to run
+ * — `new URL(v).protocol === 'https:'` — accepts `https:register.example.org`
+ * and `https:/register.example.org`, because the WHATWG parser reads a
+ * special scheme with no `//` as a relative reference. Put in an `href`,
+ * that string does not go to register.example.org at all: it resolves
+ * against the page it sits on, and a reader clicking Register lands on the
+ * event's own domain. shared/urlSafety already refuses exactly that shape
+ * for every other link that leaves the site, so the rule stays there and
+ * this narrows it rather than restating it — one definition of what an
+ * absolute http(s) URL looks like, not two that can drift.
+ *
+ * RETURNS THE PARSED HREF for the same reason `safeUrlHref` does: what a
+ * reader clicks must be the exact string this function approved, so a value
+ * cannot validate as one URL and resolve as another.
+ *
+ * Stricter than `isSafeUrl`, on purpose. That helper gates a link a person
+ * typed into the CMS and allows http: as well, because refusing an
+ * operator's own plain-http link would be refusing their own content. This
+ * one gates a value the SITE renders as its own action — the registration
+ * destination on the home lead and in the header — and a plain-http
+ * destination there would send a reader off the event's own TLS-served site
+ * to type their name and their email in clear. A provider that cannot serve
+ * https is a provider this field refuses.
+ *
+ * @param {*} v
+ * @returns {string} the canonical href, or '' when the value is not an
+ *   absolute https URL
+ */
+function httpsUrlHref(v) {
+  const href = safeUrlHref(v);
+  return href.startsWith('https://') ? href : '';
+}
+
+/**
+ * True when the string is a URL a browser may be sent to over TLS.
  *
  * @param {*} v
  * @returns {boolean}
  */
 function isHttpsUrl(v) {
-  if (typeof v !== 'string' || !v.trim()) return false;
-  try {
-    return new URL(v.trim()).protocol === 'https:';
-  } catch {
-    return false;
-  }
+  return httpsUrlHref(v) !== '';
 }
 
 // Every key config/features may carry (spec §2.2). Unknown keys are
@@ -858,4 +883,5 @@ module.exports = {
   KNOWN_FEATURE_KEYS,
   TRACK_LETTER_RE,
   isHttpsUrl,
+  httpsUrlHref,
 };

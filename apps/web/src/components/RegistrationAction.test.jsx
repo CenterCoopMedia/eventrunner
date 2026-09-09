@@ -55,6 +55,22 @@ describe('RegistrationAction', () => {
     expect(link.className).not.toContain('bg-accent');
   });
 
+  it('puts the canonical href in the anchor, not the string that was stored', () => {
+    // The destination is unvalidated Firestore data at read time, so what
+    // the reader clicks is the href the shared reader parsed and approved —
+    // host lower-cased, path present, components encoded. A raw string in
+    // the anchor is how a value validates as one URL and resolves as
+    // another.
+    renderAction(
+      { registration: { externalUrl: '  HTTPS://Register.Example.ORG  ', actionLabel: 'Register' } },
+      'lead',
+    );
+    expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute(
+      'href',
+      'https://register.example.org/',
+    );
+  });
+
   it('falls back to a stated label rather than drawing a blank control', () => {
     renderAction({ registration: { externalUrl: 'https://register.example.org' } }, 'lead');
     expect(screen.getByRole('link', { name: 'Register' })).toBeInTheDocument();
@@ -90,6 +106,12 @@ describe('RegistrationAction', () => {
       'javascript:alert(1)',
       'register.example.org',
       42,
+      // Codex review (P2): a scheme with no authority reads as https to a
+      // protocol test, and in an `href` resolves against the page it sits
+      // on — a reader clicking Register would land on this site's own
+      // /register.example.org, not on the registration form.
+      'https:register.example.org',
+      'https:/register.example.org',
     ]) {
       const { container, unmount } = renderAction({ registration: { externalUrl: url } }, 'lead');
       expect(container).toBeEmptyDOMElement();
