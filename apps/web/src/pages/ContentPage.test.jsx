@@ -74,6 +74,13 @@ describe('Home', () => {
     expect(document.querySelectorAll('a[target="_blank"]')).toHaveLength(0);
     // Generic sections render with their labels from the pages snapshot.
     const home = pagesData.find((p) => p.id === 'home');
+    // The key facts group (M7 issue 9) is drawn by the core, under its own
+    // heading, and exactly once: the slot renderer must not draw the same
+    // section a second time further down the page.
+    const infoSection = home.sections.find((s) => s.id === 'info');
+    expect(screen.getAllByRole('heading', { name: infoSection.label })).toHaveLength(1);
+    expect(screen.getByText(siteContent.info__when.takeaway)).toBeInTheDocument();
+    expect(screen.getByText(siteContent.info__where_venue.text)).toBeInTheDocument();
     const statsSection = home.sections.find((s) => s.id === 'stats');
     expect(
       screen.getByRole('heading', { name: statsSection.label }),

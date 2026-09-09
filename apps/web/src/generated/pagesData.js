@@ -47,6 +47,39 @@ export const pagesData = [
         ],
       },
       {
+        id: 'info',
+        label: 'Key facts',
+        description: 'The event’s own short answers. A stat opens a card; the list items after it are that card’s lines.',
+        allowedBlocks: [
+          'stat',
+          'list_item',
+        ],
+        maxBlocks: 12,
+        reorderable: true,
+        defaultBlocks: [
+          {
+            field: 'when',
+            blockType: 'stat',
+            description: 'When the event runs.',
+          },
+          {
+            field: 'where_venue',
+            blockType: 'list_item',
+            description: 'The venue’s name, labelled.',
+          },
+          {
+            field: 'where_address',
+            blockType: 'list_item',
+            description: 'The venue’s street address, labelled.',
+          },
+          {
+            field: 'where_transit',
+            blockType: 'list_item',
+            description: 'How to reach the venue on public transit, labelled.',
+          },
+        ],
+      },
+      {
         id: 'details',
         label: 'Details',
         description: 'Body copy describing what happens at the event.',

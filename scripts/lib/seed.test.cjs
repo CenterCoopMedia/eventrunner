@@ -383,6 +383,50 @@ test('the hero seeds no registration action of its own (M7 issue 8)', () => {
   assert.equal(content.some((doc) => doc.section === 'hero' && doc.blockType === 'cta'), false);
 });
 
+// M7 issue 9: the key facts group. The seed supplies the section and its
+// placeholder blocks, using the two block types that already exist — a
+// stat opens a card and the list items after it are that card's lines.
+//
+// ONE STAT, THREE LINES. A stat is six [Replace] instructions (the stat
+// contract), so three of them would put fifteen of them under the hero of a
+// site nobody has edited yet. One figure and three lines is one short card
+// an operator can finish, and the section takes twelve blocks.
+test('the home page seeds a key facts section built from stat and list_item blocks', () => {
+  const home = defaultPages().find((page) => page.id === 'home');
+  const info = home.sections.find((section) => section.id === 'info');
+  assert.ok(info, 'the home page seeds an info section');
+  assert.deepEqual(info.allowedBlocks, ['stat', 'list_item'], 'no new block type');
+  assert.deepEqual(
+    info.defaultBlocks.map((def) => [def.field, def.blockType]),
+    [
+      ['when', 'stat'],
+      ['where_venue', 'list_item'],
+      ['where_address', 'list_item'],
+      ['where_transit', 'list_item'],
+    ],
+    'one stat opens the card and its lines follow it',
+  );
+  assert.equal(
+    info.defaultBlocks.filter((def) => def.blockType === 'stat').length,
+    1,
+    'a fresh site opens one short card, not one per fact',
+  );
+  const content = new Map(
+    buildSeedContent({ pages: defaultPages(), docs: configDocs(), tierA: TIER_A }).map((d) => [d.id, d]),
+  );
+  // Seeded in the order the card reads in, so the positional grouping the
+  // renderer applies is the one an editor sees in the admin.
+  assert.deepEqual(
+    info.defaultBlocks.map((def) => content.get(`info__${def.field}`).order),
+    [0, 1, 2, 3],
+  );
+  // The seeded stat carries the six-part contract, so the section can be
+  // published without an editor first filling in four more fields.
+  for (const part of ['value', 'label', 'takeaway', 'description', 'source', 'alt']) {
+    assert.ok(content.get('info__when')[part], `info__when.${part} is seeded`);
+  }
+});
+
 test('placeholder copy is a [Replace] instruction, never another event copy', () => {
   const docs = configDocs();
   const content = buildSeedContent({ pages: defaultPages(), docs, tierA: TIER_A });

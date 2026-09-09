@@ -13,13 +13,23 @@ import { cleanup, render, screen } from '@testing-library/react';
 let eventConfig;
 let heroBlocks;
 let theme;
+// The key facts group (M7 issue 9) reads its own section's blocks and the
+// page document's label for it, so the mock answers per section rather than
+// handing every section the hero's blocks. Both default to empty, so every
+// test above renders exactly the page it rendered before the group existed.
+let infoBlocks;
+let pageDoc;
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig, theme }),
 }));
 vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({
-    getPage: () => null,
-    getSectionBlocks: () => heroBlocks,
+    getPage: () => pageDoc,
+    getSectionBlocks: (section) => {
+      if (section === 'hero') return heroBlocks;
+      if (section === 'info') return infoBlocks;
+      return [];
+    },
     getBlock: (section, field) =>
       section === 'hero' && field === 'title' ? { value: 'Fallback title' } : null,
   }),
@@ -38,6 +48,8 @@ const LEAD = {
 beforeEach(() => {
   heroBlocks = [];
   theme = undefined;
+  infoBlocks = [];
+  pageDoc = null;
 });
 
 describe('Home', () => {
@@ -175,5 +187,55 @@ describe('Home lead countdown', () => {
     unmount();
     expect(clearSpy).toHaveBeenCalledTimes(1);
     clearSpy.mockRestore();
+  });
+});
+
+// The key facts group (M7 issue 9). The arrangement's own rules live with
+// it (components/InfoCards.test.jsx). What the page owns is whether to open
+// the section at all, and the case that matters is a section holding only
+// something the arrangement cannot draw: the heading must not be written
+// over nothing.
+describe('Home key facts', () => {
+  const stat = {
+    section: 'info',
+    field: 'when',
+    blockType: 'stat',
+    value: '3 days',
+    label: 'When',
+    takeaway: 'The event runs from Wednesday to Friday',
+    description: 'The three days on the programme.',
+    source: 'The programme, read today.',
+    alt: 'The event runs for three days.',
+  };
+
+  beforeEach(() => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    pageDoc = {
+      id: 'home',
+      path: '/',
+      label: 'Home page',
+      sections: [{ id: 'info', label: 'Key facts' }],
+    };
+  });
+
+  it('opens the section under the page document’s own label for it', () => {
+    infoBlocks = [stat, { section: 'info', field: 'venue', blockType: 'list_item', text: 'Venue: The hall' }];
+    render(<Home />);
+    expect(screen.getByRole('heading', { level: 2, name: 'Key facts' })).toBeInTheDocument();
+    expect(screen.getByText('The event runs from Wednesday to Friday')).toBeInTheDocument();
+    expect(screen.getByText('Venue: The hall')).toBeInTheDocument();
+  });
+
+  it('writes no heading over a section it cannot draw', () => {
+    // Every block is a type this arrangement does not render, so there is
+    // no group under the heading and therefore no heading.
+    infoBlocks = [{ section: 'info', field: 'note', blockType: 'richtext', value: '<p>Not here.</p>' }];
+    render(<Home />);
+    expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();
+  });
+
+  it('writes no heading for an empty section', () => {
+    render(<Home />);
+    expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();
   });
 });

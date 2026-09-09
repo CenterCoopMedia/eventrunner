@@ -245,6 +245,29 @@ const DEMO_CONTENT = Object.freeze({
     value:
       'Sessions and workshops for people who operate local and cooperative newsrooms.',
   },
+  // The key facts card (M7 issue 9): one figure, then the lines a reader
+  // needs beside it. The figure carries the six-part stat contract, the
+  // same as the two figures further down the page, because the demo is
+  // what a filled-in deployment looks like rather than a template — and
+  // because the dates really are a number somebody counted, from a source
+  // that can be named.
+  info__when: {
+    value: '3 days',
+    label: 'When',
+    takeaway: 'The summit runs from Wednesday to Friday',
+    description: '14 to 16 October 2026, in the Eastern timezone. Doors open at 09:00 each day.',
+    source: 'Summit programme, read 1 September 2026.',
+    alt: 'The summit runs for three days, 14 to 16 October 2026.',
+  },
+  // Where the summit happens is a name, an address, and a way to get there.
+  // They are labelled lines, not statistics: a venue is not a number, and
+  // the only way to dress one as a stat is to invent a count ("1 venue")
+  // and a source line to cite it to. Neither is a fact anyone measured.
+  info__where_venue: { text: 'Venue: Harborlight Hall' },
+  info__where_address: { text: 'Address: 1 Harborlight Way, Millhaven, MH 58211' },
+  info__where_transit: {
+    text: 'Nearest transit: Millhaven Central station, ten minutes on foot',
+  },
   details__intro: {
     value:
       '<p>The summit has shared sessions and two workshop tracks. Day one includes registration ' +

@@ -16,6 +16,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import CtaBlock from '../components/blocks/CtaBlock.jsx';
 import EventCountdown from '../components/EventCountdown.jsx';
+import InfoCards, { groupIntoCards } from '../components/InfoCards.jsx';
 import LeadImage from '../components/LeadImage.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import RegistrationAction, {
@@ -60,6 +61,17 @@ export default function Home() {
   // because the action row around it is drawn only when it holds something.
   const registrationAction = resolveRegistrationLink(eventConfig);
   const heroBlocks = getSectionBlocks('hero');
+  // The key facts group (M7 issue 9). Its heading is the page document's
+  // own label for the section, with a stated fallback for a deployment
+  // whose page doc predates the section but whose content does not.
+  //
+  // Grouped here as well as inside the component because the section around
+  // it is drawn only when it holds something: a section whose blocks are
+  // all of some type this arrangement does not draw would otherwise print
+  // its heading over nothing.
+  const infoCards = groupIntoCards(getSectionBlocks('info'));
+  const infoLabel =
+    page?.sections?.find((section) => section.id === 'info')?.label ?? 'Key facts';
   const heroCtas = heroBlocks.filter((block) => block.blockType === 'cta');
   // One lead image at most. An editor who stores several images in the
   // opening section gets the first one, never a gallery.
@@ -81,9 +93,15 @@ export default function Home() {
     // snapshot render identical text by construction (spec §8.6 hygiene).
     //
     // The lead is the core (brief §6.2), so the `hero` section is the core's
-    // own and never renders again as a slot section. Everything else the
-    // page stores renders around the core in its stated slot.
-    <SystemPage pageId={['home', '/']} exclude={['hero']} data-content-source={source}>
+    // own and never renders again as a slot section. `info` is the core's
+    // too: it is the group of cards directly under the lead (M7 issue 9),
+    // an arrangement the generic block renderer has no way to draw, so the
+    // core draws it and the slot renderer must not draw it a second time.
+    <SystemPage
+      pageId={['home', '/']}
+      exclude={['hero', 'info']}
+      data-content-source={source}
+    >
       <section
         className="pb-xl"
         {...(leadTitle ? { 'aria-labelledby': 'hero-title' } : { 'aria-label': 'Introduction' })}
@@ -138,6 +156,20 @@ export default function Home() {
           {lead ? <LeadImage block={lead} /> : null}
         </div>
       </section>
+
+      {/* The key facts, directly under the lead: when the event runs, where
+          it happens, and who it is for (M7 issue 9). The section renders
+          only when an editor has put something in it, and its heading is
+          the label the page document states, so the group is named by the
+          same words the admin Pages list shows. */}
+      {infoCards.length ? (
+        <section aria-labelledby="section-info" className="page-section">
+          <SectionHead level={2} id="section-info" title={infoLabel} />
+          <div className="mt-md">
+            <InfoCards cards={infoCards} />
+          </div>
+        </section>
+      ) : null}
 
       {features?.liveUpdates ? (
         <div className="mb-xl">
