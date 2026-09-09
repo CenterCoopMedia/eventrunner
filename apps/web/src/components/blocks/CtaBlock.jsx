@@ -17,7 +17,7 @@
 // how the drift that module's header describes got started.
 import { Link } from 'react-router-dom';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
-import { isCanonicalPagePath } from '../../lib/internalPath.js';
+import { isCanonicalPagePath } from 'shared/routing';
 import { primaryActionClass } from '../controlClasses.js';
 
 export default function CtaBlock({ block }) {

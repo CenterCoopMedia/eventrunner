@@ -22,7 +22,7 @@
 // underline at 40%, accent-strong on hover.
 import { Link } from 'react-router-dom';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
-import { isCanonicalPagePath } from '../../lib/internalPath.js';
+import { isCanonicalPagePath } from 'shared/routing';
 
 const LINK_CLASS =
   'touch-target inline-flex items-center text-body text-accent underline decoration-accent/40 underline-offset-2 hover:text-accent-strong';
