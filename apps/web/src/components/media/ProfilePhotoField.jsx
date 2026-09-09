@@ -30,8 +30,8 @@ import {
   checkFile,
   formatBytes,
   typeLabel,
-  uploadProfilePhoto,
 } from '../../lib/mediaSource.js';
+import { uploadProfilePhoto } from '../../lib/photoUpload.js';
 import AssetImage from './AssetImage.jsx';
 
 export default function ProfilePhotoField({ uid, value, onChange }) {

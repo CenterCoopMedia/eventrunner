@@ -9,7 +9,6 @@ import {
   connectFirestoreEmulator,
   disableNetwork,
 } from 'firebase/firestore';
-import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { IS_DEMO } from './lib/demoMode.js';
 
 const firebaseConfig = {
@@ -24,9 +23,18 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app);
 
-const useEmulators = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true';
+// Storage has NO client here on purpose (docs/performance/public-bundle-budget.md).
+// Nothing a visitor sees on first paint talks to the Storage service: the
+// media URLs on every page are built as strings from the bucket name below,
+// and the only calls that need the SDK are one attendee's own photo upload
+// and delete on /profile. So the Storage client is created inside
+// lib/photoUpload.js, which that route alone imports, and the ~34 kB SDK
+// rides in the /profile chunk instead of the chunk every visitor downloads.
+// `useEmulators` is exported for the same reason: the emulator wiring for
+// Storage has to happen wherever the client is made.
+export const useEmulators =
+  import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true';
 
 // --- Demo mode (VITE_DEMO_MODE=1, lib/demoMode.js) --------------------------
 // The static GitHub Pages demo has no Firebase project behind it, so every
@@ -52,7 +60,6 @@ if (IS_DEMO) {
 if (useEmulators) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
-  connectStorageEmulator(storage, '127.0.0.1', 9199);
 }
 
 // --- Storage download origin ------------------------------------------------

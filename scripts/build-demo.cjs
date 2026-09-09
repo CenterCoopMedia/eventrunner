@@ -29,6 +29,15 @@
  * this repo from /docs. Stale contents are deleted first so a renamed hashed
  * asset never lingers.
  *
+ * Right after the vite build, scripts/write-site-files.cjs writes
+ * sitemap.xml, robots.txt, and the web manifest into the same dist/ before
+ * it is copied to --out — the demo gets real ones from the committed
+ * snapshot, the same way deploy-client.yml's build job does for a real
+ * client, rather than only the neutral fallback Vite copies from
+ * apps/web/public/manifest.webmanifest. The demo's public URL is derived
+ * from --base: DEMO_ORIGIN + base, since GitHub Pages serves it under a
+ * subpath rather than a domain of its own.
+ *
  * Usage:
  *   node scripts/build-demo.cjs                     # build + sync
  *   node scripts/build-demo.cjs --base /other/path/ # different subpath
@@ -54,6 +63,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
+const { main: writeSiteFiles } = require('./write-site-files.cjs');
+
 const REPO_ROOT = path.resolve(__dirname, '..');
 const WEB_DIR = path.join(REPO_ROOT, 'apps', 'web');
 const DIST_DIR = path.join(WEB_DIR, 'dist');
@@ -61,6 +72,29 @@ const DIST_DIR = path.join(WEB_DIR, 'dist');
 /** Pages project site root is /eventrunner/; the demo lives beside the docs. */
 const DEFAULT_BASE = '/eventrunner/demo/';
 const DEFAULT_OUT = path.join('docs', 'demo');
+
+/** Where GitHub Pages serves this repo from; the demo's own public URL is this plus --base. */
+const DEMO_ORIGIN = 'https://centercoopmedia.github.io';
+
+/**
+ * Write sitemap.xml, robots.txt, and the manifest into the just-built
+ * DIST_DIR, from the committed generated snapshot (write-site-files.cjs's
+ * own default — this script already clears GENERATED_DIR for the same
+ * reason). Any failure here is treated as this script's own "unexpected
+ * error" (exit 1): it is not a vite build failure (exit 4 already means
+ * something specific) and not a `--check` drift finding.
+ *
+ * @param {{ base: string }} args
+ * @returns {Promise<void>}
+ */
+async function writeDemoSiteFiles({ base }) {
+  const publicUrl = `${DEMO_ORIGIN}${base.replace(/\/+$/, '')}`;
+  const code = await writeSiteFiles(['--dist', DIST_DIR, '--public-url', publicUrl]);
+  if (code !== 0) {
+    console.error(`write-site-files failed while building the demo (exit ${code}).`);
+    process.exit(1);
+  }
+}
 
 /**
  * Non-secret placeholders for the six required VITE_FIREBASE_* values.
@@ -273,7 +307,7 @@ function compareDirs(expectedDir, actualDir) {
  * here) and diff it against the committed output. Writes nothing to the
  * working tree either way.
  */
-function runCheck({ base, expectedOutDir }) {
+async function runCheck({ base, expectedOutDir }) {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'run-of-show-demo-check-'));
   try {
     console.log(`Building demo to a scratch dir for comparison: ${tmpRoot}`);
@@ -282,6 +316,7 @@ function runCheck({ base, expectedOutDir }) {
       console.error(`Expected build output at ${DIST_DIR}; it is not there.`);
       return 4;
     }
+    await writeDemoSiteFiles({ base });
     fs.cpSync(DIST_DIR, tmpRoot, { recursive: true });
     normalizeGeneratedHtml(tmpRoot);
 
@@ -334,7 +369,7 @@ function directorySize(dir) {
   return { bytes, files };
 }
 
-function main(argv) {
+async function main(argv) {
   let options;
   try {
     options = parseArgs(argv);
@@ -361,6 +396,7 @@ function main(argv) {
   runBuild(options);
 
   if (options.dryRun) {
+    console.log(`[dry-run] write sitemap.xml, robots.txt, and manifest.webmanifest into apps/web/dist`);
     console.log(
       `[dry-run] rm -rf ${path.relative(REPO_ROOT, options.outDir)} && ` +
         `cp -R apps/web/dist/. ${path.relative(REPO_ROOT, options.outDir)}`,
@@ -372,6 +408,8 @@ function main(argv) {
     console.error(`Expected build output at ${DIST_DIR}; it is not there.`);
     return 4;
   }
+
+  await writeDemoSiteFiles({ base: options.base });
 
   // Delete first: hashed asset names change every build, so a plain copy
   // would accumulate every past build's chunks forever.
@@ -392,12 +430,12 @@ function main(argv) {
 }
 
 if (require.main === module) {
-  try {
-    process.exit(main(process.argv.slice(2)));
-  } catch (error) {
-    console.error(error);
-    process.exit(1);
-  }
+  main(process.argv.slice(2))
+    .then((code) => { process.exitCode = code; })
+    .catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
 }
 
 module.exports = {
@@ -409,6 +447,10 @@ module.exports = {
   listFilesRecursive,
   DEFAULT_BASE,
   DEFAULT_OUT,
+  DEMO_ORIGIN,
   DEMO_FIREBASE_ENV,
   UsageError,
+  main,
+  runCheck,
+  writeDemoSiteFiles,
 };

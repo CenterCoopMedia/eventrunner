@@ -342,6 +342,39 @@ describe('page editor', () => {
     expect(screen.getByLabelText('Path')).toHaveAttribute('aria-invalid', 'true');
   });
 
+  it('states a system page’s address without offering to change it', async () => {
+    draftDocs = [{
+      ...SCHOLARSHIPS_DRAFT,
+      id: 'schedule',
+      label: 'Schedule',
+      path: '/schedule',
+      systemPage: true,
+    }];
+    await renderAt('/admin/pages/schedule');
+
+    // The route this page renders through is declared in the app's code, so
+    // editing the field here would strand the document rather than move the
+    // page. The server refuses the change; the room does not offer it.
+    const path = await screen.findByLabelText('Path');
+    expect(path).toHaveAttribute('readonly');
+    expect(path).toHaveValue('/schedule');
+    expect(screen.getByText(/served at a fixed address, which cannot change/i))
+      .toBeInTheDocument();
+
+    // Everything else about the page is still the operator's to change.
+    expect(screen.getByLabelText('Title')).not.toHaveAttribute('readonly');
+  });
+
+  it('leaves a regular page’s address editable', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+
+    const path = await screen.findByLabelText('Path');
+    expect(path).not.toHaveAttribute('readonly');
+    fireEvent.change(path, { target: { value: '/bursaries' } });
+    expect(screen.getByLabelText('Path')).toHaveValue('/bursaries');
+  });
+
   it('reflects the systemPage delete guard instead of letting the operator hit it', async () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'home', label: 'Home page', systemPage: true }];
     await renderAt('/admin/pages/home');

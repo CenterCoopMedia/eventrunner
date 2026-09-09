@@ -80,4 +80,45 @@ function isReservedPathSegment(segment) {
   return RESERVED_PATH_SEGMENTS.includes(segment);
 }
 
-module.exports = { RESERVED_PATH_SEGMENTS, firstPathSegment, isReservedPathSegment };
+/**
+ * One normalized path segment: a lowercase slug, no leading or trailing
+ * hyphen. This is the shape functions/src/cms/pages.cjs enforces on write,
+ * and it lives here so the renderers can ask the same question of data that
+ * was written before it did.
+ */
+const PAGE_PATH_SEGMENT_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/**
+ * True when `path` is a page path in the ONE shape the system stores: a
+ * single leading slash, normalized segments, no trailing slash, no empty
+ * segment. '/' is the home page's path and is canonical on its own.
+ *
+ * The characters the segment pattern allows are the whole guarantee here,
+ * and the guarantee is that the value is a PATH and nothing else. A renderer
+ * puts this string into an href, where a value that is not a path is not a
+ * cosmetic problem: '//example.org' is a protocol-relative URL that sends
+ * the reader to another origin, and 'https://evil.example' is an absolute
+ * one. Neither starts a segment this pattern accepts, and neither survives
+ * the no-empty-segment rule, so a renderer that asks this question before
+ * rendering a link cannot be made to point off-site by stored data — whether
+ * that data predates the validator or was written straight into Firestore
+ * around it.
+ *
+ * @param {unknown} path
+ * @returns {boolean}
+ */
+function isCanonicalPagePath(path) {
+  if (typeof path !== 'string' || path.length === 0) return false;
+  if (path === '/') return true;
+  if (!path.startsWith('/') || path.endsWith('/')) return false;
+  const segments = path.slice(1).split('/');
+  return segments.every((segment) => PAGE_PATH_SEGMENT_RE.test(segment));
+}
+
+module.exports = {
+  RESERVED_PATH_SEGMENTS,
+  PAGE_PATH_SEGMENT_RE,
+  firstPathSegment,
+  isReservedPathSegment,
+  isCanonicalPagePath,
+};

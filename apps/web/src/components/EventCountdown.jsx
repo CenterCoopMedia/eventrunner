@@ -30,9 +30,30 @@
 // config does not change on its own), so without its own low-frequency
 // check the running line would sit there forever after the last day ends,
 // only correcting itself on the reader's next page load.
+//
+// draft polls the same way, for the same reason: `getEventPhase` reads
+// `announcedAt` first (packages/shared/src/config/lifecycle.cjs) and stays
+// draft until the clock reaches it, so a reader who opens the page before
+// that moment would otherwise see nothing here forever — the lead only
+// ever appears on its next page load, past the moment it was supposed to
+// appear on its own. There is nothing to poll toward when `announcedAt` is
+// unset or unparseable — that boundary never arrives on the clock alone,
+// only by an operator's own edit, which already re-renders this component
+// through a changed `eventConfig` prop.
 import { useEffect, useId, useState } from 'react';
 import { getEventPhase } from 'shared/config';
 import { countdownParts, resolveEventStart } from '../lib/eventTime.js';
+
+// The same "YYYY-MM-DDTHH:MM" shape getEventPhase's own toMinuteIso
+// requires of announcedAt, so this agrees with the lifecycle clock about
+// what counts as a real boundary to wait for, not merely a truthy string.
+const ISO_MINUTE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+function hasPendingAnnouncement(eventConfig) {
+  return (
+    typeof eventConfig?.announcedAt === 'string' && ISO_MINUTE_RE.test(eventConfig.announcedAt)
+  );
+}
 
 const RUNNING_LINE = 'This event is happening now.';
 const POST_EVENT_LINE = 'This event has ended.';
@@ -63,13 +84,28 @@ export default function EventCountdown({ eventConfig }) {
   const target = resolveEventStart(eventConfig);
   const counting = COUNTING_PHASES.has(phase) && Boolean(target);
   const watchingRunning = phase === 'in_progress';
+  // Waiting on the announcement is its own gate, distinct from `counting`:
+  // a draft event never renders a countdown (the allowlist above excludes
+  // it), but it still needs a clock running toward the moment it stops
+  // being draft, or that moment only ever arrives on a reload.
+  const watchingDraft = phase === 'draft' && hasPendingAnnouncement(eventConfig);
 
   useEffect(() => {
-    const delayMs = counting ? 1000 : watchingRunning ? RUNNING_CHECK_MS : null;
+    const delayMs = counting
+      ? 1000
+      : watchingRunning || watchingDraft
+        ? RUNNING_CHECK_MS
+        : null;
     if (delayMs === null) return undefined;
+    // The one interval this component ever runs, and its callback touches
+    // nothing but this component's own state: no window, no document, no
+    // DOM read of any kind, so there is nothing here for an unmounted
+    // instance's stray tick to fail against. React runs this same cleanup
+    // both when the delay changes (phase moved) and on unmount, so a timer
+    // this effect started is never the one left running past either.
     const id = setInterval(() => setNow(new Date()), delayMs);
     return () => clearInterval(id);
-  }, [counting, watchingRunning]);
+  }, [counting, watchingRunning, watchingDraft]);
 
   if (phase === 'in_progress') {
     return <p className={STATED_LINE_CLASS}>{RUNNING_LINE}</p>;

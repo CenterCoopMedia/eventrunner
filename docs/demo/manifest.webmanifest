@@ -1,20 +1,21 @@
 {
-  "name": "Event site",
-  "short_name": "Event",
-  "start_url": "/",
-  "scope": "/",
+  "name": "[Demo] Harborlight Media Summit",
+  "short_name": "DEMO-SUMMIT",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "icons": [
     {
-      "src": "/branding/mark.svg",
+      "src": "branding/mark.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/branding/favicon.svg",
+      "src": "branding/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml"
     }
-  ]
+  ],
+  "description": "A three-day event for people who operate local and cooperative newsrooms."
 }

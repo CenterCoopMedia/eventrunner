@@ -28,14 +28,10 @@ const deleteOwnPhotoMock = vi.fn(() => Promise.resolve());
 const uploadProfilePhotoMock = vi.fn(async ({ uid }) => ({
   path: `profile-photos/${uid}/photo.png`,
 }));
-vi.mock('../lib/mediaSource.js', async () => {
-  const actual = await vi.importActual('../lib/mediaSource.js');
-  return {
-    ...actual,
-    deleteOwnPhoto: (...args) => deleteOwnPhotoMock(...args),
-    uploadProfilePhoto: (...args) => uploadProfilePhotoMock(...args),
-  };
-});
+vi.mock('../lib/photoUpload.js', () => ({
+  deleteOwnPhoto: (...args) => deleteOwnPhotoMock(...args),
+  uploadProfilePhoto: (...args) => uploadProfilePhotoMock(...args),
+}));
 
 const { default: Profile } = await import('./Profile.jsx');
 

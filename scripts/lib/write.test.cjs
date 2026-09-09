@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 
 const { makeFakeDb } = require('../../functions/src/cms/firestoreFake.cjs');
 const store = require('../../functions/src/cms/store.cjs');
-const { writeConfigDocs, seedCollection, countSeeded, readConfig } = require('./write.cjs');
+const { writeConfigDocs, seedCollection, findPagePathCollisions, countSeeded, readConfig } = require('./write.cjs');
 const { defaultPages, buildSeedContent } = require('./seed.cjs');
 const { buildConfigDocs } = require('./answers.cjs');
 
@@ -44,6 +44,52 @@ test('seeding writes a published live doc AND a clean draft, like an admin save 
   assert.equal(live.data().revision, 1);
   assert.equal(live.data().seeded, true);
   assert.equal(draft.data().status, 'clean', 'a seeded page must not show up as unpublished work');
+});
+
+test('findPagePathCollisions finds nothing on a fresh project', async () => {
+  const db = makeFakeDb();
+  const pages = defaultPages().map((p) => ({ ...p, seeded: true }));
+  const collisions = await findPagePathCollisions({ db, pages });
+  assert.equal(collisions.size, 0);
+});
+
+test('findPagePathCollisions flags a seeded page whose path a DIFFERENT live doc id already owns', async () => {
+  const db = makeFakeDb();
+  await db.collection('cmsPages').doc('about-us').set({
+    label: 'About us', path: '/recap', icon: null, order: 99,
+    visible: true, systemPage: false, sections: [], seeded: false,
+  });
+  const pages = defaultPages().map((p) => ({ ...p, seeded: true }));
+
+  const collisions = await findPagePathCollisions({ db, pages });
+
+  assert.equal(collisions.size, 1);
+  assert.deepEqual(collisions.get('recap'), { path: '/recap', ownerId: 'about-us' });
+});
+
+test('findPagePathCollisions also reads the draft revision — an unpublished path claim still collides', async () => {
+  const db = makeFakeDb();
+  await db.collection('cmsPages_drafts').doc('speaker-notes').set({
+    label: 'Speaker notes', path: '/guidelines', icon: null, order: 50,
+    visible: true, systemPage: false, sections: [], status: 'dirty',
+  });
+  const pages = defaultPages().map((p) => ({ ...p, seeded: true }));
+
+  const collisions = await findPagePathCollisions({ db, pages });
+
+  assert.equal(collisions.size, 1);
+  assert.deepEqual(collisions.get('guidelines'), { path: '/guidelines', ownerId: 'speaker-notes' });
+});
+
+test('findPagePathCollisions does not flag a page reclaiming its own path', async () => {
+  const db = makeFakeDb();
+  const pages = defaultPages().map((p) => ({ ...p, seeded: true }));
+  // A normal re-run: the seeded page's own prior live doc already sits at
+  // its own path under its own id — that is a refresh, not a collision.
+  await seedCollection({ db, store, collection: 'cmsPages', docs: pages, now });
+
+  const collisions = await findPagePathCollisions({ db, pages });
+  assert.equal(collisions.size, 0);
 });
 
 test('re-running is a no-op for untouched seeds and never clobbers an edited doc', async () => {
