@@ -79,14 +79,17 @@ async function renderAt(path) {
       <App />
     </MemoryRouter>,
   );
-  // Two waits, not one: the lazy admin chunk, and then the admin probe the
-  // gate holds on (AdminGate renders "Checking your access…" until it
-  // answers). Waiting only for the chunk lets an assertion run while the
-  // gate is still checking, which is a flake under load, not a bug.
+  // Three waits, not one: the lazy admin chunk, the admin probe the gate
+  // holds on (AdminGate renders "Checking your access…" until it answers),
+  // and the route's own chunk — /admin/settings is deferred too, so the
+  // form itself arrives after the area around it. Waiting only for the
+  // chunk lets an assertion run while the gate is still checking, which is
+  // a flake under load, not a bug.
   await waitFor(
     () => {
       expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading event settings…')).not.toBeInTheDocument();
     },
     // The admin chunk now pulls the whole public app in with it (the theme
     // editor's frame renders real pages), so the first mount in a file can
