@@ -84,25 +84,28 @@ Read-only diagnostics done. Write tools wait on a separate security and product 
 
 Prospective clients asked for the platform they used at CJS 2026. CJS parity is now the product target. See [docs/plans/2026-09-09-cjs-parity-gap.md](plans/2026-09-09-cjs-parity-gap.md) for the full gap analysis and issue list.
 
-### M7: Public site completeness
+### M7: Public site completeness — complete
 
 A visitor can reach and read every page the seed creates, and the site presents itself correctly to search engines and social previews.
 
-- [ ] Render the navigation from page documents (#147)
-- [ ] Add the sign-in and account control to the header (#148)
-- [ ] Build the footer link list and organizer links (#149)
-- [ ] Serve per route metadata from the server (#150)
-- [ ] Generate a sitemap, a robots file, and a web manifest at publish time (#151)
-- [ ] Reset scroll position on route change and add a back to top control (#152)
-- [ ] Add a countdown and a lifecycle aware home lead (#153)
-- [ ] Add a configured registration action (#154)
-- [ ] Add an information card arrangement to the home page (#155)
-- [ ] Add a sponsor strip section to the home page (#156)
-- [ ] Seed a recap page and a guidelines page (#157)
-- [ ] Seed a city guide page (#158)
-- [ ] Add an uploaded venue map with labelled rooms (#159)
-- [ ] Add search and a section index to long content pages (#160)
-- [ ] Add a session recording link field (#161)
+- [x] Render the navigation from page documents (#147)
+- [x] Add the sign-in and account control to the header (#148)
+- [x] Build the footer link list and organizer links (#149)
+- [x] Serve per route metadata from the server (#150)
+- [x] Generate a sitemap, a robots file, and a web manifest at publish time (#151)
+- [x] Reset scroll position on route change and add a back to top control (#152)
+- [x] Add a countdown and a lifecycle aware home lead (#153)
+- [x] Add a configured registration action (#154)
+- [x] Add an information card arrangement to the home page (#155)
+- [x] Add a sponsor strip section to the home page (#156)
+- [x] Seed a recap page and a guidelines page (#157)
+- [x] Seed a city guide page (#158)
+- [x] Add an uploaded venue map with labelled rooms (#159)
+- [x] Add search and a section index to long content pages (#160)
+- [x] Add a session recording link field (#161)
+
+Follow-ups filed while the milestone ran, carried into later milestones rather
+than held against M7: #218, #219, #226, #227, #230, #231, #233, #234, #236.
 
 ### M8: Attendee and schedule experience
 
