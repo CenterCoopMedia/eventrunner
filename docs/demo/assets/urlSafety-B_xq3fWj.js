@@ -1,1 +1,0 @@
-const n=/^https?:\/\//i;function s(t){if(typeof t!="string")return"";const r=t.trim();if(!n.test(r))return"";try{const e=new URL(r);return["http:","https:"].includes(e.protocol)?e.href:""}catch{return""}}function f(t){return s(t)!==""}var i={isSafeUrl:f};export{i as u};
