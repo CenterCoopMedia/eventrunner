@@ -116,6 +116,61 @@ async function seedCollection({ db, store, collection, docs, dryRun = false, now
 }
 
 /**
+ * Delete the documents an EARLIER release seeded and this one no longer
+ * emits (Codex review of the configured registration action: P1).
+ *
+ * THE MISSING HALF OF `seedCollection`. That function writes and refreshes;
+ * it never deletes, and it only ever looks at the ids it was handed. So
+ * dropping a block from the seed changes nothing on a site that already ran
+ * init: the old document stays live, stays published, and keeps drawing the
+ * control the release removed. Upgrading a deployment has to be able to
+ * take something away, not only add to it.
+ *
+ * SAME OWNERSHIP RULE, SAME FUNCTION. `decideSeedWrite` already answers
+ * "may the seed have this document back", reading BOTH revisions because
+ * unpublished editor work lives only in the draft (§8.4). Deleting asks
+ * exactly that question with more at stake, so it asks it the same way
+ * rather than inventing a second test of what counts as seed-owned: a
+ * document the seed may not overwrite is a document it may not delete. An
+ * editor's own cta at the same id, and a seeded one they have since
+ * edited, both stay — including under --force, which relaxes the run-level
+ * refusal and never a client edit.
+ *
+ * Both revisions go together (`store.deleteBoth`). Deleting the live doc
+ * alone would leave a draft that republishes the block the moment anybody
+ * presses publish.
+ *
+ * @param {{ db: object, store: object, collection: string, docIds: readonly string[],
+ *           dryRun?: boolean }} args
+ * @returns {Promise<{ removed: string[], kept: Array<{ id: string, reason: string }> }>}
+ */
+async function removeObsoleteSeeds({ db, store, collection, docIds, dryRun = false }) {
+  const removed = [];
+  const kept = [];
+  const draftCollection = draftCollectionFor(collection);
+  for (const id of docIds) {
+    const [snap, draftSnap] = await Promise.all([
+      db.collection(collection).doc(id).get(),
+      db.collection(draftCollection).doc(id).get(),
+    ]);
+    const existing = snap.exists ? snap.data() : null;
+    const draft = draftSnap.exists ? draftSnap.data() : null;
+    // Neither revision exists: a site that never had it, which is every
+    // site initialized after the block was dropped. Nothing to report.
+    if (existing == null && draft == null) continue;
+    const decision = decideSeedWrite(existing, { draft });
+    if (decision.action === 'skip') {
+      kept.push({ id, reason: decision.reason });
+      continue;
+    }
+    removed.push(id);
+    if (dryRun) continue;
+    await store.deleteBoth({ db, collection, docId: id });
+  }
+  return { removed, kept };
+}
+
+/**
  * Path-collision preflight for the page seed (Codex review, seed a recap
  * page and a guidelines page: P1).
  *
@@ -334,6 +389,7 @@ async function readConfig({ db }) {
 module.exports = {
   writeConfigDocs,
   seedCollection,
+  removeObsoleteSeeds,
   findPagePathCollisions,
   findPageSectionCollisions,
   seedEmailTemplateOverrides,

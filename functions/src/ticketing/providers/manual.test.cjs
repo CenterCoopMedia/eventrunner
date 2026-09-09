@@ -130,6 +130,11 @@ test('getRegistrationPrompt: a non-https destination is refused, the same as on 
     'register.example.org',
     '   ',
     42,
+    // Codex review (P2): a scheme with no authority reads as https to a
+    // protocol test. In an email it is worse than on the page — nobody sees
+    // the address before they click.
+    'https:register.example.org',
+    'https:/register.example.org',
   ]) {
     const provider = createManualProvider({
       db: makeFakeDb(),
@@ -153,6 +158,17 @@ test('getRegistrationPrompt: the button says what the client called the action',
   const prompt = await provider.getRegistrationPrompt({ trigger: 'account_created' });
   assert.equal(prompt.ctaLabel, 'Get a ticket');
   assert.equal(prompt.ctaUrl, 'https://register.example/');
+});
+
+test('getRegistrationPrompt: the button carries the canonical href, not the stored string', async () => {
+  const provider = createManualProvider({
+    db: makeFakeDb(),
+    getConfig: async () => ({
+      event: { registration: { externalUrl: '  HTTPS://Register.Example.ORG  ' } },
+    }),
+  });
+  const prompt = await provider.getRegistrationPrompt({ trigger: 'account_created' });
+  assert.equal(prompt.ctaUrl, 'https://register.example.org/');
 });
 
 test('getRegistrationPrompt: an unset label leaves this provider stating its own', async () => {

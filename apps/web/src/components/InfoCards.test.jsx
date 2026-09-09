@@ -50,6 +50,37 @@ describe('groupIntoCards', () => {
     expect(cards[0].lines.map((l) => l.field)).toEqual(['note']);
   });
 
+  it('drops a line whose text is blank rather than counting it', () => {
+    // Only a stat's fields are checked when content is written, so a
+    // published line can carry an empty text. ListItemBlock draws nothing
+    // for it, so the grouping must not count it either.
+    const cards = groupIntoCards([
+      line('note', '   '),
+      line('real', 'A line with something in it.'),
+    ]);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].lines.map((l) => l.field)).toEqual(['real']);
+  });
+
+  it('opens no card for a section whose lines are all blank', () => {
+    // A card here would reach the page as a heading over nothing: Home
+    // opens the section on this count.
+    expect(groupIntoCards([line('note', ''), line('other', '  ')])).toEqual([]);
+  });
+
+  it('keeps the lines under a fact that draws nothing, and prints no fact', () => {
+    // The line was written under this fact, so it stays under it rather
+    // than joining the fact above; the card just opens without a figure.
+    const cards = groupIntoCards([
+      stat('when', 'When', '3 days'),
+      { section: 'info', field: 'where', blockType: 'stat', value: '', label: '' },
+      line('where_note', 'The hall is on the ground floor.'),
+    ]);
+    expect(cards).toHaveLength(2);
+    expect(cards[1].stat).toBeNull();
+    expect(cards[1].lines.map((l) => l.field)).toEqual(['where_note']);
+  });
+
   it('ignores a block type this arrangement does not draw', () => {
     const cards = groupIntoCards([
       { section: 'info', field: 'x', blockType: 'richtext', value: '<p>Not here.</p>' },
@@ -93,6 +124,20 @@ describe('InfoCards', () => {
     expect(group.className).not.toContain('grid-cols-3 ');
     expect(group.className).toContain('sm:grid-cols-2');
     expect(group.className).toContain('lg:grid-cols-3');
+  });
+
+  it('renders only the lines that say something', () => {
+    const { container } = render(
+      <InfoCards
+        cards={groupIntoCards([
+          stat('when', 'When', '3 days'),
+          line('blank', ''),
+          line('real', 'Doors open at 09:00.'),
+        ])}
+      />,
+    );
+    const items = [...container.querySelectorAll('li')].map((node) => node.textContent);
+    expect(items).toEqual(['Doors open at 09:00.']);
   });
 
   it('renders nothing at all for an empty section', () => {

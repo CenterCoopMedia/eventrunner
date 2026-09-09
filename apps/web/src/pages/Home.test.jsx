@@ -245,6 +245,18 @@ describe('Home key facts', () => {
     expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();
   });
 
+  it('writes no heading over a section whose lines are all blank', () => {
+    // A line's text is not checked when content is written, so a published
+    // line can be empty. It draws nothing, so it must not open the section.
+    infoBlocks = [
+      { section: 'info', field: 'venue', blockType: 'list_item', text: '' },
+      { section: 'info', field: 'note', blockType: 'list_item', text: '  ' },
+    ];
+    render(<Home />);
+    expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();
+    expect(document.querySelector('section[aria-labelledby="section-info"]')).toBeNull();
+  });
+
   it('writes no heading for an empty section', () => {
     render(<Home />);
     expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();

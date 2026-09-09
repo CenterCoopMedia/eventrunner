@@ -134,3 +134,47 @@ test('resolveRegistrationAction: refuses every destination that is not https', (
     );
   }
 });
+
+// Codex review of the configured registration action (P2). Two halves of
+// one bug: what the reader ACCEPTS, and what it hands back.
+//
+// `new URL('https:register.example.org').protocol` is 'https:' — the WHATWG
+// parser reads a special scheme with no `//` as a relative reference — so a
+// protocol test alone let a string through that is not an absolute URL at
+// all. In an `href` it resolves against the page it sits on, and a reader
+// clicking Register lands on the event's own domain; in an email it is
+// worse, because nobody sees the address before they click.
+test('resolveRegistrationAction: a destination with no authority is not a destination', () => {
+  for (const externalUrl of [
+    'https:register.example.org',
+    'https:/register.example.org',
+    'http:register.example.org',
+    '//register.example.org',
+  ]) {
+    assert.equal(
+      resolveRegistrationAction({ registration: { externalUrl } }),
+      null,
+      `expected ${JSON.stringify(externalUrl)} to be refused`,
+    );
+  }
+});
+
+test('resolveRegistrationAction: hands back the canonical href, not the raw string', () => {
+  // What the page puts in an `href` and what the email puts in its button
+  // is exactly the string this reader approved — host lower-cased, path
+  // present, every component encoded the way the parser read it. Handing
+  // back the raw text is what lets a value validate as one URL and resolve
+  // as another.
+  assert.equal(
+    resolveRegistrationAction({
+      registration: { externalUrl: '  HTTPS://Register.Example.ORG  ' },
+    }).url,
+    'https://register.example.org/',
+  );
+  assert.equal(
+    resolveRegistrationAction({
+      registration: { externalUrl: 'https://register.example.org/summit tickets' },
+    }).url,
+    'https://register.example.org/summit%20tickets',
+  );
+});
