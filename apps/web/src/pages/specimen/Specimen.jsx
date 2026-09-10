@@ -9,8 +9,11 @@
 // server (specimenRoute.js), the page marks itself noindex while it is
 // mounted, and the sitemap builder refuses to list it.
 //
-// Every word on the page comes from the committed synthetic snapshot in
-// src/generated. Nothing here is placeholder copy.
+// THE EVENT CONTENT COMES FROM THE SNAPSHOT in src/generated: the name, the
+// days, the rooms, the sessions, the speakers, the sponsors. The words
+// inside a control example are written for the book, because a control
+// needs a label, a hint and a refusal that the snapshot has no field for.
+// Nothing on the page is placeholder copy either way.
 import SectionIndexNav from '../../components/SectionIndexNav.jsx';
 import { SPECIMEN_SECTIONS, sectionFolio } from './sections/index.js';
 import { SPECIMEN_TITLE } from './specimenRoute.js';

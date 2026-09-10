@@ -31,20 +31,31 @@ function MeasuredValue({ token }) {
   return <span className="font-mono text-caption text-text-secondary">{value || token}</span>;
 }
 
-/** One width, drawn as the band it caps, with its resolved value beside it. */
+/**
+ * One width, drawn as the band it caps, with its resolved value beside it.
+ *
+ * It is a real term-and-description pair: the width's name is the term, and
+ * the value, the sentence and the band are its description. A `<div>` is
+ * allowed inside a `<dl>`, but only around a `dt` and its `dd`s — the block
+ * used to hold an `h3`, a `span` and a `p` directly, which is neither a
+ * pair nor valid, and a heading is not allowed inside a `dt` either. This
+ * is the shape ControlsSection's token rows already use.
+ */
 function WidthBand({ entry }) {
   return (
-    <div className="border-t-hairline border-t-rule-hairline py-sm">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-md gap-y-3xs">
-        <h3 className="font-data text-caption font-semibold text-text-primary">{entry.label}</h3>
+    <div className="grid gap-x-md gap-y-3xs border-t-hairline border-t-rule-hairline py-sm sm:grid-cols-[1fr,auto]">
+      <dt className="font-data text-caption font-semibold text-text-primary">{entry.label}</dt>
+      <dd className="sm:text-end">
         <MeasuredValue token={entry.token} />
-      </div>
-      <p className="mt-2xs max-w-prose text-body text-text-secondary text-pretty">{entry.job}</p>
-      <span
-        aria-hidden="true"
-        className="mt-sm block h-2xs bg-rule-strong"
-        style={{ maxInlineSize: `var(${entry.token})` }}
-      />
+      </dd>
+      <dd className="sm:col-span-2">
+        <p className="mt-2xs max-w-prose text-body text-text-secondary text-pretty">{entry.job}</p>
+        <span
+          aria-hidden="true"
+          className="mt-sm block h-2xs bg-rule-strong"
+          style={{ maxInlineSize: `var(${entry.token})` }}
+        />
+      </dd>
     </div>
   );
 }

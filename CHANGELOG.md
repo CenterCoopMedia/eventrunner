@@ -10,19 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
-  mode the page is set to, with the component file and the tier 3 contract beside each one. Twelve
-  sections cover type, colour, rules and spacing, headers, editorial devices, illustrations,
-  sessions and schedule, directories, controls, inputs, feedback and print, and every word on the
-  page comes from the committed synthetic snapshot. The route ships in the demo build and in a
-  development server and never in a client production build, it is `noindex`, and the sitemap
-  builder refuses to list it. `scripts/dev/capture-specimen.mjs` writes one full-page capture per
+  mode the page is set to, with the component file and the tier 3 contract beside each one.
+  Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,
+  illustrations, sessions and schedule, directories, controls, inputs, feedback and print. The
+  event content on the page — names, days, rooms, sessions, speakers — comes from the committed
+  synthetic snapshot; the words inside the control examples are written for the book. The route
+  ships in the demo build and in a development server and never in a client production build, it
+  is `noindex`, and the sitemap builder refuses to list it. `scripts/dev/capture-specimen.mjs` writes one full-page capture per
   style, mode and width. The record is `docs/plans/2026-09-10-design-vocabulary-expansion.md` §7.
 - The specimen book's layout section: the two page widths with the value each one resolves to in
   the style on screen, the margin column, and the composed first screen the home page opens on.
 - Every shared control has an entry in the specimen book, and each one accounts for all ten
   interaction states — it draws the states it has and says which ones it does not have, and why.
-  A state that is simply missing looks the same as a state somebody decided against, and only one
-  of those is a defect.
+  A state that is missing looks the same as a state somebody decided against, and only one of
+  those is a defect.
 
 ### Changed
 

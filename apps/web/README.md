@@ -185,8 +185,8 @@ opening six pages.
   `src/pages/specimen/controls/`, then one import and one line in that
   directory's `index.js`. The file declares the states it draws and the
   states it does not have, with the reason for each; `controls/index.test.js`
-  fails a control that accounts for neither, because a state that is simply
-  missing looks the same as a state somebody decided against.
+  fails a control that accounts for neither, because a state that is missing
+  looks the same as a state somebody decided against.
 - **The folio is the position in the contents.** `sections/index.js` is the
   order, and each section takes its number from its place in that array, so
   inserting a section renumbers the book on its own.

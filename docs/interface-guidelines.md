@@ -124,9 +124,11 @@ Every control and every interactive row defines these ten states, in both modes,
 
 **A hover state never transitions.** Colour is repainted on every frame, and a state a reader caused has to land at once. Only `transform` and `opacity` animate.
 
-**A tap is not a hover.** A touch screen reports a tap as a hover and holds it until the reader taps elsewhere, so an unguarded hover tint reads as a selection nobody made. Tailwind's `hoverOnlyWhenSupported` puts every `hover:` utility inside the query; a raw `:hover` rule in `index.css` carries `@media (hover: hover) and (pointer: fine)` by hand.
+**A tap is not a hover.** A touch screen reports a tap as a hover and holds it until the reader taps elsewhere, so an unguarded hover tint looks like a selection nobody made. Tailwind's `hoverOnlyWhenSupported` puts every `hover:` utility inside the query; a raw `:hover` rule in `index.css` carries `@media (hover: hover) and (pointer: fine)` by hand.
 
 **A new tab says so.** A link with `target="_blank"` uses the shared `ExternalLink`, which puts "(opens in a new tab)" inside the link's own name. A note beside the link is read after the reader has already followed it.
+
+**The radio is the one round shape the system draws.** Full rounding is refused everywhere else (design brief §2.4, and the refusal is a test), and `.control-choice--radio` keeps its `border-radius: 50%` because a circle is the radio's universal form and the reason a reader can tell "pick one" from "pick any" before reading a word.
 
 **A dialog is a native `<dialog>` opened with `showModal()`.** That one call traps focus, makes the page behind it inert, sends Escape as `cancel`, and puts the dialog in the top layer. The component returns focus to the opener itself, because React removes the dialog on close and an element removed while it holds focus drops focus to the body. The scrim is tinted ink at low alpha, never a blur.
 
