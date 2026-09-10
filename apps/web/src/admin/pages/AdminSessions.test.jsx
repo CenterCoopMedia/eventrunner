@@ -34,6 +34,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { NEW_TAB_NOTE } from '../../components/ExternalLink.jsx';
 
 function response(body) {
   return { ok: true, status: 200, json: async () => body };
@@ -233,5 +234,23 @@ describe('admin Sessions workspace', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(String(fetch.mock.calls[1][0])).toMatch(/\/cmsPublish$/);
     expect(bodyOf(1).docIds).toEqual(['parent', 'child']);
+  });
+
+  it('says that the preview opens a new tab, inside the link name (issue 236)', async () => {
+    // A new tab is a change of context. A reader who can see the page reads
+    // it off the tab strip; a reader using a screen reader gets no signal
+    // at all unless the sentence is part of the link's own name.
+    await renderAt('/admin/sessions/child');
+    await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
+    pushSessions([], [
+      {
+        id: 'child', dayId: 'day-1', startTime: '09:30', endTime: '10:00',
+        title: 'Child', description: 'Child session.', status: 'dirty',
+      },
+    ]);
+    expect(await screen.findByDisplayValue('Child')).toBeInTheDocument();
+    const preview = screen.getByRole('link', { name: /Preview draft/ });
+    expect(preview).toHaveAttribute('target', '_blank');
+    expect(preview).toHaveAccessibleName(`Preview draft (${NEW_TAB_NOTE})`);
   });
 });

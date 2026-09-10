@@ -12,6 +12,7 @@ import {
 } from '../sessionDoc.js';
 import { useAdminSessions } from '../useAdminSessions.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
+import { NewTabNote } from '../../components/ExternalLink.jsx';
 import {
   CheckboxField,
   DestructiveConfirm,
@@ -253,6 +254,11 @@ export default function AdminSessionEditor({ mode }) {
                 className={linkButtonClass}
               >
                 Preview draft
+                {/* The preview opens a tab, so it says so inside its own
+                    name (issue 236). The note is beside the words rather
+                    than through ExternalLink because this link is internal
+                    and takes the admin's own control shape. */}
+                <NewTabNote />
               </a>
             ) : null}
             <button
