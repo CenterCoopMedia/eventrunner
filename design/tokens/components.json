@@ -49,9 +49,12 @@
     "--section-rule-gap": "var(--space-sm)"
   },
   "$page-note": "The hybrid page shell (brief §6.1, §6.2). A system page's composable sections sit at --page-section-gap from what comes before them, and a ruled directory row is padded at --page-row-pad-block. Both are what the `density` layout variant moves: tight, comfortable, and loose remap them in index.css, and a page that states no density keeps the preset's own.",
+  "$stage-note": "The stage and the measure (2026-09-10 vocabulary expansion). --stage-max is the frame: the header, the navigation, the schedule grid, the directories, the logo wall, the footer, and every section head run to it. --measure-text is the text measure: a paragraph, a list, a rich text block, a stat description, or an FAQ answer never exceeds it. Both default to the tier 2 stage family, and a style retunes either one in its preset file where its story asks: a broadsheet may run wider, a zine narrower. Neither is a fixed width. index.css reads them as a maximum inline size, and the margin column beside the measure opens only at lg and above.",
   "page": {
     "--page-section-gap": "var(--space-2xl)",
-    "--page-row-pad-block": "var(--space-md)"
+    "--page-row-pad-block": "var(--space-md)",
+    "--stage-max": "var(--stage-frame)",
+    "--measure-text": "var(--stage-measure)"
   },
   "folio-rule": {
     "--folio-rule-rgb": "--rule-hairline-rgb",

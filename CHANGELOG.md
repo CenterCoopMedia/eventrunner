@@ -7,8 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A specimen book at `/specimen`: every device the system has, drawn in the site style and display
+  mode the page is set to, with the component file and the tier 3 contract beside each one.
+  Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,
+  illustrations, sessions and schedule, directories, controls, inputs, feedback and print. The
+  event content on the page — names, days, rooms, sessions, speakers — comes from the committed
+  synthetic snapshot; the words inside the control examples are written for the book. The route
+  ships in the demo build and in a development server and never in a client production build, it
+  is `noindex`, and the sitemap builder refuses to list it. `scripts/dev/capture-specimen.mjs` writes one full-page capture per
+  style, mode and width. The record is `docs/plans/2026-09-10-design-vocabulary-expansion.md` §7.
+- The specimen book's layout section: the two page widths with the value each one resolves to in
+  the style on screen, the margin column, and the composed first screen the home page opens on.
+- Every shared control has an entry in the specimen book, and each one accounts for all ten
+  interaction states — it draws the states it has and says which ones it does not have, and why.
+  A state that is missing looks the same as a state somebody decided against, and only one of
+  those is a defect.
+
 ### Changed
 
+- Every control on the public site now answers the same ten interaction states: rest, hover, focus,
+  press, selected, disabled, busy, error, success and empty. The hover, press and selected tints
+  come from a new `state` family in the design tokens, so a site style retunes every control at
+  once and dark mode carries its own share. A colour change no longer fades — a state a reader
+  caused has to land at once — and the only things that animate are transform and opacity.
+- Hover states are behind `@media (hover: hover)`. A touch screen reports a tap as a hover and
+  holds it, so a tapped control on a phone used to stay lit as though it had been selected.
+- The site has two motion moves and no third: an enter at 160ms and an exit at 120ms, both fading
+  over at most 8px, both switched off entirely for a reader who asks for less motion. The admin
+  takes neither: a state change there is instant.
+- A toast now states its tone in a word and a rule weight rather than in colour, and a toast that
+  only repeats a result the page already states no longer announces it a second time.
+- A loading state holds the space the content will take, with a block of hairline rules. The page
+  no longer jumps when the content lands. Nothing pulses and nothing spins.
+- The public site is now built on two widths instead of one column. The stage is the frame — the
+  header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer and every
+  section heading run to it — and the measure is running text, which never exceeds it. At wide
+  screen sizes a margin opens beside the measure for a label, a picture or a line of detail. The
+  home page opens on the masthead, then the lead sentence at the measure, then one ruled row of
+  three: the dates, the key facts and the clock, side by side and separated by hairlines. The
+  speaker shelf runs three portraits across at large screen sizes and four at extra large, each
+  portrait square. The sponsor wall runs about four marks across in its first tier and six in its
+  third. Both widths are tokens a site style retunes.
+- The public site no longer scrolls sideways on a phone. The title block's corner mark is drawn
+  outside the block and the page gutter is now wide enough to hold it, which was the 4px every
+  style scrolled by; and the event name in the header and the title block now takes the room that
+  is left and breaks a word too long for it, which was another 8px on Field Guide. Measured on a
+  built demo at 320px and at 390px: six styles across six routes, none of them scrolling sideways.
+- Clearing a search or a filter keeps a keyboard reader where they were working. The clear control
+  removes itself once there is nothing left to clear, and an element removed while it holds focus
+  drops focus to the top of the document; the search field now takes focus on its input and the
+  filter group on the first box in the group.
+- A refused feedback submit now marks the field that refused, states the message under it, and
+  moves focus there, instead of putting one sentence at the head of the form and leaving the reader
+  on the submit control. The submit control stays enabled, as it does everywhere else.
+- The admin's "Preview draft" link says that it opens a new tab, in the same words every other
+  link on the site uses.
+- The demo band's content lines up with the header, the page and the footer. It ran to its own
+  width before, ending 60px inside the frame at either end.
+- The demo band is now the showcase's own device: the style's name in the heading face, the line
+  that describes it under the name, a hairline, and the four controls on one row at the shared
+  control height. The `style` and `mode` values still round-trip through the query string.
 - The admin CMS takes the editorial desk: a dark navigation rail against a cool-grey canvas, a
   white title band that holds the page's name and its save actions while the page scrolls, white
   panels, one action colour for every primary control and focus ring, a record's state as a
@@ -42,6 +102,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Pressing Save in an admin editor with an invalid field did nothing and said nothing, because the
+  control was disabled. Save now stays enabled until the request starts, sends nothing while a
+  field is wrong, and moves the operator to the first field that refused.
+- The feedback form was an overlay, so Tab walked out of it and into the page behind. It is now a
+  real dialog: focus stays inside it, the page behind is inert, Escape closes it, and focus goes
+  back to the control that opened it.
+- A link that opens a new tab now says so, so a reader using a screen reader is not moved to a tab
+  with no history and no way back. Every outbound link carries it, the sponsor wall included —
+  the wall is the one place on the site where outbound links run one after another, which is
+  where a silent change of context costs a reader the most.
+- The profile page's visibility choices and badge picks were painted by the operating system, so a
+  client's palette and dark mode both stopped at their edge. They are drawn from the design tokens
+  now, and the control under the paint is unchanged.
+
 - A site restyled after deployment printed the palette it shipped with, not the one on screen —
   and only from a dark screen, because the generated print block outranked the runtime one. The
   runtime theme element now emits its own print block from the live resolved light palette at the
@@ -49,6 +123,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A heading containing a long identifier scrolled a whole documentation page sideways at 320px.
 
 ### Added
+
+- Eight shared controls the site had no answer for: a switch, a segmented control, tabs, a drawn
+  checkbox and radio, a search field with a spoken result count, a sort control, and a filter group
+  with an active count and one clear control. Each holds one place in the tab order and moves
+  inside itself with the arrow keys.
+- A motion contract test. It reads the stylesheet and every class string the app ships and fails
+  the build on a transition over every property, a spinner, a pulse, a looping animation, a raw
+  duration, a hover rule outside the hover query, a shadow, a blurred panel, or a shading gradient.
 
 - `config/theme.adminScheme` and the **Admin colours** control on Settings → Branding. The admin's
   rail, buttons, links and focus ring follow the main brand colour by default, worked into a

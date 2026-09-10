@@ -94,7 +94,13 @@ describe('Home', () => {
     // organizations on the home page, in the section's own place: it comes
     // after the History section, which is where the seed puts it.
     expect(screen.getByText(siteContent.sponsors__lede.value)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: organizationsData[0].name })).toBeInTheDocument();
+    // A prefix match: a supporter's link leaves the site, so its own name
+    // now ends in the new-tab sentence (components/ExternalLink.jsx).
+    expect(
+      screen.getByRole('link', {
+        name: new RegExp(`^${organizationsData[0].name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\b`),
+      }),
+    ).toBeInTheDocument();
     const sectionOrder = home.sections
       .filter((s) => screen.queryByRole('heading', { name: s.label }))
       .map((s) => s.id);

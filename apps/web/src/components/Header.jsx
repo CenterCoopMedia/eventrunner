@@ -46,8 +46,17 @@ export default function Header({
   // overlay), so an unrecognized value renders the base header.
   const treatment = THEME_HEADERS.includes(variant) ? variant : DEFAULT_HEADER;
 
+  // THE ROW MAY BREAK A WORD. A flex row is sized from its content's own
+  // minimum, and the minimum of a line of text is its longest word — so a
+  // name with a long word in it held the whole word and ran past the stage
+  // at 320px instead of wrapping inside it. `wrap-anywhere` lowers that
+  // minimum as well as drawing the break, and it breaks only a word that
+  // cannot fit, so nothing changes at a width where the word fits. It is
+  // the same shape the nameplate carries; the measurement is written up
+  // there (interface guidelines, Responsive: no page scrolls sideways at
+  // 320px).
   const wordmark = (
-    <span className="inline-flex items-center gap-xs">
+    <span className="inline-flex items-center gap-xs wrap-anywhere">
       {mark}
       {name}
     </span>

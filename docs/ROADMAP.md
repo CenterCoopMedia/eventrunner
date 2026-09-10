@@ -107,6 +107,27 @@ A visitor can reach and read every page the seed creates, and the site presents 
 Follow-ups filed while the milestone ran, carried into later milestones rather
 than held against M7: #218, #219, #226, #227, #230, #231, #233, #234, #236.
 
+### Design system: the editorial desk and the vocabulary expansion — in progress
+
+The admin CMS moved onto the editorial desk on 2026-09-10 (#245): a dark rail, a
+white title band, tinted state badges, 44px controls, and the event's own colours
+worked into the admin's action family. The design vocabulary then expands in six
+waves so a site and its admin read as designed. Tracking issue #249; direction
+record `docs/plans/2026-09-10-design-vocabulary-expansion.md`. Every wave is one
+pull request stacked on the wave below.
+
+- [x] The admin CMS on the editorial desk, in the event's own colours (#245)
+- [x] The direction record (#250)
+- [ ] Wave 1: the state grammar, the motion grammar and its test, eight shared
+      controls, the stage and measure width system, the specimen book and its
+      capture script; closes #219, #233, #236 (in review)
+- [ ] Wave 2: text, feedback and input devices; block types; option groups
+- [ ] Wave 3: four illustration sets (a first pass sits on its branch)
+- [ ] Wave 4: schedule devices on the schedule (#162 to #167) and the dashboard
+      shells (#168, #210)
+- [ ] Wave 5: three site styles: Gallery, Playbill, Listings
+- [ ] Wave 6: admin devices on the M9 to M11 pages
+
 ### M8: Attendee and schedule experience
 
 An attendee can find a session, build a personal schedule, and take it with them.

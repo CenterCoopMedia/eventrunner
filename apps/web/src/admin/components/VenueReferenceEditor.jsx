@@ -176,11 +176,15 @@ export function validateVenueReferences(venue) {
  * The map's own problems, SEPARATE FROM validateVenueReferences ABOVE.
  *
  * Two validators because they are used at two different moments, and issue
- * #219 is why. The places and movements above disable the save button while
- * they are wrong; growing that set is how a form ends up with a dead button
- * and no way for the person in front of it to find out which field did it.
- * The map's fields are checked at SUBMIT instead: the button stays live, the
- * offending field is marked, focus moves there, and nothing is sent.
+ * #219 is why. The places and the movements above are checked AS THEY ARE
+ * TYPED, so a field states its problem while the person is still in it. The
+ * map's fields are checked at SUBMIT instead, because until a save is
+ * attempted there is nothing to argue with.
+ *
+ * Neither one disables the save control — a dead button tells nobody which
+ * field stopped them. Both refuse in the same place, AdminEventSettings's
+ * submit: the offending field is marked, focus moves to the first of them,
+ * and nothing is sent.
  *
  * Nothing is checked until an image is chosen, because until then there is
  * no map to be wrong about.

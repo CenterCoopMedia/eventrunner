@@ -3,10 +3,24 @@
 // A normal client build compiles IS_DEMO to false, so it renders no banner
 // and exposes no style controls. The demo uses EventConfigProvider's existing
 // theme path. It does not write Firestore or create a second resolver.
+//
+// The band is the showcase's own device, and it is built from the same
+// vocabulary as the site under it: the STAGE it shares with the header, the
+// page and the footer, the alternate ground, a hairline, the heading face
+// for the style's name, the body face for the line that describes it, and
+// four controls in one row at the shared control height. No pill, no
+// shadow, no gradient, and nothing that can push the page sideways at
+// 390px.
+//
+// The band held its own `max-w-5xl` and `px-md` after the stage landed, so
+// at 1440px its content box ran 224 to 1216 against the header's 164 to
+// 1276: 60px inside the frame at each end. A band that does not line up
+// with the page under it is the one thing a demo band must not be.
 import { useEffect, useId, useState } from 'react';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { recommendedConfiguration } from '../lib/themeRuntime.js';
+import Rule from './editorial/Rule.jsx';
 import { quietActionClass } from './controlClasses.js';
 import {
   DEMO_STYLE_OPTIONS,
@@ -46,9 +60,15 @@ export function writeDemoDisplaySearch(search, style, mode) {
   return `?${params.toString()}`;
 }
 
+// The select carries the control height like the three buttons beside it,
+// so the row reads as one row rather than four sizes. The height is the
+// shared 44px floor `touch-target` sets, not a number written here: a
+// second source for one measurement is a second place for it to drift.
 const selectClass =
-  'touch-target w-full rounded-brand border-hairline border-control bg-surface ' +
-  'px-sm py-xs font-data text-caption text-text-primary';
+  'touch-target w-full min-w-0 rounded-brand border-hairline border-control bg-surface ' +
+  'px-sm font-data text-caption text-text-primary';
+
+const bandActionClass = `${quietActionClass} justify-center`;
 
 export function DemoBannerContent({
   location = window.location,
@@ -86,29 +106,36 @@ export function DemoBannerContent({
       aria-label="Demo controls"
       className="no-print border-b-hairline border-b-rule-hairline bg-surface-alt text-text-primary"
     >
-      <div className="mx-auto flex max-w-5xl flex-col gap-sm px-md py-sm">
-        <p className="max-w-prose text-caption text-text-secondary">
-          <strong className="text-text-primary">Demo site.</strong>{' '}
-          This event is fictional and read-only. Account features are off.
-        </p>
+      <div className="stage flex flex-col gap-sm py-sm">
+        {/* The style's own name, then the line that says what it does. The
+            name is set in the heading face and is not a heading element:
+            the page under this band owns its h1. */}
+        <div aria-live="polite">
+          <p className="font-heading text-h3 font-semibold text-text-primary">
+            {activeStyle.label}
+          </p>
+          <p className="mt-3xs max-w-prose text-body text-text-secondary text-pretty">
+            {activeStyle.summary}
+          </p>
+        </div>
+
+        <Rule weight="hairline" />
 
         <div
-          className="flex flex-wrap items-end gap-xs"
+          className="flex flex-wrap items-center gap-xs"
           aria-label="Demo display settings"
         >
           <button
             type="button"
-            className={quietActionClass}
+            className={bandActionClass}
+            aria-label="Previous site style"
             onClick={() => setStyleId(adjacentDemoStyleId(styleId, -1))}
           >
-            Previous style
+            Previous
           </button>
 
-          <div className="min-w-48 flex-1 sm:max-w-xs">
-            <label
-              htmlFor={selectId}
-              className="mb-2xs block font-data text-caption font-semibold"
-            >
+          <div className="min-w-0 flex-1 basis-40 sm:max-w-xs">
+            <label htmlFor={selectId} className="sr-only">
               Site style
             </label>
             <select
@@ -127,15 +154,16 @@ export function DemoBannerContent({
 
           <button
             type="button"
-            className={quietActionClass}
+            className={bandActionClass}
+            aria-label="Next site style"
             onClick={() => setStyleId(adjacentDemoStyleId(styleId, 1))}
           >
-            Next style
+            Next
           </button>
 
           <button
             type="button"
-            className={quietActionClass}
+            className={bandActionClass}
             aria-pressed={mode === 'dark'}
             onClick={() =>
               setMode((current) => (current === 'dark' ? 'light' : 'dark'))
@@ -145,12 +173,9 @@ export function DemoBannerContent({
           </button>
         </div>
 
-        <p
-          className="max-w-prose text-caption text-text-secondary"
-          aria-live="polite"
-        >
-          <strong className="text-text-primary">{activeStyle.label}.</strong>{' '}
-          {activeStyle.summary}
+        <p className="max-w-prose text-caption text-text-secondary">
+          <strong className="text-text-primary">Demo site.</strong>{' '}
+          This event is fictional and read-only. Account features are off.
         </p>
       </div>
     </section>

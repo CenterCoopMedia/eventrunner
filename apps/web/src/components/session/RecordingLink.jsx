@@ -16,6 +16,7 @@
 // behind, exactly like its materials.
 import { isSafeUrl } from 'shared/urlSafety';
 import { rowActionClass } from './sessionActionClass.js';
+import ExternalLink from '../ExternalLink.jsx';
 
 /**
  * The session's recording link, or '' when it has none this page may open.
@@ -43,7 +44,7 @@ export default function RecordingLink({ session }) {
   const url = sessionRecordingUrl(session);
   if (!url) return null;
   return (
-    <a href={url} target="_blank" rel="noreferrer" className={rowActionClass}>
+    <ExternalLink href={url} className={rowActionClass}>
       Watch the recording
       {/* Which session's recording. A schedule day can list thirty rows,
           and a reader pulling up the links on the page would otherwise
@@ -51,6 +52,6 @@ export default function RecordingLink({ session }) {
           to tell them apart. The row says it by position to anyone who can
           see it; this says it to everyone else. */}
       {session?.title ? <span className="sr-only">{` of ${session.title}`}</span> : null}
-    </a>
+    </ExternalLink>
   );
 }

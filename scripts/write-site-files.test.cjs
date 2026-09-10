@@ -6,7 +6,14 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { main, readGeneratedSnapshot, DEFAULT_GENERATED_DIR } = require('./write-site-files.cjs');
+const {
+  main,
+  readGeneratedSnapshot,
+  excludedRoutesFound,
+  excludedRouteMessage,
+  DEFAULT_GENERATED_DIR,
+  NEVER_IN_SITEMAP,
+} = require('./write-site-files.cjs');
 
 const quiet = { log() {}, error() {} };
 
@@ -160,4 +167,96 @@ test('a real run against the committed demo snapshot (no --generated) succeeds',
   } finally {
     fs.rmSync(distDir, { recursive: true, force: true });
   }
+});
+
+// --- the specimen book stays out of the sitemap ------------------------------
+
+test('the review-only route list names the specimen book', () => {
+  assert.deepEqual([...NEVER_IN_SITEMAP], ['/specimen']);
+});
+
+test('a clean sitemap reports no excluded route', () => {
+  const xml = [
+    '<urlset>',
+    '  <url><loc>https://example.org/</loc></url>',
+    '  <url><loc>https://example.org/schedule</loc></url>',
+    '</urlset>',
+  ].join('\n');
+  assert.deepEqual(excludedRoutesFound(xml), []);
+});
+
+test('a sitemap that lists the specimen book is refused', () => {
+  const xml = '<urlset><url><loc>https://example.org/specimen</loc></url></urlset>';
+  assert.deepEqual(excludedRoutesFound(xml), ['/specimen']);
+});
+
+test('a sitemap that lists a page under the specimen book is refused too', () => {
+  const xml = '<urlset><url><loc>https://example.org/specimen/type</loc></url></urlset>';
+  assert.deepEqual(excludedRoutesFound(xml), ['/specimen']);
+});
+
+test('a page whose path merely starts with the same letters is allowed', () => {
+  const xml = '<urlset><url><loc>https://example.org/specimens-of-the-year</loc></url></urlset>';
+  assert.deepEqual(excludedRoutesFound(xml), []);
+});
+
+test('a refused route no page holds says what to remove instead', () => {
+  // The sitemap is built from pages, sessions, speakers and updates. A
+  // route that reached it from one of the other three has no page path to
+  // rename, so the message says the one thing that is still true.
+  const message = excludedRouteMessage(['/specimen'], []);
+  assert.match(message, /reserved for the specimen book/u);
+  assert.match(message, /Remove it from the route source/u);
+});
+
+test('the refusal names the reserved segment and the page that took it', async (t) => {
+  // An operator reading this message has to know two things: that the
+  // segment belongs to the specimen book, and which of their own pages is
+  // sitting on it. Without the page path there is nothing to rename.
+  const generatedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'write-site-files-clash-'));
+  const distDir = fs.mkdtempSync(path.join(os.tmpdir(), 'write-site-files-clash-dist-'));
+  t.after(() => {
+    fs.rmSync(generatedDir, { recursive: true, force: true });
+    fs.rmSync(distDir, { recursive: true, force: true });
+  });
+  fs.writeFileSync(
+    path.join(generatedDir, 'eventConfig.js'),
+    "export const eventConfig = { name: 'Fixture Event', shortName: 'FIX' };\n"
+    + 'export const features = { schedule: false, speakers: false, sponsors: false, '
+    + 'attendeeDirectory: false, updates: false };\n'
+    + 'export const theme = {};\n',
+  );
+  fs.writeFileSync(
+    path.join(generatedDir, 'pagesData.js'),
+    'export const pagesData = ['
+    + "{ id: 'home', path: '/', order: 0, visible: true, systemPage: true },"
+    + "{ id: 'specimen', path: '/specimen', order: 4, visible: true, systemPage: false },"
+    + '];\n',
+  );
+  fs.writeFileSync(
+    path.join(generatedDir, 'scheduleData.js'),
+    'export const scheduleData = [];\nexport const speakers = [];\n',
+  );
+
+  const errors = [];
+  const code = await main(
+    ['--dist', distDir, '--public-url', 'https://example.org', '--generated', generatedDir],
+    { log: { log() {}, error: (line) => errors.push(line) } },
+  );
+  assert.equal(code, 4);
+  const message = errors.join('\n');
+  assert.match(message, /reserved for the specimen book/u);
+  assert.match(message, /\/specimen/u);
+});
+
+test('the demo snapshot writes a sitemap that does not list the specimen book', async (t) => {
+  const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'write-site-files-specimen-'));
+  t.after(() => fs.rmSync(dist, { recursive: true, force: true }));
+  const code = await main(
+    ['--dist', dist, '--public-url', 'https://example.org'],
+    { log: quiet },
+  );
+  assert.equal(code, 0);
+  const sitemap = fs.readFileSync(path.join(dist, 'sitemap.xml'), 'utf8');
+  assert.equal(sitemap.includes('/specimen'), false);
 });

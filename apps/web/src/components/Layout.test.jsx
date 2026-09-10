@@ -770,6 +770,51 @@ describe('Layout back-to-top', () => {
   });
 });
 
+describe('Layout on the stage', () => {
+  // ONE FRAME, FOUR LANDMARKS. The header, the page, the footer and the
+  // side rail all sit on the same stage, or the site is four widths wearing
+  // one identity. jsdom measures no box, so what is asserted here is that
+  // every one of them carries the class the stylesheet gives the frame —
+  // and that none of them still states a width of its own beside it.
+  const framed = (container) => [
+    container.querySelector('header'),
+    container.querySelector('#main-content'),
+    container.querySelector('footer'),
+  ];
+
+  it('sets the header, the page and the footer on one stage', () => {
+    const { container } = renderShell({});
+    for (const landmark of framed(container)) {
+      expect(landmark).not.toBeNull();
+      const framedNode = landmark.classList.contains('stage') ? landmark : landmark.firstElementChild;
+      expect(framedNode.classList.contains('stage'), landmark.tagName).toBe(true);
+    }
+  });
+
+  it('keeps the rail on the same stage as the page it serves', () => {
+    const { container } = renderShell({}, {
+      pageDoc: { id: 'home', path: '/', layout: { navPlacement: 'side' } },
+    });
+    const main = container.querySelector('#main-content');
+    expect(main.parentElement.classList.contains('stage')).toBe(true);
+    expect(main.parentElement.querySelector('nav[aria-label="Main"]')).not.toBeNull();
+  });
+
+  it('states no second width beside the stage', () => {
+    const { container } = renderShell({});
+    for (const node of container.querySelectorAll('.stage')) {
+      expect([...node.classList].filter((name) => /^max-w-/.test(name))).toEqual([]);
+    }
+  });
+
+  it('runs the footer page list in columns that wrap', () => {
+    const { container } = renderShell({});
+    const list = container.querySelector('nav[aria-label="Site pages"] ul');
+    expect(list.classList.contains('footer-links')).toBe(true);
+    expect(indexCss).toMatch(/\.footer-links \{[^}]*repeat\(auto-fill, minmax\(/);
+  });
+});
+
 describe('Layout variants (brief §6.1)', () => {
   it('takes the treatment the page states, over the shell’s own rule', () => {
     // An inner page that asks for the full masthead gets it...
@@ -919,7 +964,9 @@ describe('Layout registration action (M7 issue 8)', () => {
     );
     const link = container.querySelector('header a[href="https://register.example.org/tickets"]');
     expect(link).not.toBeNull();
-    expect(link.textContent).toBe('Get a ticket');
+    // The link's words are the client's label; the hidden half tells a
+    // screen reader that the tab will change (issue 236).
+    expect(link.textContent).toBe('Get a ticket (opens in a new tab)');
   });
 
   it('keeps its own distance from the navigation in the one row treatment', () => {

@@ -37,6 +37,14 @@
  * routes are always empty from this path; only the Cloud Run publisher,
  * which does have a live read, can list them.
  *
+ * One route is refused outright: the specimen book at /specimen is a review
+ * surface that ships only in the demo build and in a development server, so
+ * a sitemap that lists it fails this script with exit code 4 rather than
+ * publishing it. `specimen` is reserved in shared/routing for the same
+ * reason, so a page written after that landed cannot take the segment; the
+ * refusal below names the page path anyway, because a page written before
+ * it can, and renaming that page is the fix.
+ *
  * Usage:
  *   node scripts/write-site-files.cjs --dist apps/web/dist --public-url https://example.org
  *   node scripts/write-site-files.cjs --dist apps/web/dist --generated /tmp/generated --public-url https://example.org
@@ -52,6 +60,86 @@ const { buildSiteArtifacts } = require('./lib/site-manifest.cjs');
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_GENERATED_DIR = path.join(ROOT, 'apps', 'web', 'src', 'generated');
 const FLAGS = ['dist', 'generated', 'public-url', 'help'];
+
+/**
+ * The review-only routes this build must never advertise.
+ *
+ * The specimen book (apps/web/src/pages/specimen/) renders every device in
+ * every state. It ships in the static demo build and in a development
+ * server, never in a client production build, and it is not a page anybody
+ * should reach from a search result.
+ *
+ * A sitemap is built from cmsPages, sessions, speakers, and updates, so no
+ * ordinary change can put this path in one. That is exactly why the check
+ * belongs here: the day a route table starts feeding the sitemap, this
+ * fails instead of quietly publishing a review surface.
+ */
+const NEVER_IN_SITEMAP = Object.freeze(['/specimen']);
+
+/**
+ * The reason each refused route is refused, in the words an operator needs.
+ *
+ * The segment is reserved in shared/routing, so no page written after that
+ * landed can hold it. A page written BEFORE it can, which is the whole
+ * reason this message names a path: the operator has to rename that page,
+ * and a message that only says "remove it from the route source" names
+ * nothing they can act on.
+ */
+const EXCLUDED_ROUTE_REASONS = Object.freeze({
+  '/specimen': 'reserved for the specimen book, the review page that ships in the demo build only',
+});
+
+/**
+ * Refuse a sitemap that lists a review-only route.
+ *
+ * @param {string} sitemapXml
+ * @param {string[]} [routes]
+ * @returns {string[]} the offending routes, empty when the sitemap is clean
+ */
+function excludedRoutesFound(sitemapXml, routes = NEVER_IN_SITEMAP) {
+  const text = String(sitemapXml ?? '');
+  return routes.filter((route) => {
+    const inLoc = new RegExp(`<loc>[^<]*${route}(?:/[^<]*)?</loc>`, 'u');
+    return inLoc.test(text);
+  });
+}
+
+/**
+ * The stored pages sitting on one refused route, by their own path.
+ *
+ * The sitemap carries absolute URLs; the operator renames a PAGE PATH in
+ * the admin. So the offending pages are read from the snapshot the sitemap
+ * was built from rather than parsed back out of the XML.
+ *
+ * @param {object[]} pages the generated pagesData
+ * @param {string} route e.g. '/specimen'
+ * @returns {string[]} the page paths on that route, in snapshot order
+ */
+function pagePathsOnRoute(pages, route) {
+  return (pages ?? [])
+    .map((page) => String(page?.path ?? ''))
+    .filter((pagePath) => pagePath === route || pagePath.startsWith(`${route}/`));
+}
+
+/**
+ * One line per refused route, naming the reason and what to rename.
+ *
+ * @param {string[]} routes the routes excludedRoutesFound reported
+ * @param {object[]} pages the generated pagesData
+ * @returns {string}
+ */
+function excludedRouteMessage(routes, pages) {
+  return routes
+    .map((route) => {
+      const reason = EXCLUDED_ROUTE_REASONS[route] ?? 'a review-only route';
+      const taken = pagePathsOnRoute(pages, route);
+      const owner = taken.length > 0
+        ? `The page at ${taken.join(', ')} took it. Rename that page's path and publish again.`
+        : 'Remove it from the route source before publishing.';
+      return `the sitemap lists ${route}, and that segment is ${reason}. ${owner}`;
+    })
+    .join('\n');
+}
 
 function usage() {
   return [
@@ -157,6 +245,12 @@ async function main(argv, { importModule = importGenerated, log = console } = {}
 
   const artifacts = buildSiteArtifacts({ ...snapshot, publicUrl: parsed['public-url'] });
 
+  const listed = excludedRoutesFound(artifacts.sitemapXml);
+  if (listed.length > 0) {
+    log.error(`write-site-files: ${excludedRouteMessage(listed, snapshot.pages)}`);
+    return 4;
+  }
+
   fs.mkdirSync(distDir, { recursive: true });
   fs.writeFileSync(path.join(distDir, 'sitemap.xml'), artifacts.sitemapXml);
   fs.writeFileSync(path.join(distDir, 'robots.txt'), artifacts.robotsTxt);
@@ -181,6 +275,9 @@ module.exports = {
   main,
   readGeneratedSnapshot,
   importGenerated,
+  excludedRoutesFound,
+  excludedRouteMessage,
   DEFAULT_GENERATED_DIR,
-  internals: { usage, FLAGS },
+  NEVER_IN_SITEMAP,
+  internals: { usage, FLAGS, pagePathsOnRoute },
 };

@@ -11,6 +11,7 @@ const {
   loadTokens,
   resolveAdminTokens,
   resolveColorTokens,
+  resolveStateTokens,
   resolveFonts,
   modePolicy,
   TOKENS_DIR,
@@ -304,6 +305,45 @@ test("the active preset's block carries this deployment's overrides", () => {
   );
 });
 
+test('the stage and the measure are declared once and read by name', () => {
+  // The two widths every page is built on (2026-09-10 vocabulary
+  // expansion). Tier 1 holds the values, tier 2 names the family, and the
+  // page contract is the pair a style retunes — so a preset that wants a
+  // wider stage moves --stage-max and never mints a width of its own.
+  const css = buildTokenCss(THEME);
+  for (const [name, value] of [
+    ['--er-stage-frame', '72.5rem'],
+    ['--er-stage-measure', '44rem'],
+    ['--stage-frame', 'var(--er-stage-frame)'],
+    ['--stage-measure', 'var(--er-stage-measure)'],
+    ['--stage-max', 'var(--stage-frame)'],
+    ['--measure-text', 'var(--stage-measure)'],
+  ]) {
+    assert.match(css, new RegExp(`${name}: ${value.replace(/[()\\-]/g, '\\$&')};`), name);
+  }
+  // Both are declared exactly once. A second declaration is a second
+  // answer, and the one that wins would depend on the order of the file.
+  for (const name of ['--stage-max', '--measure-text']) {
+    const declared = css.match(new RegExp(`${name}:`, 'g')) || [];
+    assert.equal(declared.length, 1, `${name} is declared once`);
+  }
+  // The frame is the wider of the two, or the measure is not a measure.
+  const rem = (name) => Number(css.match(new RegExp(`${name}: ([\\d.]+)rem;`))[1]);
+  assert.ok(rem('--er-stage-frame') > rem('--er-stage-measure'), 'the stage is wider than the measure');
+});
+
+test('a style may retune the stage and the measure from its own preset file', () => {
+  // The contract is what a preset moves, so a remap has to reach the block
+  // the style renders under and has to keep the name the components read.
+  const css = buildTokenCss({ preset: 'broadsheet' });
+  const block = css.match(/\[data-theme='broadsheet'\]\[data-mode='light'\] \{([^}]*)\}/);
+  assert.ok(block, 'the preset block exists');
+  const declared = new Set([...css.matchAll(/(--[\w-]+):/g)].map((m) => m[1]));
+  for (const name of ['--stage-max', '--measure-text']) {
+    assert.ok(declared.has(name), `${name} is declarable, so a preset may remap it`);
+  }
+});
+
 test('every option a preset offers remaps a token the contracts already declare', () => {
   // Brief §3.4: an option remaps existing tier 2 and tier 3 tokens. It never
   // adds a property name, never adds a class, never adds a component type.
@@ -522,6 +562,100 @@ test('the admin marker takes the resolved brand colour, and falls back to admin 
 });
 
 // ------------------------------------------------ the motif layer (brief §3.8)
+
+test('every motion step has one job, and the two moments share one curve', () => {
+  // Expansion record §2.2 gives each duration step a job: fast is the exit,
+  // base is the enter, slow is the press, signature is the one signature a
+  // surface owns. There is one curve. An enter must never open on ease-in,
+  // which would delay the response at the one moment the reader is watching,
+  // and an exit that used a second curve would make the two moments read as
+  // two systems — so the asymmetry is carried by DURATION alone.
+  const css = buildTokenCss(THEME);
+  assert.match(css, /--motion-fast: var\(--er-duration-fast\);/);
+  assert.match(css, /--motion-base: var\(--er-duration-base\);/);
+  assert.match(css, /--motion-slow: var\(--er-duration-slow\);/);
+  assert.match(css, /--motion-signature: var\(--er-duration-signature\);/);
+  assert.match(css, /--motion-ease: var\(--er-easing-out\);/);
+
+  const { primitives, semantic } = loadTokens();
+  assert.deepEqual(Object.keys(primitives.scalar.easing), ['out'], 'one curve, not two');
+  assert.equal(
+    Object.keys(semantic.motion).filter((step) => step.startsWith('ease')).length,
+    1,
+    'tier 2 offers one easing token',
+  );
+  assert.match(primitives.scalar.easing.out, /^cubic-bezier\(0, 0, /, 'the curve decelerates');
+
+  // The exit is faster than the enter that brought the element in.
+  const ms = (value) => Number(String(value).replace('ms', ''));
+  assert.ok(ms(primitives.scalar.duration.fast) < ms(primitives.scalar.duration.base));
+});
+
+test('the focus ring is its own token pair, never a rule weight', () => {
+  // Expansion record §2.1: one ring on every public control, 3px, outside
+  // the element. It reads its own family so a retune of the rule scale
+  // cannot thin the one signal that answers "where am I".
+  const css = buildTokenCss(THEME);
+  assert.match(css, /--focus-ring-width: var\(--er-width-focus-ring\);/);
+  assert.match(css, /--focus-ring-offset: var\(--er-width-focus-offset\);/);
+
+  const { primitives } = loadTokens();
+  assert.equal(primitives.scalar.width['focus-ring'], '3px');
+  assert.ok(
+    parseFloat(primitives.scalar.width['focus-ring'])
+      > parseFloat(primitives.scalar.width.strong),
+    'the ring outweighs the strong rule, so it is never read as structure',
+  );
+  assert.ok(parseFloat(primitives.scalar.width['focus-offset']) > 0, 'the ring sits outside');
+});
+
+test('the state shares resolve in both modes, and dark carries the higher share', () => {
+  // Expansion record §2.1. A state tint is ink mixed into the ground at a
+  // fixed share, so the share is a number and not a colour: it never lands
+  // in a palette block, and it is emitted per mode because the same amount
+  // of ink reads as a smaller step on a dark ground.
+  const tokens = loadTokens();
+  const { names, values } = resolveStateTokens(tokens);
+  assert.deepEqual(names, [
+    '--state-hover-share',
+    '--state-pressed-share',
+    '--state-selected-share',
+  ]);
+
+  const share = (mode, name) => {
+    const ref = values[mode][name].match(/^var\((--er-state-[\w-]+)\)$/);
+    assert.ok(ref, `${name} in ${mode} reads a tier 1 primitive`);
+    const step = ref[1].replace('--er-state-', '');
+    const raw = tokens.primitives.scalar.state[step];
+    assert.ok(raw !== undefined, `${ref[1]} is declared in tier 1`);
+    return Number(raw);
+  };
+
+  for (const name of names) {
+    const light = share('light', name);
+    const dark = share('dark', name);
+    assert.ok(light > 0 && light < 1, `${name} light is a share`);
+    assert.ok(dark > 0 && dark < 1, `${name} dark is a share`);
+    assert.ok(dark > light, `${name} carries more ink in dark mode`);
+  }
+
+  // A press is the firmest tint and a hover the lightest, in both modes, so
+  // the three states never read as the same state.
+  for (const mode of ['light', 'dark']) {
+    assert.ok(share(mode, '--state-hover-share') < share(mode, '--state-selected-share'));
+    assert.ok(share(mode, '--state-selected-share') < share(mode, '--state-pressed-share'));
+  }
+
+  // Both mode blocks carry the whole family, and neither is a colour block.
+  const css = buildTokenCss(THEME);
+  for (const mode of ['light', 'dark']) {
+    const block = css.match(
+      new RegExp(`:root\\[data-mode='${mode}'\\],\\n\\[data-mode='${mode}'\\] \\{([^}]*--state-[^}]*)\\}`),
+    );
+    assert.ok(block, `the ${mode} state block exists`);
+    for (const name of names) assert.match(block[1], new RegExp(`${name}: `));
+  }
+});
 
 test('every motif set gets a slot-resolution block, and its assets exist', () => {
   const css = buildTokenCss(THEME);

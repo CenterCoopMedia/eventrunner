@@ -161,7 +161,7 @@ describe('the schedule grid', () => {
       ...SESSIONS.slice(2),
     ]);
     expect(
-      screen.getByRole('link', { name: 'Watch the recording of [Fixture] Reporting workshop' }),
+      screen.getByRole('link', { name: /^Watch the recording of \[Fixture\] Reporting workshop\b/ }),
     ).toHaveAttribute('href', 'https://video.example.org/watch?v=practice');
   });
 

@@ -294,6 +294,51 @@ misconfigured. Postmark reports domain state only to an **account** token, so
 `EMAIL_ACCOUNT_API_KEY` is needed in addition to the server token; without it the provider reports
 `unknown` rather than guessing.
 
+### `dev/capture-specimen.mjs`
+
+Captures the specimen book (`apps/web/src/pages/specimen/`) once per site style, display mode and
+viewport width, so review evidence is a command rather than a script somebody writes again next
+time.
+
+It needs a served build. Either point it at a server you already started with `--base-url`, or give
+it a built directory with `--dist` and it serves that itself on `--port` (default 8901) and stops
+when it is done.
+
+```sh
+VITE_DEMO_MODE=1 npm run build -w apps/web -- \
+  --base /eventrunner/demo/ --outDir /tmp/specimen-demo --emptyOutDir
+PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/dev/capture-specimen.mjs \
+  --dist /tmp/specimen-demo --out docs/plans/evidence/specimen
+```
+
+| Option | What it does |
+| --- | --- |
+| `--out <dir>` | where the PNGs go. Required. |
+| `--dist <dir>` / `--base-url <url>` | the build to open. Give one, not both. |
+| `--styles <list>` | comma-separated style ids. Default: all six. |
+| `--modes <list>` | `light`, `dark`, or both. Default: both. |
+| `--widths <list>` | comma-separated widths. Default: `1440,390`. |
+| `--only <section id>` | capture one section, for example `specimen-controls`. |
+| `--scale <n>` | device scale factor. Default: 1. |
+| `--port <n>` | the port `--dist` is served on. Default: 8901. |
+| `--base-path <path>` | the path the build is served under. Default: `/eventrunner/demo/`. |
+
+Each file is named `<style>--<mode>--<width>.png`, and a section capture adds the section id. The
+book is a long page, so a full-page PNG at 1440 runs to about 2MB: `--scale 0.5` brings one under
+1.5MB, and `--only` keeps a section capture small at full scale. A half-scale full-page capture is
+not legible to a person, so the committed evidence is section captures at full scale and the
+full set is what this script regenerates on demand.
+
+A section capture brings its section into view, waits, and then hides everything the page fixes to
+the viewport before it shoots, because the back-to-top control mounts on scroll and would otherwise
+land in the middle of the picture.
+
+It needs the `playwright` package and a Chromium binary through `PLAYWRIGHT_BROWSERS_PATH`. It
+never runs `playwright install`: a missing browser fails fast with a message rather than reaching
+for the network.
+
+Exit codes: `0` ok, `1` the capture failed, `2` bad arguments, `3` no build at `--dist`.
+
 ## Planned
 
 `grant-admin`, `register-ticketing-webhook`, `export-attendees`, `generate-favicons`. Credentials go

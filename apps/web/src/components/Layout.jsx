@@ -12,6 +12,13 @@
 // treatments it has always stored, so `pageHeaderTreatment` reads them into
 // the theme's vocabulary rather than making the page learn a second one.
 //
+// THE SHELL RUNS TO THE STAGE. The header, the navigation, the page, and
+// the footer all sit on one frame — `.stage` in index.css, capped at
+// --stage-max and gutter-padded from the spacing scale. Running text
+// inside it is capped again at --measure-text, so a paragraph never runs
+// the width of a schedule grid. Both widths are tokens a style retunes
+// (docs/interface-guidelines.md, Layout).
+//
 // Navigation is in the editorial register: text links, no pills, no tinted
 // ground. The active item is marked twice over (§8.1 — never color alone):
 // heavier weight plus a strong rule under the word. `side` moves the same
@@ -380,7 +387,7 @@ export default function Layout() {
       className={
         navPlacement === 'side'
           ? 'min-w-0 flex-1 pb-2xl pt-xl'
-          : 'mx-auto w-full max-w-5xl flex-1 px-md pb-2xl pt-xl'
+          : 'stage flex-1 pb-2xl pt-xl'
       }
     >
       <Outlet />
@@ -398,7 +405,7 @@ export default function Layout() {
           here so a reader who is not looking at the screen arrives with the
           keyboard where the picture is (M7 issue 6). */}
       <header id={TOP_LANDMARK_ID} tabIndex={-1} className="bg-surface">
-        <div className="mx-auto w-full max-w-5xl px-md">
+        <div className="stage">
           <Header
             variant={headerVariant}
             name={plate.name}
@@ -430,11 +437,11 @@ export default function Layout() {
         </div>
       </header>
       {navPlacement === 'side' ? (
-        // The rail and the page it serves share one measure, so the nav
+        // The rail and the page it serves share one stage, so the nav
         // sits at the leading edge of the page rather than at the edge of
         // the window. Below `lg` the row stacks and this is the top nav
         // again, in the same order, with the same rule under it.
-        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-md lg:flex-row lg:gap-xl">
+        <div className="stage flex flex-1 flex-col lg:flex-row lg:gap-xl">
           {nav}
           {main}
         </div>
@@ -449,7 +456,7 @@ export default function Layout() {
           either way, so its place here is a sequential one only. */}
       <BackToTop targetId={TOP_LANDMARK_ID} footerId={FOOTER_ID} />
       <footer id={FOOTER_ID} className="bg-surface">
-        <div className="mx-auto w-full max-w-5xl px-md">
+        <div className="stage">
           <div className="section-rule pb-xl pt-md font-data text-caption text-text-secondary">
             <p className="font-heading text-body font-semibold text-text-primary">
               {eventConfig?.name}
@@ -462,7 +469,7 @@ export default function Layout() {
                 href reloads a path the static host does not serve. */}
             {navItems.length === 0 ? null : (
               <nav aria-label="Site pages" className="mt-md">
-                <ul className="flex flex-wrap gap-x-md">
+                <ul className="footer-links">
                   {navItems.map((item) => (
                     <li key={item.to}>
                       <Link to={item.to} className={FOOTER_LINK_CLASS}>

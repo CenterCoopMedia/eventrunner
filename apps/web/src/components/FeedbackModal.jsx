@@ -26,10 +26,46 @@
 // `<label>` in SelectField/TextAreaField/TextField stays above its input —
 // a control label is the one exemption the eyebrow ban names (§2.4), never
 // an eyebrow to "fix".
+//
+// A NATIVE <dialog>, OPENED WITH showModal(). This used to be a z-50 <div>
+// over the page, so Tab walked straight out of it and into the page behind
+// — including the fixed back-to-top control. `showModal()` is the platform's
+// own answer and it is four behaviours in one call: focus is trapped inside
+// the dialog, everything behind it is inert to the pointer and to assistive
+// technology, Escape fires `cancel`, and the top layer puts the dialog above
+// every stacking context without a z-index. None of that is reimplemented
+// here, because a hand-written trap is a list of focusable selectors that
+// goes stale the moment a control is added.
+//
+// The one thing the component still owns is the RETURN of focus. React
+// unmounts the dialog on close, and an element removed while it holds focus
+// drops focus to the body, so the opener is remembered on mount and focused
+// again on the way out.
+//
+// TWO KINDS OF REFUSAL, TWO PLACES (issue 219). A field that refuses states
+// it on the field: `aria-invalid`, the message under it named by
+// `aria-describedby`, and focus moved there on submit, so the label, the
+// state and the message are read as one. A refusal from the SERVER belongs
+// to the request rather than to any field, so that one stays the single
+// urgent line at the head of the form. One result, announced once: the
+// field's message is not repeated in the summary, because the focus move
+// is what announces it.
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
-import { SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
+import { focusFirstError, SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
+
+/**
+ * The dialog's frame: the strong rule on the page ground, at the reading
+ * width. Exported so the specimen book draws the frame from this string
+ * rather than from a copy of it.
+ *
+ * `.public-dialog` is not in here. That class is the element's own
+ * behaviour — how tall a native dialog may grow, how it scrolls, and what
+ * its backdrop paints — and it belongs only on the <dialog> itself.
+ */
+export const DIALOG_FRAME_CLASS =
+  'w-full max-w-lg border-strong border-rule-strong bg-surface p-lg';
 
 const CATEGORY_OPTIONS = [
   { value: 'feedback', label: 'General feedback' },
@@ -56,24 +92,47 @@ export default function FeedbackModal({ onClose }) {
   const [website, setWebsite] = useState(''); // honeypot
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [messageError, setMessageError] = useState(null);
   const [sent, setSent] = useState(false);
 
+  const dialogRef = useRef(null);
+  const formRef = useRef(null);
+  // The opener is read at the FIRST RENDER, not in the effect. The message
+  // field carries autoFocus, and React applies that during the commit, so by
+  // the time an effect runs the active element is already the field inside
+  // the dialog — and the dialog would then try to give focus back to itself.
+  const [opener] = useState(() => (typeof document === 'undefined' ? null : document.activeElement));
+
   useEffect(() => {
-    function onKeyDown(event) {
-      if (event.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+    const dialog = dialogRef.current;
+    // `showModal` is the whole mechanism. Where it is missing the dialog
+    // still opens and the form still works; what is lost is the trap, and a
+    // visitor can still reach every control and close the dialog.
+    if (typeof dialog?.showModal === 'function') dialog.showModal();
+    else if (dialog) dialog.setAttribute('open', '');
+    return () => {
+      if (opener && typeof opener.focus === 'function' && opener.isConnected) opener.focus();
+    };
+  }, [opener]);
 
   async function submit(event) {
     event.preventDefault();
     if (!message.trim()) {
-      setError('Please enter a message.');
+      // The field says it, and the reader is put in front of the field.
+      setMessageError('Please enter a message.');
+      // A rejection from the server, if one is still standing, goes now:
+      // nothing is being sent, so it would be stating a problem that may
+      // already be fixed.
+      setError(null);
+      // After the render that marks the field, not before it. The submit
+      // control stays enabled throughout — a dead control announces
+      // nothing.
+      window.setTimeout(() => focusFirstError(formRef.current), 0);
       return;
     }
     setSubmitting(true);
     setError(null);
+    setMessageError(null);
     const result = await submitFeedback({
       message: message.trim(),
       email: email.trim() || undefined,
@@ -91,17 +150,19 @@ export default function FeedbackModal({ onClose }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/40 px-md py-xl"
-      onClick={onClose}
+    // Escape reaches the dialog as `cancel`. Its default would close the
+    // element while React still believed it was open, so the close is handed
+    // to the caller instead, and the caller unmounts the dialog.
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      className={`public-dialog motion-enter ${DIALOG_FRAME_CLASS}`}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="w-full max-w-lg border-strong border-rule-strong bg-surface p-lg"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <div>
         {sent ? (
           <div className="flex flex-col gap-md">
             <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
@@ -124,7 +185,7 @@ export default function FeedbackModal({ onClose }) {
             </div>
           </div>
         ) : (
-          <form className="flex flex-col gap-md" onSubmit={submit}>
+          <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit}>
             <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
               Share feedback
             </h2>
@@ -144,7 +205,16 @@ export default function FeedbackModal({ onClose }) {
             <TextAreaField
               label="Message"
               value={message}
-              onChange={setMessage}
+              // THE MARK COMES OFF WHEN THE ANSWER ARRIVES. The field held
+              // `aria-invalid` and its message while the reader typed the
+              // very thing it asked for, so the field went on announcing
+              // itself as invalid after it was not. A value that is still
+              // only whitespace has not answered it, so the mark stays.
+              onChange={(next) => {
+                setMessage(next);
+                if (messageError && next.trim()) setMessageError(null);
+              }}
+              error={messageError}
               rows={5}
               autoFocus
             />
@@ -174,13 +244,20 @@ export default function FeedbackModal({ onClose }) {
               <button type="button" className={secondaryActionClass} onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className={primaryActionClass} disabled={submitting}>
+              {/* Busy is a stated word and `aria-busy`, never a spinner. The
+                  control is disabled only once the request has started. */}
+              <button
+                type="submit"
+                className={primaryActionClass}
+                disabled={submitting}
+                aria-busy={submitting || undefined}
+              >
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
             </div>
           </form>
         )}
       </div>
-    </div>
+    </dialog>
   );
 }

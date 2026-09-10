@@ -15,8 +15,21 @@
 // place: the reaction group on a session's DETAIL page, where a set of
 // small pressed/unpressed targets needs a visible edge to be legible as a
 // set. It never appears on a row.
+//
+// Both shapes carry the shared state grammar (expansion record §2.1), so a
+// row control and a chip answer a hover, a press, a selection and an
+// unavailable state the same way every other control on the site does. The
+// chip's own hover tint is gone: it used to fade a background colour over
+// 120ms, and a colour a reader caused must land at once.
+import { controlStateClass, textControlStateClass } from '../controlClasses.js';
+
+// The row control takes the TEXT register of the grammar: the same press,
+// the same unavailable ink, the same selected weight, and no tint — a tint
+// behind a row control would be the box this module exists to remove.
 export const rowActionClass =
-  'touch-target inline-flex items-center gap-2xs font-data text-caption text-text-secondary underline-offset-2 hover:text-text-primary hover:underline';
+  `${textControlStateClass} touch-target inline-flex items-center gap-2xs font-data text-caption ` +
+  'text-text-secondary underline-offset-2 hover:text-text-primary hover:underline';
 
 export const chipActionClass =
-  'touch-target inline-flex items-center gap-2xs rounded-brand border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary transition-colors duration-fast ease-motion hover:bg-brand-surface-alt disabled:cursor-not-allowed disabled:opacity-50';
+  `${controlStateClass} touch-target inline-flex items-center gap-2xs rounded-brand ` +
+  'border-hairline border-rule-hairline px-sm py-2xs font-data text-caption text-text-primary';

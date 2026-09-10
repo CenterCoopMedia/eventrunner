@@ -18,22 +18,28 @@ Haiku agents build.
 
 ## Wave 1: the grammar
 
-- [ ] State grammar on both surfaces: hover inside the hover query, press,
+- [x] State grammar on both surfaces: hover inside the hover query, press,
       selected, disabled, busy, error, success, empty; the tint tokens.
-- [ ] New controls: switch, segmented control, tabs, checkbox, radio, search
+- [x] New controls: switch, segmented control, tabs, checkbox, radio, search
       field, sort control, filter group, external link marker.
-- [ ] Motion grammar: exit easing token, enter and exit utilities, the
-      static loading device, the motion contract test.
-- [ ] Closes #219 (submit stays enabled, focus moves to the first error),
-      #233 (dialog focus trap), #236 (new-tab marker).
-- [ ] Specimen book route in the demo and in development, with every device
+- [x] Motion grammar: one curve with the asymmetry in duration, enter and
+      exit utilities, the static loading device, the motion contract test.
+- [x] Closes #219 (submit stays enabled, focus moves to the first error),
+      #233 (dialog focus trap), #236 (new-tab marker, sponsor wall included).
+- [x] The two widths: a stage for the frame, a measure for running text, and
+      the composed first screen on the home page.
+- [x] Specimen book route in the demo and in development, with every device
       in every state, and the committed capture script.
-- [ ] Integration: merge, specimen entries for the new controls, regenerate,
-      checks last, independent review, evidence under
+- [x] Integration: merge, specimen entries for the new controls and the two
+      widths, regenerate, checks last, evidence under
       `docs/plans/evidence/specimen/`.
-- [ ] Docs: interface guidelines, design reference, web README, CHANGELOG,
+- [x] Docs: interface guidelines, design reference, web README, CHANGELOG,
       `docs/docs` regenerated.
-- [ ] Push, open the PR, watch CI and the review bots.
+- [x] Independent review before the pull request opens; its fourteen findings
+      verified against the code, fixed, and reported.
+- [x] "Feels wrong to humans" pass on the captures; the evidence replaced with
+      section captures at full scale, and what they showed fixed.
+- [x] Push, open the PR, watch CI and the review bots.
 
 ## Wave 2: devices and blocks
 
@@ -61,6 +67,29 @@ Haiku agents build.
 ## Wave 6: admin devices
 
 - [ ] M9 to M11 pages on the desk; the defects in §11 of the record.
+
+## State at the end of the 2026-09-10 session
+
+Recorded so a fresh context can rebuild the wave from the repository alone.
+
+- Wave 1 is integrated on `claude/admin-cms-design-language-ub69gr`: the three
+  builder branches merged, the seams closed, the independent review's findings
+  fixed, every check green, the specimen evidence committed as section
+  captures. The pull request opens from this tip.
+- Builder worktrees, kept for reference: `/home/user/wt-w1a`
+  (`…-w1a`, 16 commits), `/home/user/wt-w1b` (`…-w1b`, 1 commit),
+  `/home/user/wt-w1d` (`…-w1d`, 2 commits). All three are merged into wave 1.
+- Wave 3's builder left one commit on `…-w3` (four illustration sets) and six
+  uncommitted SVG redraws in `/home/user/wt-w3` (botanical divider, empty
+  state, nameplate mark, section mark; cartographic section mark; typographic
+  empty state). Decide whether the redraws stay before a fresh W3 builder
+  resumes from that worktree.
+- Decisions waiting on Joe: the toast tone's second signal is a weak rule; the
+  segmented control and the tabs take no disabled prop (wave 2 owns it);
+  hover, focus and press are drawn once on the five shared shapes, not per
+  composite control; an empty feedback message marks the field and moves
+  focus, with no form-level alert.
+- Wave 2 branches from the wave 1 tip as `…-w2`, never from main.
 
 ## After every wave
 

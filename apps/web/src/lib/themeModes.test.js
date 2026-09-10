@@ -32,6 +32,13 @@ const css = fs.readFileSync(GENERATED_THEME, 'utf8');
 const SAME_IN_BOTH_MODES = [];
 
 /**
+ * The state family (expansion record §2.1). These are the only mode-scoped
+ * tokens that are not colors: each one is the share of ink a state tint
+ * mixes into the ground the control already sits on.
+ */
+const STATE_SHARES = ['--state-hover-share', '--state-pressed-share', '--state-selected-share'];
+
+/**
  * Split a stylesheet into its top-level rules. Brace-aware, so an @media
  * wrapper does not swallow the rules around it.
  *
@@ -173,7 +180,14 @@ describe.each(THEMES)('$id theme', ({ light: lightBlock, dark: darkBlock }) => {
 
   it('defines color tokens, and defines them in both mode blocks', () => {
     expect(colorTokens.length).toBeGreaterThan(20);
-    expect(Object.keys(lightBlock).sort()).toEqual(colorTokens.sort());
+    // A mode block carries colors and, on the attribute-free pair, the state
+    // shares. Nothing else. A share is a number, so it cannot end in -rgb
+    // and cannot be measured for contrast; naming the exception here is what
+    // keeps a stray non-color token out of the palette.
+    const other = Object.keys(lightBlock).filter(
+      (name) => !name.endsWith('-rgb') && !STATE_SHARES.includes(name),
+    );
+    expect(other, 'a mode block carries colors and state shares only').toEqual([]);
   });
 
   it('leaves no color token behind in dark mode', () => {
@@ -391,6 +405,78 @@ describe('admin identity', () => {
 });
 
 // The motif layer (brief §3.8).
+describe('state tint shares', () => {
+  // Expansion record §2.1: hover, pressed, and selected are an ink-mixed
+  // tint of the ground at a fixed share. The share is what makes one rule
+  // work on every ground and in every preset, so it has to resolve in both
+  // modes — and it has to be a real number, because CSS mixes it.
+  const light = { ...baseline, ...declarations(":root[data-mode='light']") };
+  const dark = { ...baseline, ...declarations(":root[data-mode='dark']") };
+
+  /** @param {Record<string, string>} scope @param {string} name */
+  const share = (scope, name) => Number(resolve(scope, name));
+
+  it('defines every share in both mode blocks', () => {
+    for (const name of STATE_SHARES) {
+      expect(resolve(light, name), `${name} in light`).not.toBeNull();
+      expect(resolve(dark, name), `${name} in dark`).not.toBeNull();
+    }
+  });
+
+  it('resolves every share to a number between 0 and 1', () => {
+    for (const scope of [light, dark]) {
+      for (const name of STATE_SHARES) {
+        const value = share(scope, name);
+        expect(Number.isFinite(value), name).toBe(true);
+        expect(value).toBeGreaterThan(0);
+        expect(value).toBeLessThan(1);
+      }
+    }
+  });
+
+  it('carries more ink in dark mode, where the same share reads smaller', () => {
+    for (const name of STATE_SHARES) {
+      expect(share(dark, name), `${name} is higher in dark`).toBeGreaterThan(share(light, name));
+    }
+  });
+
+  it('keeps the three states apart, so one tint never reads as another', () => {
+    for (const scope of [light, dark]) {
+      expect(share(scope, '--state-hover-share')).toBeLessThan(
+        share(scope, '--state-selected-share'),
+      );
+      expect(share(scope, '--state-selected-share')).toBeLessThan(
+        share(scope, '--state-pressed-share'),
+      );
+    }
+  });
+
+  it('leaves a tint light enough to keep the text on it readable', () => {
+    // A tint is the control's OWN ink mixed into its own ground, so the
+    // ground moves toward the label and the pair closes by the share. The
+    // check is both real pairings — a control on the page surface, and the
+    // filled action, whose label is the surface colour — in both modes, at
+    // the 4.5:1 bar.
+    const PAIRS = [
+      ['--color-text-primary-rgb', '--color-surface-rgb'],
+      ['--color-surface-rgb', '--color-accent-rgb'],
+    ];
+    for (const scope of [light, dark]) {
+      for (const [inkToken, groundToken] of PAIRS) {
+        const ink = channels(resolve(scope, inkToken));
+        const ground = channels(resolve(scope, groundToken));
+        for (const name of STATE_SHARES) {
+          const alpha = share(scope, name);
+          const tinted = ground.map((c, i) => c + (ink[i] - c) * alpha);
+          const ratio = contrastRatio(ink, tinted);
+          expect(ratio, `${inkToken} on the ${name} tint of ${groundToken} is ${ratio.toFixed(2)}:1`)
+            .toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    }
+  });
+});
+
 describe('motif sets', () => {
   it('gives every set a block that resolves every slot', () => {
     const sets = RULES.filter((rule) =>

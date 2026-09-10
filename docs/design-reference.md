@@ -155,6 +155,18 @@ They take the site's own ink and never carry a colour of their own, so a set can
 
 ## Layout
 
+### Two widths: The stage and the measure
+
+Every page is built on two widths, and picking a style is what sets them.
+
+**The stage** is the frame. The header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer, and every section heading run to it. It is the width of the page.
+
+**The measure** is running text. A paragraph, a list, a description under a figure, an answer under a question: none of them runs wider than the measure, at any screen size. Long lines are hard to read, and a paragraph set the width of a timetable is a paragraph nobody finishes.
+
+At wide screen sizes a **margin** opens beside the measure. A small label, a picture, or a line of detail can sit there. On a narrow screen the margin closes and the text fills the page.
+
+**Engine.** Both widths are tokens: `--stage-max` and `--measure-text`, declared in the page contract over a tier 2 stage family. A style retunes either one in its own preset file — a broadsheet may run wider and tighter, a zine may keep the stage narrow — and nothing states a fixed width. The `arrangement` variant maps onto them: `grid` uses the stage's columns and `list` uses the measure.
+
 ### Pages are chosen by task
 
 An operator knows "this is a long read" and "this is a directory with an introduction". They do not know, and should not have to work out, what `arrangement` should be. So the page editor asks the question they can answer:
@@ -255,6 +267,22 @@ The devices, and the one job each has. The implementations live in `apps/web/src
 - **Grid schedule** — time down the left, lettered tracks across the head, at wide viewports. A real table, and it degrades to the time-ordered list, which is the accessible baseline and not a lesser view.
 - **Back issue** — the archival state of a past day. Reduce the palette to the archive tokens, add the folio, remove the live controls. Never hide the content.
 - **Print view** — its own view, not the screen with the controls hidden.
+- **Loading** — a stated line saying what is loading, and a block of hairline rules that holds the space the content will take. No spinner, no shimmer, no skeleton, and nothing that moves.
+- **Toast** — a repeat of a result the page already states in place. Its tone is a word and a rule weight, never a colour on its own, and a repeat is silent so one result is announced once.
+
+### The shared controls
+
+Keyboard-first, on the token system, in `apps/web/src/components/forms/`. Every one carries the ten interaction states in [`interface-guidelines.md`](interface-guidelines.md), Interaction states.
+
+- **Switch** — a setting that is on or off. `role="switch"`, the state as a word beside the label, 44px on touch. The label names the enabled state. No sliding knob.
+- **Segmented control** — one choice from a short set, as one ruled row of words. The chosen word takes the filled ground and the bold weight. One tab stop; arrow keys, Home and End move inside it. Never a pill.
+- **Tabs** — one panel from a short set, on the ARIA tab pattern with a roving tab index. The selected tab carries the strong rule, the same device a section boundary uses. Never a pill, never a filled tab.
+- **Checkbox and radio** — drawn from the tokens rather than painted by the operating system: the boundary on the control token, the checked fill in the accent, the mark an inline drawing that reads the ink around it. The input under the paint is untouched, so the keyboard, the label and the group stay the browser's.
+- **Search field** — a labelled search input, a stated clear control, and a result count the page speaks as well as shows.
+- **Sort control** — a labelled select. The label names what is being ordered.
+- **Filter group** — a fieldset with a legend, the count of what is on inside the legend, and one clear control for the whole group.
+- **Dialog** — a native dialog opened as a modal, so focus is trapped, the page behind is inert, and Escape closes it. Focus returns to the control that opened it. The scrim is tinted ink, never a blur.
+- **External link** — any link that opens a new tab says so inside the link's own name.
 
 **The eyebrow ban is absolute.** Nothing sits directly above a heading — not a label, not a chip, not a small line of description, not a plain folio. It holds at every size, in every style. Two things are not eyebrows and must never be "fixed": Metadata inside the rule-bounded nameplate block, and a form `<label>` above its own input.
 
@@ -285,6 +313,21 @@ The admin CMS is its own design surface and it does not restyle. It reads its ow
 - **A destructive action stands still and states what it costs.** Nothing animates in a destructive moment.
 
 **Engine.** The `admin-*` blocks are emitted once per mode and never once per (style, mode), which is the mechanical form of "the admin ignores the site style". They stay root-only, because the admin never renders inside the page-preview frame.
+
+## The specimen book
+
+**Staff.** You will not meet this page. It is a review surface for the people who build and extend the look.
+
+**Engine.** `/specimen` renders every device the system has, in the site style and display mode the page is set to, with the component file and the tier 3 contract beside each one. It exists because a designer otherwise has to open real pages to see a device, and five of the six styles have devices no seeded page draws.
+
+Thirteen sections, in this order: type, colour, rules and spacing, layout, headers, editorial devices, illustrations, sessions and schedule, directories, controls, inputs, feedback, print. Each specimen is a `<figure>`, and its `<figcaption>` names the device, the file, and the contract. The event content on the page — the name, the days, the rooms, the sessions, the speakers — comes from the committed synthetic snapshot in `apps/web/src/generated/`. The words inside a control example are written for the book, because a control needs a label, a hint and a refusal that the snapshot has no field for. A section's number is its place in the contents, not a string inside the file, so inserting one renumbers the book on its own.
+
+- **Where it ships.** The demo build and a development server, never a client production build. The gate is `SPECIMEN_ENABLED` in `apps/web/src/pages/specimen/specimenRoute.js`, written as an expression over two build constants so the bundler folds the route away and never emits the chunk.
+- **What it refuses.** The page marks itself `noindex` while it is mounted, and `scripts/write-site-files.cjs` fails the build if a sitemap ever lists the route.
+- **What keeps it complete.** `tokens.js` lists the scales the book draws and a test pins each list to `design/tokens/semantic.json`, so a new colour token, type step, page width, state share or focus-ring value fails until the book shows it. A second test renders the whole page and checks that every component under `components/editorial/` and `components/forms/` appears in it.
+- **A device a style switches off.** Three devices read a display token that four of the six styles hold at `none`: the plate number, the specimen label's term, and the pen mark. Each figure sets that one token to the value a style that uses the device sets, and says so in its caption.
+- **Adding a control.** The controls section is a registry: one file per control under `apps/web/src/pages/specimen/controls/`, plus one import and one line in `index.js`. The file declares which of the ten interaction states it draws and which it does not have, with a reason for each; a control that accounts for neither fails `controls/index.test.js`. The reasons are the point: a state that is missing looks the same as a state somebody decided against, and only one of those is a defect.
+- **Captures.** `scripts/dev/capture-specimen.mjs` writes one full-page PNG per style, mode, and width. See `scripts/README.md`.
 
 ## Extension points
 

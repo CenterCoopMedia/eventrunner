@@ -57,8 +57,11 @@ describe('the column that comes forward', () => {
     expect(grid).toContain('onClick=');
     expect(grid).toContain('onFocus=');
     expect(grid).toContain('aria-pressed=');
-    // Never from scroll, never on a loop, never on its own.
-    expect(declarations).not.toMatch(/@keyframes|animation-iteration-count: infinite/);
+    // Never from scroll, never on a loop, never on its own. A keyframe is
+    // allowed where it runs once and stops — the toast and the dialog
+    // enter that way — so the refusal is `infinite`, not the at-rule.
+    expect(declarations).not.toMatch(/animation[^;]*infinite|animation-iteration-count: infinite/);
+    expect(signature, 'the signature is a transition, not a sequence').not.toMatch(/animation/);
     expect(grid).not.toMatch(
       /onScroll|'scroll'|IntersectionObserver|setInterval|setTimeout|requestAnimationFrame/,
     );

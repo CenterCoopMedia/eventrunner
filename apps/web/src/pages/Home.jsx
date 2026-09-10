@@ -9,13 +9,22 @@
 // identity, not this page's subject. Nothing sits above that heading.
 //
 // The opening section may carry one lead image, beside the copy or below it.
+//
+// THE PAGE IS BUILT ON THE STAGE (2026-09-10 vocabulary expansion). The
+// masthead runs the full stage; the lead sentence sits at the measure with
+// the lead image in the margin beside it; and then ONE composed moment —
+// the summary row: the dates, the key facts, and the clock, three equal
+// cells across the stage, separated by hairlines, each with its own head.
+// Below `lg` the row stacks. It is not a bento grid and it is not a set of
+// cards: no cell has a ground, a border or a shadow, and every cell holds
+// real content. Everything after it is the ordinary section flow.
 import { resolveHeader } from 'shared/theme';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import CtaBlock from '../components/blocks/CtaBlock.jsx';
-import EventCountdown from '../components/EventCountdown.jsx';
+import EventCountdown, { countdownDraws } from '../components/EventCountdown.jsx';
 import InfoCards, { groupIntoCards } from '../components/InfoCards.jsx';
 import LeadImage from '../components/LeadImage.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
@@ -25,6 +34,72 @@ import RegistrationAction, {
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { SponsorStrip } from '../components/SponsorWall.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
+
+/**
+ * The one composed moment on the first screen: three equal cells across the
+ * stage — the dates, the key facts, and the clock — separated by a hairline
+ * in the gutter, each opening on its own section boundary. Below `lg` the
+ * row stacks and each cell's own rule is what separates it.
+ *
+ * Exported so the specimen book draws this row rather than a copy of it.
+ * The book is where a reviewer sees the composition in six styles, and a
+ * copy would be the one version of it nobody keeps in step.
+ *
+ * A cell that has nothing to say is not drawn, so the row is a row of two
+ * or of one where the event has not recorded its days or the operator has
+ * not written the facts. A row with no cell at all draws nothing.
+ *
+ * @param {{
+ *   days: object[],
+ *   timezone?: string,
+ *   eventConfig: object,
+ *   facts: { id: string, title: string, cards: object[] } | null,
+ *   className?: string,
+ * }} props
+ */
+export function SummaryRow({ days, timezone, eventConfig, facts, className = '' }) {
+  const clock = countdownDraws(eventConfig);
+  if (days.length === 0 && !facts && !clock) return null;
+  return (
+    <div className={['stage-row', className].filter(Boolean).join(' ')}>
+      {/* The dates as a ruled list, not a set of cards: the label in the
+          heading face, the day's date and hours in the mono face so the
+          figures line up as a column (brief §2.1, §3.2). */}
+      {days.length === 0 ? null : (
+        <section aria-labelledby="event-days">
+          <SectionHead level={2} id="event-days" title="Dates" />
+          <ul className="mt-sm">
+            {days.map((day) => (
+              <li
+                key={day.id}
+                className="flex flex-wrap items-baseline justify-between gap-x-md gap-y-3xs border-t-hairline border-t-rule-hairline py-sm"
+              >
+                <h3 className="font-heading text-h3 font-semibold text-text-primary">
+                  {day.label}
+                </h3>
+                <p className="font-mono text-caption text-text-secondary">
+                  <time dateTime={day.date}>{formatDayDate(day, timezone) ?? day.date}</time>
+                  {day.startTime && day.endTime ? ` · ${day.startTime}–${day.endTime}` : null}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {facts ? (
+        <section aria-labelledby={facts.id}>
+          <SectionHead level={2} id={facts.id} title={facts.title} />
+          <div className="mt-sm">
+            {/* One cell wide, so the cards run down it rather than across
+                a track that cannot hold three of them. */}
+            <InfoCards cards={facts.cards} columns="single" />
+          </div>
+        </section>
+      ) : null}
+      <EventCountdown eventConfig={eventConfig} />
+    </div>
+  );
+}
 
 export default function Home() {
   const { eventConfig, features, theme } = useEventConfig();
@@ -63,6 +138,14 @@ export default function Home() {
   const registrationAction = resolveRegistrationLink(eventConfig);
   const heroBlocks = getSectionBlocks('hero');
   const heroCtas = heroBlocks.filter((block) => block.blockType === 'cta');
+  // config/event is runtime data, so `days` may arrive as anything.
+  const days = Array.isArray(eventConfig.days) ? eventConfig.days : [];
+  // Where the summary row is drawn. The row belongs to the key facts
+  // section, so it renders in that section's own place (renderHomeSection
+  // below). A page whose operator never had that section — or has deleted
+  // it — still has dates and a clock to state, so the core draws the row
+  // itself in that one case, with two cells instead of three.
+  const hasFactsSection = (page?.sections ?? []).some((section) => section?.id === 'info');
   // TWO SECTIONS THIS PAGE DRAWS ITSELF, AND BOTH STAY IN THE OPERATOR'S
   // ORDER. Neither is a list of blocks the generic renderer can draw — the
   // key facts group is an arrangement of its section's blocks (M7 issue 9)
@@ -82,14 +165,20 @@ export default function Home() {
       // blocks are all of some type this arrangement does not draw would
       // otherwise print its heading over nothing.
       const cards = groupIntoCards(blocks);
-      if (cards.length === 0) return null;
+      // THE KEY FACTS ARE ONE CELL OF THE SUMMARY ROW, and the row is drawn
+      // HERE, in this section's own place in the operator's order. Moving
+      // the section in the admin moves the whole row, which is the control
+      // the operator already has; excluding the section and drawing the row
+      // at a fixed point in the core would make that control look like it
+      // works and do nothing.
       return (
-        <section aria-labelledby={`section-${section.id}`} className="page-section">
-          <SectionHead level={2} id={`section-${section.id}`} title={section.label} />
-          <div className="mt-md">
-            <InfoCards cards={cards} />
-          </div>
-        </section>
+        <SummaryRow
+          className="page-section"
+          days={days}
+          timezone={eventConfig.timezone}
+          eventConfig={eventConfig}
+          facts={cards.length ? { id: `section-${section.id}`, title: section.label, cards } : null}
+        />
       );
     }
     if (section.id === 'sponsors') {
@@ -144,11 +233,14 @@ export default function Home() {
       data-content-source={source}
     >
       <section
-        className="pb-xl"
         {...(leadTitle ? { 'aria-labelledby': 'hero-title' } : { 'aria-label': 'Introduction' })}
       >
-        <div className="flex flex-col gap-lg lg:flex-row lg:items-start">
-          <div className="min-w-0 flex-1">
+        {/* The measure and the margin beside it: the opening copy runs to
+            the measure and the lead image sits in the margin column at
+            `lg` and above. Below `lg` the margin closes and the copy fills
+            the stage. */}
+        <div className="stage-split">
+          <div className="min-w-0">
             {leadTitle ? (
               <h1
                 id="hero-title"
@@ -178,7 +270,6 @@ export default function Home() {
                 {subtitle.value}
               </p>
             ) : null}
-            <EventCountdown eventConfig={eventConfig} />
             {/* The registration action leads the row: it is the event's own
                 configured action, and the hero's cta blocks are whatever
                 else an editor wanted beside it. The row itself is drawn
@@ -199,38 +290,20 @@ export default function Home() {
       </section>
 
       {features?.liveUpdates ? (
-        <div className="mb-xl">
+        <div className="my-xl">
           <LiveUpdatesCard />
         </div>
       ) : null}
 
-      {/* The dates as a ruled list, not a set of cards: label in the heading
-          face, the day's date and hours in the mono face so the figures line
-          up as a column (brief §2.1, §3.2). */}
-      {Array.isArray(eventConfig.days) && eventConfig.days.length ? (
-        <section aria-labelledby="event-days">
-          <SectionHead level={2} id="event-days" title="Dates" />
-          <ul className="mt-sm">
-            {eventConfig.days.map((day) => (
-              <li
-                key={day.id}
-                className="flex flex-wrap items-baseline justify-between gap-x-md gap-y-3xs border-t-hairline border-t-rule-hairline py-sm"
-              >
-                <h3 className="font-heading text-h3 font-semibold text-text-primary">
-                  {day.label}
-                </h3>
-                <p className="font-mono text-caption text-text-secondary">
-                  <time dateTime={day.date}>
-                    {formatDayDate(day, eventConfig.timezone) ?? day.date}
-                  </time>
-                  {day.startTime && day.endTime ? ` · ${day.startTime}–${day.endTime}` : null}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
+      {hasFactsSection ? null : (
+        <SummaryRow
+          className="page-section"
+          days={days}
+          timezone={eventConfig.timezone}
+          eventConfig={eventConfig}
+          facts={null}
+        />
+      )}
     </SystemPage>
   );
 }

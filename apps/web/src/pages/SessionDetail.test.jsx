@@ -217,7 +217,7 @@ describe('SessionDetail', () => {
     // session features.
     renderDetail('fx-recorded');
     expect(
-      screen.getByRole('link', { name: 'Watch the recording of [Fixture] Recorded panel' }),
+      screen.getByRole('link', { name: /^Watch the recording of \[Fixture\] Recorded panel\b/ }),
     ).toHaveAttribute('href', 'https://video.example.org/watch?v=fx-recorded');
   });
 

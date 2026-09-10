@@ -21,6 +21,16 @@ const fontStep = (step) => [
 ];
 
 export default {
+  // A TAP IS NOT A HOVER. `hoverOnlyWhenSupported` puts every `hover:`
+  // utility inside `@media (hover: hover)`, so a touch screen — which
+  // reports a tap as a hover and then keeps the state until the reader taps
+  // something else — never paints one. Without it a tapped control on a
+  // phone stays lit, which reads as a selected control that is not selected
+  // (expansion record §2.1; interface guidelines, Accessibility). The raw
+  // `:hover` rules in index.css carry the same query by hand.
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
   // TESTS ARE NOT CONTENT, AND ONE OF THEM DEPENDS ON THAT.
   //
   // Tailwind tree-shakes anything in `@layer components` whose class name it
@@ -183,6 +193,14 @@ export default {
       },
       maxWidth: {
         'admin-canvas': 'var(--admin-canvas-max)',
+        // The stage and the measure (design/tokens/components.json, the
+        // page contract). `prose` is REMAPPED rather than left at Tailwind's
+        // own 65ch: every `max-w-prose` in the app already means "this is
+        // running text", so pointing that one name at the measure is what
+        // makes the rule true on every surface at once instead of on the
+        // twenty-five files that happen to get edited.
+        prose: 'var(--measure-text)',
+        stage: 'var(--stage-max)',
       },
       // The named weights (--weight-regular … --weight-bold) are NOT mapped
       // here on purpose: font-medium, font-semibold, and font-bold already

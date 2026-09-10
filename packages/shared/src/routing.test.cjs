@@ -19,6 +19,16 @@ test('RESERVED_PATH_SEGMENTS covers every statically mounted App.jsx route, the 
   }
 });
 
+test('specimen is reserved, so no page can take the segment the book ships at', () => {
+  // The specimen route mounts as path={SPECIMEN_PATH}, an expression rather
+  // than a quoted literal, so the App.jsx sweep in siteNavigation.test.js
+  // never saw it. A client page at /specimen would be served in production,
+  // where the book itself is not built, and the sitemap guard in
+  // scripts/write-site-files.cjs would then refuse that client's deploy.
+  assert.ok(RESERVED_PATH_SEGMENTS.includes('specimen'));
+  assert.equal(isReservedPathSegment('specimen'), true);
+});
+
 test('isReservedPathSegment matches only reserved segments', () => {
   assert.equal(isReservedPathSegment('schedule'), true);
   assert.equal(isReservedPathSegment('profile'), true);

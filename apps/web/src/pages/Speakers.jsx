@@ -71,11 +71,18 @@ export default function Speakers() {
             // what a shelf normally looks like, and `list` gives each
             // portrait its own row with the bio running beside it — the
             // reading a long-form speaker page wants.
+            //
+            // THE SHELF IS SET ON THE STAGE, THE LIST ON THE MEASURE
+            // (2026-09-10 vocabulary expansion). Three plates across at
+            // `lg` and four at `xl` leave a face about 200px wide at the
+            // narrower of the two, which is a size a face survives; the
+            // reading list is running text beside a portrait, so it stops
+            // at the measure like every other run of prose.
             <ul
               className={
                 arrangement === 'grid'
-                  ? 'portrait-shelf mt-lg grid gap-x-lg sm:grid-cols-2 lg:grid-cols-3'
-                  : 'portrait-shelf mt-lg'
+                  ? 'portrait-shelf mt-lg grid gap-x-lg sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                  : 'portrait-shelf measure mt-lg'
               }
             >
               {speakers.map((speaker, index) => {

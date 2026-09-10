@@ -18,6 +18,7 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
 const { SponsorStrip, default: SponsorWall, groupByTier, visibleOrganizations } = await import(
   './SponsorWall.jsx'
 );
+const { NEW_TAB_NOTE } = await import('./ExternalLink.jsx');
 
 const org = (id, name, tier, extra = {}) => ({
   id,
@@ -78,16 +79,23 @@ describe('groupByTier', () => {
 });
 
 describe('SponsorWall', () => {
+  // The step VALUES are set for the stage and may be retuned with it; what
+  // must hold is that the mark is built from the spacing scale and that a
+  // higher tier gets a bigger mark. Pinning the literals made a retune a
+  // test failure rather than a design decision.
+  /** @param {Element} wall @returns {number} the mark's multiple of the scale */
+  const markStep = (wall) => {
+    const value = wall.style.getPropertyValue('--logo-wall-mark-size');
+    const found = /^calc\(var\(--space-3xl\) \* ([\d.]+)\)$/.exec(value);
+    expect(found, value).not.toBeNull();
+    return Number(found[1]);
+  };
+
   it('sizes each tier group by its rank in the operator’s own order', () => {
     const { container } = render(<SponsorWall organizations={PUBLISHED} />);
     const walls = [...container.querySelectorAll('.logo-wall')];
     expect(walls).toHaveLength(2);
-    expect(walls[0].style.getPropertyValue('--logo-wall-mark-size')).toBe(
-      'calc(var(--space-3xl) * 2)',
-    );
-    expect(walls[1].style.getPropertyValue('--logo-wall-mark-size')).toBe(
-      'calc(var(--space-3xl) * 1.5)',
-    );
+    expect(markStep(walls[0])).toBeGreaterThan(markStep(walls[1]));
   });
 
   it('takes the heading level and the id namespace its caller states', () => {
@@ -96,8 +104,11 @@ describe('SponsorWall', () => {
     );
     expect(container.querySelector('#home-tier-0').tagName).toBe('H3');
     // A name sits UNDER its tier in the outline, so it follows the tier's
-    // level rather than being fixed at one.
-    expect(container.querySelector('.logo-wall h4').textContent).toBe('First Supporter');
+    // level rather than being fixed at one. The heading's text now ends in
+    // the link's hidden new-tab sentence, so the visible name is its start.
+    expect(container.querySelector('.logo-wall h4').textContent).toBe(
+      `First Supporter (${NEW_TAB_NOTE})`,
+    );
   });
 
   // A mark is decorative: the organization's name is printed directly under
@@ -118,7 +129,21 @@ describe('SponsorWall', () => {
     expect(frame).not.toBeNull();
     expect(frame.textContent).toBe('');
     // The name is still there — the acknowledgement survives the lost file.
-    expect(screen.getByRole('link', { name: 'First Supporter' })).toBeInTheDocument();
+    // The name is a prefix match because the link's own name now carries
+    // the new-tab sentence after it (components/ExternalLink.jsx).
+    expect(screen.getByRole('link', { name: /^First Supporter\b/ })).toBeInTheDocument();
+  });
+
+  // The wall is the one place a reader meets a run of outbound links one
+  // after another, so a silent change of context is hardest to recover
+  // from here: a reader who has followed three of them and presses Back
+  // is three tabs deep with no history in any of them (issue 236).
+  it('says that a supporter’s link opens a new tab', () => {
+    render(<SponsorWall organizations={PUBLISHED} />);
+    const link = screen.getByRole('link', { name: /^First Supporter\b/ });
+    expect(link).toHaveAccessibleName(`First Supporter (${NEW_TAB_NOTE})`);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noreferrer');
   });
 });
 
@@ -135,7 +160,9 @@ describe('SponsorStrip', () => {
       .map((node) => node.textContent);
     expect(tiers).toEqual(['Presenting', 'Partner']);
     for (const name of ['First Supporter', 'Second Supporter', 'Third Supporter']) {
-      expect(within(section).getByRole('link', { name })).toBeInTheDocument();
+      expect(
+        within(section).getByRole('link', { name: new RegExp(`^${name}\\b`) }),
+      ).toBeInTheDocument();
     }
   });
 
@@ -159,10 +186,14 @@ describe('SponsorStrip', () => {
     // The first group is the operator's first, so it is the one drawn largest.
     expect(
       container.querySelector('.logo-wall').style.getPropertyValue('--logo-wall-mark-size'),
-    ).toBe('calc(var(--space-3xl) * 2)');
+    ).toBe('calc(var(--space-3xl) * 2.5)');
     expect(
       [...container.querySelectorAll('.logo-wall h4')].map((node) => node.textContent),
-    ).toEqual(['First Supporter', 'Second Supporter', 'Third Supporter']);
+    ).toEqual(
+      ['First Supporter', 'Second Supporter', 'Third Supporter'].map(
+        (name) => `${name} (${NEW_TAB_NOTE})`,
+      ),
+    );
   });
 
   it('is the acknowledgement wall: marks and names, never the descriptions', () => {

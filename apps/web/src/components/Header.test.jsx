@@ -103,6 +103,17 @@ describe('Header treatments', () => {
     expect(container.textContent).toContain('October 14–16, 2026');
   });
 
+  it('lets the wordmark break a word too long for the stage at 320px', () => {
+    // The base header's wordmark is the same shape as the nameplate's and
+    // carries the same rule: a flex row is sized from its longest word, so
+    // a name with a long word in it ran past the stage at 320px instead of
+    // wrapping inside it. The measurement is in editorial/Nameplate.test.jsx.
+    const { container } = renderHeader({ variant: 'standard' });
+    const row = container.querySelector('a > span.inline-flex');
+    expect(row, 'the wordmark is not one flex row').toBeTruthy();
+    expect(row.className).toContain('wrap-anywhere');
+  });
+
   it('renders no dateline at all rather than an empty line', () => {
     const { container } = renderHeader({ variant: 'standard', dates: null, place: null });
     expect(container.querySelectorAll('p')).toHaveLength(1);

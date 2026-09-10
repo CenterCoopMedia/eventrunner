@@ -21,6 +21,9 @@ export const pagesData = [
     order: 0,
     visible: true,
     systemPage: true,
+    layout: {
+      arrangement: 'grid',
+    },
     sections: [
       {
         id: 'hero',
@@ -205,6 +208,9 @@ export const pagesData = [
     order: 2,
     visible: true,
     systemPage: true,
+    layout: {
+      arrangement: 'grid',
+    },
     sections: [],
     seeded: true,
   },

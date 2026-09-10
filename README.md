@@ -4,7 +4,7 @@ A white-label event CMS for conferences and gatherings. Each client event gets i
 
 **License:** [Apache-2.0](LICENSE). The code is free. The trademark is the exclusivity lever: nobody else can market hosting under this name.
 
-**Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2).
+**Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2). Milestones 1 to 4 and the public-site parity milestone are complete. Packaging (M5) and the parity milestones M8 to M12 are open. The design vocabulary is expanding in six waves ([#249](https://github.com/CenterCoopMedia/eventrunner/issues/249)); wave 1 is in review.
 
 Site: [centercoopmedia.github.io/eventrunner](https://centercoopmedia.github.io/eventrunner/)
 Documentation: [centercoopmedia.github.io/eventrunner/docs](https://centercoopmedia.github.io/eventrunner/docs/)
@@ -31,7 +31,8 @@ The reference implementation is the [2026 Collaborative Journalism Summit](https
 - Session materials with embargo
 - Media library
 - Eventbrite plus manual/CSV ticketing adapters
-- Per-event theming
+- Per-event theming: six site styles, each with a light and a dark palette, and a specimen book in the demo that draws every device in every style and mode
+- An admin CMS on its own editorial desk, in the event's own colours
 - Transactional email through a provider adapter (Postmark is the reference)
 
 What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, bulk broadcast email, invoicing, Airtable, social feeds, and speaker chat stay out.
@@ -48,11 +49,12 @@ See spec §2.
 ## Repo layout
 
 ```
-apps/web            Vite frontend (not landed yet)
-functions           Cloud Functions by domain module (not landed yet)
-packages/shared     Config schema, lifecycle clock, time, registration, badges
-scripts             Operator tools (not landed yet)
-docs                Spec, roadmap, and the GitHub Pages site
+apps/web            Vite frontend: the public site, the admin CMS, the demo, the specimen book
+functions           Cloud Functions by domain module
+packages/shared     Config schema, theme, lifecycle clock, time, registration, badges
+scripts             Operator tools, generators, and the CI checks
+design/tokens       The three token tiers, the six site styles, the admin's own set
+docs                Spec, roadmap, design records, and the GitHub Pages site
 ```
 
 `packages/shared` is CommonJS with hand-written ESM shims so the same module serves Vite and Cloud Functions with no transpile step.

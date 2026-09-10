@@ -27,6 +27,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
+import { focusFirstError } from '../../lib/focusFirstError.js';
 
 const REVIEW_LABEL = { pending: 'Pending review', approved: 'Approved', rejected: 'Rejected' };
 
@@ -37,6 +38,7 @@ const REVIEW_TONE = { pending: 'caution', approved: 'ok', rejected: 'error' };
 function AddLinkForm({ sessionId, onAdded }) {
   const call = useAdminApi();
   const { showToast } = useToast();
+  const formRef = useRef(null);
   const [url, setUrl] = useState('');
   const [label, setLabel] = useState('');
   const [error, setError] = useState(null);
@@ -44,6 +46,13 @@ function AddLinkForm({ sessionId, onAdded }) {
 
   async function submit(event) {
     event.preventDefault();
+    // The control stays enabled while the URL is missing (#219): a disabled
+    // control says nothing, so pressing Add with an empty field now moves
+    // the operator to that field instead of doing nothing.
+    if (!url) {
+      focusFirstError(formRef.current);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -60,7 +69,7 @@ function AddLinkForm({ sessionId, onAdded }) {
   }
 
   return (
-    <form className="flex flex-col gap-sm" onSubmit={submit}>
+    <form ref={formRef} className="flex flex-col gap-sm" onSubmit={submit}>
       <ServerErrorSummary error={error} />
       <TextField label="Link URL" value={url} onChange={setUrl} type="url" required />
       <TextField
@@ -70,7 +79,12 @@ function AddLinkForm({ sessionId, onAdded }) {
         hint="Leave blank to use the default label. A blank or URL-shaped label is stored as “External link” — it is never shown as the raw URL."
       />
       <div>
-        <button type="submit" className={primaryButtonClass} disabled={saving || !url}>
+        <button
+          type="submit"
+          className={primaryButtonClass}
+          disabled={saving}
+          aria-busy={saving || undefined}
+        >
           {saving ? 'Adding…' : 'Add link'}
         </button>
       </div>

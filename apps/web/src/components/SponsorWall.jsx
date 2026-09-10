@@ -34,6 +34,7 @@ import { useContent } from '../contexts/ContentContext.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
 import AssetImage from './media/AssetImage.jsx';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
+import ExternalLink from './ExternalLink.jsx';
 
 /**
  * The mark size for a tier group, by its rank in the operator's ordering.
@@ -42,11 +43,17 @@ import { isSafeHref } from '../lib/sanitizeHtml.js';
  * being legible as differences, and a fourth smaller size would only be a
  * smaller size. Every value is the spacing scale multiplied, so a preset
  * that rescales the room rescales the wall with it.
+ *
+ * THE STEPS ARE SET FOR THE STAGE (2026-09-10 vocabulary expansion). On the
+ * stage the first tier runs about four marks across, the second five, and
+ * the third six, so the tier's weight is legible as a count of marks in a
+ * row as well as a size. The wall wraps at every narrower width, down to
+ * one mark a row on a phone.
  */
 const MARK_SIZES = Object.freeze([
+  'calc(var(--space-3xl) * 2.5)',
   'calc(var(--space-3xl) * 2)',
   'calc(var(--space-3xl) * 1.5)',
-  'var(--space-3xl)',
 ]);
 
 /** A tier's label, or the one heading an untiered group gets. */
@@ -110,12 +117,20 @@ export function groupByTier(organizations) {
   return [...groups.entries()].map(([tier, members]) => ({ tier, members }));
 }
 
-/** One organization's name, linked where the URL is one we may follow. */
+/**
+ * One organization's name, linked where the URL is one we may follow.
+ *
+ * The link leaves the event's site for the supporter's own, so it opens a
+ * tab and says so in the same words every other outbound link on the site
+ * uses (components/ExternalLink.jsx). The wall is the one place a reader
+ * meets a run of outbound links one after another, which is exactly where
+ * a silent change of context is hardest to recover from.
+ */
 function SponsorName({ org }) {
   return isSafeHref(org.url) ? (
-    <a href={org.url} target="_blank" rel="noreferrer" className="hover:underline">
+    <ExternalLink href={org.url} className="hover:underline">
       {org.name}
-    </a>
+    </ExternalLink>
   ) : (
     org.name
   );

@@ -155,6 +155,27 @@ describe('Nameplate', () => {
     for (const mark of marks) expect(mark).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('lets the wordmark break a word too long for the stage at 320px', () => {
+    // MEASURED on a built demo, in headless Chromium at a viewport of
+    // exactly 320px: the demo event's name holds "Harborlight", set at the
+    // 44px nameplate size in each style's own face — 241px on Civic, 256px
+    // on Field Guide — so with the mark and the gutter the row's minimum is
+    // wider than the 272px stage. Field Guide is the style whose word also
+    // crosses the viewport edge, and all six of its routes scrolled
+    // sideways by 8px; the book's masthead figure, framed in a 224px box,
+    // went 17px past on Civic and 16px on Newsroom.
+    //
+    // `wrap-anywhere` rather than `break-words`: break-word draws the break
+    // but leaves the row's minimum at the whole word, so the row overflows
+    // its box anyway. jsdom lays out nothing, so what is checked here is
+    // the class that made the measurement come out at 272px.
+    const { container } = renderPlate({ name: 'Harborlight Media Summit', to: '/' });
+    const row = container.querySelector('.nameplate__name span');
+    expect(row.className).toContain('inline-flex');
+    expect(row.className).toContain('wrap-anywhere');
+    expect(row.className).not.toContain('break-words');
+  });
+
   it('lays the lockup out the way the Header style sets the block', () => {
     // A start-aligned masthead puts the name at one end of the measure and
     // the dateline at the other, which is space-between. A CENTRED one wants

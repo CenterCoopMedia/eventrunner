@@ -45,8 +45,89 @@ describe('FeedbackModal', () => {
   it('refuses to submit an empty message without calling the server', () => {
     render(<FeedbackModal onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please enter a message.');
     expect(submitFeedbackMock).not.toHaveBeenCalled();
+  });
+
+  // ISSUE 219. A refused submit used to state one sentence at the head of
+  // the form and stop there: the field that refused carried no
+  // `aria-invalid`, nothing named the message, and focus stayed on the
+  // submit control. A reader using a screen reader heard nothing move.
+  it('marks the field that refused, names its message, and moves focus to it', () => {
+    vi.useFakeTimers();
+    try {
+      render(<FeedbackModal onClose={() => {}} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+      vi.runOnlyPendingTimers();
+
+      const field = screen.getByLabelText('Message');
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      const describedBy = field.getAttribute('aria-describedby');
+      expect(describedBy).toBeTruthy();
+      expect(document.getElementById(describedBy)).toHaveTextContent('Please enter a message.');
+      expect(field).toHaveFocus();
+      // And nothing states it a second time at the head of the form. One
+      // result is announced once, and the focus move is the announcement.
+      expect(screen.queryByRole('alert')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('takes the mark off the field once there is a message to send', () => {
+    // The field kept `aria-invalid` and "Please enter a message." while the
+    // reader typed the answer to it, so a screen reader announced the field
+    // as invalid on every re-read of a field that was no longer empty.
+    vi.useFakeTimers();
+    try {
+      render(<FeedbackModal onClose={() => {}} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+      vi.runOnlyPendingTimers();
+
+      const field = screen.getByLabelText('Message');
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      fireEvent.change(field, { target: { value: 'The link is broken.' } });
+      expect(field).not.toHaveAttribute('aria-invalid');
+      expect(screen.queryByText('Please enter a message.')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the mark on while the field is still empty', () => {
+    // Only a value clears it. A reader who types a space and stops has not
+    // answered the refusal, so the field still says so.
+    vi.useFakeTimers();
+    try {
+      render(<FeedbackModal onClose={() => {}} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+      vi.runOnlyPendingTimers();
+
+      const field = screen.getByLabelText('Message');
+      fireEvent.change(field, { target: { value: '   ' } });
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the submit control enabled while the form is invalid', () => {
+    // A disabled control announces nothing, so a reader who presses it
+    // learns nothing (interface guidelines, Interaction states).
+    render(<FeedbackModal onClose={() => {}} />);
+    const submit = screen.getByRole('button', { name: 'Send feedback' });
+    fireEvent.click(submit);
+    expect(submit).toBeEnabled();
+  });
+
+  it('states a rejection from the server at the head of the form, where no field owns it', async () => {
+    // A server refusal belongs to the request, not to one field, so it
+    // stays the one urgent line the form announces.
+    submitFeedbackMock.mockResolvedValueOnce({ ok: false, error: 'Too many submissions. Try again later.' });
+    render(<FeedbackModal onClose={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many submissions. Try again later.');
+    expect(screen.getByLabelText('Message')).not.toHaveAttribute('aria-invalid');
   });
 
   it('closes on Cancel', () => {
@@ -56,11 +137,52 @@ describe('FeedbackModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('closes on Escape', () => {
+  // THE DIALOG ITSELF. The modal used to be a <div> over the page, so Tab
+  // walked out of it and into the page behind (issue 233). It is now a
+  // native <dialog> opened with showModal(), which is where the trap, the
+  // inert page and the top layer come from. jsdom has neither a top layer
+  // nor a focus model, so what is asserted here is that the component ASKS
+  // for those behaviours and that it returns focus itself.
+  it('opens as a modal dialog rather than as an overlay', () => {
+    const opened = [];
+    const proto = Object.getPrototypeOf(document.createElement('dialog'));
+    const real = proto.showModal;
+    proto.showModal = function record() {
+      opened.push(this);
+      return real.call(this);
+    };
+    try {
+      render(<FeedbackModal onClose={() => {}} />);
+      expect(opened).toHaveLength(1);
+      expect(opened[0].tagName).toBe('DIALOG');
+      expect(opened[0]).toHaveAttribute('open');
+    } finally {
+      proto.showModal = real;
+    }
+  });
+
+  it('closes on Escape, which reaches a dialog as cancel', () => {
     const onClose = vi.fn();
-    render(<FeedbackModal onClose={onClose} />);
-    fireEvent.keyDown(document, { key: 'Escape' });
+    const { container } = render(<FeedbackModal onClose={onClose} />);
+    const dialog = container.querySelector('dialog');
+    fireEvent(dialog, new Event('cancel', { bubbles: false, cancelable: true }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns focus to the control that opened it', () => {
+    const opener = document.createElement('button');
+    opener.textContent = 'Share feedback';
+    document.body.append(opener);
+    opener.focus();
+    expect(opener).toHaveFocus();
+
+    const view = render(<FeedbackModal onClose={() => {}} />);
+    // React removes the dialog on close, and an element removed while it
+    // holds focus drops focus to the body. The opener has to be put back.
+    expect(opener).not.toHaveFocus();
+    view.unmount();
+    expect(opener).toHaveFocus();
+    opener.remove();
   });
 
   it('carries the honeypot field out of the tab order and off-screen', () => {
