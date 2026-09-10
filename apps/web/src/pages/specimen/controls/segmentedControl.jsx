@@ -2,15 +2,18 @@
 import { useState } from 'react';
 import SegmentedControl from '../../../components/forms/SegmentedControl.jsx';
 import { sharedGrammar } from './states.js';
+import { specimenDays } from '../exampleContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 
-const OPTIONS = eventConfig.days.map((day) => ({ value: day.id, label: day.label }));
+// `days` may be an empty array on an event that has not published its
+// programme yet, and one word is not a row of choices.
+const OPTIONS = specimenDays(eventConfig).map((day) => ({ value: day.id, label: day.label }));
 
 function SegmentedSpecimen({ state }) {
   // Rest opens on the first day and selected on the second, so a reviewer
   // sees the filled ground follow the choice rather than sitting still.
   const [value, setValue] = useState(
-    state === 'selected' ? OPTIONS[1].value : OPTIONS[0].value,
+    state === 'selected' ? (OPTIONS[1] ?? OPTIONS[0]).value : OPTIONS[0].value,
   );
   return (
     <SegmentedControl label="Day" options={OPTIONS} value={value} onChange={setValue} />

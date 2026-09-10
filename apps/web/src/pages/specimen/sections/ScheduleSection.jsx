@@ -13,23 +13,34 @@ import TransferLine from '../../../components/TransferLine.jsx';
 import { resolveTracks, withCallingPoints } from '../../../lib/scheduleGrid.js';
 import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
+import { specimenEventConfig, specimenSchedule } from '../exampleContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import { scheduleData } from '@generated/scheduleData.js';
 
-const DAY = eventConfig.days[1];
-const bySession = (id) => scheduleData.find((session) => session.id === id);
+// EVERY PIECE THIS SECTION DRAWS IS OPTIONAL IN config/event. The days may
+// be empty, the lines and the rooms may be absent, and a snapshot may hold
+// no session on the day the book picks. Each reader takes the event's own
+// where the event states it and the book's authored example where it does
+// not, so the section draws a schedule for every valid configuration.
+const CONFIG = specimenEventConfig(eventConfig);
+const { day: DAY, sessions: DAY_SESSIONS } = specimenSchedule(eventConfig, scheduleData);
+const bySession = (id) =>
+  scheduleData.find((session) => session.id === id)
+  ?? DAY_SESSIONS.find((session) => session.id === id);
+// The two rows the first figure draws: the seeded pair where the snapshot
+// has them, and otherwise the first two sessions of the day above.
+const ROWS = [bySession('session-panel'), bySession('session-workshop-money')].every(Boolean)
+  ? [bySession('session-panel'), bySession('session-workshop-money')]
+  : DAY_SESSIONS.slice(0, 2);
 
 export default function ScheduleSection({ folio }) {
-  const entries = useMemo(
-    () => withCallingPoints(scheduleData.filter((session) => session.dayId === DAY.id)),
-    [],
-  );
-  const columns = useMemo(() => resolveTracks(eventConfig), []);
+  const entries = useMemo(() => withCallingPoints(DAY_SESSIONS), []);
+  const columns = useMemo(() => resolveTracks(CONFIG), []);
   const parentEntry = entries.find((entry) => entry.children.length > 0) ?? entries[0];
   const movement = sessionMovement(
-    eventConfig,
-    bySession('session-workshop-money'),
-    bySession('session-workshop-b'),
+    CONFIG,
+    bySession('session-workshop-money') ?? DAY_SESSIONS[0],
+    bySession('session-workshop-b') ?? DAY_SESSIONS.at(-1),
   );
 
   return (
@@ -46,18 +57,16 @@ export default function ScheduleSection({ folio }) {
         note="A ruled entry in a printed programme. The time is a column in the mono face, the format is a word beside the title, and the site style decides the whole treatment."
       >
         <ul>
-          <SessionCard
-            session={bySession('session-panel')}
-            eventConfig={eventConfig}
-            linkToDetail={false}
-            lead
-          />
-          <SessionCard
-            session={bySession('session-workshop-money')}
-            eventConfig={eventConfig}
-            linkToDetail={false}
-            position={2}
-          />
+          {ROWS.map((session, index) => (
+            <SessionCard
+              key={session.id}
+              session={session}
+              eventConfig={CONFIG}
+              linkToDetail={false}
+              lead={index === 0}
+              position={index === 0 ? undefined : index + 1}
+            />
+          ))}
         </ul>
       </Figure>
 
@@ -72,7 +81,7 @@ export default function ScheduleSection({ folio }) {
             day={DAY}
             entries={entries}
             columns={columns}
-            eventConfig={eventConfig}
+            eventConfig={CONFIG}
           />
         </div>
       </Figure>
@@ -86,7 +95,7 @@ export default function ScheduleSection({ folio }) {
         <CallingPoints
           parent={parentEntry.session}
           points={parentEntry.children}
-          eventConfig={eventConfig}
+          eventConfig={CONFIG}
         />
       </Figure>
 

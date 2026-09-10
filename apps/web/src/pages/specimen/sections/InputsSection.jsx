@@ -20,11 +20,15 @@ import { SelectField, TextAreaField, TextField } from '../../../components/forms
 import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
 import { FORCED_FOCUS } from '../controls/states.js';
+import { specimenPlaces } from '../exampleContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 
 const FIELD_STATES = Object.freeze(['Rest', 'Focus-visible', 'Error', 'Disabled']);
 
-const ROOM_OPTIONS = eventConfig.venue.places.map((place) => ({
+// `venue.places` is optional, so the select draws the event's own rooms
+// where it records them and the book's own three where it records none. A
+// select with nothing in it is not a select.
+const ROOM_OPTIONS = specimenPlaces(eventConfig).map((place) => ({
   value: place.id,
   label: place.name,
 }));

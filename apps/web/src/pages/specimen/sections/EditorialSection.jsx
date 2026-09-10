@@ -19,12 +19,19 @@ import SessionCard from '../../../components/SessionCard.jsx';
 import StatBlock from '../../../components/blocks/StatBlock.jsx';
 import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
+import { EXAMPLE_SESSIONS, specimenTracks } from '../exampleContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import { scheduleData } from '@generated/scheduleData.js';
 
 const identity = buildNameplate(eventConfig);
 const compactIdentity = buildNameplate(eventConfig, { compact: true });
-const [firstSession, secondSession] = scheduleData;
+// Optional fields, every one of them: an event may state no lines, no
+// rooms, and no sessions yet, and each of these ran while the module was
+// being imported. The book draws the event's own wherever it has them.
+const TRACKS = specimenTracks(eventConfig);
+const [firstSession, secondSession] =
+  scheduleData.length > 1 ? scheduleData : EXAMPLE_SESSIONS;
+const FOLIO_LINE = ['Day one', eventConfig.venue?.city].filter(Boolean).join(' · ');
 
 const LEAD_IMAGE_BLOCK = Object.freeze({
   url: `${import.meta.env.BASE_URL}branding/og-default.svg`,
@@ -100,7 +107,7 @@ export default function EditorialSection({ folio }) {
         contract="folio-rule"
         note="Text on a hairline. Never a chip, and never directly above a heading."
       >
-        <Folio>Day one · {eventConfig.venue.city}</Folio>
+        <Folio>{FOLIO_LINE}</Folio>
         <div className="mt-md">
           <Folio rule={false}>Back issue</Folio>
         </div>
@@ -164,7 +171,7 @@ export default function EditorialSection({ folio }) {
         note="A track letter and its name, drawn as a line marker."
       >
         <div className="flex flex-wrap gap-md">
-          {eventConfig.tracks.map((track) => (
+          {TRACKS.map((track) => (
             <RouteMark key={track.letter} letter={track.letter} name={track.name} />
           ))}
         </div>

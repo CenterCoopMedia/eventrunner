@@ -2,17 +2,24 @@
 import { useState } from 'react';
 import FilterGroup from '../../../components/forms/FilterGroup.jsx';
 import { fieldRegister } from './states.js';
+import { specimenPlaces } from '../exampleContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 
-const OPTIONS = eventConfig.venue.places.slice(0, 3).map((place, index) => ({
+// `venue.places` is optional, and an event that records one room is as
+// valid as one that records twenty — so the count list is read by index
+// rather than assumed to have three entries under it.
+const COUNTS = Object.freeze([12, 7, 5]);
+const OPTIONS = specimenPlaces(eventConfig).slice(0, COUNTS.length).map((place, index) => ({
   value: place.id,
   label: place.name,
-  count: [12, 7, 5][index],
+  count: COUNTS[index],
 }));
 
 function FilterSpecimen({ state }) {
   const [selected, setSelected] = useState(
-    state === 'selected' ? [OPTIONS[0].value, OPTIONS[2].value] : [],
+    state === 'selected'
+      ? [...new Set([OPTIONS[0].value, OPTIONS.at(-1).value])]
+      : [],
   );
   return (
     <FilterGroup

@@ -2,9 +2,12 @@
 import { useState } from 'react';
 import { Tab, TabList, TabPanel, Tabs } from '../../../components/forms/Tabs.jsx';
 import { sharedGrammar } from './states.js';
+import { specimenTracks } from '../exampleContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 
-const TABS = eventConfig.tracks.map((track) => ({
+// `tracks` is optional: an event with one room runs no lines, and this ran
+// at module level, so an event that stated none took the whole book down.
+const TABS = specimenTracks(eventConfig).map((track) => ({
   id: track.letter,
   label: `${track.letter} · ${track.name}`,
 }));
@@ -12,7 +15,7 @@ const TABS = eventConfig.tracks.map((track) => ({
 const IDS = TABS.map((tab) => tab.id);
 
 function TabsSpecimen({ state }) {
-  const [open, setOpen] = useState(state === 'selected' ? IDS[1] : IDS[0]);
+  const [open, setOpen] = useState(state === 'selected' ? (IDS[1] ?? IDS[0]) : IDS[0]);
   return (
     <Tabs value={open} onChange={setOpen} tabs={IDS}>
       <TabList label="Track">

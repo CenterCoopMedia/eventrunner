@@ -9,6 +9,7 @@ import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
 import { useLiveToken } from '../useLiveToken.js';
 import { TYPE_ROLES, TYPE_STEPS } from '../tokens.js';
+import { EXAMPLE_SESSIONS } from '../exampleContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import { scheduleData } from '@generated/scheduleData.js';
 
@@ -32,17 +33,23 @@ const ROLE_CLASS = Object.freeze({
   mono: 'font-mono',
 });
 
+// Eight lines of real copy, one per step. The event's own where the event
+// has it: the sessions where the snapshot holds three, and the address
+// where the venue states one. A configuration is valid with none of that.
+const LINE_SESSIONS = scheduleData.length > 2 ? scheduleData : EXAMPLE_SESSIONS;
+const PLACE_LINE = [eventConfig.venue?.name, eventConfig.venue?.city].filter(Boolean).join(', ');
+
 /** Real copy, one line per step, from the seeded event. */
 const SPECIMEN_LINES = Object.freeze([
   eventConfig.shortName,
   eventConfig.name,
-  scheduleData[0].title,
-  scheduleData[1].title,
+  LINE_SESSIONS[0].title,
+  LINE_SESSIONS[1].title,
   eventConfig.tagline,
-  scheduleData[2].description,
-  `${eventConfig.venue.name}, ${eventConfig.venue.city}`,
+  LINE_SESSIONS[2].description,
+  PLACE_LINE || LINE_SESSIONS[0].location,
   `${eventConfig.days.length} days · ${scheduleData.length} sessions`,
-]);
+].filter(Boolean));
 
 function RoleSpecimen({ role, label, job }) {
   const family = useLiveToken(`--font-${role}`);

@@ -11,6 +11,7 @@
 // underneath all six. That is why the widths belong in the book: the numbers
 // below are read from the live document, so a reviewer switching the style
 // control watches them move.
+import { Fragment } from 'react';
 import { SummaryRow } from '../../Home.jsx';
 import { groupIntoCards } from '../../../components/InfoCards.jsx';
 import Figure from '../Figure.jsx';
@@ -25,6 +26,14 @@ const FACT_BLOCKS = Object.values(siteContent)
   .sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
 
 const FACTS = { id: 'specimen-key-facts', title: 'Key facts', cards: groupIntoCards(FACT_BLOCKS) };
+
+// The address in the margin, one line per part the event states. Every part
+// of `venue` is optional, so a line with nothing in it is not drawn rather
+// than drawn as a comma on its own.
+const ADDRESS_LINES = Object.freeze([
+  eventConfig.venue?.name,
+  [eventConfig.venue?.city, eventConfig.venue?.region].filter(Boolean).join(', '),
+].filter(Boolean));
 
 function MeasuredValue({ token }) {
   const value = useLiveToken(token);
@@ -98,9 +107,12 @@ export default function LayoutSection({ folio }) {
             </p>
           </div>
           <p className="font-data text-caption text-text-secondary">
-            {eventConfig.venue.name}
-            <br />
-            {eventConfig.venue.city}, {eventConfig.venue.region}
+            {ADDRESS_LINES.map((line, index) => (
+              <Fragment key={line}>
+                {index > 0 ? <br /> : null}
+                {line}
+              </Fragment>
+            ))}
           </p>
         </div>
       </Figure>

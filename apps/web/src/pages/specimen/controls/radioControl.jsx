@@ -4,16 +4,21 @@
 import { useState } from 'react';
 import { Radio } from '../../../components/forms/Choice.jsx';
 import { fieldRegister } from './states.js';
+import { specimenTracks } from '../exampleContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
+
+// `tracks` is optional, so the group draws the event's lines where it has
+// them and the book's own two where it has none.
+const TRACKS = specimenTracks(eventConfig);
 
 function RadioSpecimen({ state }) {
   const [track, setTrack] = useState(
-    state === 'selected' ? eventConfig.tracks[0].letter : '',
+    state === 'selected' ? TRACKS[0].letter : '',
   );
   return (
     <fieldset className="flex flex-col gap-3xs">
       <legend className="font-data text-caption font-semibold text-text-primary">Track</legend>
-      {eventConfig.tracks.map((entry, index) => (
+      {TRACKS.map((entry, index) => (
         <Radio
           key={entry.letter}
           name={`specimen-track-${state}`}
@@ -22,7 +27,7 @@ function RadioSpecimen({ state }) {
           checked={state === 'error' ? false : track === entry.letter}
           disabled={state === 'disabled'}
           error={
-            state === 'error' && index === eventConfig.tracks.length - 1
+            state === 'error' && index === TRACKS.length - 1
               ? 'Pick the track this session belongs to.'
               : undefined
           }
