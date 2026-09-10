@@ -39,7 +39,7 @@ Haiku agents build.
       verified against the code, fixed, and reported.
 - [x] "Feels wrong to humans" pass on the captures; the evidence replaced with
       section captures at full scale, and what they showed fixed.
-- [ ] Push, open the PR, watch CI and the review bots.
+- [x] Push, open the PR, watch CI and the review bots.
 
 ## Wave 2: devices and blocks
 
