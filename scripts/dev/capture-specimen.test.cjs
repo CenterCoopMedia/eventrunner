@@ -130,3 +130,40 @@ test('the fixed furniture is put back even when the shot throws', async () => {
   );
   assert.equal(evaluations, 2);
 });
+
+test('a style outside the known list is refused', async () => {
+  // A misspelled id used to parse, and the demo band then fell back to the
+  // first style while the file name still said the id that was typed. The
+  // capture was evidence for a style nobody rendered.
+  const { parseArgs } = await load();
+  const parsed = parseArgs(['--out', '/tmp/s', '--dist', '/tmp/b', '--styles', 'newsroon']);
+  assert.equal(parsed.ok, false);
+  assert.match(parsed.error, /unknown style newsroon/u);
+});
+
+test('the first bad style is named, not the last', async () => {
+  const { parseArgs } = await load();
+  const parsed = parseArgs([
+    '--out', '/tmp/s', '--dist', '/tmp/b', '--styles', 'zine,atlantis,broadsheat',
+  ]);
+  assert.equal(parsed.ok, false);
+  assert.match(parsed.error, /unknown style atlantis/u);
+});
+
+test('every default style passes its own check', async () => {
+  const { parseArgs, DEFAULT_STYLES } = await load();
+  const parsed = parseArgs([
+    '--out', '/tmp/s', '--dist', '/tmp/b', '--styles', DEFAULT_STYLES.join(','),
+  ]);
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(parsed.options.styles, [...DEFAULT_STYLES]);
+});
+
+test('the known style list is the preset catalog, not a copy that can drift', async () => {
+  // The book is captured per site style, and the site styles are the
+  // presets. A hand-kept second list is a list that goes stale the day a
+  // seventh preset lands.
+  const { DEFAULT_STYLES } = await load();
+  const { THEME_PRESET_IDS } = require('shared/theme');
+  assert.deepEqual([...DEFAULT_STYLES], [...THEME_PRESET_IDS]);
+});

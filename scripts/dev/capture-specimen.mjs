@@ -26,7 +26,8 @@
  *
  * Options:
  *   --out <dir>        where the PNGs go. Required.
- *   --styles <list>    comma-separated style ids. Default: every style.
+ *   --styles <list>    comma-separated style ids. Default: every style. An
+ *                      id outside the list below is refused by name.
  *   --modes <list>     light, dark, or both. Default: both.
  *   --widths <list>    comma-separated viewport widths. Default: 1440,390.
  *   --only <id>        capture one section instead of the whole page. The
@@ -56,7 +57,11 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '..', '..');
 
-/** The six site styles, in picker order. */
+/**
+ * The six site styles, in picker order, and the list --styles is checked
+ * against. It mirrors THEME_PRESET_IDS (packages/shared/src/theme.cjs);
+ * capture-specimen.test.cjs fails when the two drift apart.
+ */
 export const DEFAULT_STYLES = Object.freeze([
   'civic',
   'newsroom',
@@ -138,6 +143,18 @@ export function parseArgs(argv) {
   }
   if (options.styles.length === 0) return { ok: false, error: '--styles is empty' };
   if (options.modes.length === 0) return { ok: false, error: '--modes is empty' };
+  // A style that is not a site style is refused HERE, because nothing
+  // downstream can refuse it: the demo band falls back to the first style
+  // when it does not know the one in the query string, and captureName
+  // still writes the id that was typed. A misspelling would then produce a
+  // file that names one style and pictures another.
+  const badStyle = options.styles.find((style) => !DEFAULT_STYLES.includes(style));
+  if (badStyle) {
+    return {
+      ok: false,
+      error: `unknown style ${badStyle}. The styles are: ${DEFAULT_STYLES.join(', ')}`,
+    };
+  }
   const badMode = options.modes.find((mode) => !DEFAULT_MODES.includes(mode));
   if (badMode) return { ok: false, error: `unknown mode ${badMode}` };
   if (options.widths.some((width) => !Number.isFinite(width) || width <= 0)) {
