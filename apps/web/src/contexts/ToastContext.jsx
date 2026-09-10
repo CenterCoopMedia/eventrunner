@@ -31,6 +31,18 @@ const ToastContext = createContext(null);
 let nextId = 0;
 
 /**
+ * The bar itself, without its tone rule and without its move.
+ *
+ * It is reversed ink — the same idiom the demo band uses — so it follows
+ * the mode instead of pinning one tone, and it floats over the page with no
+ * scrim behind it to tint against. That is why it takes a rule as its frame:
+ * a strong rule stands in for the elevation a shadow would have given it,
+ * and shadow decorates nothing.
+ */
+export const TOAST_BAR_CLASS =
+  'flex items-baseline gap-sm rounded-brand border-surface bg-text-primary px-md py-sm text-surface';
+
+/**
  * How long a leaving toast stays in the document. It is `--motion-fast`, the
  * exit step, in milliseconds — the CSS runs the fade and this holds the
  * element until the fade is over. `toastMotion.test.js` pins the two
@@ -41,11 +53,17 @@ export const TOAST_EXIT_MS = 120;
 /**
  * Each tone's word and rule. The word is the first signal and it is always
  * present; the rule weight is the second. Neither is a colour.
+ *
+ * Exported so the specimen book draws the tones from this table rather than
+ * from a copy of it. A copy is a second place for a tone to be added and a
+ * guaranteed way for the book to fall behind the bar it documents.
  */
-const TONES = Object.freeze({
-  info: { word: 'Note', frame: 'border-hairline' },
-  error: { word: 'Problem', frame: 'border-strong' },
+export const TOAST_TONES = Object.freeze({
+  info: Object.freeze({ word: 'Note', frame: 'border-hairline' }),
+  error: Object.freeze({ word: 'Problem', frame: 'border-strong' }),
 });
+
+const TONES = TOAST_TONES;
 
 /**
  * Whether this page is the admin room.
@@ -123,7 +141,7 @@ export function ToastProvider({ children }) {
             <div
               key={toast.id}
               role={toast.announce ? (toast.tone === 'error' ? 'alert' : 'status') : undefined}
-              className={`pointer-events-auto flex items-baseline gap-sm rounded-brand ${tone.frame} border-surface bg-text-primary px-md py-sm text-surface ${move}`}
+              className={`${TOAST_BAR_CLASS} pointer-events-auto ${tone.frame} ${move}`}
             >
               <span className="font-data text-folio font-semibold uppercase">
                 {tone.word}

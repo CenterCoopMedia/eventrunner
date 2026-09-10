@@ -12,7 +12,7 @@
 // Every word on the page comes from the committed synthetic snapshot in
 // src/generated. Nothing here is placeholder copy.
 import SectionIndexNav from '../../components/SectionIndexNav.jsx';
-import { SPECIMEN_SECTIONS } from './sections/index.js';
+import { SPECIMEN_SECTIONS, sectionFolio } from './sections/index.js';
 import { SPECIMEN_TITLE } from './specimenRoute.js';
 import useNoIndex from './useNoIndex.js';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
@@ -43,8 +43,8 @@ export default function Specimen() {
         />
       </div>
 
-      {SPECIMEN_SECTIONS.map((section) => (
-        <section.Component key={section.id} />
+      {SPECIMEN_SECTIONS.map((section, index) => (
+        <section.Component key={section.id} folio={sectionFolio(index)} />
       ))}
     </article>
   );

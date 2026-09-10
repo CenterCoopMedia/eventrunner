@@ -1,4 +1,4 @@
-// Section 6: the illustration sets, four slots each.
+// The illustration sets, four slots each.
 //
 // Each row below carries its own data-motif-set attribute, so every set
 // draws at once and a reviewer can compare them without switching. The
@@ -83,12 +83,12 @@ function MotifSetControl() {
   );
 }
 
-export default function IllustrationsSection() {
+export default function IllustrationsSection({ folio }) {
   return (
     <SpecimenSection
       id="specimen-illustrations"
       title="Illustrations"
-      folio="Section 6"
+      folio={folio}
       standfirst="Four slots in every set. The drawings take the site's own ink and carry no colour of their own."
     >
       <Figure

@@ -1,4 +1,4 @@
-// Section 1: the eight steps, in each of the four roles.
+// The eight steps, in each of the four roles.
 //
 // Each line is set at the step it names, in the role it names, and states
 // the family that role resolves to right now. Change the site style in the
@@ -82,12 +82,12 @@ function RoleSpecimen({ role, label, job }) {
   );
 }
 
-export default function TypeSection() {
+export default function TypeSection({ folio }) {
   return (
     <SpecimenSection
       id="specimen-type"
       title="Type"
-      folio="Section 1"
+      folio={folio}
       standfirst="Eight steps carry the whole scale, and each of the four roles sets all eight."
     >
       {TYPE_ROLES.map((entry) => (

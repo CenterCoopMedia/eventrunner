@@ -1,4 +1,4 @@
-// Section 4: the four header treatments, each with the seeded identity.
+// The four header treatments, each with the seeded identity.
 //
 // Every treatment carries the identity and the navigation, and none of
 // them is a heading: the page's own h1 is at the top of this book. The
@@ -62,7 +62,7 @@ function SpecimenNav() {
   );
 }
 
-export default function HeadersSection() {
+export default function HeadersSection({ folio }) {
   const identity = buildNameplate(eventConfig);
   const compact = buildNameplate(eventConfig, { compact: true });
 
@@ -70,7 +70,7 @@ export default function HeadersSection() {
     <SpecimenSection
       id="specimen-headers"
       title="Headers"
-      folio="Section 4"
+      folio={folio}
       standfirst="Four treatments, one identity. A site picks one, and a page may state its own."
     >
       {TREATMENTS.map((treatment) => (

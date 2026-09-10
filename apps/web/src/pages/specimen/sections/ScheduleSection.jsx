@@ -1,4 +1,4 @@
-// Section 7: the session row, the grid, the calling points, the transfer.
+// The session row, the grid, the calling points, the transfer.
 //
 // The day reads twice and both readings are first-class, so both are here:
 // the time-ordered row, and the two-axis grid. The grid excerpt keeps its
@@ -19,7 +19,7 @@ import { scheduleData } from '@generated/scheduleData.js';
 const DAY = eventConfig.days[1];
 const bySession = (id) => scheduleData.find((session) => session.id === id);
 
-export default function ScheduleSection() {
+export default function ScheduleSection({ folio }) {
   const entries = useMemo(
     () => withCallingPoints(scheduleData.filter((session) => session.dayId === DAY.id)),
     [],
@@ -36,7 +36,7 @@ export default function ScheduleSection() {
     <SpecimenSection
       id="specimen-schedule"
       title="Sessions and schedule"
-      folio="Section 7"
+      folio={folio}
       standfirst="A day reads twice: a time-ordered list everywhere, and a two-axis grid where the event lists tracks."
     >
       <Figure

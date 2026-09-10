@@ -46,6 +46,18 @@ import { submitFeedback } from '../lib/feedbackApi.js';
 import { SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 
+/**
+ * The dialog's frame: the strong rule on the page ground, at the reading
+ * width. Exported so the specimen book draws the frame from this string
+ * rather than from a copy of it.
+ *
+ * `.public-dialog` is not in here. That class is the element's own
+ * behaviour — how tall a native dialog may grow, how it scrolls, and what
+ * its backdrop paints — and it belongs only on the <dialog> itself.
+ */
+export const DIALOG_FRAME_CLASS =
+  'w-full max-w-lg border-strong border-rule-strong bg-surface p-lg';
+
 const CATEGORY_OPTIONS = [
   { value: 'feedback', label: 'General feedback' },
   { value: 'bug', label: 'Something is broken' },
@@ -123,7 +135,7 @@ export default function FeedbackModal({ onClose }) {
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
-      className="public-dialog motion-enter w-full max-w-lg border-strong border-rule-strong bg-surface p-lg"
+      className={`public-dialog motion-enter ${DIALOG_FRAME_CLASS}`}
       onCancel={(event) => {
         event.preventDefault();
         onClose();

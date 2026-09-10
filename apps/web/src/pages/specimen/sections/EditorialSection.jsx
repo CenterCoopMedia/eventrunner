@@ -1,4 +1,4 @@
-// Section 5: the editorial devices, one figure each.
+// The editorial devices, one figure each.
 //
 // Every device under components/editorial/ appears here at least once, and
 // a test reads the rendered book back to prove it. A device this page does
@@ -63,12 +63,12 @@ const LABEL_FIELDS = Object.freeze([
   Object.freeze({ key: 'Opens', value: firstSession.startTime }),
 ]);
 
-export default function EditorialSection() {
+export default function EditorialSection({ folio }) {
   return (
     <SpecimenSection
       id="specimen-editorial"
       title="Editorial devices"
-      folio="Section 5"
+      folio={folio}
       standfirst="Each device has one job, and each one resolves through a tier 3 contract a site style can remap."
     >
       <Figure

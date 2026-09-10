@@ -1,4 +1,4 @@
-// Section 2: every tier 2 colour token, measured against the page ground.
+// Every tier 2 colour token, measured against the page ground.
 //
 // The swatch is a ruled band rather than a chip, and the number beside it
 // is measured in this document, in this mode, at this moment. A number
@@ -34,12 +34,12 @@ function SwatchRow({ token }) {
   );
 }
 
-export default function ColourSection() {
+export default function ColourSection({ folio }) {
   return (
     <SpecimenSection
       id="specimen-colour"
       title="Colour"
-      folio="Section 2"
+      folio={folio}
       standfirst="Every tier 2 colour token, with the contrast it holds against the page ground in the style and mode on screen."
     >
       <p className="mt-sm max-w-prose text-body text-text-secondary">

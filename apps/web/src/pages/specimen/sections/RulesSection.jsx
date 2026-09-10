@@ -1,4 +1,4 @@
-// Section 3: the three rule weights, and the nine spacing steps.
+// The three rule weights, and the nine spacing steps.
 //
 // A rule replaces a card border, so the three weights are the whole
 // structural vocabulary of the site and a reviewer must be able to compare
@@ -27,12 +27,12 @@ function MeasuredValue({ token }) {
   return <span className="font-mono text-caption text-text-secondary">{value || token}</span>;
 }
 
-export default function RulesSection() {
+export default function RulesSection({ folio }) {
   return (
     <SpecimenSection
       id="specimen-rules"
       title="Rules and spacing"
-      folio="Section 3"
+      folio={folio}
       standfirst="Three rule weights do the dividing, and nine spacing steps set every gap on the page."
     >
       <Figure

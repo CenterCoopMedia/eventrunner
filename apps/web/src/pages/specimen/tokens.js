@@ -35,6 +35,55 @@ export const SPACING_STEPS = Object.freeze([
   '3xs', '2xs', 'xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl',
 ]);
 
+/**
+ * The two widths a page is built on (2026-09-10 vocabulary expansion).
+ *
+ * `token` is the tier 3 name a component reads, because that is what a
+ * style retunes in its own preset file. `base` is the tier 2 family under
+ * it, and the test pins the list to that family.
+ */
+export const STAGE_WIDTHS = Object.freeze([
+  Object.freeze({
+    token: '--stage-max',
+    base: '--stage-frame',
+    label: 'Stage',
+    job: 'The frame of the page: the header, the navigation, the schedule grid, the four directories, the logo wall, the footer, and every section head.',
+  }),
+  Object.freeze({
+    token: '--measure-text',
+    base: '--stage-measure',
+    label: 'Measure',
+    job: 'Running text: a paragraph, a list, a rich text block, a stat description, an answer. It never exceeds the stage.',
+  }),
+]);
+
+/**
+ * The interaction-state tints (expansion record §2.1).
+ *
+ * A share, not a colour: the shared rule mixes the control's own ink into
+ * the ground it already sits on, so one number covers the page ground, the
+ * alternate ground and a filled action. The share is mode-scoped, and dark
+ * carries the higher one, because the same ink reads as a smaller step on a
+ * dark ground.
+ */
+export const STATE_SHARES = Object.freeze([
+  Object.freeze({ token: '--state-hover-share', label: 'Hover', job: 'Under the pointer, inside the hover query.' }),
+  Object.freeze({ token: '--state-pressed-share', label: 'Pressed', job: 'Held down. It is what carries the press for a reader who asked for less motion.' }),
+  Object.freeze({ token: '--state-selected-share', label: 'Selected', job: 'A toggle that is on, beside the bold weight.' }),
+]);
+
+/**
+ * The focus ring (expansion record §2.1).
+ *
+ * Its own family rather than a rule weight: a rule is structure a reader
+ * passes over, and a ring is the answer to "where am I". Sharing the scale
+ * would let a retune of the hairline thin the ring.
+ */
+export const FOCUS_TOKENS = Object.freeze([
+  Object.freeze({ token: '--focus-ring-width', label: 'Ring width', job: 'Drawn outside the element, never removed.' }),
+  Object.freeze({ token: '--focus-ring-offset', label: 'Ring offset', job: 'The gap between the element and its ring.' }),
+]);
+
 /** The three rule weights. */
 export const RULE_WEIGHTS = Object.freeze([
   Object.freeze({ weight: 'hairline', label: 'Hairline', job: 'Structure between rows.' }),

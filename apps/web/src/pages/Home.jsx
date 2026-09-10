@@ -41,6 +41,10 @@ import { formatDayDate } from '../lib/eventTime.js';
  * in the gutter, each opening on its own section boundary. Below `lg` the
  * row stacks and each cell's own rule is what separates it.
  *
+ * Exported so the specimen book draws this row rather than a copy of it.
+ * The book is where a reviewer sees the composition in six styles, and a
+ * copy would be the one version of it nobody keeps in step.
+ *
  * A cell that has nothing to say is not drawn, so the row is a row of two
  * or of one where the event has not recorded its days or the operator has
  * not written the facts. A row with no cell at all draws nothing.
@@ -53,7 +57,7 @@ import { formatDayDate } from '../lib/eventTime.js';
  *   className?: string,
  * }} props
  */
-function SummaryRow({ days, timezone, eventConfig, facts, className = '' }) {
+export function SummaryRow({ days, timezone, eventConfig, facts, className = '' }) {
   const clock = countdownDraws(eventConfig);
   if (days.length === 0 && !facts && !clock) return null;
   return (

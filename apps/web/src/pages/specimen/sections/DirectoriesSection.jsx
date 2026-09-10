@@ -1,4 +1,4 @@
-// Section 8: four directories, four compositions, one token system.
+// Four directories, four compositions, one token system.
 //
 // Speakers is a shelf of portraits, attendees is an index, sponsors is a
 // tiered wall, and updates is a feed on a spine. None of them is a card,
@@ -67,12 +67,12 @@ const feedEntries = FEED_SOURCES.map((source) => ({
   body: siteContent[source.contentKey]?.text ?? '',
 }));
 
-export default function DirectoriesSection() {
+export default function DirectoriesSection({ folio }) {
   return (
     <SpecimenSection
       id="specimen-directories"
       title="Directories"
-      folio="Section 8"
+      folio={folio}
       standfirst="Four lists, four compositions. Reading each of them is a different job, so none of them shares one shape."
     >
       <Figure

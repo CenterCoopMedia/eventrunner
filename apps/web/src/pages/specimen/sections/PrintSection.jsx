@@ -1,4 +1,4 @@
-// Section 12: what this page does on paper.
+// What this page does on paper.
 //
 // Paper has no dark mode. The print rules read the ink and rule tokens and
 // nothing else, so pointing those at the light palette is the whole switch,
@@ -33,12 +33,12 @@ const PRINT_RULES = Object.freeze([
   'Times keep tabular figures, so the time column lines up.',
 ]);
 
-export default function PrintSection() {
+export default function PrintSection({ folio }) {
   return (
     <SpecimenSection
       id="specimen-print"
       title="Print"
-      folio="Section 12"
+      folio={folio}
       standfirst="This page prints as the light edition, whatever mode the screen is in."
     >
       <Figure

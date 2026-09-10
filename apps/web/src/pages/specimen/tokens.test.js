@@ -12,8 +12,11 @@ import { describe, expect, it } from 'vitest';
 import {
   COLOUR_GROUPS,
   COLOUR_TOKENS,
+  FOCUS_TOKENS,
   RULE_WEIGHTS,
   SPACING_STEPS,
+  STAGE_WIDTHS,
+  STATE_SHARES,
   TYPE_ROLES,
   TYPE_STEPS,
   formatContrast,
@@ -56,6 +59,34 @@ describe('the lists the specimen book draws', () => {
 
   it('holds the four type roles and no fifth', () => {
     expect(TYPE_ROLES.map((entry) => entry.role)).toEqual(['heading', 'body', 'data', 'mono']);
+  });
+
+  // The three families this wave added. Each one is pinned to its tier 2
+  // family, so a share, a width or a ring value added to the system fails
+  // here until the book shows it.
+
+  it('holds both widths a page is built on', () => {
+    expect(STAGE_WIDTHS.map((entry) => entry.base).sort()).toEqual(
+      names(semantic.stage).map((step) => `--stage-${step}`).sort(),
+    );
+    // Every band draws the tier 3 name a component actually reads, because
+    // that is the name a style retunes.
+    for (const entry of STAGE_WIDTHS) {
+      expect(entry.token.startsWith('--')).toBe(true);
+      expect(entry.job.length).toBeGreaterThan(20);
+    }
+  });
+
+  it('holds every interaction-state share', () => {
+    expect(STATE_SHARES.map((entry) => entry.token).sort()).toEqual(
+      names(semantic.state).map((step) => `--state-${step}`).sort(),
+    );
+  });
+
+  it('holds every value the focus ring is drawn from', () => {
+    expect(FOCUS_TOKENS.map((entry) => entry.token).sort()).toEqual(
+      names(semantic.focus).map((step) => `--focus-${step}`).sort(),
+    );
   });
 });
 
