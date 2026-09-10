@@ -126,12 +126,26 @@ export function sharedGrammar(state) {
 /**
  * The reason a FIELD does not draw one of the three forced states.
  *
+ * It covers hover, focus and press, and it REFUSES anything else. It used
+ * to hand back `{ reason: undefined }`, which reaches the book as a state
+ * named under the grid with no reason under it — the exact silence the
+ * second list exists to end, and a defect that would ship looking like a
+ * layout slip.
+ *
  * @param {string} state
  * @returns {{ state: string, reason: string }}
+ * @throws {Error} where the register holds no reason for that state
  */
 export function fieldRegister(state) {
   if (state === 'focus') return Object.freeze({ state, reason: FOCUS_REASON });
-  return Object.freeze({ state, reason: FIELD_REASONS[state] });
+  const reason = Object.hasOwn(FIELD_REASONS, state) ? FIELD_REASONS[state] : null;
+  if (typeof reason !== 'string') {
+    throw new Error(
+      `fieldRegister: the field register has no reason for the "${state}" state. `
+      + 'It covers hover, focus and pressed; give the control its own reason for anything else.',
+    );
+  }
+  return Object.freeze({ state, reason });
 }
 
 /** The two register reasons, for the registry's own test. */

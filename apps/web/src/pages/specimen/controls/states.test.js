@@ -16,7 +16,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
-import { CONTROL_STATES, FORCED_FOCUS, FORCED_PRESS, STATE_IDS, forcedTint } from './states.js';
+import {
+  CONTROL_STATES,
+  FORCED_FOCUS,
+  FORCED_PRESS,
+  STATE_IDS,
+  fieldRegister,
+  forcedTint,
+} from './states.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const INDEX_CSS = path.resolve(here, '..', '..', '..', 'index.css');
@@ -64,6 +71,19 @@ describe('the state list', () => {
 
   it('forces a press as the scale the motion grammar gives it', () => {
     expect(FORCED_PRESS).toBe('scale-[0.98]');
+  });
+
+  it('gives the field register a reason for each of the three states it holds', () => {
+    for (const state of ['hover', 'focus', 'pressed']) {
+      expect(fieldRegister(state).reason.length).toBeGreaterThan(20);
+    }
+  });
+
+  it('refuses a state the field register has no reason for', () => {
+    // It used to hand back `{ reason: undefined }`, and an absent reason
+    // reaches the book as a blank line under the grid — the exact silence
+    // the second list exists to prevent.
+    expect(() => fieldRegister('busy')).toThrow(/busy/u);
   });
 
   it('forces a tint as a share of the ground, never as a colour', () => {
