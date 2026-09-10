@@ -84,4 +84,20 @@ describe('FilterGroup', () => {
     expect(screen.getByRole('checkbox', { name: 'Talk (12)' })).toHaveFocus();
     expect(document.body).not.toHaveFocus();
   });
+
+  it('passes over a box that cannot take focus', () => {
+    // `focus()` on a disabled input does nothing, so the reader lands on the
+    // body anyway — the exact drop this move exists to prevent. The box is
+    // disabled in the DOM rather than through a prop, because the group
+    // renders no disabled box today and the guard has to hold for the day
+    // one arrives.
+    render(<Driven />);
+    const boxes = screen.getAllByRole('checkbox');
+    boxes[0].disabled = true;
+    const clear = screen.getByRole('button', { name: 'Clear filter' });
+    clear.focus();
+    fireEvent.click(clear);
+    expect(boxes[1]).toHaveFocus();
+    expect(document.body).not.toHaveFocus();
+  });
 });

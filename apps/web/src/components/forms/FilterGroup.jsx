@@ -19,7 +19,9 @@
 // reader back to the start of the page. The head of the group is where the
 // reader would work next, so the first box takes focus before the control
 // goes. The box is found in the group's own boxes rather than held as a ref
-// per option, the same way the tab row finds its tabs.
+// per option, the same way the tab row finds its tabs. It is the first
+// ENABLED box: `focus()` on a disabled input does nothing, so a disabled
+// first box would drop the reader on the body after all.
 import { useRef } from 'react';
 import { Checkbox } from './Choice.jsx';
 import { quietActionClass } from '../controlClasses.js';
@@ -52,7 +54,7 @@ export default function FilterGroup({
     // The box is focused first: React removes the control in the render
     // this state change causes, and by then the reader is already on the
     // group rather than on nothing.
-    boxesRef.current?.querySelector('input[type="checkbox"]')?.focus();
+    boxesRef.current?.querySelector('input[type="checkbox"]:not([disabled])')?.focus();
     onChange([]);
   }
 
