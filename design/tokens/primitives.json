@@ -47,7 +47,10 @@
     "width": {
       "hairline": "1px",
       "strong": "2px",
-      "nameplate": "3px"
+      "nameplate": "3px",
+      "$focus-note": "The focus ring is not a rule and never borrows a rule weight: a rule is structure a reader passes over, and a ring is the answer to \"where am I\". It is its own pair of values so a retune of the rule scale cannot thin it.",
+      "focus-ring": "3px",
+      "focus-offset": "2px"
     },
     "weight": {
       "regular": "400",
@@ -63,6 +66,15 @@
     },
     "easing": {
       "out": "cubic-bezier(0, 0, 0.2, 1)"
+    },
+    "$state-note": "The share of ink a state tint mixes into the ground it sits on. A share is a number, not a colour, because the tint has to work on every ground a control renders on. Each state has a light value and a dark value: ink on a dark ground carries less of a step than ink on a light one, so the dark share is the higher of the pair.",
+    "state": {
+      "hover-light": "0.06",
+      "hover-dark": "0.1",
+      "pressed-light": "0.1",
+      "pressed-dark": "0.16",
+      "selected-light": "0.08",
+      "selected-dark": "0.13"
     }
   }
 }

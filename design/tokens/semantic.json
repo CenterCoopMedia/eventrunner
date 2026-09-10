@@ -98,19 +98,32 @@
     "nameplate": { "width": "var(--er-width-nameplate)" }
   },
 
+  "$focus-note": "Expansion record §2.1. One ring, on every public control, drawn outside the element and never removed. It is its own family because a focus ring is not a rule: it answers \"where am I\", and a retune of the rule scale must not thin it.",
+  "focus": {
+    "ring-width": "var(--er-width-focus-ring)",
+    "ring-offset": "var(--er-width-focus-offset)"
+  },
+
   "$font-note": "Roles, never family names (brief §3.2). Four roles — heading, body, data, mono — resolve from the active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright, all through the bundled-set allowlist (spec §7.4). A role nothing names falls through to the alias list below: --font-data follows the body face, --font-mono follows the data face. PR2 removed --font-accent, the retired role (brief §7): Zine's handwritten callout runs on the component token --callout-font instead.",
   "font": {
     "--font-data": "var(--font-body)",
     "--font-mono": "var(--font-data)"
   },
 
-  "$motion-note": "Brief §2.2. Functional motion runs 120ms to 200ms. One expressive signature per surface finishes under 600ms.",
+  "$motion-note": "Brief §2.2. Functional motion runs 120ms to 200ms. One expressive signature per surface finishes under 600ms. Each step has one job: --motion-fast is the exit, --motion-base is the enter, --motion-slow is the press, and --motion-signature is the one signature a surface owns. An exit is faster than the enter that brought the element in. There is ONE curve: enter and exit both take --motion-ease, and the asymmetry is carried by duration alone.",
   "motion": {
     "fast": "var(--er-duration-fast)",
     "base": "var(--er-duration-base)",
     "slow": "var(--er-duration-slow)",
     "signature": "var(--er-duration-signature)",
     "ease": "var(--er-easing-out)"
+  },
+
+  "$state-note": "Expansion record §2.1. A state tint is ink mixed into the ground the control already sits on, at a fixed share, so one rule covers every ground and every preset. The share is mode-scoped: it is emitted in both mode blocks and the dark value is the higher one.",
+  "state": {
+    "hover-share": { "light": "var(--er-state-hover-light)", "dark": "var(--er-state-hover-dark)" },
+    "pressed-share": { "light": "var(--er-state-pressed-light)", "dark": "var(--er-state-pressed-dark)" },
+    "selected-share": { "light": "var(--er-state-selected-light)", "dark": "var(--er-state-selected-dark)" }
   },
 
   "$weight-note": "Named weights so a component never writes a raw number.",

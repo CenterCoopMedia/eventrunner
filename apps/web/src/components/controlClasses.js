@@ -14,6 +14,71 @@
 // Colors read the tier 2 role names and spacing reads the named steps
 // (design brief §3.1, §3.7). Shapes are rectangles on the theme radius,
 // never pills (§2.4).
+//
+// THE STATE GRAMMAR (expansion record §2.1). Every control below carries the
+// same eight states, so a reader learns them once:
+//
+//   Rest       the style's own ink and ground.
+//   Hover      the control's own ink mixed into its own ground, at
+//              --state-hover-share, behind `@media (hover: hover)`. It lands
+//              at once: a colour change never transitions. A control set as
+//              TEXT takes no tint — its hover is the ink and the underline.
+//   Focus      the 3px accent ring, drawn by the one :focus-visible rule in
+//              index.css. A control never draws its own and never removes it.
+//   Press      scale 0.98 on transform alone, at --motion-slow, inside
+//              `motion-safe:` — plus the firmer tint, which is what carries
+//              the press for a reader who asked for less motion.
+//   Selected   the bold weight, plus a second signal: the selected tint on
+//              `aria-pressed`, the filled ground on `aria-checked`, the
+//              strong rule on `aria-selected`. Never colour alone.
+//   Disabled   `disabled` where the control must not act; `aria-disabled`
+//              where it must stay focusable to explain itself, and then its
+//              handler refuses every activation path. The disabled ink on
+//              the alternate ground, the pointer unchanged. Never removed.
+//   Busy       `aria-busy="true"` and a stated word inside the control
+//              ("Saving…"). The control stays enabled, the pointer is
+//              unchanged, and nothing spins.
+//   Error      the field states it, not the button: see components/forms.
+//
+// The `disabled:` half of each pair is kept beside the `aria-disabled:` half
+// for the call sites that still use the attribute. Prefer `aria-disabled`.
+
+/** Press: the one motion a control makes. Transform only, inside motion-safe. */
+const pressClass =
+  'active:scale-[0.98] motion-safe:transition-transform motion-safe:duration-slow ' +
+  'motion-safe:ease-motion';
+
+/** Unavailable: the disabled ink on the alternate ground, still focusable. */
+const unavailableClass =
+  'aria-disabled:bg-surface-alt aria-disabled:text-text-secondary ' +
+  'disabled:bg-surface-alt disabled:text-text-secondary';
+
+/** The same state, for a control with no ground of its own: the ink alone. */
+const unavailableInkClass = 'aria-disabled:text-text-secondary disabled:text-text-secondary';
+
+/**
+ * Selected: the weight, so the state is never colour alone. `aria-pressed`
+ * also takes the tint (it has no ground of its own); `aria-checked` and
+ * `aria-selected` take the segmented control's filled ground and the tab's
+ * strong rule instead.
+ */
+const selectedClass = 'aria-pressed:font-bold aria-checked:font-bold aria-selected:font-bold';
+
+/** Every state a BOXED control shares. Compose it into each shape below. */
+export const controlStateClass =
+  `control-tint ${pressClass} ${unavailableClass} ${selectedClass}`;
+
+/**
+ * The same states for a control set as TEXT — a control in a schedule row,
+ * say, where the row's own rhythm is the design and a boxed control would be
+ * a second grid competing with the programme.
+ *
+ * It takes no tint and no ground: a tint behind running text is a box, and
+ * the point of the text register is that nothing on the row is boxed. Its
+ * hover is the ink and the underline the shape already carries.
+ */
+export const textControlStateClass =
+  `${pressClass} ${unavailableInkClass} ${selectedClass}`;
 
 // A form control's boundary is --color-border-control, not --rule-hairline
 // (design brief §8.1 polish, WCAG 1.4.11): a rule is tuned for low-contrast
@@ -25,23 +90,22 @@ export const inputClass =
 
 /** The filled primary action. Sized by its own content. */
 export const primaryActionClass =
-  'touch-target inline-flex items-center justify-center rounded-brand bg-accent ' +
-  'px-md py-xs font-data text-caption font-semibold text-surface ' +
-  'hover:bg-accent-strong disabled:opacity-60';
+  `${controlStateClass} touch-target inline-flex items-center justify-center rounded-brand ` +
+  'bg-accent px-md py-xs font-data text-caption font-semibold text-surface';
 
 /** The outlined action that sits beside a primary one. */
 export const secondaryActionClass =
-  'touch-target inline-flex items-center justify-center rounded-brand ' +
+  `${controlStateClass} touch-target inline-flex items-center justify-center rounded-brand ` +
   'border-hairline border-rule-hairline bg-surface px-md py-xs font-data text-caption ' +
-  'font-semibold text-text-primary hover:bg-surface-alt disabled:opacity-60';
+  'font-semibold text-text-primary';
 
 /**
  * A page-level action in the editorial register: a ruled rectangle with no
  * fill, for a control that offers something rather than completing a task.
  */
 export const quietActionClass =
-  'touch-target inline-flex items-center rounded-brand border-hairline border-rule-hairline ' +
-  'px-md py-2xs font-data text-caption font-medium text-text-primary hover:bg-surface-alt';
+  `${controlStateClass} touch-target inline-flex items-center rounded-brand border-hairline ` +
+  'border-rule-hairline px-md py-2xs font-data text-caption font-medium text-text-primary';
 
 /** The same two actions across a form's full width, for a submit row. */
 export const primaryButtonClass = `${primaryActionClass} w-full`;

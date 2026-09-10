@@ -11,6 +11,7 @@ import {
   sessionIdFromTitle,
 } from '../sessionDoc.js';
 import { useAdminSessions } from '../useAdminSessions.js';
+import { focusFirstError } from '../../lib/focusFirstError.js';
 import {
   CheckboxField,
   DestructiveConfirm,
@@ -102,6 +103,7 @@ export default function AdminSessionEditor({ mode }) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
+  const formRef = useRef(null);
   const adoptedRef = useRef(false);
 
   useEffect(() => {
@@ -167,7 +169,15 @@ export default function AdminSessionEditor({ mode }) {
   }
 
   async function save({ publish = false } = {}) {
-    if (localErrors.size > 0 || saving) return;
+    if (saving) return;
+    // The submit control stays enabled while a field is invalid (#219). A
+    // disabled control announces nothing, so an operator who pastes a bad
+    // value and presses Save would get silence. Pressing it now moves the
+    // operator to the field that stopped the save, and sends nothing.
+    if (localErrors.size > 0) {
+      focusFirstError(formRef.current);
+      return;
+    }
     setSaving(true);
     setError(null);
     setStatus('');
@@ -180,10 +190,13 @@ export default function AdminSessionEditor({ mode }) {
         const verdict = summarizePublish(response, 'cmsSchedule', ids, 'sessions');
         if (!verdict.ok) throw new Error(verdict.message);
         setStatus(verdict.message);
-        showToast(verdict.message);
+        // The line above is the record and it announces. The bar repeats it
+        // where the operator is looking, and says nothing, so one result is
+        // announced once.
+        showToast(verdict.message, { announce: false });
       } else {
         setStatus('Draft saved. It is not live until you publish it.');
-        showToast('Session draft saved.');
+        showToast('Session draft saved.', { announce: false });
       }
       if (mode === 'create') {
         navigate(`/admin/sessions/${encodeURIComponent(docId)}`, { replace: true });
@@ -220,7 +233,11 @@ export default function AdminSessionEditor({ mode }) {
   }
 
   return (
-    <form className="flex flex-col gap-md" onSubmit={(event) => { event.preventDefault(); save(); }}>
+    <form
+      ref={formRef}
+      className="flex flex-col gap-md"
+      onSubmit={(event) => { event.preventDefault(); save(); }}
+    >
       <AdminPageHeader
         title={mode === 'create' ? 'New session' : form.title || sessionId}
         state={mode === 'edit' ? <RecordState state={row?.state} /> : null}
@@ -241,14 +258,16 @@ export default function AdminSessionEditor({ mode }) {
             <button
               type="submit"
               className={secondaryButtonClass}
-              disabled={saving || localErrors.size > 0}
+              disabled={saving}
+              aria-busy={saving || undefined}
             >
               {saving ? 'Saving…' : 'Save draft'}
             </button>
             <button
               type="button"
               className={primaryButtonClass}
-              disabled={saving || localErrors.size > 0}
+              disabled={saving}
+              aria-busy={saving || undefined}
               onClick={() => save({ publish: true })}
             >
               {saving ? 'Working…' : 'Save and publish'}

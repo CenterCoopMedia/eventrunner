@@ -49,8 +49,12 @@ function withoutMotionBlocks(source) {
 const staticCss = withoutMotionBlocks(indexCss);
 /** The stamp's own rules, with the reduced-motion wrapper kept out. */
 const stampRules = staticCss.match(/\.session-block(?:__face)?(?:::before)? \{[^}]*\}/g).join('\n');
+// Every no-preference block, INCLUDING the ones that carry a second
+// condition: the peek's hover half sits in
+// `… no-preference) and (hover: hover) and (pointer: fine)`, because a touch
+// screen reports a tap as a hover and would leave a row peeking.
 const noPreference = indexCss.match(
-  /@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*?\n {2}\}/g,
+  /@media \(prefers-reduced-motion: no-preference\)[^{]*\{[\s\S]*?\n {2}\}/g,
 );
 
 describe('the Zine stamp', () => {
@@ -128,8 +132,9 @@ describe('the Zine stamp', () => {
   });
 
   it('4. peeks on transform only, from a user action, at a token duration', () => {
-    const block = noPreference.find((rule) => rule.includes('.session-block'));
-    expect(block).toBeTruthy();
+    const blocks = noPreference.filter((rule) => rule.includes('.session-block'));
+    expect(blocks.length).toBeGreaterThan(0);
+    const block = blocks.join('\n');
     expect(block).toContain('transition: transform var(--motion-base) var(--motion-ease);');
     // --motion-base is 160ms: the token step nearest the story's 150ms, and
     // inside §2.2's 120-200ms functional band. A device may not mint a raw
@@ -141,8 +146,19 @@ describe('the Zine stamp', () => {
     expect(block).toContain('.session-block:has(:focus-visible)::before');
     expect(block).toContain('.session-block:hover .session-block__face');
     expect(block).toContain('.session-block:has(:focus-visible) .session-block__face');
-    // No scroll trigger, no loop, no ambient movement anywhere near it.
-    expect(indexCss).not.toMatch(/@keyframes|animation-iteration-count: infinite/);
+    // The hover half carries the hover query and the focus half does not:
+    // focus reaches a reader on every device, a hover does not.
+    const hoverBlock = blocks.find((rule) => rule.includes(':hover'));
+    expect(hoverBlock).toContain('(hover: hover) and (pointer: fine)');
+    const focusBlock = blocks.find((rule) => !rule.includes(':hover'));
+    expect(focusBlock).toContain(':has(:focus-visible)');
+    expect(focusBlock).not.toContain('(hover: hover)');
+    // No scroll trigger, no loop, no ambient movement anywhere near it. A
+    // keyframe that runs once and stops is allowed elsewhere in the sheet
+    // (the toast and the dialog enter that way), so the refusal here is
+    // `infinite` and any sequence inside the stamp's own block.
+    expect(indexCss).not.toMatch(/animation[^;]*infinite|animation-iteration-count: infinite/);
+    expect(block).not.toMatch(/@keyframes|animation/);
   });
 
   it('5. is truly static under prefers-reduced-motion, and still renders', () => {

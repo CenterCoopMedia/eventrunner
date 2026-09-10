@@ -36,7 +36,7 @@ const CONFIGURED = {
 describe('RegistrationAction', () => {
   it('links to the configured destination on the home lead, in the filled register', () => {
     renderAction(CONFIGURED, 'lead');
-    const link = screen.getByRole('link', { name: 'Get a ticket' });
+    const link = screen.getByRole('link', { name: /^Get a ticket\b/ });
     expect(link).toHaveAttribute('href', 'https://register.example.org/summit');
     // Somebody else's form, opened in its own tab with the opener severed
     // and no referrer, the same way every other outbound link opens here.
@@ -47,7 +47,7 @@ describe('RegistrationAction', () => {
 
   it('renders the same action in the header, in the quiet register', () => {
     renderAction(CONFIGURED, 'header');
-    const link = screen.getByRole('link', { name: 'Get a ticket' });
+    const link = screen.getByRole('link', { name: /^Get a ticket\b/ });
     expect(link).toHaveAttribute('href', 'https://register.example.org/summit');
     // The header's own register: a ruled rectangle, never the filled one —
     // the identity row is not where the site shouts.
@@ -65,7 +65,7 @@ describe('RegistrationAction', () => {
       { registration: { externalUrl: '  HTTPS://Register.Example.ORG  ', actionLabel: 'Register' } },
       'lead',
     );
-    expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Register\b/ })).toHaveAttribute(
       'href',
       'https://register.example.org/',
     );
@@ -73,12 +73,12 @@ describe('RegistrationAction', () => {
 
   it('falls back to a stated label rather than drawing a blank control', () => {
     renderAction({ registration: { externalUrl: 'https://register.example.org' } }, 'lead');
-    expect(screen.getByRole('link', { name: 'Register' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Register\b/ })).toBeInTheDocument();
     renderAction(
       { registration: { externalUrl: 'https://register.example.org', actionLabel: '   ' } },
       'lead',
     );
-    expect(screen.getAllByRole('link', { name: 'Register' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: /^Register\b/ }).length).toBeGreaterThan(0);
   });
 
   it('renders no control at all, in either placement, when nothing is configured', () => {

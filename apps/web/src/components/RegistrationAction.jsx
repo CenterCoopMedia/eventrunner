@@ -57,6 +57,7 @@
 import { resolveRegistrationAction } from 'shared/registration';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { primaryActionClass, quietActionClass } from './controlClasses.js';
+import ExternalLink from './ExternalLink.jsx';
 
 /**
  * What the control says where a client has not written their own wording.
@@ -98,14 +99,12 @@ export default function RegistrationAction({ placement = 'lead' }) {
   // (CtaBlock.jsx): the registration form belongs to somebody else, and a
   // reader partway through one should not lose the event's own page.
   const link = (
-    <a
+    <ExternalLink
       href={action.url}
-      target="_blank"
-      rel="noreferrer"
       className={placement === 'header' ? quietActionClass : primaryActionClass}
     >
       {action.label}
-    </a>
+    </ExternalLink>
   );
 
   if (placement !== 'header') return link;

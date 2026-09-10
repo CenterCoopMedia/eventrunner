@@ -255,6 +255,22 @@ The devices, and the one job each has. The implementations live in `apps/web/src
 - **Grid schedule** — time down the left, lettered tracks across the head, at wide viewports. A real table, and it degrades to the time-ordered list, which is the accessible baseline and not a lesser view.
 - **Back issue** — the archival state of a past day. Reduce the palette to the archive tokens, add the folio, remove the live controls. Never hide the content.
 - **Print view** — its own view, not the screen with the controls hidden.
+- **Loading** — a stated line saying what is loading, and a block of hairline rules that holds the space the content will take. No spinner, no shimmer, no skeleton, and nothing that moves.
+- **Toast** — a repeat of a result the page already states in place. Its tone is a word and a rule weight, never a colour on its own, and a repeat is silent so one result is announced once.
+
+### The shared controls
+
+Keyboard-first, on the token system, in `apps/web/src/components/forms/`. Every one carries the ten interaction states in [`interface-guidelines.md`](interface-guidelines.md), Interaction states.
+
+- **Switch** — a setting that is on or off. `role="switch"`, the state as a word beside the label, 44px on touch. The label names the enabled state. No sliding knob.
+- **Segmented control** — one choice from a short set, as one ruled row of words. The chosen word takes the filled ground and the bold weight. One tab stop; arrow keys, Home and End move inside it. Never a pill.
+- **Tabs** — one panel from a short set, on the ARIA tab pattern with a roving tab index. The selected tab carries the strong rule, the same device a section boundary uses. Never a pill, never a filled tab.
+- **Checkbox and radio** — drawn from the tokens rather than painted by the operating system: the boundary on the control token, the checked fill in the accent, the mark an inline drawing that reads the ink around it. The input under the paint is untouched, so the keyboard, the label and the group stay the browser's.
+- **Search field** — a labelled search input, a stated clear control, and a result count the page speaks as well as shows.
+- **Sort control** — a labelled select. The label names what is being ordered.
+- **Filter group** — a fieldset with a legend, the count of what is on inside the legend, and one clear control for the whole group.
+- **Dialog** — a native dialog opened as a modal, so focus is trapped, the page behind is inert, and Escape closes it. Focus returns to the control that opened it. The scrim is tinted ink, never a blur.
+- **External link** — any link that opens a new tab says so inside the link's own name.
 
 **The eyebrow ban is absolute.** Nothing sits directly above a heading — not a label, not a chip, not a small line of description, not a plain folio. It holds at every size, in every style. Two things are not eyebrows and must never be "fixed": Metadata inside the rule-bounded nameplate block, and a form `<label>` above its own input.
 

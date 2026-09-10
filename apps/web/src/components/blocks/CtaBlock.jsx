@@ -19,6 +19,7 @@ import { Link } from 'react-router-dom';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
 import { isCanonicalPagePath } from 'shared/routing';
 import { primaryActionClass } from '../controlClasses.js';
+import ExternalLink from '../ExternalLink.jsx';
 
 export default function CtaBlock({ block }) {
   if (!block?.url || !block?.label || !isSafeHref(block.url)) return null;
@@ -29,13 +30,18 @@ export default function CtaBlock({ block }) {
       </Link>
     );
   }
+  // Only the external branch opens a tab, so only that branch carries the
+  // marker. A same-tab link that claimed to open one would be a lie in a
+  // string nobody can see (components/ExternalLink.jsx).
+  if (block.external) {
+    return (
+      <ExternalLink href={block.url} className={primaryActionClass}>
+        {block.label}
+      </ExternalLink>
+    );
+  }
   return (
-    <a
-      href={block.url}
-      rel="noreferrer"
-      {...(block.external ? { target: '_blank' } : {})}
-      className={primaryActionClass}
-    >
+    <a href={block.url} rel="noreferrer" className={primaryActionClass}>
       {block.label}
     </a>
   );

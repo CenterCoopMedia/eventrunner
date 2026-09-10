@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Every control on the public site now answers the same ten interaction states: rest, hover, focus,
+  press, selected, disabled, busy, error, success and empty. The hover, press and selected tints
+  come from a new `state` family in the design tokens, so a site style retunes every control at
+  once and dark mode carries its own share. A colour change no longer fades — a state a reader
+  caused has to land at once — and the only things that animate are transform and opacity.
+- Hover states are behind `@media (hover: hover)`. A touch screen reports a tap as a hover and
+  holds it, so a tapped control on a phone used to stay lit as though it had been selected.
+- The site has two motion moves and no third: an enter at 160ms and an exit at 120ms, both fading
+  over at most 8px, both switched off entirely for a reader who asks for less motion. The admin
+  takes neither: a state change there is instant.
+- A toast now states its tone in a word and a rule weight rather than in colour, and a toast that
+  only repeats a result the page already states no longer announces it a second time.
+- A loading state holds the space the content will take, with a block of hairline rules. The page
+  no longer jumps when the content lands. Nothing pulses and nothing spins.
+
 - The admin CMS takes the editorial desk: a dark navigation rail against a cool-grey canvas, a
   white title band that holds the page's name and its save actions while the page scrolls, white
   panels, one action colour for every primary control and focus ring, a record's state as a
@@ -42,6 +57,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Pressing Save in an admin editor with an invalid field did nothing and said nothing, because the
+  control was disabled. Save now stays enabled until the request starts, sends nothing while a
+  field is wrong, and moves the operator to the first field that refused.
+- The feedback form was an overlay, so Tab walked out of it and into the page behind. It is now a
+  real dialog: focus stays inside it, the page behind is inert, Escape closes it, and focus goes
+  back to the control that opened it.
+- A link that opens a new tab now says so, so a reader using a screen reader is not moved to a tab
+  with no history and no way back.
+- The profile page's visibility choices and badge picks were painted by the operating system, so a
+  client's palette and dark mode both stopped at their edge. They are drawn from the design tokens
+  now, and the control under the paint is unchanged.
+
 - A site restyled after deployment printed the palette it shipped with, not the one on screen —
   and only from a dark screen, because the generated print block outranked the runtime one. The
   runtime theme element now emits its own print block from the live resolved light palette at the
@@ -49,6 +76,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A heading containing a long identifier scrolled a whole documentation page sideways at 320px.
 
 ### Added
+
+- Eight shared controls the site had no answer for: a switch, a segmented control, tabs, a drawn
+  checkbox and radio, a search field with a spoken result count, a sort control, and a filter group
+  with an active count and one clear control. Each holds one place in the tab order and moves
+  inside itself with the arrow keys.
+- A motion contract test. It reads the stylesheet and every class string the app ships and fails
+  the build on a transition over every property, a spinner, a pulse, a looping animation, a raw
+  duration, a hover rule outside the hover query, a shadow, a blurred panel, or a shading gradient.
 
 - `config/theme.adminScheme` and the **Admin colours** control on Settings → Branding. The admin's
   rail, buttons, links and focus ring follow the main brand colour by default, worked into a

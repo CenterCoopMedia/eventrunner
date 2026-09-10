@@ -72,6 +72,32 @@ vi.mock('firebase/firestore', () => {
   };
 });
 
+// jsdom implements <dialog> as markup and nothing else: it ships the
+// interface, but showModal, close, the top layer and cancel-on-Escape are
+// all missing. A component that opens a dialog would therefore be untestable
+// here, so the parts a test can OBSERVE are stood in for below. What is not
+// stood in for, because jsdom has no top layer and no focus model to hang it
+// on, is the focus trap and the inert page — those belong to the browser,
+// and a test asserts that the component ASKS for them by calling showModal()
+// rather than pretending to prove them here.
+//
+// The guard reads the METHOD, not the class: a check for the class finds one
+// and stands nothing in.
+const dialogPrototype = Object.getPrototypeOf(document.createElement('dialog'));
+if (typeof dialogPrototype.showModal !== 'function') {
+  dialogPrototype.showModal = function showModal() {
+    this.setAttribute('open', '');
+    this.querySelector('input, select, textarea, button')?.focus();
+  };
+  dialogPrototype.show = function show() {
+    this.setAttribute('open', '');
+  };
+  dialogPrototype.close = function close() {
+    this.removeAttribute('open');
+    this.dispatchEvent(new Event('close'));
+  };
+}
+
 afterEach(() => {
   cleanup();
 });

@@ -21,6 +21,16 @@ const fontStep = (step) => [
 ];
 
 export default {
+  // A TAP IS NOT A HOVER. `hoverOnlyWhenSupported` puts every `hover:`
+  // utility inside `@media (hover: hover)`, so a touch screen — which
+  // reports a tap as a hover and then keeps the state until the reader taps
+  // something else — never paints one. Without it a tapped control on a
+  // phone stays lit, which reads as a selected control that is not selected
+  // (expansion record §2.1; interface guidelines, Accessibility). The raw
+  // `:hover` rules in index.css carry the same query by hand.
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
   // TESTS ARE NOT CONTENT, AND ONE OF THEM DEPENDS ON THAT.
   //
   // Tailwind tree-shakes anything in `@layer components` whose class name it

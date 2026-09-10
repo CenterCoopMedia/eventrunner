@@ -34,12 +34,15 @@ import { primaryActionClass, quietActionClass } from '../components/controlClass
 
 // One day of the programme. The active day is marked twice over — heavier
 // weight plus a strong rule under the word — because color alone never
-// signals state (§8.1). The press is functional motion: transform only,
-// inside the 120–200ms band, and the global reduced-motion block in
-// index.css takes it out entirely for a reader who asked for that.
+// signals state (§8.1). The press is the shared one: transform only, at
+// --motion-slow, and the whole of it sits behind `motion-safe:`, so a reader
+// who asked for less motion gets the control already in its end state rather
+// than a shortened move (expansion record §2.2).
 function dayClass(isActive) {
   return [
-    'touch-target inline-flex items-center border-b-strong px-2xs py-xs font-data text-caption transition-transform duration-fast ease-motion active:scale-[0.98]',
+    'touch-target inline-flex items-center border-b-strong px-2xs py-xs font-data text-caption '
+    + 'active:scale-[0.98] motion-safe:transition-transform motion-safe:duration-slow '
+    + 'motion-safe:ease-motion',
     isActive
       ? 'border-b-rule-strong font-semibold text-text-primary'
       : 'border-b-transparent text-text-secondary hover:text-text-primary',

@@ -11,6 +11,7 @@ const {
   loadTokens,
   resolveAdminTokens,
   resolveColorTokens,
+  resolveStateTokens,
   resolveFonts,
   modePolicy,
   TOKENS_DIR,
@@ -522,6 +523,100 @@ test('the admin marker takes the resolved brand colour, and falls back to admin 
 });
 
 // ------------------------------------------------ the motif layer (brief §3.8)
+
+test('every motion step has one job, and the two moments share one curve', () => {
+  // Expansion record §2.2 gives each duration step a job: fast is the exit,
+  // base is the enter, slow is the press, signature is the one signature a
+  // surface owns. There is one curve. An enter must never open on ease-in,
+  // which would delay the response at the one moment the reader is watching,
+  // and an exit that used a second curve would make the two moments read as
+  // two systems — so the asymmetry is carried by DURATION alone.
+  const css = buildTokenCss(THEME);
+  assert.match(css, /--motion-fast: var\(--er-duration-fast\);/);
+  assert.match(css, /--motion-base: var\(--er-duration-base\);/);
+  assert.match(css, /--motion-slow: var\(--er-duration-slow\);/);
+  assert.match(css, /--motion-signature: var\(--er-duration-signature\);/);
+  assert.match(css, /--motion-ease: var\(--er-easing-out\);/);
+
+  const { primitives, semantic } = loadTokens();
+  assert.deepEqual(Object.keys(primitives.scalar.easing), ['out'], 'one curve, not two');
+  assert.equal(
+    Object.keys(semantic.motion).filter((step) => step.startsWith('ease')).length,
+    1,
+    'tier 2 offers one easing token',
+  );
+  assert.match(primitives.scalar.easing.out, /^cubic-bezier\(0, 0, /, 'the curve decelerates');
+
+  // The exit is faster than the enter that brought the element in.
+  const ms = (value) => Number(String(value).replace('ms', ''));
+  assert.ok(ms(primitives.scalar.duration.fast) < ms(primitives.scalar.duration.base));
+});
+
+test('the focus ring is its own token pair, never a rule weight', () => {
+  // Expansion record §2.1: one ring on every public control, 3px, outside
+  // the element. It reads its own family so a retune of the rule scale
+  // cannot thin the one signal that answers "where am I".
+  const css = buildTokenCss(THEME);
+  assert.match(css, /--focus-ring-width: var\(--er-width-focus-ring\);/);
+  assert.match(css, /--focus-ring-offset: var\(--er-width-focus-offset\);/);
+
+  const { primitives } = loadTokens();
+  assert.equal(primitives.scalar.width['focus-ring'], '3px');
+  assert.ok(
+    parseFloat(primitives.scalar.width['focus-ring'])
+      > parseFloat(primitives.scalar.width.strong),
+    'the ring outweighs the strong rule, so it is never read as structure',
+  );
+  assert.ok(parseFloat(primitives.scalar.width['focus-offset']) > 0, 'the ring sits outside');
+});
+
+test('the state shares resolve in both modes, and dark carries the higher share', () => {
+  // Expansion record §2.1. A state tint is ink mixed into the ground at a
+  // fixed share, so the share is a number and not a colour: it never lands
+  // in a palette block, and it is emitted per mode because the same amount
+  // of ink reads as a smaller step on a dark ground.
+  const tokens = loadTokens();
+  const { names, values } = resolveStateTokens(tokens);
+  assert.deepEqual(names, [
+    '--state-hover-share',
+    '--state-pressed-share',
+    '--state-selected-share',
+  ]);
+
+  const share = (mode, name) => {
+    const ref = values[mode][name].match(/^var\((--er-state-[\w-]+)\)$/);
+    assert.ok(ref, `${name} in ${mode} reads a tier 1 primitive`);
+    const step = ref[1].replace('--er-state-', '');
+    const raw = tokens.primitives.scalar.state[step];
+    assert.ok(raw !== undefined, `${ref[1]} is declared in tier 1`);
+    return Number(raw);
+  };
+
+  for (const name of names) {
+    const light = share('light', name);
+    const dark = share('dark', name);
+    assert.ok(light > 0 && light < 1, `${name} light is a share`);
+    assert.ok(dark > 0 && dark < 1, `${name} dark is a share`);
+    assert.ok(dark > light, `${name} carries more ink in dark mode`);
+  }
+
+  // A press is the firmest tint and a hover the lightest, in both modes, so
+  // the three states never read as the same state.
+  for (const mode of ['light', 'dark']) {
+    assert.ok(share(mode, '--state-hover-share') < share(mode, '--state-selected-share'));
+    assert.ok(share(mode, '--state-selected-share') < share(mode, '--state-pressed-share'));
+  }
+
+  // Both mode blocks carry the whole family, and neither is a colour block.
+  const css = buildTokenCss(THEME);
+  for (const mode of ['light', 'dark']) {
+    const block = css.match(
+      new RegExp(`:root\\[data-mode='${mode}'\\],\\n\\[data-mode='${mode}'\\] \\{([^}]*--state-[^}]*)\\}`),
+    );
+    assert.ok(block, `the ${mode} state block exists`);
+    for (const name of names) assert.match(block[1], new RegExp(`${name}: `));
+  }
+});
 
 test('every motif set gets a slot-resolution block, and its assets exist', () => {
   const css = buildTokenCss(THEME);

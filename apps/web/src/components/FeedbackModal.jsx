@@ -26,6 +26,21 @@
 // `<label>` in SelectField/TextAreaField/TextField stays above its input —
 // a control label is the one exemption the eyebrow ban names (§2.4), never
 // an eyebrow to "fix".
+//
+// A NATIVE <dialog>, OPENED WITH showModal(). This used to be a z-50 <div>
+// over the page, so Tab walked straight out of it and into the page behind
+// — including the fixed back-to-top control. `showModal()` is the platform's
+// own answer and it is four behaviours in one call: focus is trapped inside
+// the dialog, everything behind it is inert to the pointer and to assistive
+// technology, Escape fires `cancel`, and the top layer puts the dialog above
+// every stacking context without a z-index. None of that is reimplemented
+// here, because a hand-written trap is a list of focusable selectors that
+// goes stale the moment a control is added.
+//
+// The one thing the component still owns is the RETURN of focus. React
+// unmounts the dialog on close, and an element removed while it holds focus
+// drops focus to the body, so the opener is remembered on mount and focused
+// again on the way out.
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
 import { SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
@@ -58,13 +73,24 @@ export default function FeedbackModal({ onClose }) {
   const [error, setError] = useState(null);
   const [sent, setSent] = useState(false);
 
+  const dialogRef = useRef(null);
+  // The opener is read at the FIRST RENDER, not in the effect. The message
+  // field carries autoFocus, and React applies that during the commit, so by
+  // the time an effect runs the active element is already the field inside
+  // the dialog — and the dialog would then try to give focus back to itself.
+  const [opener] = useState(() => (typeof document === 'undefined' ? null : document.activeElement));
+
   useEffect(() => {
-    function onKeyDown(event) {
-      if (event.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+    const dialog = dialogRef.current;
+    // `showModal` is the whole mechanism. Where it is missing the dialog
+    // still opens and the form still works; what is lost is the trap, and a
+    // visitor can still reach every control and close the dialog.
+    if (typeof dialog?.showModal === 'function') dialog.showModal();
+    else if (dialog) dialog.setAttribute('open', '');
+    return () => {
+      if (opener && typeof opener.focus === 'function' && opener.isConnected) opener.focus();
+    };
+  }, [opener]);
 
   async function submit(event) {
     event.preventDefault();
@@ -91,17 +117,19 @@ export default function FeedbackModal({ onClose }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/40 px-md py-xl"
-      onClick={onClose}
+    // Escape reaches the dialog as `cancel`. Its default would close the
+    // element while React still believed it was open, so the close is handed
+    // to the caller instead, and the caller unmounts the dialog.
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      className="public-dialog motion-enter w-full max-w-lg border-strong border-rule-strong bg-surface p-lg"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="w-full max-w-lg border-strong border-rule-strong bg-surface p-lg"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <div>
         {sent ? (
           <div className="flex flex-col gap-md">
             <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
@@ -174,13 +202,20 @@ export default function FeedbackModal({ onClose }) {
               <button type="button" className={secondaryActionClass} onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className={primaryActionClass} disabled={submitting}>
+              {/* Busy is a stated word and `aria-busy`, never a spinner. The
+                  control is disabled only once the request has started. */}
+              <button
+                type="submit"
+                className={primaryActionClass}
+                disabled={submitting}
+                aria-busy={submitting || undefined}
+              >
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
             </div>
           </form>
         )}
       </div>
-    </div>
+    </dialog>
   );
 }

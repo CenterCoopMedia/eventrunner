@@ -29,9 +29,14 @@
     overflow-wrap: break-word;
   }
 
-  /* Never remove outlines without replacing them (interface guidelines). */
+  /* ONE RING, ON EVERYTHING (expansion record §2.1). Never removed, never
+     redrawn per control: a control that drew its own would be the start of
+     eight different rings. It reads its own token pair rather than a rule
+     weight, because a rule is structure a reader passes over and a ring is
+     the answer to "where am I" (interface guidelines, Accessibility). */
   :focus-visible {
-    @apply outline outline-2 outline-offset-2 outline-accent;
+    outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
+    outline-offset: var(--focus-ring-offset);
   }
 
   /* WHERE A CONTROL SENT THE READER. The back-to-top control moves focus to
@@ -51,7 +56,8 @@
      So the ring is keyed to an attribute that only lib/scrollToTop.js
      focusAsDestination sets, and that clears itself on blur. */
   [data-focus-ring]:focus {
-    @apply outline outline-2 outline-offset-2 outline-accent;
+    outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
+    outline-offset: var(--focus-ring-offset);
   }
 
   [id] {
@@ -73,6 +79,223 @@
 }
 
 @layer components {
+  /* THE STATE TINT (expansion record §2.1).
+     ------------------------------------------------------------------
+     Hover, pressed, and selected are one device: ink mixed into the ground
+     the control already sits on, at the share the mode holds. One rule
+     therefore paints the tint on the page surface, on the alternate
+     surface, and on a filled action alike, and a preset that remaps the ink
+     or the ground retunes every state without a component edit.
+
+     It paints as a background IMAGE rather than a background colour,
+     because a colour would replace the control's own ground instead of
+     sitting over it. A single-stop paint is flat: it shades nothing, and it
+     is the same idiom the nameplate rule and the session face already use.
+     The share is zero at rest, so a control with no state paints nothing.
+
+     THE INK IS THE CONTROL'S OWN, through `currentColor`, and that is what
+     makes one rule work everywhere. A fixed page ink would darken a light
+     ground correctly and do almost nothing to a filled navy action, which
+     is exactly the control a reader hovers most. `currentColor` moves the
+     ground toward the label instead: it darkens a light ground, lightens a
+     dark fill, and reverses again in dark mode — always toward the one
+     colour already proved legible against it.
+
+     A tint never transitions. Colour is not free the way transform and
+     opacity are, and a state a reader caused must land at once, not fade in
+     (interface guidelines, Animation: don't animate frequent interactions).
+
+     Hover sits behind the hover query, because a touch screen reports a tap
+     as a hover and then holds it. Selected reads `aria-pressed`, so the
+     tint is never the only signal — the control also carries the weight.
+     Press comes last, so pressing a selected control reads as a press. */
+  .control-tint {
+    --control-tint-share: 0;
+    --control-tint: color-mix(
+      in srgb,
+      currentColor calc(var(--control-tint-share) * 100%),
+      transparent
+    );
+    background-image: linear-gradient(var(--control-tint), var(--control-tint));
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .control-tint:hover {
+      --control-tint-share: var(--state-hover-share);
+    }
+  }
+  /* `aria-pressed` is the toggle: it has no ground of its own, so the tint
+     is what shows it. `aria-checked` and `aria-selected` take a filled
+     ground and a strong rule instead — see the segmented control and the
+     tabs below — so a tint there would be a third signal saying the same
+     thing twice. */
+  .control-tint[aria-pressed='true'] {
+    --control-tint-share: var(--state-selected-share);
+  }
+  .control-tint:active {
+    --control-tint-share: var(--state-pressed-share);
+  }
+  /* A control that states it is unavailable takes no tint at all: a state
+     a reader cannot reach must not look reachable. It keeps its place in
+     the tab order and its pointer, so the reader can still land on it and
+     read why (interface guidelines, Accessibility). */
+  .control-tint[aria-disabled='true'],
+  .control-tint:disabled {
+    --control-tint-share: 0;
+  }
+
+  /* A DRAWN BOX AND A DRAWN CIRCLE (expansion record §3.3).
+     ------------------------------------------------------------------
+     A native checkbox and a native radio take no token: they are painted by
+     the operating system, so a client's palette and both modes stop at
+     their edge. The control is therefore turned off with `appearance: none`
+     and redrawn from the tokens — the boundary in --color-border-control,
+     which is the one tuned to clear 3:1 on either ground (WCAG 1.4.11), and
+     the checked fill in the accent.
+
+     The mark is not drawn here. It is an inline SVG beside the input that
+     reads `currentColor`, so it follows the ink of whatever ground it lands
+     on and needs no second colour token. See components/forms/Choice.jsx.
+
+     The circle is the one round shape the system draws. It is the radio's
+     universal form, not decoration, and it is the reason a reader can tell
+     "pick one" from "pick any" before reading a word. */
+  .control-choice {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    inline-size: 1.125rem;
+    block-size: 1.125rem;
+    border: var(--rule-hairline-width) solid rgb(var(--color-border-control-rgb));
+    border-radius: var(--radius-base);
+    background-color: rgb(var(--color-surface-rgb));
+  }
+  .control-choice--radio {
+    border-radius: 50%;
+  }
+  .control-choice:checked {
+    border-color: rgb(var(--color-accent-rgb));
+    background-color: rgb(var(--color-accent-rgb));
+  }
+  /* The alarm rule: a field in error states it with a rule a reader can see
+     without colour vision, so the weight changes as well as the ink. */
+  .control-choice[aria-invalid='true'] {
+    border-width: var(--rule-strong-width);
+    border-color: rgb(var(--semantic-danger-rgb));
+  }
+
+  /* THE SEGMENTED CONTROL (expansion record §3.3): one choice from a short
+     set, set as ONE RULED ROW of words. The chosen word sits on the filled
+     ground and takes the bold weight, so the state is never colour alone.
+     The row is a rectangle on the theme radius. A segmented control is
+     never a pill.
+
+     The inner radius is the outer radius less the boundary it sits inside,
+     which is the concentric rule (interface guidelines, User interface). */
+  .segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    border: var(--rule-hairline-width) solid rgb(var(--color-border-control-rgb));
+    border-radius: var(--radius-base);
+  }
+  .segmented__option + .segmented__option {
+    border-inline-start: var(--rule-hairline-width) solid rgb(var(--color-border-control-rgb));
+  }
+  .segmented__option:first-child {
+    border-start-start-radius: max(0px, calc(var(--radius-base) - var(--rule-hairline-width)));
+    border-end-start-radius: max(0px, calc(var(--radius-base) - var(--rule-hairline-width)));
+  }
+  .segmented__option:last-child {
+    border-start-end-radius: max(0px, calc(var(--radius-base) - var(--rule-hairline-width)));
+    border-end-end-radius: max(0px, calc(var(--radius-base) - var(--rule-hairline-width)));
+  }
+  .segmented__option[aria-checked='true'] {
+    background-color: rgb(var(--color-accent-rgb));
+    color: rgb(var(--color-surface-rgb));
+  }
+
+  /* TABS (expansion record §3.3): the ARIA tab pattern. The list rules
+     across at the hairline and the selected tab carries the STRONG RULE,
+     which is the same boundary device a section head takes — so a tab reads
+     as part of the page's own typography rather than as a widget. Never a
+     pill, never a filled tab. */
+  .tab-list {
+    display: flex;
+    flex-wrap: wrap;
+    border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+  }
+  .tab {
+    border-block-end: var(--rule-strong-width) solid transparent;
+    margin-block-end: calc(-1 * var(--rule-hairline-width));
+  }
+  .tab[aria-selected='true'] {
+    border-block-end-color: rgb(var(--rule-strong-rgb));
+  }
+
+  /* THE PUBLIC DIALOG (expansion record §2.1).
+     ------------------------------------------------------------------
+     A native <dialog> opened with showModal(). The browser puts it in the
+     top layer, so it needs no z-index and cannot be trapped under a
+     stacking context; the User-Agent stylesheet centres it and gives it a
+     border and a margin, which is what these rules undo so the frame is the
+     system's strong rule and nothing else.
+
+     THE SCRIM IS TINTED INK, NOT BLUR. A blur is glassmorphism (§2.4) and it
+     costs a full-screen filter on every frame. The ink is the page's own
+     text colour at low alpha, so the scrim follows the mode and the preset
+     without a token of its own. */
+  .public-dialog {
+    /* The UA stylesheet sizes a dialog to its content and lets it run off a
+       short viewport. The dialog holds a form, so it scrolls inside itself
+       and leaves the page behind it still. */
+    max-block-size: calc(100dvh - 2 * var(--space-xl));
+    overflow-y: auto;
+    color: rgb(var(--color-text-primary-rgb));
+  }
+  /* The backdrop is in the top layer. A modern browser lets it inherit from
+     the dialog, so the token resolves and the scrim follows the mode; the
+     fallback in the var() covers an implementation that does not, where the
+     declaration would otherwise be dropped and no scrim would paint. */
+  .public-dialog::backdrop {
+    background-color: rgb(var(--color-text-primary-rgb, 24 27 32) / 0.45);
+  }
+
+  /* THE TWO MOVES (expansion record §2.2).
+     ------------------------------------------------------------------
+     An element that arrives fades up over a short distance; an element that
+     leaves fades back down it. There is no third move, and nothing else on
+     the public site animates.
+
+     ONE CURVE, TWO DURATIONS. The exit is faster than the enter that brought
+     the element in, and that is the whole of the asymmetry. A second curve
+     would make the two moments read as two systems, and the obvious second
+     curve — an ease-in — is the one shape an interface must not open on.
+
+     Both sit inside the no-preference query, and the reduced state is the
+     END state, not a shorter animation: a reader who asked for less motion
+     gets the element already in place, at full opacity.
+
+     Keyframes rather than transitions, because an entrance is a one-time
+     sequence and not an interruptible state change (interface guidelines,
+     Animation). Nothing here loops, and the `both` fill is what holds the
+     element at its end state when the sequence finishes.
+
+     ADMIN PAGES TAKE NEITHER. The admin has no expressive motion and no
+     enter or exit: a state change in the room is instant. Only public
+     surfaces put these classes on an element.
+
+     The two sequences themselves are declared at the foot of this file, at
+     the top level: a components-layer rule is dropped when its class name is
+     not found in the app, and a dropped @keyframes would leave the classes
+     below animating nothing. */
+  @media (prefers-reduced-motion: no-preference) {
+    .motion-enter {
+      animation: motion-enter var(--motion-base) var(--motion-ease) both;
+    }
+    .motion-exit {
+      animation: motion-exit var(--motion-fast) var(--motion-ease) both;
+    }
+  }
+
   /* Skip link: first focusable element on every page (Layout.jsx). */
   .skip-link {
     @apply sr-only focus:not-sr-only focus:absolute focus:start-md focus:top-md focus:z-50
@@ -587,20 +810,37 @@
       calc(var(--session-card-stamp-offset) * 1000)
       calc(var(--session-card-stamp-offset) * 1000);
   }
+  /* The peek, split by input. Focus is available on every device, so the
+     focus half is not behind the hover query; the hover half is, because a
+     touch screen reports a tap as a hover and then holds it until the
+     reader taps elsewhere — which would leave one row peeking for as long
+     as the reader stayed on the page (expansion record §2.1). */
   @media (prefers-reduced-motion: no-preference) {
     .session-block::before,
     .session-block__face {
       transition: transform var(--motion-base) var(--motion-ease);
     }
-    .session-block:hover::before,
     .session-block:has(:focus-visible)::before {
       transform: translate(
         calc(var(--session-card-stamp-offset) * 2.25),
         calc(var(--session-card-stamp-offset) * 2.25)
       );
     }
-    .session-block:hover .session-block__face,
     .session-block:has(:focus-visible) .session-block__face {
+      transform: translate(
+        calc(var(--session-card-stamp-offset) * -0.25),
+        calc(var(--session-card-stamp-offset) * -0.25)
+      );
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+    .session-block:hover::before {
+      transform: translate(
+        calc(var(--session-card-stamp-offset) * 2.25),
+        calc(var(--session-card-stamp-offset) * 2.25)
+      );
+    }
+    .session-block:hover .session-block__face {
       transform: translate(
         calc(var(--session-card-stamp-offset) * -0.25),
         calc(var(--session-card-stamp-offset) * -0.25)
@@ -1143,8 +1383,10 @@
     text-underline-position: from-font;
     text-decoration-skip-ink: auto;
   }
-  .rich-text a:hover {
-    @apply text-accent-strong;
+  @media (hover: hover) and (pointer: fine) {
+    .rich-text a:hover {
+      @apply text-accent-strong;
+    }
   }
   /* The quote rule draws in rule-token ink at the strong rule width, never
      in brand or accent color, so it is a typographic rule and not the
@@ -1288,6 +1530,35 @@
   .font-data,
   .font-mono {
     font-variant-numeric: tabular-nums;
+  }
+}
+
+/* The two sequences the .motion-enter and .motion-exit classes run (see the
+   motion block in @layer components above). They are declared here, outside
+   every layer, because a layer is subject to Tailwind's own tree-shaking and
+   an animation with no keyframes is a class that does nothing.
+
+   Nothing here loops, nothing runs from scroll, and each sequence moves one
+   short step on transform and opacity only. */
+@keyframes motion-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-xs));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes motion-exit {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--space-xs));
   }
 }
 
