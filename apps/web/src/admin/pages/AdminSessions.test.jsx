@@ -145,12 +145,25 @@ describe('admin Sessions workspace', () => {
     expect(bodyOf(0).fields.recordingUrl).toBe('https://video.example.org/watch?v=abc');
   });
 
-  it('does not save or publish until required fields are valid', async () => {
+  it('answers an invalid save instead of going quiet', async () => {
+    // A disabled control announces nothing. An operator who presses Save
+    // with a bad field used to get silence; the control now stays enabled,
+    // sends nothing, and puts the operator on the field that stopped it.
     await renderAt('/admin/sessions/new/session');
     await screen.findByRole('heading', { name: 'New session' });
-    expect(screen.getByRole('button', { name: 'Save and publish' })).toBeDisabled();
+
+    for (const name of ['Save draft', 'Save and publish']) {
+      expect(screen.getByRole('button', { name })).toBeEnabled();
+    }
+
     fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
     expect(fetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(document.activeElement).toHaveAttribute('aria-invalid', 'true');
+    });
+    // The field that has focus is the first invalid one in the form.
+    const marked = document.querySelectorAll('[aria-invalid="true"]');
+    expect(marked[0]).toBe(document.activeElement);
   });
 
   it('keeps creation separate from a session named new and encodes edit links', async () => {

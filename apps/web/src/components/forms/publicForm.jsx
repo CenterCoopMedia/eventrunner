@@ -14,6 +14,14 @@
 // its hint under the label, the field inside a boundary that clears 3:1, and
 // the error under the field as text — never colour alone.
 //
+// THE FIELD STATES ITS OWN ERROR. `aria-invalid` marks the field, the
+// message sits under it, and `aria-describedby` names both the hint and the
+// message, so a reader who lands on the field hears the label, the state,
+// the hint and the failure as one. On submit the caller runs
+// `focusFirstError(form)` and the reader is put on the field that stopped
+// them — which is why a submit control here never disables itself for a
+// validation state (interface guidelines, Accessibility).
+//
 // The class strings themselves are not here. Every shared control shape on
 // the public site — the input, the filled action, the outlined action, the
 // quiet one — has exactly one copy, in components/controlClasses.js. These
@@ -21,6 +29,12 @@
 // hand and a field built here draw the same control.
 import { useId } from 'react';
 import { inputClass } from '../controlClasses.js';
+
+// A rejected submit moves focus to the first field that stopped it, which
+// is what lets the submit control stay enabled while a form is invalid. The
+// helper is pure DOM work and it is shared with the admin, so it lives in
+// lib/ and is offered again here, where a public form author looks for it.
+export { focusFirstError } from '../../lib/focusFirstError.js';
 
 function describedBy(hint, hintId, error, errorId) {
   return [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined;

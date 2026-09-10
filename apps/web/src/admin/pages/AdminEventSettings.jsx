@@ -27,6 +27,7 @@ import {
 } from '../components/formControls.jsx';
 import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
 import { subscribeAdminCollection } from '../adminSource.js';
+import { focusFirstError } from '../../lib/focusFirstError.js';
 import VenueReferenceEditor, {
   normalizeVenueReferences,
   validateVenueMap,
@@ -269,10 +270,8 @@ export default function AdminEventSettings() {
       // marked field in the form, which would be one of that old
       // rejection's rather than the map field doing the refusing.
       setError(null);
-      window.setTimeout(() => {
-        const invalid = formRef.current?.querySelector('[aria-invalid="true"]');
-        invalid?.focus();
-      }, 0);
+      // After the render that marks the fields, not before it.
+      window.setTimeout(() => focusFirstError(formRef.current), 0);
       return;
     }
     setSaving(true);
@@ -307,7 +306,8 @@ export default function AdminEventSettings() {
           <button
             type="submit"
             className={primaryButtonClass}
-            disabled={saving || localVenueErrors.size > 0}
+            disabled={saving}
+            aria-busy={saving || undefined}
           >
             {saving ? 'Saving…' : 'Save event settings'}
           </button>
