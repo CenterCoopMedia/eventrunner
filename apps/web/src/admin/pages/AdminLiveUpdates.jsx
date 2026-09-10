@@ -15,12 +15,14 @@ import {
   ServerErrorSummary,
   TextAreaField,
   DestructiveConfirm,
+  linkButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
+  StatusBadge,
 } from '../components/adminChrome.jsx';
 
 function toDate(value) {
@@ -168,22 +170,21 @@ export default function AdminLiveUpdates() {
                 key={row.id}
                 className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
               >
-                <div className="flex flex-wrap items-start justify-between gap-sm px-md py-xs">
+                {/* The galley rhythm, but aligned to the top rather than
+                    centred: an update is a message of any length beside a
+                    fixed column of controls. */}
+                <div className="flex flex-wrap items-start justify-between gap-sm px-md py-sm">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-x-sm gap-y-3xs">
-                      {row.pinned ? (
-                        <span className="font-admin-data text-folio text-admin-ink-data">
-                          Pinned
-                        </span>
-                      ) : null}
-                      <span className="font-admin-data text-folio text-admin-ink-secondary">
+                    <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
+                      {row.pinned ? <StatusBadge tone="info">Pinned</StatusBadge> : null}
+                      <span className="font-admin-data text-admin-xs text-admin-ink-secondary">
                         {toDate(row.postedAt)?.toLocaleString() ?? ''}
                       </span>
                     </div>
-                    <p className="mt-3xs text-caption text-admin-ink">{row.message}</p>
+                    <p className="mt-3xs text-admin-base text-admin-ink">{row.message}</p>
                   </div>
                   <div className="flex shrink-0 gap-xs">
-                    <button type="button" className={secondaryButtonClass} onClick={() => startEdit(row)}>
+                    <button type="button" className={linkButtonClass} onClick={() => startEdit(row)}>
                       Edit
                     </button>
                     <DestructiveConfirm

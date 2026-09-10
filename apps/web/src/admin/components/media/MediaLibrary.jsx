@@ -11,12 +11,13 @@
 // mis-click from a delete dialog.
 import { useMemo, useState } from 'react';
 import { formatBytes } from '../../../lib/mediaSource.js';
-import { AdminEmptyState, AdminLoadingState } from '../adminChrome.jsx';
+import { AdminEmptyState, AdminLoadingState, StatusBadge } from '../adminChrome.jsx';
 import {
   Notice,
   fieldLabelClass,
   inputClass,
   primaryButtonClass,
+  rowMetaClass,
   secondaryButtonClass,
 } from '../formControls.jsx';
 import AssetImage from '../../../components/media/AssetImage.jsx';
@@ -34,12 +35,12 @@ function matches(asset, term) {
   return haystack.includes(term.toLowerCase());
 }
 
-/** A tile's frame. Selection is never colour alone: the heavier rule pairs
- * with the "Selected" word rendered beside the title below. */
+/** A tile's frame. Selection is never colour alone: the action rule pairs
+ * with the "Selected" badge rendered beside the title below. */
 function tileClass(isSelected) {
   return [
     'flex flex-col overflow-hidden rounded-admin bg-admin-ground-raised',
-    isSelected ? 'border-admin-strong border-admin-rule-strong' : 'border-admin-hairline border-admin-rule-hairline',
+    isSelected ? 'border-admin-strong border-admin-action' : 'border-admin-hairline border-admin-rule-hairline',
   ].join(' ');
 }
 
@@ -120,32 +121,28 @@ export default function MediaLibrary({
                 <AssetImage
                   path={asset.path}
                   alt={asset.alt ?? ''}
-                  className="h-32 w-full bg-admin-ground-input object-contain"
+                  className="h-32 w-full bg-admin-ground-soft object-contain"
                 />
-                <span className="block px-sm py-2xs">
+                <span className="block px-sm py-xs">
                   <span className="flex flex-wrap items-baseline gap-x-2xs">
-                    <span className="block truncate text-caption font-semibold text-admin-ink">
+                    <span className="block truncate text-admin-base font-semibold text-admin-ink">
                       {asset.title || asset.filename}
                     </span>
-                    {isSelected ? (
-                      <span className="font-admin-data text-folio text-admin-ink-data">Selected</span>
-                    ) : null}
+                    {isSelected ? <StatusBadge tone="info">Selected</StatusBadge> : null}
                   </span>
-                  <span className="block truncate font-admin-data text-folio text-admin-ink-data">
-                    {asset.path}
-                  </span>
-                  <span className="block font-admin-data text-folio text-admin-ink-secondary">
+                  <span className={`block truncate ${rowMetaClass}`}>{asset.path}</span>
+                  <span className="block font-admin-data text-admin-xs text-admin-ink-secondary">
                     {formatBytes(asset.size)}
                   </span>
                   {asset.alt ? null : (
-                    <span className="block text-folio text-admin-ink-secondary">no alt text</span>
+                    <span className="block text-admin-xs text-admin-ink-secondary">no alt text</span>
                   )}
                 </span>
               </button>
               {choosing ? (
                 <button
                   type="button"
-                  className="admin-target border-admin-rule-hairline border-t-admin-hairline px-sm py-2xs text-left font-admin-ui text-folio text-admin-ink-secondary hover:bg-admin-ground-input"
+                  className="admin-target border-admin-rule-hairline border-t-admin-hairline px-sm py-xs text-left font-admin-ui text-admin-sm font-semibold text-admin-ink-link hover:bg-admin-ground-soft"
                   onClick={() => setDetail(asset)}
                 >
                   Details and delete
@@ -183,7 +180,7 @@ export default function MediaLibrary({
       ) : null}
 
       {!choosing && visible.length > 0 ? (
-        <p className="font-admin-data text-folio text-admin-ink-data">
+        <p className={rowMetaClass}>
           {visible.length} of {assets.length} {assets.length === 1 ? 'file' : 'files'} shown.
         </p>
       ) : null}

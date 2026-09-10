@@ -1,0 +1,23 @@
+## 1440px viewport, light
+description text: 14px
+title (main h1): 31.68px
+field label: 15px
+text field height: 44.00px
+primary button height: 44.00px
+secondary button height: 44.00px
+rail width: 232.00px
+current rail item height: 38.50px
+state badge height: 20.25px
+state badge text: 13px
+
+## 390px viewport, light
+description text: 14px
+title (main h1): 26px
+field label: 15px
+text field height: 44.00px
+primary button height: 44.00px
+secondary button height: 44.00px
+rail width: 390.00px
+current rail item height: 29.00px
+state badge height: 20.25px
+state badge text: 13px

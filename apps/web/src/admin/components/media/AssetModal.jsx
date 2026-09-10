@@ -19,6 +19,7 @@ import {
   TextAreaField,
   TextField,
   primaryButtonClass,
+  rowMetaClass,
   secondaryButtonClass,
 } from '../formControls.jsx';
 import AssetImage from '../../../components/media/AssetImage.jsx';
@@ -26,21 +27,21 @@ import ModalShell from './ModalShell.jsx';
 
 function UsageList({ references }) {
   if (references === null) {
-    return <p className="text-caption text-admin-ink-secondary">Checking usage…</p>;
+    return <p className="text-admin-sm text-admin-ink-secondary">Checking usage…</p>;
   }
   if (references.length === 0) {
     return (
-      <p className="text-caption text-admin-ink-secondary">
+      <p className="text-admin-sm text-admin-ink-secondary">
         Nothing references this file. Deleting it is safe.
       </p>
     );
   }
   return (
-    <div className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-proof px-sm py-2xs">
-      <p className="text-caption font-semibold text-admin-state-caution">
+    <div className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-proof px-md py-sm">
+      <p className="text-admin-base font-bold text-admin-state-caution">
         Used by {references.length} {references.length === 1 ? 'document' : 'documents'}
       </p>
-      <ul className="mt-2xs list-disc ps-5 text-caption text-admin-ink">
+      <ul className="mt-2xs list-disc ps-5 text-admin-sm text-admin-ink">
         {references.map((reference) => (
           <li key={`${reference.docPath}:${reference.field}`}>
             <code className="font-admin-data text-admin-ink-data">{reference.docPath}</code>
@@ -123,19 +124,15 @@ export default function AssetModal({ asset, onClose, onChanged, scanUsage, updat
           alt={asset.alt ?? ''}
           className="max-h-64 w-full rounded-admin border-admin-hairline border-admin-rule-hairline object-contain"
         />
-        <dl className="text-caption text-admin-ink">
+        <dl className="text-admin-sm text-admin-ink">
           <dt className="font-semibold">Path</dt>
-          <dd className="mb-2xs break-all font-admin-data text-folio text-admin-ink-data">
-            {asset.path}
-          </dd>
+          <dd className={`mb-2xs break-all ${rowMetaClass}`}>{asset.path}</dd>
           <dt className="font-semibold">Type and size</dt>
-          <dd className="mb-2xs font-admin-data text-folio text-admin-ink-data">
+          <dd className={`mb-2xs ${rowMetaClass}`}>
             {asset.contentType} · {formatBytes(asset.size)}
           </dd>
           <dt className="font-semibold">Uploaded by</dt>
-          <dd className="font-admin-data text-folio text-admin-ink-data">
-            {asset.uploadedBy ?? 'unknown'}
-          </dd>
+          <dd className={rowMetaClass}>{asset.uploadedBy ?? 'unknown'}</dd>
         </dl>
       </div>
 
@@ -155,7 +152,7 @@ export default function AssetModal({ asset, onClose, onChanged, scanUsage, updat
       </form>
 
       <section className="mt-md border-admin-rule-hairline border-t-admin-hairline pt-sm">
-        <h3 className="text-lead font-semibold text-admin-ink">Where this is used</h3>
+        <h3 className="text-admin-lg font-bold text-admin-ink">Where this is used</h3>
         <div className="mt-2xs">
           <UsageList references={references} />
         </div>

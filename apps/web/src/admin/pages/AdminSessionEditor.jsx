@@ -20,6 +20,7 @@ import {
   ServerErrorSummary,
   TextAreaField,
   TextField,
+  linkButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -226,16 +227,33 @@ export default function AdminSessionEditor({ mode }) {
         identifiers={mode === 'edit' ? sessionId : null}
         description="Save builds a draft. Preview reads that draft, and publish sends it to the public schedule."
         actions={
-          mode === 'edit' ? (
-            <a
-              href={`/schedule/${encodeURIComponent(sessionId)}?preview=1`}
-              target="_blank"
-              rel="noreferrer"
+          <>
+            {mode === 'edit' ? (
+              <a
+                href={`/schedule/${encodeURIComponent(sessionId)}?preview=1`}
+                target="_blank"
+                rel="noreferrer"
+                className={linkButtonClass}
+              >
+                Preview draft
+              </a>
+            ) : null}
+            <button
+              type="submit"
               className={secondaryButtonClass}
+              disabled={saving || localErrors.size > 0}
             >
-              Preview draft
-            </a>
-          ) : null
+              {saving ? 'Saving…' : 'Save draft'}
+            </button>
+            <button
+              type="button"
+              className={primaryButtonClass}
+              disabled={saving || localErrors.size > 0}
+              onClick={() => save({ publish: true })}
+            >
+              {saving ? 'Working…' : 'Save and publish'}
+            </button>
+          </>
         }
       />
 
@@ -353,17 +371,6 @@ export default function AdminSessionEditor({ mode }) {
       </Panel>
 
       <div className="flex flex-wrap items-center gap-xs">
-        <button type="submit" className={primaryButtonClass} disabled={saving || localErrors.size > 0}>
-          {saving ? 'Saving…' : 'Save draft'}
-        </button>
-        <button
-          type="button"
-          className={secondaryButtonClass}
-          disabled={saving || localErrors.size > 0}
-          onClick={() => save({ publish: true })}
-        >
-          {saving ? 'Working…' : 'Save and publish'}
-        </button>
         <button type="button" className={secondaryButtonClass} onClick={() => navigate('..')}>
           Cancel
         </button>

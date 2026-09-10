@@ -13,15 +13,17 @@ import {
   primaryButtonClass,
 } from './formControls.jsx';
 
-describe('a ruled region of the stone', () => {
-  it('is a ruled, tinted region — never a floating card', () => {
+describe('a panel on the stone', () => {
+  it('is a ruled, raised panel — never a floating card', () => {
     const { container } = render(<Panel title="Days">body</Panel>);
     const panel = container.querySelector('section');
 
     expect(panel.className).toContain('border-admin-rule-hairline');
     expect(panel.className).toContain('bg-admin-ground-raised');
+    expect(panel.className).toContain('rounded-admin-panel');
     expect(panel.className).toContain('p-md');
-    // Elevation in this room is tint. No shadow family ships.
+    // Elevation in this room is the step from the canvas to the paper. No
+    // shadow family ships.
     expect(panel.className).not.toMatch(/shadow/);
   });
 
@@ -59,10 +61,29 @@ describe('the copy bench', () => {
   it('draws a field boundary that clears 3:1, not the hairline rule', () => {
     // WCAG 1.4.11 again, on the admin side: --admin-rule-hairline is tuned
     // for row separators and does not clear the bar against the input
-    // ground, so a control's boundary is --admin-rule-strong.
+    // ground, so a control's boundary is --admin-rule-control.
     render(<TextField label="Title" value="" onChange={() => {}} />);
-    expect(screen.getByLabelText('Title')).toHaveClass('border-admin-rule-strong');
+    expect(screen.getByLabelText('Title')).toHaveClass('border-admin-rule-control');
     expect(screen.getByLabelText('Title')).not.toHaveClass('border-admin-rule-hairline');
+  });
+
+  it('keeps its own classes when a caller adds one', () => {
+    // A place id is set in the data face, so the venue editor passes a face
+    // class. That must join the field's classes, never replace them: a
+    // field that loses its rule, its ground and its height is not a field.
+    render(<TextField label="Place id" value="" onChange={() => {}} className="font-admin-data" />);
+    const input = screen.getByLabelText('Place id');
+    expect(input).toHaveClass('font-admin-data');
+    expect(input).toHaveClass('border-admin-rule-control');
+    expect(input).toHaveClass('min-h-admin-control');
+  });
+
+  it('holds the control height on every pointer', () => {
+    // A field and a button are the same height everywhere (desk amendment,
+    // part k): density comes from the gutters, never from the targets.
+    render(<TextField label="Title" value="" onChange={() => {}} />);
+    expect(screen.getByLabelText('Title')).toHaveClass('min-h-admin-control');
+    expect(primaryButtonClass).toContain('min-h-admin-control');
   });
 
   it('shows a field error as a mark and a word, never as colour alone', () => {
@@ -140,7 +161,7 @@ describe('a destructive moment', () => {
     expect(confirm.className).toBe(dangerButtonClass);
     // And never an oversized primary action — the destructive button is the
     // same size as every other button in the room (§2.4, moment 3).
-    for (const size of ['px-sm', 'py-2xs', 'text-caption']) {
+    for (const size of ['min-h-admin-control', 'px-md', 'py-xs', 'text-admin-base']) {
       expect(dangerButtonClass).toContain(size);
       expect(primaryButtonClass).toContain(size);
     }

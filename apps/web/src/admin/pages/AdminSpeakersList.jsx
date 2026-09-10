@@ -42,12 +42,16 @@ import {
   Panel,
   linkButtonClass,
   primaryButtonClass,
+  rowClass,
+  rowMetaClass,
+  rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
   RecordState,
+  StatusBadge,
   proofRowClass,
 } from '../components/adminChrome.jsx';
 import { deadMatter, state } from '../recordState.js';
@@ -89,12 +93,26 @@ function pendingFieldsOf(speaker) {
   return pending && typeof pending === 'object' ? Object.keys(pending) : [];
 }
 
-/** The pipeline word, in the data face. Never a coloured pill. */
+/**
+ * The tone under each pipeline word. The word itself is always rendered and
+ * is the first signal; the tint is the second one, never the only one
+ * (§8.1). An invitation still waiting on its speaker sits on the proof
+ * ground, the same tint an unpublished record carries elsewhere in the room.
+ */
+const PIPELINE_TONES = {
+  draft: 'neutral',
+  invited: 'draft',
+  accepted: 'ok',
+  approved: 'ok',
+  removed: 'dead',
+};
+
+/** The pipeline word, set in a badge whose tone agrees with it. */
 function PipelineStatus({ status }) {
   return (
-    <span className="font-admin-data text-folio text-admin-ink-data">
+    <StatusBadge tone={PIPELINE_TONES[status] ?? 'neutral'}>
       {PIPELINE_LABELS[status] ?? status ?? 'Unknown'}
-    </span>
+    </StatusBadge>
   );
 }
 
@@ -217,108 +235,101 @@ export default function AdminSpeakersList() {
                     recordState.id,
                   )}`}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-sm px-md py-xs">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
-                      <Link
-                        to={speaker.id}
-                        className="admin-target inline-flex items-center rounded-admin font-semibold text-admin-ink underline underline-offset-4"
-                      >
-                        {speaker.displayName || speaker.id}
-                      </Link>
-                      <RecordState state={recordState} />
-                      <PipelineStatus status={speaker.status} />
-                      {speaker.uid ? (
-                        <span className="font-admin-data text-folio text-admin-ink-secondary">
-                          Account linked
-                        </span>
-                      ) : null}
+                  <div className={rowClass}>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
+                        <Link to={speaker.id} className={rowTitleLinkClass}>
+                          {speaker.displayName || speaker.id}
+                        </Link>
+                        <RecordState state={recordState} />
+                        <PipelineStatus status={speaker.status} />
+                        {speaker.uid ? (
+                          <StatusBadge tone="neutral">Account linked</StatusBadge>
+                        ) : null}
+                        {pendingFieldsOf(speaker).length > 0 ? (
+                          <StatusBadge tone="caution">Changes pending review</StatusBadge>
+                        ) : null}
+                      </div>
+                      <p className={`mt-3xs truncate ${rowMetaClass}`}>
+                        {[speaker.jobTitle, speaker.organization].filter(Boolean).join(', ') || '—'}
+                        {' · '}
+                        {speaker.slug}
+                        {note ? ` · ${note}` : ''}
+                      </p>
                       {pendingFieldsOf(speaker).length > 0 ? (
-                        <span className="font-admin-data text-folio text-admin-state-caution">
-                          Changes pending review
-                        </span>
+                        <p className="mt-3xs text-admin-sm text-admin-ink-secondary">
+                          Speaker-submitted changes awaiting review:{' '}
+                          {pendingFieldsOf(speaker).join(', ')}.
+                        </p>
                       ) : null}
                     </div>
-                    <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
-                      {[speaker.jobTitle, speaker.organization].filter(Boolean).join(', ') || '—'}
-                      {' · '}
-                      {speaker.slug}
-                      {note ? ` · ${note}` : ''}
-                    </p>
-                    {pendingFieldsOf(speaker).length > 0 ? (
-                      <p className="mt-3xs text-caption text-admin-ink-secondary">
-                        Speaker-submitted changes awaiting review:{' '}
-                        {pendingFieldsOf(speaker).join(', ')}.
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-xs">
-                    {speaker.status === 'draft' ? (
-                      <button
-                        type="button"
-                        onClick={() => run('invite', 'sendSpeakerInvite', speaker)}
-                        disabled={busy === `${speaker.id}:invite`}
-                        className={secondaryButtonClass}
-                      >
-                        {busy === `${speaker.id}:invite` ? 'Inviting…' : 'Invite'}
-                      </button>
-                    ) : null}
-                    {speaker.status === 'invited' ? (
-                      <>
+                    <div className="flex flex-wrap items-center gap-xs">
+                      {speaker.status === 'draft' ? (
                         <button
                           type="button"
-                          onClick={() => run('resend', 'resendSpeakerInvite', speaker)}
-                          disabled={busy === `${speaker.id}:resend`}
+                          onClick={() => run('invite', 'sendSpeakerInvite', speaker)}
+                          disabled={busy === `${speaker.id}:invite`}
                           className={secondaryButtonClass}
                         >
-                          {busy === `${speaker.id}:resend` ? 'Resending…' : 'Resend invite'}
+                          {busy === `${speaker.id}:invite` ? 'Inviting…' : 'Invite'}
                         </button>
+                      ) : null}
+                      {speaker.status === 'invited' ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => run('resend', 'resendSpeakerInvite', speaker)}
+                            disabled={busy === `${speaker.id}:resend`}
+                            className={secondaryButtonClass}
+                          >
+                            {busy === `${speaker.id}:resend` ? 'Resending…' : 'Resend invite'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => run('cancel', 'cancelSpeakerInvite', speaker)}
+                            disabled={busy === `${speaker.id}:cancel`}
+                            className={linkButtonClass}
+                          >
+                            {busy === `${speaker.id}:cancel` ? 'Cancelling…' : 'Cancel invite'}
+                          </button>
+                        </>
+                      ) : null}
+                      {speaker.status === 'accepted' ? (
                         <button
                           type="button"
-                          onClick={() => run('cancel', 'cancelSpeakerInvite', speaker)}
-                          disabled={busy === `${speaker.id}:cancel`}
-                          className={linkButtonClass}
-                        >
-                          {busy === `${speaker.id}:cancel` ? 'Cancelling…' : 'Cancel invite'}
-                        </button>
-                      </>
-                    ) : null}
-                    {speaker.status === 'accepted' ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          run('approve', 'updateSpeaker', speaker, { speaker: { status: 'approved' } })
-                        }
-                        disabled={busy === `${speaker.id}:approve`}
-                        className={primaryButtonClass}
-                      >
-                        {busy === `${speaker.id}:approve` ? 'Approving…' : 'Approve'}
-                      </button>
-                    ) : null}
-                    {pendingFieldsOf(speaker).length > 0 ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => run('apply', 'applySpeakerPendingEdits', speaker)}
-                          disabled={busy === `${speaker.id}:apply`}
+                          onClick={() =>
+                            run('approve', 'updateSpeaker', speaker, { speaker: { status: 'approved' } })
+                          }
+                          disabled={busy === `${speaker.id}:approve`}
                           className={primaryButtonClass}
                         >
-                          {busy === `${speaker.id}:apply` ? 'Applying…' : 'Apply changes'}
+                          {busy === `${speaker.id}:approve` ? 'Approving…' : 'Approve'}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => run('discard', 'discardSpeakerPendingEdits', speaker)}
-                          disabled={busy === `${speaker.id}:discard`}
-                          className={linkButtonClass}
-                        >
-                          {busy === `${speaker.id}:discard` ? 'Discarding…' : 'Discard changes'}
-                        </button>
-                      </>
-                    ) : null}
-                    <Link to={speaker.id} className={secondaryButtonClass}>
-                      Edit
-                    </Link>
-                  </div>
+                      ) : null}
+                      {pendingFieldsOf(speaker).length > 0 ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => run('apply', 'applySpeakerPendingEdits', speaker)}
+                            disabled={busy === `${speaker.id}:apply`}
+                            className={primaryButtonClass}
+                          >
+                            {busy === `${speaker.id}:apply` ? 'Applying…' : 'Apply changes'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => run('discard', 'discardSpeakerPendingEdits', speaker)}
+                            disabled={busy === `${speaker.id}:discard`}
+                            className={linkButtonClass}
+                          >
+                            {busy === `${speaker.id}:discard` ? 'Discarding…' : 'Discard changes'}
+                          </button>
+                        </>
+                      ) : null}
+                      <Link to={speaker.id} className={linkButtonClass}>
+                        Edit
+                      </Link>
+                    </div>
                   </div>
                 </li>
               );

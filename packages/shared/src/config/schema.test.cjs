@@ -584,6 +584,19 @@ test('validateTheme accepts a site navigation placement, and rejects a stranger'
   assert.ok(errors.some((e) => e.startsWith('theme.navPlacement:') && e.includes('"floating"')));
 });
 
+test('validateTheme accepts a house admin scheme or the brand colour, and names a stranger', () => {
+  /* eslint-disable no-restricted-syntax */
+  const base = { colors: { primary: '#336699' } };
+  /* eslint-enable no-restricted-syntax */
+  assert.equal(validateTheme({ ...base, adminScheme: 'brand' }).ok, true);
+  assert.equal(validateTheme({ ...base, adminScheme: 'forest' }).ok, true);
+  // Optional: a document that says nothing follows the brand colour.
+  assert.equal(validateTheme(base).ok, true);
+  const { ok, errors } = validateTheme({ ...base, adminScheme: 'purple' });
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.startsWith('theme.adminScheme:') && e.includes('"purple"')));
+});
+
 test('validateTheme accepts the four headers and names an unknown one', () => {
   /* eslint-disable no-restricted-syntax */
   const colors = { primary: '#336699' };

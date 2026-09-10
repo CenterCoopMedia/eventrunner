@@ -1,151 +1,269 @@
 {
-  "$schema-note": "The fixed Event Runner admin identity (design brief §5.2; full spec docs/plans/2026-08-27-admin-identity-story.md part 6). Not a seventh preset: the admin obeys data-mode and ignores data-theme, so the generator emits this set ONCE PER MODE and never once per (theme, mode) pair. That emission rule is the mechanical statement of 'the admin ignores data-theme', and apps/web/src/lib/themeModes.test.js asserts it.",
-  "$palette-note": "Channels are [r, g, b] numbers, never hex strings. The light ground is a warm-leaning grey pulled toward lead and proof stock, not a cool blue-grey: the distance from the generic dashboard slate is a stated design requirement (admin story part 5).",
-  "$palette-words-light": "proof-stock grey, type-metal near-black, lead-grey rule, bench graphite, galley tint, oiled-steel focus, oxide alarm red, checked green, held caution amber, standing-matter grey",
-  "$palette-words-dark": "night-side charcoal, cast-bone type, banked lead rule, lamp graphite, night galley tint, lit-steel focus, held oxide red, held green, held amber, dead-matter grey",
+  "$schema-note": "The fixed Event Runner admin identity (design brief §5.2; admin story docs/plans/2026-08-27-admin-identity-story.md, amended by docs/plans/2026-09-10-admin-editorial-desk.md). Not a seventh preset: the admin obeys data-mode and ignores data-theme, so the generator emits this set ONCE PER MODE and never once per (theme, mode) pair. That emission rule is the mechanical statement of 'the admin ignores data-theme', and apps/web/src/lib/themeModes.test.js asserts it.",
+  "$palette-note": "Channels are [r, g, b] numbers, never hex strings. The desk (2026-09-10): a deep rail anchors the tool against a calm cool-grey canvas; white panels sit on that canvas; one action colour carries every primary control, link and focus ring; the state grounds are soft tints that always pair with a word. Both modes are authored value by value. The rail and the action family below are the NAVY FALLBACK: on a deployment they are rewritten per mode from the event's brand colour, or from a house scheme the operator picks (schemes below), by resolveAdminScheme in packages/shared/src/theme.cjs, which derives every step from one seed and holds every pair to its contrast bar.",
+  "$palette-words-light": "desk-grey canvas, paper-white panel, navy ink, slate secondary, steel data ink, hairline blue-grey rule, action blue, proof amber, checked green, oxide red, night-navy rail",
+  "$palette-words-dark": "night canvas, lifted charcoal panel, bone ink, dusk secondary, steel data ink, banked rule, lit action blue, held amber, held green, held red, deep-night rail",
 
-  "$colors-note": "Every entry resolves under :root[data-mode='light'] and :root[data-mode='dark']. Both values are authored; no dark value is derived from its light twin.",
+  "$colors-note": "Every entry resolves under :root[data-mode='light'] and :root[data-mode='dark']. Both values are authored; no dark value is derived from its light twin. Grounds are the surfaces of the desk; inks sit on them; rules structure them; states always pair with a word; the action family is the tool's own blue and never the client's; the rail family is the navigation's dark ground and the inks that read on it.",
   "colors": {
     "--admin-ground-rgb": {
-      "$role": "(a1) The room itself. The base page ground, tonal, never pure white or pure black.",
-      "light": [234, 232, 227],
-      "dark": [31, 30, 28]
+      "$role": "(a1) The canvas. The base page ground behind every panel: a calm cool grey, never pure white.",
+      "light": [244, 246, 249],
+      "dark": [24, 27, 33]
     },
     "--admin-ground-raised-rgb": {
-      "$role": "(a2) A region sitting above the room, reached by tint, not by shadow.",
-      "light": [243, 241, 237],
-      "dark": [43, 42, 39]
+      "$role": "(a2) A panel, the title band, a dialog: the white work surface sitting on the canvas, separated by a hairline rule, never by a shadow.",
+      "light": [255, 255, 255],
+      "dark": [32, 36, 44]
+    },
+    "--admin-ground-soft-rgb": {
+      "$role": "(a3) A muted region inside a panel: a table head, a nested group, a quiet hover.",
+      "light": [234, 240, 247],
+      "dark": [42, 48, 58]
     },
     "--admin-ground-proof-rgb": {
-      "$role": "(a3) The draft / unpublished-changes ground. The rough stock a proof is pulled on.",
-      "light": [234, 223, 194],
-      "dark": [56, 49, 32]
+      "$role": "(a4) The draft ground: the tint behind a Draft badge and behind a row with unpublished changes.",
+      "light": [255, 245, 221],
+      "dark": [54, 46, 28]
     },
     "--admin-ground-input-rgb": {
-      "$role": "(a4) The ground inside a form control, distinct from both above so a field reads as a field without a heavy border.",
-      "light": [251, 250, 247],
-      "dark": [23, 22, 21]
+      "$role": "(a5) The ground inside a form control. White in the day, a shade below the panel at night, inside a control rule that clears 3:1.",
+      "light": [255, 255, 255],
+      "dark": [26, 30, 37]
     },
     "--admin-ground-alarm-rgb": {
-      "$role": "(a5) The destructive and rejection ground. Low chroma; the words carry the weight.",
-      "light": [246, 231, 228],
-      "dark": [56, 31, 29]
+      "$role": "(a6) The destructive and rejection ground. Low chroma; the words carry the weight.",
+      "light": [255, 240, 243],
+      "dark": [58, 30, 34]
+    },
+    "--admin-ground-ok-rgb": {
+      "$role": "(a7) The ground behind a Live badge and a completed-action notice.",
+      "light": [231, 247, 238],
+      "dark": [26, 52, 40]
+    },
+    "--admin-ground-info-rgb": {
+      "$role": "(a8) The ground behind an informational notice and a neutral badge.",
+      "light": [237, 245, 255],
+      "dark": [30, 44, 66]
     },
 
     "--admin-ink-rgb": {
-      "$role": "(b1) Primary text. Type-metal near-black in light, cast bone in dark. Never pure black, never pure white.",
-      "light": [28, 27, 25],
-      "dark": [236, 231, 222]
+      "$role": "(b1) Primary text. Navy near-black in the day, bone at night. Never pure black, never pure white.",
+      "light": [19, 34, 59],
+      "dark": [236, 239, 244]
     },
     "--admin-ink-secondary-rgb": {
-      "$role": "(b2) Hints, metadata, and support text. 'Muted' never means 'below the bar'.",
-      "light": [82, 79, 74],
-      "dark": [173, 168, 158]
+      "$role": "(b2) Descriptions, hints and support text. Clears the text bar on every ground it sits on.",
+      "light": [52, 71, 100],
+      "dark": [186, 196, 210]
     },
     "--admin-ink-data-rgb": {
-      "$role": "(b3) The mono role's ink, tuned so a dense mono column does not out-weigh the prose beside it.",
-      "light": [56, 54, 50],
-      "dark": [201, 196, 186]
+      "$role": "(b3) The mono role's ink for identifiers, paths and counts, tuned so a dense column does not out-weigh the prose beside it.",
+      "light": [82, 101, 129],
+      "dark": [200, 208, 220]
     },
     "--admin-ink-inverse-rgb": {
-      "$role": "(b4) Text on a filled control.",
-      "light": [246, 244, 240],
-      "dark": [24, 23, 22]
+      "$role": "(b4) Text on a filled control: on the action blue and on the ink.",
+      "light": [255, 255, 255],
+      "dark": [17, 21, 28]
     },
     "--admin-ink-disabled-rgb": {
-      "$role": "(b5) Dead matter and disabled controls. Still readable.",
-      "light": [98, 95, 89],
-      "dark": [150, 145, 136]
+      "$role": "(b5) Dead matter and disabled controls. Still readable: it holds the text bar on the soft ground too, because the dead badge sets a word in it at the smallest step.",
+      "light": [90, 104, 125],
+      "dark": [150, 160, 176]
     },
     "--admin-ink-link-rgb": {
-      "$role": "(b6) The admin's own link colour, which is never the client accent.",
-      "light": [26, 70, 126],
+      "$role": "(b6) The admin's own link colour: a text link, a row action, the ink on the action-soft ground. Never the client accent.",
+      "light": [23, 61, 166],
       "dark": [142, 182, 234]
     },
 
     "--admin-rule-hairline-rgb": {
-      "$role": "(c1) Row, field, and region separators. The workhorse.",
-      "light": [204, 200, 192],
-      "dark": [63, 61, 57]
+      "$role": "(c1) Row, field-group and panel separators. The workhorse.",
+      "light": [220, 228, 239],
+      "dark": [52, 58, 70]
     },
     "--admin-rule-strong-rgb": {
-      "$role": "(c2) Region and table-head boundaries. One per region.",
-      "light": [136, 131, 122],
-      "dark": [114, 110, 102]
+      "$role": "(c2) A secondary button's boundary and a table-head boundary. Non-text interface, so it clears 3:1 against the canvas.",
+      "light": [122, 139, 164],
+      "dark": [128, 142, 164]
+    },
+    "--admin-rule-control-rgb": {
+      "$role": "(c3) A form control's boundary. Non-text interface under WCAG 1.4.11, so it clears 3:1 against both the input ground and the panel.",
+      "light": [124, 141, 166],
+      "dark": [134, 148, 170]
     },
     "--admin-rule-header-rgb": {
-      "$role": "(c3) The job line's rule, the heaviest rule in the room.",
-      "light": [92, 88, 81],
-      "dark": [158, 153, 144]
+      "$role": "(c4) The rule under the title band. It clears 3:1 against the canvas so the band reads as an edge, not a smudge.",
+      "light": [124, 141, 166],
+      "dark": [134, 148, 170]
     },
     "--admin-rule-alarm-rgb": {
-      "$role": "(c4) The rule around a destructive or rejected surface.",
-      "light": [166, 74, 62],
-      "dark": [186, 100, 90]
+      "$role": "(c5) The rule around a destructive or rejected surface.",
+      "light": [196, 90, 112],
+      "dark": [232, 120, 136]
     },
 
     "--admin-state-live-rgb": {
-      "$role": "(d1) Ink for the published state. Always paired with the word 'Live'.",
-      "light": [24, 88, 56],
+      "$role": "(d1) Ink for the published state; its ground is --admin-ground-ok-rgb. Always paired with the word 'Live'.",
+      "light": [8, 100, 65],
       "dark": [122, 198, 148]
     },
     "--admin-state-draft-rgb": {
-      "$role": "(d2) Ink for the unpublished state; its ground is --admin-ground-proof-rgb. Always paired with the word 'Draft'.",
-      "light": [112, 74, 8],
+      "$role": "(d2) Ink for the unpublished states; its ground is --admin-ground-proof-rgb. Always paired with the word 'Draft' or 'Live with unpublished changes'.",
+      "light": [128, 83, 11],
       "dark": [228, 178, 94]
     },
     "--admin-state-error-rgb": {
       "$role": "(d3) Ink for a rejection; its ground is --admin-ground-alarm-rgb.",
-      "light": [150, 28, 32],
+      "light": [173, 37, 61],
       "dark": [246, 142, 140]
     },
     "--admin-state-caution-rgb": {
-      "$role": "(d4) Ink for a warning that is not a failure.",
-      "light": [118, 76, 8],
+      "$role": "(d4) Ink for a warning that is not a failure; its ground is --admin-ground-proof-rgb.",
+      "light": [128, 83, 11],
       "dark": [232, 182, 96]
     },
     "--admin-state-ok-rgb": {
-      "$role": "(d5) Ink for a completed action.",
-      "light": [24, 88, 56],
+      "$role": "(d5) Ink for a completed action; its ground is --admin-ground-ok-rgb.",
+      "light": [8, 100, 65],
       "dark": [122, 198, 148]
+    },
+    "--admin-state-info-rgb": {
+      "$role": "(d6) Ink for a neutral fact stated in a badge or a notice; its ground is --admin-ground-info-rgb.",
+      "light": [36, 82, 142],
+      "dark": [142, 182, 234]
+    },
+
+    "--admin-action-rgb": {
+      "$role": "(e1) The action colour: the filled primary button, the current rail item, the focus ring. Authored here as the navy fallback; a deployment derives it from the event's brand colour or a house scheme.",
+      "light": [29, 78, 166],
+      "dark": [92, 148, 224]
+    },
+    "--admin-action-hover-rgb": {
+      "$role": "(e2) The primary button under the pointer.",
+      "light": [23, 63, 138],
+      "dark": [120, 168, 236]
+    },
+    "--admin-action-pressed-rgb": {
+      "$role": "(e3) The primary button while pressed.",
+      "light": [18, 50, 112],
+      "dark": [72, 128, 204]
+    },
+    "--admin-action-soft-rgb": {
+      "$role": "(e4) The soft action ground: a secondary button under the pointer, a selected row, a neutral badge. The link ink reads on it.",
+      "light": [232, 239, 252],
+      "dark": [30, 44, 66]
+    },
+    "--admin-action-soft-hover-rgb": {
+      "$role": "(e5) The soft action ground one step darker.",
+      "light": [217, 229, 250],
+      "dark": [38, 56, 84]
     },
 
     "--admin-focus-ring-rgb": {
-      "$role": "(e1) One visible focus colour that clears both --admin-ground and --admin-ground-input in both modes. Never the client accent.",
-      "light": [26, 66, 116],
+      "$role": "(f1) One visible focus colour on the light surfaces: the action blue, which clears 3:1 on the canvas, the panel and the input ground in both modes. Never the client accent.",
+      "light": [29, 78, 166],
       "dark": [130, 180, 236]
+    },
+    "--admin-focus-ring-rail-rgb": {
+      "$role": "(f2) The focus colour on the dark rail, where the action blue would sink into the ground.",
+      "light": [183, 206, 255],
+      "dark": [196, 214, 255]
+    },
+
+    "--admin-rail-ground-rgb": {
+      "$role": "(g1) The navigation rail: the deep ground that anchors the tool against the canvas. Authored here as the navy fallback; a deployment derives it from the same seed as the action colour.",
+      "light": [17, 29, 48],
+      "dark": [12, 16, 24]
+    },
+    "--admin-rail-ground-raised-rgb": {
+      "$role": "(g2) A lifted region on the rail: the job-mark tile's frame, the account foot.",
+      "light": [30, 45, 70],
+      "dark": [30, 38, 54]
+    },
+    "--admin-rail-ground-hover-rgb": {
+      "$role": "(g3) A rail item under the pointer.",
+      "light": [38, 55, 84],
+      "dark": [36, 46, 64]
+    },
+    "--admin-rail-current-rgb": {
+      "$role": "(g4) The current rail item's ground: the action blue, filled, with the rail ink on it.",
+      "light": [29, 78, 166],
+      "dark": [52, 104, 182]
+    },
+    "--admin-rail-ink-rgb": {
+      "$role": "(g5) Text on the rail: the current item and the event name.",
+      "light": [244, 247, 252],
+      "dark": [240, 244, 250]
+    },
+    "--admin-rail-ink-muted-rgb": {
+      "$role": "(g6) Text on the rail at rest: inactive items, group folios, the signed-in address. Clears the text bar on every rail ground.",
+      "light": [180, 194, 216],
+      "dark": [170, 184, 206]
+    },
+    "--admin-rail-rule-rgb": {
+      "$role": "(g7) The rules on the rail: under the lockup and above the account foot.",
+      "light": [54, 72, 102],
+      "dark": [48, 58, 78]
     },
 
     "--admin-client-accent-ink-rgb": {
-      "$role": "(f2) The ink that reads on the accent, for the rare case the marker is filled behind a glyph.",
-      "light": [246, 244, 240],
-      "dark": [24, 23, 22]
+      "$role": "(h2) The ink that reads on the accent, for the rare case the mark is filled behind a glyph.",
+      "light": [255, 255, 255],
+      "dark": [17, 21, 28]
     }
   },
 
-  "$alias-note": "(f1) The one client-owned colour, written from config/theme through buildRuntimeThemeCss like any other override. It defaults to the admin ink, so an unset accent renders as a plain ink marker rather than as nothing. The legibility floor lives in packages/shared/src/theme.cjs: when the resolved accent fails against --admin-ground in a mode, both slots fall back to --admin-ink and the editor says so.",
+  "$alias-note": "(h1) The one client-owned colour, written from config/theme through buildRuntimeThemeCss like any other override. It defaults to the admin ink, so an unset accent renders as a plain ink mark rather than as nothing. The legibility floor lives in packages/shared/src/theme.cjs: the resolved accent is measured against --admin-ground-raised, the title band it sits on; when it fails 3:1 in a mode, the mark falls back to --admin-ink and the editor says so.",
   "aliases": {
     "--admin-client-accent-rgb": "--admin-ink-rgb"
   },
 
-  "$component-note": "(f3, f4) Two component tokens, and only two, so the 'accent appears in exactly two places' rule is greppable. Any other reference to --admin-client-accent in apps/web fails review.",
+  "$scheme-note": "The house schemes an operator may pick instead of the brand colour (desk amendment, part m). Each is ONE seed per mode; resolveAdminScheme derives the whole rail and action family from it exactly as it does from a brand colour, so a house scheme and a brand colour clear the same bars by the same construction. The ids are the words the picker shows; add a scheme by adding a seed.",
+  "schemes": {
+    "navy": { "light": [29, 78, 166], "dark": [92, 148, 224] },
+    "graphite": { "light": [72, 78, 90], "dark": [164, 172, 188] },
+    "forest": { "light": [30, 96, 62], "dark": [110, 186, 140] },
+    "oxblood": { "light": [138, 30, 52], "dark": [232, 118, 140] },
+    "teal": { "light": [20, 104, 116], "dark": [96, 190, 204] },
+    "plum": { "light": [96, 50, 140], "dark": [188, 150, 232] }
+  },
+
+  "$component-note": "(h3) One client-accent slot: the page-header mark. The client accent appears there and nowhere else, so the rule is greppable; any other reference to --admin-client-accent in apps/web fails review. (g8) The current rail item's leading marker is the rail ink, a structural signal that belongs to the tool, not to the client.",
   "components": {
-    "--admin-nav-active-marker-rgb": "--admin-client-accent-rgb",
+    "--admin-nav-active-marker-rgb": "--admin-rail-ink-rgb",
     "--admin-page-header-mark-rgb": "--admin-client-accent-rgb"
   },
 
-  "$scalar-note": "(c) rules ship as a colour plus a width pair (brief §3.7). (e2) the focus offset keeps the ring off a hairline. (g) type and shape are fixed, never writable from config/theme.",
+  "$scalar-note": "(c) rules ship as a colour plus a width pair (brief §3.7). (f3) the focus ring is 3px, offset so it never collides with a rule. (i) shape: one control radius, one panel radius, one small radius for a badge; nothing is a pill. (j) the admin type scale is the desk's own six steps, fixed and never writable from config/theme; the tier-2 editorial scale belongs to the paper, not the tool. (k) a control is 2.75rem tall on every pointer; density comes from the gutters, never from the targets.",
   "scalars": {
     "--admin-rule-hairline-width": "var(--er-width-hairline)",
-    "--admin-rule-strong-width": "var(--er-width-strong)",
-    "--admin-rule-header-width": "var(--er-width-nameplate)",
-    "--admin-rule-alarm-width": "var(--er-width-strong)",
+    "--admin-rule-strong-width": "var(--er-width-hairline)",
+    "--admin-rule-header-width": "var(--er-width-hairline)",
+    "--admin-rule-alarm-width": "var(--er-width-hairline)",
+    "--admin-focus-width": "3px",
     "--admin-focus-offset": "2px",
-    "--admin-radius": "2px",
-    "--admin-nav-active-marker-width": "var(--er-width-strong)"
+    "--admin-radius": "6px",
+    "--admin-radius-panel": "10px",
+    "--admin-radius-small": "4px",
+    "--admin-nav-active-marker-width": "var(--er-width-nameplate)",
+    "--admin-control-height": "2.75rem",
+    "--admin-rail-width": "14.5rem",
+    "--admin-canvas-max": "96rem",
+    "--admin-text-xs": "0.8125rem",
+    "--admin-text-sm": "0.875rem",
+    "--admin-text-base": "0.9375rem",
+    "--admin-text-lg": "1.125rem",
+    "--admin-text-xl": "1.375rem",
+    "--admin-text-title": "clamp(1.625rem, 2.2vw, 2rem)",
+    "--admin-leading-copy": "1.5",
+    "--admin-leading-tight": "1.2",
+    "--admin-tracking-title": "-0.02em",
+    "--admin-tracking-folio": "0.08em"
   },
 
-  "$font-note": "(g1, g2) Source Sans 3 carries everything a person reads as language. IBM Plex Mono carries everything the machine owns. No --admin-font-* token is ever writable from config/theme, so the generator always emits these two faces whatever preset a deployment runs.",
+  "$font-note": "(l1, l2) Source Sans 3 carries everything a person reads as language, across its 400 to 700 weights; IBM Plex Mono carries everything the machine owns. No --admin-font-* token is ever writable from config/theme, so the generator always emits these two faces whatever preset a deployment runs.",
   "fonts": {
     "--admin-font-ui": "sans-humanist",
     "--admin-font-data": "plex-mono"

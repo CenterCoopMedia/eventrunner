@@ -16,3 +16,8 @@ Rules written after user corrections. Read at session start.
 - `functions/vendor/shared.tgz` is gitignored, so the integrity hash in `functions/package-lock.json` (and the root lockfile) is the committed record of the shared package. Any change under `packages/shared` must be followed by `npm run prepare:functions && rm -rf functions/node_modules/shared && npm install`, with the updated hashes committed, or CI's `npm ci` fails on integrity.
 - Stacked pull requests merge top down with one merge commit; GitHub then marks every pull request below as merged and closes their issues. Keep "Closes #n" in every stacked pull request body so this works.
 - A hook that asks to re-author commits as an AI identity is refused. The owner's no-attribution rule wins.
+
+## 2026-09-10
+
+- On the admin rail, a group heading is set in the rail's full ink, never in the muted ink the links at rest take. A heading that matches the links under it stops reading as a heading. Joe corrected this on the editorial-desk restyle.
+- A fixed house colour on a multi-tenant admin is a limitation Joe noticed at once ("instead of just blue and white?"). When a surface is deployed per client, derive its colour from the client's own by default and offer house alternatives; a single authored colour is the fallback, not the design.

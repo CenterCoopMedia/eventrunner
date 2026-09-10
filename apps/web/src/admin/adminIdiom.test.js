@@ -80,10 +80,13 @@ describe('the room runs on admin-* tokens only', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('uses the two client-accent slots and never the raw accent', () => {
-    // The accent appears in exactly two named places (admin story part 6f),
-    // and both go through their own component token. A third reference is a
-    // review failure, so it is a test failure.
+  it('uses the one client-accent slot and never the raw accent', () => {
+    // The client accent appears in exactly one named place — the mark
+    // beside the page title — and it goes through its own component token
+    // (desk amendment, part h). The rail's current-item marker has a
+    // component token of its own that resolves to the rail ink, and it is
+    // read in the shell alone. A reference anywhere else is a review
+    // failure, so it is a test failure.
     const raw = [];
     const slots = [];
     for (const file of files) {

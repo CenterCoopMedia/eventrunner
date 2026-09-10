@@ -182,7 +182,7 @@ const THEME_LOGO_SLOTS = Object.freeze(['primary', 'mark', 'footer', 'ogDefault'
 const THEME_DOC_KEYS = Object.freeze([
   'colors', 'fonts', 'texture', 'radius', 'density', 'mode', 'header',
   'logos', 'placeholderLogos', 'preset', 'optionPicks', 'tokens', 'motifSet',
-  'brandColor', 'navPlacement',
+  'brandColor', 'navPlacement', 'adminScheme',
 ]);
 
 /**
@@ -1123,27 +1123,27 @@ function resolveLegacyColors(theme) {
  */
 const ADMIN_TOKEN_SET = ADMIN_TOKENS;
 
-/** The contrast the admin position marker must clear: it is non-text UI. */
+/** The contrast the admin page-header mark must clear: it is non-text UI. */
 const ADMIN_ACCENT_MIN_CONTRAST = DARK_MIN_CONTRAST_UI;
 
 /**
- * The admin position marker's colour, and its legibility floor (admin story
- * part 6f, owner review 2026-08-27).
+ * The admin page-header mark's colour, and its legibility floor (admin story
+ * part 6f, owner review 2026-08-27, desk amendment 2026-09-10).
  *
- * THERE IS NO SEPARATE ADMIN MARKER COLOUR ANY MORE. The editable
- * `config/theme.adminAccent` field is gone. The admin's two client-owned
- * slots — the marker beside the section you are in, and the mark on the
- * page-header rule — take the RESOLVED brand colour for the mode, which is
- * the same value the site paints. One colour decision, used in both places,
- * so the admin cannot drift from the site it is editing and nobody has to
- * pick a second colour whose only job is to sit on an admin ground.
+ * THERE IS NO SEPARATE ADMIN MARKER COLOUR. The editable
+ * `config/theme.adminAccent` field is gone. The admin's one client-owned
+ * colour slot — the mark beside the page title — takes the RESOLVED brand
+ * colour for the mode, which is the same value the site paints. One colour
+ * decision, so the admin cannot drift from the site it is editing and nobody
+ * has to pick a second colour whose only job is to sit on an admin ground.
  *
- * The floor is unchanged and still does the work. The brand colour is
- * measured against `--admin-ground` in the mode; a marker is non-text user
- * interface, so it holds 3:1. When it fails, both slots fall back to
- * `--admin-ink` and the editor says so. Nothing is clamped: the site keeps
- * painting the client's colour, and it is only the admin marker that steps
- * aside.
+ * The floor does the work. The brand colour is measured against
+ * `--admin-ground-raised` in the mode — the title band the mark sits on — and
+ * a mark is non-text user interface, so it holds 3:1. When it fails, the slot
+ * falls back to `--admin-ink` and the editor says so. Nothing is clamped: the
+ * site keeps painting the client's colour, and it is only the admin mark that
+ * steps aside. (The rail's current-item marker is the tool's own ink and
+ * never reads this value.)
  *
  * @param {object} theme config/theme
  * @param {'light'|'dark'} mode
@@ -1155,11 +1155,165 @@ function resolveAdminAccent(theme, mode) {
   const palette = resolveThemePalettes(theme)[mode];
   const accent = isRgb(palette?.primary) ? palette.primary.map(clampChannel) : null;
   if (!accent) return { rgb: null, ratio: null, fellBack: false };
-  const ground = ADMIN_TOKENS.colors['--admin-ground-rgb'][mode];
+  const ground = ADMIN_TOKENS.colors['--admin-ground-raised-rgb'][mode];
   const ink = ADMIN_TOKENS.colors['--admin-ink-rgb'][mode];
   const ratio = contrastRatio(accent, ground);
   if (ratio < ADMIN_ACCENT_MIN_CONTRAST) return { rgb: [...ink], ratio, fellBack: true };
   return { rgb: accent, ratio, fellBack: false };
+}
+
+/* -------------------------------------------------------------------------
+ * The admin colour scheme (desk amendment, 2026-09-10).
+ *
+ * The admin's rail and action family are no longer one fixed navy. By
+ * default they take the event's own colour: the resolved brand primary for
+ * the mode is the SEED, and every step — the filled control, its hover and
+ * pressed states, the soft grounds, the link ink, the focus ring, the rail
+ * and its lifted steps, the current rail item — is derived from that seed
+ * and held to its contrast bar by construction, the way `deriveBrandSteps`
+ * holds the site's steps. An operator may instead pick a house scheme
+ * (`config/theme.adminScheme`), which is one seed per mode in
+ * `design/tokens/admin.json`, run through the same derivation.
+ *
+ * What a scheme never touches: the canvas, the panels, the inks, the rules,
+ * the state colours. Green, amber and red keep their meanings on every
+ * deployment, and a red-brand event does not get red Live badges.
+ * ---------------------------------------------------------------------- */
+
+/** The house schemes, one seed per mode. */
+const ADMIN_SCHEMES = ADMIN_TOKENS.schemes || {};
+
+/** What `config/theme.adminScheme` may say: the brand colour, or a house scheme. */
+const ADMIN_SCHEME_IDS = Object.freeze(['brand', ...Object.keys(ADMIN_SCHEMES)]);
+
+/** A document that names no scheme follows the brand colour. */
+const DEFAULT_ADMIN_SCHEME = 'brand';
+
+/** The admin tokens a scheme rewrites, and only these. */
+const ADMIN_SCHEME_TOKENS = Object.freeze([
+  '--admin-action-rgb',
+  '--admin-action-hover-rgb',
+  '--admin-action-pressed-rgb',
+  '--admin-action-soft-rgb',
+  '--admin-action-soft-hover-rgb',
+  '--admin-ink-link-rgb',
+  '--admin-focus-ring-rgb',
+  '--admin-rail-ground-rgb',
+  '--admin-rail-ground-raised-rgb',
+  '--admin-rail-ground-hover-rgb',
+  '--admin-rail-rule-rgb',
+  '--admin-rail-current-rgb',
+]);
+
+/** One authored admin colour for a mode. */
+function adminFixed(name, mode) {
+  return ADMIN_TOKENS.colors[name][mode];
+}
+
+/**
+ * The admin's rail and action family for one mode, from one seed —
+ * CONTRAST-SAFE BY CONSTRUCTION.
+ *
+ * Every derived value is a blend of the seed toward black or white only, so
+ * the hue stays the client's, and every value that carries text or marks a
+ * control is then moved away from its ground until it clears its bar:
+ *
+ *   - the action colour holds the inverse ink at 4.5:1, which also clears
+ *     the 3:1 non-text bar on the canvas, the panel and the input ground;
+ *   - the link ink holds 4.5:1 on the darkest soft ground, so it holds on
+ *     the panel too;
+ *   - the rail ground is held until the MUTED rail ink reads on its lifted
+ *     hover step, so it reads on the rail itself and on the raised step;
+ *   - the current rail item holds the rail ink at 4.5:1.
+ *
+ * In dark mode the rail is also capped below the canvas, so the frame stays
+ * a step darker than the work whatever the seed.
+ *
+ * @param {readonly number[]} seed
+ * @param {'light'|'dark'} mode
+ * @returns {Record<string, number[]>} token name → `[r, g, b]`
+ */
+function deriveAdminScheme(seed, mode) {
+  const black = [0, 0, 0];
+  const white = [255, 255, 255];
+  const light = mode === 'light';
+  const raised = adminFixed('--admin-ground-raised-rgb', mode);
+  const canvas = adminFixed('--admin-ground-rgb', mode);
+  const inverse = adminFixed('--admin-ink-inverse-rgb', mode);
+  const railInk = adminFixed('--admin-rail-ink-rgb', mode);
+  const railMuted = adminFixed('--admin-rail-ink-muted-rgb', mode);
+  const start = seed.map(clampChannel);
+
+  const action = stepToContrast(start, inverse, BRAND_MIN_CONTRAST);
+  const hover = light
+    ? stepToContrast(mixRgb(action, black, 0.14), inverse, BRAND_MIN_CONTRAST)
+    : mixRgb(action, white, 0.12);
+  const pressed = light
+    ? mixRgb(action, black, 0.28)
+    : stepToContrast(mixRgb(action, black, 0.12), inverse, BRAND_MIN_CONTRAST);
+  const soft = mixRgb(action, raised, light ? 0.9 : 0.82);
+  const softHover = mixRgb(action, raised, light ? 0.84 : 0.74);
+  const link = stepToContrast(action, softHover, BRAND_MIN_CONTRAST);
+
+  const hoverLift = light ? 0.12 : 0.14;
+  let railGround = mixRgb(start, black, light ? 0.78 : 0.9);
+  if (!light) railGround = railGround.map((c, i) => Math.min(c, canvas[i] - 4));
+  let railHover = mixRgb(railGround, white, hoverLift);
+  for (let i = 0; i < 100 && contrastRatio(railMuted, railHover) < BRAND_MIN_CONTRAST; i += 1) {
+    railGround = mixRgb(railGround, black, 0.06);
+    railHover = mixRgb(railGround, white, hoverLift);
+  }
+  const railRaised = mixRgb(railGround, white, light ? 0.08 : 0.1);
+  const railRule = mixRgb(railGround, white, 0.22);
+  const railCurrent = stepToContrast(
+    light ? action : mixRgb(action, black, 0.3),
+    railInk,
+    BRAND_MIN_CONTRAST,
+  );
+
+  return {
+    '--admin-action-rgb': action,
+    '--admin-action-hover-rgb': hover,
+    '--admin-action-pressed-rgb': pressed,
+    '--admin-action-soft-rgb': soft,
+    '--admin-action-soft-hover-rgb': softHover,
+    '--admin-ink-link-rgb': link,
+    '--admin-focus-ring-rgb': action,
+    '--admin-rail-ground-rgb': railGround,
+    '--admin-rail-ground-raised-rgb': railRaised,
+    '--admin-rail-ground-hover-rgb': railHover,
+    '--admin-rail-rule-rgb': railRule,
+    '--admin-rail-current-rgb': railCurrent,
+  };
+}
+
+/**
+ * The admin colour scheme a document resolves to, per mode.
+ *
+ * `brand` (the default) seeds from the resolved brand primary for the mode,
+ * which is the same value the site paints. A document that resolves no
+ * primary at all returns no tokens, so the authored navy in
+ * `design/tokens/admin.json` stays in force. A house scheme seeds from its
+ * own entry there. An unknown id is read as the default; the validator is
+ * what refuses it at the write.
+ *
+ * @param {object} theme config/theme
+ * @param {'light'|'dark'} mode
+ * @returns {{ id: string, seed: number[]|null, tokens: Record<string, number[]> }}
+ */
+function resolveAdminScheme(theme, mode) {
+  const id = ADMIN_SCHEME_IDS.includes(theme?.adminScheme)
+    ? theme.adminScheme
+    : DEFAULT_ADMIN_SCHEME;
+  let seed = null;
+  if (id === DEFAULT_ADMIN_SCHEME) {
+    const palette = resolveThemePalettes(theme)[mode];
+    seed = isRgb(palette?.primary) ? palette.primary.map(clampChannel) : null;
+  } else if (isRgb(ADMIN_SCHEMES[id]?.[mode])) {
+    seed = [...ADMIN_SCHEMES[id][mode]];
+  }
+  if (!seed) return { id, seed: null, tokens: {} };
+  return { id, seed, tokens: deriveAdminScheme(seed, mode) };
 }
 
 module.exports = {
@@ -1209,6 +1363,11 @@ module.exports = {
   THEME_CONTRAST_PAIRS,
   findThemeContrastFailures,
   resolveAdminAccent,
+  ADMIN_SCHEME_IDS,
+  DEFAULT_ADMIN_SCHEME,
+  ADMIN_SCHEME_TOKENS,
+  deriveAdminScheme,
+  resolveAdminScheme,
   hexToRgb,
   rgbToHex,
   BRAND_EMPHASIS_STEP,

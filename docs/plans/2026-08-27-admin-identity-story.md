@@ -1,7 +1,14 @@
 # Admin CMS visual story — the seventh surface
 
 **Date:** 2026-08-27
-**Status:** Settled. Read before admin work starts (brief §5.2, PR2).
+**Status:** Settled, then amended. Read before admin work starts (brief §5.2, PR2).
+**Amended:** 2026-09-10 by `docs/plans/2026-09-10-admin-editorial-desk.md`, which moves the
+admin from the composing room onto the editorial desk: a dark rail, a white title band, white
+panels on a cool canvas, one action colour that follows the main brand colour or a house scheme,
+tinted state badges, 44px controls, and the admin's own type scale. Where that document and this
+one disagree, that document wins. The story below is kept
+as the record of the identity it amends; the vocabulary, the three moments, and the refusals still
+hold except where the amendment names a change.
 **Binding source:** `docs/plans/2026-08-27-design-system-overhaul.md`. Where this document and the
 brief disagree, the brief wins. Brief §5.2 points here for the full spec.
 **Companion:** `docs/plans/2026-08-27-preset-visual-stories.md`. This page uses the same six parts

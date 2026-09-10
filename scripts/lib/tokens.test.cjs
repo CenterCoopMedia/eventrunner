@@ -469,6 +469,29 @@ test('the admin set is emitted once per mode and never inside a theme block', ()
   }
 });
 
+test('the admin takes the event\'s colours: the brand colour by default, or a house scheme', () => {
+  // The default: the rail and the action family derive from the resolved
+  // brand primary per mode. Civic's own primary already reads under white
+  // text, so it is the action colour as given.
+  const css = buildTokenCss(THEME);
+  const light = css.match(/Admin identity — light[^{]*\{([^}]*)\}/);
+  const dark = css.match(/Admin identity — dark[^{]*\{([^}]*)\}/);
+  assert.match(light[1], /--admin-action-rgb: 26 82 150;/);
+  assert.match(light[1], /--admin-rail-ground-rgb: \d+ \d+ \d+;/);
+  assert.doesNotMatch(light[1], /--admin-rail-ground-rgb: 17 29 48;/, 'the authored navy rail gave way');
+  assert.match(dark[1], /--admin-action-rgb: \d+ \d+ \d+;/);
+
+  // A house scheme: the same derivation from the scheme's own seed.
+  const forest = buildTokenCss({ ...THEME, adminScheme: 'forest' });
+  const forestLight = forest.match(/Admin identity — light[^{]*\{([^}]*)\}/);
+  assert.match(forestLight[1], /--admin-action-rgb: 30 96 62;/);
+
+  // The scheme never reaches a theme block: the admin still ignores data-theme.
+  for (const block of forest.matchAll(/:root\[data-theme='[\w-]+'\]\[data-mode='\w+'\] \{([^}]*)\}/g)) {
+    assert.doesNotMatch(block[1], /--admin-/);
+  }
+});
+
 test('the admin marker takes the resolved brand colour, and falls back to admin ink when it cannot be read', () => {
   // Owner review 2026-08-27: there is no separate admin marker colour to
   // pick. The marker takes the brand colour the site itself paints. The
@@ -484,9 +507,9 @@ test('the admin marker takes the resolved brand colour, and falls back to admin 
   const brandedLight = branded.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
   assert.match(brandedLight[1], /--admin-client-accent-rgb: 122 31 61;/);
 
-  // The floor still fires where the resolved brand colour cannot sit on an
-  // admin ground: a pre-preset deployment on a dark ground resolves a
-  // near-white primary, and the LIGHT admin ground is light.
+  // The floor still fires where the resolved brand colour cannot sit on the
+  // admin title band: a pre-preset deployment on a dark ground resolves a
+  // near-white primary, and the LIGHT admin band is white.
   const unreadable = buildTokenCss({
     colors: {
       primary: `#${'ebe8e3'}`,
@@ -495,7 +518,7 @@ test('the admin marker takes the resolved brand colour, and falls back to admin 
     },
   });
   const light = unreadable.match(/:root,\n:root\[data-mode='light'\] \{([^}]*)\}/);
-  assert.match(light[1], /--admin-client-accent-rgb: 28 27 25;/, 'falls back to admin ink');
+  assert.match(light[1], /--admin-client-accent-rgb: 19 34 59;/, 'falls back to admin ink');
 });
 
 // ------------------------------------------------ the motif layer (brief §3.8)

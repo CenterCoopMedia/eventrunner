@@ -55,6 +55,9 @@ import {
   ADMIN_TOKEN_SET,
   deriveRuleColors,
   resolveAdminAccent,
+  resolveAdminScheme,
+  ADMIN_SCHEME_IDS as THEME_ADMIN_SCHEME_IDS,
+  DEFAULT_ADMIN_SCHEME as THEME_DEFAULT_ADMIN_SCHEME,
   resolveComponentFonts,
   resolveFontRoles,
   resolveMotifSet,
@@ -380,6 +383,14 @@ export function buildRuntimeThemeCss(themeDoc) {
     if (accent.rgb) {
       modeLines[mode].push(`  --admin-client-accent-rgb: ${accent.rgb.join(' ')};`);
     }
+    // The event's colours reach the admin (desk amendment): the rail and
+    // the action family for the mode, derived from the brand colour or
+    // from the house scheme the document names, so a published theme
+    // restyles the admin as it restyles the site. Screen only, like the
+    // accent.
+    for (const [name, rgb] of Object.entries(resolveAdminScheme(themeDoc, mode).tokens)) {
+      modeLines[mode].push(`  ${name}: ${rgb.join(' ')};`);
+    }
   }
 
   const blocks = [];
@@ -563,11 +574,12 @@ export function resolveRootAttributes(themeDoc) {
 }
 
 /**
- * Whether the resolved brand colour clears the admin ground in a mode, and
- * what the marker actually renders (admin story part 6f, owner review
- * 2026-08-27). There is no separate admin marker colour: the marker is the
- * site's own brand colour, and the floor is the only thing that can move it.
- * The theme editor states that in words; nothing is clamped.
+ * Whether the resolved brand colour clears the admin title band in a mode,
+ * and what the page-header mark actually renders (admin story part 6f, owner
+ * review 2026-08-27, desk amendment 2026-09-10). There is no separate admin
+ * marker colour: the mark is the site's own brand colour, and the floor is
+ * the only thing that can move it. The theme editor states that in words;
+ * nothing is clamped.
  *
  * @param {object} themeDoc
  * @param {'light'|'dark'} mode
@@ -577,8 +589,29 @@ export function adminAccentVerdict(themeDoc, mode) {
   return { ...resolveAdminAccent(themeDoc, mode), floor: ADMIN_ACCENT_FLOOR };
 }
 
-/** The contrast the admin position marker must clear: it is non-text UI. */
+/** The contrast the admin page-header mark must clear: it is non-text UI. */
 const ADMIN_ACCENT_FLOOR = 3;
 
 /** The admin token set, for the editor's own preview surfaces. */
 export { ADMIN_TOKEN_SET };
+
+/** What the Branding tab may name as the admin's colours: the brand colour, or a house scheme. */
+export const ADMIN_SCHEME_IDS = Object.freeze([...THEME_ADMIN_SCHEME_IDS]);
+
+/** The admin colours a document that names none renders: the brand colour. */
+export const DEFAULT_ADMIN_SCHEME = THEME_DEFAULT_ADMIN_SCHEME;
+
+/**
+ * What each admin colour scheme is called on the Branding tab. The default
+ * says what it follows, so a staff member who has never opened the setting
+ * can read what the admin is doing from the one line.
+ */
+export const ADMIN_SCHEME_LABELS = Object.freeze({
+  brand: 'Follow the main brand colour',
+  navy: 'Navy',
+  graphite: 'Graphite',
+  forest: 'Forest',
+  oxblood: 'Oxblood',
+  teal: 'Teal',
+  plum: 'Plum',
+});

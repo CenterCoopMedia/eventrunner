@@ -219,6 +219,24 @@ describe('buildRuntimeThemeCss print block', () => {
     }
   });
 
+  it('restyles the admin from the brand colour, on screen only', () => {
+    // The rail and the action family follow the published brand colour, so
+    // a publish restyles the admin as it restyles the site — in both mode
+    // blocks, and never on paper.
+    const css = buildRuntimeThemeCss({
+      colors: { surface: hex('F7F7F5'), ink: hex('16212C') },
+      brandColor: hex('7A1F3D'),
+    });
+    expect(css).toMatch(/--admin-action-rgb: 122 31 61;/);
+    expect(css).toMatch(/--admin-rail-ground-rgb: \d+ \d+ \d+;/);
+    expect(css.match(/--admin-rail-ground-rgb:/g)).toHaveLength(2);
+    expect(printBlockOf(css)).not.toContain('--admin-');
+
+    // A house scheme takes its own seed instead.
+    const forest = buildRuntimeThemeCss({ colors: {}, brandColor: hex('7A1F3D'), adminScheme: 'forest' });
+    expect(forest).toMatch(/--admin-action-rgb: 30 96 62;/);
+  });
+
   it('leaves the admin token on screen', () => {
     // The admin is a screen tool; no print rule reads its tokens. Its own
     // mode blocks still carry the marker colour, which is the site's own

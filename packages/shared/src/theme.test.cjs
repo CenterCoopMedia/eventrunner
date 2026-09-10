@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  THEME_MODES,
   THEME_MODE_POLICIES,
   DEFAULT_MODE_POLICY,
   THEME_FONT_ROLES,
@@ -18,6 +19,10 @@ const {
   THEME_PRESET_IDS,
   THEME_DOC_KEYS,
   ADMIN_TOKEN_SET,
+  ADMIN_SCHEME_IDS,
+  ADMIN_SCHEME_TOKENS,
+  DEFAULT_ADMIN_SCHEME,
+  resolveAdminScheme,
   DEFAULT_PRESET_ID,
   recommendedConfiguration,
   deriveBrandSteps,
@@ -41,6 +46,7 @@ const {
   THEME_HEADERS,
   DEFAULT_HEADER,
   resolveHeader,
+  isRgb,
 } = require('./theme.cjs');
 
 /** WCAG 1.4.11: the non-text bar a form-control boundary must clear. */
@@ -548,9 +554,9 @@ test('an expert per-token override still wins over the derived value', () => {
 });
 
 test('the admin marker takes the resolved brand colour, with its floor intact', () => {
-  // There is no adminAccent field any more: the marker is the site's own
+  // There is no adminAccent field any more: the mark is the site's own
   // brand colour, and the only question left is whether it can be seen on
-  // the admin ground.
+  // the admin title band (the raised ground).
   assert.ok(!THEME_DOC_KEYS.includes('adminAccent'));
   assert.ok(THEME_DOC_KEYS.includes('brandColor'));
 
@@ -559,8 +565,8 @@ test('the admin marker takes the resolved brand colour, with its floor intact', 
   assert.deepEqual(marker.rgb, [122, 31, 61]);
   assert.equal(marker.fellBack, false);
 
-  // A resolved primary that cannot sit on the admin ground steps aside for
-  // the admin's own ink rather than rendering as nothing.
+  // A resolved primary that cannot sit on the admin title band steps aside
+  // for the admin's own ink rather than rendering as nothing.
   const onDarkGround = resolveAdminAccent(
     { colors: { primary: rgbToHex([235, 232, 227]), surface: rgbToHex([17, 17, 17]), ink: rgbToHex([255, 255, 255]) } },
     'light',
@@ -571,4 +577,118 @@ test('the admin marker takes the resolved brand colour, with its floor intact', 
   // A document that resolves no palette at all leaves the token on its
   // declared default.
   assert.deepEqual(resolveAdminAccent({}, 'light'), { rgb: null, ratio: null, fellBack: false });
+});
+
+// ------------------------------------------- the admin colour scheme (desk amendment)
+
+/** Every pair a derived admin scheme must hold, per mode, against the fixed admin set. */
+function assertAdminSchemeHolds(tokens, mode, label) {
+  const fixed = (name) => ADMIN_TOKEN_SET.colors[name][mode];
+  const text = 4.5;
+  const ui = 3;
+  const pairs = [
+    ['--admin-ink-inverse-rgb', '--admin-action-rgb', text],
+    ['--admin-ink-inverse-rgb', '--admin-action-hover-rgb', text],
+    ['--admin-ink-inverse-rgb', '--admin-action-pressed-rgb', text],
+    ['--admin-action-rgb', '--admin-ground-rgb', ui],
+    ['--admin-action-rgb', '--admin-ground-raised-rgb', ui],
+    ['--admin-action-rgb', '--admin-ground-input-rgb', ui],
+    ['--admin-focus-ring-rgb', '--admin-ground-rgb', ui],
+    ['--admin-focus-ring-rgb', '--admin-ground-raised-rgb', ui],
+    ['--admin-focus-ring-rgb', '--admin-ground-input-rgb', ui],
+    ['--admin-ink-link-rgb', '--admin-ground-raised-rgb', text],
+    ['--admin-ink-link-rgb', '--admin-action-soft-rgb', text],
+    ['--admin-ink-link-rgb', '--admin-action-soft-hover-rgb', text],
+    ['--admin-ink-rgb', '--admin-action-soft-rgb', text],
+    ['--admin-ink-rgb', '--admin-action-soft-hover-rgb', text],
+    ['--admin-rail-ink-rgb', '--admin-rail-ground-rgb', text],
+    ['--admin-rail-ink-rgb', '--admin-rail-ground-raised-rgb', text],
+    ['--admin-rail-ink-rgb', '--admin-rail-ground-hover-rgb', text],
+    ['--admin-rail-ink-rgb', '--admin-rail-current-rgb', text],
+    ['--admin-rail-ink-muted-rgb', '--admin-rail-ground-rgb', text],
+    ['--admin-rail-ink-muted-rgb', '--admin-rail-ground-raised-rgb', text],
+    ['--admin-rail-ink-muted-rgb', '--admin-rail-ground-hover-rgb', text],
+    ['--admin-focus-ring-rail-rgb', '--admin-rail-ground-rgb', ui],
+    ['--admin-focus-ring-rail-rgb', '--admin-rail-current-rgb', ui],
+  ];
+  for (const [fg, bg, bar] of pairs) {
+    const a = tokens[fg] ?? fixed(fg);
+    const b = tokens[bg] ?? fixed(bg);
+    const ratio = contrastRatio(a, b);
+    assert.ok(ratio >= bar, `${label} ${mode}: ${fg} on ${bg} is ${ratio.toFixed(2)}:1, wants ${bar}`);
+  }
+  // The rail stays a frame: darker than the canvas in both modes.
+  assert.ok(
+    relativeLuminance(tokens['--admin-rail-ground-rgb']) < relativeLuminance(fixed('--admin-ground-rgb')),
+    `${label} ${mode}: the rail sits below the canvas`,
+  );
+  // A scheme rewrites exactly its own tokens.
+  assert.deepEqual(Object.keys(tokens).sort(), [...ADMIN_SCHEME_TOKENS].sort());
+}
+
+test('the admin follows the brand colour by default, safe by construction, in every style', () => {
+  assert.equal(DEFAULT_ADMIN_SCHEME, 'brand');
+  assert.ok(ADMIN_SCHEME_IDS.includes('brand'));
+  // White, black, mid grey, yellow, lime, the canvas grey, the dark canvas
+  // and orange: colours a client might set that no button could take as-is.
+  const awful = [
+    [255, 255, 255],
+    [0, 0, 0],
+    [128, 128, 128],
+    [255, 255, 0],
+    [0, 255, 0],
+    [244, 246, 249],
+    [11, 13, 16],
+    [255, 136, 0],
+  ].map(rgbToHex);
+  for (const id of THEME_PRESET_IDS) {
+    for (const brand of [null, ...awful]) {
+      const theme = brand
+        ? { ...recommendedConfiguration(id), brandColor: brand }
+        : recommendedConfiguration(id);
+      for (const mode of THEME_MODES) {
+        const scheme = resolveAdminScheme(theme, mode);
+        assert.equal(scheme.id, 'brand');
+        assert.ok(isRgb(scheme.seed), `${id} ${brand} ${mode} seeds from the brand primary`);
+        assertAdminSchemeHolds(scheme.tokens, mode, `${id} ${brand ?? 'own primary'}`);
+      }
+    }
+  }
+});
+
+test('every house scheme holds the same bars in both modes', () => {
+  const house = ADMIN_SCHEME_IDS.filter((id) => id !== 'brand');
+  assert.ok(house.length >= 5, 'a handful of house schemes ship');
+  for (const id of house) {
+    for (const mode of THEME_MODES) {
+      const scheme = resolveAdminScheme({ ...recommendedConfiguration('civic'), adminScheme: id }, mode);
+      assert.equal(scheme.id, id);
+      assertAdminSchemeHolds(scheme.tokens, mode, id);
+    }
+  }
+});
+
+test('a house scheme ignores the brand colour, and a stranger reads as the default', () => {
+  const branded = { ...recommendedConfiguration('civic'), brandColor: rgbToHex([122, 31, 61]) };
+  const forest = resolveAdminScheme({ ...branded, adminScheme: 'forest' }, 'light');
+  const plain = resolveAdminScheme({ ...recommendedConfiguration('civic'), adminScheme: 'forest' }, 'light');
+  assert.deepEqual(forest.tokens, plain.tokens, 'the brand colour does not reach a house scheme');
+  assert.equal(resolveAdminScheme({ ...branded, adminScheme: 'purple' }, 'light').id, 'brand');
+});
+
+test('a document that resolves no primary leaves the authored navy in force', () => {
+  const none = resolveAdminScheme({}, 'light');
+  assert.equal(none.id, 'brand');
+  assert.equal(none.seed, null);
+  assert.deepEqual(none.tokens, {});
+});
+
+test('a legible brand colour is used as the action colour exactly as given', () => {
+  // The seed moves only as far as its bar requires; a colour that already
+  // reads under white text is the client's own value on the button.
+  const scheme = resolveAdminScheme(
+    { ...recommendedConfiguration('civic'), brandColor: rgbToHex([122, 31, 61]) },
+    'light',
+  );
+  assert.deepEqual(scheme.tokens['--admin-action-rgb'], [122, 31, 61]);
 });

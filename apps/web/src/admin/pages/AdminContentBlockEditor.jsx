@@ -46,6 +46,7 @@ import {
   ServerErrorSummary,
   TextAreaField,
   TextField,
+  linkButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -70,7 +71,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
   const fields = valueFieldsOf(blockTypeId);
   if (!blockTypeFor(blockTypeId)) {
     return (
-      <p className="text-caption text-admin-ink-secondary">
+      <p className="text-admin-sm text-admin-ink-secondary">
         Choose a block type above to fill in its value.
       </p>
     );
@@ -431,9 +432,22 @@ export default function AdminContentBlockEditor({ mode }) {
           </>
         }
         actions={
-          <Link to=".." relative="path" className={secondaryButtonClass}>
-            Back to section
-          </Link>
+          <>
+            <Link to=".." relative="path" className={linkButtonClass}>
+              Back to section
+            </Link>
+            <button type="submit" className={secondaryButtonClass} disabled={busy !== null}>
+              {busy === 'draft' ? 'Saving…' : 'Save draft'}
+            </button>
+            <button
+              type="button"
+              className={primaryButtonClass}
+              disabled={busy !== null}
+              onClick={() => save({ publish: true })}
+            >
+              {busy === 'publish' ? 'Publishing…' : 'Save and publish'}
+            </button>
+          </>
         }
       />
 
@@ -504,17 +518,6 @@ export default function AdminContentBlockEditor({ mode }) {
       </Panel>
 
       <div className="flex flex-wrap items-center gap-xs">
-        <button type="submit" className={secondaryButtonClass} disabled={busy !== null}>
-          {busy === 'draft' ? 'Saving…' : 'Save draft'}
-        </button>
-        <button
-          type="button"
-          className={primaryButtonClass}
-          disabled={busy !== null}
-          onClick={() => save({ publish: true })}
-        >
-          {busy === 'publish' ? 'Publishing…' : 'Save and publish'}
-        </button>
         {resumeQueueId ? (
           <button
             type="button"

@@ -54,6 +54,7 @@ const {
   getPreset,
   themePresetId,
   resolveAdminAccent,
+  resolveAdminScheme,
   resolveComponentFonts,
   resolveFontRoles,
   resolveMotifSet,
@@ -235,6 +236,16 @@ function resolveAdminTokens(theme, tokens) {
   for (const [name, target] of tokenEntries(admin.components)) {
     names.push(name);
     for (const mode of THEME_MODES) values[mode][name] = `var(${target})`;
+  }
+
+  // The event's colours reach the admin (desk amendment): the rail and the
+  // action family are rewritten per mode from the resolved brand colour, or
+  // from the house scheme the document names. A document that resolves no
+  // seed leaves the authored navy above in force.
+  for (const mode of THEME_MODES) {
+    for (const [name, rgb] of Object.entries(resolveAdminScheme(theme, mode).tokens)) {
+      if (names.includes(name)) values[mode][name] = triple(rgb);
+    }
   }
 
   return { names, values };

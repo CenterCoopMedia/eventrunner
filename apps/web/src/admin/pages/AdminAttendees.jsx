@@ -37,12 +37,14 @@ import {
   Panel,
   SelectField,
   TextField,
+  rowMetaClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
   RecordState,
+  StatusBadge,
 } from '../components/adminChrome.jsx';
 import { deadMatter } from '../recordState.js';
 
@@ -62,10 +64,10 @@ const REGISTRATION_LABELS = {
 };
 
 /**
- * The account's registration status, as a word in the data face — never a
- * coloured pill (§8.1). `revoked` is dead matter and keeps its word on the
- * standing-matter ink; every other status renders on the secondary ink,
- * because none of them is this admin's Draft/Live vocabulary.
+ * The account's registration status, as a word in a badge whose tint agrees
+ * with it — never colour alone (§8.1). `revoked` is dead matter and keeps
+ * its word on the standing-matter ink; every other status renders in the
+ * neutral tone, because none of them is this admin's Draft/Live vocabulary.
  */
 function registrationState(status) {
   if (status === 'revoked') return deadMatter(REGISTRATION_LABELS.revoked);
@@ -176,27 +178,21 @@ export default function AdminAttendees() {
                 key={row.id}
                 className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
               >
-                <div className="flex flex-wrap items-start justify-between gap-sm px-md py-xs">
+                <div className="flex flex-wrap items-center justify-between gap-sm px-md py-sm">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
-                      <span className="font-semibold text-admin-ink">
+                    <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
+                      <span className="text-admin-base font-bold text-admin-ink">
                         {row.displayName || '(no name yet)'}
                       </span>
                       <RecordState state={registrationState(row.registrationStatus)} />
                       {row.approvalSource ? (
-                        <span className="text-folio text-admin-ink-secondary">
+                        <span className="text-admin-xs text-admin-ink-secondary">
                           approved by {row.approvalSource === 'admin' ? 'an organizer' : 'ticket'}
                         </span>
                       ) : null}
-                      {row.speakerId ? (
-                        <span className="font-admin-data text-folio text-admin-ink-secondary">
-                          Speaker
-                        </span>
-                      ) : null}
+                      {row.speakerId ? <StatusBadge tone="info">Speaker</StatusBadge> : null}
                     </div>
-                    <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
-                      {row.email}
-                    </p>
+                    <p className={`mt-3xs truncate ${rowMetaClass}`}>{row.email}</p>
                   </div>
                   <div className="flex shrink-0 gap-xs">
                     {canApprove(row) ? (

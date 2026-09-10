@@ -23,11 +23,16 @@ import {
   TextField,
   DestructiveConfirm,
   primaryButtonClass,
+  rowMetaClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
-import AdminPageHeader from '../components/adminChrome.jsx';
+import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
 
 const REVIEW_LABEL = { pending: 'Pending review', approved: 'Approved', rejected: 'Rejected' };
+
+// The verdict's tone. The word is always rendered beside the filename and is
+// the first signal; the tint is the second one, never the only one (§8.1).
+const REVIEW_TONE = { pending: 'caution', approved: 'ok', rejected: 'error' };
 
 function AddLinkForm({ sessionId, onAdded }) {
   const call = useAdminApi();
@@ -105,23 +110,36 @@ function MaterialRow({ material, onChanged }) {
   }
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline py-xs last:border-b-0">
+    <li className="flex flex-wrap items-center justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline py-sm last:border-b-0">
       <div className="min-w-0">
-        <p className="font-semibold text-admin-ink">{material.filename}</p>
-        <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
-          <span>{material.type === 'link' ? material.url : material.storagePath}</span>
-          {' · '}
-          <span>{REVIEW_LABEL[material.reviewStatus] ?? material.reviewStatus}</span>
+        <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
+          <p className="text-admin-base font-bold text-admin-ink">{material.filename}</p>
+          <StatusBadge tone={REVIEW_TONE[material.reviewStatus] ?? 'neutral'}>
+            {REVIEW_LABEL[material.reviewStatus] ?? material.reviewStatus}
+          </StatusBadge>
+        </div>
+        <p className={`mt-3xs truncate ${rowMetaClass}`}>
+          {material.type === 'link' ? material.url : material.storagePath}
         </p>
       </div>
       <div className="flex flex-wrap gap-xs">
         {material.reviewStatus !== 'approved' ? (
-          <button type="button" className={secondaryButtonClass} disabled={busy} onClick={() => review('approved')}>
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            disabled={busy}
+            onClick={() => review('approved')}
+          >
             Approve
           </button>
         ) : null}
         {material.reviewStatus !== 'rejected' ? (
-          <button type="button" className={secondaryButtonClass} disabled={busy} onClick={() => review('rejected')}>
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            disabled={busy}
+            onClick={() => review('rejected')}
+          >
             Reject
           </button>
         ) : null}
@@ -210,7 +228,7 @@ export default function AdminMaterialsTab() {
             {loading ? (
               <SaveStatus message="Loading materials…" />
             ) : materials.length === 0 ? (
-              <p className="text-caption text-admin-ink-secondary">No materials yet.</p>
+              <p className="text-admin-sm text-admin-ink-secondary">No materials yet.</p>
             ) : (
               <ul className="flex flex-col">
                 {materials.map((material) => (

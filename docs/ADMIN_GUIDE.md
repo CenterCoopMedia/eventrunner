@@ -35,6 +35,8 @@ Work down the controls in this order.
 
 **Light or dark.** Always light, always dark, or follow the reader's own setting. Every site style defines both, so there is no wrong answer here.
 
+**Admin colours.** The colour of the admin's own rail, buttons and links — this panel, not the public site. By default it follows the Main brand colour, adjusted until white text and the focus ring hold their contrast in light and in dark. Or pick one of six house schemes: navy, graphite, forest, oxblood, teal or plum. The admin changes colour when you publish the theme, and attendees never see it.
+
 **Advanced.** Everything else the system can do, behind a disclosure, and none of it is needed for a finished site:
 
 - *Navigation* — **Where the navigation sits**: Across the top, or down the leading edge on wide screens. One choice, every page, for the same reason the header is site-wide. A single page can overrule it from the page editor.

@@ -1,10 +1,11 @@
-// The copy bench — form primitives for the composing room (no form library;
-// the forms here are plain controlled inputs, and a dependency would buy
-// nothing but bundle weight).
+// The copy bench — form primitives for the desk (no form library; the forms
+// here are plain controlled inputs, and a dependency would buy nothing but
+// bundle weight).
 //
 // Every control reads the `admin-*` tokens and nothing else: the admin has
 // one fixed identity, so a client's preset never reaches a field, a button,
-// or a rule in this room (design brief §5.2, admin story part 2). The public
+// or a rule in this room (design brief §5.2, admin story part 2, desk
+// amendment docs/plans/2026-09-10-admin-editorial-desk.md). The public
 // site's own controls live in components/forms/publicForm.jsx and run on the
 // tier-2 tokens — the two tiers stay apart on purpose.
 //
@@ -17,7 +18,7 @@
 // reader; nothing is signalled by colour alone.
 import { useId, useState } from 'react';
 
-// The field boundary is --admin-rule-strong, not the hairline: a form
+// The field boundary is --admin-rule-control, not the hairline: a form
 // control's boundary is non-text user interface under WCAG 1.4.11 and needs
 // 3:1 against its own ground, which the hairline (tuned for row separators)
 // does not clear.
@@ -27,41 +28,73 @@ import { useId, useState } from 'react';
  * fields elsewhere in the room, and a copy that drifts is a control that
  * stops matching its neighbours.
  */
-export const fieldLabelClass = 'text-caption font-semibold text-admin-ink';
-export const fieldHintClass = 'text-folio text-admin-ink-secondary';
+export const fieldLabelClass = 'text-admin-base font-semibold text-admin-ink';
+export const fieldHintClass = 'text-admin-sm text-admin-ink-secondary';
 
+// Neither a field nor a button carries `admin-target`: that class is the
+// 24px floor under a quiet in-row link, and Tailwind emits it after the
+// generated utilities, so on the same element it would beat the control
+// height at equal specificity and the control would fall to its padding.
 export const inputClass =
-  'admin-target w-full rounded-admin border-admin-hairline border-admin-rule-strong ' +
-  'bg-admin-ground-input px-sm py-2xs font-admin-ui text-caption text-admin-ink ' +
-  'placeholder:text-admin-ink-secondary aria-[invalid=true]:border-admin-rule-alarm';
+  'min-h-admin-control w-full rounded-admin border-admin-hairline border-admin-rule-control ' +
+  'bg-admin-ground-input px-sm py-xs font-admin-ui text-admin-base text-admin-ink ' +
+  'placeholder:text-admin-ink-data hover:border-admin-action ' +
+  'aria-[invalid=true]:border-admin-rule-alarm';
 
-// Buttons are all one size. An oversized primary action is the pattern
-// §2.4 rejects, and the room never shouts (admin story part 5).
+// Buttons are all one height — the control height — and one type size. The
+// hierarchy is in the fill: one filled action per surface, quiet secondary
+// controls beside it. An oversized primary action is the pattern §2.4
+// rejects, and the room never shouts (admin story part 5).
 const buttonBase =
-  'admin-target inline-flex items-center justify-center rounded-admin px-sm py-2xs ' +
-  'font-admin-ui text-caption font-semibold disabled:opacity-60';
-
-/** The filled control: type metal. Never the client accent. */
-export const primaryButtonClass =
-  `${buttonBase} bg-admin-ink text-admin-ink-inverse hover:bg-admin-ink/90`;
-
-export const secondaryButtonClass =
-  `${buttonBase} border-admin-hairline border-admin-rule-strong bg-admin-ground-raised ` +
-  'text-admin-ink hover:bg-admin-ground-input';
+  'inline-flex min-h-admin-control items-center justify-center gap-2xs rounded-admin ' +
+  'border-admin-hairline px-md py-xs font-admin-ui text-admin-base leading-tight ' +
+  'disabled:cursor-not-allowed disabled:opacity-60';
 
 /**
- * A destructive control: the alarm ground inside the alarm rule, at NORMAL
- * size, with nothing animated. The label is the caller's, and it repeats the
- * consequence — "Delete this page", never "Confirm" (admin story moment 3).
+ * The filled control: the admin's action colour. By default that is the
+ * brand colour worked into a family that holds its bars in both modes
+ * (shared/theme deriveAdminScheme), or the house scheme the Branding tab
+ * picked. Never the raw client accent.
+ */
+export const primaryButtonClass =
+  `${buttonBase} border-admin-action bg-admin-action font-bold text-admin-ink-inverse ` +
+  'hover:border-admin-action-hover hover:bg-admin-action-hover active:bg-admin-action-pressed';
+
+/** The quiet control: white, ruled, and lifted to the soft action ground under the pointer. */
+export const secondaryButtonClass =
+  `${buttonBase} border-admin-rule-strong bg-admin-ground-raised font-medium text-admin-ink ` +
+  'hover:border-admin-action-soft-hover hover:bg-admin-action-soft hover:text-admin-ink-link';
+
+/** The quietest control: no rule until the pointer arrives. */
+export const ghostButtonClass =
+  `${buttonBase} border-transparent bg-transparent font-medium text-admin-ink-secondary ` +
+  'hover:bg-admin-ground-soft hover:text-admin-ink';
+
+/**
+ * A destructive control: the alarm ink on the alarm ground, at NORMAL size,
+ * with nothing animated; it fills only under the pointer. The label is the
+ * caller's, and it repeats the consequence — "Delete this page", never
+ * "Confirm" (admin story moment 3).
  */
 export const dangerButtonClass =
-  `${buttonBase} border-admin-hairline border-admin-rule-alarm bg-admin-ground-alarm ` +
-  'text-admin-state-error hover:bg-admin-ground-alarm/70';
+  `${buttonBase} border-transparent bg-admin-ground-alarm font-semibold text-admin-state-error ` +
+  'hover:border-admin-rule-alarm hover:bg-admin-state-error hover:text-admin-ink-inverse';
 
-/** A quiet in-row control: still a button, still a 24px target. */
+/** A quiet in-row control: a link-coloured word, still a button, still a 24px target. */
 export const linkButtonClass =
-  'admin-target inline-flex items-center rounded-admin px-2xs py-3xs font-admin-ui text-folio ' +
-  'text-admin-ink-link underline underline-offset-2 hover:text-admin-ink disabled:opacity-60';
+  'admin-target inline-flex items-center rounded-admin-small px-2xs py-3xs font-admin-ui text-admin-sm ' +
+  'font-semibold text-admin-ink-link underline-offset-2 hover:underline disabled:opacity-60';
+
+/** The title of a record in a list row: a link in the ink, underlined only under the pointer. */
+export const rowTitleLinkClass =
+  'admin-target inline-flex items-center rounded-admin-small text-admin-base font-bold text-admin-ink ' +
+  'underline-offset-4 hover:text-admin-ink-link hover:underline';
+
+/** The identifiers under a row's title: paths, ids, counts, in the data face. */
+export const rowMetaClass = 'font-admin-data text-admin-xs text-admin-ink-data';
+
+/** One list row's inner padding, so every galley in the room keeps one rhythm. */
+export const rowClass = 'flex flex-wrap items-center justify-between gap-sm px-md py-sm';
 
 /** A labelled text-ish input. `error` is the server's message, verbatim. */
 export function TextField({
@@ -71,6 +104,7 @@ export function TextField({
   error,
   hint,
   type = 'text',
+  className = '',
   ...rest
 }) {
   const id = useId();
@@ -92,7 +126,7 @@ export function TextField({
       <input
         id={id}
         type={type}
-        className={inputClass}
+        className={`${inputClass} ${className}`}
         value={value ?? ''}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? 'true' : undefined}
@@ -105,7 +139,16 @@ export function TextField({
 }
 
 /** A labelled multi-line input (rich-text and long descriptions). */
-export function TextAreaField({ label, value, onChange, error, hint, rows = 3, ...rest }) {
+export function TextAreaField({
+  label,
+  value,
+  onChange,
+  error,
+  hint,
+  rows = 3,
+  className = '',
+  ...rest
+}) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
@@ -125,7 +168,7 @@ export function TextAreaField({ label, value, onChange, error, hint, rows = 3, .
       <textarea
         id={id}
         rows={rows}
-        className={inputClass}
+        className={`${inputClass} ${className}`}
         value={value ?? ''}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? 'true' : undefined}
@@ -138,7 +181,16 @@ export function TextAreaField({ label, value, onChange, error, hint, rows = 3, .
 }
 
 /** A labelled <select> over `options: [{ value, label }]`. */
-export function SelectField({ label, value, onChange, options, error, hint, ...rest }) {
+export function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  error,
+  hint,
+  className = '',
+  ...rest
+}) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
@@ -157,7 +209,7 @@ export function SelectField({ label, value, onChange, options, error, hint, ...r
       ) : null}
       <select
         id={id}
-        className={inputClass}
+        className={`${inputClass} ${className}`}
         value={value ?? ''}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? 'true' : undefined}
@@ -184,7 +236,7 @@ export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
       <input
         id={id}
         type="checkbox"
-        className="mt-3xs h-5 w-5 rounded-admin border-admin-rule-strong bg-admin-ground-input"
+        className="mt-3xs h-5 w-5 shrink-0 rounded-admin-small border-admin-rule-control bg-admin-ground-input accent-admin-action"
         checked={Boolean(checked)}
         onChange={(event) => onChange(event.target.checked)}
         aria-describedby={hint ? hintId : undefined}
@@ -223,7 +275,7 @@ export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
 export function FieldError({ id, message, role }) {
   if (!message) return null;
   return (
-    <p id={id} role={role} className="text-folio text-admin-state-error">
+    <p id={id} role={role} className="text-admin-sm font-medium text-admin-state-error">
       <span aria-hidden="true" className="font-semibold">
         !{' '}
       </span>
@@ -249,15 +301,15 @@ export function ServerErrorSummary({ error, errorRef, title = 'The server reject
       tabIndex={-1}
       className="rounded-admin border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm text-admin-state-error"
     >
-      <p className="text-caption font-semibold">{title}</p>
+      <p className="text-admin-base font-bold">{title}</p>
       {segments.length > 1 ? (
-        <ul className="mt-2xs list-disc ps-5 font-admin-data text-folio">
+        <ul className="mt-2xs list-disc ps-5 font-admin-data text-admin-sm">
           {segments.map((segment, index) => (
             <li key={`${segment.message}-${index}`}>{segment.message}</li>
           ))}
         </ul>
       ) : (
-        <p className="mt-3xs font-admin-data text-folio">{error.message}</p>
+        <p className="mt-3xs font-admin-data text-admin-sm">{error.message}</p>
       )}
     </div>
   );
@@ -266,7 +318,7 @@ export function ServerErrorSummary({ error, errorRef, title = 'The server reject
 /** A saved/idle status line, stated in place. Routine work uses role=status. */
 export function SaveStatus({ message }) {
   return (
-    <p role="status" className="text-caption text-admin-ink-secondary">
+    <p role="status" className="text-admin-sm text-admin-ink-secondary">
       {message}
     </p>
   );
@@ -274,8 +326,8 @@ export function SaveStatus({ message }) {
 
 /** Notice ink and ground per tone. Each tone always carries its own words. */
 const NOTICE_TONES = Object.freeze({
-  info: 'border-admin-rule-hairline bg-admin-ground-raised text-admin-ink',
-  ok: 'border-admin-rule-hairline bg-admin-ground-raised text-admin-state-ok',
+  info: 'border-admin-rule-hairline bg-admin-ground-info text-admin-state-info',
+  ok: 'border-admin-rule-hairline bg-admin-ground-ok text-admin-state-ok',
   caution: 'border-admin-rule-hairline bg-admin-ground-proof text-admin-state-caution',
   error: 'border-admin-rule-alarm bg-admin-ground-alarm text-admin-state-error',
 });
@@ -291,7 +343,7 @@ export function Notice({ tone = 'info', message, children }) {
   return (
     <p
       role={tone === 'error' ? 'alert' : 'status'}
-      className={`rounded-admin border-admin-hairline px-sm py-2xs text-caption ${
+      className={`rounded-admin border-admin-hairline px-md py-sm text-admin-sm font-medium ${
         NOTICE_TONES[tone] ?? NOTICE_TONES.info
       }`}
     >
@@ -352,12 +404,12 @@ export function DestructiveConfirm({
   return (
     <section
       aria-labelledby={headingId}
-      className={`flex flex-col gap-xs rounded-admin border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm ${className}`}
+      className={`flex flex-col gap-xs rounded-admin-panel border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm ${className}`}
     >
-      <h2 id={headingId} className="text-caption font-semibold text-admin-state-error">
+      <h2 id={headingId} className="text-admin-base font-bold text-admin-state-error">
         {title ?? trigger}
       </h2>
-      <p className="max-w-[65ch] text-caption text-admin-ink">
+      <p className="max-w-[65ch] text-admin-sm text-admin-ink">
         {consequence}
         {permanence ? ` ${permanence}` : ''}
       </p>
@@ -384,9 +436,10 @@ export function DestructiveConfirm({
 }
 
 /**
- * A ruled region of the stone. Regions are separated by rules and by tint,
- * never by a floating rounded card and never by a shadow: elevation in this
- * room is tint (admin story part 6).
+ * A panel on the stone: the white work surface on the canvas, inside a
+ * hairline rule with the panel radius, and never a shadow — elevation in
+ * this room is the step from the canvas to the paper (desk amendment,
+ * part a).
  *
  * `flush` drops the panel's own padding so a galley's hairline rows run the
  * full measure to the panel rule and supply their own gutters. It is a prop
@@ -404,7 +457,7 @@ export function Panel({
 }) {
   return (
     <section
-      className={`rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised ${
+      className={`rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised ${
         flush ? '' : 'p-md'
       } ${className}`}
     >
@@ -412,17 +465,17 @@ export function Panel({
         <div
           className={`${
             flush ? 'px-md pt-md ' : ''
-          }mb-sm flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline pb-2xs`}
+          }mb-sm flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline pb-sm`}
         >
-          <div>
-            <h2 className="font-admin-ui text-lead font-semibold text-admin-ink">{title}</h2>
+          <div className="min-w-0">
+            <h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">{title}</h2>
             {description ? (
-              <p className="mt-3xs max-w-[65ch] text-caption text-admin-ink-secondary">
+              <p className="mt-3xs max-w-[65ch] text-admin-sm text-admin-ink-secondary">
                 {description}
               </p>
             ) : null}
           </div>
-          {actions}
+          {actions ? <div className="flex flex-wrap items-center gap-xs">{actions}</div> : null}
         </div>
       ) : null}
       {children}

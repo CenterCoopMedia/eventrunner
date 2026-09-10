@@ -850,113 +850,227 @@ const PRESETS = Object.freeze({
 const ADMIN_TOKENS = Object.freeze({
   colors: {
     '--admin-ground-rgb': {
-      light: [234, 232, 227],
-      dark: [31, 30, 28],
+      light: [244, 246, 249],
+      dark: [24, 27, 33],
     },
     '--admin-ground-raised-rgb': {
-      light: [243, 241, 237],
-      dark: [43, 42, 39],
+      light: [255, 255, 255],
+      dark: [32, 36, 44],
+    },
+    '--admin-ground-soft-rgb': {
+      light: [234, 240, 247],
+      dark: [42, 48, 58],
     },
     '--admin-ground-proof-rgb': {
-      light: [234, 223, 194],
-      dark: [56, 49, 32],
+      light: [255, 245, 221],
+      dark: [54, 46, 28],
     },
     '--admin-ground-input-rgb': {
-      light: [251, 250, 247],
-      dark: [23, 22, 21],
+      light: [255, 255, 255],
+      dark: [26, 30, 37],
     },
     '--admin-ground-alarm-rgb': {
-      light: [246, 231, 228],
-      dark: [56, 31, 29],
+      light: [255, 240, 243],
+      dark: [58, 30, 34],
+    },
+    '--admin-ground-ok-rgb': {
+      light: [231, 247, 238],
+      dark: [26, 52, 40],
+    },
+    '--admin-ground-info-rgb': {
+      light: [237, 245, 255],
+      dark: [30, 44, 66],
     },
     '--admin-ink-rgb': {
-      light: [28, 27, 25],
-      dark: [236, 231, 222],
+      light: [19, 34, 59],
+      dark: [236, 239, 244],
     },
     '--admin-ink-secondary-rgb': {
-      light: [82, 79, 74],
-      dark: [173, 168, 158],
+      light: [52, 71, 100],
+      dark: [186, 196, 210],
     },
     '--admin-ink-data-rgb': {
-      light: [56, 54, 50],
-      dark: [201, 196, 186],
+      light: [82, 101, 129],
+      dark: [200, 208, 220],
     },
     '--admin-ink-inverse-rgb': {
-      light: [246, 244, 240],
-      dark: [24, 23, 22],
+      light: [255, 255, 255],
+      dark: [17, 21, 28],
     },
     '--admin-ink-disabled-rgb': {
-      light: [98, 95, 89],
-      dark: [150, 145, 136],
+      light: [90, 104, 125],
+      dark: [150, 160, 176],
     },
     '--admin-ink-link-rgb': {
-      light: [26, 70, 126],
+      light: [23, 61, 166],
       dark: [142, 182, 234],
     },
     '--admin-rule-hairline-rgb': {
-      light: [204, 200, 192],
-      dark: [63, 61, 57],
+      light: [220, 228, 239],
+      dark: [52, 58, 70],
     },
     '--admin-rule-strong-rgb': {
-      light: [136, 131, 122],
-      dark: [114, 110, 102],
+      light: [122, 139, 164],
+      dark: [128, 142, 164],
+    },
+    '--admin-rule-control-rgb': {
+      light: [124, 141, 166],
+      dark: [134, 148, 170],
     },
     '--admin-rule-header-rgb': {
-      light: [92, 88, 81],
-      dark: [158, 153, 144],
+      light: [124, 141, 166],
+      dark: [134, 148, 170],
     },
     '--admin-rule-alarm-rgb': {
-      light: [166, 74, 62],
-      dark: [186, 100, 90],
+      light: [196, 90, 112],
+      dark: [232, 120, 136],
     },
     '--admin-state-live-rgb': {
-      light: [24, 88, 56],
+      light: [8, 100, 65],
       dark: [122, 198, 148],
     },
     '--admin-state-draft-rgb': {
-      light: [112, 74, 8],
+      light: [128, 83, 11],
       dark: [228, 178, 94],
     },
     '--admin-state-error-rgb': {
-      light: [150, 28, 32],
+      light: [173, 37, 61],
       dark: [246, 142, 140],
     },
     '--admin-state-caution-rgb': {
-      light: [118, 76, 8],
+      light: [128, 83, 11],
       dark: [232, 182, 96],
     },
     '--admin-state-ok-rgb': {
-      light: [24, 88, 56],
+      light: [8, 100, 65],
       dark: [122, 198, 148],
     },
+    '--admin-state-info-rgb': {
+      light: [36, 82, 142],
+      dark: [142, 182, 234],
+    },
+    '--admin-action-rgb': {
+      light: [29, 78, 166],
+      dark: [92, 148, 224],
+    },
+    '--admin-action-hover-rgb': {
+      light: [23, 63, 138],
+      dark: [120, 168, 236],
+    },
+    '--admin-action-pressed-rgb': {
+      light: [18, 50, 112],
+      dark: [72, 128, 204],
+    },
+    '--admin-action-soft-rgb': {
+      light: [232, 239, 252],
+      dark: [30, 44, 66],
+    },
+    '--admin-action-soft-hover-rgb': {
+      light: [217, 229, 250],
+      dark: [38, 56, 84],
+    },
     '--admin-focus-ring-rgb': {
-      light: [26, 66, 116],
+      light: [29, 78, 166],
       dark: [130, 180, 236],
     },
+    '--admin-focus-ring-rail-rgb': {
+      light: [183, 206, 255],
+      dark: [196, 214, 255],
+    },
+    '--admin-rail-ground-rgb': {
+      light: [17, 29, 48],
+      dark: [12, 16, 24],
+    },
+    '--admin-rail-ground-raised-rgb': {
+      light: [30, 45, 70],
+      dark: [30, 38, 54],
+    },
+    '--admin-rail-ground-hover-rgb': {
+      light: [38, 55, 84],
+      dark: [36, 46, 64],
+    },
+    '--admin-rail-current-rgb': {
+      light: [29, 78, 166],
+      dark: [52, 104, 182],
+    },
+    '--admin-rail-ink-rgb': {
+      light: [244, 247, 252],
+      dark: [240, 244, 250],
+    },
+    '--admin-rail-ink-muted-rgb': {
+      light: [180, 194, 216],
+      dark: [170, 184, 206],
+    },
+    '--admin-rail-rule-rgb': {
+      light: [54, 72, 102],
+      dark: [48, 58, 78],
+    },
     '--admin-client-accent-ink-rgb': {
-      light: [246, 244, 240],
-      dark: [24, 23, 22],
+      light: [255, 255, 255],
+      dark: [17, 21, 28],
     },
   },
   aliases: {
     '--admin-client-accent-rgb': '--admin-ink-rgb',
   },
   components: {
-    '--admin-nav-active-marker-rgb': '--admin-client-accent-rgb',
+    '--admin-nav-active-marker-rgb': '--admin-rail-ink-rgb',
     '--admin-page-header-mark-rgb': '--admin-client-accent-rgb',
   },
   scalars: {
     '--admin-rule-hairline-width': 'var(--er-width-hairline)',
-    '--admin-rule-strong-width': 'var(--er-width-strong)',
-    '--admin-rule-header-width': 'var(--er-width-nameplate)',
-    '--admin-rule-alarm-width': 'var(--er-width-strong)',
+    '--admin-rule-strong-width': 'var(--er-width-hairline)',
+    '--admin-rule-header-width': 'var(--er-width-hairline)',
+    '--admin-rule-alarm-width': 'var(--er-width-hairline)',
+    '--admin-focus-width': '3px',
     '--admin-focus-offset': '2px',
-    '--admin-radius': '2px',
-    '--admin-nav-active-marker-width': 'var(--er-width-strong)',
+    '--admin-radius': '6px',
+    '--admin-radius-panel': '10px',
+    '--admin-radius-small': '4px',
+    '--admin-nav-active-marker-width': 'var(--er-width-nameplate)',
+    '--admin-control-height': '2.75rem',
+    '--admin-rail-width': '14.5rem',
+    '--admin-canvas-max': '96rem',
+    '--admin-text-xs': '0.8125rem',
+    '--admin-text-sm': '0.875rem',
+    '--admin-text-base': '0.9375rem',
+    '--admin-text-lg': '1.125rem',
+    '--admin-text-xl': '1.375rem',
+    '--admin-text-title': 'clamp(1.625rem, 2.2vw, 2rem)',
+    '--admin-leading-copy': '1.5',
+    '--admin-leading-tight': '1.2',
+    '--admin-tracking-title': '-0.02em',
+    '--admin-tracking-folio': '0.08em',
   },
   fonts: {
     '--admin-font-ui': 'sans-humanist',
     '--admin-font-data': 'plex-mono',
+  },
+  schemes: {
+    navy: {
+      light: [29, 78, 166],
+      dark: [92, 148, 224],
+    },
+    graphite: {
+      light: [72, 78, 90],
+      dark: [164, 172, 188],
+    },
+    forest: {
+      light: [30, 96, 62],
+      dark: [110, 186, 140],
+    },
+    oxblood: {
+      light: [138, 30, 52],
+      dark: [232, 118, 140],
+    },
+    teal: {
+      light: [20, 104, 116],
+      dark: [96, 190, 204],
+    },
+    plum: {
+      light: [96, 50, 140],
+      dark: [188, 150, 232],
+    },
   },
 });
 

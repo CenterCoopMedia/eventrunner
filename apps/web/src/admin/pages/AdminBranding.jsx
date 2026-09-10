@@ -23,6 +23,12 @@
 //   5. Schedule style      how the programme is set.
 //   6. Light or dark       the mode policy.
 //
+// Then one decision about the ROOM rather than the page: Admin colours. The
+// rail, the filled button, the links and the focus ring take the main brand
+// colour by default, worked into a safe family for both modes
+// (shared/theme deriveAdminScheme), or one of the house schemes. It never
+// reaches the public site, so the frame beside it never shows it.
+//
 // Then the page preview, then Publish. That is the whole normal job.
 //
 // ADVANCED holds everything else, behind one disclosure: typography (the
@@ -38,7 +44,8 @@
 //
 // WHAT IS SAVED. config/theme is a WHOLE-DOC replace, so the payload always
 // carries every field together: preset, optionPicks, brandColor, tokens,
-// motifSet, mode, fonts, texture, radius, density, logos, and colors.
+// motifSet, mode, adminScheme, fonts, texture, radius, density, logos, and
+// colors.
 // Dropping one on a save would silently delete it — which is exactly what
 // would happen to `preset` if this form still sent the pre-preset shape.
 //
@@ -62,6 +69,9 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { configuredThemeColor } from '../themeColors.js';
 import {
+  ADMIN_SCHEME_IDS,
+  ADMIN_SCHEME_LABELS,
+  DEFAULT_ADMIN_SCHEME,
   DEFAULT_MODE_POLICY,
   DENSITY_IDS,
   FONT_SET_IDS,
@@ -213,6 +223,11 @@ function toForm(theme) {
     // 'top' would take that fallback away on the next save of any other
     // field on this tab.
     navPlacement: NAV_PLACEMENT_IDS.includes(theme?.navPlacement) ? theme.navPlacement : '',
+    // The admin's own colours. A document that names none follows the brand
+    // colour, so that is what the form starts on.
+    adminScheme: ADMIN_SCHEME_IDS.includes(theme?.adminScheme)
+      ? theme.adminScheme
+      : DEFAULT_ADMIN_SCHEME,
   };
 }
 
@@ -253,6 +268,13 @@ export function toThemeDoc(form) {
   }
   if (form.brandColor.trim()) doc.brandColor = form.brandColor.trim();
   if (form.navPlacement) doc.navPlacement = form.navPlacement;
+  // Written every time, the brand default included. EventConfigProvider
+  // overlays the live document on the built snapshot shallowly, so a saved
+  // document that omitted the field would inherit whatever scheme the
+  // snapshot carries, and "Follow the main brand colour" could never be
+  // chosen back on such a deployment. Saying `brand` is how a document says
+  // it. (A document that predates the field still reads as brand.)
+  doc.adminScheme = form.adminScheme || DEFAULT_ADMIN_SCHEME;
   return doc;
 }
 
@@ -370,7 +392,7 @@ export default function AdminBranding() {
   // The words for the picked style. The rendering values and the copy are
   // two generated outputs of one source, so a style always has both.
   const copy = presetCopy(form.preset);
-  // The mode the admin marker's legibility is judged in: whichever mode the
+  // The mode the admin mark's legibility is judged in: whichever mode the
   // preview is showing, so the warning and the picture agree.
   const [previewMode, setPreviewMode] = useState('light');
   const accent = adminAccentVerdict(candidate, previewMode);
@@ -492,7 +514,7 @@ export default function AdminBranding() {
                 error={fieldErrors.get('theme.preset')}
               />
               {copy ? (
-                <p className="max-w-[65ch] text-caption text-admin-ink-secondary">
+                <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
                   {copy.summary}
                   <span className="mt-3xs block text-admin-ink-data">
                     Best for: {copy.bestFor}
@@ -569,7 +591,7 @@ export default function AdminBranding() {
                     onChange={(event) =>
                       setForm((c) => ({ ...c, brandColor: event.target.value }))
                     }
-                    className="admin-target h-9 w-12 rounded-admin border-admin-hairline border-admin-rule-strong bg-admin-ground-input p-3xs"
+                    className="admin-target h-9 w-12 rounded-admin-small border-admin-hairline border-admin-rule-control bg-admin-ground-input p-3xs"
                   />
                 ) : null}
                 <div className="flex-1">
@@ -582,13 +604,13 @@ export default function AdminBranding() {
                   />
                 </div>
               </div>
-              {/* The admin marker's legibility floor, stated plainly. The
+              {/* The admin mark's legibility floor, stated plainly. The
                   site keeps painting the client's colour; only the admin
-                  marker steps aside, and it says so. */}
+                  mark beside the page title steps aside, and it says so. */}
               {accent.fellBack ? (
                 <Notice
                   tone="caution"
-                  message={`This colour reads at ${accent.ratio.toFixed(2)}:1 against the ${previewMode} admin ground, below the ${accent.floor}:1 floor a position marker needs. The marker beside the section you are in falls back to the admin’s own ink. The site itself is unaffected.`}
+                  message={`This colour reads at ${accent.ratio.toFixed(2)}:1 against the ${previewMode} admin title band, below the ${accent.floor}:1 floor a position marker needs. The mark beside the page title falls back to the admin’s own ink. The site itself is unaffected.`}
                 />
               ) : null}
             </div>
@@ -615,6 +637,32 @@ export default function AdminBranding() {
               onChange={(value) => setForm((c) => ({ ...c, mode: value }))}
               hint="Every style defines both. Follow the reader lets each visitor’s own setting decide."
               error={fieldErrors.get('theme.mode')}
+            />
+          </Panel>
+
+          {/* 7 ------------------------------------ the admin's own colours */}
+          {/* THE ROOM, NOT THE PAGE. Every other decision on this tab is
+              about the client's site. This one is about the admin around
+              it: the rail, the filled button, the links and the focus ring.
+              Whatever seeds it — the main brand colour by default, or a
+              house scheme — is worked into a family that holds its contrast
+              in both modes (shared/theme deriveAdminScheme), so there is no
+              wrong answer here either. The frame never shows it, because the
+              public site never gets it. */}
+          <Panel
+            title="Admin colours"
+            description="The colour of this admin’s rail, buttons and links. The public site never uses it."
+          >
+            <SelectField
+              label="Admin colours"
+              value={form.adminScheme}
+              options={ADMIN_SCHEME_IDS.map((id) => ({
+                value: id,
+                label: ADMIN_SCHEME_LABELS[id] ?? id,
+              }))}
+              onChange={(value) => setForm((c) => ({ ...c, adminScheme: value }))}
+              hint="Whichever colour you pick is adjusted until white text and the focus ring hold their contrast in light and dark. The admin changes colour when the theme is published."
+              error={fieldErrors.get('theme.adminScheme')}
             />
           </Panel>
 
@@ -650,7 +698,7 @@ export default function AdminBranding() {
               <section aria-labelledby="admin-theme-navigation">
                 <h3
                   id="admin-theme-navigation"
-                  className="font-admin-ui text-body font-semibold text-admin-ink"
+                  className="font-admin-ui text-admin-lg font-bold text-admin-ink"
                 >
                   Navigation
                 </h3>
@@ -682,11 +730,11 @@ export default function AdminBranding() {
               <section aria-labelledby="admin-theme-typography">
                 <h3
                   id="admin-theme-typography"
-                  className="font-admin-ui text-body font-semibold text-admin-ink"
+                  className="font-admin-ui text-admin-lg font-bold text-admin-ink"
                 >
                   Typography
                 </h3>
-                <p className="mb-sm mt-3xs max-w-[65ch] text-caption text-admin-ink-secondary">
+                <p className="mb-sm mt-3xs max-w-[65ch] text-admin-sm text-admin-ink-secondary">
                   The style names a face for every role. The heading face has
                   curated alternates that stay inside the style; naming a role
                   outright leaves the curated set behind.
@@ -695,7 +743,7 @@ export default function AdminBranding() {
                     library is 23 families; this is the four a reader of THIS
                     site actually gets, so it is worth stating rather than
                     leaving an operator to read it off four select boxes. */}
-                <dl className="mb-sm grid grid-cols-[auto,1fr] gap-x-sm gap-y-3xs font-admin-data text-folio text-admin-ink-data">
+                <dl className="mb-sm grid grid-cols-[auto,1fr] gap-x-sm gap-y-3xs font-admin-data text-admin-xs text-admin-ink-data">
                   {THEME_FONT_ROLES.map((role) => (
                     <div key={role} className="contents">
                       <dt>{FONT_ROLE_LABELS[role] ?? role}</dt>
@@ -732,7 +780,7 @@ export default function AdminBranding() {
               <section aria-labelledby="admin-theme-illustrations">
                 <h3
                   id="admin-theme-illustrations"
-                  className="font-admin-ui text-body font-semibold text-admin-ink"
+                  className="font-admin-ui text-admin-lg font-bold text-admin-ink"
                 >
                   Illustrations
                 </h3>
@@ -763,7 +811,7 @@ export default function AdminBranding() {
               <section aria-labelledby="admin-theme-shape">
                 <h3
                   id="admin-theme-shape"
-                  className="font-admin-ui text-body font-semibold text-admin-ink"
+                  className="font-admin-ui text-admin-lg font-bold text-admin-ink"
                 >
                   Surface and shape
                 </h3>
@@ -808,11 +856,11 @@ export default function AdminBranding() {
               <section aria-labelledby="admin-theme-colors">
                 <h3
                   id="admin-theme-colors"
-                  className="font-admin-ui text-body font-semibold text-admin-ink"
+                  className="font-admin-ui text-admin-lg font-bold text-admin-ink"
                 >
                   Advanced colour settings
                 </h3>
-                <p className="mb-sm mt-3xs max-w-[65ch] text-caption text-admin-ink-secondary">
+                <p className="mb-sm mt-3xs max-w-[65ch] text-admin-sm text-admin-ink-secondary">
                   Set any colour by hand, per mode. A value here wins over the
                   brand colour and over the style in that mode only; a blank
                   field keeps the worked-out value. Every pair is measured as
@@ -906,7 +954,7 @@ export default function AdminBranding() {
                                 colors: { ...c.colors, [key]: event.target.value },
                               }))
                             }
-                            className="admin-target h-9 w-12 rounded-admin border-admin-hairline border-admin-rule-strong bg-admin-ground-input p-3xs"
+                            className="admin-target h-9 w-12 rounded-admin-small border-admin-hairline border-admin-rule-control bg-admin-ground-input p-3xs"
                           />
                         ) : null}
                         <div className="flex-1">

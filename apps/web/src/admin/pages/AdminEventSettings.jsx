@@ -25,7 +25,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
-import AdminPageHeader from '../components/adminChrome.jsx';
+import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
 import { subscribeAdminCollection } from '../adminSource.js';
 import VenueReferenceEditor, {
   normalizeVenueReferences,
@@ -303,6 +303,15 @@ export default function AdminEventSettings() {
       <AdminPageHeader
         title="Event"
         description="Name, dates, venue, and the addresses the site and its email use."
+        actions={
+          <button
+            type="submit"
+            className={primaryButtonClass}
+            disabled={saving || localVenueErrors.size > 0}
+          >
+            {saving ? 'Saving…' : 'Save event settings'}
+          </button>
+        }
       />
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
@@ -355,7 +364,7 @@ export default function AdminEventSettings() {
         }
       >
         {form.days.length === 0 ? (
-          <p className="text-caption text-admin-ink-secondary">No days configured yet.</p>
+          <p className="text-admin-sm text-admin-ink-secondary">No days configured yet.</p>
         ) : (
           <ol className="flex flex-col">
             {form.days.map((day, index) => (
@@ -429,7 +438,7 @@ export default function AdminEventSettings() {
         }
       >
         {form.tracks.length === 0 ? (
-          <p className="text-caption text-admin-ink-secondary">No tracks configured yet.</p>
+          <p className="text-admin-sm text-admin-ink-secondary">No tracks configured yet.</p>
         ) : (
           <ol className="flex flex-col">
             {form.tracks.map((track, index) => (
@@ -592,15 +601,11 @@ export default function AdminEventSettings() {
             onChange={(value) => setGroup('sender', { replyTo: value })}
             error={errorFor('sender.replyTo')}
           />
-          <p className="self-center text-caption text-admin-ink-secondary">
+          <p className="self-center text-admin-sm text-admin-ink-secondary">
             Sender domain:{' '}
-            <strong
-              className={`font-admin-data font-semibold ${
-                verified ? 'text-admin-state-ok' : 'text-admin-state-caution'
-              }`}
-            >
+            <StatusBadge tone={verified ? 'ok' : 'caution'}>
               {verified ? 'verified' : 'not verified'}
-            </strong>
+            </StatusBadge>
             . Verification is set by the sender-domain job, not from here.
           </p>
         </div>
@@ -649,16 +654,6 @@ export default function AdminEventSettings() {
           />
         </div>
       </Panel>
-
-      <div>
-        <button
-          type="submit"
-          className={primaryButtonClass}
-          disabled={saving || localVenueErrors.size > 0}
-        >
-          {saving ? 'Saving…' : 'Save event settings'}
-        </button>
-      </div>
     </form>
   );
 }

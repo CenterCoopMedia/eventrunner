@@ -334,7 +334,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
 
   return (
     <>
-      {notice ? <p role="status" className="text-caption text-admin-ink-secondary">{notice}</p> : null}
+      {notice ? <p role="status" className="text-admin-sm text-admin-ink-secondary">{notice}</p> : null}
       <Panel
         title="Places"
         description="Stable room references for sessions and transfer routes. Names and floors can change without changing an id."
@@ -350,7 +350,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
         }
       >
         {places.length === 0 ? (
-          <p className="text-caption text-admin-ink-secondary">No places configured yet.</p>
+          <p className="text-admin-sm text-admin-ink-secondary">No places configured yet.</p>
         ) : (
           <ol className="flex flex-col">
             {places.map((place, index) => {
@@ -387,7 +387,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                     />
                   </div>
                   {uses.length > 0 ? (
-                    <p className="mt-xs text-caption text-admin-state-caution">
+                    <p className="mt-xs text-admin-sm text-admin-state-caution">
                       Used by {uses.slice(0, 4).join(', ')}
                       {uses.length > 4 ? ` and ${uses.length - 4} more` : ''}. Move those sessions before removing this place.
                     </p>
@@ -423,7 +423,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
         }
       >
         {movements.length === 0 ? (
-          <p className="text-caption text-admin-ink-secondary">No movements configured yet.</p>
+          <p className="text-admin-sm text-admin-ink-secondary">No movements configured yet.</p>
         ) : (
           <ol className="flex flex-col">
             {movements.map((movement, index) => (
@@ -531,7 +531,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
         {map.image ? (
           <div className="mt-sm">
             {markers.length === 0 ? (
-              <p className="text-caption text-admin-ink-secondary">
+              <p className="text-admin-sm text-admin-ink-secondary">
                 No rooms marked yet. Every place is listed beside the map either way; a marker
                 also puts a numbered dot on the image.
               </p>

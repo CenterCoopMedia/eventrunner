@@ -16,13 +16,17 @@ import {
   DestructiveConfirm,
   Notice,
   Panel,
+  linkButtonClass,
   primaryButtonClass,
+  rowClass,
+  rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
   RecordState,
+  StatusBadge,
   proofRowClass,
 } from '../components/adminChrome.jsx';
 
@@ -60,7 +64,7 @@ export default function AdminContentSection() {
         title="No such section"
         description="That section doesn’t exist on this page (any more)."
         action={
-          <Link to="../.." relative="path" className={secondaryButtonClass}>
+          <Link to="../.." relative="path" className={linkButtonClass}>
             Back to content
           </Link>
         }
@@ -134,7 +138,7 @@ export default function AdminContentSection() {
         }`}
         actions={
           <>
-            <Link to="../.." relative="path" className={secondaryButtonClass}>
+            <Link to="../.." relative="path" className={linkButtonClass}>
               Back to content
             </Link>
             {addBlockButton}
@@ -167,23 +171,21 @@ export default function AdminContentSection() {
                   resolvedIds.has(row.id),
                 )}`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-sm px-md py-xs">
+                <div className={rowClass}>
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
+                    <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
+                      {/* A block's name is its field id, so the title keeps
+                          the data face the rest of the room sets ids in. */}
                       <Link
                         to={row.current.field}
-                        className="admin-target inline-flex items-center rounded-admin font-admin-data font-semibold text-admin-ink underline underline-offset-4"
+                        className={`${rowTitleLinkClass} font-admin-data`}
                       >
                         {row.current.field}
                       </Link>
                       <RecordState state={row.state} />
-                      <span className="text-folio text-admin-ink-secondary">
-                        {blockTypeLabel(row.current.blockType)}
-                      </span>
+                      <StatusBadge tone="info">{blockTypeLabel(row.current.blockType)}</StatusBadge>
                       {row.current.visible === false ? (
-                        <span className="font-admin-data text-folio text-admin-ink-secondary">
-                          Hidden
-                        </span>
+                        <StatusBadge tone="neutral">Hidden</StatusBadge>
                       ) : null}
                     </div>
                   </div>
@@ -198,7 +200,7 @@ export default function AdminContentSection() {
                         {busyId === row.id ? 'Publishing…' : 'Publish this block'}
                       </button>
                     ) : null}
-                    <Link to={row.current.field} className={secondaryButtonClass}>
+                    <Link to={row.current.field} className={linkButtonClass}>
                       Edit
                     </Link>
                     <DestructiveConfirm
