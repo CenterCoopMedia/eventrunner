@@ -219,12 +219,13 @@ export default function AdminEventSettings() {
     [form.venue],
   );
   // THE MAP IS CHECKED AT SUBMIT, NOT WHILE TYPING (issue #219). The places
-  // and movements above disable the save button while they are wrong; that
-  // set does not grow, because a dead button is a form telling somebody "no"
-  // without telling them which field said it. So the map's problems appear
-  // only once a save has been attempted — then they mark their fields, focus
-  // moves to the first of them, and nothing is sent. They clear themselves
-  // as the fields are fixed, so nobody is arguing with a stale message.
+  // and movements above mark their fields as they are typed; the map's
+  // fields say nothing until a save is attempted, because until then there
+  // is no map to be wrong about. Neither set disables the save control — a
+  // dead button is a form telling somebody "no" without telling them which
+  // field said it — so both are refused in submit instead. They clear
+  // themselves as the fields are fixed, so nobody is arguing with a stale
+  // message.
   const [mapChecked, setMapChecked] = useState(false);
   const mapErrors = useMemo(
     () => (mapChecked ? validateVenueMap(form.venue) : NO_ERRORS),
@@ -259,16 +260,24 @@ export default function AdminEventSettings() {
 
   async function submit(event) {
     event.preventDefault();
-    // Nothing is sent while the map is wrong, and the person is put in front
-    // of the field that is wrong rather than left to hunt for it.
+    // Nothing is sent while the venue is wrong, and the person is put in
+    // front of the field that is wrong rather than left to hunt for it.
+    //
+    // BOTH validators refuse here, for one reason each. The places and the
+    // movements are checked as they are typed, so their fields are already
+    // marked — but the save control stays live (interface guidelines: a
+    // submit control is never disabled for a validation state), and without
+    // this the marked form was still sent and the refusal came back from the
+    // server a round trip later. The map is checked only from here, because
+    // its fields say nothing until a save is attempted.
     setMapChecked(true);
-    if (validateVenueMap(form.venue).size > 0) {
+    if (localVenueErrors.size > 0 || validateVenueMap(form.venue).size > 0) {
       setStatus('');
       // A rejection from the SERVER, if one is still standing, goes now.
       // Nothing is being sent, so its summary is stating a problem that may
       // already be fixed — and the focus move below lands on the first
       // marked field in the form, which would be one of that old
-      // rejection's rather than the map field doing the refusing.
+      // rejection's rather than the venue field doing the refusing.
       setError(null);
       // After the render that marks the fields, not before it.
       window.setTimeout(() => focusFirstError(formRef.current), 0);

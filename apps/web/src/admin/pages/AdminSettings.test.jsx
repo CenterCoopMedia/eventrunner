@@ -306,6 +306,77 @@ describe('event settings', () => {
     // own budget rather than failing as a flake on a busy machine.
   }, 20000);
 
+  it('refuses a blank place name at submit and puts the keyboard on it', async () => {
+    // The places and the movements mark their fields as they are typed, and
+    // the save control stays live, which is the rule. What was missing is
+    // the other half of it: submit sent the invalid payload anyway, so the
+    // refusal came back from the server a round trip later instead of from
+    // the form.
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [{ id: 'main-hall', name: 'Main hall' }],
+        movements: [],
+      },
+    });
+
+    fireEvent.change(screen.getByLabelText('Place 1 name'), { target: { value: '  ' } });
+    const save = screen.getByRole('button', { name: 'Save event settings' });
+    expect(save).toBeEnabled();
+    save.focus();
+    fireEvent.click(save);
+
+    const name = screen.getByLabelText('Place 1 name');
+    await waitFor(() => expect(document.activeElement).toBe(name));
+    expect(name).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Enter a place name.')).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+
+    // Fixed, and the same control saves.
+    fireEvent.change(name, { target: { value: 'Main hall' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.venue.places[0].name).toBe('Main hall');
+  });
+
+  it('refuses a stored movement whose endpoint names no place', async () => {
+    // A document written before the place was renamed carries a route to a
+    // room that no longer exists. Sending it back unchanged makes the server
+    // refuse it; the form has to refuse it first and say which end is wrong.
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      venue: {
+        ...LIVE_EVENT.venue,
+        places: [
+          { id: 'main-hall', name: 'Main hall' },
+          { id: 'studio', name: 'Studio' },
+        ],
+        movements: [{ from: 'annexe', to: 'studio', walkingMinutes: 4 }],
+      },
+    });
+
+    const save = screen.getByRole('button', { name: 'Save event settings' });
+    expect(save).toBeEnabled();
+    save.focus();
+    fireEvent.click(save);
+
+    const from = screen.getByLabelText('Movement 1 from');
+    await waitFor(() => expect(document.activeElement).toBe(from));
+    expect(from).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Select a defined place.')).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+
+    fireEvent.change(from, { target: { value: 'main-hall' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.venue.movements[0].from).toBe('main-hall');
+  });
+
   it('drops the server\u2019s rejection before the map\u2019s own refusal takes focus', async () => {
     // A save the SERVER refused leaves a summary and marks its fields. The
     // next save is refused LOCALLY, by the map, and returns before anything
