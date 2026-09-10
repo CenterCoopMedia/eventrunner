@@ -1,7 +1,12 @@
-// The home lead's lifecycle-aware line (M7, "Add a countdown and a
+// The home page's lifecycle-aware clock (M7, "Add a countdown and a
 // lifecycle aware home lead"): the static identity frame the splash screen
 // row stood in for now carries the event's own clock instead of an
 // animated intro.
+//
+// IT IS ONE CELL OF THE SUMMARY ROW (2026-09-10 vocabulary expansion). It
+// draws its own section boundary and its own head, so the row hands it a
+// track and nothing else, and `countdownDraws` below is how the row knows
+// whether to give it one at all.
 //
 // `getEventPhase` (shared/config) is the one place that decides where the
 // event stands, so this reads it rather than re-deriving a boolean from
@@ -42,6 +47,7 @@
 // through a changed `eventConfig` prop.
 import { useEffect, useId, useState } from 'react';
 import { getEventPhase } from 'shared/config';
+import SectionHead from './editorial/SectionHead.jsx';
 import { countdownParts, resolveEventStart } from '../lib/eventTime.js';
 
 // The same "YYYY-MM-DDTHH:MM" shape getEventPhase's own toMinuteIso
@@ -57,7 +63,14 @@ function hasPendingAnnouncement(eventConfig) {
 
 const RUNNING_LINE = 'This event is happening now.';
 const POST_EVENT_LINE = 'This event has ended.';
-const COUNTDOWN_LABEL = 'Time until the event starts';
+// One word, so the three heads of the summary row read as a row: "Dates",
+// "Key facts", "Countdown". The unit under each figure says what is being
+// counted, so the head does not have to say it twice.
+const COUNTDOWN_LABEL = 'Countdown';
+// The cell's head once the clock has stopped mattering. Two heads, one per
+// state: "Countdown" is not true of an event that is running, and it is not
+// true of one that has finished.
+const STATED_LABEL = 'Event status';
 
 // Only these phases count down. Anything else — draft, in_progress, ended,
 // archived, or a phase this file has not been taught — renders nothing or
@@ -75,7 +88,48 @@ const UNITS = [
   { key: 'seconds', label: 'Seconds', pad: true },
 ];
 
-const STATED_LINE_CLASS = 'mt-md max-w-prose text-body text-text-secondary text-pretty';
+const STATED_LINE_CLASS = 'mt-sm max-w-prose text-body text-text-secondary text-pretty';
+
+// The phases that state a line instead of counting.
+const STATED_PHASES = new Set(['in_progress', 'ended', 'archived']);
+
+/**
+ * Whether this component draws anything at all for a given event.
+ *
+ * The summary row on the home page is three cells, and a cell with a head
+ * and nothing under it is a heading over nothing. The row therefore has to
+ * know, BEFORE it opens the cell, whether the clock has anything to say —
+ * so the answer is exported here, beside the rules that decide it, rather
+ * than guessed at the call site.
+ *
+ * @param {object} eventConfig
+ * @param {Date} [now]
+ * @returns {boolean}
+ */
+export function countdownDraws(eventConfig, now = new Date()) {
+  const phase = getEventPhase(eventConfig, now);
+  if (STATED_PHASES.has(phase)) return true;
+  return COUNTING_PHASES.has(phase) && Boolean(resolveEventStart(eventConfig));
+}
+
+/**
+ * The clock as one cell of the home page's summary row: a section boundary
+ * of its own, then whatever the phase has to say.
+ *
+ * The head carries the id the figures point at, so the accessible name of
+ * the group and the visible head are one string rather than two that can
+ * drift.
+ *
+ * @param {{ labelId: string, title: string, children: import('react').ReactNode }} props
+ */
+function Cell({ labelId, title, children }) {
+  return (
+    <section aria-labelledby={labelId}>
+      <SectionHead level={2} id={labelId} title={title} />
+      {children}
+    </section>
+  );
+}
 
 export default function EventCountdown({ eventConfig }) {
   const labelId = useId();
@@ -107,12 +161,14 @@ export default function EventCountdown({ eventConfig }) {
     return () => clearInterval(id);
   }, [counting, watchingRunning, watchingDraft]);
 
-  if (phase === 'in_progress') {
-    return <p className={STATED_LINE_CLASS}>{RUNNING_LINE}</p>;
-  }
-
-  if (phase === 'ended' || phase === 'archived') {
-    return <p className={STATED_LINE_CLASS}>{POST_EVENT_LINE}</p>;
+  if (STATED_PHASES.has(phase)) {
+    return (
+      <Cell labelId={labelId} title={STATED_LABEL}>
+        <p className={STATED_LINE_CLASS}>
+          {phase === 'in_progress' ? RUNNING_LINE : POST_EVENT_LINE}
+        </p>
+      </Cell>
+    );
   }
 
   if (!counting) return null;
@@ -123,19 +179,12 @@ export default function EventCountdown({ eventConfig }) {
   const parts = countdownParts(target.getTime() - now.getTime());
 
   return (
-    // The outer gap (from the copy above) reads at least twice the gap
-    // between the figures themselves (interface guidelines, Layout: named
-    // steps pair sm with lg) — a group boundary, not a run of equally
-    // spaced siblings.
-    <div className="mt-lg border-t-hairline border-t-rule-hairline pt-sm">
-      <p id={labelId} className="font-data text-caption text-text-secondary">
-        {COUNTDOWN_LABEL}
-      </p>
+    <Cell labelId={labelId} title={COUNTDOWN_LABEL}>
       {/* Not a live region: a screen reader is not interrupted once a
-          second for a figure nobody asked to be read aloud. The visible
-          label above states what the group is; a reader who tabs to it
-          hears that label, then the figures, at their own pace. */}
-      <dl aria-labelledby={labelId} className="mt-xs flex flex-wrap gap-sm">
+          second for a figure nobody asked to be read aloud. The cell's own
+          head states what the group is; a reader who tabs to it hears that
+          head, then the figures, at their own pace. */}
+      <dl aria-labelledby={labelId} className="mt-sm flex flex-wrap gap-sm">
         {UNITS.map((unit) => (
           <div key={unit.key} className="flex flex-col">
             <dt className="order-last mt-2xs font-data text-caption text-text-secondary">
@@ -147,6 +196,6 @@ export default function EventCountdown({ eventConfig }) {
           </div>
         ))}
       </dl>
-    </div>
+    </Cell>
   );
 }

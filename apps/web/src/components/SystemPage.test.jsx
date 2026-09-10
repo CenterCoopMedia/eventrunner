@@ -150,6 +150,26 @@ describe('SystemPage', () => {
     expect(screen.getByText('arrangement: grid')).toBeInTheDocument();
   });
 
+  it('sets a list section on the measure and a grid section on the stage', () => {
+    // The arrangement mapped onto the stage (2026-09-10 vocabulary
+    // expansion). The head runs to the stage either way — a section
+    // boundary is the width of the page it opens — and only the body moves.
+    for (const [arrangement, measured] of [
+      ['list', true],
+      ['grid', false],
+    ]) {
+      page = { id: 'schedule', layout: { arrangement }, sections: [section('one')] };
+      blocksBySection = { one: [textBlock('one')] };
+      const { container, unmount } = renderPage();
+      // The head is the first child of the section; the body is the last.
+      const body = container.querySelector(
+        'section[aria-labelledby="section-one"] > div:last-child',
+      );
+      expect(body.classList.contains('measure'), arrangement).toBe(measured);
+      unmount();
+    }
+  });
+
   it('finds the page by path where the id is not the key', () => {
     page = { id: 'landing', path: '/', sections: [section('one', 'above')] };
     blocksBySection = { one: [textBlock('one')] };

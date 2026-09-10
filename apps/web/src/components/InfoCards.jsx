@@ -115,13 +115,25 @@ export function groupIntoCards(blocks) {
  * file does not draw would otherwise print its heading over nothing, and a
  * heading over nothing is a boundary the reader cannot cross.
  *
- * @param {{ cards: ReturnType<typeof groupIntoCards> }} props
+ * @param {{
+ *   cards: ReturnType<typeof groupIntoCards>,
+ *   columns?: 'auto' | 'single',
+ * }} props
  */
-export default function InfoCards({ cards }) {
+export default function InfoCards({ cards, columns = 'auto' }) {
   if (!cards?.length) return null;
 
   return (
-    <div className="grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
+    <div
+      className={
+        // `single` is the group inside one cell of the home page's summary
+        // row: the cell is already a column of the stage, so the cards run
+        // DOWN it. `auto` is the group on the open page.
+        columns === 'single'
+          ? 'grid gap-lg'
+          : 'grid gap-lg sm:grid-cols-2 lg:grid-cols-3'
+      }
+    >
       {cards.map((card) => (
         <div key={card.key}>
           {/* One card, one fact, so the description list holds one entry.

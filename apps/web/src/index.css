@@ -109,6 +109,100 @@
     background-size: 24px 24px;
   }
 
+  /* THE STAGE AND THE MEASURE (2026-09-10 vocabulary expansion).
+     ------------------------------------------------------------------
+     Every page used to sit in one column the width of a text measure. At
+     1440px the event name wrapped at display size, the schedule grid, the
+     portrait shelf, the logo wall and the footer were all squeezed into
+     that measure, and half the canvas stayed empty. Every style shared the
+     shape, so every style read as the same narrow template.
+
+     There are TWO widths now, and both are tokens the page contract
+     declares, so a style retunes either one in its own preset file:
+
+       .stage     the frame. The header, the navigation, the schedule grid,
+                  the directories, the logo wall, the footer, and every
+                  section head run to it.
+       .measure   running text. A paragraph, a list, a rich text block, a
+                  stat description, or an FAQ answer never exceeds it.
+
+     Nothing here states a fixed width. Both are read as a MAXIMUM inline
+     size, the gutter is a spacing step, and every grid track is a
+     `minmax(0, …)` so a long word narrows the column instead of widening
+     the page.
+
+     THE GUTTER IS --space-lg, NOT --space-md, and that is load-bearing. The
+     Atlas coordinate mark is drawn 20px outside the title block, so a 16px
+     gutter pushed it 4px past the viewport and every style scrolled
+     sideways by 4px on a phone. The stage gives the mark the room its
+     device needs rather than clipping it. */
+  .stage {
+    inline-size: 100%;
+    max-inline-size: var(--stage-max);
+    margin-inline: auto;
+    padding-inline: var(--space-lg);
+  }
+  .measure {
+    max-inline-size: var(--measure-text);
+  }
+
+  /* THE MARGIN COLUMN. At lg and above the stage is a grid: the measure
+     takes the leading track and a margin opens beside it, which is where a
+     folio, a picture, or a line of metadata may sit (brief §2.1: a folio
+     lives beside a rule, in a margin, or in a running header). Below lg the
+     margin closes and the measure fills the stage. */
+  .stage-split {
+    display: grid;
+    row-gap: var(--space-lg);
+  }
+  @media (min-width: 64rem) {
+    .stage-split {
+      grid-template-columns: minmax(0, var(--measure-text)) minmax(0, 1fr);
+      column-gap: var(--space-2xl);
+      align-items: start;
+    }
+  }
+
+  /* THE RULED ROW. Equal cells across the stage, each one a section with
+     its own head, separated by a hairline in the gutter. It is not a bento
+     grid and it is not a set of cards: no cell has a ground, a border, a
+     shadow or a radius of its own, and every cell holds real content.
+
+     Below lg the row stacks and the cells' own section rules separate
+     them, so nothing draws a second rule there. */
+  .stage-row {
+    display: grid;
+    row-gap: var(--space-lg);
+  }
+  @media (min-width: 64rem) {
+    .stage-row {
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
+      row-gap: 0;
+    }
+    .stage-row > * {
+      padding-inline: var(--space-lg);
+    }
+    .stage-row > :first-child {
+      padding-inline-start: 0;
+    }
+    .stage-row > :last-child {
+      padding-inline-end: 0;
+    }
+    .stage-row > * + * {
+      border-inline-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    }
+  }
+
+  /* The footer's page list, in columns that wrap. One link to a line at
+     every width, so a dense block of links is a set of columns a reader
+     scans rather than a wall of words to pick apart. */
+  .footer-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    column-gap: var(--space-md);
+  }
+
   /* Editorial devices. Each class is the rendered form of one tier-3
      component contract, so a preset retunes a device by remapping its
      tokens and no component changes. What each device is for, and the rules
@@ -383,7 +477,11 @@
     padding-block: var(--page-row-pad-block);
   }
   .portrait-shelf__frame {
-    aspect-ratio: 4 / 5;
+    /* Square, on the house radius, never a circle (interface guidelines,
+       User interface). On the stage the shelf runs three across at lg and
+       four at xl, which leaves a face about 200px wide at the narrower of
+       the two — a size a face survives. */
+    aspect-ratio: 1 / 1;
     overflow: hidden;
     border-radius: var(--radius-base);
     background-color: rgb(var(--color-surface-alt-rgb));

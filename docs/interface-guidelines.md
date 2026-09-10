@@ -203,6 +203,14 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 
 ## Layout
 
+**The page is built on two widths, and both are tokens.**
+
+- **The stage** (`--stage-max`) is the frame. The header, the navigation, the schedule grid, the four directories, the logo wall, the footer, and every section head run to it. It is a maximum inline size with a gutter from the spacing scale, never a fixed width.
+- **The measure** (`--measure-text`) is running text. A paragraph, a list, a rich text block, a stat block's description, an FAQ answer: none of them exceeds it, at any viewport. `max-w-prose` resolves to it, so the rule holds wherever that utility already sits.
+- **The margin column** opens beside the measure at `lg` and above. The measure takes the leading track, the margin takes the rest, and a folio, a picture, or a line of metadata may sit there. Below `lg` the margin closes and the measure fills the stage.
+- **A style retunes either width in its own preset file.** Both names are declared in the `page` contract (`design/tokens/components.json`) over a tier-2 stage family, so a broadsheet may run wider and tighter and a zine may keep the stage narrow. A style never mints a width of its own.
+- **The arrangement variant maps onto the stage.** `grid` gives a section the stage's columns; `list` sets it on the measure. The section head runs to the stage either way, because a section boundary is the width of the page it opens.
+- **The stage gutter holds every device drawn outside it.** The Atlas coordinate mark sits `--space-sm` plus `--space-xs` outside the title block, so the gutter is `--space-lg`. A narrower gutter pushes the mark past the viewport and the whole page scrolls sideways.
 - The gap between groups is at least twice the gap inside one: 8px within, 16px+ between. Use the named spacing steps (`--space-3xs` through `--space-3xl`), which are built to that rule: `xs` pairs with `md`, `sm` with `lg`, `md` with `xl`.
 - Logical properties (`margin-inline-start`, `padding-inline-end`), not directional values.
 - No fixed widths or heights on text containers.

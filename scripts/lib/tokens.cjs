@@ -407,6 +407,14 @@ function rootBlock(theme, tokens) {
   group('Tier 2 — spacing scale (brief §3.7).');
   for (const [step, value] of tokenEntries(tokens.semantic.space)) push(`--space-${step}`, value);
 
+  group(
+    'Tier 2 — the stage and the measure. Two widths, and every page is built ' +
+    'on them: the stage is the frame the header, the grid, the directories, ' +
+    'the wall and the footer run to; the measure is what running text never ' +
+    'exceeds. The page contract below is what a style retunes.',
+  );
+  for (const [step, value] of tokenEntries(tokens.semantic.stage)) push(`--stage-${step}`, value);
+
   group('Tier 2 — rule widths (brief §3.7). The matching colors are mode-scoped below.');
   for (const [weight, spec] of tokenEntries(tokens.semantic.rule)) {
     push(`--rule-${weight}-width`, spec.width);

@@ -155,6 +155,18 @@ They take the site's own ink and never carry a colour of their own, so a set can
 
 ## Layout
 
+### Two widths: The stage and the measure
+
+Every page is built on two widths, and picking a style is what sets them.
+
+**The stage** is the frame. The header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer, and every section heading run to it. It is the width of the page.
+
+**The measure** is running text. A paragraph, a list, a description under a figure, an answer under a question: none of them runs wider than the measure, at any screen size. Long lines are hard to read, and a paragraph set the width of a timetable is a paragraph nobody finishes.
+
+At wide screen sizes a **margin** opens beside the measure. A small label, a picture, or a line of detail can sit there. On a narrow screen the margin closes and the text fills the page.
+
+**Engine.** Both widths are tokens: `--stage-max` and `--measure-text`, declared in the page contract over a tier 2 stage family. A style retunes either one in its own preset file — a broadsheet may run wider and tighter, a zine may keep the stage narrow — and nothing states a fixed width. The `arrangement` variant maps onto them: `grid` uses the stage's columns and `list` uses the measure.
+
 ### Pages are chosen by task
 
 An operator knows "this is a long read" and "this is a directory with an introduction". They do not know, and should not have to work out, what `arrangement` should be. So the page editor asks the question they can answer:

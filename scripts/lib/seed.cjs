@@ -101,6 +101,15 @@ function defaultPages() {
       order: 0,
       visible: true,
       systemPage: true,
+      // A FRONT PAGE IS ARRANGED IN COLUMNS. `arrangement` is the only
+      // variant stated here: the header stays whatever the deployment's
+      // theme names, and the density stays the active style's, so seeding
+      // this changes the shape of one axis and nothing else. Without it a
+      // front page fell back to `list`, which sets every section on the
+      // text measure — right for a page that is read straight through,
+      // wrong for the page that has to show the dates, the facts, the
+      // figures and the supporters at a glance.
+      layout: { arrangement: 'grid' },
       sections: [
         // No registration action seeds here any more (M7 issue 8). The
         // event's own registration action is configuration, not content:
@@ -197,6 +206,10 @@ function defaultPages() {
       order: 2,
       visible: true,
       systemPage: true,
+      // A directory of people is a shelf of portraits, not a column of
+      // rows: `grid` runs the plates across the stage. Same rule as the
+      // home page above — one axis stated, the rest left to the style.
+      layout: { arrangement: 'grid' },
       sections: [],
     },
     {

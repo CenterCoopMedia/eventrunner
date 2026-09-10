@@ -3,9 +3,17 @@
 // public-safe fields, and a speaker who is not `approved` has no document
 // there at all — so there is no visibility filter for this page to apply,
 // and no private field for it to accidentally render.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+// jsdom applies no CSS, so the portrait's own shape is asserted against the
+// stylesheet (the device components/editorial/stamp.test.js uses).
+const indexCss = fs.readFileSync(path.resolve(here, '..', 'index.css'), 'utf8');
 
 let speakers;
 let pageDoc = null;
@@ -73,6 +81,36 @@ describe('Speakers', () => {
       expect(row.className).toContain('border-t-rule-hairline');
       expect(row.className).not.toContain('rounded');
     }
+  });
+
+  it('runs the shelf three across at lg and four at xl', () => {
+    // The shelf is set on the stage (2026-09-10 vocabulary expansion), and
+    // the stage is wide enough for a fourth plate at xl. Below those two
+    // steps it is two across and then one.
+    speakers = [PROJECTED];
+    pageDoc = { id: 'speakers', layout: { arrangement: 'grid' } };
+    const { container } = renderSpeakers();
+    pageDoc = null;
+    const shelf = container.querySelector('ul').className;
+    expect(shelf).toContain('lg:grid-cols-3');
+    expect(shelf).toContain('xl:grid-cols-4');
+  });
+
+  it('sets the reading list on the measure, never on the whole stage', () => {
+    speakers = [PROJECTED];
+    const { container } = renderSpeakers();
+    expect(container.querySelector('ul').className).toContain('measure');
+  });
+
+  it('frames a portrait square, never a circle', () => {
+    // interface guidelines, User interface: a portrait is square on the
+    // brand radius. The size comes from the stylesheet, so that is where
+    // the shape is asserted.
+    speakers = [PROJECTED];
+    const { container } = renderSpeakers();
+    expect(container.querySelector('.portrait-shelf__frame')).not.toBeNull();
+    expect(indexCss).toMatch(/\.portrait-shelf__frame \{[^}]*aspect-ratio: 1 \/ 1;/);
+    expect(indexCss).not.toMatch(/\.portrait-shelf__frame \{[^}]*border-radius: 50%/);
   });
 
   it('runs one entry per row by default', () => {

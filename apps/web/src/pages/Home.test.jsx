@@ -187,13 +187,13 @@ describe('Home lead countdown', () => {
 
   it('renders the countdown in the lead, ahead of a future event', () => {
     render(<Home />);
-    expect(screen.getByText('Time until the event starts')).toBeInTheDocument();
+    expect(screen.getByText('Countdown')).toBeInTheDocument();
   });
 
   it('clears its interval on unmount rather than leaving it for the real clock', () => {
     const clearSpy = vi.spyOn(globalThis, 'clearInterval');
     const { unmount } = render(<Home />);
-    expect(screen.getByText('Time until the event starts')).toBeInTheDocument();
+    expect(screen.getByText('Countdown')).toBeInTheDocument();
     expect(clearSpy).not.toHaveBeenCalled();
     unmount();
     expect(clearSpy).toHaveBeenCalledTimes(1);
@@ -294,6 +294,107 @@ describe('Home key facts', () => {
     render(<Home />);
     expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();
     expect(screen.queryByText('The event runs from Wednesday to Friday')).toBeNull();
+  });
+});
+
+// THE SUMMARY ROW (2026-09-10 vocabulary expansion). One composed moment on
+// the first screen: the dates, the key facts and the clock as three equal
+// cells across the stage. What the page owns is which cells there are and
+// where the row is drawn; the row's own shape is a stylesheet rule
+// (components/stageLayout.test.js).
+describe('Home summary row', () => {
+  const CLOCK = '2026-06-01T00:00:00.000Z';
+  const stat = {
+    section: 'info',
+    field: 'when',
+    blockType: 'stat',
+    value: '3 days',
+    label: 'When',
+    takeaway: 'The event runs from Wednesday to Friday',
+    description: 'The three days on the programme.',
+    source: 'The programme, read today.',
+    alt: 'The event runs for three days.',
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(CLOCK));
+    eventConfig = {
+      name: 'Demo Event',
+      timezone: 'UTC',
+      announcedAt: '2026-01-01T00:00',
+      days: [
+        { id: 'day-1', label: 'Day one', date: '2026-10-14', startTime: '09:00', endTime: '17:00' },
+      ],
+    };
+    pageDoc = { id: 'home', path: '/', label: 'Home', sections: [{ id: 'info', label: 'Key facts' }] };
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  /** @param {HTMLElement} container @returns {HTMLElement} */
+  const row = (container) => container.querySelector('.stage-row');
+
+  it('draws the three cells as one row, each opening on its own head', () => {
+    infoBlocks = [stat];
+    const { container } = render(<Home />);
+    const cells = [...row(container).children];
+    expect(cells).toHaveLength(3);
+    expect(cells.map((cell) => cell.querySelector('h2').textContent.trim())).toEqual([
+      'Dates',
+      'Key facts',
+      'Countdown',
+    ]);
+  });
+
+  it('draws no cell for a fact the operator has not written', () => {
+    // The section is on the page and holds nothing this arrangement draws,
+    // so the row is the dates and the clock rather than three heads one of
+    // which stands over nothing.
+    infoBlocks = [];
+    const { container } = render(<Home />);
+    const cells = [...row(container).children];
+    expect(cells).toHaveLength(2);
+    expect(cells.map((cell) => cell.querySelector('h2').textContent.trim())).toEqual([
+      'Dates',
+      'Countdown',
+    ]);
+  });
+
+  it('draws no row at all when nothing in it has anything to say', () => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    const { container } = render(<Home />);
+    expect(row(container)).toBeNull();
+  });
+
+  it('still states the dates and the clock on a page with no key facts section', () => {
+    // Deleting the section deletes one cell, never the other two: the dates
+    // and the clock are configuration, not that section's content.
+    pageDoc = { ...pageDoc, sections: [] };
+    infoBlocks = [stat];
+    const { container } = render(<Home />);
+    expect([...row(container).children]).toHaveLength(2);
+    expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();
+  });
+
+  it('moves with the key facts section when an operator reorders it', () => {
+    infoBlocks = [stat];
+    sectionBlocks = {
+      details: [{ section: 'details', field: 'body', blockType: 'text', value: 'Details body' }],
+    };
+    const other = { id: 'details', label: 'Details' };
+
+    pageDoc = { ...pageDoc, sections: [other, { id: 'info', label: 'Key facts' }] };
+    const before = render(<Home />);
+    expect([...before.container.querySelectorAll('h2')][0].textContent.trim()).toBe('Details');
+    before.unmount();
+
+    pageDoc = { ...pageDoc, sections: [{ id: 'info', label: 'Key facts' }, other] };
+    const after = render(<Home />);
+    expect([...after.container.querySelectorAll('h2')][0].textContent.trim()).toBe('Dates');
   });
 });
 

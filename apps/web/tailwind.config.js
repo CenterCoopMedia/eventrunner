@@ -183,6 +183,14 @@ export default {
       },
       maxWidth: {
         'admin-canvas': 'var(--admin-canvas-max)',
+        // The stage and the measure (design/tokens/components.json, the
+        // page contract). `prose` is REMAPPED rather than left at Tailwind's
+        // own 65ch: every `max-w-prose` in the app already means "this is
+        // running text", so pointing that one name at the measure is what
+        // makes the rule true on every surface at once instead of on the
+        // twenty-five files that happen to get edited.
+        prose: 'var(--measure-text)',
+        stage: 'var(--stage-max)',
       },
       // The named weights (--weight-regular … --weight-bold) are NOT mapped
       // here on purpose: font-medium, font-semibold, and font-bold already
