@@ -126,7 +126,7 @@ Every control and every interactive row defines these ten states, in both modes,
 
 **A tap is not a hover.** A touch screen reports a tap as a hover and holds it until the reader taps elsewhere, so an unguarded hover tint looks like a selection nobody made. Tailwind's `hoverOnlyWhenSupported` puts every `hover:` utility inside the query; a raw `:hover` rule in `index.css` carries `@media (hover: hover) and (pointer: fine)` by hand.
 
-**A new tab says so.** A link with `target="_blank"` uses the shared `ExternalLink`, which puts "(opens in a new tab)" inside the link's own name. A note beside the link is read after the reader has already followed it.
+**A new tab says so.** A link with `target="_blank"` uses the shared `ExternalLink`, which puts "(opens in a new tab)" inside the link's own name, or composes its `NewTabNote` where the call site needs its own element. A note beside the link is read after the reader has already followed it.
 
 **The radio is the one round shape the system draws.** Full rounding is refused everywhere else (design brief §2.4, and the refusal is a test), and `.control-choice--radio` keeps its `border-radius: 50%` because a circle is the radio's universal form and the reason a reader can tell "pick one" from "pick any" before reading a word.
 
