@@ -552,6 +552,24 @@ test('every motion step has one job, and the two moments share one curve', () =>
   assert.ok(ms(primitives.scalar.duration.fast) < ms(primitives.scalar.duration.base));
 });
 
+test('the focus ring is its own token pair, never a rule weight', () => {
+  // Expansion record §2.1: one ring on every public control, 3px, outside
+  // the element. It reads its own family so a retune of the rule scale
+  // cannot thin the one signal that answers "where am I".
+  const css = buildTokenCss(THEME);
+  assert.match(css, /--focus-ring-width: var\(--er-width-focus-ring\);/);
+  assert.match(css, /--focus-ring-offset: var\(--er-width-focus-offset\);/);
+
+  const { primitives } = loadTokens();
+  assert.equal(primitives.scalar.width['focus-ring'], '3px');
+  assert.ok(
+    parseFloat(primitives.scalar.width['focus-ring'])
+      > parseFloat(primitives.scalar.width.strong),
+    'the ring outweighs the strong rule, so it is never read as structure',
+  );
+  assert.ok(parseFloat(primitives.scalar.width['focus-offset']) > 0, 'the ring sits outside');
+});
+
 test('the state shares resolve in both modes, and dark carries the higher share', () => {
   // Expansion record §2.1. A state tint is ink mixed into the ground at a
   // fixed share, so the share is a number and not a colour: it never lands

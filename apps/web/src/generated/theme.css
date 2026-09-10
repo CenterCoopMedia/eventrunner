@@ -51,6 +51,8 @@
   --er-width-hairline: 1px;
   --er-width-strong: 2px;
   --er-width-nameplate: 3px;
+  --er-width-focus-ring: 3px;
+  --er-width-focus-offset: 2px;
   --er-weight-regular: 400;
   --er-weight-medium: 500;
   --er-weight-semibold: 600;
@@ -108,6 +110,10 @@
   --rule-hairline-width: var(--er-width-hairline);
   --rule-strong-width: var(--er-width-strong);
   --rule-nameplate-width: var(--er-width-nameplate);
+
+  /* Tier 2 — the focus ring (expansion record §2.1). Its own family, not a rule weight: a rule is structure a reader passes over, and a ring is the answer to "where am I". */
+  --focus-ring-width: var(--er-width-focus-ring);
+  --focus-ring-offset: var(--er-width-focus-offset);
 
   /* Tier 2 — font roles (brief §3.2). The active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright — all resolved to a bundled set id (spec §7.4). Preset: newsroom. */
   --font-heading: 'Fraunces', 'Source Serif 4', Georgia, serif;

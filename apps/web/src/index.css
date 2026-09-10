@@ -29,9 +29,14 @@
     overflow-wrap: break-word;
   }
 
-  /* Never remove outlines without replacing them (interface guidelines). */
+  /* ONE RING, ON EVERYTHING (expansion record §2.1). Never removed, never
+     redrawn per control: a control that drew its own would be the start of
+     eight different rings. It reads its own token pair rather than a rule
+     weight, because a rule is structure a reader passes over and a ring is
+     the answer to "where am I" (interface guidelines, Accessibility). */
   :focus-visible {
-    @apply outline outline-2 outline-offset-2 outline-accent;
+    outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
+    outline-offset: var(--focus-ring-offset);
   }
 
   /* WHERE A CONTROL SENT THE READER. The back-to-top control moves focus to
@@ -51,7 +56,8 @@
      So the ring is keyed to an attribute that only lib/scrollToTop.js
      focusAsDestination sets, and that clears itself on blur. */
   [data-focus-ring]:focus {
-    @apply outline outline-2 outline-offset-2 outline-accent;
+    outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
+    outline-offset: var(--focus-ring-offset);
   }
 
   [id] {

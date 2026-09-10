@@ -440,6 +440,13 @@ function rootBlock(theme, tokens) {
     push(`--rule-${weight}-width`, spec.width);
   }
 
+  group(
+    'Tier 2 — the focus ring (expansion record §2.1). Its own family, not a ' +
+    'rule weight: a rule is structure a reader passes over, and a ring is the ' +
+    'answer to "where am I".',
+  );
+  for (const [step, value] of tokenEntries(tokens.semantic.focus)) push(`--focus-${step}`, value);
+
   const presetId = themePresetId(theme);
   const preset = getPreset(presetId);
   const { stacks, componentStacks } = resolveFonts(theme);
