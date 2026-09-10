@@ -451,20 +451,27 @@ describe('state tint shares', () => {
     }
   });
 
-  it('leaves a hover tint light enough to keep the text on it readable', () => {
-    // A tint is ink over the ground the control already sits on, so the
-    // text on it reads against a ground that has moved toward the ink. The
-    // check is the real rendered pairing: primary ink on the tinted
-    // surface, in both modes, at the 4.5:1 bar.
+  it('leaves a tint light enough to keep the text on it readable', () => {
+    // A tint is the control's OWN ink mixed into its own ground, so the
+    // ground moves toward the label and the pair closes by the share. The
+    // check is both real pairings — a control on the page surface, and the
+    // filled action, whose label is the surface colour — in both modes, at
+    // the 4.5:1 bar.
+    const PAIRS = [
+      ['--color-text-primary-rgb', '--color-surface-rgb'],
+      ['--color-surface-rgb', '--color-accent-rgb'],
+    ];
     for (const scope of [light, dark]) {
-      const ink = channels(resolve(scope, '--color-text-primary-rgb'));
-      const ground = channels(resolve(scope, '--color-surface-rgb'));
-      for (const name of STATE_SHARES) {
-        const alpha = share(scope, name);
-        const tinted = ground.map((c, i) => c + (ink[i] - c) * alpha);
-        const ratio = contrastRatio(ink, tinted);
-        expect(ratio, `${name} tint reads ${ratio.toFixed(2)}:1 under the ink`)
-          .toBeGreaterThanOrEqual(4.5);
+      for (const [inkToken, groundToken] of PAIRS) {
+        const ink = channels(resolve(scope, inkToken));
+        const ground = channels(resolve(scope, groundToken));
+        for (const name of STATE_SHARES) {
+          const alpha = share(scope, name);
+          const tinted = ground.map((c, i) => c + (ink[i] - c) * alpha);
+          const ratio = contrastRatio(ink, tinted);
+          expect(ratio, `${inkToken} on the ${name} tint of ${groundToken} is ${ratio.toFixed(2)}:1`)
+            .toBeGreaterThanOrEqual(4.5);
+        }
       }
     }
   });

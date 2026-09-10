@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   controlStateClass,
+  textControlStateClass,
   primaryActionClass,
   quietActionClass,
   secondaryActionClass,
@@ -16,20 +17,44 @@ import {
 } from './controlClasses.js';
 import { chipActionClass, rowActionClass } from './session/sessionActionClass.js';
 
-const SHAPES = [
+/** The boxed shapes: a ground of their own, so a tint has somewhere to go. */
+const BOXED = [
   ['primary action', primaryActionClass],
   ['secondary action', secondaryActionClass],
   ['quiet action', quietActionClass],
   ['primary button', primaryButtonClass],
   ['secondary button', secondaryButtonClass],
-  ['row action', rowActionClass],
   ['chip action', chipActionClass],
 ];
 
-describe.each(SHAPES)('%s', (_name, className) => {
-  it('carries the shared state grammar', () => {
+/** The text register: no ground, and therefore no tint. */
+const TEXT = [['row action', rowActionClass]];
+
+const SHAPES = [...BOXED, ...TEXT];
+
+describe.each(BOXED)('%s', (_name, className) => {
+  it('carries the boxed state grammar, tint and all', () => {
     expect(className).toContain(controlStateClass);
   });
+
+  it('states that it is unavailable on its own ground', () => {
+    expect(className).toContain('aria-disabled:bg-surface-alt');
+  });
+});
+
+describe.each(TEXT)('%s', (_name, className) => {
+  it('carries the text state grammar', () => {
+    expect(className).toContain(textControlStateClass);
+  });
+
+  it('takes no tint and no ground', () => {
+    // A tint behind a row control is the box the row register removes.
+    expect(className).not.toContain('control-tint');
+    expect(className).not.toContain('aria-disabled:bg-');
+  });
+});
+
+describe.each(SHAPES)('%s', (_name, className) => {
 
   it('presses on transform alone, and only where motion is welcome', () => {
     expect(className).toContain('active:scale-[0.98]');
@@ -65,10 +90,18 @@ describe.each(SHAPES)('%s', (_name, className) => {
 
 describe('the shared state string', () => {
   it('paints its tint through the one token-driven rule', () => {
-    // The tint is `.control-tint` in index.css, which mixes ink into the
-    // control's own ground at --state-*-share. A control that set its own
-    // hover colour would leave that grammar.
+    // The tint is `.control-tint` in index.css, which mixes the control's
+    // own ink into its own ground at --state-*-share. A control that set its
+    // own hover colour would leave that grammar.
     expect(controlStateClass).toContain('control-tint');
+    expect(textControlStateClass).not.toContain('control-tint');
+  });
+
+  it('gives the two registers the same press and the same selected weight', () => {
+    for (const shared of ['active:scale-[0.98]', 'aria-pressed:font-bold']) {
+      expect(controlStateClass).toContain(shared);
+      expect(textControlStateClass).toContain(shared);
+    }
   });
 
   it('leaves the focus ring to the one rule that draws it', () => {

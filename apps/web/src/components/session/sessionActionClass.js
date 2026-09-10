@@ -21,10 +21,13 @@
 // unavailable state the same way every other control on the site does. The
 // chip's own hover tint is gone: it used to fade a background colour over
 // 120ms, and a colour a reader caused must land at once.
-import { controlStateClass } from '../controlClasses.js';
+import { controlStateClass, textControlStateClass } from '../controlClasses.js';
 
+// The row control takes the TEXT register of the grammar: the same press,
+// the same unavailable ink, the same selected weight, and no tint — a tint
+// behind a row control would be the box this module exists to remove.
 export const rowActionClass =
-  `${controlStateClass} touch-target inline-flex items-center gap-2xs font-data text-caption ` +
+  `${textControlStateClass} touch-target inline-flex items-center gap-2xs font-data text-caption ` +
   'text-text-secondary underline-offset-2 hover:text-text-primary hover:underline';
 
 export const chipActionClass =

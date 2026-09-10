@@ -93,6 +93,14 @@
      is the same idiom the nameplate rule and the session face already use.
      The share is zero at rest, so a control with no state paints nothing.
 
+     THE INK IS THE CONTROL'S OWN, through `currentColor`, and that is what
+     makes one rule work everywhere. A fixed page ink would darken a light
+     ground correctly and do almost nothing to a filled navy action, which
+     is exactly the control a reader hovers most. `currentColor` moves the
+     ground toward the label instead: it darkens a light ground, lightens a
+     dark fill, and reverses again in dark mode — always toward the one
+     colour already proved legible against it.
+
      A tint never transitions. Colour is not free the way transform and
      opacity are, and a state a reader caused must land at once, not fade in
      (interface guidelines, Animation: don't animate frequent interactions).
@@ -103,10 +111,12 @@
      Press comes last, so pressing a selected control reads as a press. */
   .control-tint {
     --control-tint-share: 0;
-    background-image: linear-gradient(
-      rgb(var(--color-text-primary-rgb) / var(--control-tint-share)),
-      rgb(var(--color-text-primary-rgb) / var(--control-tint-share))
+    --control-tint: color-mix(
+      in srgb,
+      currentColor calc(var(--control-tint-share) * 100%),
+      transparent
     );
+    background-image: linear-gradient(var(--control-tint), var(--control-tint));
   }
   @media (hover: hover) and (pointer: fine) {
     .control-tint:hover {

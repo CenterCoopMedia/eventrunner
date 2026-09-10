@@ -110,7 +110,7 @@ Every control and every interactive row defines these ten states, in both modes,
 | State | Public site | Admin |
 |---|---|---|
 | Rest | The style's own ink and ground | The desk's ink and ground |
-| Hover | An ink-mixed tint of the ground at `--state-hover-share`, inside `@media (hover: hover)` | The same device, with the desk's tints |
+| Hover | The control's own ink mixed into its own ground at `--state-hover-share`, inside `@media (hover: hover)`. A control set as text takes no tint: its hover is the ink and the underline | The same device, with the desk's tints |
 | Focus-visible | The 3px ring in the accent, outside the element, never removed | The 3px action ring; the light ring on the rail |
 | Active (pressed) | Scale 0.98 at `--motion-slow` on `transform`, inside `motion-safe:`, plus the firmer tint at `--state-pressed-share` | The pressed action ground; no scale |
 | Selected or current | Weight, plus one of: the tint at `--state-selected-share` on `aria-pressed`, the filled ground on `aria-checked`, the strong rule on `aria-selected`, `aria-current` on a link | The rail's four signals; a filled row marker elsewhere |
