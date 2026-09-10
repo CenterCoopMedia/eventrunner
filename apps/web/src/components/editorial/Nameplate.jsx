@@ -80,12 +80,18 @@ export default function Nameplate({
   const compact = variant === 'compact';
   // THE ROW MAY BREAK A WORD. A flex row is sized from its content's own
   // minimum, and the minimum of a line of text is its longest word. The
-  // demo event's name holds "Harborlight", 241px at the 44px nameplate
-  // size, so with the mark and the gutter this row would not go below
-  // 289px — wider than the 272px stage at 320px, and wider than the 224px
-  // box the specimen book frames the device in. Measured: Field Guide
-  // scrolled sideways by 8px on every route, and the book's masthead
-  // figure went 17px past on Civic and 16px on Newsroom.
+  // demo event's name holds "Harborlight", set at the 44px nameplate size
+  // in each style's own face: 241px on Civic, 256px on Field Guide. With
+  // the mark and the gutter beside it, that minimum is wider than the
+  // 272px stage at 320px in every style, so the word paints out of the
+  // block and into the page gutter.
+  //
+  // MEASURED on a built demo, in headless Chromium at a viewport of
+  // exactly 320px, six styles across six routes. Field Guide is the style
+  // whose word also crosses the viewport edge — 256px puts its right edge
+  // at 328 — and all six of its routes scrolled sideways by 8px. In the
+  // specimen book, where the device is framed in a 224px box, Civic went
+  // 17px past the viewport and Newsroom 16px.
   //
   // `wrap-anywhere` lowers that minimum as well as drawing the break, which
   // is what lets the row fit a box narrower than its longest word. It

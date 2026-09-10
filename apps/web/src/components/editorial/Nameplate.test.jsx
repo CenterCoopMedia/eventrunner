@@ -156,12 +156,14 @@ describe('Nameplate', () => {
   });
 
   it('lets the wordmark break a word too long for the stage at 320px', () => {
-    // MEASURED, on the built demo at a 320px viewport: the demo event's
-    // name holds "Harborlight", 241px at the 44px nameplate size, so with
-    // the mark and the gutter the row would not go below 289px — inside a
-    // 272px stage. Field Guide scrolled sideways by 8px on every route, and
-    // the book's masthead figure, framed in a 224px box, went 17px past on
-    // Civic and 16px on Newsroom.
+    // MEASURED on a built demo, in headless Chromium at a viewport of
+    // exactly 320px: the demo event's name holds "Harborlight", set at the
+    // 44px nameplate size in each style's own face — 241px on Civic, 256px
+    // on Field Guide — so with the mark and the gutter the row's minimum is
+    // wider than the 272px stage. Field Guide is the style whose word also
+    // crosses the viewport edge, and all six of its routes scrolled
+    // sideways by 8px; the book's masthead figure, framed in a 224px box,
+    // went 17px past on Civic and 16px on Newsroom.
     //
     // `wrap-anywhere` rather than `break-words`: break-word draws the break
     // but leaves the row's minimum at the whole word, so the row overflows
