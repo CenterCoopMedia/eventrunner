@@ -5,11 +5,17 @@
 // theme path. It does not write Firestore or create a second resolver.
 //
 // The band is the showcase's own device, and it is built from the same
-// vocabulary as the site under it: the alternate ground, a hairline, the
-// heading face for the style's name, the body face for the line that
-// describes it, and four controls in one row at the control height. No
-// pill, no shadow, no gradient, and nothing that can push the page sideways
-// at 390px.
+// vocabulary as the site under it: the STAGE it shares with the header, the
+// page and the footer, the alternate ground, a hairline, the heading face
+// for the style's name, the body face for the line that describes it, and
+// four controls in one row at the shared control height. No pill, no
+// shadow, no gradient, and nothing that can push the page sideways at
+// 390px.
+//
+// The band held its own `max-w-5xl` and `px-md` after the stage landed, so
+// its content box started 60px inside the header's and ended 68px short of
+// it at 1440px. A band that does not line up with the page under it reads
+// as something bolted on, which is the one thing a demo band must not do.
 import { useEffect, useId, useState } from 'react';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
@@ -55,12 +61,14 @@ export function writeDemoDisplaySearch(search, style, mode) {
 }
 
 // The select carries the control height like the three buttons beside it,
-// so the row reads as one row rather than four sizes.
+// so the row reads as one row rather than four sizes. The height is the
+// shared 44px floor `touch-target` sets, not a number written here: a
+// second source for one measurement is a second place for it to drift.
 const selectClass =
-  'touch-target h-11 w-full min-w-0 rounded-brand border-hairline border-control bg-surface ' +
+  'touch-target w-full min-w-0 rounded-brand border-hairline border-control bg-surface ' +
   'px-sm font-data text-caption text-text-primary';
 
-const bandActionClass = `${quietActionClass} h-11 justify-center`;
+const bandActionClass = `${quietActionClass} justify-center`;
 
 export function DemoBannerContent({
   location = window.location,
@@ -98,7 +106,7 @@ export function DemoBannerContent({
       aria-label="Demo controls"
       className="no-print border-b-hairline border-b-rule-hairline bg-surface-alt text-text-primary"
     >
-      <div className="mx-auto flex max-w-5xl flex-col gap-sm px-md py-sm">
+      <div className="stage flex flex-col gap-sm py-sm">
         {/* The style's own name, then the line that says what it does. The
             name is set in the heading face and is not a heading element:
             the page under this band owns its h1. */}

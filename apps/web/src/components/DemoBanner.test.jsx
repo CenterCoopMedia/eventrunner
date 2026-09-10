@@ -135,7 +135,7 @@ describe('the demo band', () => {
     expect(name.previousElementSibling).toBeNull();
   });
 
-  it('keeps the four controls in one row at the control height', () => {
+  it('keeps the four controls in one row at the shared control height', () => {
     renderControls({ search: '?style=newsroom&mode=light' });
 
     const controls = [
@@ -145,9 +145,25 @@ describe('the demo band', () => {
       screen.getByRole('button', { name: 'Use dark mode' }),
     ];
     for (const control of controls) {
-      expect(control.className).toContain('h-11');
+      // `touch-target` is the 44px floor every control on the site takes.
+      // A number written on this row as well would be a second source for
+      // one measurement, and the row would drift off the rest of the site
+      // the first time the floor moved.
       expect(control.className).toContain('touch-target');
+      expect(control.className).not.toMatch(/\bh-\d/u);
     }
+  });
+
+  it('runs its content on the same stage as the header, the page and the footer', () => {
+    // The band held its own max-w-5xl and px-md, so its content box was
+    // 224 to 1232 against the header's 164 to 1300 at 1440px. A band that
+    // does not line up with the page under it reads as bolted on.
+    renderControls({ search: '?style=civic&mode=light' });
+    const band = screen.getByRole('note', { name: 'Demo controls' });
+    const inner = band.firstElementChild;
+    expect(inner.className).toContain('stage');
+    expect(inner.className).not.toContain('max-w-');
+    expect(inner.className).not.toMatch(/\bpx-/u);
   });
 
   it('draws no pill, no shadow, and no gradient', () => {
