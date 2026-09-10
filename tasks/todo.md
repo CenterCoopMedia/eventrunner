@@ -1,88 +1,69 @@
 # Session task list
 
-Restyle the admin CMS on the njpbs-site editorial desk: its style, its type
-pairing, and its hierarchy, expressed in this repo's own token system.
-Branch `claude/admin-cms-design-language-ub69gr`, one PR against `main`.
+Expand the design vocabulary until the template reads as designed by a
+top-tier studio, then improve it wave by wave. Direction record:
+`docs/plans/2026-09-10-design-vocabulary-expansion.md`. Tracking issue: #249.
+Branch `claude/admin-cms-design-language-ub69gr` carries wave 1; later waves
+stack on it with a `-w2` to `-w6` suffix. Fable directs. Opus, Sonnet, and
+Haiku agents build.
 
-## What changes and why
+## Done before this session's first commit
 
-The composing-room admin sets everything on one warm grey at 11–14px, with
-24px controls and a black filled button. The njpbs-site admin anchors the tool
-with a dark navigation rail against a light canvas, a white title band, white
-panels on the canvas, one action blue, tinted status badges, 44px controls, and
-a 15px UI scale. This session ports that hierarchy. The admin still reads
-`admin-*` tokens only, still obeys `data-mode` and ignores `data-theme`, still
-uses Source Sans 3 and IBM Plex Mono, and still refuses shadows, pills, icons
-in the rail, KPI tiles, eyebrows, and expressive motion.
+- [x] Last night's admin restyle merged as PR #245. The designated branch was
+      restarted from main.
+- [x] Research baseline: platform guidelines, motion grammar, admin CMS UX
+      (three of six briefs in; slop tells, event UX, and editorial devices pending).
+- [x] Inventory of the design system and the M8 to M12 UI needs.
+- [x] Direction record written. Issues #247, #248, #249 filed.
 
-## Foundation
+## Wave 1: the grammar
 
-- [x] `design/tokens/admin.json`: the editorial-desk palette in both modes,
-      plus the rail, action, soft-ground, info-state, control-rule and
-      rail-focus families, the admin type scale, control height, radii.
-- [x] `node scripts/build-preset-catalog.cjs` regenerates the shared mirror.
-- [x] `packages/shared/src/theme.cjs`: the accent floor is judged against the
-      raised ground the header mark sits on; one client accent slot.
-- [x] `apps/web/tailwind.config.js`: utilities for the new tokens and scale.
-- [x] `apps/web/src/index.css`: the room's focus rings, the rail, the title band.
-- [x] `node scripts/generate-content.cjs --demo` regenerates `theme.css`.
-- [x] Tests updated: `themeModes.test.js`, `tokens.test.cjs`, `theme.test.cjs`.
+- [ ] State grammar on both surfaces: hover inside the hover query, press,
+      selected, disabled, busy, error, success, empty; the tint tokens.
+- [ ] New controls: switch, segmented control, tabs, checkbox, radio, search
+      field, sort control, filter group, external link marker.
+- [ ] Motion grammar: exit easing token, enter and exit utilities, the
+      static loading device, the motion contract test.
+- [ ] Closes #219 (submit stays enabled, focus moves to the first error),
+      #233 (dialog focus trap), #236 (new-tab marker).
+- [ ] Specimen book route in the demo and in development, with every device
+      in every state, and the committed capture script.
+- [ ] Integration: merge, specimen entries for the new controls, regenerate,
+      checks last, independent review, evidence under
+      `docs/plans/evidence/specimen/`.
+- [ ] Docs: interface guidelines, design reference, web README, CHANGELOG,
+      `docs/docs` regenerated.
+- [ ] Push, open the PR, watch CI and the review bots.
 
-## Chrome
+## Wave 2: devices and blocks
 
-- [x] `AdminLayout.jsx`: dark sticky rail, job-mark tile, grouped docket, account foot.
-- [x] `adminChrome.jsx`: sticky title band, tinted state badge, empty state.
-- [x] `formControls.jsx`: 44px controls, action-blue primary, white panels, notices.
-- [x] `ModalShell.jsx`: panel radius and sizes.
-- [x] Pinned tests updated: `AdminLayout.test.jsx`, `formControls.test.jsx`.
+- [ ] Text devices: standfirst, pull quote (Zine through the callout),
+      byline and dateline, drop cap option, definition list, timeline,
+      ruled table.
+- [ ] Feedback devices: count, legend, session state marker, meter, notice
+      bar, toast tones, loading, empty.
+- [ ] Input devices: dropzone, avatar, repeater.
+- [ ] Block types and editor mirrors; option groups from §4 of the record.
 
-## Page sweep
+## Wave 3: illustration sets
 
-- [x] Lists: pages, sessions, speakers, attendees, content, media, materials.
-- [x] Editors: page, session, speaker, content block, venue reference.
-- [x] Settings: event, features, badges, branding, ticketing, live updates,
-      feedback, system errors.
-- [x] Status words render as tinted badges everywhere a state renders.
+- [ ] `typographic`, `registration`, `celestial`, `architectural`; the asset
+      test extended to every set.
 
-## Admin colours (owner request, later in the session)
+## Wave 4: schedule and dashboards
 
-Joe asked whether a deployment could pick something other than blue and white
-and chose both paths: follow the brand colour by default, with a picker for a
-house scheme.
+- [ ] #162 to #167 on the schedule; #168 and #210 shells.
 
-- [x] `design/tokens/admin.json`: six house seeds, light and dark.
-- [x] `packages/shared/src/theme.cjs`: `deriveAdminScheme` and
-      `resolveAdminScheme`; `adminScheme` in the document keys and the schema.
-- [x] `scripts/lib/tokens.cjs` overlays the derivation at build time;
-      `apps/web/src/lib/themeRuntime.js` writes it at runtime.
-- [x] Branding: the **Admin colours** panel after **Light or dark**; the
-      choice is written on every publish, brand included, so the snapshot
-      overlay cannot hand a house scheme back.
-- [x] Tests: `theme.test.cjs` (23 pairs per style, hostile brand and house
-      scheme, both modes), `tokens.test.cjs`, `themeRuntime.test.js`,
-      `schema.test.cjs`, `AdminBranding.test.jsx`.
-- [x] Docs: the design record section, the brief, the admin story header,
-      the interface guidelines, the design reference, the admin guide, CHANGELOG.
-- [x] Evidence: the admin on the seeded event's own brand colour and on a
-      house scheme, both modes.
+## Wave 5: site styles
 
-## Verification
+- [ ] Gallery, Playbill, Listings.
 
-- [x] `npm run lint`, `npm run check:copy`, `npm test`, `npm run test:web`.
-- [x] `node scripts/generate-content.cjs --demo --check`,
-      `node scripts/build-preset-catalog.cjs --check`,
-      `npm run build -w apps/web` and the bundle budget, `npm run build:demo`.
-- [x] `npm run prepare:functions && rm -rf functions/node_modules/shared && npm install`.
-- [x] Browser evidence from the emulators: light and dark, 1440 and 390, for
-      the pages list, the page editor, sessions, speakers, attendees,
-      branding, media, and ticketing. Saved under `docs/plans/evidence/`.
-- [x] A "looks fine to software, feels wrong to humans" pass on the captures.
-- [x] Docs: the design record, the admin story amendment, brief §0, the
-      interface guidelines, the design reference, CHANGELOG; `docs/docs` regenerated.
-- [ ] Review pass on the diff; findings fixed; checks re-run last.
-- [ ] Commit with DCO sign-off as Joe, push, open the PR.
+## Wave 6: admin devices
 
-## Review
+- [ ] M9 to M11 pages on the desk; the defects in §11 of the record.
 
-- Every diff gets a review pass before the PR opens.
-- Checks run as the last step, after docs and generated output.
+## After every wave
+
+- [ ] Independent review against the brief and the slop list.
+- [ ] "Feels wrong to humans" pass on the captures; findings fixed.
+- [ ] `tasks/lessons.md` updated after any correction.
