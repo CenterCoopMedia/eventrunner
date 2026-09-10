@@ -97,12 +97,13 @@ describe('Sponsors', () => {
     const walls = [...container.querySelectorAll('.logo-wall')];
     expect(walls).toHaveLength(2);
     // Partner is first in the operator's order, so Partner is the big wall.
-    expect(walls[0].style.getPropertyValue('--logo-wall-mark-size')).toBe(
-      'calc(var(--space-3xl) * 2)',
-    );
-    expect(walls[1].style.getPropertyValue('--logo-wall-mark-size')).toBe(
-      'calc(var(--space-3xl) * 1.5)',
-    );
+    // The step values are set for the stage and may be retuned with it, so
+    // what is asserted is the order of the two marks, not their literals.
+    const step = (wall) =>
+      Number(
+        /\* ([\d.]+)\)$/.exec(wall.style.getPropertyValue('--logo-wall-mark-size'))[1],
+      );
+    expect(step(walls[0])).toBeGreaterThan(step(walls[1]));
     expect(container.querySelectorAll('h2')[0].textContent).toContain('Partner');
   });
 

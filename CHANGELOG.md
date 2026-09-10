@@ -23,7 +23,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only repeats a result the page already states no longer announces it a second time.
 - A loading state holds the space the content will take, with a block of hairline rules. The page
   no longer jumps when the content lands. Nothing pulses and nothing spins.
-
+- The public site is now built on two widths instead of one column. The stage is the frame — the
+  header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer and every
+  section heading run to it — and the measure is running text, which never exceeds it. At wide
+  screen sizes a margin opens beside the measure for a label, a picture or a line of detail. The
+  home page opens on the masthead, then the lead sentence at the measure, then one ruled row of
+  three: the dates, the key facts and the clock, side by side and separated by hairlines. The
+  speaker shelf runs three portraits across at large screen sizes and four at extra large, each
+  portrait square. The sponsor wall runs about four marks across in its first tier and six in its
+  third. Both widths are tokens a site style retunes.
+- The public site no longer scrolls sideways by 4px on a phone. The title block's corner mark is
+  drawn outside the block, and the page gutter is now wide enough to hold it.
 - The admin CMS takes the editorial desk: a dark navigation rail against a cool-grey canvas, a
   white title band that holds the page's name and its save actions while the page scrolls, white
   panels, one action colour for every primary control and focus ring, a record's state as a

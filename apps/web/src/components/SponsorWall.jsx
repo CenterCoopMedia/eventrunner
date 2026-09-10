@@ -42,11 +42,17 @@ import { isSafeHref } from '../lib/sanitizeHtml.js';
  * being legible as differences, and a fourth smaller size would only be a
  * smaller size. Every value is the spacing scale multiplied, so a preset
  * that rescales the room rescales the wall with it.
+ *
+ * THE STEPS ARE SET FOR THE STAGE (2026-09-10 vocabulary expansion). On the
+ * stage the first tier runs about four marks across, the second five, and
+ * the third six, so the tier's weight is legible as a count of marks in a
+ * row as well as a size. The wall wraps at every narrower width, down to
+ * one mark a row on a phone.
  */
 const MARK_SIZES = Object.freeze([
+  'calc(var(--space-3xl) * 2.5)',
   'calc(var(--space-3xl) * 2)',
   'calc(var(--space-3xl) * 1.5)',
-  'var(--space-3xl)',
 ]);
 
 /** A tier's label, or the one heading an untiered group gets. */

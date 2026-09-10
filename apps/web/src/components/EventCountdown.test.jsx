@@ -86,7 +86,7 @@ describe('EventCountdown', () => {
 
     // A stated, visible label above the figures — not a live region — gives
     // the group of numbers a name in words.
-    const label = screen.getByText('Time until the event starts');
+    const label = screen.getByText('Countdown');
     const dl = container.querySelector('dl');
     expect(dl).toHaveAttribute('aria-labelledby', label.id);
     expect(dl).not.toHaveAttribute('aria-live');
@@ -161,7 +161,7 @@ describe('EventCountdown', () => {
 
     const intervalSpy = vi.spyOn(globalThis, 'setInterval');
     render(<EventCountdown eventConfig={draftConfig} />);
-    expect(screen.queryByText('Time until the event starts')).toBeNull();
+    expect(screen.queryByText('Countdown')).toBeNull();
     // A single low-frequency timer, not a once-a-second one: draft carries
     // no figures a per-second tick would ever move.
     expect(intervalSpy).toHaveBeenCalledTimes(1);
@@ -173,7 +173,7 @@ describe('EventCountdown', () => {
     });
 
     expect(getEventPhase(draftConfig, new Date('2026-06-01T00:01:00.000Z'))).not.toBe('draft');
-    expect(screen.getByText('Time until the event starts')).toBeInTheDocument();
+    expect(screen.getByText('Countdown')).toBeInTheDocument();
   });
 
   it('stops counting and states that the event is running at in_progress', () => {

@@ -68,9 +68,10 @@ import { resolvePageLayout, sectionsBySlot, statedPageLayout } from '../lib/page
  *   sections: object[],
  *   getSectionBlocks: (id: string) => object[],
  *   renderSection?: (section: object, blocks: object[]) => import('react').ReactNode | undefined,
+ *   arrangement: 'grid' | 'list',
  * }} props
  */
-function SlotSections({ sections, getSectionBlocks, renderSection }) {
+function SlotSections({ sections, getSectionBlocks, renderSection, arrangement }) {
   const drawn = sections
     .map((section) => {
       const blocks = getSectionBlocks(section.id);
@@ -81,8 +82,16 @@ function SlotSections({ sections, getSectionBlocks, renderSection }) {
         section,
         node: (
           <section aria-labelledby={`section-${section.id}`} className="page-section">
+            {/* The head runs to the stage whatever the arrangement: a
+                section boundary is the width of the page it opens. */}
             <SectionHead level={2} id={`section-${section.id}`} title={section.label} />
-            <div className="mt-md">
+            {/* THE ARRANGEMENT ON THE STAGE (2026-09-10 vocabulary
+                expansion): `grid` gives the section the stage's own
+                columns, `list` sets it on the text measure — which is what
+                a page read straight through wants, and what keeps an
+                introduction paragraph from running the width of a schedule
+                grid. */}
+            <div className={arrangement === 'grid' ? 'mt-md' : 'measure mt-md'}>
               <SectionBlocks blocks={blocks} />
             </div>
           </section>
@@ -136,17 +145,20 @@ export default function SystemPage({
         sections={slots.above}
         getSectionBlocks={getSectionBlocks}
         renderSection={renderSection}
+        arrangement={layout.arrangement}
       />
       {core}
       <SlotSections
         sections={slots.main}
         getSectionBlocks={getSectionBlocks}
         renderSection={renderSection}
+        arrangement={layout.arrangement}
       />
       <SlotSections
         sections={slots.below}
         getSectionBlocks={getSectionBlocks}
         renderSection={renderSection}
+        arrangement={layout.arrangement}
       />
     </article>
   );

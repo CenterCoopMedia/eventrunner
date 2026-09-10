@@ -91,6 +91,12 @@
     "3xl": "var(--er-space-3xl)"
   },
 
+  "$stage-note": "The stage and the measure (2026-09-10 vocabulary expansion). Two widths, and every page is built on them. The stage is the frame: the header, the navigation, the schedule grid, the directories, the logo wall, the footer, and every section head run to it. The measure is running text: a paragraph, a list, a rich text block, a stat description, or an FAQ answer never exceeds it. Nothing states a fixed width; both are read as a maximum inline size, and the page contract in components.json is what a style retunes.",
+  "stage": {
+    "frame": "var(--er-stage-frame)",
+    "measure": "var(--er-stage-measure)"
+  },
+
   "$rule-note": "Brief §3.7. Rules are structure, so each weight ships as a color plus a width. The colors are mode-scoped above; the widths do not change with the mode.",
   "rule": {
     "hairline": { "width": "var(--er-width-hairline)" },

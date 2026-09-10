@@ -126,6 +126,39 @@ describe('InfoCards', () => {
     expect(group.className).toContain('lg:grid-cols-3');
   });
 
+  it('gives one card the measure rather than a third of it', () => {
+    // A single card in a three-column grid drew at a third of the measure,
+    // which reads as a cramped box rather than as one fact stated plainly.
+    const { container } = render(
+      <InfoCards cards={groupIntoCards([WHEN_WHERE_WHO[0]])} />,
+    );
+    const group = container.firstChild;
+    expect(group.className).toContain('measure');
+    expect(group.className).not.toContain('grid-cols');
+  });
+
+  it('splits the measure between two cards', () => {
+    const { container } = render(
+      // Two facts and the line under the first: two cards, not two blocks.
+      <InfoCards cards={groupIntoCards(WHEN_WHERE_WHO.slice(0, 3))} />,
+    );
+    const group = container.firstChild;
+    expect(group.className).toContain('measure');
+    expect(group.className).toContain('sm:grid-cols-2');
+    expect(group.className).not.toContain('lg:grid-cols-3');
+  });
+
+  it('runs down one column inside a cell of the summary row, whatever the count', () => {
+    const { container } = render(
+      <InfoCards cards={groupIntoCards(WHEN_WHERE_WHO)} columns="single" />,
+    );
+    const group = container.firstChild;
+    expect(group.className).toContain('grid');
+    expect(group.className).not.toContain('grid-cols');
+    // The cell is already a column of the stage, so the group takes it.
+    expect(group.className).not.toContain('measure');
+  });
+
   it('renders only the lines that say something', () => {
     const { container } = render(
       <InfoCards

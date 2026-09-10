@@ -48,6 +48,8 @@
   --er-space-xl: 2.5rem;
   --er-space-2xl: 4rem;
   --er-space-3xl: 6rem;
+  --er-stage-frame: 72.5rem;
+  --er-stage-measure: 44rem;
   --er-width-hairline: 1px;
   --er-width-strong: 2px;
   --er-width-nameplate: 3px;
@@ -105,6 +107,10 @@
   --space-xl: var(--er-space-xl);
   --space-2xl: var(--er-space-2xl);
   --space-3xl: var(--er-space-3xl);
+
+  /* Tier 2 — the stage and the measure. Two widths, and every page is built on them: the stage is the frame the header, the grid, the directories, the wall and the footer run to; the measure is what running text never exceeds. The page contract below is what a style retunes. */
+  --stage-frame: var(--er-stage-frame);
+  --stage-measure: var(--er-stage-measure);
 
   /* Tier 2 — rule widths (brief §3.7). The matching colors are mode-scoped below. */
   --rule-hairline-width: var(--er-width-hairline);
@@ -187,6 +193,8 @@
   /* Tier 3 — page contract (brief §3.1). */
   --page-section-gap: var(--space-2xl);
   --page-row-pad-block: var(--space-md);
+  --stage-max: var(--stage-frame);
+  --measure-text: var(--stage-measure);
 
   /* Tier 3 — folio-rule contract (brief §3.1). */
   --folio-rule-width: var(--rule-hairline-width);

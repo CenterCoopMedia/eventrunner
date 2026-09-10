@@ -305,6 +305,45 @@ test("the active preset's block carries this deployment's overrides", () => {
   );
 });
 
+test('the stage and the measure are declared once and read by name', () => {
+  // The two widths every page is built on (2026-09-10 vocabulary
+  // expansion). Tier 1 holds the values, tier 2 names the family, and the
+  // page contract is the pair a style retunes — so a preset that wants a
+  // wider stage moves --stage-max and never mints a width of its own.
+  const css = buildTokenCss(THEME);
+  for (const [name, value] of [
+    ['--er-stage-frame', '72.5rem'],
+    ['--er-stage-measure', '44rem'],
+    ['--stage-frame', 'var(--er-stage-frame)'],
+    ['--stage-measure', 'var(--er-stage-measure)'],
+    ['--stage-max', 'var(--stage-frame)'],
+    ['--measure-text', 'var(--stage-measure)'],
+  ]) {
+    assert.match(css, new RegExp(`${name}: ${value.replace(/[()\\-]/g, '\\$&')};`), name);
+  }
+  // Both are declared exactly once. A second declaration is a second
+  // answer, and the one that wins would depend on the order of the file.
+  for (const name of ['--stage-max', '--measure-text']) {
+    const declared = css.match(new RegExp(`${name}:`, 'g')) || [];
+    assert.equal(declared.length, 1, `${name} is declared once`);
+  }
+  // The frame is the wider of the two, or the measure is not a measure.
+  const rem = (name) => Number(css.match(new RegExp(`${name}: ([\\d.]+)rem;`))[1]);
+  assert.ok(rem('--er-stage-frame') > rem('--er-stage-measure'), 'the stage is wider than the measure');
+});
+
+test('a style may retune the stage and the measure from its own preset file', () => {
+  // The contract is what a preset moves, so a remap has to reach the block
+  // the style renders under and has to keep the name the components read.
+  const css = buildTokenCss({ preset: 'broadsheet' });
+  const block = css.match(/\[data-theme='broadsheet'\]\[data-mode='light'\] \{([^}]*)\}/);
+  assert.ok(block, 'the preset block exists');
+  const declared = new Set([...css.matchAll(/(--[\w-]+):/g)].map((m) => m[1]));
+  for (const name of ['--stage-max', '--measure-text']) {
+    assert.ok(declared.has(name), `${name} is declarable, so a preset may remap it`);
+  }
+});
+
 test('every option a preset offers remaps a token the contracts already declare', () => {
   // Brief §3.4: an option remaps existing tier 2 and tier 3 tokens. It never
   // adds a property name, never adds a class, never adds a component type.
