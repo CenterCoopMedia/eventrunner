@@ -130,6 +130,8 @@ Every control and every interactive row defines these ten states, in both modes,
 
 **The radio is the one round shape the system draws.** Full rounding is refused everywhere else (design brief §2.4, and the refusal is a test), and `.control-choice--radio` keeps its `border-radius: 50%` because a circle is the radio's universal form and the reason a reader can tell "pick one" from "pick any" before reading a word.
 
+**A field takes no hover tint.** The Hover row names one exception, the text register; a field is the second. `inputClass` and `.control-choice` compose none of the shared tint, so an input, a select, a checkbox, a radio, a search field and a filter group draw no hover state at all, and their only state changes are the focus ring and the error rule. The specimen book prints that register and its reason under every field it draws (`apps/web/src/pages/specimen/controls/states.js`).
+
 **A dialog is a native `<dialog>` opened with `showModal()`.** That one call traps focus, makes the page behind it inert, sends Escape as `cancel`, and puts the dialog in the top layer. The component returns focus to the opener itself, because React removes the dialog on close and an element removed while it holds focus drops focus to the body. The scrim is tinted ink at low alpha, never a blur.
 
 ### The shared controls

@@ -87,8 +87,8 @@ export function forcedTint(state) {
  *   and no press class, and neither does `.control-choice` — so the
  *   checkbox, the radio, the select, the search field and the filter group
  *   do NOT take the tint, and the shared reason was a false statement about
- *   them. A field takes no tint at all: what a pointer changes on a field
- *   is the platform's own paint, and its focus is the one ring.
+ *   them. A field draws no hover state at all: its state changes are the
+ *   one focus ring and the error rule.
  *
  * Focus is neither register's: it is a single `:focus-visible` rule on
  * every element in index.css, which is why both registers say the same
@@ -100,9 +100,9 @@ const FOCUS_REASON =
 
 const FIELD_REASONS = Object.freeze({
   hover:
-    'A field takes no tint. A tint behind a field would compete with the value inside it, so what '
-    + 'a pointer changes on a field is the platform’s own paint. The tinted hover every boxed '
-    + 'control composes is drawn on the shared shapes above.',
+    'A field takes no tint. A tint behind a field would compete with the value inside it, so a '
+    + 'field draws no hover state at all: its state changes are the one focus ring and the error '
+    + 'rule. The tinted hover every boxed control composes is drawn on the shared shapes above.',
   pressed:
     'A field holds a value rather than an action, so there is nothing to press. The press is drawn '
     + 'on the shared shapes above, and an action beside a field — a clear control, a submit — '
