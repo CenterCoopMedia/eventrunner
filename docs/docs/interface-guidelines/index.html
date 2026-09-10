@@ -118,6 +118,7 @@
               <li><a href="#headers">Headers</a></li>
               <li><a href="#the-base-and-the-theme">The base and the theme</a></li>
               <li><a href="#user-interface">User interface</a></li>
+              <li><a href="#interaction-states">Interaction states</a></li>
               <li><a href="#animation">Animation</a></li>
               <li><a href="#typography">Typography</a></li>
               <li><a href="#colors">Colors</a></li>
@@ -233,6 +234,50 @@
           <li>Add a <code>1px</code> outline to images, offset by <code>-1px</code>: Black at 8% opacity in light mode, white at 8% in dark mode.</li>
           <li>Portraits and avatars are square on the brand radius (<code>rounded-brand</code>), never a circle (<code>rounded-full</code>) — a circular crop is a generic-template tell.</li>
           </ul>
+          <h2 id="interaction-states">Interaction states<a class="heading-anchor" href="#interaction-states" aria-label="Link to this section">#</a></h2>
+          <p>Every control and every interactive row defines these ten states, in both modes, on both surfaces. A state is a word, an ink change, a weight change, or a rule change. <strong>A state is never colour alone and never a pill.</strong> The public shapes carry them through one shared class string (<code>components/controlClasses.js</code>); the admin carries them through <code>admin/components/formControls.jsx</code>. Neither imports the other.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>State</th><th>Public site</th><th>Admin</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Rest</td><td>The style&#39;s own ink and ground</td><td>The desk&#39;s ink and ground</td></tr>
+          <tr><td>Hover</td><td>The control&#39;s own ink mixed into its own ground at <code>--state-hover-share</code>, inside <code>@media (hover: hover)</code>. A control set as text takes no tint: its hover is the ink and the underline</td><td>The same device, with the desk&#39;s tints</td></tr>
+          <tr><td>Focus-visible</td><td>The 3px ring in the accent, outside the element, never removed</td><td>The 3px action ring; the light ring on the rail</td></tr>
+          <tr><td>Active (pressed)</td><td>Scale 0.98 at <code>--motion-slow</code> on <code>transform</code>, inside <code>motion-safe:</code>, plus the firmer tint at <code>--state-pressed-share</code></td><td>The pressed action ground; no scale</td></tr>
+          <tr><td>Selected or current</td><td>Weight, plus one of: the tint at <code>--state-selected-share</code> on <code>aria-pressed</code>, the filled ground on <code>aria-checked</code>, the strong rule on <code>aria-selected</code>, <code>aria-current</code> on a link</td><td>The rail&#39;s four signals; a filled row marker elsewhere</td></tr>
+          <tr><td>Disabled</td><td><code>disabled</code> where the control must not act; <code>aria-disabled=&quot;true&quot;</code> where it must stay focusable to explain itself, and then its handler refuses every activation path. The disabled ink on the alternate ground, the pointer unchanged. Never a removed control</td><td>The same</td></tr>
+          <tr><td>Busy</td><td><code>aria-busy=&quot;true&quot;</code> and a stated word inside the control (&quot;Saving…&quot;); never a spinner, never a shimmer</td><td>The same, and the result stays in place after</td></tr>
+          <tr><td>Error</td><td><code>aria-invalid=&quot;true&quot;</code>, the alarm rule, a message under the field named by <code>aria-describedby</code>, and focus moved to the first error on submit (<code>lib/focusFirstError.js</code>)</td><td>The same</td></tr>
+          <tr><td>Success</td><td>A stated line in place, in a <code>role=&quot;status&quot;</code> region, that stays. A toast may repeat it, and a repeat carries no live role, so one result is announced once</td><td>The same</td></tr>
+          <tr><td>Empty</td><td>A sentence that names what was searched or filtered, plus one action</td><td>The desk&#39;s empty state</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p><strong>A submit control is never disabled for a validation state.</strong> A disabled control announces nothing, so a person who presses it learns nothing. Keep it enabled until the request starts, mark the fields, and move focus to the first one that refused.</p>
+          <p><strong>A hover state never transitions.</strong> Colour is repainted on every frame, and a state a reader caused has to land at once. Only <code>transform</code> and <code>opacity</code> animate.</p>
+          <p><strong>A tap is not a hover.</strong> A touch screen reports a tap as a hover and holds it until the reader taps elsewhere, so an unguarded hover tint reads as a selection nobody made. Tailwind&#39;s <code>hoverOnlyWhenSupported</code> puts every <code>hover:</code> utility inside the query; a raw <code>:hover</code> rule in <code>index.css</code> carries <code>@media (hover: hover) and (pointer: fine)</code> by hand.</p>
+          <p><strong>A new tab says so.</strong> A link with <code>target=&quot;_blank&quot;</code> uses the shared <code>ExternalLink</code>, which puts &quot;(opens in a new tab)&quot; inside the link&#39;s own name. A note beside the link is read after the reader has already followed it.</p>
+          <p><strong>A dialog is a native <code>&lt;dialog&gt;</code> opened with <code>showModal()</code>.</strong> That one call traps focus, makes the page behind it inert, sends Escape as <code>cancel</code>, and puts the dialog in the top layer. The component returns focus to the opener itself, because React removes the dialog on close and an element removed while it holds focus drops focus to the body. The scrim is tinted ink at low alpha, never a blur.</p>
+          <h3 id="the-shared-controls">The shared controls<a class="heading-anchor" href="#the-shared-controls" aria-label="Link to this section">#</a></h3>
+          <p>Each one is keyboard-first, reads the tier-2 tokens, and lives in <code>apps/web/src/components/forms/</code>.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Control</th><th>One job</th><th>The rule</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>Switch</code></td><td>A setting that is on or off</td><td><code>role=&quot;switch&quot;</code>, <code>aria-checked</code>, the state as a word beside the label. The label names the ENABLED state. No sliding knob.</td></tr>
+          <tr><td><code>SegmentedControl</code></td><td>One choice from a short set</td><td>A <code>role=&quot;radiogroup&quot;</code> set as one ruled row. The chosen word takes the filled ground and the bold weight. One tab stop; arrow keys, Home and End move inside it. Never a pill.</td></tr>
+          <tr><td><code>Tabs</code></td><td>One panel from a short set</td><td>The ARIA tab pattern with a roving tab index. Selection follows focus. The selected tab carries the strong rule. Never a pill, never a filled tab.</td></tr>
+          <tr><td><code>Checkbox</code>, <code>Radio</code></td><td>Pick any; pick one</td><td>A real input with <code>appearance: none</code>, redrawn from the tokens: the boundary in <code>--color-border-control</code>, the checked fill in the accent, the mark an inline SVG reading <code>currentColor</code>. The keyboard, the label and the group stay the platform&#39;s.</td></tr>
+          <tr><td><code>SearchField</code></td><td>Narrow a list by words</td><td>A labelled <code>type=&quot;search&quot;</code> input, a stated clear control, and the result count in a <code>role=&quot;status&quot;</code> line the caller feeds.</td></tr>
+          <tr><td><code>SortControl</code></td><td>Order a list</td><td>A labelled select. The label names what is being ordered.</td></tr>
+          <tr><td><code>FilterGroup</code></td><td>Narrow a list by a facet</td><td>A <code>&lt;fieldset&gt;</code> with a <code>&lt;legend&gt;</code>, the active count in the legend, and one clear control for the whole group.</td></tr>
+          </tbody>
+          </table>
+          </div>
           <h2 id="animation">Animation<a class="heading-anchor" href="#animation" aria-label="Link to this section">#</a></h2>
           <p>The system has two motion classes and there is no third (design brief §2.2).</p>
           <ul>
@@ -240,10 +285,12 @@
           <li><strong>Expressive motion</strong> is one designed signature interaction per surface. The schedule grid holds that slot on the public site: A track column comes forward when a reader presses or focuses its head. Focus previews it, the press keeps it, and <code>aria-pressed</code> is the record. The state is a tint of the column&#39;s own ground and the motion is a small lift, so the state lands in both motion settings and only the lift is animated — under <code>prefers-reduced-motion</code> the column still comes forward and nothing moves. No other column is dimmed, so no text drops below its contrast bar at any frame.</li>
           </ul>
           <p>Both classes: Never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support <code>prefers-reduced-motion</code> in full; the reduced state is truly static, and a shortened animation is not a fallback.</p>
+          <p><strong>Enter and exit are the two moves, and there is no third.</strong> An element that arrives fades up over at most 8px at <code>--motion-base</code>; an element that leaves fades back down it at <code>--motion-fast</code>. Both take <code>--motion-ease</code>: there is ONE curve, and the asymmetry is carried by duration alone. An enter never opens on an ease-in, which would delay the response at the exact moment the reader is watching. The utilities are <code>.motion-enter</code> and <code>.motion-exit</code> in <code>index.css</code>, both inside <code>@media (prefers-reduced-motion: no-preference)</code>, and the reduced state is the END state, not a shorter animation. <strong>Enter, exit and press are public only</strong>: the admin has no expressive motion and a state change in the room is instant, so the shared toast carries no motion class there.</p>
+          <p><strong>The refusals are a test, not a paragraph.</strong> <code>apps/web/src/lib/motionContract.test.js</code> parses <code>index.css</code> with PostCSS and scans every shipped <code>.js</code> and <code>.jsx</code>. It fails on <code>transition: all</code> or <code>transition-all</code>; on a numeric or arbitrary <code>duration-*</code> or <code>delay-*</code> utility and on any millisecond value outside the four duration tokens; on an animated property other than <code>transform</code> and <code>opacity</code>; on a <code>:hover</code> rule outside the hover query; on <code>animate-pulse</code>, <code>animate-spin</code>, <code>animate-bounce</code> and <code>animate-ping</code>; on any keyframe run <code>infinite</code>; on a <code>transition</code> or <code>animation</code> declaration outside a no-preference block, the global reduce block and the mode swap excepted; on <code>rounded-full</code>; on <code>box-shadow</code> and <code>backdrop-filter</code>; and on a gradient whose colour stops differ. Flat paint written as a one-colour gradient, or two colours meeting at one exact position, is a rule, a frame, a grid, or a dot pattern, and it passes. <strong>When it fails, fix the source.</strong> A new exception belongs in the binding brief before it belongs in the test.</p>
           <ul>
           <li>Never <code>transition: all</code>; list the exact properties that change.</li>
           <li>Scale pressed buttons to 0.95–0.98 with <code>transition: scale 200ms ease-out</code>.</li>
-          <li>Cross-fade swapped icons: Entering scales 0.25→1 with opacity 0→1 and blur 4px→0; exiting reverses.</li>
+          <li>Cross-fade swapped icons on opacity and scale only: Entering scales 0.9→1 with opacity 0→1; exiting reverses. No blur — a filter repaints on every frame and <code>filter</code> is not on the animated-property list.</li>
           <li>CSS transitions for interruptible interactions; keyframes for one-time sequences.</li>
           <li>Disable transitions while switching between light and dark themes.</li>
           <li><code>will-change</code> only on properties that actually change: <code>transform</code>, <code>opacity</code>, <code>filter</code>. Add <code>will-change: transform</code> to elements that jitter 1–2px mid-animation (iOS Safari especially).</li>
@@ -329,7 +376,14 @@
           <li>Skip-to-content link is the first focusable element; anchored headings get <code>scroll-margin-top</code>.</li>
           </ul>
           <h2 id="layout">Layout<a class="heading-anchor" href="#layout" aria-label="Link to this section">#</a></h2>
+          <p><strong>The page is built on two widths, and both are tokens.</strong></p>
           <ul>
+          <li><strong>The stage</strong> (<code>--stage-max</code>) is the frame. The header, the navigation, the schedule grid, the four directories, the logo wall, the footer, and every section head run to it. It is a maximum inline size with a gutter from the spacing scale, never a fixed width.</li>
+          <li><strong>The measure</strong> (<code>--measure-text</code>) is running text. A paragraph, a list, a rich text block, a stat block&#39;s description, an FAQ answer: none of them exceeds it, at any viewport. <code>max-w-prose</code> resolves to it, so the rule holds wherever that utility already sits.</li>
+          <li><strong>The margin column</strong> opens beside the measure at <code>lg</code> and above. The measure takes the leading track, the margin takes the rest, and a folio, a picture, or a line of metadata may sit there. Below <code>lg</code> the margin closes and the measure fills the stage.</li>
+          <li><strong>A style retunes either width in its own preset file.</strong> Both names are declared in the <code>page</code> contract (<code>design/tokens/components.json</code>) over a tier-2 stage family, so a broadsheet may run wider and tighter and a zine may keep the stage narrow. A style never mints a width of its own.</li>
+          <li><strong>The arrangement variant maps onto the stage.</strong> <code>grid</code> gives a section the stage&#39;s columns; <code>list</code> sets it on the measure. The section head runs to the stage either way, because a section boundary is the width of the page it opens.</li>
+          <li><strong>The stage gutter holds every device drawn outside it.</strong> The Atlas coordinate mark sits <code>--space-sm</code> plus <code>--space-xs</code> outside the title block, so the gutter is <code>--space-lg</code>. A narrower gutter pushes the mark past the viewport and the whole page scrolls sideways.</li>
           <li>The gap between groups is at least twice the gap inside one: 8px within, 16px+ between. Use the named spacing steps (<code>--space-3xs</code> through <code>--space-3xl</code>), which are built to that rule: <code>xs</code> pairs with <code>md</code>, <code>sm</code> with <code>lg</code>, <code>md</code> with <code>xl</code>.</li>
           <li>Logical properties (<code>margin-inline-start</code>, <code>padding-inline-end</code>), not directional values.</li>
           <li>No fixed widths or heights on text containers.</li>

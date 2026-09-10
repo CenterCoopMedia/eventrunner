@@ -124,6 +124,7 @@
               <li><a href="#composition-rules">Composition rules</a></li>
               <li><a href="#print">Print</a></li>
               <li><a href="#the-admin-panel-is-not-a-site-style">The admin panel is not a site style</a></li>
+              <li><a href="#the-specimen-book">The specimen book</a></li>
               <li><a href="#extension-points">Extension points</a></li>
             </ul>
           </nav>
@@ -259,6 +260,12 @@
           <p>They take the site&#39;s own ink and never carry a colour of their own, so a set cannot fight a client&#39;s palette.</p>
           <p><strong>Engine.</strong> <code>config/theme.motifSet</code> names the set; <code>data-motif-set</code> on the root element does the switching, because a custom property cannot rewrite the asset another custom property points at. A motif renders as a <code>mask-image</code> painted with the ink token, or as an inline SVG symbol reading <code>currentColor</code> — never as an <code>&lt;img&gt;</code>, never as a <code>url()</code> fill.</p>
           <h2 id="layout">Layout<a class="heading-anchor" href="#layout" aria-label="Link to this section">#</a></h2>
+          <h3 id="two-widths-the-stage-and-the-measure">Two widths: The stage and the measure<a class="heading-anchor" href="#two-widths-the-stage-and-the-measure" aria-label="Link to this section">#</a></h3>
+          <p>Every page is built on two widths, and picking a style is what sets them.</p>
+          <p><strong>The stage</strong> is the frame. The header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer, and every section heading run to it. It is the width of the page.</p>
+          <p><strong>The measure</strong> is running text. A paragraph, a list, a description under a figure, an answer under a question: none of them runs wider than the measure, at any screen size. Long lines are hard to read, and a paragraph set the width of a timetable is a paragraph nobody finishes.</p>
+          <p>At wide screen sizes a <strong>margin</strong> opens beside the measure. A small label, a picture, or a line of detail can sit there. On a narrow screen the margin closes and the text fills the page.</p>
+          <p><strong>Engine.</strong> Both widths are tokens: <code>--stage-max</code> and <code>--measure-text</code>, declared in the page contract over a tier 2 stage family. A style retunes either one in its own preset file — a broadsheet may run wider and tighter, a zine may keep the stage narrow — and nothing states a fixed width. The <code>arrangement</code> variant maps onto them: <code>grid</code> uses the stage&#39;s columns and <code>list</code> uses the measure.</p>
           <h3 id="pages-are-chosen-by-task">Pages are chosen by task<a class="heading-anchor" href="#pages-are-chosen-by-task" aria-label="Link to this section">#</a></h3>
           <p>An operator knows &quot;this is a long read&quot; and &quot;this is a directory with an introduction&quot;. They do not know, and should not have to work out, what <code>arrangement</code> should be. So the page editor asks the question they can answer:</p>
           <div class="table-scroll" data-scroll-region data-scroll-label="Table">
@@ -344,6 +351,21 @@
           <li><strong>Grid schedule</strong> — time down the left, lettered tracks across the head, at wide viewports. A real table, and it degrades to the time-ordered list, which is the accessible baseline and not a lesser view.</li>
           <li><strong>Back issue</strong> — the archival state of a past day. Reduce the palette to the archive tokens, add the folio, remove the live controls. Never hide the content.</li>
           <li><strong>Print view</strong> — its own view, not the screen with the controls hidden.</li>
+          <li><strong>Loading</strong> — a stated line saying what is loading, and a block of hairline rules that holds the space the content will take. No spinner, no shimmer, no skeleton, and nothing that moves.</li>
+          <li><strong>Toast</strong> — a repeat of a result the page already states in place. Its tone is a word and a rule weight, never a colour on its own, and a repeat is silent so one result is announced once.</li>
+          </ul>
+          <h3 id="the-shared-controls">The shared controls<a class="heading-anchor" href="#the-shared-controls" aria-label="Link to this section">#</a></h3>
+          <p>Keyboard-first, on the token system, in <code>apps/web/src/components/forms/</code>. Every one carries the ten interaction states in <a href="/eventrunner/docs/interface-guidelines/"><code>interface-guidelines.md</code></a>, Interaction states.</p>
+          <ul>
+          <li><strong>Switch</strong> — a setting that is on or off. <code>role=&quot;switch&quot;</code>, the state as a word beside the label, 44px on touch. The label names the enabled state. No sliding knob.</li>
+          <li><strong>Segmented control</strong> — one choice from a short set, as one ruled row of words. The chosen word takes the filled ground and the bold weight. One tab stop; arrow keys, Home and End move inside it. Never a pill.</li>
+          <li><strong>Tabs</strong> — one panel from a short set, on the ARIA tab pattern with a roving tab index. The selected tab carries the strong rule, the same device a section boundary uses. Never a pill, never a filled tab.</li>
+          <li><strong>Checkbox and radio</strong> — drawn from the tokens rather than painted by the operating system: the boundary on the control token, the checked fill in the accent, the mark an inline drawing that reads the ink around it. The input under the paint is untouched, so the keyboard, the label and the group stay the browser&#39;s.</li>
+          <li><strong>Search field</strong> — a labelled search input, a stated clear control, and a result count the page speaks as well as shows.</li>
+          <li><strong>Sort control</strong> — a labelled select. The label names what is being ordered.</li>
+          <li><strong>Filter group</strong> — a fieldset with a legend, the count of what is on inside the legend, and one clear control for the whole group.</li>
+          <li><strong>Dialog</strong> — a native dialog opened as a modal, so focus is trapped, the page behind is inert, and Escape closes it. Focus returns to the control that opened it. The scrim is tinted ink, never a blur.</li>
+          <li><strong>External link</strong> — any link that opens a new tab says so inside the link&#39;s own name.</li>
           </ul>
           <p><strong>The eyebrow ban is absolute.</strong> Nothing sits directly above a heading — not a label, not a chip, not a small line of description, not a plain folio. It holds at every size, in every style. Two things are not eyebrows and must never be &quot;fixed&quot;: Metadata inside the rule-bounded nameplate block, and a form <code>&lt;label&gt;</code> above its own input.</p>
           <p><strong>Elevation is tint, not shadow.</strong> Where a surface must sit above another, shift its tone.</p>
@@ -365,6 +387,18 @@
           <li><strong>A destructive action stands still and states what it costs.</strong> Nothing animates in a destructive moment.</li>
           </ul>
           <p><strong>Engine.</strong> The <code>admin-*</code> blocks are emitted once per mode and never once per (style, mode), which is the mechanical form of &quot;the admin ignores the site style&quot;. They stay root-only, because the admin never renders inside the page-preview frame.</p>
+          <h2 id="the-specimen-book">The specimen book<a class="heading-anchor" href="#the-specimen-book" aria-label="Link to this section">#</a></h2>
+          <p><strong>Staff.</strong> You will not meet this page. It is a review surface for the people who build and extend the look.</p>
+          <p><strong>Engine.</strong> <code>/specimen</code> renders every device the system has, in the site style and display mode the page is set to, with the component file and the tier 3 contract beside each one. It exists because a designer otherwise has to open real pages to see a device, and five of the six styles have devices no seeded page draws.</p>
+          <p>Thirteen sections, in this order: type, colour, rules and spacing, layout, headers, editorial devices, illustrations, sessions and schedule, directories, controls, inputs, feedback, print. Each specimen is a <code>&lt;figure&gt;</code>, and its <code>&lt;figcaption&gt;</code> names the device, the file, and the contract. Every word on the page comes from the committed synthetic snapshot in <code>apps/web/src/generated/</code>. A section&#39;s number is its place in the contents, not a string inside the file, so inserting one renumbers the book on its own.</p>
+          <ul>
+          <li><strong>Where it ships.</strong> The demo build and a development server, never a client production build. The gate is <code>SPECIMEN_ENABLED</code> in <code>apps/web/src/pages/specimen/specimenRoute.js</code>, written as an expression over two build constants so the bundler folds the route away and never emits the chunk.</li>
+          <li><strong>What it refuses.</strong> The page marks itself <code>noindex</code> while it is mounted, and <code>scripts/write-site-files.cjs</code> fails the build if a sitemap ever lists the route.</li>
+          <li><strong>What keeps it complete.</strong> <code>tokens.js</code> lists the scales the book draws and a test pins each list to <code>design/tokens/semantic.json</code>, so a new colour token, type step, page width, state share or focus-ring value fails until the book shows it. A second test renders the whole page and checks that every component under <code>components/editorial/</code> and <code>components/forms/</code> appears in it.</li>
+          <li><strong>A device a style switches off.</strong> Three devices read a display token that four of the six styles hold at <code>none</code>: the plate number, the specimen label&#39;s term, and the pen mark. Each figure sets that one token to the value a style that uses the device sets, and says so in its caption.</li>
+          <li><strong>Adding a control.</strong> The controls section is a registry: one file per control under <code>apps/web/src/pages/specimen/controls/</code>, plus one import and one line in <code>index.js</code>. The file declares which of the ten interaction states it draws and which it does not have, with a reason for each; a control that accounts for neither fails <code>controls/index.test.js</code>. The reasons are the point: a state that is simply missing looks the same as a state somebody decided against, and only one of those is a defect.</li>
+          <li><strong>Captures.</strong> <code>scripts/dev/capture-specimen.mjs</code> writes one full-page PNG per style, mode, and width. See <code>scripts/README.md</code>.</li>
+          </ul>
           <h2 id="extension-points">Extension points<a class="heading-anchor" href="#extension-points" aria-label="Link to this section">#</a></h2>
           <p>What a developer can add, and what the system will refuse.</p>
           <p><strong>A new site style.</strong> Add its JSON under <code>design/tokens/presets/</code>, with both palettes, its type map, its shape, its option groups, and its tier. A style that names no tier reads as still-being-proved, so a new one cannot reach the launch surface by accident. It must clear the contrast gate in both modes before it ships.</p>

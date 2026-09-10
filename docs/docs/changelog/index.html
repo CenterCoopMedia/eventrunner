@@ -113,8 +113,53 @@
           <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
           and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
+          <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>A specimen book at <code>/specimen</code>: every device the system has, drawn in the site style and display
+          mode the page is set to, with the component file and the tier 3 contract beside each one. Twelve
+          sections cover type, colour, rules and spacing, headers, editorial devices, illustrations,
+          sessions and schedule, directories, controls, inputs, feedback and print, and every word on the
+          page comes from the committed synthetic snapshot. The route ships in the demo build and in a
+          development server and never in a client production build, it is <code>noindex</code>, and the sitemap
+          builder refuses to list it. <code>scripts/dev/capture-specimen.mjs</code> writes one full-page capture per
+          style, mode and width. The record is <code>docs/plans/2026-09-10-design-vocabulary-expansion.md</code> §7.</li>
+          <li>The specimen book&#39;s layout section: the two page widths with the value each one resolves to in
+          the style on screen, the margin column, and the composed first screen the home page opens on.</li>
+          <li>Every shared control has an entry in the specimen book, and each one accounts for all ten
+          interaction states — it draws the states it has and says which ones it does not have, and why.
+          A state that is simply missing looks the same as a state somebody decided against, and only one
+          of those is a defect.</li>
+          </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Every control on the public site now answers the same ten interaction states: rest, hover, focus,
+          press, selected, disabled, busy, error, success and empty. The hover, press and selected tints
+          come from a new <code>state</code> family in the design tokens, so a site style retunes every control at
+          once and dark mode carries its own share. A colour change no longer fades — a state a reader
+          caused has to land at once — and the only things that animate are transform and opacity.</li>
+          <li>Hover states are behind <code>@media (hover: hover)</code>. A touch screen reports a tap as a hover and
+          holds it, so a tapped control on a phone used to stay lit as though it had been selected.</li>
+          <li>The site has two motion moves and no third: an enter at 160ms and an exit at 120ms, both fading
+          over at most 8px, both switched off entirely for a reader who asks for less motion. The admin
+          takes neither: a state change there is instant.</li>
+          <li>A toast now states its tone in a word and a rule weight rather than in colour, and a toast that
+          only repeats a result the page already states no longer announces it a second time.</li>
+          <li>A loading state holds the space the content will take, with a block of hairline rules. The page
+          no longer jumps when the content lands. Nothing pulses and nothing spins.</li>
+          <li>The public site is now built on two widths instead of one column. The stage is the frame — the
+          header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer and every
+          section heading run to it — and the measure is running text, which never exceeds it. At wide
+          screen sizes a margin opens beside the measure for a label, a picture or a line of detail. The
+          home page opens on the masthead, then the lead sentence at the measure, then one ruled row of
+          three: the dates, the key facts and the clock, side by side and separated by hairlines. The
+          speaker shelf runs three portraits across at large screen sizes and four at extra large, each
+          portrait square. The sponsor wall runs about four marks across in its first tier and six in its
+          third. Both widths are tokens a site style retunes.</li>
+          <li>The public site no longer scrolls sideways by 4px on a phone. The title block&#39;s corner mark is
+          drawn outside the block, and the page gutter is now wide enough to hold it.</li>
+          <li>The demo band is now the showcase&#39;s own device: the style&#39;s name in the heading face, the line
+          that describes it under the name, a hairline, and the four controls on one row at the control
+          height. The <code>style</code> and <code>mode</code> values still round-trip through the query string.</li>
           <li>The admin CMS takes the editorial desk: a dark navigation rail against a cool-grey canvas, a
           white title band that holds the page&#39;s name and its save actions while the page scrolls, white
           panels, one action colour for every primary control and focus ring, a record&#39;s state as a
@@ -148,13 +193,37 @@
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Pressing Save in an admin editor with an invalid field did nothing and said nothing, because the
+          control was disabled. Save now stays enabled until the request starts, sends nothing while a
+          field is wrong, and moves the operator to the first field that refused.</li>
+          <li>The feedback form was an overlay, so Tab walked out of it and into the page behind. It is now a
+          real dialog: focus stays inside it, the page behind is inert, Escape closes it, and focus goes
+          back to the control that opened it.</li>
+          <li>A link that opens a new tab now says so, so a reader using a screen reader is not moved to a tab
+          with no history and no way back. Every outbound link carries it, the sponsor wall included —
+          the wall is the one place on the site where outbound links run one after another, which is
+          where a silent change of context costs a reader the most.</li>
+          <li>The profile page&#39;s visibility choices and badge picks were painted by the operating system, so a
+          client&#39;s palette and dark mode both stopped at their edge. They are drawn from the design tokens
+          now, and the control under the paint is unchanged.</li>
+          </ul>
+          <ul>
           <li>A site restyled after deployment printed the palette it shipped with, not the one on screen —
           and only from a dark screen, because the generated print block outranked the runtime one. The
           runtime theme element now emits its own print block from the live resolved light palette at the
           same specificity, and the generated block stays as the no-JavaScript fallback.</li>
           <li>A heading containing a long identifier scrolled a whole documentation page sideways at 320px.</li>
           </ul>
-          <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
+          <h3 id="added-1">Added<a class="heading-anchor" href="#added-1" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>Eight shared controls the site had no answer for: a switch, a segmented control, tabs, a drawn
+          checkbox and radio, a search field with a spoken result count, a sort control, and a filter group
+          with an active count and one clear control. Each holds one place in the tab order and moves
+          inside itself with the arrow keys.</li>
+          <li>A motion contract test. It reads the stylesheet and every class string the app ships and fails
+          the build on a transition over every property, a spinner, a pulse, a looping animation, a raw
+          duration, a hover rule outside the hover query, a shadow, a blurred panel, or a shading gradient.</li>
+          </ul>
           <ul>
           <li><code>config/theme.adminScheme</code> and the <strong>Admin colours</strong> control on Settings → Branding. The admin&#39;s
           rail, buttons, links and focus ring follow the main brand colour by default, worked into a
