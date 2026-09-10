@@ -16,6 +16,12 @@
 // color, and the "Badges" subsection opens with the SectionHead device
 // instead of a bare heading. Every visible `<label>` here stays a control
 // label above its own input — the eyebrow ban's one named exception (§2.4).
+//
+// The visibility choices and the badge picks are the shared drawn controls
+// (components/forms/Choice.jsx). They were native inputs, which the
+// operating system paints: a client's palette and dark mode both stopped at
+// their edge, so this page held the two controls on the site that no preset
+// could reach (expansion record §3.3).
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PROFILE_VISIBILITIES } from 'shared/profile';
@@ -29,6 +35,7 @@ import ProfilePhotoField from '../components/media/ProfilePhotoField.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { deleteOwnPhoto } from '../lib/photoUpload.js';
 import { inputClass, primaryActionClass } from '../components/controlClasses.js';
+import { Checkbox, Radio } from '../components/forms/Choice.jsx';
 
 const VISIBILITY_COPY = {
   public: {
@@ -308,24 +315,15 @@ export default function Profile() {
           <legend className="font-semibold text-text-primary">Who can see your profile</legend>
           <div className="mt-xs space-y-xs">
             {visibilityOptions.map((value) => (
-              <label key={value} className="flex items-start gap-sm rounded-brand p-xs">
-                <input
-                  type="radio"
-                  name="profileVisibility"
-                  value={value}
-                  checked={form.profileVisibility === value}
-                  onChange={() => setField('profileVisibility', value)}
-                  className="mt-3xs"
-                />
-                <span>
-                  <span className="block font-semibold text-text-primary">
-                    {VISIBILITY_COPY[value].label}
-                  </span>
-                  <span className="block font-data text-caption text-text-secondary">
-                    {VISIBILITY_COPY[value].description}
-                  </span>
-                </span>
-              </label>
+              <Radio
+                key={value}
+                name="profileVisibility"
+                value={value}
+                label={VISIBILITY_COPY[value].label}
+                description={VISIBILITY_COPY[value].description}
+                checked={form.profileVisibility === value}
+                onChange={() => setField('profileVisibility', value)}
+              />
             ))}
           </div>
         </fieldset>
@@ -358,20 +356,14 @@ export default function Profile() {
                     {category.badges.map((badge) => {
                       const checked = form.badges.includes(badge.id);
                       return (
-                        <label
+                        <Checkbox
                           key={badge.id}
-                          className={`flex items-center gap-sm rounded-brand p-xs ${
-                            !checked && atCap ? 'text-text-secondary' : ''
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={!checked && atCap}
-                            onChange={() => toggleBadge(badge.id)}
-                          />
-                          <span className="text-text-primary">{badge.label}</span>
-                        </label>
+                          label={badge.label}
+                          checked={checked}
+                          disabled={!checked && atCap}
+                          className={!checked && atCap ? 'text-text-secondary' : ''}
+                          onChange={() => toggleBadge(badge.id)}
+                        />
                       );
                     })}
                   </div>

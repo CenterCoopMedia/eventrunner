@@ -27,8 +27,9 @@
 //   Press      scale 0.98 on transform alone, at --motion-slow, inside
 //              `motion-safe:` — plus the firmer tint, which is what carries
 //              the press for a reader who asked for less motion.
-//   Selected   `aria-pressed` (or `aria-checked`, `aria-selected`), the bold
-//              weight, and the selected tint. Never colour alone.
+//   Selected   the bold weight, plus a second signal: the selected tint on
+//              `aria-pressed`, the filled ground on `aria-checked`, the
+//              strong rule on `aria-selected`. Never colour alone.
 //   Disabled   `aria-disabled="true"`, the disabled ink on the alternate
 //              ground, the control still in the tab order and the pointer
 //              unchanged. A removed control announces nothing.
@@ -50,7 +51,12 @@ const unavailableClass =
   'aria-disabled:bg-surface-alt aria-disabled:text-text-secondary ' +
   'disabled:bg-surface-alt disabled:text-text-secondary';
 
-/** Selected: the weight beside the tint, so the state is never colour alone. */
+/**
+ * Selected: the weight, so the state is never colour alone. `aria-pressed`
+ * also takes the tint (it has no ground of its own); `aria-checked` and
+ * `aria-selected` take the segmented control's filled ground and the tab's
+ * strong rule instead.
+ */
 const selectedClass = 'aria-pressed:font-bold aria-checked:font-bold aria-selected:font-bold';
 
 /** Every state a control shares. Compose it into each shape below. */
