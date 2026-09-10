@@ -85,12 +85,19 @@ export default function BookmarkAction({ session, bookmarked = false }) {
   // whole programme.
   if (!attendeeAccess) return null;
 
+  // `aria-busy` while the write is in flight (expansion record §2.1). The
+  // stated word is already there: the label flips optimistically the moment
+  // the control is pressed, so a reader is told what happened and then told
+  // that it is still happening. Without the attribute the control simply
+  // leaves the tab order for the length of a request and says nothing about
+  // why — the busy state of the grammar rendered as an unavailable one.
   return (
     <button
       type="button"
       className={rowActionClass}
       onClick={onClick}
       disabled={pending}
+      aria-busy={pending || undefined}
       aria-pressed={isBookmarked}
     >
       <span aria-hidden="true">{isBookmarked ? '★' : '☆'}</span>

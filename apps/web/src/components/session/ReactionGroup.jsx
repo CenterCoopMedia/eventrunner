@@ -121,6 +121,7 @@ export default function ReactionGroup({ session }) {
             className={chipActionClass}
             onClick={() => onPick(emoji)}
             disabled={pending}
+            aria-busy={pending || undefined}
             aria-pressed={mine}
             aria-label={`React with ${emoji}${count ? `, ${count}` : ''}`}
           >

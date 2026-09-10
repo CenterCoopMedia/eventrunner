@@ -4,7 +4,7 @@
 // point of the component, so it is tested first and by name. No Firebase,
 // no network (spec §8.1): every source module is mocked.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AuthContext from '../../contexts/AuthContext.jsx';
 import ProfileContext from '../../contexts/ProfileContext.jsx';
@@ -260,6 +260,33 @@ describe('BookmarkAction', () => {
       sessionId: 'fx-1',
       bookmarked: true,
     });
+  });
+
+  // The control leaves the tab order for the length of the write. Without
+  // `aria-busy` that is the busy state of the grammar rendered as an
+  // unavailable one: a reader is dropped out of the control and told
+  // nothing about why (expansion record §2.1).
+  it('says it is busy while the write is in flight, and stops when it lands', async () => {
+    let settle;
+    setSessionBookmarkedMock.mockReturnValue(
+      new Promise((resolve) => {
+        settle = () => resolve({ bookmarked: true, count: 1 });
+      }),
+    );
+    renderActions({
+      features: { sessionBookmarks: true },
+      auth: { user: { uid: 'u1' } },
+      profile: { attendeeAccess: true },
+      bookmarked: false,
+    });
+    fireEvent.click(screen.getByRole('button', { name: /bookmark/i }));
+    // The word is already there: the label flipped optimistically.
+    const busy = screen.getByRole('button', { name: /bookmarked/i, hidden: true });
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    await act(async () => {
+      settle();
+    });
+    expect(screen.getByRole('button', { name: /bookmarked/i })).not.toHaveAttribute('aria-busy');
   });
 
   it('reverts the optimistic toggle when the request fails', async () => {

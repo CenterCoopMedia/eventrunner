@@ -116,7 +116,8 @@ export default function FeedbackSection({ folio }) {
         name="Toast"
         file="contexts/ToastContext.jsx"
         contract={null}
-        note="Two tones, and neither of them is a colour: each states its own word at the head of the line and draws its own rule weight around the bar. A toast repeats a result the page already states, and a repeat is silent, so one result is announced once."
+        ground="alt"
+        note="Two tones, and neither of them is a colour: each states its own word at the head of the line and draws its own rule weight around the bar. The rule is drawn in the page ground, because the bar floats over content with nothing behind it to tint against, so the weight is the width of the halo around it — which is why these two sit on the alternate ground here and not on the page’s own. A toast repeats a result the page already states, and a repeat is silent, so one result is announced once."
       >
         <ToastSpecimen />
       </Figure>

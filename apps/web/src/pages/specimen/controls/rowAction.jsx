@@ -11,7 +11,6 @@ const CLASS_FOR_STATE = Object.freeze({
   focus: `${rowActionClass} ${FORCED_FOCUS}`,
   pressed: `${rowActionClass} ${FORCED_PRESS}`,
   selected: rowActionClass,
-  disabled: rowActionClass,
   busy: rowActionClass,
 });
 
@@ -26,8 +25,12 @@ export default Object.freeze({
   file: 'components/session/sessionActionClass.js',
   contract: null,
   note: 'Nothing on a schedule row is boxed, so the reader keeps running down the time column. The bookmark is the toggle: the selected state is aria-pressed, the word, and the weight.',
-  states: Object.freeze(['rest', 'hover', 'focus', 'pressed', 'selected', 'disabled', 'busy']),
+  states: Object.freeze(['rest', 'hover', 'focus', 'pressed', 'selected', 'busy']),
   absent: Object.freeze([
+    Object.freeze({
+      state: 'disabled',
+      reason: 'A row control that cannot be used is not drawn. The text register has no ground, so its unavailable ink is the ink it already sits in — a dead “Bookmark” under every session on the page would be a refusal repeated thirty times and legible as nothing.',
+    }),
     Object.freeze({
       state: 'error',
       reason: 'A row control acts on one session and states its own failure as a line under the row, not on itself.',
@@ -42,8 +45,6 @@ export default Object.freeze({
     <button
       type="button"
       className={CLASS_FOR_STATE[state]}
-      disabled={state === 'disabled'}
-      aria-disabled={state === 'disabled' ? 'true' : undefined}
       aria-pressed={state === 'selected' ? 'true' : undefined}
       aria-busy={state === 'busy' ? 'true' : undefined}
     >

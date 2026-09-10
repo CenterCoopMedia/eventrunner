@@ -100,7 +100,7 @@ export default function ControlsSection({ folio }) {
         name="External link marker"
         file="components/ExternalLink.jsx"
         contract={null}
-        note="A link that opens a new tab says so inside its own name, in the same words everywhere. The sentence is hidden, so the marker below looks like any other link until it is announced or inspected."
+        note="A link that opens a new tab says so inside its own name, in the same words everywhere. The sentence is hidden, so the marker in this figure looks like any other link until it is announced or inspected."
       >
         <p className="max-w-prose text-body text-text-primary">
           Every outbound link on the site carries it: the{' '}
