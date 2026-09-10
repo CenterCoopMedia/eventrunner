@@ -87,9 +87,14 @@
     outline-offset: var(--focus-ring-offset);
   }
 
+  /* The region scrolls, so it takes focus itself and shows the ring the
+     rest of the site shows. It read a width of its own and a spacing step
+     for its offset, which made it a second source for the one measurement
+     the ring tokens hold: a retune of the ring moved every other ring on
+     the site and left this one where it was. */
   .horizontal-scroll-region:focus-visible {
-    outline: 2px solid rgb(var(--color-accent-rgb));
-    outline-offset: var(--space-3xs);
+    outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
+    outline-offset: var(--focus-ring-offset);
   }
 }
 

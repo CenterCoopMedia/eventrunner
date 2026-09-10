@@ -39,6 +39,45 @@ function declarationsOf(selector) {
   return found;
 }
 
+/** Every outline declaration on a rule whose selector carries :focus-visible. */
+function focusVisibleOutlines() {
+  const found = [];
+  root.walkRules((rule) => {
+    if (!rule.selector.includes(':focus-visible')) return;
+    rule.walkDecls((decl) => {
+      if (!decl.prop.startsWith('outline')) return;
+      found.push({ selector: rule.selector, prop: decl.prop, value: decl.value });
+    });
+  });
+  return found;
+}
+
+// A ring width and a ring offset are their own token family — the public
+// pair and the admin pair — so a focus rule reads one of them by name.
+const RING_WIDTH_TOKEN = /var\(--[a-z-]*focus[a-z-]*-width\)/u;
+const RING_OFFSET_TOKEN = /^var\(--[a-z-]*focus[a-z-]*-offset\)$/u;
+const RAW_LENGTH = /(?:^|\s)\d*\.?\d+(?:px|rem|em)\b/u;
+
+describe('the shipped focus ring', () => {
+  it('is drawn at the ring tokens everywhere, never at a length of its own', () => {
+    // The scroll region drew a 2px ring at --space-3xs, a second source for
+    // a measurement the ring tokens already hold: a retune of the ring
+    // would have moved every ring on the site except that one.
+    const outlines = focusVisibleOutlines();
+    expect(outlines.length).toBeGreaterThan(0);
+    for (const { selector, prop, value } of outlines) {
+      const where = `${selector} { ${prop}: ${value} }`;
+      expect(RAW_LENGTH.test(value), where).toBe(false);
+      if (prop === 'outline' || prop === 'outline-width') {
+        expect(RING_WIDTH_TOKEN.test(value), where).toBe(true);
+      }
+      if (prop === 'outline-offset') {
+        expect(RING_OFFSET_TOKEN.test(value.trim()), where).toBe(true);
+      }
+    }
+  });
+});
+
 describe('the forced focus ring', () => {
   it('is one class, not a set of outline utilities', () => {
     expect(FORCED_FOCUS).toBe('focus-ring-forced');
