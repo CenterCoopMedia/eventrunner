@@ -13,9 +13,9 @@
 // 390px.
 //
 // The band held its own `max-w-5xl` and `px-md` after the stage landed, so
-// its content box started 60px inside the header's and ended 68px short of
-// it at 1440px. A band that does not line up with the page under it reads
-// as something bolted on, which is the one thing a demo band must not do.
+// at 1440px its content box ran 224 to 1216 against the header's 164 to
+// 1276: 60px inside the frame at each end. A band that does not line up
+// with the page under it is the one thing a demo band must not be.
 import { useEffect, useId, useState } from 'react';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';

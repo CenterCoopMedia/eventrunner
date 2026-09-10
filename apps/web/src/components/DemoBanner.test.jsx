@@ -155,9 +155,10 @@ describe('the demo band', () => {
   });
 
   it('runs its content on the same stage as the header, the page and the footer', () => {
-    // The band held its own max-w-5xl and px-md, so its content box was
-    // 224 to 1232 against the header's 164 to 1300 at 1440px. A band that
-    // does not line up with the page under it reads as bolted on.
+    // The band held its own max-w-5xl and px-md, so at 1440px its content
+    // box ran 224 to 1216 against the header's 164 to 1276: a 1024px box
+    // with a 16px gutter inside a 1160px stage with a 24px one, which put
+    // the band 60px inside the frame at each end.
     renderControls({ search: '?style=civic&mode=light' });
     const band = screen.getByRole('note', { name: 'Demo controls' });
     const inner = band.firstElementChild;
