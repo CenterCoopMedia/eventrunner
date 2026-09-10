@@ -230,9 +230,10 @@ async function loadPlaywright() {
  * @returns {Promise<() => Promise<void>>}
  */
 async function hideFixedFurniture(page) {
+  // `globalThis.` on every browser name: this file is linted as Node.
   await page.evaluate(() => {
-    globalThis.__specimenHidden = [...document.body.querySelectorAll('*')].filter(
-      (el) => getComputedStyle(el).position === 'fixed',
+    globalThis.__specimenHidden = [...globalThis.document.body.querySelectorAll('*')].filter(
+      (el) => globalThis.getComputedStyle(el).position === 'fixed',
     );
     for (const el of globalThis.__specimenHidden) el.style.visibility = 'hidden';
   });
