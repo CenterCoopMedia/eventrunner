@@ -113,3 +113,20 @@ test('a base URL with no trailing slash still resolves', async () => {
     'http://127.0.0.1:8901/demo/?style=zine&mode=light#/specimen',
   );
 });
+
+test('the fixed furniture is put back even when the shot throws', async () => {
+  // The furniture is hidden for a section shot and shown again after. A
+  // screenshot that threw used to leave the page hidden, and every capture
+  // after it in the same run was taken on a page missing its furniture.
+  const { withFixedFurnitureHidden } = await load();
+  let evaluations = 0;
+  const page = { evaluate: async () => { evaluations += 1; } };
+  await assert.rejects(
+    withFixedFurnitureHidden(page, async () => {
+      assert.equal(evaluations, 1);
+      throw new Error('the section is not on the page');
+    }),
+    /not on the page/u,
+  );
+  assert.equal(evaluations, 2);
+});

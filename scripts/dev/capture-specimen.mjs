@@ -245,6 +245,27 @@ async function hideFixedFurniture(page) {
   };
 }
 
+/**
+ * Take one shot with the page's fixed furniture hidden, and show it again.
+ *
+ * The restore runs in a `finally`, because a shot that throws — a section
+ * that is not on the page, a timeout — used to leave the furniture hidden,
+ * and every capture after it in the same run was then taken on a page
+ * missing the control the reader sees.
+ *
+ * @param {import('playwright').Page} page
+ * @param {() => Promise<void>} shoot
+ * @returns {Promise<void>}
+ */
+export async function withFixedFurnitureHidden(page, shoot) {
+  const restore = await hideFixedFurniture(page);
+  try {
+    await shoot();
+  } finally {
+    await restore();
+  }
+}
+
 async function capture({ options, baseUrl, log }) {
   const { chromium } = await loadPlaywright();
   let browser;
@@ -289,9 +310,7 @@ async function capture({ options, baseUrl, log }) {
             // nothing to hide and the control arrives inside the shot.
             await target.scrollIntoViewIfNeeded();
             await page.waitForTimeout(150);
-            const restore = await hideFixedFurniture(page);
-            await target.screenshot({ path: file });
-            await restore();
+            await withFixedFurnitureHidden(page, () => target.screenshot({ path: file }));
           } else {
             await page.screenshot({ path: file, fullPage: true });
           }
