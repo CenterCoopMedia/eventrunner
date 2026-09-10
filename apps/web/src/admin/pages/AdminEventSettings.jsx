@@ -287,7 +287,8 @@ export default function AdminEventSettings() {
         },
       }));
       setStatus('Saved. The site picks the change up live.');
-      showToast('Event settings saved.');
+      // The line above is the record and it announces; the bar repeats it.
+      showToast('Event settings saved.', { announce: false });
     } catch (err) {
       setError(err);
     } finally {

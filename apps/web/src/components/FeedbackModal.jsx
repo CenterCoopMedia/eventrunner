@@ -123,7 +123,7 @@ export default function FeedbackModal({ onClose }) {
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
-      className="public-dialog w-full max-w-lg border-strong border-rule-strong bg-surface p-lg"
+      className="public-dialog motion-enter w-full max-w-lg border-strong border-rule-strong bg-surface p-lg"
       onCancel={(event) => {
         event.preventDefault();
         onClose();

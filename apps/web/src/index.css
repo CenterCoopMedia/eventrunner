@@ -243,6 +243,43 @@
     background-color: rgb(var(--color-text-primary-rgb, 24 27 32) / 0.45);
   }
 
+  /* THE TWO MOVES (expansion record §2.2).
+     ------------------------------------------------------------------
+     An element that arrives fades up over a short distance; an element that
+     leaves fades back down it. There is no third move, and nothing else on
+     the public site animates.
+
+     ONE CURVE, TWO DURATIONS. The exit is faster than the enter that brought
+     the element in, and that is the whole of the asymmetry. A second curve
+     would make the two moments read as two systems, and the obvious second
+     curve — an ease-in — is the one shape an interface must not open on.
+
+     Both sit inside the no-preference query, and the reduced state is the
+     END state, not a shorter animation: a reader who asked for less motion
+     gets the element already in place, at full opacity.
+
+     Keyframes rather than transitions, because an entrance is a one-time
+     sequence and not an interruptible state change (interface guidelines,
+     Animation). Nothing here loops, and the `both` fill is what holds the
+     element at its end state when the sequence finishes.
+
+     ADMIN PAGES TAKE NEITHER. The admin has no expressive motion and no
+     enter or exit: a state change in the room is instant. Only public
+     surfaces put these classes on an element.
+
+     The two sequences themselves are declared at the foot of this file, at
+     the top level: a components-layer rule is dropped when its class name is
+     not found in the app, and a dropped @keyframes would leave the classes
+     below animating nothing. */
+  @media (prefers-reduced-motion: no-preference) {
+    .motion-enter {
+      animation: motion-enter var(--motion-base) var(--motion-ease) both;
+    }
+    .motion-exit {
+      animation: motion-exit var(--motion-fast) var(--motion-ease) both;
+    }
+  }
+
   /* Skip link: first focusable element on every page (Layout.jsx). */
   .skip-link {
     @apply sr-only focus:not-sr-only focus:absolute focus:start-md focus:top-md focus:z-50
@@ -1477,6 +1514,35 @@
   .font-data,
   .font-mono {
     font-variant-numeric: tabular-nums;
+  }
+}
+
+/* The two sequences the .motion-enter and .motion-exit classes run (see the
+   motion block in @layer components above). They are declared here, outside
+   every layer, because a layer is subject to Tailwind's own tree-shaking and
+   an animation with no keyframes is a class that does nothing.
+
+   Nothing here loops, nothing runs from scroll, and each sequence moves one
+   short step on transform and opacity only. */
+@keyframes motion-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-xs));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes motion-exit {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--space-xs));
   }
 }
 

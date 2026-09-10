@@ -190,10 +190,13 @@ export default function AdminSessionEditor({ mode }) {
         const verdict = summarizePublish(response, 'cmsSchedule', ids, 'sessions');
         if (!verdict.ok) throw new Error(verdict.message);
         setStatus(verdict.message);
-        showToast(verdict.message);
+        // The line above is the record and it announces. The bar repeats it
+        // where the operator is looking, and says nothing, so one result is
+        // announced once.
+        showToast(verdict.message, { announce: false });
       } else {
         setStatus('Draft saved. It is not live until you publish it.');
-        showToast('Session draft saved.');
+        showToast('Session draft saved.', { announce: false });
       }
       if (mode === 'create') {
         navigate(`/admin/sessions/${encodeURIComponent(docId)}`, { replace: true });
