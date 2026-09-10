@@ -28,6 +28,7 @@ import {
   icsFileName,
 } from '../../utils/calendar.js';
 import { rowActionClass } from './sessionActionClass.js';
+import ExternalLink from '../ExternalLink.jsx';
 
 /**
  * @param {{ eventConfig: object, session: object }} props
@@ -87,16 +88,16 @@ export default function CalendarMenu({ eventConfig, session }) {
           </li>
           {googleUrl ? (
             <li>
-              <a href={googleUrl} target="_blank" rel="noreferrer" className={rowActionClass}>
+              <ExternalLink href={googleUrl} className={rowActionClass}>
                 Google Calendar
-              </a>
+              </ExternalLink>
             </li>
           ) : null}
           {outlookUrl ? (
             <li>
-              <a href={outlookUrl} target="_blank" rel="noreferrer" className={rowActionClass}>
+              <ExternalLink href={outlookUrl} className={rowActionClass}>
                 Outlook
-              </a>
+              </ExternalLink>
             </li>
           ) : null}
         </ul>

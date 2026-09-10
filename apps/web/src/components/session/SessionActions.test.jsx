@@ -344,8 +344,8 @@ describe('CalendarMenu', () => {
     renderActions({ features: { icsExport: true } });
     const trigger = screen.getByRole('button', { name: 'Add to calendar' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('link', { name: 'Google Calendar' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Outlook' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Google Calendar\b/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Outlook\b/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /\.ics/ })).toBeNull();
   });
 
@@ -356,11 +356,11 @@ describe('CalendarMenu', () => {
       'aria-expanded',
       'true',
     );
-    expect(screen.getByRole('link', { name: 'Google Calendar' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Google Calendar\b/ })).toHaveAttribute(
       'href',
       expect.stringContaining('calendar.google.com'),
     );
-    expect(screen.getByRole('link', { name: 'Outlook' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Outlook\b/ })).toHaveAttribute(
       'href',
       expect.stringContaining('outlook.live.com'),
     );
@@ -382,7 +382,7 @@ describe('CalendarMenu', () => {
     renderActions({ features: { icsExport: true } });
     const trigger = screen.getByRole('button', { name: 'Add to calendar' });
     fireEvent.click(trigger);
-    fireEvent.keyDown(screen.getByRole('link', { name: 'Google Calendar' }), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('link', { name: /^Google Calendar\b/ }), { key: 'Escape' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(trigger).toHaveFocus();
   });
@@ -448,7 +448,11 @@ describe('RecordingLink', () => {
     // links on the page hears which session each one belongs to.
     renderActions({ surface: 'row', session: recorded });
     const link = screen.getByRole('link', { name: /^Watch the recording/ });
-    expect(link).toHaveAccessibleName('Watch the recording of [Fixture] Morning kickoff');
+    // The name also carries the new-tab sentence every outbound link
+    // carries (issue 236).
+    expect(link).toHaveAccessibleName(
+      'Watch the recording of [Fixture] Morning kickoff (opens in a new tab)',
+    );
     // The title is heard, not seen: the visible words stay the same three
     // on every row, so the programme keeps its rhythm.
     expect(link.querySelector('.sr-only')).toHaveTextContent('of [Fixture] Morning kickoff');
