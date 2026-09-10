@@ -78,6 +78,18 @@ export default function Nameplate({
   className = '',
 }) {
   const compact = variant === 'compact';
+  // THE NAME IS ITS OWN FLEX ITEM, AND IT MAY SHRINK. Text sitting straight
+  // in a flex row is an anonymous item at `min-width: auto`, which refuses
+  // to go below its own content. At 320px the mark, the gutter and the name
+  // wanted 304px inside a 272px stage, so Field Guide scrolled sideways by
+  // 8px on every route; in the book, where the device is framed in a 224px
+  // box, Civic and Newsroom went 17px and 16px past the viewport.
+  //
+  // `min-w-0` lets the name take the room that is left. `wrap-anywhere`
+  // breaks a word that cannot fit — the demo name's "Harborlight" is 241px
+  // at the nameplate size — and lowers the row's own minimum, which is
+  // what lets the row fit a box narrower than that word (interface
+  // guidelines, Responsive).
   const nameBody = (
     <span className="inline-flex items-center gap-xs">
       {mark ?? (
@@ -86,7 +98,7 @@ export default function Nameplate({
           className={compact ? 'h-6 w-6 shrink-0' : 'h-10 w-10 shrink-0'}
         />
       )}
-      {name}
+      <span className="min-w-0 wrap-anywhere">{name}</span>
     </span>
   );
   // The literal class matters: Tailwind scans for whole strings, and

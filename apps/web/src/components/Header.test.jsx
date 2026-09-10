@@ -103,6 +103,20 @@ describe('Header treatments', () => {
     expect(container.textContent).toContain('October 14–16, 2026');
   });
 
+  it('lets the name shrink inside the stage at 320px', () => {
+    // The base header's wordmark is the same shape as the nameplate's, and
+    // it had the same defect: text straight in a flex row is an anonymous
+    // item at `min-width: auto`, so a long name held its full width and ran
+    // past the stage instead of wrapping inside it. See the measurement in
+    // editorial/Nameplate.test.jsx.
+    const { container } = renderHeader({ variant: 'standard' });
+    const row = container.querySelector('a > span.inline-flex');
+    const named = [...row.children].find((child) => child.textContent === PROPS.name);
+    expect(named, 'the name is not its own flex item').toBeTruthy();
+    expect(named.className).toContain('min-w-0');
+    expect(named.className).toContain('wrap-anywhere');
+  });
+
   it('renders no dateline at all rather than an empty line', () => {
     const { container } = renderHeader({ variant: 'standard', dates: null, place: null });
     expect(container.querySelectorAll('p')).toHaveLength(1);

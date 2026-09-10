@@ -46,10 +46,17 @@ export default function Header({
   // overlay), so an unrecognized value renders the base header.
   const treatment = THEME_HEADERS.includes(variant) ? variant : DEFAULT_HEADER;
 
+  // THE NAME IS ITS OWN FLEX ITEM, AND IT MAY SHRINK. Text sitting straight
+  // in a flex row is an anonymous item at `min-width: auto`, which refuses
+  // to go below its own content — so at 320px the name held its full width
+  // and ran past the stage instead of wrapping inside it. `min-w-0` lets it
+  // take the room that is left; `wrap-anywhere` breaks a word longer than
+  // that room, and lowers the row's own minimum so the row fits its box
+  // (interface guidelines, Responsive: no page scrolls sideways at 320px).
   const wordmark = (
     <span className="inline-flex items-center gap-xs">
       {mark}
-      {name}
+      <span className="min-w-0 wrap-anywhere">{name}</span>
     </span>
   );
   const identityLink = (body) => (

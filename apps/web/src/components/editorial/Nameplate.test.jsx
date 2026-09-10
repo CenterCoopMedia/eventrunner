@@ -155,6 +155,31 @@ describe('Nameplate', () => {
     for (const mark of marks) expect(mark).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('lets the name shrink inside the stage at 320px', () => {
+    // MEASURED, on the built demo at a 320px viewport: the mark, the gutter
+    // and the name wanted 304px inside the stage's 272px content box, so
+    // Field Guide scrolled sideways by 8px on every route, and in the book,
+    // where the device is framed in a 224px box, Civic went 17px and
+    // Newsroom 16px past the viewport.
+    //
+    // Two things were wrong. Text sitting straight in a flex row is an
+    // anonymous item at `min-width: auto` and refuses to go below its own
+    // content, so the name needs its own item that may shrink. And a word
+    // longer than the room that is left has to break — `wrap-anywhere`
+    // rather than `break-words`, because break-word leaves the row's
+    // min-content at the whole word and the row overflows anyway.
+    //
+    // jsdom lays out nothing, so what is checked is the shape that made the
+    // measurement come out at 272px.
+    const { container } = renderPlate({ name: 'Harborlight Media Summit', to: '/' });
+    const row = container.querySelector('.nameplate__name span');
+    expect(row.className).toContain('inline-flex');
+    const named = [...row.children].find((child) => child.textContent === 'Harborlight Media Summit');
+    expect(named, 'the name is not its own flex item').toBeTruthy();
+    expect(named.className).toContain('min-w-0');
+    expect(named.className).toContain('wrap-anywhere');
+  });
+
   it('lays the lockup out the way the Header style sets the block', () => {
     // A start-aligned masthead puts the name at one end of the measure and
     // the dateline at the other, which is space-between. A CENTRED one wants

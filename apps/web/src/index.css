@@ -1638,6 +1638,25 @@
     @apply min-h-11 min-w-11;
   }
 
+  /* A WORD THAT CANNOT FIT BREAKS (interface guidelines, Responsive: no
+     page scrolls sideways at 320px).
+
+     Tailwind's `break-words` is `overflow-wrap: break-word`, and inside a
+     flex row that is not enough: it breaks the word when the line is
+     drawn, but it leaves the item's min-content at the width of the whole
+     word, so the row refuses to shrink below it and overflows its box
+     anyway. `anywhere` lowers the min-content as well, which is what lets
+     the row fit. Either way only a word that cannot fit is broken, so
+     nothing changes at a width where the word fits.
+
+     Measured: the demo event's name holds "Harborlight", 241px at the
+     44px nameplate size, and the wordmark's mark and gutter put its
+     minimum at 289px — wider than the 272px stage at 320px, and wider
+     than the 224px box the specimen book frames the device in. */
+  .wrap-anywhere {
+    overflow-wrap: anywhere;
+  }
+
   /* A quiet in-row control may drop to the 24×24px minimum on a pointer
      surface and holds 44×44px on touch. A button or a field holds the
      control height on every pointer (min-h-admin-control), so this is only
