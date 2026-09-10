@@ -14,7 +14,14 @@
 //
 // The clear control is rendered only when there is something to clear. A
 // control that does nothing is a dead end (interface guidelines, Writing).
-import { useId } from 'react';
+//
+// CLEARING MOVES FOCUS TO THE FIELD. The control exists only while there is
+// a query, so clearing the query removes the control — and an element
+// removed while it holds focus drops focus to the body, which sends a
+// keyboard reader back to the start of the page. The field is where the
+// reader was working and where they would type next, so the field takes
+// focus before the control goes.
+import { useId, useRef } from 'react';
 import { inputClass, quietActionClass } from '../controlClasses.js';
 
 /**
@@ -28,6 +35,16 @@ import { inputClass, quietActionClass } from '../controlClasses.js';
 export default function SearchField({ label, value, onChange, status, placeholder }) {
   const id = useId();
   const statusId = `${id}-status`;
+  const inputRef = useRef(null);
+
+  function clear() {
+    // The field is focused first: React removes the control in the render
+    // this state change causes, and by then the reader is already on the
+    // field rather than on nothing.
+    inputRef.current?.focus();
+    onChange('');
+  }
+
   return (
     <div className="flex flex-col gap-2xs">
       <label htmlFor={id} className="font-data text-caption font-semibold text-text-primary">
@@ -36,6 +53,7 @@ export default function SearchField({ label, value, onChange, status, placeholde
       <div className="flex flex-wrap items-center gap-xs">
         <input
           id={id}
+          ref={inputRef}
           type="search"
           className={`${inputClass} sm:w-auto sm:flex-1`}
           value={value}
@@ -44,7 +62,7 @@ export default function SearchField({ label, value, onChange, status, placeholde
           onChange={(event) => onChange(event.target.value)}
         />
         {value ? (
-          <button type="button" className={quietActionClass} onClick={() => onChange('')}>
+          <button type="button" className={quietActionClass} onClick={clear}>
             Clear search
           </button>
         ) : null}

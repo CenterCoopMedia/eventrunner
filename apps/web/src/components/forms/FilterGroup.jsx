@@ -12,6 +12,15 @@
 //
 // The clear control renders only when something is on. A control that
 // clears nothing is a dead end (interface guidelines, Writing).
+//
+// CLEARING MOVES FOCUS TO THE FIRST BOX. The control exists only while
+// something is on, so clearing removes the control — and an element removed
+// while it holds focus drops focus to the body, which sends a keyboard
+// reader back to the start of the page. The head of the group is where the
+// reader would work next, so the first box takes focus before the control
+// goes. The box is found in the group's own boxes rather than held as a ref
+// per option, the same way the tab row finds its tabs.
+import { useRef } from 'react';
 import { Checkbox } from './Choice.jsx';
 import { quietActionClass } from '../controlClasses.js';
 
@@ -31,11 +40,20 @@ export default function FilterGroup({
   clearLabel = 'Clear filter',
 }) {
   const active = selected.length;
+  const boxesRef = useRef(null);
 
   function toggle(value) {
     onChange(
       selected.includes(value) ? selected.filter((item) => item !== value) : [...selected, value],
     );
+  }
+
+  function clear() {
+    // The box is focused first: React removes the control in the render
+    // this state change causes, and by then the reader is already on the
+    // group rather than on nothing.
+    boxesRef.current?.querySelector('input[type="checkbox"]')?.focus();
+    onChange([]);
   }
 
   return (
@@ -46,7 +64,7 @@ export default function FilterGroup({
           <span className="font-normal text-text-secondary"> — {active} on</span>
         ) : null}
       </legend>
-      <div className="flex flex-col">
+      <div ref={boxesRef} className="flex flex-col">
         {options.map((option) => (
           <Checkbox
             key={option.value}
@@ -60,7 +78,7 @@ export default function FilterGroup({
       </div>
       {active > 0 ? (
         <div>
-          <button type="button" className={quietActionClass} onClick={() => onChange([])}>
+          <button type="button" className={quietActionClass} onClick={clear}>
             {clearLabel}
           </button>
         </div>
