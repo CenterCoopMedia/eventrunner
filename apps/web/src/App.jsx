@@ -22,6 +22,7 @@ import LoadingState from './components/LoadingState.jsx';
 import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';
 import DeferredPage from './components/DeferredPage.jsx';
 import { clearReloadFlag } from './lib/chunkReload.js';
+import { SPECIMEN_ENABLED, SPECIMEN_PATH } from './pages/specimen/specimenRoute.js';
 
 // Code-split the admin CMS out of the public bundle (issue #95): AdminApp
 // and everything under src/admin/pages pull in the entire content-editing
@@ -58,6 +59,15 @@ const TicketClaim = lazyPage(() => import('./pages/TicketClaim.jsx'));
 const Profile = lazyPage(() => import('./pages/Profile.jsx'));
 const Attendees = lazyPage(() => import('./pages/Attendees.jsx'));
 const AttendeeProfile = lazyPage(() => import('./pages/AttendeeProfile.jsx'));
+
+// The specimen book (design vocabulary expansion, §7): every device in
+// every state, for review. It ships in the static demo and in a development
+// server and nowhere else. SPECIMEN_ENABLED is an expression over two build
+// constants, so a client production build folds this whole ternary to null
+// and Rollup never emits the chunk.
+const SpecimenPage = SPECIMEN_ENABLED
+  ? lazyPage(() => import('./pages/specimen/Specimen.jsx'))
+  : null;
 
 export function AppRoutes() {
   return (
@@ -112,6 +122,12 @@ export function AppRoutes() {
         <Route path="profile" element={<DeferredPage component={Profile} label="profile" />} />
         <Route path="attendees" element={<DeferredPage component={Attendees} label="attendees" />} />
         <Route path="attendees/:uid" element={<DeferredPage component={AttendeeProfile} label="attendee" />} />
+        {SpecimenPage ? (
+          <Route
+            path={SPECIMEN_PATH}
+            element={<DeferredPage component={SpecimenPage} label="specimen book" />}
+          />
+        ) : null}
         {/* Generic cmsPages route by their own root-level `path`
             (issue #52) — this catch-all matches whatever the system
             routes above didn't, and ContentPage looks the current

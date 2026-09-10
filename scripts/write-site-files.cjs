@@ -37,6 +37,11 @@
  * routes are always empty from this path; only the Cloud Run publisher,
  * which does have a live read, can list them.
  *
+ * One route is refused outright: the specimen book at /specimen is a review
+ * surface that ships only in the demo build and in a development server, so
+ * a sitemap that lists it fails this script with exit code 4 rather than
+ * publishing it.
+ *
  * Usage:
  *   node scripts/write-site-files.cjs --dist apps/web/dist --public-url https://example.org
  *   node scripts/write-site-files.cjs --dist apps/web/dist --generated /tmp/generated --public-url https://example.org
@@ -52,6 +57,36 @@ const { buildSiteArtifacts } = require('./lib/site-manifest.cjs');
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_GENERATED_DIR = path.join(ROOT, 'apps', 'web', 'src', 'generated');
 const FLAGS = ['dist', 'generated', 'public-url', 'help'];
+
+/**
+ * The review-only routes this build must never advertise.
+ *
+ * The specimen book (apps/web/src/pages/specimen/) renders every device in
+ * every state. It ships in the static demo build and in a development
+ * server, never in a client production build, and it is not a page anybody
+ * should reach from a search result.
+ *
+ * A sitemap is built from cmsPages, sessions, speakers, and updates, so no
+ * ordinary change can put this path in one. That is exactly why the check
+ * belongs here: the day a route table starts feeding the sitemap, this
+ * fails instead of quietly publishing a review surface.
+ */
+const NEVER_IN_SITEMAP = Object.freeze(['/specimen']);
+
+/**
+ * Refuse a sitemap that lists a review-only route.
+ *
+ * @param {string} sitemapXml
+ * @param {string[]} [routes]
+ * @returns {string[]} the offending routes, empty when the sitemap is clean
+ */
+function excludedRoutesFound(sitemapXml, routes = NEVER_IN_SITEMAP) {
+  const text = String(sitemapXml ?? '');
+  return routes.filter((route) => {
+    const inLoc = new RegExp(`<loc>[^<]*${route}(?:/[^<]*)?</loc>`, 'u');
+    return inLoc.test(text);
+  });
+}
 
 function usage() {
   return [
@@ -157,6 +192,15 @@ async function main(argv, { importModule = importGenerated, log = console } = {}
 
   const artifacts = buildSiteArtifacts({ ...snapshot, publicUrl: parsed['public-url'] });
 
+  const listed = excludedRoutesFound(artifacts.sitemapXml);
+  if (listed.length > 0) {
+    log.error(
+      `write-site-files: the sitemap lists a review-only route: ${listed.join(', ')}. `
+        + 'Remove it from the route source before publishing.',
+    );
+    return 4;
+  }
+
   fs.mkdirSync(distDir, { recursive: true });
   fs.writeFileSync(path.join(distDir, 'sitemap.xml'), artifacts.sitemapXml);
   fs.writeFileSync(path.join(distDir, 'robots.txt'), artifacts.robotsTxt);
@@ -181,6 +225,8 @@ module.exports = {
   main,
   readGeneratedSnapshot,
   importGenerated,
+  excludedRoutesFound,
   DEFAULT_GENERATED_DIR,
+  NEVER_IN_SITEMAP,
   internals: { usage, FLAGS },
 };

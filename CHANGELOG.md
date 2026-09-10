@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A specimen book at `/specimen`: every device the system has, drawn in the site style and display
+  mode the page is set to, with the component file and the tier 3 contract beside each one. Twelve
+  sections cover type, colour, rules and spacing, headers, editorial devices, illustrations,
+  sessions and schedule, directories, controls, inputs, feedback and print, and every word on the
+  page comes from the committed synthetic snapshot. The route ships in the demo build and in a
+  development server and never in a client production build, it is `noindex`, and the sitemap
+  builder refuses to list it. `scripts/dev/capture-specimen.mjs` writes one full-page capture per
+  style, mode and width. The record is `docs/plans/2026-09-10-design-vocabulary-expansion.md` §7.
+
 ### Changed
 
 - Every control on the public site now answers the same ten interaction states: rest, hover, focus,
@@ -34,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   third. Both widths are tokens a site style retunes.
 - The public site no longer scrolls sideways by 4px on a phone. The title block's corner mark is
   drawn outside the block, and the page gutter is now wide enough to hold it.
+- The demo band is now the showcase's own device: the style's name in the heading face, the line
+  that describes it under the name, a hairline, and the four controls on one row at the control
+  height. The `style` and `mode` values still round-trip through the query string.
 - The admin CMS takes the editorial desk: a dark navigation rail against a cool-grey canvas, a
   white title band that holds the page's name and its save actions while the page scrolls, white
   panels, one action colour for every primary control and focus ring, a record's state as a

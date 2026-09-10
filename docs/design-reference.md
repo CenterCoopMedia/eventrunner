@@ -314,6 +314,21 @@ The admin CMS is its own design surface and it does not restyle. It reads its ow
 
 **Engine.** The `admin-*` blocks are emitted once per mode and never once per (style, mode), which is the mechanical form of "the admin ignores the site style". They stay root-only, because the admin never renders inside the page-preview frame.
 
+## The specimen book
+
+**Staff.** You will not meet this page. It is a review surface for the people who build and extend the look.
+
+**Engine.** `/specimen` renders every device the system has, in the site style and display mode the page is set to, with the component file and the tier 3 contract beside each one. It exists because a designer otherwise has to open real pages to see a device, and five of the six styles have devices no seeded page draws.
+
+Twelve sections, in this order: type, colour, rules and spacing, headers, editorial devices, illustrations, sessions and schedule, directories, controls, inputs, feedback, print. Each specimen is a `<figure>`, and its `<figcaption>` names the device, the file, and the contract. Every word on the page comes from the committed synthetic snapshot in `apps/web/src/generated/`.
+
+- **Where it ships.** The demo build and a development server, never a client production build. The gate is `SPECIMEN_ENABLED` in `apps/web/src/pages/specimen/specimenRoute.js`, written as an expression over two build constants so the bundler folds the route away and never emits the chunk.
+- **What it refuses.** The page marks itself `noindex` while it is mounted, and `scripts/write-site-files.cjs` fails the build if a sitemap ever lists the route.
+- **What keeps it complete.** `tokens.js` lists the scales the book draws and a test pins each list to `design/tokens/semantic.json`, so a new colour token or type step fails until the book shows it. A second test renders the whole page and checks that every component under `components/editorial/` appears in it.
+- **A device a style switches off.** Three devices read a display token that four of the six styles hold at `none`: the plate number, the specimen label's term, and the pen mark. Each figure sets that one token to the value a style that uses the device sets, and says so in its caption.
+- **Adding a control.** The controls section is a registry: one file per control under `apps/web/src/pages/specimen/controls/`, plus one import and one line in `index.js`. `PENDING_CONTROLS` there names the controls that have a slot and no file yet.
+- **Captures.** `scripts/dev/capture-specimen.mjs` writes one full-page PNG per style, mode, and width. See `scripts/README.md`.
+
 ## Extension points
 
 What a developer can add, and what the system will refuse.
