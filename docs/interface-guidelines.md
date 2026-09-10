@@ -103,6 +103,47 @@ The base is what a deployment renders before its theme states anything, and it i
 - Add a `1px` outline to images, offset by `-1px`: Black at 8% opacity in light mode, white at 8% in dark mode.
 - Portraits and avatars are square on the brand radius (`rounded-brand`), never a circle (`rounded-full`) — a circular crop is a generic-template tell.
 
+## Interaction states
+
+Every control and every interactive row defines these ten states, in both modes, on both surfaces. A state is a word, an ink change, a weight change, or a rule change. **A state is never colour alone and never a pill.** The public shapes carry them through one shared class string (`components/controlClasses.js`); the admin carries them through `admin/components/formControls.jsx`. Neither imports the other.
+
+| State | Public site | Admin |
+|---|---|---|
+| Rest | The style's own ink and ground | The desk's ink and ground |
+| Hover | An ink-mixed tint of the ground at `--state-hover-share`, inside `@media (hover: hover)` | The same device, with the desk's tints |
+| Focus-visible | The 3px ring in the accent, outside the element, never removed | The 3px action ring; the light ring on the rail |
+| Active (pressed) | Scale 0.98 at `--motion-slow` on `transform`, inside `motion-safe:`, plus the firmer tint at `--state-pressed-share` | The pressed action ground; no scale |
+| Selected or current | Weight, plus one of: the tint at `--state-selected-share` on `aria-pressed`, the filled ground on `aria-checked`, the strong rule on `aria-selected`, `aria-current` on a link | The rail's four signals; a filled row marker elsewhere |
+| Disabled | `disabled` where the control must not act; `aria-disabled="true"` where it must stay focusable to explain itself, and then its handler refuses every activation path. The disabled ink on the alternate ground, the pointer unchanged. Never a removed control | The same |
+| Busy | `aria-busy="true"` and a stated word inside the control ("Saving…"); never a spinner, never a shimmer | The same, and the result stays in place after |
+| Error | `aria-invalid="true"`, the alarm rule, a message under the field named by `aria-describedby`, and focus moved to the first error on submit (`lib/focusFirstError.js`) | The same |
+| Success | A stated line in place, in a `role="status"` region, that stays. A toast may repeat it, and a repeat carries no live role, so one result is announced once | The same |
+| Empty | A sentence that names what was searched or filtered, plus one action | The desk's empty state |
+
+**A submit control is never disabled for a validation state.** A disabled control announces nothing, so a person who presses it learns nothing. Keep it enabled until the request starts, mark the fields, and move focus to the first one that refused.
+
+**A hover state never transitions.** Colour is repainted on every frame, and a state a reader caused has to land at once. Only `transform` and `opacity` animate.
+
+**A tap is not a hover.** A touch screen reports a tap as a hover and holds it until the reader taps elsewhere, so an unguarded hover tint reads as a selection nobody made. Tailwind's `hoverOnlyWhenSupported` puts every `hover:` utility inside the query; a raw `:hover` rule in `index.css` carries `@media (hover: hover) and (pointer: fine)` by hand.
+
+**A new tab says so.** A link with `target="_blank"` uses the shared `ExternalLink`, which puts "(opens in a new tab)" inside the link's own name. A note beside the link is read after the reader has already followed it.
+
+**A dialog is a native `<dialog>` opened with `showModal()`.** That one call traps focus, makes the page behind it inert, sends Escape as `cancel`, and puts the dialog in the top layer. The component returns focus to the opener itself, because React removes the dialog on close and an element removed while it holds focus drops focus to the body. The scrim is tinted ink at low alpha, never a blur.
+
+### The shared controls
+
+Each one is keyboard-first, reads the tier-2 tokens, and lives in `apps/web/src/components/forms/`.
+
+| Control | One job | The rule |
+|---|---|---|
+| `Switch` | A setting that is on or off | `role="switch"`, `aria-checked`, the state as a word beside the label. The label names the ENABLED state. No sliding knob. |
+| `SegmentedControl` | One choice from a short set | A `role="radiogroup"` set as one ruled row. The chosen word takes the filled ground and the bold weight. One tab stop; arrow keys, Home and End move inside it. Never a pill. |
+| `Tabs` | One panel from a short set | The ARIA tab pattern with a roving tab index. Selection follows focus. The selected tab carries the strong rule. Never a pill, never a filled tab. |
+| `Checkbox`, `Radio` | Pick any; pick one | A real input with `appearance: none`, redrawn from the tokens: the boundary in `--color-border-control`, the checked fill in the accent, the mark an inline SVG reading `currentColor`. The keyboard, the label and the group stay the platform's. |
+| `SearchField` | Narrow a list by words | A labelled `type="search"` input, a stated clear control, and the result count in a `role="status"` line the caller feeds. |
+| `SortControl` | Order a list | A labelled select. The label names what is being ordered. |
+| `FilterGroup` | Narrow a list by a facet | A `<fieldset>` with a `<legend>`, the active count in the legend, and one clear control for the whole group. |
+
 ## Animation
 
 The system has two motion classes and there is no third (design brief §2.2).
@@ -112,9 +153,13 @@ The system has two motion classes and there is no third (design brief §2.2).
 
 Both classes: Never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support `prefers-reduced-motion` in full; the reduced state is truly static, and a shortened animation is not a fallback.
 
+**Enter and exit are the two moves, and there is no third.** An element that arrives fades up over at most 8px at `--motion-base`; an element that leaves fades back down it at `--motion-fast`. Both take `--motion-ease`: there is ONE curve, and the asymmetry is carried by duration alone. An enter never opens on an ease-in, which would delay the response at the exact moment the reader is watching. The utilities are `.motion-enter` and `.motion-exit` in `index.css`, both inside `@media (prefers-reduced-motion: no-preference)`, and the reduced state is the END state, not a shorter animation. **Enter, exit and press are public only**: the admin has no expressive motion and a state change in the room is instant, so the shared toast carries no motion class there.
+
+**The refusals are a test, not a paragraph.** `apps/web/src/lib/motionContract.test.js` parses `index.css` with PostCSS and scans every shipped `.js` and `.jsx`. It fails on `transition: all` or `transition-all`; on a numeric or arbitrary `duration-*` or `delay-*` utility and on any millisecond value outside the four duration tokens; on an animated property other than `transform` and `opacity`; on a `:hover` rule outside the hover query; on `animate-pulse`, `animate-spin`, `animate-bounce` and `animate-ping`; on any keyframe run `infinite`; on a `transition` or `animation` declaration outside a no-preference block, the global reduce block and the mode swap excepted; on `rounded-full`; on `box-shadow` and `backdrop-filter`; and on a gradient whose colour stops differ. Flat paint written as a one-colour gradient, or two colours meeting at one exact position, is a rule, a frame, a grid, or a dot pattern, and it passes. **When it fails, fix the source.** A new exception belongs in the binding brief before it belongs in the test.
+
 - Never `transition: all`; list the exact properties that change.
 - Scale pressed buttons to 0.95–0.98 with `transition: scale 200ms ease-out`.
-- Cross-fade swapped icons: Entering scales 0.25→1 with opacity 0→1 and blur 4px→0; exiting reverses.
+- Cross-fade swapped icons on opacity and scale only: Entering scales 0.9→1 with opacity 0→1; exiting reverses. No blur — a filter repaints on every frame and `filter` is not on the animated-property list.
 - CSS transitions for interruptible interactions; keyframes for one-time sequences.
 - Disable transitions while switching between light and dark themes.
 - `will-change` only on properties that actually change: `transform`, `opacity`, `filter`. Add `will-change: transform` to elements that jitter 1–2px mid-animation (iOS Safari especially).
