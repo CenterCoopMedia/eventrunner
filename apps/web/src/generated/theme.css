@@ -60,7 +60,6 @@
   --er-duration-slow: 200ms;
   --er-duration-signature: 560ms;
   --er-easing-out: cubic-bezier(0, 0, 0.2, 1);
-  --er-easing-in: cubic-bezier(0.4, 0, 1, 1);
   --er-state-hover-light: 0.06;
   --er-state-hover-dark: 0.1;
   --er-state-pressed-light: 0.1;
@@ -133,7 +132,6 @@
   --motion-slow: var(--er-duration-slow);
   --motion-signature: var(--er-duration-signature);
   --motion-ease: var(--er-easing-out);
-  --motion-ease-exit: var(--er-easing-in);
 
   /* Tier 2 — named weights, so a component never writes a raw number. */
   --weight-regular: var(--er-weight-regular);

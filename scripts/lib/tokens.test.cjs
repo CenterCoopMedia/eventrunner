@@ -524,26 +524,32 @@ test('the admin marker takes the resolved brand colour, and falls back to admin 
 
 // ------------------------------------------------ the motif layer (brief §3.8)
 
-test('every motion step has one job, and the exit curve is its own', () => {
+test('every motion step has one job, and the two moments share one curve', () => {
   // Expansion record §2.2 gives each duration step a job: fast is the exit,
   // base is the enter, slow is the press, signature is the one signature a
-  // surface owns. An exit may accelerate away, so it takes its own curve.
+  // surface owns. There is one curve. An enter must never open on ease-in,
+  // which would delay the response at the one moment the reader is watching,
+  // and an exit that used a second curve would make the two moments read as
+  // two systems — so the asymmetry is carried by DURATION alone.
   const css = buildTokenCss(THEME);
   assert.match(css, /--motion-fast: var\(--er-duration-fast\);/);
   assert.match(css, /--motion-base: var\(--er-duration-base\);/);
   assert.match(css, /--motion-slow: var\(--er-duration-slow\);/);
   assert.match(css, /--motion-signature: var\(--er-duration-signature\);/);
   assert.match(css, /--motion-ease: var\(--er-easing-out\);/);
-  assert.match(css, /--motion-ease-exit: var\(--er-easing-in\);/);
 
-  const { primitives } = loadTokens();
-  const easing = primitives.scalar.easing;
-  // An enter never opens on ease-in: it would delay the response at the one
-  // moment the reader is watching. The two curves are therefore distinct,
-  // and the exit is the one that starts fast.
-  assert.notEqual(easing.out, easing.in);
-  assert.match(easing.out, /^cubic-bezier\(0, 0, /, 'the enter curve decelerates');
-  assert.match(easing.in, /, 1, 1\)$/, 'the exit curve accelerates');
+  const { primitives, semantic } = loadTokens();
+  assert.deepEqual(Object.keys(primitives.scalar.easing), ['out'], 'one curve, not two');
+  assert.equal(
+    Object.keys(semantic.motion).filter((step) => step.startsWith('ease')).length,
+    1,
+    'tier 2 offers one easing token',
+  );
+  assert.match(primitives.scalar.easing.out, /^cubic-bezier\(0, 0, /, 'the curve decelerates');
+
+  // The exit is faster than the enter that brought the element in.
+  const ms = (value) => Number(String(value).replace('ms', ''));
+  assert.ok(ms(primitives.scalar.duration.fast) < ms(primitives.scalar.duration.base));
 });
 
 test('the state shares resolve in both modes, and dark carries the higher share', () => {

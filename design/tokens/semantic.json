@@ -104,14 +104,13 @@
     "--font-mono": "var(--font-data)"
   },
 
-  "$motion-note": "Brief §2.2. Functional motion runs 120ms to 200ms. One expressive signature per surface finishes under 600ms. Each step has one job: --motion-fast is the exit, --motion-base is the enter, --motion-slow is the press, and --motion-signature is the one signature a surface owns. An exit is faster than the enter that brought the element in, and it takes --motion-ease-exit, because an element leaving may accelerate away while an element arriving must never delay the reader.",
+  "$motion-note": "Brief §2.2. Functional motion runs 120ms to 200ms. One expressive signature per surface finishes under 600ms. Each step has one job: --motion-fast is the exit, --motion-base is the enter, --motion-slow is the press, and --motion-signature is the one signature a surface owns. An exit is faster than the enter that brought the element in. There is ONE curve: enter and exit both take --motion-ease, and the asymmetry is carried by duration alone.",
   "motion": {
     "fast": "var(--er-duration-fast)",
     "base": "var(--er-duration-base)",
     "slow": "var(--er-duration-slow)",
     "signature": "var(--er-duration-signature)",
-    "ease": "var(--er-easing-out)",
-    "ease-exit": "var(--er-easing-in)"
+    "ease": "var(--er-easing-out)"
   },
 
   "$state-note": "Expansion record §2.1. A state tint is ink mixed into the ground the control already sits on, at a fixed share, so one rule covers every ground and every preset. The share is mode-scoped: it is emitted in both mode blocks and the dark value is the higher one.",
