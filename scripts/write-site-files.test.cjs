@@ -199,6 +199,46 @@ test('a page whose path merely starts with the same letters is allowed', () => {
   assert.deepEqual(excludedRoutesFound(xml), []);
 });
 
+test('the refusal names the reserved segment and the page that took it', async (t) => {
+  // An operator reading this message has to know two things: that the
+  // segment belongs to the specimen book, and which of their own pages is
+  // sitting on it. Without the page path there is nothing to rename.
+  const generatedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'write-site-files-clash-'));
+  const distDir = fs.mkdtempSync(path.join(os.tmpdir(), 'write-site-files-clash-dist-'));
+  t.after(() => {
+    fs.rmSync(generatedDir, { recursive: true, force: true });
+    fs.rmSync(distDir, { recursive: true, force: true });
+  });
+  fs.writeFileSync(
+    path.join(generatedDir, 'eventConfig.js'),
+    "export const eventConfig = { name: 'Fixture Event', shortName: 'FIX' };\n"
+    + 'export const features = { schedule: false, speakers: false, sponsors: false, '
+    + 'attendeeDirectory: false, updates: false };\n'
+    + 'export const theme = {};\n',
+  );
+  fs.writeFileSync(
+    path.join(generatedDir, 'pagesData.js'),
+    'export const pagesData = ['
+    + "{ id: 'home', path: '/', order: 0, visible: true, systemPage: true },"
+    + "{ id: 'specimen', path: '/specimen', order: 4, visible: true, systemPage: false },"
+    + '];\n',
+  );
+  fs.writeFileSync(
+    path.join(generatedDir, 'scheduleData.js'),
+    'export const scheduleData = [];\nexport const speakers = [];\n',
+  );
+
+  const errors = [];
+  const code = await main(
+    ['--dist', distDir, '--public-url', 'https://example.org', '--generated', generatedDir],
+    { log: { log() {}, error: (line) => errors.push(line) } },
+  );
+  assert.equal(code, 4);
+  const message = errors.join('\n');
+  assert.match(message, /reserved for the specimen book/u);
+  assert.match(message, /\/specimen/u);
+});
+
 test('the demo snapshot writes a sitemap that does not list the specimen book', async (t) => {
   const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'write-site-files-specimen-'));
   t.after(() => fs.rmSync(dist, { recursive: true, force: true }));

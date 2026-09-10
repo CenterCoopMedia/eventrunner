@@ -44,12 +44,23 @@
  * getRegistrationPrompt). Same reasoning as `speaker`: mail already sent
  * with this link must keep working.
  *
+ * `specimen` is the specimen book (apps/web/src/pages/specimen/): the
+ * review page that draws every device in every state. It is mounted only in
+ * the demo build and in a development server, so in a client production
+ * build the segment is free and the catch-all route would serve a generic
+ * page there. Two reasons that must not happen: the segment belongs to a
+ * built-in surface, and scripts/write-site-files.cjs refuses to publish a
+ * sitemap listing /specimen, so such a page would stop that client's
+ * deploy. Its route mounts as path={SPECIMEN_PATH}, an expression rather
+ * than a quoted literal, which is why the App.jsx sweep in
+ * apps/web/src/lib/siteNavigation.test.js did not report it missing.
+ *
  * Keep in sync with the static <Route path="..."> segments in App.jsx by
  * hand — there is no build-time check tying the two together.
  */
 const RESERVED_PATH_SEGMENTS = Object.freeze([
   'schedule', 'speakers', 'speaker', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin', 'updates',
-  'ticket',
+  'ticket', 'specimen',
 ]);
 
 /**
