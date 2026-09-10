@@ -124,7 +124,7 @@
           </nav>
           <p>A white-label event CMS for conferences and gatherings. Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates it. Client staff run the site from the admin CMS. They never touch the code.</p>
           <p><strong>License:</strong> <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>. The code is free. The trademark is the exclusivity lever: nobody else can market hosting under this name.</p>
-          <p><strong>Status:</strong> Public extraction in progress. The <a href="/eventrunner/docs/decisions/0001-event-platform-v1/">v1 architecture spec</a> and <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">feature triage</a> are the contract. Work is tracked on the <a href="/eventrunner/docs/roadmap/">roadmap</a> and the <a href="https://github.com/orgs/CenterCoopMedia/projects/2">project board</a>.</p>
+          <p><strong>Status:</strong> Public extraction in progress. The <a href="/eventrunner/docs/decisions/0001-event-platform-v1/">v1 architecture spec</a> and <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">feature triage</a> are the contract. Work is tracked on the <a href="/eventrunner/docs/roadmap/">roadmap</a> and the <a href="https://github.com/orgs/CenterCoopMedia/projects/2">project board</a>. Milestones 1 to 4 and the public-site parity milestone are complete. Packaging (M5) and the parity milestones M8 to M12 are open. The design vocabulary is expanding in six waves (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/249">#249</a>); wave 1 is in review.</p>
           <p>Site: <a href="https://centercoopmedia.github.io/eventrunner/">centercoopmedia.github.io/eventrunner</a>
           Documentation: <a href="https://centercoopmedia.github.io/eventrunner/docs/">centercoopmedia.github.io/eventrunner/docs</a>
           Handbook: <a href="https://github.com/CenterCoopMedia/eventrunner/wiki">wiki</a></p>
@@ -145,7 +145,8 @@
           <li>Session materials with embargo</li>
           <li>Media library</li>
           <li>Eventbrite plus manual/CSV ticketing adapters</li>
-          <li>Per-event theming</li>
+          <li>Per-event theming: six site styles, each with a light and a dark palette, and a specimen book in the demo that draws every device in every style and mode</li>
+          <li>An admin CMS on its own editorial desk, in the event&#39;s own colours</li>
           <li>Transactional email through a provider adapter (Postmark is the reference)</li>
           </ul>
           <p>What v1 does not include is listed in the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">triage record</a>. Video generation, bulk broadcast email, invoicing, Airtable, social feeds, and speaker chat stay out.</p>
@@ -157,11 +158,12 @@
           </ol>
           <p>See spec §2.</p>
           <h2 id="repo-layout">Repo layout<a class="heading-anchor" href="#repo-layout" aria-label="Link to this section">#</a></h2>
-          <pre data-scroll-region data-scroll-label="Code example"><code>apps/web            Vite frontend (not landed yet)
-          functions           Cloud Functions by domain module (not landed yet)
-          packages/shared     Config schema, lifecycle clock, time, registration, badges
-          scripts             Operator tools (not landed yet)
-          docs                Spec, roadmap, and the GitHub Pages site
+          <pre data-scroll-region data-scroll-label="Code example"><code>apps/web            Vite frontend: the public site, the admin CMS, the demo, the specimen book
+          functions           Cloud Functions by domain module
+          packages/shared     Config schema, theme, lifecycle clock, time, registration, badges
+          scripts             Operator tools, generators, and the CI checks
+          design/tokens       The three token tiers, the six site styles, the admin&#39;s own set
+          docs                Spec, roadmap, design records, and the GitHub Pages site
           </code></pre>
           <p><code>packages/shared</code> is CommonJS with hand-written ESM shims so the same module serves Vite and Cloud Functions with no transpile step.</p>
           <h2 id="develop">Develop<a class="heading-anchor" href="#develop" aria-label="Link to this section">#</a></h2>

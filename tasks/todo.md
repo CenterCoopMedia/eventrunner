@@ -68,6 +68,29 @@ Haiku agents build.
 
 - [ ] M9 to M11 pages on the desk; the defects in §11 of the record.
 
+## State at the end of the 2026-09-10 session
+
+Recorded so a fresh context can rebuild the wave from the repository alone.
+
+- Wave 1 is integrated on `claude/admin-cms-design-language-ub69gr`: the three
+  builder branches merged, the seams closed, the independent review's findings
+  fixed, every check green, the specimen evidence committed as section
+  captures. The pull request opens from this tip.
+- Builder worktrees, kept for reference: `/home/user/wt-w1a`
+  (`…-w1a`, 16 commits), `/home/user/wt-w1b` (`…-w1b`, 1 commit),
+  `/home/user/wt-w1d` (`…-w1d`, 2 commits). All three are merged into wave 1.
+- Wave 3's builder left one commit on `…-w3` (four illustration sets) and six
+  uncommitted SVG redraws in `/home/user/wt-w3` (botanical divider, empty
+  state, nameplate mark, section mark; cartographic section mark; typographic
+  empty state). Decide whether the redraws stay before a fresh W3 builder
+  resumes from that worktree.
+- Decisions waiting on Joe: the toast tone's second signal is a weak rule; the
+  segmented control and the tabs take no disabled prop (wave 2 owns it);
+  hover, focus and press are drawn once on the five shared shapes, not per
+  composite control; an empty feedback message marks the field and moves
+  focus, with no form-level alert.
+- Wave 2 branches from the wave 1 tip as `…-w2`, never from main.
+
 ## After every wave
 
 - [ ] Independent review against the brief and the slop list.
