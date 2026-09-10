@@ -202,7 +202,14 @@ export default function FeedbackModal({ onClose }) {
               <button type="button" className={secondaryActionClass} onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className={primaryActionClass} disabled={submitting}>
+              {/* Busy is a stated word and `aria-busy`, never a spinner. The
+                  control is disabled only once the request has started. */}
+              <button
+                type="submit"
+                className={primaryActionClass}
+                disabled={submitting}
+                aria-busy={submitting || undefined}
+              >
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
             </div>
