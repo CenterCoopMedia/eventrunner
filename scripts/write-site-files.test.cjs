@@ -10,6 +10,7 @@ const {
   main,
   readGeneratedSnapshot,
   excludedRoutesFound,
+  excludedRouteMessage,
   DEFAULT_GENERATED_DIR,
   NEVER_IN_SITEMAP,
 } = require('./write-site-files.cjs');
@@ -197,6 +198,15 @@ test('a sitemap that lists a page under the specimen book is refused too', () =>
 test('a page whose path merely starts with the same letters is allowed', () => {
   const xml = '<urlset><url><loc>https://example.org/specimens-of-the-year</loc></url></urlset>';
   assert.deepEqual(excludedRoutesFound(xml), []);
+});
+
+test('a refused route no page holds says what to remove instead', () => {
+  // The sitemap is built from pages, sessions, speakers and updates. A
+  // route that reached it from one of the other three has no page path to
+  // rename, so the message says the one thing that is still true.
+  const message = excludedRouteMessage(['/specimen'], []);
+  assert.match(message, /reserved for the specimen book/u);
+  assert.match(message, /Remove it from the route source/u);
 });
 
 test('the refusal names the reserved segment and the page that took it', async (t) => {

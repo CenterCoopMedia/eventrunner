@@ -29,9 +29,8 @@ const bySession = (id) =>
   ?? DAY_SESSIONS.find((session) => session.id === id);
 // The two rows the first figure draws: the seeded pair where the snapshot
 // has them, and otherwise the first two sessions of the day above.
-const ROWS = [bySession('session-panel'), bySession('session-workshop-money')].every(Boolean)
-  ? [bySession('session-panel'), bySession('session-workshop-money')]
-  : DAY_SESSIONS.slice(0, 2);
+const SEEDED_ROWS = [bySession('session-panel'), bySession('session-workshop-money')];
+const ROWS = SEEDED_ROWS.every(Boolean) ? SEEDED_ROWS : DAY_SESSIONS.slice(0, 2);
 
 export default function ScheduleSection({ folio }) {
   const entries = useMemo(() => withCallingPoints(DAY_SESSIONS), []);
