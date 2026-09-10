@@ -73,6 +73,57 @@
 }
 
 @layer components {
+  /* THE STATE TINT (expansion record §2.1).
+     ------------------------------------------------------------------
+     Hover, pressed, and selected are one device: ink mixed into the ground
+     the control already sits on, at the share the mode holds. One rule
+     therefore paints the tint on the page surface, on the alternate
+     surface, and on a filled action alike, and a preset that remaps the ink
+     or the ground retunes every state without a component edit.
+
+     It paints as a background IMAGE rather than a background colour,
+     because a colour would replace the control's own ground instead of
+     sitting over it. A single-stop paint is flat: it shades nothing, and it
+     is the same idiom the nameplate rule and the session face already use.
+     The share is zero at rest, so a control with no state paints nothing.
+
+     A tint never transitions. Colour is not free the way transform and
+     opacity are, and a state a reader caused must land at once, not fade in
+     (interface guidelines, Animation: don't animate frequent interactions).
+
+     Hover sits behind the hover query, because a touch screen reports a tap
+     as a hover and then holds it. Selected reads `aria-pressed`, so the
+     tint is never the only signal — the control also carries the weight.
+     Press comes last, so pressing a selected control reads as a press. */
+  .control-tint {
+    --control-tint-share: 0;
+    background-image: linear-gradient(
+      rgb(var(--color-text-primary-rgb) / var(--control-tint-share)),
+      rgb(var(--color-text-primary-rgb) / var(--control-tint-share))
+    );
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .control-tint:hover {
+      --control-tint-share: var(--state-hover-share);
+    }
+  }
+  .control-tint[aria-pressed='true'],
+  .control-tint[aria-checked='true'],
+  .control-tint[aria-selected='true'] {
+    --control-tint-share: var(--state-selected-share);
+  }
+  .control-tint:active {
+    --control-tint-share: var(--state-pressed-share);
+  }
+  /* A control that states it is unavailable takes no tint at all: a state
+     a reader cannot reach must not look reachable. It keeps its place in
+     the tab order and its pointer, so the reader can still land on it and
+     read why (interface guidelines, Accessibility). */
+  .control-tint[aria-disabled='true'],
+  .control-tint:disabled {
+    --control-tint-share: 0;
+  }
+
   /* Skip link: first focusable element on every page (Layout.jsx). */
   .skip-link {
     @apply sr-only focus:not-sr-only focus:absolute focus:start-md focus:top-md focus:z-50
