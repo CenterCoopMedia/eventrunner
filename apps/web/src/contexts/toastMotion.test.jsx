@@ -88,6 +88,22 @@ describe('the toast', () => {
     expect(bar.className).not.toMatch(/motion-enter|motion-exit|animate-|transition-|duration-/);
   });
 
+  it('reads the room when the toast is raised, not while rendering', () => {
+    // The provider used to call document.querySelector during its render,
+    // which is impure: React may run a render twice, before the commit, or
+    // throw it away. The answer travels with the toast instead, so a bar
+    // raised in the room keeps no motion through any later render — and a
+    // bar raised after the room has gone gets the motion it should.
+    const { container } = setup({ admin: true });
+    raise();
+    container.querySelector('.admin-room').classList.remove('admin-room');
+    raise();
+    const bars = screen.getAllByRole('status');
+    expect(bars).toHaveLength(2);
+    expect(bars[0].className).not.toMatch(/motion-enter|motion-exit/);
+    expect(bars[1].className).toContain('motion-enter');
+  });
+
   it('exits before it is removed, and then it is gone', () => {
     setup();
     raise();

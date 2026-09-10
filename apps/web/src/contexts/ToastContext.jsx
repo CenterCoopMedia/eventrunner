@@ -73,6 +73,15 @@ const TONES = TOAST_TONES;
  * rather than a per-toast one. The room marks itself with `.admin-room`, and
  * that is what is read here: the admin has no enter and no exit, so the bar
  * carries no motion class there (design brief §2.2; expansion record §2.2).
+ *
+ * IT IS READ WHEN A TOAST IS RAISED, NOT WHILE RENDERING. A render that
+ * reads the document is impure: React may run it twice, run it before the
+ * commit, or throw it away, and none of those is a moment when the room is
+ * reliably in the document. `showToast` is an event handler, which is a
+ * moment when the document is settled and the caller is, by definition, the
+ * surface raising the toast. So each toast carries the answer it was given,
+ * and a toast raised in the room keeps no motion even if the reader
+ * navigates out from under it while it is still up.
  */
 function inAdminRoom() {
   if (typeof document === 'undefined') return false;
@@ -120,7 +129,8 @@ export function ToastProvider({ children }) {
   const showToast = useCallback(
     (message, { tone = 'info', duration = 5000, announce = true } = {}) => {
       const id = nextId++;
-      setToasts((current) => [...current, { id, message, tone, announce, leaving: false }]);
+      const motion = !inAdminRoom();
+      setToasts((current) => [...current, { id, message, tone, announce, motion, leaving: false }]);
       if (duration > 0) later(() => dismiss(id), duration);
       return id;
     },
@@ -128,7 +138,6 @@ export function ToastProvider({ children }) {
   );
 
   const value = useMemo(() => ({ showToast, dismiss }), [showToast, dismiss]);
-  const motion = !inAdminRoom();
 
   return (
     <ToastContext.Provider value={value}>
@@ -136,7 +145,7 @@ export function ToastProvider({ children }) {
       <div className="pointer-events-none fixed inset-x-0 bottom-md z-50 flex flex-col items-center gap-xs px-md">
         {toasts.map((toast) => {
           const tone = TONES[toast.tone] ?? TONES.info;
-          const move = motion ? (toast.leaving ? 'motion-exit' : 'motion-enter') : '';
+          const move = toast.motion ? (toast.leaving ? 'motion-exit' : 'motion-enter') : '';
           return (
             <div
               key={toast.id}
