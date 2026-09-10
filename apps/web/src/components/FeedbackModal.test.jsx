@@ -70,6 +70,43 @@ describe('FeedbackModal', () => {
     }
   });
 
+  it('takes the mark off the field once there is a message to send', () => {
+    // The field kept `aria-invalid` and "Please enter a message." while the
+    // reader typed the answer to it, so a screen reader announced the field
+    // as invalid on every re-read of a field that was no longer empty.
+    vi.useFakeTimers();
+    try {
+      render(<FeedbackModal onClose={() => {}} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+      vi.runOnlyPendingTimers();
+
+      const field = screen.getByLabelText('Message');
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      fireEvent.change(field, { target: { value: 'The link is broken.' } });
+      expect(field).not.toHaveAttribute('aria-invalid');
+      expect(screen.queryByText('Please enter a message.')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the mark on while the field is still empty', () => {
+    // Only a value clears it. A reader who types a space and stops has not
+    // answered the refusal, so the field still says so.
+    vi.useFakeTimers();
+    try {
+      render(<FeedbackModal onClose={() => {}} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+      vi.runOnlyPendingTimers();
+
+      const field = screen.getByLabelText('Message');
+      fireEvent.change(field, { target: { value: '   ' } });
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the submit control enabled while the form is invalid', () => {
     // A disabled control announces nothing, so a reader who presses it
     // learns nothing (interface guidelines, Interaction states).

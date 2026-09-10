@@ -205,7 +205,15 @@ export default function FeedbackModal({ onClose }) {
             <TextAreaField
               label="Message"
               value={message}
-              onChange={setMessage}
+              // THE MARK COMES OFF WHEN THE ANSWER ARRIVES. The field held
+              // `aria-invalid` and its message while the reader typed the
+              // very thing it asked for, so the field went on announcing
+              // itself as invalid after it was not. A value that is still
+              // only whitespace has not answered it, so the mark stays.
+              onChange={(next) => {
+                setMessage(next);
+                if (messageError && next.trim()) setMessageError(null);
+              }}
               error={messageError}
               rows={5}
               autoFocus
