@@ -268,11 +268,13 @@ export function toThemeDoc(form) {
   }
   if (form.brandColor.trim()) doc.brandColor = form.brandColor.trim();
   if (form.navPlacement) doc.navPlacement = form.navPlacement;
-  // The default is not written. A document that names no scheme follows the
-  // brand colour, which is what every document did before the field existed.
-  if (form.adminScheme && form.adminScheme !== DEFAULT_ADMIN_SCHEME) {
-    doc.adminScheme = form.adminScheme;
-  }
+  // Written every time, the brand default included. EventConfigProvider
+  // overlays the live document on the built snapshot shallowly, so a saved
+  // document that omitted the field would inherit whatever scheme the
+  // snapshot carries, and "Follow the main brand colour" could never be
+  // chosen back on such a deployment. Saying `brand` is how a document says
+  // it. (A document that predates the field still reads as brand.)
+  doc.adminScheme = form.adminScheme || DEFAULT_ADMIN_SCHEME;
   return doc;
 }
 

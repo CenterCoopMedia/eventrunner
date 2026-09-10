@@ -56,7 +56,8 @@ house scheme.
 - [x] `scripts/lib/tokens.cjs` overlays the derivation at build time;
       `apps/web/src/lib/themeRuntime.js` writes it at runtime.
 - [x] Branding: the **Admin colours** panel after **Light or dark**; the
-      default is never written.
+      choice is written on every publish, brand included, so the snapshot
+      overlay cannot hand a house scheme back.
 - [x] Tests: `theme.test.cjs` (23 pairs per style, hostile brand and house
       scheme, both modes), `tokens.test.cjs`, `themeRuntime.test.js`,
       `schema.test.cjs`, `AdminBranding.test.jsx`.

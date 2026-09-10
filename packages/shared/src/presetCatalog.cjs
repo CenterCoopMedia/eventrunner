@@ -898,7 +898,7 @@ const ADMIN_TOKENS = Object.freeze({
       dark: [17, 21, 28],
     },
     '--admin-ink-disabled-rgb': {
-      light: [98, 112, 133],
+      light: [90, 104, 125],
       dark: [150, 160, 176],
     },
     '--admin-ink-link-rgb': {

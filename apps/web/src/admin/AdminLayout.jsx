@@ -106,7 +106,7 @@ function docketItemClass({ isActive }) {
 }
 
 const railButtonClass =
-  'inline-flex min-h-10 items-center justify-center rounded-admin border-admin-hairline ' +
+  'inline-flex min-h-admin-control items-center justify-center rounded-admin border-admin-hairline ' +
   'border-admin-rail-rule px-sm py-2xs text-admin-sm font-semibold text-admin-rail-ink ' +
   'hover:bg-admin-rail-ground-hover';
 

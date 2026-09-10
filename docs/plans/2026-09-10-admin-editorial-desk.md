@@ -116,9 +116,12 @@ the action family and the rail take the event's colour, worked safe by construct
 - **A house scheme replaces it.** `config/theme.adminScheme` names one of six pairs authored in
   `design/tokens/admin.json`: navy (the authored default), graphite, forest, oxblood, teal and
   plum, each with a light and a dark seed. The Branding tab offers them under **Admin colours**,
-  after **Light or dark**, with **Follow the main brand colour** first. The default is never
-  written, so every existing document keeps following its brand colour, and the schema accepts
-  only the known ids.
+  after **Light or dark**, with **Follow the main brand colour** first. The editor writes the
+  choice on every publish, `brand` included: the provider overlays the live document on the
+  built snapshot shallowly, so an omitted field would inherit the snapshot's scheme and the brand
+  default could never be chosen back on a deployment whose snapshot names a house scheme. A
+  document that predates the field still reads as brand, and the schema accepts only the known
+  ids.
 - **The public site never sees it.** The scheme rewrites `admin-*` tokens only, they stay
   root-only, and the page-preview frame does not resolve them.
 - **Every derived family is measured.** `theme.test.cjs` runs the derivation for every style, for
@@ -171,6 +174,13 @@ Recorded on the branch tip; the captures and the numbers are in
 - Eight more captures show the event's own colours reaching the admin: the pages list and the
   branding tab with the main brand colour set to a deep oxblood, and the pages list and the page
   editor under the forest house scheme, each in both modes at 1440px.
+- The pull request's automated review found three things, each verified against the code before
+  it was changed: the dead badge's disabled ink measured 4.38:1 on the soft ground in light mode,
+  so the ink is darker and the pair is in `themeModes.test.js`; the rail's two account controls
+  had dropped to 40px with no touch lift, so they hold the control height like every other
+  button; and a saved document that omitted `adminScheme` would inherit a house scheme from the
+  built snapshot through the provider's shallow overlay, so the editor writes the choice on every
+  publish, `brand` included.
 
 ## Rollout and rollback
 

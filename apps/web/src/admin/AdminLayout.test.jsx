@@ -177,4 +177,17 @@ describe('the admin shell', () => {
     await renderAdmin();
     expect(screen.getByText('admin@example.org').className).toContain('font-admin-data');
   });
+
+  it('holds the account controls at the control height on every pointer', async () => {
+    // The two ways out sit at the foot of the rail and are used constantly.
+    // A button holds the control height everywhere (2.75rem), so touch gets
+    // its 44px without a coarse-pointer special case.
+    await renderAdmin();
+    expect(screen.getByRole('link', { name: 'View site' }).className).toContain(
+      'min-h-admin-control',
+    );
+    expect(screen.getByRole('button', { name: 'Sign out' }).className).toContain(
+      'min-h-admin-control',
+    );
+  });
 });

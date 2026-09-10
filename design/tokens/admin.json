@@ -68,8 +68,8 @@
       "dark": [17, 21, 28]
     },
     "--admin-ink-disabled-rgb": {
-      "$role": "(b5) Dead matter and disabled controls. Still readable.",
-      "light": [98, 112, 133],
+      "$role": "(b5) Dead matter and disabled controls. Still readable: it holds the text bar on the soft ground too, because the dead badge sets a word in it at the smallest step.",
+      "light": [90, 104, 125],
       "dark": [150, 160, 176]
     },
     "--admin-ink-link-rgb": {

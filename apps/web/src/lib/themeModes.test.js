@@ -336,6 +336,9 @@ describe('admin identity', () => {
       ['--admin-ink-rgb', '--admin-ground-ok-rgb', 4.5],
       ['--admin-ink-rgb', '--admin-ground-info-rgb', 4.5],
       ['--admin-ink-secondary-rgb', '--admin-ground-soft-rgb', 4.5],
+      // The dead badge: a word in the disabled ink on the soft ground, at
+      // the smallest text step, so it is text and holds the text bar.
+      ['--admin-ink-disabled-rgb', '--admin-ground-soft-rgb', 4.5],
       ['--admin-ink-data-rgb', '--admin-ground-raised-rgb', 4.5],
       ['--admin-ink-link-rgb', '--admin-ground-raised-rgb', 4.5],
       ['--admin-ink-link-rgb', '--admin-action-soft-rgb', 4.5],

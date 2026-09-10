@@ -11,7 +11,9 @@
 //     other control is behind the Advanced disclosure.
 //   • Admin colours is the one decision about the room rather than the
 //     page: it follows the brand colour unless a house scheme is chosen,
-//     and the default is never written to the document.
+//     and the choice is written on every publish, brand included, because
+//     the provider's shallow overlay would otherwise hand a snapshot's
+//     house scheme back to a document that stopped naming one.
 //   • The whole-document replace really is whole — a save carries preset,
 //     optionPicks, brandColor, tokens, motifSet, mode, fonts, and logos
 //     together. Dropping one would silently delete it.
@@ -513,10 +515,24 @@ describe('publishing the theme', () => {
     expect(theme.texture).toBe('flat');
     expect(theme.radius).toBe('sharp');
     expect(theme.logos).toEqual({ primary: 'branding/new.svg' });
-    // The default admin colours are the absence of the field, so a document
-    // that never chose keeps following the brand colour.
-    expect(theme.adminScheme).toBeUndefined();
+    // The admin colours travel too, the brand default said outright.
+    expect(theme.adminScheme).toBe('brand');
     expect(await screen.findByText(/no deploy needed/i)).toBeInTheDocument();
+  });
+
+  it('says brand outright when a stored house scheme is switched back', async () => {
+    // EventConfigProvider overlays the live document on the built snapshot
+    // shallowly. A document that dropped the field would inherit whatever
+    // scheme the snapshot names, so switching back must be a written value.
+    await renderBranding({ ...PRESET_THEME, adminScheme: 'plum' });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
+
+    fireEvent.change(screen.getByLabelText('Admin colours'), { target: { value: 'brand' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const { theme } = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(theme.adminScheme).toBe('brand');
   });
 
   it('reads a stored admin colour scheme back and posts the one chosen', async () => {
