@@ -17,7 +17,12 @@
 // to click, and a picker that could not express them would be a downgrade
 // from the plain field it replaces.
 import { useId, useState } from 'react';
-import { FieldError, fieldHintClass, fieldLabelClass, secondaryButtonClass } from '../formControls.jsx';
+import {
+  FieldError,
+  fieldHintClass,
+  fieldLabelClass,
+  secondaryButtonClass,
+} from '../formControls.jsx';
 import AssetImage from '../../../components/media/AssetImage.jsx';
 import ModalShell from './ModalShell.jsx';
 import MediaLibrary from './MediaLibrary.jsx';
@@ -49,12 +54,12 @@ export default function ImagePicker({
           <AssetImage
             path={value}
             alt=""
-            className="h-16 w-16 shrink-0 rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-input object-contain"
+            className="h-16 w-16 shrink-0 rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-soft object-contain"
           />
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-admin border-dashed border-admin-hairline border-admin-rule-hairline font-admin-data text-folio text-admin-ink-secondary"
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-admin border-dashed border-admin-hairline border-admin-rule-hairline font-admin-data text-admin-xs text-admin-ink-secondary"
           >
             None
           </span>
@@ -62,7 +67,7 @@ export default function ImagePicker({
         <div className="flex-1">
           <input
             id={id}
-            className="admin-target w-full rounded-admin border-admin-hairline border-admin-rule-strong bg-admin-ground-input px-sm py-2xs font-admin-data text-folio text-admin-ink-data aria-[invalid=true]:border-admin-rule-alarm"
+            className="admin-target min-h-admin-control w-full rounded-admin border-admin-hairline border-admin-rule-control bg-admin-ground-input px-sm py-xs font-admin-data text-admin-sm text-admin-ink-data aria-[invalid=true]:border-admin-rule-alarm"
             value={value ?? ''}
             onChange={(event) => onChange(event.target.value)}
             aria-invalid={error ? 'true' : undefined}

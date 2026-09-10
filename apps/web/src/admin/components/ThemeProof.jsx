@@ -64,7 +64,12 @@ import {
   applyThemePreview,
   clearThemePreview,
 } from '../themePreview.js';
-import { Notice, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
+import {
+  Notice,
+  primaryButtonClass,
+  rowMetaClass,
+  secondaryButtonClass,
+} from './formControls.jsx';
 
 /**
  * The pages an operator can pull a preview of. Every one is a real route in
@@ -223,12 +228,13 @@ function PreviewFrame({ path, scopeRef, width, height, scale, identification }) 
         A preview of the {identification}. It is a picture of the page, not a
         working copy: nothing inside the frame can be reached by keyboard.
       </p>
-      {/* The forme locked in a chase: a hairline frame on the room's ground.
-          No shadow, no rounded card, no browser-window chrome pretending to
-          be a device. The scale is a transform on the page inside, so the
-          layout is untouched — a scaled 390px page is still a 390px page. */}
+      {/* The forme locked in a chase: a hairline frame in the control rule,
+          at the room's own corner. No shadow, no browser-window chrome
+          pretending to be a device. The scale is a transform on the page
+          inside, so the layout is untouched — a scaled 390px page is still a
+          390px page. */}
       <div
-        className="overflow-auto border-admin-hairline border-admin-rule-strong"
+        className="overflow-auto rounded-admin border-admin-hairline border-admin-rule-control"
         style={{ height: `${Math.round(height * scale)}px` }}
       >
         <div
@@ -267,7 +273,9 @@ function PreviewFrame({ path, scopeRef, width, height, scale, identification }) 
           </UNSAFE_RouteContext.Provider>
         </div>
       </div>
-      <p className="mt-2xs border-admin-rule-hairline border-t-admin-hairline pt-3xs font-admin-data text-folio text-admin-ink-data">
+      <p
+        className={`mt-2xs border-admin-rule-hairline border-t-admin-hairline pt-3xs ${rowMetaClass}`}
+      >
         {identification}
       </p>
     </div>
@@ -419,7 +427,7 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
   return (
     <div ref={columnRef} className="flex min-w-0 flex-col gap-xs">
       <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rule-hairline border-b-admin-hairline pb-2xs">
-        <h2 className="font-admin-ui text-lead font-semibold text-admin-ink">Page preview</h2>
+        <h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">Page preview</h2>
         <ControlGroup
           label="Page to preview"
           value={page.id}
@@ -478,7 +486,7 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
       </div>
 
       {stress ? (
-        <p className="max-w-[65ch] text-caption text-admin-ink-secondary">
+        <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
           A made-up event name that wraps three times, and one day packed with{' '}
           {STRESS_SESSION_COUNT} sessions. Nothing here is saved or published — it
           is a harder page than any client will send, shown so you meet it now.

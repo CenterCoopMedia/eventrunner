@@ -8,10 +8,10 @@
 // Restyled onto the fixed admin identity (docs/plans/2026-08-27-admin-
 // identity-story.md): the job line via AdminPageHeader, the galley for the
 // row list (hairline rows, mono data, no zebra, no row cards), and the
-// status word set in the data face with its own ink — never a coloured
-// pill — because a state is always a word first and colour is never the
-// only signal (§8.1). An archived row is dead matter: it drops to the
-// standing-matter ink and keeps its word.
+// status word set in a badge whose tinted ground and ink agree with it,
+// because a state is always a word first and colour is never the only
+// signal (§8.1). An archived row is dead matter: it takes the dead tone and
+// keeps its word.
 import { useEffect, useMemo, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -19,11 +19,15 @@ import { subscribeAdminCollection } from '../adminSource.js';
 import {
   Notice,
   Panel,
-  SelectField,
+  inputClass,
   linkButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
-import AdminPageHeader, { AdminEmptyState, AdminLoadingState } from '../components/adminChrome.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  StatusBadge,
+} from '../components/adminChrome.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
@@ -44,14 +48,14 @@ function toDate(value) {
   return Number.isFinite(parsed.getTime()) ? parsed : null;
 }
 
-// The status ink. The word (rendered verbatim below) is always the first
-// signal; this is the second one, never the only one. `archived` drops to
-// the disabled ink because an archived submission is dead matter — it keeps
-// its word rather than being hidden (admin story part 2).
-const STATUS_INK = Object.freeze({
-  new: 'text-admin-state-caution',
-  reviewed: 'text-admin-state-ok',
-  archived: 'text-admin-ink-disabled',
+// The tone under each status word. The word (rendered verbatim below) is
+// always the first signal; this is the second one, never the only one.
+// `archived` takes the dead tone because an archived submission is dead
+// matter — it keeps its word rather than being hidden (admin story part 2).
+const STATUS_TONE = Object.freeze({
+  new: 'caution',
+  reviewed: 'ok',
+  archived: 'dead',
 });
 
 // One word per status, spelled the same way everywhere it appears (§8.5) —
@@ -115,9 +119,23 @@ export default function AdminFeedback() {
         title="Feedback"
         description="Bug reports and feedback submitted through the public site."
         actions={
-          <div className="w-full max-w-xs sm:w-auto">
-            <SelectField label="Show" value={filter} onChange={setFilter} options={STATUS_FILTERS} />
-          </div>
+          // The filter lives in the title band, so its label sits beside the
+          // control rather than over it: a stacked label would make the band
+          // two lines tall on one page alone.
+          <label className="flex items-center gap-xs text-admin-sm font-semibold text-admin-ink">
+            Show
+            <select
+              className={`${inputClass} w-auto min-w-[14rem]`}
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            >
+              {STATUS_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         }
       />
 
@@ -140,24 +158,25 @@ export default function AdminFeedback() {
                 key={row.id}
                 className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
               >
-                <div className="flex flex-wrap items-start justify-between gap-sm px-md py-xs">
+                {/* The galley rhythm, but aligned to the top rather than
+                    centred: a submission is a message of any length beside a
+                    fixed column of controls. */}
+                <div className="flex flex-wrap items-start justify-between gap-sm px-md py-sm">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-x-sm gap-y-3xs">
-                      <span
-                        className={`font-admin-data text-folio font-semibold ${
-                          STATUS_INK[row.status] ?? STATUS_INK.new
-                        }`}
-                      >
+                    <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
+                      <StatusBadge tone={STATUS_TONE[row.status] ?? STATUS_TONE.new}>
                         {STATUS_LABELS[row.status] ?? STATUS_LABELS.new}
-                      </span>
-                      <span className="font-admin-data text-folio text-admin-ink-secondary">
+                      </StatusBadge>
+                      <span className="font-admin-data text-admin-xs text-admin-ink-secondary">
                         {row.category ?? 'feedback'}
                       </span>
-                      <span className="font-admin-data text-folio text-admin-ink-secondary">
+                      <span className="font-admin-data text-admin-xs text-admin-ink-secondary">
                         {toDate(row.createdAt)?.toLocaleString() ?? ''}
                       </span>
                     </div>
-                    <p className="mt-3xs whitespace-pre-wrap text-caption text-admin-ink">{row.message}</p>
+                    <p className="mt-3xs whitespace-pre-wrap text-admin-base text-admin-ink">
+                      {row.message}
+                    </p>
                     {row.email ? (
                       <a href={`mailto:${row.email}`} className={`mt-3xs ${linkButtonClass}`}>
                         {row.email}

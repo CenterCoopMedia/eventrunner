@@ -36,6 +36,7 @@ const {
   THEME_PRESET_IDS,
   THEME_MOTIF_SET_IDS,
   THEME_NAV_PLACEMENTS,
+  ADMIN_SCHEME_IDS,
   THEME_MODES,
   getPreset,
   canonicalColorKey,
@@ -734,6 +735,9 @@ function validateTheme(theme) {
     // the default.
     ['navPlacement', THEME_NAV_PLACEMENTS],
     ['header', THEME_HEADERS],
+    // The admin's colours: the brand colour, or one house scheme by id.
+    // Optional: a document that says nothing follows the brand colour.
+    ['adminScheme', ADMIN_SCHEME_IDS],
   ];
   for (const [field, allowed] of enums) {
     if (theme[field] == null) continue;

@@ -110,6 +110,11 @@ export default function AdminBadgeSettings() {
         title="Badges"
         description="The badge set attendees pick from, grouped into categories with a cap on how many each attendee may choose."
         identifiers={`${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`}
+        actions={
+          <button type="submit" className={primaryButtonClass} disabled={saving}>
+            {saving ? 'Saving…' : 'Save badges'}
+          </button>
+        }
       />
 
       {features?.badges ? null : (
@@ -140,7 +145,7 @@ export default function AdminBadgeSettings() {
         }
       >
         {categories.length === 0 ? (
-          <p className="text-caption text-admin-ink-secondary">No badge categories configured.</p>
+          <p className="text-admin-sm text-admin-ink-secondary">No badge categories configured.</p>
         ) : (
           <ol className="flex flex-col">
             {categories.map((category, index) => {
@@ -176,7 +181,7 @@ export default function AdminBadgeSettings() {
                   </div>
 
                   <div className="mt-sm flex flex-wrap items-center justify-between gap-xs">
-                    <h3 className="font-admin-ui text-caption font-semibold text-admin-ink">
+                    <h3 className="font-admin-ui text-admin-base font-bold text-admin-ink">
                       Badges
                     </h3>
                     <button
@@ -192,7 +197,7 @@ export default function AdminBadgeSettings() {
                     </button>
                   </div>
                   {category.badges.length === 0 ? (
-                    <p className="mt-xs text-caption text-admin-ink-secondary">No badges yet.</p>
+                    <p className="mt-xs text-admin-sm text-admin-ink-secondary">No badges yet.</p>
                   ) : (
                     <ol className="mt-xs flex flex-col gap-sm">
                       {category.badges.map((badge, badgeIndex) => (
@@ -251,12 +256,6 @@ export default function AdminBadgeSettings() {
           </ol>
         )}
       </Panel>
-
-      <div>
-        <button type="submit" className={primaryButtonClass} disabled={saving}>
-          {saving ? 'Saving…' : 'Save badges'}
-        </button>
-      </div>
     </form>
   );
 }

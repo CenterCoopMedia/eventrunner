@@ -104,6 +104,11 @@ export default function AdminFeatureSettings() {
       <AdminPageHeader
         title="Features"
         description="What the site offers. Turning a feature off hides its route as well as its navigation."
+        actions={
+          <button type="submit" className={primaryButtonClass} disabled={saving}>
+            {saving ? 'Saving…' : 'Save features'}
+          </button>
+        }
       />
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
@@ -124,12 +129,6 @@ export default function AdminFeatureSettings() {
           ))}
         </div>
       </Panel>
-
-      <div>
-        <button type="submit" className={primaryButtonClass} disabled={saving}>
-          {saving ? 'Saving…' : 'Save features'}
-        </button>
-      </div>
     </form>
   );
 }

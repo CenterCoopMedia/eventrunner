@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The admin CMS takes the editorial desk: a dark navigation rail against a cool-grey canvas, a
+  white title band that holds the page's name and its save actions while the page scrolls, white
+  panels, one action colour for every primary control and focus ring, a record's state as a
+  word in a tinted badge, 2.75rem controls, and the admin's own six-step type scale. Source Sans 3
+  and IBM Plex Mono stay the two faces. The client accent keeps one slot, the mark beside the page
+  title, and its legibility floor is measured against the title band. Every admin token pair is
+  measured in both modes. The record is `docs/plans/2026-09-10-admin-editorial-desk.md`.
 - The landing page and the documentation site now use the product's own design language: the same
   token names the app ships, the editorial type scale, rules and folios instead of cards, and a
   complete dark palette that follows the reader's system setting. The page content, links, and
@@ -43,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `config/theme.adminScheme` and the **Admin colours** control on Settings → Branding. The admin's
+  rail, buttons, links and focus ring follow the main brand colour by default, worked into a
+  contrast-safe family for both modes, or take one of six house schemes: navy, graphite, forest,
+  oxblood, teal or plum. The public site never uses it.
 - Public repository under the Center for Cooperative Media, Apache-2.0.
 - Shared workspace package: deploy-env validation, event config schema, lifecycle clock, event-timezone time helpers, registration state machine, badge validation, slug and URL-safety utilities.
 - Day-one legal and community files: LICENSE, NOTICE, SECURITY.md, CODE_OF_CONDUCT.md, CONTRIBUTING.md, issue and pull request templates.

@@ -19,13 +19,18 @@ import { summarizePublish } from '../publishResult.js';
 import {
   Notice,
   Panel,
+  linkButtonClass,
   primaryButtonClass,
+  rowClass,
+  rowMetaClass,
+  rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
   RecordState,
+  StatusBadge,
   proofRowClass,
 } from '../components/adminChrome.jsx';
 
@@ -165,33 +170,26 @@ export default function AdminPagesList() {
                   resolvedIds.has(row.id),
                 )}`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-sm px-md py-xs">
+                <div className={rowClass}>
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
-                      <Link
-                        to={row.id}
-                        className="admin-target inline-flex items-center rounded-admin font-semibold text-admin-ink underline underline-offset-4"
-                      >
+                    <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
+                      <Link to={row.id} className={rowTitleLinkClass}>
                         {row.current?.label || row.id}
                       </Link>
                       <RecordState state={row.state} />
                       {row.current?.systemPage ? (
-                        <span className="font-admin-data text-folio text-admin-ink-secondary">
-                          System page
-                        </span>
+                        <StatusBadge tone="neutral">System page</StatusBadge>
                       ) : null}
                       {row.current?.visible === false ? (
-                        <span className="font-admin-data text-folio text-admin-ink-secondary">
-                          Hidden
-                        </span>
+                        <StatusBadge tone="neutral">Hidden</StatusBadge>
                       ) : null}
                     </div>
-                    <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
+                    <p className={`mt-3xs truncate ${rowMetaClass}`}>
                       {row.current?.path} · {(row.current?.sections ?? []).length} section
                       {(row.current?.sections ?? []).length === 1 ? '' : 's'}
                     </p>
                   </div>
-                  <Link to={row.id} className={secondaryButtonClass}>
+                  <Link to={row.id} className={linkButtonClass}>
                     Edit this page
                   </Link>
                 </div>

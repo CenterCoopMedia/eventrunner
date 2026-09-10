@@ -30,7 +30,7 @@ const FOLDERS = [
  * ground shift, semibold weight, an underline, and `aria-current`. */
 function drawerTabClass(active) {
   return [
-    'admin-target inline-flex items-center rounded-admin px-sm py-2xs font-admin-ui text-caption',
+    'admin-target inline-flex items-center rounded-admin px-sm py-2xs font-admin-ui text-admin-base',
     active
       ? 'bg-admin-ground-raised font-semibold text-admin-ink underline underline-offset-4'
       : 'text-admin-ink hover:bg-admin-ground-raised',
@@ -64,7 +64,7 @@ export default function AdminMedia() {
         </ul>
       </nav>
 
-      <p className="text-caption text-admin-ink-secondary">{folder.hint}</p>
+      <p className="text-admin-sm text-admin-ink-secondary">{folder.hint}</p>
       <MediaLibrary key={folder.id} folder={folder.id} />
     </div>
   );

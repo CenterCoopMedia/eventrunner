@@ -15,9 +15,10 @@
 // The two tables here are galleys (admin story part 2): hairline rows, a
 // sticky head on --admin-rule-strong, fixed column order, data columns in
 // the mono with tabular figures, numbers right-aligned. No zebra striping,
-// no row cards, no row shadows, no hover lift. The import verdicts read as
-// plain words in the data face — never a coloured pill (admin story part 5
-// refuses that device by name).
+// no row cards, no row shadows, no hover lift. Each import verdict is a word
+// in a tinted badge at the smallest radius, never a pill (admin story part 5
+// refuses that device by name): the word carries the meaning and the tint
+// agrees with it.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { parseCsvFile } from '../../lib/csv.js';
 import { useAdminApi } from '../adminApi.js';
@@ -28,9 +29,14 @@ import {
   fieldLabelClass,
   inputClass,
   primaryButtonClass,
+  rowMetaClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
-import AdminPageHeader, { AdminEmptyState, AdminLoadingState } from '../components/adminChrome.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  StatusBadge,
+} from '../components/adminChrome.jsx';
 
 const MAPPING_FIELDS = [
   { id: 'email', label: 'Email address', required: true },
@@ -50,22 +56,24 @@ const VERDICT_LABELS = {
   duplicate: 'Duplicate in file',
   invalid: 'Invalid',
 };
-// The verdict's word, in the data face ink that matches its meaning. No
-// border, no fill, no rounded chip — the word carries it, the colour never
-// carries it alone.
-const VERDICT_INK = {
-  create: 'text-admin-state-ok',
-  update: 'text-admin-ink-data',
-  duplicate: 'text-admin-state-caution',
-  invalid: 'text-admin-state-error',
+// The badge tone each verdict is set in. The word above is always rendered
+// with it, so the tint is the second signal and never the only one.
+const VERDICT_TONES = {
+  create: 'ok',
+  update: 'neutral',
+  duplicate: 'caution',
+  invalid: 'error',
 };
 
-/** A galley table head cell: sticky, on the strong rule, in the UI face. */
+/**
+ * A galley table head cell. Both tables here scroll inside their own box, so
+ * the head stays sticky and holds the top of that box while the rows move.
+ */
 function GalleyHead({ children, align = 'start' }) {
   return (
     <th
       scope="col"
-      className={`sticky top-0 z-10 border-b-admin-strong border-admin-rule-strong bg-admin-ground-raised px-sm py-2xs font-admin-ui font-semibold text-admin-ink ${
+      className={`sticky top-0 z-10 border-b-admin-strong border-admin-rule-strong bg-admin-ground-soft px-sm py-xs text-admin-xs font-semibold text-admin-ink-secondary ${
         align === 'end' ? 'text-end' : 'text-start'
       }`}
     >
@@ -90,20 +98,20 @@ function StatusCard({ status, error, onRefresh, busy }) {
       ) : !status ? (
         <AdminLoadingState label="Loading ticketing status…" />
       ) : (
-        <dl className="grid grid-cols-1 gap-sm text-caption sm:grid-cols-2">
+        <dl className="grid grid-cols-1 gap-sm text-admin-sm sm:grid-cols-2">
           <div>
-            <dt className="font-admin-ui font-semibold text-admin-ink">Provider</dt>
+            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Provider</dt>
             <dd className="font-admin-data text-admin-ink-data">{status.provider}</dd>
           </div>
           <div>
-            <dt className="font-admin-ui font-semibold text-admin-ink">Webhook support</dt>
+            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Webhook support</dt>
             <dd className="text-admin-ink-secondary">
               {status.webhookSupported ? 'Supported' : 'Not applicable for this provider'}
             </dd>
           </div>
           {status.webhookSupported ? (
             <div>
-              <dt className="font-admin-ui font-semibold text-admin-ink">Webhook registration</dt>
+              <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Webhook registration</dt>
               <dd className="text-admin-ink-secondary">
                 {status.webhookRegisteredAt ? (
                   <span className="font-admin-data text-admin-ink-data">
@@ -113,7 +121,7 @@ function StatusCard({ status, error, onRefresh, busy }) {
                 ) : (
                   <>
                     Not registered —{' '}
-                    <code className="rounded-admin bg-admin-ground-input px-2xs py-3xs font-admin-data text-folio text-admin-ink-data">
+                    <code className="rounded-admin-small bg-admin-ground-soft px-2xs py-3xs font-admin-data text-admin-xs text-admin-ink-data">
                       node scripts/register-ticketing-webhook.cjs
                     </code>
                   </>
@@ -122,11 +130,11 @@ function StatusCard({ status, error, onRefresh, busy }) {
             </div>
           ) : null}
           <div>
-            <dt className="font-admin-ui font-semibold text-admin-ink">Last webhook delivery</dt>
+            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Last webhook delivery</dt>
             <dd className="font-admin-data text-admin-ink-data">{status.lastDeliveryAt ?? 'None'}</dd>
           </div>
           <div>
-            <dt className="font-admin-ui font-semibold text-admin-ink">Sync queue</dt>
+            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Sync queue</dt>
             <dd className="font-admin-data text-admin-ink-data">
               {status.queue.pending} pending{status.queue.pendingCapped ? '+' : ''}
               {', '}
@@ -160,15 +168,15 @@ function PreviewTable({ preview }) {
   const rows = preview.rows.slice(0, 50);
   return (
     <div className="flex flex-col gap-sm">
-      <div className="flex flex-wrap gap-x-sm gap-y-3xs font-admin-data text-caption">
+      <div className="flex flex-wrap items-center gap-xs">
         {Object.entries(preview.summary).map(([verdict, count]) => (
-          <span key={verdict} className={VERDICT_INK[verdict] ?? 'text-admin-ink-data'}>
+          <StatusBadge key={verdict} tone={VERDICT_TONES[verdict] ?? 'neutral'}>
             {count} {VERDICT_LABELS[verdict] ?? verdict}
-          </span>
+          </StatusBadge>
         ))}
       </div>
       <div className="max-h-[28rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline">
-        <table className="w-full min-w-[36rem] border-collapse text-caption">
+        <table className="w-full min-w-[36rem] border-collapse text-admin-sm">
           <thead>
             <tr>
               <GalleyHead align="end">Row</GalleyHead>
@@ -181,20 +189,22 @@ function PreviewTable({ preview }) {
           <tbody>
             {rows.map((row) => (
               <tr key={row.index} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
-                <td className="px-sm py-2xs text-end font-admin-data text-admin-ink-data">{row.index + 1}</td>
-                <td className={`px-sm py-2xs font-admin-data ${VERDICT_INK[row.verdict] ?? 'text-admin-ink-data'}`}>
-                  {VERDICT_LABELS[row.verdict] ?? row.verdict}
+                <td className="px-sm py-xs text-end font-admin-data text-admin-ink-data">{row.index + 1}</td>
+                <td className="px-sm py-xs">
+                  <StatusBadge tone={VERDICT_TONES[row.verdict] ?? 'neutral'}>
+                    {VERDICT_LABELS[row.verdict] ?? row.verdict}
+                  </StatusBadge>
                 </td>
-                <td className="px-sm py-2xs font-admin-data text-admin-ink-data">{row.externalId ?? '—'}</td>
-                <td className="px-sm py-2xs font-admin-data text-admin-ink-data">{row.email ?? '—'}</td>
-                <td className="px-sm py-2xs text-admin-ink-secondary">{(row.reasons ?? []).join('; ') || '—'}</td>
+                <td className="px-sm py-xs font-admin-data text-admin-ink-data">{row.externalId ?? '—'}</td>
+                <td className="px-sm py-xs font-admin-data text-admin-ink-data">{row.email ?? '—'}</td>
+                <td className="px-sm py-xs text-admin-ink-secondary">{(row.reasons ?? []).join('; ') || '—'}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       {preview.rows.length > rows.length ? (
-        <p className="text-caption text-admin-ink-secondary">
+        <p className="text-admin-sm text-admin-ink-secondary">
           Showing the first {rows.length} of {preview.rows.length} rows.
         </p>
       ) : null}
@@ -290,7 +300,7 @@ function ImportPanel({ call, onImported }) {
             className={inputClass}
           />
           {parsed ? (
-            <p className="font-admin-data text-folio text-admin-ink-data">
+            <p className={rowMetaClass}>
               {parsed.fileName} · {parsed.rows.length} row{parsed.rows.length === 1 ? '' : 's'}
             </p>
           ) : null}
@@ -407,7 +417,7 @@ function TicketList({ call, refreshToken }) {
         <AdminEmptyState title="No tickets found" description="Import a CSV above, or adjust your search." />
       ) : (
         <div className="max-h-[28rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline">
-          <table className="w-full min-w-[40rem] border-collapse text-caption">
+          <table className="w-full min-w-[40rem] border-collapse text-admin-sm">
             <thead>
               <tr>
                 <GalleyHead>Ticket ID</GalleyHead>
@@ -420,13 +430,13 @@ function TicketList({ call, refreshToken }) {
             <tbody>
               {tickets.map((t) => (
                 <tr key={t.id} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
-                  <td className="px-sm py-2xs font-admin-data text-admin-ink-data">{t.id}</td>
-                  <td className="px-sm py-2xs font-admin-data text-admin-ink-data">{t.email ?? '—'}</td>
-                  <td className="px-sm py-2xs text-admin-ink-secondary">
+                  <td className="px-sm py-xs font-admin-data text-admin-ink-data">{t.id}</td>
+                  <td className="px-sm py-xs font-admin-data text-admin-ink-data">{t.email ?? '—'}</td>
+                  <td className="px-sm py-xs text-admin-ink-secondary">
                     {[t.firstName, t.lastName].filter(Boolean).join(' ') || '—'}
                   </td>
-                  <td className="px-sm py-2xs font-admin-data text-admin-ink-data">{t.status ?? '—'}</td>
-                  <td className="px-sm py-2xs text-admin-ink-secondary">{t.claimedByUid ? 'Yes' : 'No'}</td>
+                  <td className="px-sm py-xs font-admin-data text-admin-ink-data">{t.status ?? '—'}</td>
+                  <td className="px-sm py-xs text-admin-ink-secondary">{t.claimedByUid ? 'Yes' : 'No'}</td>
                 </tr>
               ))}
             </tbody>

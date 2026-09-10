@@ -6,7 +6,13 @@
 // renderers (components/blocks/) read.
 import { Link } from 'react-router-dom';
 import { useAdminPages } from '../useAdminPages.js';
-import { Notice, Panel } from '../components/formControls.jsx';
+import {
+  Notice,
+  Panel,
+  rowClass,
+  rowMetaClass,
+  rowTitleLinkClass,
+} from '../components/formControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -51,18 +57,15 @@ export default function AdminContentPages() {
                     row.state.id,
                   )}`}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-sm px-md py-xs">
+                  <div className={rowClass}>
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
-                        <Link
-                          to={row.id}
-                          className="admin-target inline-flex items-center rounded-admin font-semibold text-admin-ink underline underline-offset-4"
-                        >
+                      <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
+                        <Link to={row.id} className={rowTitleLinkClass}>
                           {row.current?.label || row.id}
                         </Link>
                         <RecordState state={row.state} />
                       </div>
-                      <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
+                      <p className={`mt-3xs truncate ${rowMetaClass}`}>
                         {sectionCount} section{sectionCount === 1 ? '' : 's'}
                       </p>
                     </div>

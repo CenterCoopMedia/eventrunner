@@ -260,7 +260,7 @@ describe('admin identity', () => {
 
   it('ships the whole token set', () => {
     expect(adminTokens.length).toBeGreaterThan(20);
-    for (const family of ['ground', 'ink', 'rule', 'state', 'focus', 'client']) {
+    for (const family of ['ground', 'ink', 'rule', 'state', 'focus', 'client', 'action', 'rail']) {
       expect(
         adminTokens.some((name) => name.startsWith(`--admin-${family}`)),
         `the ${family} family ships`,
@@ -326,9 +326,44 @@ describe('admin identity', () => {
       ['--admin-rule-strong-rgb', '--admin-ground-rgb', 3],
       ['--admin-rule-header-rgb', '--admin-ground-rgb', 3],
       ['--admin-rule-alarm-rgb', '--admin-ground-alarm-rgb', 3],
-      // One ring, clearing BOTH grounds it can land on (part 6e).
+      // One ring, clearing every light ground it can land on (part f).
       ['--admin-focus-ring-rgb', '--admin-ground-rgb', 3],
       ['--admin-focus-ring-rgb', '--admin-ground-input-rgb', 3],
+      ['--admin-focus-ring-rgb', '--admin-ground-raised-rgb', 3],
+      // The desk (docs/plans/2026-09-10-admin-editorial-desk.md): the soft
+      // grounds, the action family, the state badges, and the rail.
+      ['--admin-ink-rgb', '--admin-ground-soft-rgb', 4.5],
+      ['--admin-ink-rgb', '--admin-ground-ok-rgb', 4.5],
+      ['--admin-ink-rgb', '--admin-ground-info-rgb', 4.5],
+      ['--admin-ink-secondary-rgb', '--admin-ground-soft-rgb', 4.5],
+      ['--admin-ink-data-rgb', '--admin-ground-raised-rgb', 4.5],
+      ['--admin-ink-link-rgb', '--admin-ground-raised-rgb', 4.5],
+      ['--admin-ink-link-rgb', '--admin-action-soft-rgb', 4.5],
+      ['--admin-ink-inverse-rgb', '--admin-action-rgb', 4.5],
+      ['--admin-ink-inverse-rgb', '--admin-action-hover-rgb', 4.5],
+      ['--admin-ink-inverse-rgb', '--admin-action-pressed-rgb', 4.5],
+      ['--admin-ink-inverse-rgb', '--admin-state-error-rgb', 4.5],
+      ['--admin-state-live-rgb', '--admin-ground-ok-rgb', 4.5],
+      ['--admin-state-ok-rgb', '--admin-ground-ok-rgb', 4.5],
+      ['--admin-state-info-rgb', '--admin-ground-info-rgb', 4.5],
+      ['--admin-state-info-rgb', '--admin-ground-rgb', 4.5],
+      ['--admin-state-caution-rgb', '--admin-ground-proof-rgb', 4.5],
+      // A form control's boundary is non-text interface (WCAG 1.4.11).
+      ['--admin-rule-control-rgb', '--admin-ground-input-rgb', 3],
+      ['--admin-rule-control-rgb', '--admin-ground-raised-rgb', 3],
+      ['--admin-action-rgb', '--admin-ground-raised-rgb', 3],
+      ['--admin-action-rgb', '--admin-ground-rgb', 3],
+      // The rail: text on every rail ground, and its own ring.
+      ['--admin-rail-ink-rgb', '--admin-rail-ground-rgb', 4.5],
+      ['--admin-rail-ink-rgb', '--admin-rail-ground-raised-rgb', 4.5],
+      ['--admin-rail-ink-rgb', '--admin-rail-ground-hover-rgb', 4.5],
+      ['--admin-rail-ink-rgb', '--admin-rail-current-rgb', 4.5],
+      ['--admin-rail-ink-muted-rgb', '--admin-rail-ground-rgb', 4.5],
+      ['--admin-rail-ink-muted-rgb', '--admin-rail-ground-raised-rgb', 4.5],
+      ['--admin-rail-ink-muted-rgb', '--admin-rail-ground-hover-rgb', 4.5],
+      ['--admin-focus-ring-rail-rgb', '--admin-rail-ground-rgb', 3],
+      ['--admin-focus-ring-rail-rgb', '--admin-rail-current-rgb', 3],
+      ['--admin-nav-active-marker-rgb', '--admin-rail-current-rgb', 3],
     ];
     for (const [fg, bg, bar] of pairs) {
       const a = channels(resolve(scope(), fg));

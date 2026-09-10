@@ -24,6 +24,7 @@ import {
   fieldLabelClass,
   inputClass,
   primaryButtonClass,
+  rowMetaClass,
   secondaryButtonClass,
 } from '../formControls.jsx';
 import ModalShell from './ModalShell.jsx';
@@ -82,7 +83,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
             className={inputClass}
           />
           {file ? (
-            <p className="font-admin-data text-folio text-admin-ink-data">
+            <p className={rowMetaClass}>
               {file.name} · {formatBytes(file.size)}
             </p>
           ) : null}

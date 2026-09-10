@@ -9,6 +9,9 @@ import {
   Notice,
   Panel,
   primaryButtonClass,
+  rowClass,
+  rowMetaClass,
+  rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, {
@@ -141,15 +144,12 @@ export default function AdminSessionsList() {
                     key={row.id}
                     className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(row.state.id)}`}
                   >
-                    <div className={`flex flex-wrap items-center justify-between gap-sm px-md py-xs ${session.parentId ? 'ms-md' : ''}`}>
+                    <div className={`${rowClass} ${session.parentId ? 'ms-md' : ''}`}>
                       <div className="min-w-0">
-                        <Link
-                          to={encodeURIComponent(row.id)}
-                          className="font-admin-ui text-caption font-semibold text-admin-ink-link underline underline-offset-2"
-                        >
+                        <Link to={encodeURIComponent(row.id)} className={rowTitleLinkClass}>
                           {session.title || row.id}
                         </Link>
-                        <p className="mt-3xs font-admin-data text-folio text-admin-ink-data">
+                        <p className={`mt-3xs ${rowMetaClass}`}>
                           {[`${session.startTime || 'Time unset'}${session.endTime ? `–${session.endTime}` : ''}`,
                             session.track ? `Track ${session.track}` : null,
                             place]

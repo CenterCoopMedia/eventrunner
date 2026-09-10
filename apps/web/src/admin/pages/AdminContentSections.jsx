@@ -12,7 +12,13 @@
 import { Link, useParams } from 'react-router-dom';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
-import { Panel, secondaryButtonClass } from '../components/formControls.jsx';
+import {
+  Panel,
+  linkButtonClass,
+  rowClass,
+  rowMetaClass,
+  rowTitleLinkClass,
+} from '../components/formControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -35,7 +41,7 @@ export default function AdminContentSections() {
         title="No such page"
         description="That page id has neither a published nor a draft revision."
         action={
-          <Link to=".." relative="path" className={secondaryButtonClass}>
+          <Link to=".." relative="path" className={linkButtonClass}>
             Back to content
           </Link>
         }
@@ -50,7 +56,7 @@ export default function AdminContentSections() {
         identifiers={`${sections.length} section${sections.length === 1 ? '' : 's'}`}
         description="Each section holds the content blocks the public page renders in that slot."
         actions={
-          <Link to=".." relative="path" className={secondaryButtonClass}>
+          <Link to=".." relative="path" className={linkButtonClass}>
             Back to content
           </Link>
         }
@@ -73,21 +79,18 @@ export default function AdminContentSections() {
                   key={section.id}
                   className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-sm px-md py-xs">
+                  <div className={rowClass}>
                     <div className="min-w-0">
-                      <Link
-                        to={section.id}
-                        className="admin-target inline-flex items-center rounded-admin font-semibold text-admin-ink underline underline-offset-4"
-                      >
+                      <Link to={section.id} className={rowTitleLinkClass}>
                         {section.label || section.id}
                       </Link>
-                      <p className="mt-3xs truncate font-admin-data text-folio text-admin-ink-data">
+                      <p className={`mt-3xs truncate ${rowMetaClass}`}>
                         {contentLoading ? 'Loading…' : `${count} block${count === 1 ? '' : 's'}`}
                         {' · max '}
                         {section.maxBlocks}
                       </p>
                     </div>
-                    <Link to={section.id} className={secondaryButtonClass}>
+                    <Link to={section.id} className={linkButtonClass}>
                       Open
                     </Link>
                   </div>

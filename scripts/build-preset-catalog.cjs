@@ -292,6 +292,7 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
     components: { ...adminSource.components },
     scalars: { ...adminSource.scalars },
     fonts: { ...adminSource.fonts },
+    schemes: { ...adminSource.schemes },
   };
 
   const motifs = readJson(path.join(tokensDir, 'motifs.json'));

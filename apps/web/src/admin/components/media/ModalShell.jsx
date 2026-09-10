@@ -79,15 +79,15 @@ export default function ModalShell({ title, description = null, onClose, childre
         aria-modal="true"
         aria-labelledby={headingId}
         tabIndex={-1}
-        className="my-lg w-full max-w-3xl rounded-admin border-admin-strong border-admin-rule-strong bg-admin-ground-raised p-md font-admin-ui text-admin-ink"
+        className="my-lg w-full max-w-3xl rounded-admin-panel border-admin-strong border-admin-rule-strong bg-admin-ground-raised p-md font-admin-ui text-admin-base text-admin-ink"
       >
         <div className="flex items-start justify-between gap-sm">
-          <div>
-            <h2 id={headingId} className="text-lead font-semibold text-admin-ink">
+          <div className="min-w-0">
+            <h2 id={headingId} className="text-admin-xl font-bold text-admin-ink">
               {title}
             </h2>
             {description ? (
-              <p className="mt-3xs text-caption text-admin-ink-secondary">{description}</p>
+              <p className="mt-3xs text-admin-sm text-admin-ink-secondary">{description}</p>
             ) : null}
           </div>
           <button type="button" onClick={onClose} className={secondaryButtonClass}>

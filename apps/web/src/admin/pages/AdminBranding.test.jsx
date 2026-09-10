@@ -9,6 +9,9 @@
 //   • The workflow is six decisions in order: site style, logo and icon,
 //     main brand colour, header style, schedule style, light or dark. Every
 //     other control is behind the Advanced disclosure.
+//   • Admin colours is the one decision about the room rather than the
+//     page: it follows the brand colour unless a house scheme is chosen,
+//     and the default is never written to the document.
 //   • The whole-document replace really is whole — a save carries preset,
 //     optionPicks, brandColor, tokens, motifSet, mode, fonts, and logos
 //     together. Dropping one would silently delete it.
@@ -299,12 +302,16 @@ describe('the staff workflow', () => {
     // with a small set of clear decisions". This is that list, and the order
     // is the workflow.
     await renderBranding(PRESET_THEME);
+    // Admin colours is the one decision about the room rather than the
+    // page. It follows the six and sits before Advanced, because it is not
+    // advanced: the default already works.
     expect(panelTitles()).toEqual([
       'Site style',
       'Logo and icon',
       'Main brand colour',
       'Header and schedule',
       'Light or dark',
+      'Admin colours',
       'Advanced',
       'Page preview',
     ]);
@@ -506,7 +513,37 @@ describe('publishing the theme', () => {
     expect(theme.texture).toBe('flat');
     expect(theme.radius).toBe('sharp');
     expect(theme.logos).toEqual({ primary: 'branding/new.svg' });
+    // The default admin colours are the absence of the field, so a document
+    // that never chose keeps following the brand colour.
+    expect(theme.adminScheme).toBeUndefined();
     expect(await screen.findByText(/no deploy needed/i)).toBeInTheDocument();
+  });
+
+  it('reads a stored admin colour scheme back and posts the one chosen', async () => {
+    await renderBranding({ ...PRESET_THEME, adminScheme: 'plum' });
+    expect(screen.getByLabelText('Admin colours')).toHaveValue('plum');
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
+
+    fireEvent.change(screen.getByLabelText('Admin colours'), { target: { value: 'forest' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const { theme } = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(theme.adminScheme).toBe('forest');
+    // Choosing the room's colours does not disturb the page's.
+    expect(theme.brandColor).toBe(hex('1a3a6e'));
+    expect(theme.preset).toBe('broadsheet');
+  });
+
+  it('offers the brand colour first and every house scheme by name', async () => {
+    await renderBranding(PRESET_THEME);
+    const options = within(screen.getByLabelText('Admin colours'))
+      .getAllByRole('option')
+      .map((option) => option.textContent);
+    expect(options[0]).toBe('Follow the main brand colour');
+    expect(options).toEqual(
+      expect.arrayContaining(['Navy', 'Graphite', 'Forest', 'Oxblood', 'Teal', 'Plum']),
+    );
   });
 
   it('carries a pre-preset deployment’s stored palette through untouched', async () => {

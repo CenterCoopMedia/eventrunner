@@ -1164,40 +1164,75 @@
 }
 
 @layer components {
-  /* The composing room (docs/plans/2026-08-27-admin-identity-story.md).
+  /* The desk (docs/plans/2026-09-10-admin-editorial-desk.md, which amends
+     the composing room in docs/plans/2026-08-27-admin-identity-story.md).
      The admin is the seventh surface and it is not a preset: it reads the
      admin-* tokens only, obeys data-mode, and ignores data-theme. These
-     rules carry the two things a utility class cannot: the one focus ring,
-     and moment 1's publish resolve. */
+     rules carry what a utility class cannot: the two focus rings, the
+     stone's gutters, the title band's bleed, and moment 1's publish
+     resolve. */
 
   /* The room's own skip link. Same behaviour as .skip-link, in admin ink on
      an admin ground: the shell must not paint a client's brand colour. */
   .skip-link--admin {
-    @apply focus:border-admin-hairline focus:border-admin-rule-strong focus:bg-admin-ground-raised
+    @apply focus:border-admin-hairline focus:border-admin-rule-control focus:bg-admin-ground-raised
       focus:font-admin-ui focus:text-admin-ink;
   }
 
-  /* A folio in the room: a small-caps plain-text label on a hairline at a
-     group boundary. Same device as the public .folio, in admin ink — never
-     a chip, never a pill, and never directly above a heading. */
+  /* A folio in the room: a small uppercase label at a group boundary. Never
+     a chip, never a pill, and never directly above a heading. On the rail it
+     takes the rail's full ink, not the muted ink the links at rest take: a
+     group heading has to outrank the items under it. */
   .admin-folio {
-    @apply text-folio uppercase text-admin-ink-secondary;
+    @apply text-admin-xs font-semibold uppercase tracking-admin-folio text-admin-ink-secondary;
+  }
+  .admin-rail .admin-folio {
+    @apply text-admin-rail-ink;
   }
 
-  /* Part 6e: ONE ring, clearing both --admin-ground and
-     --admin-ground-input in both modes, offset so it never collides with a
-     hairline. It replaces the public ring inside the room rather than
-     removing it. */
+  /* Part f: ONE ring on the light surfaces — the action blue, 3px, offset so
+     it never collides with a rule — clearing the canvas, the panel and the
+     input ground in both modes. It replaces the public ring inside the room
+     rather than removing it. */
   .admin-room :focus-visible {
-    outline: var(--er-width-strong) solid rgb(var(--admin-focus-ring-rgb));
+    outline: var(--admin-focus-width) solid rgb(var(--admin-focus-ring-rgb));
     outline-offset: var(--admin-focus-offset);
   }
+  /* And one on the rail, where the action blue would sink into the ground. */
+  .admin-rail :focus-visible {
+    outline-color: rgb(var(--admin-focus-ring-rail-rgb));
+  }
 
-  /* Moment 1: a record with unpublished changes sits on the proof ground —
-     the rough stock a proof is pulled on. The tint is a LAYER, so a
-     successful publish resolves it to the base ground on `opacity` alone,
-     over --motion-base (160ms). The word is always present beside it; the
-     tint is the second signal, never the first. */
+  /* The stone: the work surface beside the rail. Its gutters are custom
+     properties so the title band below can run to the stone's edges. */
+  .admin-stone {
+    --admin-stone-pad-inline: var(--space-md);
+    --admin-stone-pad-block: var(--space-md);
+    padding: var(--admin-stone-pad-block) var(--admin-stone-pad-inline) var(--space-xl);
+  }
+  @media (min-width: 1024px) {
+    .admin-stone {
+      --admin-stone-pad-inline: var(--space-lg);
+      --admin-stone-pad-block: var(--space-md);
+    }
+  }
+
+  /* The title band: the page's name on the raised ground, running to the
+     stone's edges and holding the top of the viewport while the page
+     scrolls, so the name and the page's own actions are always in reach. */
+  .admin-job-line {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    margin: calc(-1 * var(--admin-stone-pad-block)) calc(-1 * var(--admin-stone-pad-inline)) 0;
+    padding: var(--space-sm) var(--admin-stone-pad-inline);
+  }
+
+  /* Moment 1: a record with unpublished changes sits on the proof ground.
+     The tint is a LAYER, so a successful publish resolves it to the base
+     ground on `opacity` alone, over --motion-base (160ms). The word is
+     always present beside it; the tint is the second signal, never the
+     first. */
   .admin-proof-row {
     position: relative;
   }
@@ -1228,8 +1263,10 @@
     @apply min-h-11 min-w-11;
   }
 
-  /* Dense is not cramped (admin story part 5): a control may drop to the
-     24×24px minimum on a pointer surface, and holds 44×44px on touch. */
+  /* A quiet in-row control may drop to the 24×24px minimum on a pointer
+     surface and holds 44×44px on touch. A button or a field holds the
+     control height on every pointer (min-h-admin-control), so this is only
+     the floor under the links and the small controls between them. */
   .admin-target {
     @apply min-h-6 min-w-6;
   }

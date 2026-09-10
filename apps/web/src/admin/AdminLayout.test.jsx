@@ -1,4 +1,5 @@
-// The composing room's shell (docs/plans/2026-08-27-admin-identity-story.md).
+// The desk's shell (docs/plans/2026-08-27-admin-identity-story.md, amended
+// by docs/plans/2026-09-10-admin-editorial-desk.md).
 //
 // Three things are pinned here, and each one is a rule a reviewer would
 // otherwise have to eyeball:
@@ -6,10 +7,10 @@
 //   1. The admin reads the admin-* tokens ONLY. No brand utility survives in
 //      the shell chrome — that is the greppable form of "the admin stops
 //      mirroring the client theme" (brief §5.2).
-//   2. The docket is a grouped standing list of WORDS, not a tab row and not
-//      an icon rail, and the active item carries four signals rather than
-//      colour alone: the accent marker, the semibold weight, a ground shift,
-//      and aria-current="page".
+//   2. The docket is a grouped standing list of WORDS on the dark rail, not a
+//      tab row and not an icon rail, and the current item carries four
+//      signals rather than colour alone: the leading-edge marker, the bold
+//      weight, the filled ground, and aria-current="page".
 //   3. The client's two elements are the job mark and the accent, and
 //      nothing else on this surface belongs to the client.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -108,7 +109,7 @@ describe('the admin shell', () => {
     expect(html).not.toMatch(/\bfont-(heading|body|data|mono)\b/);
     expect(html).not.toMatch(/rounded-brand/);
     // What it uses instead.
-    expect(html).toMatch(/admin-ground/);
+    expect(html).toMatch(/admin-rail-ground/);
     expect(html).toMatch(/font-admin-(ui|data)/);
   });
 
@@ -143,8 +144,8 @@ describe('the admin shell', () => {
 
     expect(active).toHaveAttribute('aria-current', 'page');
     expect(active.className).toContain('border-admin-nav-active-marker');
-    expect(active.className).toContain('font-semibold');
-    expect(active.className).toContain('bg-admin-ground-raised');
+    expect(active.className).toContain('font-bold');
+    expect(active.className).toContain('bg-admin-rail-current');
 
     // And an inactive item carries none of them.
     const inactive = screen.getByRole('link', { name: 'Media' });
@@ -152,7 +153,7 @@ describe('the admin shell', () => {
     expect(inactive.className).toContain('border-transparent');
   });
 
-  it('carries the client logo as the job mark: one height, no frame', async () => {
+  it('carries the client logo as the job mark: one height, on a paper tile', async () => {
     const { container } = await renderAdmin();
     await act(async () => {
       configSubscriptions.get('theme')({ logos: { mark: 'branding/mark.svg' } });
@@ -166,6 +167,10 @@ describe('the admin shell', () => {
     expect(mark.getAttribute('alt')).toBe('');
     expect(mark.className).toContain('h-7');
     expect(mark.className).not.toMatch(/border|rounded|shadow/);
+    // The tile under it is the one light thing on the rail, and it is a tint
+    // on the raised ground — never a shadow.
+    expect(mark.parentElement.className).toContain('bg-admin-ground-raised');
+    expect(mark.parentElement.className).not.toMatch(/shadow/);
   });
 
   it('keeps the signed-in identity in the data face', async () => {

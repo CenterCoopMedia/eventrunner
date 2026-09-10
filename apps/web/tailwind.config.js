@@ -75,14 +75,17 @@ export default {
         // The admin identity (admin story part 6). A separate family on
         // purpose: the admin obeys data-mode and ignores data-theme, so an
         // admin utility must never resolve to a client's brand token. The
-        // client accent itself is NOT mapped here — only the two component
-        // tokens that are allowed to carry it, which is what makes "the
-        // accent appears in exactly two places" greppable.
+        // client accent itself is NOT mapped here — only the component
+        // token that is allowed to carry it, the page-header mark, which is
+        // what makes "the accent appears in exactly one place" greppable.
         'admin-ground': 'rgb(var(--admin-ground-rgb) / <alpha-value>)',
         'admin-ground-raised': 'rgb(var(--admin-ground-raised-rgb) / <alpha-value>)',
+        'admin-ground-soft': 'rgb(var(--admin-ground-soft-rgb) / <alpha-value>)',
         'admin-ground-proof': 'rgb(var(--admin-ground-proof-rgb) / <alpha-value>)',
         'admin-ground-input': 'rgb(var(--admin-ground-input-rgb) / <alpha-value>)',
         'admin-ground-alarm': 'rgb(var(--admin-ground-alarm-rgb) / <alpha-value>)',
+        'admin-ground-ok': 'rgb(var(--admin-ground-ok-rgb) / <alpha-value>)',
+        'admin-ground-info': 'rgb(var(--admin-ground-info-rgb) / <alpha-value>)',
         'admin-ink': 'rgb(var(--admin-ink-rgb) / <alpha-value>)',
         'admin-ink-secondary': 'rgb(var(--admin-ink-secondary-rgb) / <alpha-value>)',
         'admin-ink-data': 'rgb(var(--admin-ink-data-rgb) / <alpha-value>)',
@@ -91,6 +94,7 @@ export default {
         'admin-ink-link': 'rgb(var(--admin-ink-link-rgb) / <alpha-value>)',
         'admin-rule-hairline': 'rgb(var(--admin-rule-hairline-rgb) / <alpha-value>)',
         'admin-rule-strong': 'rgb(var(--admin-rule-strong-rgb) / <alpha-value>)',
+        'admin-rule-control': 'rgb(var(--admin-rule-control-rgb) / <alpha-value>)',
         'admin-rule-header': 'rgb(var(--admin-rule-header-rgb) / <alpha-value>)',
         'admin-rule-alarm': 'rgb(var(--admin-rule-alarm-rgb) / <alpha-value>)',
         'admin-state-live': 'rgb(var(--admin-state-live-rgb) / <alpha-value>)',
@@ -98,8 +102,30 @@ export default {
         'admin-state-error': 'rgb(var(--admin-state-error-rgb) / <alpha-value>)',
         'admin-state-caution': 'rgb(var(--admin-state-caution-rgb) / <alpha-value>)',
         'admin-state-ok': 'rgb(var(--admin-state-ok-rgb) / <alpha-value>)',
+        'admin-state-info': 'rgb(var(--admin-state-info-rgb) / <alpha-value>)',
+        // The admin's action family (desk amendment, part e). Authored as
+        // navy; at runtime shared/theme deriveAdminScheme rewrites it from
+        // the brand colour or a house scheme, worked to its contrast bars,
+        // so a primary control is the same control on every deployment
+        // even where its colour differs. Never the raw client accent.
+        'admin-action': 'rgb(var(--admin-action-rgb) / <alpha-value>)',
+        'admin-action-hover': 'rgb(var(--admin-action-hover-rgb) / <alpha-value>)',
+        'admin-action-pressed': 'rgb(var(--admin-action-pressed-rgb) / <alpha-value>)',
+        'admin-action-soft': 'rgb(var(--admin-action-soft-rgb) / <alpha-value>)',
+        'admin-action-soft-hover': 'rgb(var(--admin-action-soft-hover-rgb) / <alpha-value>)',
         'admin-focus-ring': 'rgb(var(--admin-focus-ring-rgb) / <alpha-value>)',
-        // The two client-accent slots, and the only two (admin story part 6f).
+        'admin-focus-ring-rail': 'rgb(var(--admin-focus-ring-rail-rgb) / <alpha-value>)',
+        // The rail: the navigation's dark ground and the inks that read on it.
+        'admin-rail-ground': 'rgb(var(--admin-rail-ground-rgb) / <alpha-value>)',
+        'admin-rail-ground-raised': 'rgb(var(--admin-rail-ground-raised-rgb) / <alpha-value>)',
+        'admin-rail-ground-hover': 'rgb(var(--admin-rail-ground-hover-rgb) / <alpha-value>)',
+        'admin-rail-current': 'rgb(var(--admin-rail-current-rgb) / <alpha-value>)',
+        'admin-rail-ink': 'rgb(var(--admin-rail-ink-rgb) / <alpha-value>)',
+        'admin-rail-ink-muted': 'rgb(var(--admin-rail-ink-muted-rgb) / <alpha-value>)',
+        'admin-rail-rule': 'rgb(var(--admin-rail-rule-rgb) / <alpha-value>)',
+        // The one client-accent slot (the page-header mark), and the rail's
+        // own current-item marker, which is the tool's ink and not the
+        // client's (desk amendment, part h).
         'admin-nav-active-marker': 'rgb(var(--admin-nav-active-marker-rgb) / <alpha-value>)',
         'admin-page-header-mark': 'rgb(var(--admin-page-header-mark-rgb) / <alpha-value>)',
       },
@@ -131,6 +157,32 @@ export default {
         h2: fontStep('h2'),
         h1: fontStep('h1'),
         nameplate: fontStep('nameplate'),
+        // The admin's own six-step scale (desk amendment, part j): fixed,
+        // never writable from config/theme, and separate from the editorial
+        // scale above because a tool is read at arm's length all day and a
+        // paper is not.
+        'admin-xs': ['var(--admin-text-xs)', { lineHeight: 'var(--admin-leading-copy)' }],
+        'admin-sm': ['var(--admin-text-sm)', { lineHeight: 'var(--admin-leading-copy)' }],
+        'admin-base': ['var(--admin-text-base)', { lineHeight: 'var(--admin-leading-copy)' }],
+        'admin-lg': ['var(--admin-text-lg)', { lineHeight: '1.3' }],
+        'admin-xl': ['var(--admin-text-xl)', { lineHeight: 'var(--admin-leading-tight)' }],
+        'admin-title': [
+          'var(--admin-text-title)',
+          { lineHeight: 'var(--admin-leading-tight)', letterSpacing: 'var(--admin-tracking-title)' },
+        ],
+      },
+      letterSpacing: {
+        'admin-folio': 'var(--admin-tracking-folio)',
+      },
+      minHeight: {
+        // A control's height on every pointer (desk amendment, part k).
+        'admin-control': 'var(--admin-control-height)',
+      },
+      width: {
+        'admin-rail': 'var(--admin-rail-width)',
+      },
+      maxWidth: {
+        'admin-canvas': 'var(--admin-canvas-max)',
       },
       // The named weights (--weight-regular … --weight-bold) are NOT mapped
       // here on purpose: font-medium, font-semibold, and font-bold already
@@ -165,9 +217,11 @@ export default {
         // config/theme.radius ('sharp' | 'soft' | 'round') sets --radius-base.
         brand: 'var(--radius-base)',
         'brand-lg': 'var(--radius-large)',
-        // One radius for the whole room, and there is no second one: this is
-        // what stops a pill arriving in the admin (admin story part 6g).
+        // Three admin radii and no pill (desk amendment, part i): a control,
+        // a panel, and the small one a badge takes.
         admin: 'var(--admin-radius)',
+        'admin-panel': 'var(--admin-radius-panel)',
+        'admin-small': 'var(--admin-radius-small)',
       },
       transitionDuration: {
         fast: 'var(--motion-fast)',

@@ -34,7 +34,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAdminApi } from '../adminApi.js';
 import { Notice, Panel, secondaryButtonClass } from '../components/formControls.jsx';
-import AdminPageHeader, { AdminEmptyState, AdminLoadingState } from '../components/adminChrome.jsx';
+import AdminPageHeader, {
+  AdminEmptyState,
+  AdminLoadingState,
+  StatusBadge,
+} from '../components/adminChrome.jsx';
 
 const PAGE_SIZE = 100;
 // Long enough to show real signal (a stack's first line, a validation
@@ -49,7 +53,7 @@ function formatWhen(ms) {
 
 function KindLabel({ kind }) {
   return (
-    <code className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-input px-2xs py-3xs font-admin-data text-folio text-admin-ink-data">
+    <code className="rounded-admin-small bg-admin-ground-soft px-2xs py-3xs font-admin-data text-admin-xs text-admin-ink-data">
       {kind}
     </code>
   );
@@ -68,13 +72,13 @@ function KindLabel({ kind }) {
  */
 function MessageText({ text }) {
   if (!text) {
-    return <p className="mt-3xs font-admin-data text-caption text-admin-ink-data">(no message)</p>;
+    return <p className="mt-3xs font-admin-data text-admin-sm text-admin-ink-data">(no message)</p>;
   }
   if (text.length <= MESSAGE_PREVIEW_LEN) {
-    return <p className="mt-3xs font-admin-data text-caption text-admin-ink-data">{text}</p>;
+    return <p className="mt-3xs font-admin-data text-admin-sm text-admin-ink-data">{text}</p>;
   }
   return (
-    <details className="mt-3xs font-admin-data text-caption text-admin-ink-data">
+    <details className="mt-3xs font-admin-data text-admin-sm text-admin-ink-data">
       <summary className="admin-target inline cursor-pointer underline underline-offset-4">
         {text.slice(0, MESSAGE_PREVIEW_LEN)}…{' '}
         <span className="text-admin-ink-secondary">(show full message)</span>
@@ -214,7 +218,7 @@ export default function AdminSystemErrors() {
                   key={row.id}
                   className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
                 >
-                  <div className="flex flex-col gap-2xs px-md py-xs">
+                  <div className="flex flex-col gap-2xs px-md py-sm">
                     <div className="flex flex-wrap items-center justify-between gap-sm">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-x-sm gap-y-3xs">
@@ -226,17 +230,13 @@ export default function AdminSystemErrors() {
                               the honest word; the row does not record whether
                               the notification was actually delivered. */}
                           {row.alertedAt ? (
-                            <span className="font-admin-data text-folio text-admin-ink-secondary">
-                              Alert attempted
-                            </span>
+                            <StatusBadge tone="info">Alert attempted</StatusBadge>
                           ) : (
-                            <span className="font-admin-data text-folio text-admin-ink-secondary">
-                              No alert attempted
-                            </span>
+                            <StatusBadge tone="neutral">No alert attempted</StatusBadge>
                           )}
                         </div>
                         <MessageText text={row.message || (row.errors ?? []).join('; ') || null} />
-                        <p className="mt-3xs font-admin-data text-folio text-admin-ink-secondary">
+                        <p className="mt-3xs font-admin-data text-admin-xs text-admin-ink-secondary">
                           Last seen {formatWhen(row.lastSeenAt ?? row.createdAt)}
                         </p>
                       </div>

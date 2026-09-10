@@ -1,58 +1,87 @@
 # Session task list
 
-Define and start the CJS parity milestones, M7 first.
-Stack the PRs on branches `claude/repo-milestone-completion-sbpk7w-<issue>`, PR base is the previous branch in the stack, root PR is #146.
+Restyle the admin CMS on the njpbs-site editorial desk: its style, its type
+pairing, and its hierarchy, expressed in this repo's own token system.
+Branch `claude/admin-cms-design-language-ub69gr`, one PR against `main`.
 
-## M7: Public site completeness
+## What changes and why
 
-### Wave 1
+The composing-room admin sets everything on one warm grey at 11–14px, with
+24px controls and a black filled button. The njpbs-site admin anchors the tool
+with a dark navigation rail against a light canvas, a white title band, white
+panels on the canvas, one action blue, tinted status badges, 44px controls, and
+a 15px UI scale. This session ports that hierarchy. The admin still reads
+`admin-*` tokens only, still obeys `data-mode` and ignores `data-theme`, still
+uses Source Sans 3 and IBM Plex Mono, and still refuses shadows, pills, icons
+in the rail, KPI tiles, eyebrows, and expressive motion.
 
-- [x] #147 Render the navigation from page documents (PR #220)
-- [x] #150 Serve per route metadata from the server (PR #229)
-- [x] #151 Generate a sitemap, a robots file, and a web manifest at publish time (PR #221)
-- [x] #153 Add a countdown and a lifecycle aware home lead (PR #222)
-- [x] #157 Seed a recap page and a guidelines page (PR #223)
-- [x] #160 Add search and a section index to long content pages (PR #224)
-- [x] #161 Add a session recording link field (PR #228)
+## Foundation
 
-Stack order for the waterfall merge: #229 into -161, #228 into -160, #224 into -157, #223 into -153, #222 into -151, #221 into -147, #220 into main.
+- [x] `design/tokens/admin.json`: the editorial-desk palette in both modes,
+      plus the rail, action, soft-ground, info-state, control-rule and
+      rail-focus families, the admin type scale, control height, radii.
+- [x] `node scripts/build-preset-catalog.cjs` regenerates the shared mirror.
+- [x] `packages/shared/src/theme.cjs`: the accent floor is judged against the
+      raised ground the header mark sits on; one client accent slot.
+- [x] `apps/web/tailwind.config.js`: utilities for the new tokens and scale.
+- [x] `apps/web/src/index.css`: the room's focus rings, the rail, the title band.
+- [x] `node scripts/generate-content.cjs --demo` regenerates `theme.css`.
+- [x] Tests updated: `themeModes.test.js`, `tokens.test.cjs`, `theme.test.cjs`.
 
-### Wave 2
+## Chrome
 
-- [x] #148 Add the sign-in and account control to the header
-- [x] #149 Build the footer link list and organizer links
-- [x] #152 Reset scroll position on route change and add a back to top control
-- [x] #154 Add a configured registration action
-- [x] #155 Add an information card arrangement to the home page
-- [x] #156 Add a sponsor strip section to the home page
-- [x] #158 Seed a city guide page
-- [x] #159 Add an uploaded venue map with labelled rooms
+- [x] `AdminLayout.jsx`: dark sticky rail, job-mark tile, grouped docket, account foot.
+- [x] `adminChrome.jsx`: sticky title band, tinted state badge, empty state.
+- [x] `formControls.jsx`: 44px controls, action-blue primary, white panels, notices.
+- [x] `ModalShell.jsx`: panel radius and sizes.
+- [x] Pinned tests updated: `AdminLayout.test.jsx`, `formControls.test.jsx`.
 
-Branch grouping: the shell branch carried #148, #149, and #152; the home branch carried #154, #155, and #156; #158 and #159 each had a branch of its own.
+## Page sweep
 
-### Final tip
+- [x] Lists: pages, sessions, speakers, attendees, content, media, materials.
+- [x] Editors: page, session, speaker, content block, venue reference.
+- [x] Settings: event, features, badges, branding, ticketing, live updates,
+      feedback, system errors.
+- [x] Status words render as tinted badges everywhere a state renders.
 
-- [x] Shorten the seeded page labels (Home, Travel, FAQ, Conduct, Contact, Privacy, Terms, Recap, Guidelines, City guide) and regenerate, and let a page state a heading of its own
-- [x] One shared visible predicate for whether a page is public, across navigation, sitemap, and routeMeta
-- [x] CHANGELOG entry for M7, roadmap update, regenerated docs
-- [x] Lessons from the milestone
+## Admin colours (owner request, later in the session)
 
-## Follow-ups filed during M7
+Joe asked whether a deployment could pick something other than blue and white
+and chose both paths: follow the brand colour by default, with a picker for a
+house scheme.
 
-Filed rather than fixed in place: each is outside the issue that surfaced it,
-and each is carried into a later milestone.
+- [x] `design/tokens/admin.json`: six house seeds, light and dark.
+- [x] `packages/shared/src/theme.cjs`: `deriveAdminScheme` and
+      `resolveAdminScheme`; `adminScheme` in the document keys and the schema.
+- [x] `scripts/lib/tokens.cjs` overlays the derivation at build time;
+      `apps/web/src/lib/themeRuntime.js` writes it at runtime.
+- [x] Branding: the **Admin colours** panel after **Light or dark**; the
+      default is never written.
+- [x] Tests: `theme.test.cjs` (23 pairs per style, hostile brand and house
+      scheme, both modes), `tokens.test.cjs`, `themeRuntime.test.js`,
+      `schema.test.cjs`, `AdminBranding.test.jsx`.
+- [x] Docs: the design record section, the brief, the admin story header,
+      the interface guidelines, the design reference, the admin guide, CHANGELOG.
+- [x] Evidence: the admin on the seeded event's own brand colour and on a
+      house scheme, both modes.
 
-- [ ] #218 raster app icons (M7)
-- [ ] #219 admin save buttons stay enabled (M10)
-- [ ] #226 places and movements docs (M10)
-- [ ] #227 blank number field in the venue editor (M10)
-- [ ] #230
-- [ ] #231
-- [ ] #233
-- [ ] #234
-- [ ] #236
+## Verification
+
+- [x] `npm run lint`, `npm run check:copy`, `npm test`, `npm run test:web`.
+- [x] `node scripts/generate-content.cjs --demo --check`,
+      `node scripts/build-preset-catalog.cjs --check`,
+      `npm run build -w apps/web` and the bundle budget, `npm run build:demo`.
+- [x] `npm run prepare:functions && rm -rf functions/node_modules/shared && npm install`.
+- [x] Browser evidence from the emulators: light and dark, 1440 and 390, for
+      the pages list, the page editor, sessions, speakers, attendees,
+      branding, media, and ticketing. Saved under `docs/plans/evidence/`.
+- [x] A "looks fine to software, feels wrong to humans" pass on the captures.
+- [x] Docs: the design record, the admin story amendment, brief §0, the
+      interface guidelines, the design reference, CHANGELOG; `docs/docs` regenerated.
+- [ ] Review pass on the diff; findings fixed; checks re-run last.
+- [ ] Commit with DCO sign-off as Joe, push, open the PR.
 
 ## Review
 
-- Every diff gets an Opus review pass before merge.
-- Every diff gets the repository's Codex review before merge.
+- Every diff gets a review pass before the PR opens.
+- Checks run as the last step, after docs and generated output.

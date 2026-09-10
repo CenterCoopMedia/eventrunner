@@ -62,8 +62,20 @@ pair). The accent and the five semantic roles stay the style's own. The expert p
 of §5.2 are retained under Advanced with live contrast checks, warnings, and a reset path back to
 the derived values.
 
-**There is no separate admin marker colour.** `config/theme.adminAccent` is removed. The admin's two
-client-owned slots take the resolved brand colour, and the §5.2 legibility floor is unchanged.
+**There is no separate admin marker colour.** `config/theme.adminAccent` is removed. The admin's
+client-owned slot takes the resolved brand colour, and the §5.2 legibility floor is unchanged.
+
+**The admin takes the editorial desk (owner direction, 2026-09-10).** The admin CMS is restyled on
+the NJ PBS newsroom admin's editorial desk: a dark navigation rail against a cool-grey canvas, a
+white sticky title band that carries the page's actions, white panels, one action colour for
+every primary control and focus ring, a state as a word in a tinted badge, 2.75rem controls, and
+the admin's own six-step type scale. The two faces stay Source Sans 3 and IBM Plex Mono. The
+client accent keeps one slot, the mark beside the page title, and its legibility floor is measured
+against the title band. The action family and the rail follow the main brand colour by default,
+worked into a contrast-safe family for both modes, or take one of six house schemes chosen under
+**Admin colours** on the Branding tab; the public site never uses that choice.
+`docs/plans/2026-09-10-admin-editorial-desk.md` is the record and supersedes the composing-room
+wording in §5.2 and in the admin story where the two differ.
 
 **The preview stays a real-route preview, and it grows.** It renders the app's own routes and
 components, never swatches (§5.2). It adds desktop and phone widths at true CSS width, zoom to fit,
@@ -915,8 +927,9 @@ client theme it is a support liability. Bind:
 - Ship a complete `admin-*` token set with light and dark values. The admin obeys `data-mode`. It
   ignores `data-theme`.
 - The admin carries exactly two client-owned elements: The client logo in the top-left slot, and
-  one client accent token (`--admin-client-accent`). Use the accent in two named places: The
-  active-navigation marker and the page-header mark. Use it nowhere else.
+  one client accent token (`--admin-client-accent`). Use the accent in one named place, the
+  page-header mark, and nowhere else (amended 2026-09-10; the active-navigation marker is the
+  rail's own ink — see §0).
 - The admin identity uses one type pairing for all deployments. Do not make it configurable. The
   UI face is Source Sans 3, which the repo already bundles. The data face is IBM Plex Mono with
   tabular figures.

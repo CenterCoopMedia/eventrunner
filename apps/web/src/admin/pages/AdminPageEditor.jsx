@@ -64,6 +64,7 @@ import {
   dangerButtonClass,
   fieldHintClass,
   fieldLabelClass,
+  linkButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -366,9 +367,22 @@ export default function AdminPageEditor({ mode }) {
         identifiers={isExisting ? page.id : null}
         description="Saving writes a draft. Publishing copies that draft to the live revision the public site reads."
         actions={
-          <Link to=".." relative="path" className={secondaryButtonClass}>
-            Back to pages
-          </Link>
+          <>
+            <Link to=".." relative="path" className={linkButtonClass}>
+              Back to pages
+            </Link>
+            <button type="submit" className={secondaryButtonClass} disabled={busy !== null}>
+              {busy === 'draft' ? 'Saving…' : 'Save draft'}
+            </button>
+            <button
+              type="button"
+              className={primaryButtonClass}
+              disabled={busy !== null}
+              onClick={() => save({ publish: true })}
+            >
+              {busy === 'publish' ? 'Publishing…' : 'Save and publish'}
+            </button>
+          </>
         }
       />
 
@@ -467,7 +481,7 @@ export default function AdminPageEditor({ mode }) {
               hint="Hidden pages stay out of the public site even once published."
             />
             {isSystemPage ? (
-              <p className="text-caption text-admin-ink-secondary">
+              <p className="text-admin-sm text-admin-ink-secondary">
                 This is a system page: It has a dedicated route in the app, so
                 it cannot be deleted or turned into a regular page.
               </p>
@@ -521,7 +535,7 @@ export default function AdminPageEditor({ mode }) {
             {layoutOpen ? 'Hide the individual settings' : 'Change the individual settings'}
           </button>
           <div id="admin-page-layout-advanced" hidden={!layoutOpen} className="mt-sm">
-            <p className="mb-sm max-w-[65ch] text-caption text-admin-ink-secondary">
+            <p className="mb-sm max-w-[65ch] text-admin-sm text-admin-ink-secondary">
               The parts a template sets. Change one and the page stops following
               its template — the template above reads “Custom” from then on, and
               picking a template again sets all three back.
@@ -591,7 +605,7 @@ export default function AdminPageEditor({ mode }) {
         }
       >
         {page.sections.length === 0 ? (
-          <p className="text-caption text-admin-ink-secondary">
+          <p className="text-admin-sm text-admin-ink-secondary">
             No sections yet. A page with no sections renders nothing.
           </p>
         ) : (
@@ -601,10 +615,10 @@ export default function AdminPageEditor({ mode }) {
               return (
                 <li
                   key={sectionIndex}
-                  className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground p-sm"
+                  className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-soft p-md"
                 >
-                  <div className="mb-xs flex flex-wrap items-center justify-between gap-2xs border-admin-rule-hairline border-b-admin-hairline pb-2xs">
-                    <h3 className="font-admin-ui text-lead font-semibold text-admin-ink">
+                  <div className="mb-sm flex flex-wrap items-center justify-between gap-xs border-admin-rule-hairline border-b-admin-hairline pb-xs">
+                    <h3 className="font-admin-ui text-admin-lg font-bold text-admin-ink">
                       {section.label || section.id || `Section ${sectionIndex + 1}`}
                     </h3>
                     <div className="flex flex-wrap gap-2xs">
@@ -710,7 +724,7 @@ export default function AdminPageEditor({ mode }) {
                     <legend className={fieldLabelClass}>
                       Allowed block types
                     </legend>
-                    <p className="text-caption text-admin-ink-secondary">
+                    <p className="text-admin-sm text-admin-ink-secondary">
                       Which of the registry’s block types this section accepts.
                     </p>
                     <FieldError message={errorFor(`${at}.allowedBlocks`)} />
@@ -735,7 +749,7 @@ export default function AdminPageEditor({ mode }) {
 
                   <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2xs">
-                      <h4 className="text-caption font-semibold text-admin-ink">Blocks</h4>
+                      <h4 className="text-admin-base font-bold text-admin-ink">Blocks</h4>
                       <button
                         type="button"
                         className={secondaryButtonClass}
@@ -756,7 +770,7 @@ export default function AdminPageEditor({ mode }) {
                       </button>
                     </div>
                     {section.defaultBlocks.length === 0 ? (
-                      <p className="mt-2xs text-caption text-admin-ink-secondary">
+                      <p className="mt-2xs text-admin-sm text-admin-ink-secondary">
                         No blocks yet.
                       </p>
                     ) : (
@@ -774,7 +788,7 @@ export default function AdminPageEditor({ mode }) {
                           return (
                             <li
                               key={blockIndex}
-                              className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-input p-xs"
+                              className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-sm"
                             >
                               <div className="grid gap-xs sm:grid-cols-2">
                                 <TextField
@@ -870,17 +884,6 @@ export default function AdminPageEditor({ mode }) {
       </Panel>
 
       <div className="flex flex-wrap items-center gap-xs">
-        <button type="submit" className={secondaryButtonClass} disabled={busy !== null}>
-          {busy === 'draft' ? 'Saving…' : 'Save draft'}
-        </button>
-        <button
-          type="button"
-          className={primaryButtonClass}
-          disabled={busy !== null}
-          onClick={() => save({ publish: true })}
-        >
-          {busy === 'publish' ? 'Publishing…' : 'Save and publish'}
-        </button>
         {resumeQueueId ? (
           <button
             type="button"

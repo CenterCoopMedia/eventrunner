@@ -247,6 +247,11 @@ export default function AdminSpeakerEditor({ mode }) {
         state={mode === 'edit' ? <RecordState state={speakerRecordState(speaker)} /> : null}
         identifiers={mode === 'edit' ? speakerId : null}
         description="This is the one record for this person. Sessions point at it by id, and the public directory shows a published copy of the safe fields."
+        actions={
+          <button type="submit" className={primaryButtonClass} disabled={saving}>
+            {saving ? 'Saving…' : mode === 'create' ? 'Create speaker' : 'Save speaker'}
+          </button>
+        }
       />
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
@@ -344,17 +349,17 @@ export default function AdminSpeakerEditor({ mode }) {
             // other field on this page no longer disturbs it.
             <div className="flex flex-col gap-3xs">
               <span className={fieldLabelClass}>Status</span>
-              <p className="text-caption text-admin-ink-secondary">
+              <p className="text-admin-sm text-admin-ink-secondary">
                 {PIPELINE_STATUS_LABELS[form.status] ?? form.status}
               </p>
-              <p className="text-caption text-admin-ink-secondary">
+              <p className="text-admin-sm text-admin-ink-secondary">
                 Managed by the invitation flow. Saving this form leaves it unchanged.
               </p>
             </div>
           )}
         </div>
         {speaker?.uid ? (
-          <p className="mt-sm text-caption text-admin-ink-secondary">
+          <p className="mt-sm text-admin-sm text-admin-ink-secondary">
             This speaker is linked to an attendee account. The link is managed
             by the invitation flow and cannot be edited here.
           </p>
@@ -362,9 +367,6 @@ export default function AdminSpeakerEditor({ mode }) {
       </Panel>
 
       <div className="flex flex-wrap items-center gap-xs">
-        <button type="submit" className={primaryButtonClass} disabled={saving}>
-          {saving ? 'Saving…' : mode === 'create' ? 'Create speaker' : 'Save speaker'}
-        </button>
         <button type="button" className={secondaryButtonClass} onClick={() => navigate('..')}>
           Cancel
         </button>
@@ -385,7 +387,7 @@ export default function AdminSpeakerEditor({ mode }) {
 
       {deleteBlocked ? (
         <Panel title="Delete could not remove every reference">
-          <p className="max-w-[65ch] text-caption text-admin-ink">
+          <p className="max-w-[65ch] text-admin-base text-admin-ink">
             Nothing was changed. Marking the speaker removed hides them from the
             public directory and every public surface, and leaves the sessions
             that reference them untouched.

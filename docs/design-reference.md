@@ -209,7 +209,7 @@ Semantic colours — success, warning, danger, and the rest — come from the st
 
 Any single colour can be set by hand, per mode, under **Advanced colour settings**. A light tab and a dark tab hold separate values, and a blank field keeps the worked-out one. This is an **exceptional control**: It is there for the client whose brand guide names an exact value that the derivation does not reach, and every use of it takes a token out of the derivation permanently — it will no longer move when the brand colour moves. Most sites should never open it, and a site that has overridden a dozen values has usually picked the wrong style.
 
-There is no second brand colour anywhere in the system. The admin's own marker is worked out from the admin's ink against the admin ground, so there is nothing to set and nothing to get wrong.
+There is no second brand colour anywhere in the system. The admin's own mark takes the brand colour where it can be seen against the admin's white title band and falls back to the admin's ink where it cannot, so there is nothing to set and nothing to get wrong. The admin's rail, buttons and links follow the same colour by default, worked to the admin's own contrast bars in both modes; **Admin colours** on the Branding tab can replace that with a house scheme, and the public site never sees the choice.
 
 ### The contrast gate
 
@@ -276,11 +276,12 @@ The full list of rejected patterns is in [`interface-guidelines.md`](interface-g
 
 The admin CMS is its own design surface and it does not restyle. It reads its own fixed token set, obeys the mode, and ignores the site style entirely — so the room a staff member works in does not change shape every time a client changes their palette.
 
-- **Two faces, fixed.** Source Sans 3 for everything a person reads as language, IBM Plex Mono with tabular figures for everything the machine owns.
-- **Navigation is the docket**: A grouped standing list of words down the leading edge. No icon rail, no collapse to glyphs, no counts in bubbles.
-- **The active item carries four signals**, never colour alone: The marker, the weight, a ground shift, and the assistive-technology current-page state.
-- **The position marker is the site's own brand colour**, not a second colour anyone picks. There is no marker colour field: The marker beside the section you are in and the mark on the page-header rule both take the resolved brand colour for the mode. A marker is non-text interface, so it holds 3:1 against the admin ground; below that both fall back to the admin's own ink and the editor says so. The site keeps painting the client's colour either way.
-- **Three state words, everywhere**: Draft, Live, and Live with unpublished changes.
+- **Two faces, fixed.** Source Sans 3 for everything a person reads as language, IBM Plex Mono with tabular figures for everything the machine owns, on the admin's own type scale.
+- **The frame is a dark rail against a light canvas.** Navigation is a grouped standing list of words on the rail down the leading edge. No icon rail, no collapse to glyphs, no counts in bubbles. Your logo sits at the head of the rail on a small white tile, beside the event's short name.
+- **The current item carries four signals**, never colour alone: The marker, the weight, the filled ground, and the assistive-technology current-page state.
+- **The page title carries the site's own brand colour**, not a second colour anyone picks. There is no marker colour field: The small mark beside the page title takes the resolved brand colour for the mode. A mark is non-text interface, so it holds 3:1 against the white title band; below that it falls back to the admin's own ink and the editor says so. The site keeps painting the client's colour either way.
+- **One action colour** for the primary button, the current rail item, the links, and the focus ring. By default it is the site's main brand colour worked to the admin's own contrast bars, in light and in dark; **Admin colours** on the Branding tab can replace it with one of six house schemes: navy, graphite, forest, oxblood, teal, or plum. Either way it is one colour per deployment, and it does not change with the site style.
+- **Three state words, everywhere**: Draft, Live, and Live with unpublished changes, each set in a tinted badge.
 - **A destructive action stands still and states what it costs.** Nothing animates in a destructive moment.
 
 **Engine.** The `admin-*` blocks are emitted once per mode and never once per (style, mode), which is the mechanical form of "the admin ignores the site style". They stay root-only, because the admin never renders inside the page-preview frame.
