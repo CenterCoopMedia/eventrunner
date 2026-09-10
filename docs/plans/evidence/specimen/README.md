@@ -1,6 +1,6 @@
 # Specimen captures — wave 1
 
-Twenty-seven section captures of the specimen book, at full scale. They are
+Twenty-nine section captures of the specimen book, at full scale. They are
 the review evidence for wave 1 of the design vocabulary expansion
 ([the record](../../2026-09-10-design-vocabulary-expansion.md), §7).
 
@@ -11,19 +11,32 @@ Each file is `<style>--<mode>--<width>--<section>.png`:
 | 18 | the controls, layout and feedback sections at 1440px, light mode, all six site styles |
 | 6 | the controls section at 1440px, dark mode, all six styles |
 | 3 | the same three sections at 390px, Civic |
+| 2 | the headers section at 320px, light mode, Civic and Field Guide |
 
 **Why sections rather than whole pages.** The first pass committed twenty-four
 full-page captures at a device scale of 0.5, about 1MB each. A person cannot
 read them: the book is around 9,000px long and at half scale a state label is
 a smudge. Evidence a person reads is a section at full scale. The full-page
-set is not lost — the committed script regenerates it on demand, and the three
-sections here are the ones the wave changed.
+set is not lost — the committed script regenerates it on demand.
+
+**Why these sections.** Controls, layout and feedback are where the wave added
+devices, so those three carry the six styles and both modes. Headers is where
+the wave fixed a defect rather than adding a device: the wordmark now breaks a
+word too long for the room it has, and that is visible only at 320px, so it is
+captured at that width in the style that scrolled sideways (Field Guide) and
+one that did not (Civic).
 
 Regenerate this set with the committed script:
 
 ```bash
-VITE_DEMO_MODE=1 npm run build -w apps/web -- \
-  --base /eventrunner/demo/ --outDir /tmp/specimen-demo
+VITE_DEMO_MODE=1 \
+  VITE_FIREBASE_API_KEY=demo-not-a-real-key \
+  VITE_FIREBASE_AUTH_DOMAIN=demo-run-of-show.firebaseapp.com \
+  VITE_FIREBASE_PROJECT_ID=demo-run-of-show \
+  VITE_FIREBASE_STORAGE_BUCKET=demo-run-of-show.appspot.com \
+  VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000 \
+  VITE_FIREBASE_APP_ID=1:000000000000:web:0000000000000000000000 \
+  npm run build -w apps/web -- --base /eventrunner/demo/ --outDir /tmp/specimen-demo
 for section in specimen-controls specimen-layout specimen-feedback; do
   PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/dev/capture-specimen.mjs \
     --dist /tmp/specimen-demo --out docs/plans/evidence/specimen \
@@ -37,10 +50,15 @@ for section in specimen-controls specimen-layout specimen-feedback; do
     --dist /tmp/specimen-demo --out docs/plans/evidence/specimen \
     --scale 1 --widths 390 --modes light --styles civic --only "$section"
 done
+PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/dev/capture-specimen.mjs \
+  --dist /tmp/specimen-demo --out docs/plans/evidence/specimen \
+  --scale 1 --widths 320 --modes light --styles civic,field-guide \
+  --only specimen-headers
 ```
 
-The build needs the six `VITE_FIREBASE_*` placeholders that
-`scripts/build-demo.cjs` passes; without them the app fails to start and the
+The six `VITE_FIREBASE_*` values are the non-secret placeholders
+`scripts/build-demo.cjs` passes, and they are written out here because the
+build reads them at start-up: without them the app never mounts and the
 capture times out waiting for the page. Drop `--only` for the whole page, and
 `--scale 0.5` to keep a full-page file under about 1.5MB.
 
@@ -62,6 +80,14 @@ capture times out waiting for the page. Drop `--only` for the whole page, and
   screen. Under them, the composed first screen: dates, key facts and the
   clock as three equal cells with a hairline in the gutter at 1440px, stacked
   at 390px.
+- **Headers (section 5), at 320px.** The four header treatments, at the width
+  where a long word has nowhere to go. The masthead breaks "Harborlight"
+  inside the row rather than pushing the page sideways, and the break falls
+  only in the word that cannot fit — the standard, compact and minimal
+  treatments are set in words that fit and are unbroken. Both styles break it
+  here, because the book frames the device in a 224px box, narrower than the
+  272px stage a page gives it; on the page itself Field Guide is the style
+  whose word crossed the viewport edge, and Civic's did not.
 - **Feedback (section 12).** Both toast tones on the alternate ground, where
   the rule that carries the tone is visible; the dialog frame on its scrim;
   and the loading rows, which are hairlines rather than a skeleton and do not
