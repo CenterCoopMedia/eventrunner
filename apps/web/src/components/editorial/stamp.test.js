@@ -153,8 +153,12 @@ describe('the Zine stamp', () => {
     const focusBlock = blocks.find((rule) => !rule.includes(':hover'));
     expect(focusBlock).toContain(':has(:focus-visible)');
     expect(focusBlock).not.toContain('(hover: hover)');
-    // No scroll trigger, no loop, no ambient movement anywhere near it.
-    expect(indexCss).not.toMatch(/@keyframes|animation-iteration-count: infinite/);
+    // No scroll trigger, no loop, no ambient movement anywhere near it. A
+    // keyframe that runs once and stops is allowed elsewhere in the sheet
+    // (the toast and the dialog enter that way), so the refusal here is
+    // `infinite` and any sequence inside the stamp's own block.
+    expect(indexCss).not.toMatch(/animation[^;]*infinite|animation-iteration-count: infinite/);
+    expect(block).not.toMatch(/@keyframes|animation/);
   });
 
   it('5. is truly static under prefers-reduced-motion, and still renders', () => {

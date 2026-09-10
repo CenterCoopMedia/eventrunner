@@ -45,12 +45,27 @@ describe('Switch', () => {
   });
 
   it('states that it is unavailable and keeps its place in the tab order', () => {
-    const { onChange, control } = renderSwitch({ disabled: true });
+    // `aria-disabled` rather than `disabled`, because a switch that cannot
+    // be thrown usually has a reason, and a removed control announces
+    // nothing. A reader can still land on it and hear the label and the
+    // hint (interface guidelines, Accessibility).
+    const { control } = renderSwitch({ disabled: true });
     expect(control).toHaveAttribute('aria-disabled', 'true');
     expect(control).not.toHaveAttribute('disabled');
     control.focus();
     expect(control).toHaveFocus();
+  });
+
+  it('acts on nothing at all while it states that it is unavailable', () => {
+    // A control that stays focusable has to refuse every way of working it,
+    // not only the pointer: the handler is the gate, so Enter and Space —
+    // which a button turns into a click — are refused with the click.
+    const { onChange, control } = renderSwitch({ disabled: true });
     fireEvent.click(control);
+    fireEvent.keyDown(control, { key: 'Enter' });
+    fireEvent.keyUp(control, { key: 'Enter' });
+    fireEvent.keyDown(control, { key: ' ' });
+    fireEvent.keyUp(control, { key: ' ' });
     expect(onChange).not.toHaveBeenCalled();
   });
 });

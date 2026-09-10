@@ -31,7 +31,14 @@
 export default function LoadingState({ label = 'Loading…', rows = 3 }) {
   return (
     <div className="py-xl">
-      <p role="status" className="font-data text-caption text-text-secondary">
+      {/* The label is also the region's name. A `role="status"` region takes
+          no name from its content, and every caller's test finds this line
+          by the label it passed. */}
+      <p
+        role="status"
+        aria-label={label}
+        className="font-data text-caption text-text-secondary"
+      >
         {label}
       </p>
       {/* The reserved block is decoration for a screen reader: the line

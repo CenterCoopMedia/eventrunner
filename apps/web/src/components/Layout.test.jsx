@@ -919,7 +919,9 @@ describe('Layout registration action (M7 issue 8)', () => {
     );
     const link = container.querySelector('header a[href="https://register.example.org/tickets"]');
     expect(link).not.toBeNull();
-    expect(link.textContent).toBe('Get a ticket');
+    // The link's words are the client's label; the hidden half tells a
+    // screen reader that the tab will change (issue 236).
+    expect(link.textContent).toBe('Get a ticket (opens in a new tab)');
   });
 
   it('keeps its own distance from the navigation in the one row treatment', () => {
