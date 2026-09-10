@@ -45,8 +45,49 @@ describe('FeedbackModal', () => {
   it('refuses to submit an empty message without calling the server', () => {
     render(<FeedbackModal onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please enter a message.');
     expect(submitFeedbackMock).not.toHaveBeenCalled();
+  });
+
+  // ISSUE 219. A refused submit used to state one sentence at the head of
+  // the form and stop there: the field that refused carried no
+  // `aria-invalid`, nothing named the message, and focus stayed on the
+  // submit control. A reader using a screen reader heard nothing move.
+  it('marks the field that refused, names its message, and moves focus to it', () => {
+    vi.useFakeTimers();
+    try {
+      render(<FeedbackModal onClose={() => {}} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+      vi.runOnlyPendingTimers();
+
+      const field = screen.getByLabelText('Message');
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      const describedBy = field.getAttribute('aria-describedby');
+      expect(describedBy).toBeTruthy();
+      expect(document.getElementById(describedBy)).toHaveTextContent('Please enter a message.');
+      expect(field).toHaveFocus();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the submit control enabled while the form is invalid', () => {
+    // A disabled control announces nothing, so a reader who presses it
+    // learns nothing (interface guidelines, Interaction states).
+    render(<FeedbackModal onClose={() => {}} />);
+    const submit = screen.getByRole('button', { name: 'Send feedback' });
+    fireEvent.click(submit);
+    expect(submit).toBeEnabled();
+  });
+
+  it('states a rejection from the server at the head of the form, where no field owns it', async () => {
+    // A server refusal belongs to the request, not to one field, so it
+    // stays the one urgent line the form announces.
+    submitFeedbackMock.mockResolvedValueOnce({ ok: false, error: 'Too many submissions. Try again later.' });
+    render(<FeedbackModal onClose={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many submissions. Try again later.');
+    expect(screen.getByLabelText('Message')).not.toHaveAttribute('aria-invalid');
   });
 
   it('closes on Cancel', () => {

@@ -41,9 +41,18 @@
 // unmounts the dialog on close, and an element removed while it holds focus
 // drops focus to the body, so the opener is remembered on mount and focused
 // again on the way out.
+//
+// TWO KINDS OF REFUSAL, TWO PLACES (issue 219). A field that refuses states
+// it on the field: `aria-invalid`, the message under it named by
+// `aria-describedby`, and focus moved there on submit, so the label, the
+// state and the message are read as one. A refusal from the SERVER belongs
+// to the request rather than to any field, so that one stays the single
+// urgent line at the head of the form. One result, announced once: the
+// field's message is not repeated in the summary, because the focus move
+// is what announces it.
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
-import { SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
+import { focusFirstError, SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 
 /**
@@ -83,9 +92,11 @@ export default function FeedbackModal({ onClose }) {
   const [website, setWebsite] = useState(''); // honeypot
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [messageError, setMessageError] = useState(null);
   const [sent, setSent] = useState(false);
 
   const dialogRef = useRef(null);
+  const formRef = useRef(null);
   // The opener is read at the FIRST RENDER, not in the effect. The message
   // field carries autoFocus, and React applies that during the commit, so by
   // the time an effect runs the active element is already the field inside
@@ -107,11 +118,21 @@ export default function FeedbackModal({ onClose }) {
   async function submit(event) {
     event.preventDefault();
     if (!message.trim()) {
-      setError('Please enter a message.');
+      // The field says it, and the reader is put in front of the field.
+      setMessageError('Please enter a message.');
+      // A rejection from the server, if one is still standing, goes now:
+      // nothing is being sent, so it would be stating a problem that may
+      // already be fixed.
+      setError(null);
+      // After the render that marks the field, not before it. The submit
+      // control stays enabled throughout — a dead control announces
+      // nothing.
+      window.setTimeout(() => focusFirstError(formRef.current), 0);
       return;
     }
     setSubmitting(true);
     setError(null);
+    setMessageError(null);
     const result = await submitFeedback({
       message: message.trim(),
       email: email.trim() || undefined,
@@ -164,7 +185,7 @@ export default function FeedbackModal({ onClose }) {
             </div>
           </div>
         ) : (
-          <form className="flex flex-col gap-md" onSubmit={submit}>
+          <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit}>
             <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
               Share feedback
             </h2>
@@ -185,6 +206,7 @@ export default function FeedbackModal({ onClose }) {
               label="Message"
               value={message}
               onChange={setMessage}
+              error={messageError}
               rows={5}
               autoFocus
             />
