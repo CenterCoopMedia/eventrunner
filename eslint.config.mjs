@@ -35,6 +35,10 @@ export default [
     ignores: [
       // Harness-managed session state (gitignored); may hold agent worktrees.
       ".claude/",
+      // Playwright's own scratch directory (gitignored). A one-off script
+      // left there by a debugging session is not repository code, and it
+      // must not turn `npm run lint` red for whoever runs it next.
+      "e2e/.tmp/",
       "**/node_modules/",
       "**/dist/",
       "coverage/",
