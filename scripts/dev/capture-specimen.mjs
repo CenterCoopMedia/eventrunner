@@ -217,6 +217,33 @@ async function loadPlaywright() {
   }
 }
 
+/**
+ * Hide every element the page fixes to the viewport, and give back the
+ * function that shows them again.
+ *
+ * Position is a computed value, so there is no selector for it: the page
+ * itself is asked which of its elements are fixed. Visibility rather than
+ * display, so nothing reflows and the section is captured at the size it
+ * really has.
+ *
+ * @param {import('playwright').Page} page
+ * @returns {Promise<() => Promise<void>>}
+ */
+async function hideFixedFurniture(page) {
+  await page.evaluate(() => {
+    globalThis.__specimenHidden = [...document.body.querySelectorAll('*')].filter(
+      (el) => getComputedStyle(el).position === 'fixed',
+    );
+    for (const el of globalThis.__specimenHidden) el.style.visibility = 'hidden';
+  });
+  return async () => {
+    await page.evaluate(() => {
+      for (const el of globalThis.__specimenHidden ?? []) el.style.visibility = '';
+      globalThis.__specimenHidden = undefined;
+    });
+  };
+}
+
 async function capture({ options, baseUrl, log }) {
   const { chromium } = await loadPlaywright();
   let browser;
@@ -250,8 +277,20 @@ async function capture({ options, baseUrl, log }) {
             captureName({ style, mode, width, section: options.only }),
           );
           if (options.only) {
+            // A section capture is a picture of one section, and anything
+            // the page fixes to the viewport — the back-to-top control —
+            // lands on top of it wherever the shot happens to stop. The
+            // furniture is hidden for the shot and put back after, so the
+            // evidence shows the section and nothing else.
             const target = page.locator(`#${options.only}`).locator('xpath=ancestor::section[1]');
+            // The section is brought into view FIRST. The back-to-top
+            // control mounts on scroll, so a page still at the top has
+            // nothing to hide and the control arrives inside the shot.
+            await target.scrollIntoViewIfNeeded();
+            await page.waitForTimeout(150);
+            const restore = await hideFixedFurniture(page);
             await target.screenshot({ path: file });
+            await restore();
           } else {
             await page.screenshot({ path: file, fullPage: true });
           }

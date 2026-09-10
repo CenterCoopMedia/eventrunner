@@ -325,7 +325,13 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/dev/capture-specimen.mjs 
 
 Each file is named `<style>--<mode>--<width>.png`, and a section capture adds the section id. The
 book is a long page, so a full-page PNG at 1440 runs to about 2MB: `--scale 0.5` brings one under
-1.5MB, and `--only` keeps a section capture small at full scale.
+1.5MB, and `--only` keeps a section capture small at full scale. A half-scale full-page capture is
+not legible to a person, so the committed evidence is section captures at full scale and the
+full set is what this script regenerates on demand.
+
+A section capture brings its section into view, waits, and then hides everything the page fixes to
+the viewport before it shoots, because the back-to-top control mounts on scroll and would otherwise
+land in the middle of the picture.
 
 It needs the `playwright` package and a Chromium binary through `PLAYWRIGHT_BROWSERS_PATH`. It
 never runs `playwright install`: a missing browser fails fast with a message rather than reaching
