@@ -62,7 +62,17 @@
       "signature": "560ms"
     },
     "easing": {
-      "out": "cubic-bezier(0, 0, 0.2, 1)"
+      "out": "cubic-bezier(0, 0, 0.2, 1)",
+      "in": "cubic-bezier(0.4, 0, 1, 1)"
+    },
+    "$state-note": "The share of ink a state tint mixes into the ground it sits on. A share is a number, not a colour, because the tint has to work on every ground a control renders on. Each state has a light value and a dark value: ink on a dark ground carries less of a step than ink on a light one, so the dark share is the higher of the pair.",
+    "state": {
+      "hover-light": "0.06",
+      "hover-dark": "0.1",
+      "pressed-light": "0.1",
+      "pressed-dark": "0.16",
+      "selected-light": "0.08",
+      "selected-dark": "0.13"
     }
   }
 }

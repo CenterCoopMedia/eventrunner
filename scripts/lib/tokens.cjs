@@ -252,6 +252,34 @@ function resolveAdminTokens(theme, tokens) {
 }
 
 /**
+ * The `state` family, per mode (expansion record §2.1).
+ *
+ * A state tint is ink mixed into the ground a control already sits on, at a
+ * fixed share, so one rule paints hover on the surface, on the alternate
+ * surface, and on a filled ground alike. The share is the only part that
+ * changes with the mode: the same amount of ink reads as a smaller step on
+ * a dark ground than on a light one, so the dark share is the higher of the
+ * pair.
+ *
+ * These are scalars, not colours, so they carry no `-rgb` suffix and they
+ * take no place in the palette blocks. They are still mode-scoped, which is
+ * why they get their own pair of blocks rather than a line in `:root`.
+ *
+ * @param {object} tokens loadTokens() result
+ * @returns {{ names: string[], values: Record<string, Record<string, string>> }}
+ */
+function resolveStateTokens(tokens) {
+  const names = [];
+  const values = { light: {}, dark: {} };
+  for (const [step, spec] of tokenEntries(tokens.semantic.state)) {
+    const name = `--state-${step}`;
+    names.push(name);
+    for (const mode of THEME_MODES) values[mode][name] = spec[mode];
+  }
+  return { names, values };
+}
+
+/**
  * The font stacks each role resolves to, and the faces those stacks need.
  *
  * A role nothing names is NOT resolved here. It falls through to the alias
@@ -746,6 +774,47 @@ function buildTokenCss(theme, { tokensDir } = {}) {
     lines.push(...printPaletteBlock(policy, names, values.light));
   }
 
+  // The state shares (expansion record §2.1). They sit beside the palette
+  // rather than inside it: a share is a number, so it never belongs in a
+  // block the dark-mode colour test reads as colour. They take the same
+  // scoped selectors the palette takes, so the admin's preview frame tints
+  // its controls with the mode it is rendering rather than the room's.
+  //
+  // There is no first-paint block. A state tint renders only once a reader
+  // hovers, presses, or selects, and by then the runtime has written
+  // data-mode — so the light baseline below is never the value that paints.
+  const stateTokens = resolveStateTokens(tokens);
+  if (stateTokens.names.length > 0) {
+    lines.push('');
+    lines.push(
+      ...colorBlock(
+        ':root',
+        stateTokens.names,
+        stateTokens.values.light,
+        'State tint shares — light, attribute-free baseline (expansion record §2.1).',
+      ),
+    );
+    lines.push('');
+    lines.push(
+      ...colorBlock(
+        scopedSelector("[data-mode='light']"),
+        stateTokens.names,
+        stateTokens.values.light,
+        'State tint shares — light. Ink mixed into the control\'s own ground.',
+      ),
+    );
+    lines.push('');
+    lines.push(
+      ...colorBlock(
+        scopedSelector("[data-mode='dark']"),
+        stateTokens.names,
+        stateTokens.values.dark,
+        'State tint shares — dark. The higher share: ink reads as a smaller ' +
+        'step on a dark ground.',
+      ),
+    );
+  }
+
   // The admin set, emitted ONCE PER MODE — plus the same first-paint block
   // the palette gets, because the admin renders on the same page and paints
   // the same first frame. It never appears inside a [data-theme] block, and
@@ -845,6 +914,7 @@ module.exports = {
   loadTokens,
   resolveColorTokens,
   resolveAdminTokens,
+  resolveStateTokens,
   resolveFonts,
   resolveSelectableFaces,
   resolveAdminFonts,

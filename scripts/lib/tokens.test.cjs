@@ -11,6 +11,7 @@ const {
   loadTokens,
   resolveAdminTokens,
   resolveColorTokens,
+  resolveStateTokens,
   resolveFonts,
   modePolicy,
   TOKENS_DIR,
@@ -522,6 +523,76 @@ test('the admin marker takes the resolved brand colour, and falls back to admin 
 });
 
 // ------------------------------------------------ the motif layer (brief §3.8)
+
+test('every motion step has one job, and the exit curve is its own', () => {
+  // Expansion record §2.2 gives each duration step a job: fast is the exit,
+  // base is the enter, slow is the press, signature is the one signature a
+  // surface owns. An exit may accelerate away, so it takes its own curve.
+  const css = buildTokenCss(THEME);
+  assert.match(css, /--motion-fast: var\(--er-duration-fast\);/);
+  assert.match(css, /--motion-base: var\(--er-duration-base\);/);
+  assert.match(css, /--motion-slow: var\(--er-duration-slow\);/);
+  assert.match(css, /--motion-signature: var\(--er-duration-signature\);/);
+  assert.match(css, /--motion-ease: var\(--er-easing-out\);/);
+  assert.match(css, /--motion-ease-exit: var\(--er-easing-in\);/);
+
+  const { primitives } = loadTokens();
+  const easing = primitives.scalar.easing;
+  // An enter never opens on ease-in: it would delay the response at the one
+  // moment the reader is watching. The two curves are therefore distinct,
+  // and the exit is the one that starts fast.
+  assert.notEqual(easing.out, easing.in);
+  assert.match(easing.out, /^cubic-bezier\(0, 0, /, 'the enter curve decelerates');
+  assert.match(easing.in, /, 1, 1\)$/, 'the exit curve accelerates');
+});
+
+test('the state shares resolve in both modes, and dark carries the higher share', () => {
+  // Expansion record §2.1. A state tint is ink mixed into the ground at a
+  // fixed share, so the share is a number and not a colour: it never lands
+  // in a palette block, and it is emitted per mode because the same amount
+  // of ink reads as a smaller step on a dark ground.
+  const tokens = loadTokens();
+  const { names, values } = resolveStateTokens(tokens);
+  assert.deepEqual(names, [
+    '--state-hover-share',
+    '--state-pressed-share',
+    '--state-selected-share',
+  ]);
+
+  const share = (mode, name) => {
+    const ref = values[mode][name].match(/^var\((--er-state-[\w-]+)\)$/);
+    assert.ok(ref, `${name} in ${mode} reads a tier 1 primitive`);
+    const step = ref[1].replace('--er-state-', '');
+    const raw = tokens.primitives.scalar.state[step];
+    assert.ok(raw !== undefined, `${ref[1]} is declared in tier 1`);
+    return Number(raw);
+  };
+
+  for (const name of names) {
+    const light = share('light', name);
+    const dark = share('dark', name);
+    assert.ok(light > 0 && light < 1, `${name} light is a share`);
+    assert.ok(dark > 0 && dark < 1, `${name} dark is a share`);
+    assert.ok(dark > light, `${name} carries more ink in dark mode`);
+  }
+
+  // A press is the firmest tint and a hover the lightest, in both modes, so
+  // the three states never read as the same state.
+  for (const mode of ['light', 'dark']) {
+    assert.ok(share(mode, '--state-hover-share') < share(mode, '--state-selected-share'));
+    assert.ok(share(mode, '--state-selected-share') < share(mode, '--state-pressed-share'));
+  }
+
+  // Both mode blocks carry the whole family, and neither is a colour block.
+  const css = buildTokenCss(THEME);
+  for (const mode of ['light', 'dark']) {
+    const block = css.match(
+      new RegExp(`:root\\[data-mode='${mode}'\\],\\n\\[data-mode='${mode}'\\] \\{([^}]*--state-[^}]*)\\}`),
+    );
+    assert.ok(block, `the ${mode} state block exists`);
+    for (const name of names) assert.match(block[1], new RegExp(`${name}: `));
+  }
+});
 
 test('every motif set gets a slot-resolution block, and its assets exist', () => {
   const css = buildTokenCss(THEME);

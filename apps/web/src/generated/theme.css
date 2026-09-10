@@ -60,6 +60,13 @@
   --er-duration-slow: 200ms;
   --er-duration-signature: 560ms;
   --er-easing-out: cubic-bezier(0, 0, 0.2, 1);
+  --er-easing-in: cubic-bezier(0.4, 0, 1, 1);
+  --er-state-hover-light: 0.06;
+  --er-state-hover-dark: 0.1;
+  --er-state-pressed-light: 0.1;
+  --er-state-pressed-dark: 0.16;
+  --er-state-selected-light: 0.08;
+  --er-state-selected-dark: 0.13;
 
   /* Tier 2 — fluid type scale (brief §3.7). Eight steps, size + line height + tracking. */
   --text-folio: clamp(var(--er-size-folio-min), 0.666rem + 0.09vw, var(--er-size-folio-max));
@@ -126,6 +133,7 @@
   --motion-slow: var(--er-duration-slow);
   --motion-signature: var(--er-duration-signature);
   --motion-ease: var(--er-easing-out);
+  --motion-ease-exit: var(--er-easing-in);
 
   /* Tier 2 — named weights, so a component never writes a raw number. */
   --weight-regular: var(--er-weight-regular);
@@ -1094,6 +1102,29 @@
     --callout-rgb: var(--color-text-primary-rgb);
     --marginalia-rgb: var(--color-ink-motif-rgb);
   }
+}
+
+/* State tint shares — light, attribute-free baseline (expansion record §2.1). */
+:root {
+  --state-hover-share: var(--er-state-hover-light);
+  --state-pressed-share: var(--er-state-pressed-light);
+  --state-selected-share: var(--er-state-selected-light);
+}
+
+/* State tint shares — light. Ink mixed into the control's own ground. */
+:root[data-mode='light'],
+[data-mode='light'] {
+  --state-hover-share: var(--er-state-hover-light);
+  --state-pressed-share: var(--er-state-pressed-light);
+  --state-selected-share: var(--er-state-selected-light);
+}
+
+/* State tint shares — dark. The higher share: ink reads as a smaller step on a dark ground. */
+:root[data-mode='dark'],
+[data-mode='dark'] {
+  --state-hover-share: var(--er-state-hover-dark);
+  --state-pressed-share: var(--er-state-pressed-dark);
+  --state-selected-share: var(--er-state-selected-dark);
 }
 
 /* Admin identity — light (admin story part 6). Emitted once per mode, never once per theme: the admin obeys data-mode and ignores data-theme. */
