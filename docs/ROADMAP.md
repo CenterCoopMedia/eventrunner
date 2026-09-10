@@ -118,9 +118,9 @@ pull request stacked on the wave below.
 
 - [x] The admin CMS on the editorial desk, in the event's own colours (#245)
 - [x] The direction record (#250)
-- [ ] Wave 1: the state grammar, the motion grammar and its test, eight shared
+- [x] Wave 1: the state grammar, the motion grammar and its test, eight shared
       controls, the stage and measure width system, the specimen book and its
-      capture script; closes #219, #233, #236 (in review)
+      capture script; closed #219, #233, #236 (#254)
 - [ ] Wave 2: text, feedback and input devices; block types; option groups
 - [ ] Wave 3: four illustration sets (a first pass sits on its branch)
 - [ ] Wave 4: schedule devices on the schedule (#162 to #167) and the dashboard

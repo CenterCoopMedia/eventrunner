@@ -75,7 +75,7 @@ Recorded so a fresh context can rebuild the wave from the repository alone.
 - Wave 1 is integrated on `claude/admin-cms-design-language-ub69gr`: the three
   builder branches merged, the seams closed, the independent review's findings
   fixed, every check green, the specimen evidence committed as section
-  captures. The pull request opens from this tip.
+  captures. Merged as #254 on 2026-09-10.
 - Builder worktrees, kept for reference: `/home/user/wt-w1a`
   (`…-w1a`, 16 commits), `/home/user/wt-w1b` (`…-w1b`, 1 commit),
   `/home/user/wt-w1d` (`…-w1d`, 2 commits). All three are merged into wave 1.

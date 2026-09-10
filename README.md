@@ -4,7 +4,7 @@ A white-label event CMS for conferences and gatherings. Each client event gets i
 
 **License:** [Apache-2.0](LICENSE). The code is free. The trademark is the exclusivity lever: nobody else can market hosting under this name.
 
-**Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2). Milestones 1 to 4 and the public-site parity milestone are complete. Packaging (M5) and the parity milestones M8 to M12 are open. The design vocabulary is expanding in six waves ([#249](https://github.com/CenterCoopMedia/eventrunner/issues/249)); wave 1 is in review.
+**Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2). Milestones 1 to 4 and the public-site parity milestone are complete. Packaging (M5) and the parity milestones M8 to M12 are open. The design vocabulary is expanding in six waves ([#249](https://github.com/CenterCoopMedia/eventrunner/issues/249)); wave 1 has merged.
 
 Site: [centercoopmedia.github.io/eventrunner](https://centercoopmedia.github.io/eventrunner/)
 Documentation: [centercoopmedia.github.io/eventrunner/docs](https://centercoopmedia.github.io/eventrunner/docs/)
