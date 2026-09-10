@@ -1642,12 +1642,12 @@
      page scrolls sideways at 320px).
 
      Tailwind's `break-words` is `overflow-wrap: break-word`, and inside a
-     flex row that is not enough: it breaks the word when the line is
-     drawn, but it leaves the item's min-content at the width of the whole
-     word, so the row refuses to shrink below it and overflows its box
-     anyway. `anywhere` lowers the min-content as well, which is what lets
-     the row fit. Either way only a word that cannot fit is broken, so
-     nothing changes at a width where the word fits.
+     flex row that is not enough: it draws the break, but it leaves the
+     row's minimum at the width of the whole word, so the row refuses to
+     shrink below it and overflows its box anyway. `anywhere` lowers that
+     minimum as well, which is what lets the row fit. Either way only a
+     word that cannot fit is broken, so nothing changes at a width where
+     the word fits. Tailwind 3 has no utility for it.
 
      Measured: the demo event's name holds "Harborlight", 241px at the
      44px nameplate size, and the wordmark's mark and gutter put its

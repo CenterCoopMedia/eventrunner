@@ -78,27 +78,28 @@ export default function Nameplate({
   className = '',
 }) {
   const compact = variant === 'compact';
-  // THE NAME IS ITS OWN FLEX ITEM, AND IT MAY SHRINK. Text sitting straight
-  // in a flex row is an anonymous item at `min-width: auto`, which refuses
-  // to go below its own content. At 320px the mark, the gutter and the name
-  // wanted 304px inside a 272px stage, so Field Guide scrolled sideways by
-  // 8px on every route; in the book, where the device is framed in a 224px
-  // box, Civic and Newsroom went 17px and 16px past the viewport.
+  // THE ROW MAY BREAK A WORD. A flex row is sized from its content's own
+  // minimum, and the minimum of a line of text is its longest word. The
+  // demo event's name holds "Harborlight", 241px at the 44px nameplate
+  // size, so with the mark and the gutter this row would not go below
+  // 289px — wider than the 272px stage at 320px, and wider than the 224px
+  // box the specimen book frames the device in. Measured: Field Guide
+  // scrolled sideways by 8px on every route, and the book's masthead
+  // figure went 17px past on Civic and 16px on Newsroom.
   //
-  // `min-w-0` lets the name take the room that is left. `wrap-anywhere`
-  // breaks a word that cannot fit — the demo name's "Harborlight" is 241px
-  // at the nameplate size — and lowers the row's own minimum, which is
-  // what lets the row fit a box narrower than that word (interface
-  // guidelines, Responsive).
+  // `wrap-anywhere` lowers that minimum as well as drawing the break, which
+  // is what lets the row fit a box narrower than its longest word. It
+  // breaks only a word that cannot fit, so nothing changes at a width where
+  // the word fits (interface guidelines, Responsive).
   const nameBody = (
-    <span className="inline-flex items-center gap-xs">
+    <span className="inline-flex items-center gap-xs wrap-anywhere">
       {mark ?? (
         <Motif
           slot="nameplate-mark"
           className={compact ? 'h-6 w-6 shrink-0' : 'h-10 w-10 shrink-0'}
         />
       )}
-      <span className="min-w-0 wrap-anywhere">{name}</span>
+      {name}
     </span>
   );
   // The literal class matters: Tailwind scans for whole strings, and
