@@ -38,7 +38,7 @@ export default Object.freeze({
   name: 'Tabs',
   file: 'components/forms/Tabs.jsx',
   contract: null,
-  note: 'The open word carries the strong rule — the same boundary a section head takes — so the row reads as the page’s own typography. One tab stop, arrow keys along the row, never a pill.',
+  note: 'The open word carries the strong rule — the same boundary a section head takes — so the row is set in the page’s own typography. One tab stop, arrow keys along the row, never a pill.',
   states: Object.freeze(['rest', 'selected']),
   absent: Object.freeze([
     sharedGrammar('hover'),

@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   development server and never in a client production build, it is `noindex`, and the sitemap
   builder refuses to list it. `scripts/dev/capture-specimen.mjs` writes one full-page capture per
   style, mode and width. The record is `docs/plans/2026-09-10-design-vocabulary-expansion.md` §7.
+- The specimen book's layout section: the two page widths with the value each one resolves to in
+  the style on screen, the margin column, and the composed first screen the home page opens on.
+- Every shared control has an entry in the specimen book, and each one accounts for all ten
+  interaction states — it draws the states it has and says which ones it does not have, and why.
+  A state that is simply missing looks the same as a state somebody decided against, and only one
+  of those is a defect.
 
 ### Changed
 
@@ -88,7 +94,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   real dialog: focus stays inside it, the page behind is inert, Escape closes it, and focus goes
   back to the control that opened it.
 - A link that opens a new tab now says so, so a reader using a screen reader is not moved to a tab
-  with no history and no way back.
+  with no history and no way back. Every outbound link carries it, the sponsor wall included —
+  the wall is the one place on the site where outbound links run one after another, which is
+  where a silent change of context costs a reader the most.
 - The profile page's visibility choices and badge picks were painted by the operating system, so a
   client's palette and dark mode both stopped at their edge. They are drawn from the design tokens
   now, and the control under the paint is unchanged.

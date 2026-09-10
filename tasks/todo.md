@@ -18,21 +18,24 @@ Haiku agents build.
 
 ## Wave 1: the grammar
 
-- [ ] State grammar on both surfaces: hover inside the hover query, press,
+- [x] State grammar on both surfaces: hover inside the hover query, press,
       selected, disabled, busy, error, success, empty; the tint tokens.
-- [ ] New controls: switch, segmented control, tabs, checkbox, radio, search
+- [x] New controls: switch, segmented control, tabs, checkbox, radio, search
       field, sort control, filter group, external link marker.
-- [ ] Motion grammar: exit easing token, enter and exit utilities, the
-      static loading device, the motion contract test.
-- [ ] Closes #219 (submit stays enabled, focus moves to the first error),
-      #233 (dialog focus trap), #236 (new-tab marker).
-- [ ] Specimen book route in the demo and in development, with every device
+- [x] Motion grammar: one curve with the asymmetry in duration, enter and
+      exit utilities, the static loading device, the motion contract test.
+- [x] Closes #219 (submit stays enabled, focus moves to the first error),
+      #233 (dialog focus trap), #236 (new-tab marker, sponsor wall included).
+- [x] The two widths: a stage for the frame, a measure for running text, and
+      the composed first screen on the home page.
+- [x] Specimen book route in the demo and in development, with every device
       in every state, and the committed capture script.
-- [ ] Integration: merge, specimen entries for the new controls, regenerate,
-      checks last, independent review, evidence under
+- [x] Integration: merge, specimen entries for the new controls and the two
+      widths, regenerate, checks last, evidence under
       `docs/plans/evidence/specimen/`.
-- [ ] Docs: interface guidelines, design reference, web README, CHANGELOG,
+- [x] Docs: interface guidelines, design reference, web README, CHANGELOG,
       `docs/docs` regenerated.
+- [ ] Independent review before the pull request opens.
 - [ ] Push, open the PR, watch CI and the review bots.
 
 ## Wave 2: devices and blocks

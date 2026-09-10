@@ -83,7 +83,7 @@ export default function ControlsSection({ folio }) {
         name="State tints and the focus ring"
         file="design/tokens/semantic.json"
         contract={null}
-        note="A tint is a share, not a colour: the shared rule mixes a control’s own ink into the ground it already sits on, so one number covers the page ground, the alternate ground and a filled action. Dark mode carries the higher share, because the same ink reads as a smaller step on a dark ground. The ring is its own family, because a ring answers “where am I” and a rule is structure a reader passes over."
+        note="A tint is a share, not a colour: the shared rule mixes a control’s own ink into the ground it already sits on, so one number covers the page ground, the alternate ground and a filled action. Dark mode carries the higher share, because the same amount of ink is a smaller step on a dark ground. The ring is its own family, because a ring answers “where am I” and a rule is structure a reader passes over."
       >
         <dl>
           {[...STATE_SHARES, ...FOCUS_TOKENS].map((entry) => (
@@ -100,7 +100,7 @@ export default function ControlsSection({ folio }) {
         name="External link marker"
         file="components/ExternalLink.jsx"
         contract={null}
-        note="A link that opens a new tab says so inside its own name, in the same words everywhere. The sentence is hidden, so the marker below reads as a plain link until it is announced or inspected."
+        note="A link that opens a new tab says so inside its own name, in the same words everywhere. The sentence is hidden, so the marker below looks like any other link until it is announced or inspected."
       >
         <p className="max-w-prose text-body text-text-primary">
           Every outbound link on the site carries it: the{' '}

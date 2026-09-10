@@ -177,11 +177,19 @@ opening six pages.
   `scripts/write-site-files.cjs` refuses a sitemap that lists the route.
 - **Keeping it complete.** `src/pages/specimen/tokens.js` lists the scales
   the book draws; `tokens.test.js` pins every list to
-  `design/tokens/semantic.json`. `Specimen.test.jsx` renders the page and
-  checks that every component under `src/components/editorial/` appears.
+  `design/tokens/semantic.json`, including the two page widths, the three
+  interaction-state shares and the two values the focus ring is drawn from.
+  `Specimen.test.jsx` renders the page and checks that every component under
+  `src/components/editorial/` and `src/components/forms/` appears in it.
 - **Adding a control.** One file per control in
   `src/pages/specimen/controls/`, then one import and one line in that
-  directory's `index.js`.
+  directory's `index.js`. The file declares the states it draws and the
+  states it does not have, with the reason for each; `controls/index.test.js`
+  fails a control that accounts for neither, because a state that is simply
+  missing looks the same as a state somebody decided against.
+- **The folio is the position in the contents.** `sections/index.js` is the
+  order, and each section takes its number from its place in that array, so
+  inserting a section renumbers the book on its own.
 
 ## Fonts (spec §7.4)
 

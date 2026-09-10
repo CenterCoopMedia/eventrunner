@@ -61,7 +61,7 @@ export default function LayoutSection({ folio }) {
         name="Stage and measure"
         file="design/tokens/semantic.json"
         contract="page"
-        note="The stage is what the header, the navigation, the schedule grid, the directories, the logo wall and every section head run to. The measure is running text, and it never exceeds the stage. Both are maximums, never fixed widths, so a narrow viewport simply gets the whole stage."
+        note="The stage is what the header, the navigation, the schedule grid, the directories, the logo wall and every section head run to. The measure is running text, and it never exceeds the stage. Both are maximums, never fixed widths, so a narrow viewport gets the whole stage."
       >
         <dl>
           {STAGE_WIDTHS.map((entry) => (
