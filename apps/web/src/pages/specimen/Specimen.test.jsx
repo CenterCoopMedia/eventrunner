@@ -107,6 +107,29 @@ describe('the specimen book', () => {
     }
   });
 
+  it('builds the layout section’s width bands out of the elements a dl allows', () => {
+    // A <dl> takes a <dt>, a <dd>, and a <div> only as the wrapper around
+    // one term and its descriptions. The width bands held a heading, a span
+    // and a paragraph directly, which is neither a pair nor valid, and the
+    // fix for that shipped with no test under it.
+    const { container } = renderBook();
+    const section = container.querySelector('section[aria-labelledby="specimen-layout"]');
+    expect(section).not.toBeNull();
+    const lists = [...section.querySelectorAll('dl')];
+    expect(lists.length).toBeGreaterThan(0);
+    for (const list of lists) {
+      for (const child of list.children) {
+        const tag = child.tagName.toLowerCase();
+        expect(['dt', 'dd', 'div'], `<${tag}> is a child of a <dl>`).toContain(tag);
+        if (tag !== 'div') continue;
+        for (const inner of child.children) {
+          const innerTag = inner.tagName.toLowerCase();
+          expect(['dt', 'dd'], `<${innerTag}> is inside a <dl>’s <div>`).toContain(innerTag);
+        }
+      }
+    }
+  });
+
   it('marks itself as a page a crawler must not index', () => {
     renderBook();
     expect(document.querySelector(ROBOTS_SELECTOR)).not.toBeNull();

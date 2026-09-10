@@ -65,6 +65,9 @@ describe('FeedbackModal', () => {
       expect(describedBy).toBeTruthy();
       expect(document.getElementById(describedBy)).toHaveTextContent('Please enter a message.');
       expect(field).toHaveFocus();
+      // And nothing states it a second time at the head of the form. One
+      // result is announced once, and the focus move is the announcement.
+      expect(screen.queryByRole('alert')).toBeNull();
     } finally {
       vi.useRealTimers();
     }
