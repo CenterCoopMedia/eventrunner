@@ -28,7 +28,11 @@ vi.mock('../../contexts/ContentContext.jsx', () => ({
     getSectionBlocks: () => [],
   }),
 }));
-vi.mock('../../contexts/ToastContext.jsx', () => ({
+// Only the hook is replaced. The tone table and the bar's own class are
+// what the book draws, so they have to be the real ones — a mocked tone
+// table would let the book fall behind the provider and still pass.
+vi.mock('../../contexts/ToastContext.jsx', async (importOriginal) => ({
+  ...(await importOriginal()),
   useToast: () => ({ showToast: vi.fn(), dismiss: vi.fn() }),
 }));
 
@@ -37,14 +41,14 @@ import { SPECIMEN_SECTIONS } from './sections/index.js';
 import { ROBOTS_SELECTOR } from './useNoIndex.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const EDITORIAL_DIR = path.resolve(here, '..', '..', 'components', 'editorial');
+const COMPONENTS_DIR = path.resolve(here, '..', '..', 'components');
 
-/** Every editorial component, by the path a figcaption names. */
-function editorialComponents() {
+/** Every component in one directory, by the path a figcaption names. */
+function componentsIn(directory) {
   return fs
-    .readdirSync(EDITORIAL_DIR)
+    .readdirSync(path.join(COMPONENTS_DIR, directory))
     .filter((name) => name.endsWith('.jsx') && !name.includes('.test.'))
-    .map((name) => `components/editorial/${name}`);
+    .map((name) => `components/${directory}/${name}`);
 }
 
 // The setup file unmounts after every test, so each one renders its own
@@ -75,14 +79,17 @@ describe('the specimen book', () => {
     }
   });
 
-  it('draws every editorial component at least once', () => {
+  it('draws every editorial component and every shared control at least once', () => {
     const { container } = renderBook();
     const drawn = new Set(
       [...container.querySelectorAll('[data-specimen-file]')].map((node) =>
         node.getAttribute('data-specimen-file'),
       ),
     );
-    for (const file of editorialComponents()) {
+    // Both directories, because a device that ships and never reaches the
+    // book is a device nobody reviews in six styles — and the shared
+    // controls are the half of the vocabulary a reader operates.
+    for (const file of [...componentsIn('editorial'), ...componentsIn('forms')]) {
       expect(drawn.has(file), `${file} has no specimen`).toBe(true);
     }
   });

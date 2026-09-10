@@ -2,42 +2,48 @@
 //
 // A control joins the book by adding one file beside this one and one line
 // to the list below. The file states the control's name, the file that
-// holds its shape, and how it renders in each of the six states. Nothing
-// else in the book has to change.
+// holds its shape, the states it draws, the states it does not have and
+// why, and how it renders in each state it draws. Nothing else in the book
+// has to change.
 //
-// PENDING_CONTROLS is the other half of that contract. The new shared
-// controls are being built beside this page, and each one lands here as a
-// file when its module exists. They are named rather than imported,
-// because a name is a promise a reviewer can check and an import of a
-// module that does not exist is a broken build.
+// THE LIST IS COMPLETE. It was written with a `PENDING_CONTROLS` half while
+// the eight shared controls were being built beside this page; every one of
+// them now has a module and a file here, so the promise half is gone. A
+// control added to `components/forms/` and left out of this list is what
+// `index.test.js` fails on.
 import primaryAction from './primaryAction.jsx';
 import secondaryAction from './secondaryAction.jsx';
 import quietAction from './quietAction.jsx';
 import rowAction from './rowAction.jsx';
+import chipAction from './chipAction.jsx';
+import switchControl from './switchControl.jsx';
+import segmentedControl from './segmentedControl.jsx';
+import tabsControl from './tabsControl.jsx';
+import checkboxControl from './checkboxControl.jsx';
+import radioControl from './radioControl.jsx';
+import searchFieldControl from './searchFieldControl.jsx';
+import sortControlControl from './sortControlControl.jsx';
+import filterGroupControl from './filterGroupControl.jsx';
 
+/**
+ * The shared shapes first, because they carry the hover, focus and press of
+ * the grammar that every control below composes. Then the controls that
+ * hold a value or a choice, in the order the record §3.3 names them.
+ */
 export const CONTROL_SPECIMENS = Object.freeze([
   primaryAction,
   secondaryAction,
   quietAction,
   rowAction,
-]);
-
-/**
- * The controls that have a slot but no file yet.
- *
- * `export` is the export name the module will carry, and `file` is where
- * the module lands. Add a file to this directory when one appears, import
- * it above, and delete the line here.
- */
-export const PENDING_CONTROLS = Object.freeze([
-  Object.freeze({ export: 'Switch', file: 'components/forms/Switch.jsx' }),
-  Object.freeze({ export: 'SegmentedControl', file: 'components/forms/SegmentedControl.jsx' }),
-  Object.freeze({ export: 'Tabs', file: 'components/forms/Tabs.jsx' }),
-  Object.freeze({ export: 'Checkbox', file: 'components/forms/Checkbox.jsx' }),
-  Object.freeze({ export: 'Radio', file: 'components/forms/Radio.jsx' }),
-  Object.freeze({ export: 'SearchField', file: 'components/forms/SearchField.jsx' }),
-  Object.freeze({ export: 'SortControl', file: 'components/forms/SortControl.jsx' }),
-  Object.freeze({ export: 'FilterGroup', file: 'components/forms/FilterGroup.jsx' }),
+  chipAction,
+  switchControl,
+  segmentedControl,
+  tabsControl,
+  checkboxControl,
+  radioControl,
+  searchFieldControl,
+  sortControlControl,
+  filterGroupControl,
 ]);
 
 export default CONTROL_SPECIMENS;

@@ -1,4 +1,4 @@
-// Section 10: the public form controls, in four states.
+// The public form controls, in four states.
 //
 // The shape is the same on the public site and in the admin, because
 // accessibility is not a tier: a real label tied by id and sitting above
@@ -7,6 +7,13 @@
 //
 // A label above its own input is the one thing the eyebrow ban does not
 // touch. It is a control label, not an eyebrow.
+//
+// THE CHECKBOX AND THE RADIO ARE NOT HERE. They were composed in this file
+// out of native inputs while the shared module was being written, and a
+// native input is painted by the operating system: a client's palette and
+// dark mode both stop at its edge. components/forms/Choice.jsx now draws
+// them from the tokens, so they are shared controls and they are drawn with
+// the other controls in the section above.
 import { useState } from 'react';
 import { inputClass } from '../../../components/controlClasses.js';
 import { SelectField, TextAreaField, TextField } from '../../../components/forms/publicForm.jsx';
@@ -131,99 +138,12 @@ function TextAreaStates() {
   );
 }
 
-const BOX_CLASS = 'h-5 w-5 shrink-0 accent-accent';
-
-function ChoiceRow({ label, children }) {
-  return (
-    <div className="flex flex-col gap-2xs">
-      <p className="font-data text-caption text-text-secondary">{label}</p>
-      {children}
-    </div>
-  );
-}
-
-function ChoiceStates() {
-  const [checked, setChecked] = useState(true);
-  const [track, setTrack] = useState(eventConfig.tracks[0].letter);
-  return (
-    <div className="grid gap-lg sm:grid-cols-2">
-      <ChoiceRow label={FIELD_STATES[0]}>
-        <label className="touch-target flex items-center gap-xs text-body text-text-primary">
-          <input
-            type="checkbox"
-            className={BOX_CLASS}
-            checked={checked}
-            onChange={(event) => setChecked(event.target.checked)}
-          />
-          Send me the daily programme
-        </label>
-      </ChoiceRow>
-      <ChoiceRow label={FIELD_STATES[1]}>
-        <label className="touch-target flex items-center gap-xs text-body text-text-primary">
-          <input
-            type="checkbox"
-            className={`${BOX_CLASS} ${FORCED_FOCUS}`}
-            checked={checked}
-            onChange={(event) => setChecked(event.target.checked)}
-          />
-          Send me the daily programme
-        </label>
-      </ChoiceRow>
-      <ChoiceRow label={FIELD_STATES[2]}>
-        <fieldset>
-          <legend className="font-data text-caption font-semibold text-text-primary">Track</legend>
-          {eventConfig.tracks.map((entry) => (
-            <label
-              key={entry.letter}
-              className="touch-target flex items-center gap-xs text-body text-text-primary"
-            >
-              <input
-                type="radio"
-                name="specimen-track-error"
-                className={BOX_CLASS}
-                value={entry.letter}
-                checked={false}
-                aria-invalid="true"
-                onChange={() => {}}
-              />
-              {entry.letter} · {entry.name}
-            </label>
-          ))}
-          <p className="text-caption text-danger">Pick the track this session belongs to.</p>
-        </fieldset>
-      </ChoiceRow>
-      <ChoiceRow label={FIELD_STATES[3]}>
-        <fieldset>
-          <legend className="font-data text-caption font-semibold text-text-primary">Track</legend>
-          {eventConfig.tracks.map((entry) => (
-            <label
-              key={entry.letter}
-              className="touch-target flex items-center gap-xs text-body text-text-secondary"
-            >
-              <input
-                type="radio"
-                name="specimen-track-disabled"
-                className={BOX_CLASS}
-                value={entry.letter}
-                checked={track === entry.letter}
-                disabled
-                onChange={() => setTrack(entry.letter)}
-              />
-              {entry.letter} · {entry.name}
-            </label>
-          ))}
-        </fieldset>
-      </ChoiceRow>
-    </div>
-  );
-}
-
-export default function InputsSection() {
+export default function InputsSection({ folio }) {
   return (
     <SpecimenSection
       id="specimen-inputs"
       title="Inputs"
-      folio="Section 10"
+      folio={folio}
       standfirst="Four states for every field: at rest, under the keyboard, refused, and unavailable."
     >
       <Figure
@@ -251,15 +171,6 @@ export default function InputsSection() {
         note="Same field shape at three rows. Nothing about the error is colour alone."
       >
         <TextAreaStates />
-      </Figure>
-
-      <Figure
-        name="Checkbox and radio"
-        file="pages/specimen/sections/InputsSection.jsx"
-        contract={null}
-        note="Native controls on the accent token. publicForm.jsx carries no checkbox or radio yet, so these are composed here and move to the shared module when it ships one."
-      >
-        <ChoiceStates />
       </Figure>
     </SpecimenSection>
   );
