@@ -72,6 +72,21 @@
 }
 
 @layer components {
+  /* THE RING, DRAWN WITHOUT THE FOCUS. A printed page cannot focus a
+     control, so the specimen book draws the focus state by composing this
+     class. It repeats the two declarations the :focus-visible rule above
+     makes, and nothing else, so the book cannot show a ring the product
+     does not draw: the book used to force the state with `outline-2`,
+     which drew 2px under a table printing "Ring width 3px".
+     `pages/specimen/controls/states.test.js` pins the two together.
+
+     It never goes on a real control. A ring that is always on answers
+     "where am I" with "everywhere". */
+  .focus-ring-forced {
+    outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
+    outline-offset: var(--focus-ring-offset);
+  }
+
   .horizontal-scroll-region:focus-visible {
     outline: 2px solid rgb(var(--color-accent-rgb));
     outline-offset: var(--space-3xs);

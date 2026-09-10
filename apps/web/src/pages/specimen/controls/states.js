@@ -43,8 +43,17 @@ export function stateLabel(id) {
   return CONTROL_STATES.find((state) => state.id === id)?.label ?? id;
 }
 
-/** The forced focus ring: the same outline the base layer draws. */
-export const FORCED_FOCUS = 'outline outline-2 outline-offset-2 outline-accent';
+/**
+ * The forced focus ring.
+ *
+ * It is ONE CLASS, and that class repeats the shipped :focus-visible
+ * declarations (`.focus-ring-forced` in index.css). It used to be a set of
+ * outline utilities, and they drew a 2px ring at 2px offset while the rule
+ * draws --focus-ring-width, which is 3px — under a table in this same
+ * section printing "Ring width 3px". A book that draws a state the product
+ * does not draw is worse than a book with no state at all.
+ */
+export const FORCED_FOCUS = 'focus-ring-forced';
 
 /** The forced press: the scale the motion grammar gives a press. */
 export const FORCED_PRESS = 'scale-[0.98]';
