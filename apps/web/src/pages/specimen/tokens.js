@@ -212,6 +212,25 @@ export function measureContrast(name, element = null) {
 }
 
 /**
+ * A token value as the book prints it.
+ *
+ * A share is authored as `0.06`, and the browser hands the substituted
+ * custom property back the way it serialises a number: `.06`. A value that
+ * opens on a decimal point is a value a reader has to read twice, and the
+ * table beside it is what a reviewer checks a hover cell against, so the
+ * leading zero goes back on. Nothing else is touched: a width, a length and
+ * a family name are printed as they were read.
+ *
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+export function formatTokenValue(value) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  return /^-?\.\d+$/u.test(trimmed) ? trimmed.replace('.', '0.') : trimmed;
+}
+
+/**
  * A ratio as the page states it: one decimal, against one.
  *
  * @param {number | null} ratio

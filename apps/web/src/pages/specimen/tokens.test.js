@@ -20,6 +20,7 @@ import {
   TYPE_ROLES,
   TYPE_STEPS,
   formatContrast,
+  formatTokenValue,
   measureContrast,
   parseRgbTriple,
   readToken,
@@ -128,6 +129,25 @@ describe('formatContrast', () => {
 
   it('says so when nothing was measured', () => {
     expect(formatContrast(null)).toBe('Not measured here');
+  });
+});
+
+describe('formatTokenValue', () => {
+  it('puts the leading zero back on a share', () => {
+    // A share is authored as 0.06 and the browser hands the substituted
+    // property back as `.06`, which the table printed verbatim.
+    expect(formatTokenValue('.06')).toBe('0.06');
+    expect(formatTokenValue('.1')).toBe('0.1');
+    expect(formatTokenValue('.08')).toBe('0.08');
+  });
+
+  it('prints every other value as it was read', () => {
+    expect(formatTokenValue('3px')).toBe('3px');
+    expect(formatTokenValue('72.5rem')).toBe('72.5rem');
+    expect(formatTokenValue('0.06')).toBe('0.06');
+    expect(formatTokenValue('  2px  ')).toBe('2px');
+    expect(formatTokenValue('')).toBe('');
+    expect(formatTokenValue(null)).toBe('');
   });
 });
 

@@ -16,7 +16,7 @@ import ExternalLink from '../../../components/ExternalLink.jsx';
 import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
 import { useLiveToken } from '../useLiveToken.js';
-import { FOCUS_TOKENS, STATE_SHARES } from '../tokens.js';
+import { FOCUS_TOKENS, STATE_SHARES, formatTokenValue } from '../tokens.js';
 
 /** One token row: the name, what it is for, and the value in force now. */
 function TokenRow({ entry }) {
@@ -26,7 +26,7 @@ function TokenRow({ entry }) {
       <dt className="font-data text-caption font-semibold text-text-primary">{entry.label}</dt>
       <dd className="font-data text-caption text-text-secondary text-pretty">{entry.job}</dd>
       <dd className="font-mono text-caption text-text-secondary sm:text-end">
-        {value || entry.token}
+        {formatTokenValue(value) || entry.token}
       </dd>
     </div>
   );
