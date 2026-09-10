@@ -587,20 +587,37 @@
       calc(var(--session-card-stamp-offset) * 1000)
       calc(var(--session-card-stamp-offset) * 1000);
   }
+  /* The peek, split by input. Focus is available on every device, so the
+     focus half is not behind the hover query; the hover half is, because a
+     touch screen reports a tap as a hover and then holds it until the
+     reader taps elsewhere — which would leave one row peeking for as long
+     as the reader stayed on the page (expansion record §2.1). */
   @media (prefers-reduced-motion: no-preference) {
     .session-block::before,
     .session-block__face {
       transition: transform var(--motion-base) var(--motion-ease);
     }
-    .session-block:hover::before,
     .session-block:has(:focus-visible)::before {
       transform: translate(
         calc(var(--session-card-stamp-offset) * 2.25),
         calc(var(--session-card-stamp-offset) * 2.25)
       );
     }
-    .session-block:hover .session-block__face,
     .session-block:has(:focus-visible) .session-block__face {
+      transform: translate(
+        calc(var(--session-card-stamp-offset) * -0.25),
+        calc(var(--session-card-stamp-offset) * -0.25)
+      );
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+    .session-block:hover::before {
+      transform: translate(
+        calc(var(--session-card-stamp-offset) * 2.25),
+        calc(var(--session-card-stamp-offset) * 2.25)
+      );
+    }
+    .session-block:hover .session-block__face {
       transform: translate(
         calc(var(--session-card-stamp-offset) * -0.25),
         calc(var(--session-card-stamp-offset) * -0.25)
@@ -1143,8 +1160,10 @@
     text-underline-position: from-font;
     text-decoration-skip-ink: auto;
   }
-  .rich-text a:hover {
-    @apply text-accent-strong;
+  @media (hover: hover) and (pointer: fine) {
+    .rich-text a:hover {
+      @apply text-accent-strong;
+    }
   }
   /* The quote rule draws in rule-token ink at the strong rule width, never
      in brand or accent color, so it is a typographic rule and not the
