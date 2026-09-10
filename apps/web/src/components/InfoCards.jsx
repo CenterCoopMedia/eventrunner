@@ -33,10 +33,14 @@
 // counter is ambient motion in the one place on the page a reader has come
 // to read a fact, and `docs/interface-guidelines.md` rejects it outright.
 //
-// ONE GROUP WIDE, A PLAIN LIST NARROW. The same grid step the site's other
-// stat groups use: three across where there is room, two at middle widths,
-// and one column on a phone — where "a row of cards" is a stack of ruled
-// entries read in order, which is what a narrow screen should get.
+// ONE GROUP WIDE, A PLAIN LIST NARROW. Three across where there is room,
+// two at middle widths, and one column on a phone — where "a row of cards"
+// is a stack of ruled entries read in order, which is what a narrow screen
+// should get.
+//
+// AND AS WIDE AS THE GROUP HAS CONTENT FOR (2026-09-10 vocabulary
+// expansion). One card takes the measure, two split it, and three or more
+// take the stage's columns. See `arrangementClass` below.
 import StatBlock from './blocks/StatBlock.jsx';
 import ListItemBlock from './blocks/ListItemBlock.jsx';
 
@@ -109,6 +113,30 @@ export function groupIntoCards(blocks) {
 }
 
 /**
+ * How wide the group runs, and in how many columns.
+ *
+ * THE GROUP IS AS WIDE AS IT HAS CONTENT FOR. A single card in a three-column
+ * grid drew at a third of the measure, which reads as a cramped box rather
+ * than as one fact stated plainly. So the count sets the shape: one card
+ * takes the measure, two split it, and three or more take the stage's own
+ * columns — which is the only case that has enough content to fill them.
+ *
+ * `single` is the group inside one cell of the home page's summary row. The
+ * cell is already a column of the stage, so the cards run DOWN it whatever
+ * the count, and the cell's own width is what bounds them.
+ *
+ * @param {'auto'|'single'} columns
+ * @param {number} count
+ * @returns {string}
+ */
+function arrangementClass(columns, count) {
+  if (columns === 'single') return 'grid gap-lg';
+  if (count === 1) return 'measure grid gap-lg';
+  if (count === 2) return 'measure grid gap-lg sm:grid-cols-2';
+  return 'grid gap-lg sm:grid-cols-2 lg:grid-cols-3';
+}
+
+/**
  * The cards, already grouped. The caller groups them because it has to know
  * whether the section holds anything this arrangement can draw before it
  * writes the section's own heading: a section holding only some type this
@@ -124,16 +152,7 @@ export default function InfoCards({ cards, columns = 'auto' }) {
   if (!cards?.length) return null;
 
   return (
-    <div
-      className={
-        // `single` is the group inside one cell of the home page's summary
-        // row: the cell is already a column of the stage, so the cards run
-        // DOWN it. `auto` is the group on the open page.
-        columns === 'single'
-          ? 'grid gap-lg'
-          : 'grid gap-lg sm:grid-cols-2 lg:grid-cols-3'
-      }
-    >
+    <div className={arrangementClass(columns, cards.length)}>
       {cards.map((card) => (
         <div key={card.key}>
           {/* One card, one fact, so the description list holds one entry.
