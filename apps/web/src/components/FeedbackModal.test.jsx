@@ -56,11 +56,52 @@ describe('FeedbackModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('closes on Escape', () => {
+  // THE DIALOG ITSELF. The modal used to be a <div> over the page, so Tab
+  // walked out of it and into the page behind (issue 233). It is now a
+  // native <dialog> opened with showModal(), which is where the trap, the
+  // inert page and the top layer come from. jsdom has neither a top layer
+  // nor a focus model, so what is asserted here is that the component ASKS
+  // for those behaviours and that it returns focus itself.
+  it('opens as a modal dialog rather than as an overlay', () => {
+    const opened = [];
+    const proto = Object.getPrototypeOf(document.createElement('dialog'));
+    const real = proto.showModal;
+    proto.showModal = function record() {
+      opened.push(this);
+      return real.call(this);
+    };
+    try {
+      render(<FeedbackModal onClose={() => {}} />);
+      expect(opened).toHaveLength(1);
+      expect(opened[0].tagName).toBe('DIALOG');
+      expect(opened[0]).toHaveAttribute('open');
+    } finally {
+      proto.showModal = real;
+    }
+  });
+
+  it('closes on Escape, which reaches a dialog as cancel', () => {
     const onClose = vi.fn();
-    render(<FeedbackModal onClose={onClose} />);
-    fireEvent.keyDown(document, { key: 'Escape' });
+    const { container } = render(<FeedbackModal onClose={onClose} />);
+    const dialog = container.querySelector('dialog');
+    fireEvent(dialog, new Event('cancel', { bubbles: false, cancelable: true }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns focus to the control that opened it', () => {
+    const opener = document.createElement('button');
+    opener.textContent = 'Share feedback';
+    document.body.append(opener);
+    opener.focus();
+    expect(opener).toHaveFocus();
+
+    const view = render(<FeedbackModal onClose={() => {}} />);
+    // React removes the dialog on close, and an element removed while it
+    // holds focus drops focus to the body. The opener has to be put back.
+    expect(opener).not.toHaveFocus();
+    view.unmount();
+    expect(opener).toHaveFocus();
+    opener.remove();
   });
 
   it('carries the honeypot field out of the tab order and off-screen', () => {

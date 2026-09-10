@@ -215,6 +215,34 @@
     border-block-end-color: rgb(var(--rule-strong-rgb));
   }
 
+  /* THE PUBLIC DIALOG (expansion record §2.1).
+     ------------------------------------------------------------------
+     A native <dialog> opened with showModal(). The browser puts it in the
+     top layer, so it needs no z-index and cannot be trapped under a
+     stacking context; the User-Agent stylesheet centres it and gives it a
+     border and a margin, which is what these rules undo so the frame is the
+     system's strong rule and nothing else.
+
+     THE SCRIM IS TINTED INK, NOT BLUR. A blur is glassmorphism (§2.4) and it
+     costs a full-screen filter on every frame. The ink is the page's own
+     text colour at low alpha, so the scrim follows the mode and the preset
+     without a token of its own. */
+  .public-dialog {
+    /* The UA stylesheet sizes a dialog to its content and lets it run off a
+       short viewport. The dialog holds a form, so it scrolls inside itself
+       and leaves the page behind it still. */
+    max-block-size: calc(100dvh - 2 * var(--space-xl));
+    overflow-y: auto;
+    color: rgb(var(--color-text-primary-rgb));
+  }
+  /* The backdrop is in the top layer. A modern browser lets it inherit from
+     the dialog, so the token resolves and the scrim follows the mode; the
+     fallback in the var() covers an implementation that does not, where the
+     declaration would otherwise be dropped and no scrim would paint. */
+  .public-dialog::backdrop {
+    background-color: rgb(var(--color-text-primary-rgb, 24 27 32) / 0.45);
+  }
+
   /* Skip link: first focusable element on every page (Layout.jsx). */
   .skip-link {
     @apply sr-only focus:not-sr-only focus:absolute focus:start-md focus:top-md focus:z-50
