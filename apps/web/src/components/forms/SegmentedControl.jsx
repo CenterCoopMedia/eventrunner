@@ -47,8 +47,11 @@ export default function SegmentedControl({ label, options, value, onChange, hide
     rowRef.current?.querySelectorAll('[role="radio"]')[index]?.focus();
   }
 
+  // `items-start` matters: the row is an inline-flex, and a stretching column
+  // would pull its last option out to the full width of the page, which reads
+  // as a bar rather than as a set of words.
   return (
-    <div className="flex flex-col gap-2xs">
+    <div className="flex flex-col items-start gap-2xs">
       <span
         id={labelId}
         className={
