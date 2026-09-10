@@ -18,6 +18,7 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
 const { SponsorStrip, default: SponsorWall, groupByTier, visibleOrganizations } = await import(
   './SponsorWall.jsx'
 );
+const { NEW_TAB_NOTE } = await import('./ExternalLink.jsx');
 
 const org = (id, name, tier, extra = {}) => ({
   id,
@@ -103,8 +104,11 @@ describe('SponsorWall', () => {
     );
     expect(container.querySelector('#home-tier-0').tagName).toBe('H3');
     // A name sits UNDER its tier in the outline, so it follows the tier's
-    // level rather than being fixed at one.
-    expect(container.querySelector('.logo-wall h4').textContent).toBe('First Supporter');
+    // level rather than being fixed at one. The heading's text now ends in
+    // the link's hidden new-tab sentence, so the visible name is its start.
+    expect(container.querySelector('.logo-wall h4').textContent).toBe(
+      `First Supporter (${NEW_TAB_NOTE})`,
+    );
   });
 
   // A mark is decorative: the organization's name is printed directly under
@@ -125,7 +129,21 @@ describe('SponsorWall', () => {
     expect(frame).not.toBeNull();
     expect(frame.textContent).toBe('');
     // The name is still there — the acknowledgement survives the lost file.
-    expect(screen.getByRole('link', { name: 'First Supporter' })).toBeInTheDocument();
+    // The name is a prefix match because the link's own name now carries
+    // the new-tab sentence after it (components/ExternalLink.jsx).
+    expect(screen.getByRole('link', { name: /^First Supporter\b/ })).toBeInTheDocument();
+  });
+
+  // The wall is the one place a reader meets a run of outbound links one
+  // after another, so a silent change of context is hardest to recover
+  // from here: a reader who has followed three of them and presses Back
+  // is three tabs deep with no history in any of them (issue 236).
+  it('says that a supporter’s link opens a new tab', () => {
+    render(<SponsorWall organizations={PUBLISHED} />);
+    const link = screen.getByRole('link', { name: /^First Supporter\b/ });
+    expect(link).toHaveAccessibleName(`First Supporter (${NEW_TAB_NOTE})`);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noreferrer');
   });
 });
 
@@ -142,7 +160,9 @@ describe('SponsorStrip', () => {
       .map((node) => node.textContent);
     expect(tiers).toEqual(['Presenting', 'Partner']);
     for (const name of ['First Supporter', 'Second Supporter', 'Third Supporter']) {
-      expect(within(section).getByRole('link', { name })).toBeInTheDocument();
+      expect(
+        within(section).getByRole('link', { name: new RegExp(`^${name}\\b`) }),
+      ).toBeInTheDocument();
     }
   });
 
@@ -169,7 +189,11 @@ describe('SponsorStrip', () => {
     ).toBe('calc(var(--space-3xl) * 2.5)');
     expect(
       [...container.querySelectorAll('.logo-wall h4')].map((node) => node.textContent),
-    ).toEqual(['First Supporter', 'Second Supporter', 'Third Supporter']);
+    ).toEqual(
+      ['First Supporter', 'Second Supporter', 'Third Supporter'].map(
+        (name) => `${name} (${NEW_TAB_NOTE})`,
+      ),
+    );
   });
 
   it('is the acknowledgement wall: marks and names, never the descriptions', () => {

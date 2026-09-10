@@ -34,6 +34,7 @@ import { useContent } from '../contexts/ContentContext.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
 import AssetImage from './media/AssetImage.jsx';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
+import ExternalLink from './ExternalLink.jsx';
 
 /**
  * The mark size for a tier group, by its rank in the operator's ordering.
@@ -116,12 +117,20 @@ export function groupByTier(organizations) {
   return [...groups.entries()].map(([tier, members]) => ({ tier, members }));
 }
 
-/** One organization's name, linked where the URL is one we may follow. */
+/**
+ * One organization's name, linked where the URL is one we may follow.
+ *
+ * The link leaves the event's site for the supporter's own, so it opens a
+ * tab and says so in the same words every other outbound link on the site
+ * uses (components/ExternalLink.jsx). The wall is the one place a reader
+ * meets a run of outbound links one after another, which is exactly where
+ * a silent change of context is hardest to recover from.
+ */
 function SponsorName({ org }) {
   return isSafeHref(org.url) ? (
-    <a href={org.url} target="_blank" rel="noreferrer" className="hover:underline">
+    <ExternalLink href={org.url} className="hover:underline">
       {org.name}
-    </a>
+    </ExternalLink>
   ) : (
     org.name
   );

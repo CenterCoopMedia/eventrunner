@@ -60,7 +60,9 @@ describe('Sponsors', () => {
       },
     ];
     renderSponsors();
-    expect(screen.getByRole('link', { name: 'Safe Org' })).toHaveAttribute('href', SAFE_URL);
+    // A prefix match: the link's own name now carries the new-tab sentence
+    // after the supporter's name (components/ExternalLink.jsx).
+    expect(screen.getByRole('link', { name: /^Safe Org\b/ })).toHaveAttribute('href', SAFE_URL);
   });
 
   // THE TIERED LOGO WALL (this review). The page is an acknowledgement,

@@ -437,7 +437,7 @@ describe('Home sponsor strip', () => {
   it('draws the tiered wall under the section’s own label', () => {
     render(<Home />);
     expect(screen.getByRole('region', { name: 'Sponsors' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'First Supporter' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^First Supporter\b/ })).toBeInTheDocument();
   });
 
   it('moves when an operator reorders the section', () => {
