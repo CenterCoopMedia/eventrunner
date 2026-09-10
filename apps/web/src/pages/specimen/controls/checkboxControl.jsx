@@ -1,7 +1,7 @@
 // The checkbox, drawn from the tokens rather than painted by the system.
 import { useState } from 'react';
 import { Checkbox } from '../../../components/forms/Choice.jsx';
-import { sharedGrammar } from './states.js';
+import { fieldRegister } from './states.js';
 
 function CheckboxSpecimen({ state }) {
   const [checked, setChecked] = useState(state === 'selected');
@@ -25,9 +25,9 @@ export default Object.freeze({
   note: 'Pick any. The native paint is turned off and the box is redrawn from the tokens, so a client’s palette and dark mode reach it. The input under the paint is untouched, so the keyboard, the label and the form stay the browser’s.',
   states: Object.freeze(['rest', 'selected', 'disabled', 'error']),
   absent: Object.freeze([
-    sharedGrammar('hover'),
-    sharedGrammar('focus'),
-    sharedGrammar('pressed'),
+    fieldRegister('hover'),
+    fieldRegister('focus'),
+    fieldRegister('pressed'),
     Object.freeze({
       state: 'busy',
       reason: 'A checkbox waits for the submit beside it. The submit carries the busy state.',

@@ -3,7 +3,7 @@
 // "pick any" before reading a word.
 import { useState } from 'react';
 import { Radio } from '../../../components/forms/Choice.jsx';
-import { sharedGrammar } from './states.js';
+import { fieldRegister } from './states.js';
 import { eventConfig } from '@generated/eventConfig.js';
 
 function RadioSpecimen({ state }) {
@@ -41,9 +41,9 @@ export default Object.freeze({
   note: 'Pick one. Drawn from the same tokens as the checkbox, with the platform’s own group keyboard under it. The dot reads currentColor, so it takes the ink of whatever ground it lands on.',
   states: Object.freeze(['rest', 'selected', 'disabled', 'error']),
   absent: Object.freeze([
-    sharedGrammar('hover'),
-    sharedGrammar('focus'),
-    sharedGrammar('pressed'),
+    fieldRegister('hover'),
+    fieldRegister('focus'),
+    fieldRegister('pressed'),
     Object.freeze({
       state: 'busy',
       reason: 'A radio waits for the submit beside it. The submit carries the busy state.',

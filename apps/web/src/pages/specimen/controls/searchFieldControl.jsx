@@ -1,7 +1,7 @@
 // Narrow a list by words.
 import { useState } from 'react';
 import SearchField from '../../../components/forms/SearchField.jsx';
-import { sharedGrammar } from './states.js';
+import { fieldRegister } from './states.js';
 
 const QUERY_FOR_STATE = Object.freeze({
   rest: '',
@@ -36,9 +36,9 @@ export default Object.freeze({
   note: 'The count is spoken as well as shown: it sits in a role="status" line that is always in the document, so a reader’s assistive technology is already watching when the first count lands. The clear control is a real button, and it is drawn only when there is something to clear.',
   states: Object.freeze(['rest', 'success', 'empty']),
   absent: Object.freeze([
-    sharedGrammar('hover'),
-    sharedGrammar('focus'),
-    sharedGrammar('pressed'),
+    fieldRegister('hover'),
+    fieldRegister('focus'),
+    fieldRegister('pressed'),
     Object.freeze({
       state: 'selected',
       reason: 'A query is a value, not a choice. The filter group beside it is what holds a selection.',

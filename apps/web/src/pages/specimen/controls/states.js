@@ -72,22 +72,69 @@ export function forcedTint(state) {
 }
 
 /**
- * The reason a control does not draw one of the three shared states.
+ * TWO REGISTERS, TWO REASONS.
  *
- * Hover, focus, and press are not decisions a control makes. They are one
- * rule string every boxed control composes (`controlStateClass` in
- * components/controlClasses.js), drawn on the shared shapes at the head of
- * the section. Drawing them again on each composed control would show the
- * same rule six more times and say nothing new.
+ * Hover, focus, and press are not decisions a control makes, and a control
+ * that does not draw them says so with the reason its own register gives.
+ * There are two registers, and the difference is load-bearing:
+ *
+ *   A BOXED control composes `controlStateClass` (components/
+ *   controlClasses.js): the switch's track, a segmented option, a tab. It
+ *   really does take the shared tint and the shared press, so drawing them
+ *   again under each one would show the same rule six more times.
+ *
+ *   A FIELD composes none of it. `inputClass` carries no `control-tint`
+ *   and no press class, and neither does `.control-choice` — so the
+ *   checkbox, the radio, the select, the search field and the filter group
+ *   do NOT take the tint, and the shared reason was a false statement about
+ *   them. A field takes no tint at all: what a pointer changes on a field
+ *   is the platform's own paint, and its focus is the one ring.
+ *
+ * Focus is neither register's: it is a single `:focus-visible` rule on
+ * every element in index.css, which is why both registers say the same
+ * thing about it.
+ */
+const FOCUS_REASON =
+  'Focus-visible is the one ring: a single :focus-visible rule in index.css draws it on every '
+  + 'element, and no control adds it, redraws it, or removes it. The shared shapes above show it.';
+
+const FIELD_REASONS = Object.freeze({
+  hover:
+    'A field takes no tint. A tint behind a field would compete with the value inside it, so what '
+    + 'a pointer changes on a field is the platform’s own paint. The tinted hover every boxed '
+    + 'control composes is drawn on the shared shapes above.',
+  pressed:
+    'A field holds a value rather than an action, so there is nothing to press. The press is drawn '
+    + 'on the shared shapes above, and an action beside a field — a clear control, a submit — '
+    + 'takes it from there.',
+});
+
+/**
+ * The reason a control that COMPOSES the shared grammar does not redraw it.
  *
  * @param {string} state
  * @returns {{ state: string, reason: string }}
  */
 export function sharedGrammar(state) {
-  return {
+  if (state === 'focus') return Object.freeze({ state, reason: FOCUS_REASON });
+  return Object.freeze({
     state,
     reason: `${stateLabel(state)} is one rule every boxed control composes, drawn on the shared shapes above.`,
-  };
+  });
 }
+
+/**
+ * The reason a FIELD does not draw one of the three forced states.
+ *
+ * @param {string} state
+ * @returns {{ state: string, reason: string }}
+ */
+export function fieldRegister(state) {
+  if (state === 'focus') return Object.freeze({ state, reason: FOCUS_REASON });
+  return Object.freeze({ state, reason: FIELD_REASONS[state] });
+}
+
+/** The two register reasons, for the registry's own test. */
+export const REGISTER_REASONS = Object.freeze({ focus: FOCUS_REASON, field: FIELD_REASONS });
 
 export default CONTROL_STATES;

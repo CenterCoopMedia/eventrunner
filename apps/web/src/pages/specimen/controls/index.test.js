@@ -11,8 +11,34 @@
 // Specimen.test.jsx, because a control may be drawn by a section rather
 // than by this registry.
 import { describe, expect, it } from 'vitest';
+import { cleanup, render } from '@testing-library/react';
 import { CONTROL_SPECIMENS } from './index.js';
-import { STATE_IDS } from './states.js';
+import { REGISTER_REASONS, STATE_IDS } from './states.js';
+
+/**
+ * What one control's own markup carries, across every state it draws.
+ *
+ * `render` is called rather than JSX so this file stays plain `.js`; each
+ * specimen's `render` returns the element itself.
+ */
+function markupOf(control) {
+  let tinted = false;
+  const fields = [];
+  for (const state of control.states) {
+    const { container } = render(control.render(state));
+    if (container.querySelector('.control-tint')) tinted = true;
+    for (const field of container.querySelectorAll('input, select, textarea')) {
+      fields.push(field.classList.contains('control-tint'));
+    }
+    cleanup();
+  }
+  return { tinted, fields };
+}
+
+/** The reason a control gives for a state it does not draw. */
+function reasonFor(control, state) {
+  return control.absent.find((entry) => entry.state === state)?.reason ?? null;
+}
 
 describe('the control registry', () => {
   it('gives every control a unique id and a name', () => {
@@ -56,6 +82,48 @@ describe('the control registry', () => {
       for (const state of control.states) {
         expect(control.render(state), `${control.id} renders nothing for ${state}`).toBeTruthy();
       }
+    }
+  });
+
+  // A REASON HAS TO BE TRUE. The five field controls used to say that their
+  // hover and their press were "one rule every boxed control composes",
+  // and none of them composes it: `inputClass` and `.control-choice` carry
+  // no `control-tint` and no press class. So the reason is checked against
+  // the markup the control actually renders, not just against a string.
+  it('gives the boxed reason only to a control that composes the shared tint', () => {
+    for (const control of CONTROL_SPECIMENS) {
+      const hover = reasonFor(control, 'hover');
+      // A control that draws its own hover explains nothing, and a field
+      // is checked by the test below.
+      if (hover === null || hover === REGISTER_REASONS.field.hover) continue;
+      expect(
+        markupOf(control).tinted,
+        `${control.id} says it composes the shared tint and does not`,
+      ).toBe(true);
+    }
+  });
+
+  it('gives the field reason only to a control whose own field takes no tint', () => {
+    for (const control of CONTROL_SPECIMENS) {
+      if (reasonFor(control, 'hover') !== REGISTER_REASONS.field.hover) continue;
+      const { fields } = markupOf(control);
+      expect(fields.length, `${control.id} calls itself a field and draws none`).toBeGreaterThan(0);
+      // The field itself takes no tint. An action beside it — the search
+      // field's clear control, the filter group's — is a boxed control and
+      // does take it, which is what the reason says.
+      expect(fields.some(Boolean), `${control.id} tints one of its own fields`).toBe(false);
+      expect(reasonFor(control, 'pressed')).toBe(REGISTER_REASONS.field.pressed);
+    }
+  });
+
+  it('says the same true thing about focus wherever focus is not drawn', () => {
+    // Focus is a single :focus-visible rule on every element, not a rule
+    // each control composes, so every control that does not draw it says
+    // that one sentence.
+    for (const control of CONTROL_SPECIMENS) {
+      const focus = reasonFor(control, 'focus');
+      if (focus === null) continue;
+      expect(focus, `${control.id} explains focus its own way`).toBe(REGISTER_REASONS.focus);
     }
   });
 });

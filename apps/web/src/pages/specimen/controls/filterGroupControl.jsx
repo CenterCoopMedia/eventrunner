@@ -1,7 +1,7 @@
 // Narrow a list by a facet.
 import { useState } from 'react';
 import FilterGroup from '../../../components/forms/FilterGroup.jsx';
-import { sharedGrammar } from './states.js';
+import { fieldRegister } from './states.js';
 import { eventConfig } from '@generated/eventConfig.js';
 
 const OPTIONS = eventConfig.venue.places.slice(0, 3).map((place, index) => ({
@@ -33,9 +33,9 @@ export default Object.freeze({
   note: 'A real fieldset and legend, with the count of what is on inside the legend and one clear control for the whole group. A reader who scrolls past and back learns in one glance whether the filter is doing anything.',
   states: Object.freeze(['rest', 'selected']),
   absent: Object.freeze([
-    sharedGrammar('hover'),
-    sharedGrammar('focus'),
-    sharedGrammar('pressed'),
+    fieldRegister('hover'),
+    fieldRegister('focus'),
+    fieldRegister('pressed'),
     Object.freeze({
       state: 'disabled',
       reason: 'A facet with no options is not rendered. The clear control appears only when something is on, so it is never a control that does nothing.',

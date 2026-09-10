@@ -1,7 +1,7 @@
 // Order a list.
 import { useState } from 'react';
 import SortControl from '../../../components/forms/SortControl.jsx';
-import { sharedGrammar } from './states.js';
+import { fieldRegister } from './states.js';
 
 const OPTIONS = Object.freeze([
   Object.freeze({ value: 'time', label: 'Start time' }),
@@ -24,9 +24,9 @@ export default Object.freeze({
   note: 'A labelled select, because an order is one choice from a set a reader does not need to see all at once. The label states what is being ordered — “Sort sessions”, never “Sort by” — so a reader who lands on it out of context still knows.',
   states: Object.freeze(['rest', 'selected']),
   absent: Object.freeze([
-    sharedGrammar('hover'),
-    sharedGrammar('focus'),
-    sharedGrammar('pressed'),
+    fieldRegister('hover'),
+    fieldRegister('focus'),
+    fieldRegister('pressed'),
     Object.freeze({
       state: 'disabled',
       reason: 'The select’s own unavailable state is drawn with the other fields in Inputs.',
