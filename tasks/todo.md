@@ -35,7 +35,10 @@ Haiku agents build.
       `docs/plans/evidence/specimen/`.
 - [x] Docs: interface guidelines, design reference, web README, CHANGELOG,
       `docs/docs` regenerated.
-- [ ] Independent review before the pull request opens.
+- [x] Independent review before the pull request opens; its fourteen findings
+      verified against the code, fixed, and reported.
+- [x] "Feels wrong to humans" pass on the captures; the evidence replaced with
+      section captures at full scale, and what they showed fixed.
 - [ ] Push, open the PR, watch CI and the review bots.
 
 ## Wave 2: devices and blocks

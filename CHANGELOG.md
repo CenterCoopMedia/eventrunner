@@ -50,11 +50,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speaker shelf runs three portraits across at large screen sizes and four at extra large, each
   portrait square. The sponsor wall runs about four marks across in its first tier and six in its
   third. Both widths are tokens a site style retunes.
-- The public site no longer scrolls sideways by 4px on a phone. The title block's corner mark is
-  drawn outside the block, and the page gutter is now wide enough to hold it.
+- The public site no longer scrolls sideways on a phone. The title block's corner mark is drawn
+  outside the block and the page gutter is now wide enough to hold it, which was the 4px every
+  style scrolled by; and the event name in the header and the title block now takes the room that
+  is left and breaks a word too long for it, which was another 8px on Field Guide. Measured on a
+  built demo at 320px and at 390px: six styles across six routes, none of them scrolling sideways.
+- Clearing a search or a filter keeps a keyboard reader where they were working. The clear control
+  removes itself once there is nothing left to clear, and an element removed while it holds focus
+  drops focus to the top of the document; the search field now takes focus on its input and the
+  filter group on the first box in the group.
+- A refused feedback submit now marks the field that refused, states the message under it, and
+  moves focus there, instead of putting one sentence at the head of the form and leaving the reader
+  on the submit control. The submit control stays enabled, as it does everywhere else.
+- The admin's "Preview draft" link says that it opens a new tab, in the same words every other
+  link on the site uses.
+- The demo band's content lines up with the header, the page and the footer. It ran to its own
+  width before, ending 60px inside the frame at either end.
 - The demo band is now the showcase's own device: the style's name in the heading face, the line
-  that describes it under the name, a hairline, and the four controls on one row at the control
-  height. The `style` and `mode` values still round-trip through the query string.
+  that describes it under the name, a hairline, and the four controls on one row at the shared
+  control height. The `style` and `mode` values still round-trip through the query string.
 - The admin CMS takes the editorial desk: a dark navigation rail against a cool-grey canvas, a
   white title band that holds the page's name and its save actions while the page scrolls, white
   panels, one action colour for every primary control and focus ring, a record's state as a

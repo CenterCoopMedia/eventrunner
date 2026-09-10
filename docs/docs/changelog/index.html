@@ -156,11 +156,25 @@
           speaker shelf runs three portraits across at large screen sizes and four at extra large, each
           portrait square. The sponsor wall runs about four marks across in its first tier and six in its
           third. Both widths are tokens a site style retunes.</li>
-          <li>The public site no longer scrolls sideways by 4px on a phone. The title block&#39;s corner mark is
-          drawn outside the block, and the page gutter is now wide enough to hold it.</li>
+          <li>The public site no longer scrolls sideways on a phone. The title block&#39;s corner mark is drawn
+          outside the block and the page gutter is now wide enough to hold it, which was the 4px every
+          style scrolled by; and the event name in the header and the title block now takes the room that
+          is left and breaks a word too long for it, which was another 8px on Field Guide. Measured on a
+          built demo at 320px and at 390px: six styles across six routes, none of them scrolling sideways.</li>
+          <li>Clearing a search or a filter keeps a keyboard reader where they were working. The clear control
+          removes itself once there is nothing left to clear, and an element removed while it holds focus
+          drops focus to the top of the document; the search field now takes focus on its input and the
+          filter group on the first box in the group.</li>
+          <li>A refused feedback submit now marks the field that refused, states the message under it, and
+          moves focus there, instead of putting one sentence at the head of the form and leaving the reader
+          on the submit control. The submit control stays enabled, as it does everywhere else.</li>
+          <li>The admin&#39;s &quot;Preview draft&quot; link says that it opens a new tab, in the same words every other
+          link on the site uses.</li>
+          <li>The demo band&#39;s content lines up with the header, the page and the footer. It ran to its own
+          width before, ending 60px inside the frame at either end.</li>
           <li>The demo band is now the showcase&#39;s own device: the style&#39;s name in the heading face, the line
-          that describes it under the name, a hairline, and the four controls on one row at the control
-          height. The <code>style</code> and <code>mode</code> values still round-trip through the query string.</li>
+          that describes it under the name, a hairline, and the four controls on one row at the shared
+          control height. The <code>style</code> and <code>mode</code> values still round-trip through the query string.</li>
           <li>The admin CMS takes the editorial desk: a dark navigation rail against a cool-grey canvas, a
           white title band that holds the page&#39;s name and its save actions while the page scrolls, white
           panels, one action colour for every primary control and focus ring, a record&#39;s state as a
