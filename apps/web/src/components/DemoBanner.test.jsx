@@ -115,10 +115,53 @@ describe('DemoBannerContent', () => {
       search: `?style=${first.id}&mode=light`,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Previous style' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Previous site style' }));
     expect(screen.getByLabelText('Site style')).toHaveValue(last.id);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next style' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next site style' }));
     expect(screen.getByLabelText('Site style')).toHaveValue(first.id);
+  });
+});
+
+describe('the demo band', () => {
+  it('names the style in the heading face, with the summary under it', () => {
+    const style = DEMO_STYLE_OPTIONS[0];
+    renderControls({ search: `?style=${style.id}&mode=light` });
+
+    const name = screen.getByText(style.label, { selector: 'p' });
+    expect(name.className).toContain('font-heading');
+    // Under it, never above it.
+    expect(name.nextElementSibling?.textContent).toBe(style.summary);
+    expect(name.previousElementSibling).toBeNull();
+  });
+
+  it('keeps the four controls in one row at the control height', () => {
+    renderControls({ search: '?style=newsroom&mode=light' });
+
+    const controls = [
+      screen.getByRole('button', { name: 'Previous site style' }),
+      screen.getByLabelText('Site style'),
+      screen.getByRole('button', { name: 'Next site style' }),
+      screen.getByRole('button', { name: 'Use dark mode' }),
+    ];
+    for (const control of controls) {
+      expect(control.className).toContain('h-11');
+      expect(control.className).toContain('touch-target');
+    }
+  });
+
+  it('draws no pill, no shadow, and no gradient', () => {
+    renderControls({ search: '?style=zine&mode=dark' });
+    const band = screen.getByRole('note', { name: 'Demo controls' });
+    expect(band.outerHTML).not.toMatch(/rounded-full|shadow|gradient/u);
+  });
+
+  it('lets nothing in the row set a width the viewport cannot hold', () => {
+    renderControls({ search: '?style=civic&mode=light' });
+    const select = screen.getByLabelText('Site style');
+    // The select is the one control that can grow. It grows to its
+    // container and no further, so a 390px viewport never scrolls sideways.
+    expect(select.className).toContain('min-w-0');
+    expect(select.parentElement.className).toContain('min-w-0');
   });
 });

@@ -1257,6 +1257,26 @@
   }
 }
 
+@layer components {
+  /* The specimen book (apps/web/src/pages/specimen/). Demo and development
+     only: the route is never registered in a client production build.
+
+     ONE RULE, AND IT EXISTS BECAUSE THE BOOK DRAWS EVERY SET AT ONCE. The
+     illustration section gives each row its own `data-motif-set`, so all
+     four sets can be compared without switching. That works for the slot
+     tokens, which cascade — but `[data-motif-set='none'] .motif` matches
+     from the DOCUMENT ELEMENT, so a deployment on the `none` set hides
+     every motif on the page, nested attribute or not. This re-states the
+     display for a row that names a set of its own, at a specificity that
+     wins, and nowhere else. */
+  .specimen-motif-row:not([data-motif-set='none']) .motif {
+    display: inline-block;
+  }
+  .specimen-motif-row:not([data-motif-set='none']) .motif--divider {
+    display: block;
+  }
+}
+
 @layer utilities {
   /* 44px minimum touch targets (interface guidelines: Accessibility). */
   .touch-target {

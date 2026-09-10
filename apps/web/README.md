@@ -136,6 +136,7 @@ exactly one place — `src/lib/demoMode.js` — and consumed at five points:
 | `src/lib/contentSource.js` | the CMS/speaker subscriptions are not attached at all |
 | `src/lib/mediaSource.js` | `assetUrl()` resolves bundled `branding/*` placeholders, everything else is absent |
 | `src/components/SignInPanel.jsx`, `src/pages/Login.jsx`, `src/components/DemoBanner.jsx` | sign-in replaced with a "disabled in this demo" notice; standing demo banner |
+| `src/App.jsx` | the `/specimen` route is registered (see below) |
 
 Two of those are worth the detail:
 
@@ -154,6 +155,33 @@ Two of those are worth the detail:
 Nothing else changes. A client build never sets `VITE_DEMO_MODE`, so every
 branch above folds to a constant and drops out of the bundle — the
 `deploy-client.yml` / `scripts/publish-site.cjs` pipeline is untouched.
+
+## The specimen book (`/specimen`)
+
+`src/pages/specimen/` renders every device in the system, in the style and
+mode the page is set to, with the component file and the tier 3 contract
+beside each one. Use it to review a change across all six styles without
+opening six pages.
+
+- **The gate.** `SPECIMEN_ENABLED` in `src/pages/specimen/specimenRoute.js` is
+  `IS_DEMO || import.meta.env.DEV`. It is written as an expression over two
+  build constants rather than as a function call, because a call across a
+  module boundary is not folded: with a call, Rollup emitted the lazy chunk
+  for a client production build even though no route pointed at it.
+  `specimenRouteEnabled()` is the same rule as a pure function, for tests.
+- **Reaching it.** `npm run dev` then `/specimen`. In the demo build the
+  router is a hash router, so it is `#/specimen`, and the demo banner's
+  `?style=` and `?mode=` values apply to it like any other page.
+- **Staying out of the index.** The page adds a `robots` `noindex` tag while
+  it is mounted and removes it when it unmounts, and
+  `scripts/write-site-files.cjs` refuses a sitemap that lists the route.
+- **Keeping it complete.** `src/pages/specimen/tokens.js` lists the scales
+  the book draws; `tokens.test.js` pins every list to
+  `design/tokens/semantic.json`. `Specimen.test.jsx` renders the page and
+  checks that every component under `src/components/editorial/` appears.
+- **Adding a control.** One file per control in
+  `src/pages/specimen/controls/`, then one import and one line in that
+  directory's `index.js`.
 
 ## Fonts (spec §7.4)
 
