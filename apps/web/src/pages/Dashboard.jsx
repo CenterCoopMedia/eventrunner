@@ -8,14 +8,13 @@
 // updates feed via its card — so the shell carries no data of its own and
 // no new collections.
 //
-// The two cards are the ones the site already draws: ProfileSidebar is the
-// one place an attendee sees their own status (spec §4.1 keeps registration
-// out of the public projection, so it stays on this side of sign-in), and
-// LiveUpdatesCard renders nothing at all when the feed is empty or the
-// flag is off, so an event that says nothing live shows no dead frame.
-//
-// Later M8 work lands its own cards here (the personal schedule, the
-// resource cards); this shell stays out of their way.
+// The two cards above the fold are the ones the site already draws:
+// ProfileSidebar is the one place an attendee sees their own status (spec
+// §4.1 keeps registration out of the public projection, so it stays on this
+// side of sign-in), and LiveUpdatesCard renders nothing at all when the
+// feed is empty or the flag is off, so an event that says nothing live
+// shows no dead frame. Beneath them: the personal schedule card and the
+// event's own resource cards (issue #169).
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -24,6 +23,8 @@ import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
+import MySessionsCard from '../components/dashboard/MySessionsCard.jsx';
+import ResourceCards from '../components/dashboard/ResourceCards.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function Dashboard() {
@@ -72,12 +73,20 @@ export default function Dashboard() {
           reason the reader came. LiveUpdatesCard renders nothing when the
           event has no feed, so an event without updates shows one card. */}
       <div className="mt-xl grid items-start gap-lg lg:grid-cols-2">
+        <MySessionsCard />
         <ProfileSidebar />
         {features.liveUpdates ? (
           <div className="min-w-0">
             <LiveUpdatesCard />
           </div>
         ) : null}
+      </div>
+
+      {/* The event's own pages, one card each (issue #169). The row renders
+          nothing when none of the pages exist, so it never offers a dead
+          end. */}
+      <div className="mt-xl">
+        <ResourceCards />
       </div>
     </article>
   );

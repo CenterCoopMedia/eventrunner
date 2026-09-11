@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AuthContext from '../contexts/AuthContext.jsx';
+import ContentContext from '../contexts/ContentContext.jsx';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
 import Dashboard from './Dashboard.jsx';
@@ -23,25 +24,84 @@ const READY_PROFILE = {
   badges: [],
 };
 
+const FIXTURE_SESSIONS = [
+  {
+    id: 'fx-s1',
+    dayId: 'fx-day-1',
+    startTime: '09:05',
+    endTime: '09:45',
+    title: '[Fixture] Morning kickoff',
+    visible: true,
+  },
+  {
+    id: 'fx-s2',
+    dayId: 'fx-day-1',
+    startTime: '13:30',
+    endTime: '14:15',
+    title: '[Fixture] Afternoon editing lab',
+    visible: true,
+  },
+];
+
+const FIXTURE_PAGES = [
+  { id: 'travel', label: 'Travel', path: '/travel', visible: true },
+  { id: 'faq', label: 'FAQ', path: '/faq', visible: true },
+  { id: 'conduct', label: 'Conduct', path: '/conduct', visible: true },
+  { id: 'contact', label: 'Contact', path: '/contact', visible: true },
+];
+
 function renderDashboard({
   auth = { user: { uid: 'u1' }, isAdmin: false, loading: false },
   profile = { profile: READY_PROFILE, status: 'ready', needsProfileSetup: false },
-  features = { liveUpdates: true },
+  features = { liveUpdates: true, sessionBookmarks: true },
+  scheduleData = FIXTURE_SESSIONS,
+  bookmarkedIds = new Set(['fx-s1', 'fx-s2']),
+  pages = FIXTURE_PAGES,
 } = {}) {
+  holder.bookmarkedIds = bookmarkedIds;
   return render(
     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <EventConfigContext.Provider
-        value={{ eventConfig: {}, features, theme: {}, badges: null, source: 'snapshot' }}
-      >
+        <EventConfigContext.Provider
+          value={{
+            eventConfig: {
+              timezone: 'America/Chicago',
+              days: [{ id: 'fx-day-1', label: 'Day one', date: '2026-10-15' }],
+            },
+            features,
+            theme: {},
+            badges: null,
+            source: 'snapshot',
+          }}
+        >
         <AuthContext.Provider value={auth}>
           <ProfileContext.Provider value={profile}>
-            <Dashboard />
+            <ContentContext.Provider
+              value={{
+                scheduleData,
+                pages,
+                speakers: [],
+                organizationsData: [],
+                loading: false,
+                getBlock: () => null,
+                getPage: () => null,
+                getSectionBlocks: () => [],
+              }}
+            >
+              <Dashboard />
+            </ContentContext.Provider>
           </ProfileContext.Provider>
         </AuthContext.Provider>
       </EventConfigContext.Provider>
     </MemoryRouter>,
   );
 }
+
+// The signed-in reader's bookmarks live in a hook that subscribes; the
+// tests hand the set straight through instead.
+vi.mock('../hooks/useMyBookmarks.js', () => ({
+  useMyBookmarks: () => ({ bookmarkedIds: holder.bookmarkedIds, loading: false }),
+}));
+const holder = { bookmarkedIds: new Set() };
 
 describe('the attendee dashboard shell', () => {
   it('a signed-in attendee sees their name and their status card', () => {
@@ -103,5 +163,91 @@ describe('the attendee dashboard shell', () => {
       profile: { profile: null, status: 'signed-out', needsProfileSetup: false },
     });
     expect(screen.getByRole('status', { name: 'Loading your dashboard…' })).toBeInTheDocument();
+  });
+});
+
+describe('the dashboard cards', () => {
+  it('lists the bookmarked sessions in programme order, with the link to the full schedule', () => {
+    renderDashboard();
+
+    const card = screen.getByRole('region', { name: 'My sessions' });
+    const rows = [...card.querySelectorAll('li a')];
+    expect(rows.map((row) => row.textContent)).toEqual([
+      '[Fixture] Morning kickoff',
+      '[Fixture] Afternoon editing lab',
+    ]);
+    expect(rows[0]).toHaveAttribute('href', '/schedule/fx-s1');
+    expect(screen.getByRole('link', { name: 'Your full schedule' })).toHaveAttribute(
+      'href',
+      '/schedule/mine',
+    );
+  });
+
+  it('carries the day and the time beside each session, as data', () => {
+    renderDashboard();
+    expect(screen.getByText(/Day one · 9:05–9:45 AM/)).toBeInTheDocument();
+  });
+
+  it('an attendee with no bookmarks gets the way back to the schedule', () => {
+    renderDashboard({ bookmarkedIds: new Set() });
+    expect(screen.getByText(/Bookmark sessions from the schedule/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Browse the schedule' })).toHaveAttribute(
+      'href',
+      '/schedule',
+    );
+  });
+
+  it('an event without bookmarking draws no sessions card at all', () => {
+    renderDashboard({ features: { liveUpdates: true, sessionBookmarks: false } });
+    expect(screen.queryByText('My sessions')).toBeNull();
+  });
+
+  it('the resource cards link to the seeded pages, labelled by the page docs', () => {
+    renderDashboard();
+    const nav = screen.getByRole('navigation', { name: 'Event resources' });
+    const links = [...nav.querySelectorAll('a')];
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Travel', '/travel'],
+      ['FAQ', '/faq'],
+      ['Conduct', '/conduct'],
+      ['Contact', '/contact'],
+    ]);
+  });
+
+  it('a hidden page draws no card, and an event with no pages draws no row', () => {
+    const hidden = FIXTURE_PAGES.map((page) => ({ ...page, visible: page.id === 'travel' }));
+    const { rerender } = renderDashboard({ pages: hidden });
+    const nav = screen.getByRole('navigation', { name: 'Event resources' });
+    expect(nav.querySelectorAll('a')).toHaveLength(1);
+
+    rerender(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <EventConfigContext.Provider
+          value={{ eventConfig: {}, features: { liveUpdates: true, sessionBookmarks: true }, theme: {}, badges: null, source: 'snapshot' }}
+        >
+          <AuthContext.Provider value={{ user: { uid: 'u1' }, isAdmin: false, loading: false }}>
+            <ProfileContext.Provider
+              value={{ profile: READY_PROFILE, status: 'ready', needsProfileSetup: false }}
+            >
+              <ContentContext.Provider
+                value={{
+                  scheduleData: FIXTURE_SESSIONS,
+                  pages: [],
+                  speakers: [],
+                  organizationsData: [],
+                  loading: false,
+                  getBlock: () => null,
+                  getPage: () => null,
+                  getSectionBlocks: () => [],
+                }}
+              >
+                <Dashboard />
+              </ContentContext.Provider>
+            </ProfileContext.Provider>
+          </AuthContext.Provider>
+        </EventConfigContext.Provider>
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('navigation', { name: 'Event resources' })).toBeNull();
   });
 });
