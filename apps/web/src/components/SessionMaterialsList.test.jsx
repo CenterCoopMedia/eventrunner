@@ -44,10 +44,27 @@ describe('SessionMaterialsList', () => {
       { id: 'm1', type: 'link', filename: 'External link', reviewStatus: 'approved' },
       { id: 'm2', type: 'file', filename: 'handout.pdf', reviewStatus: 'approved' },
     ]);
-    expect(screen.getByRole('button', { name: 'External link' })).toBeInTheDocument();
     expect(screen.getByText('Link')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'handout.pdf' })).toBeInTheDocument();
     expect(screen.getByText('File')).toBeInTheDocument();
+  });
+
+  it('says in a link control’s own name that it opens a new tab', () => {
+    // The control is a <button>, so the warning cannot ride on a link name
+    // the way it does on every target="_blank" anchor (#236): it rides in
+    // the accessible name itself, in the same words NewTabNote uses.
+    renderList([
+      { id: 'm1', type: 'link', filename: 'External link', reviewStatus: 'approved' },
+    ]);
+    expect(
+      screen.getByRole('button', { name: 'External link (opens in a new tab)' }),
+    ).toBeInTheDocument();
+  });
+
+  it('does not claim a new tab for a file material, which downloads in place', () => {
+    renderList([
+      { id: 'm2', type: 'file', filename: 'handout.pdf', reviewStatus: 'approved' },
+    ]);
+    expect(screen.getByRole('button', { name: 'handout.pdf' })).toBeInTheDocument();
   });
 
   it('opens the resolved URL in a new tab on click', async () => {
@@ -55,7 +72,7 @@ describe('SessionMaterialsList', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {});
     renderList([{ id: 'm1', type: 'link', filename: 'Slides', reviewStatus: 'approved' }]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Slides' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Slides (opens in a new tab)' }));
 
     await waitFor(() => expect(openSpy).toHaveBeenCalledWith('https://example.org/deck', '_blank', 'noopener,noreferrer'));
     openSpy.mockRestore();
@@ -65,7 +82,7 @@ describe('SessionMaterialsList', () => {
     fetchSessionMaterialUrlMock.mockRejectedValueOnce(new Error('This material is not available yet.'));
     renderList([{ id: 'm1', type: 'link', filename: 'Slides', reviewStatus: 'approved' }]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Slides' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Slides (opens in a new tab)' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('This material is not available yet.');
   });

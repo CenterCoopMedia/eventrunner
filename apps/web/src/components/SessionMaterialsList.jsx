@@ -25,6 +25,7 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { downloadSessionMaterialFile, fetchSessionMaterialUrl } from '../lib/materialsSource.js';
 import { useSessionMaterials } from '../hooks/useSessionMaterials.js';
 import { isSafeUrl } from 'shared/urlSafety';
+import { NewTabNote } from './ExternalLink.jsx';
 
 const TYPE_LABEL = { link: 'Link', file: 'File' };
 
@@ -67,6 +68,13 @@ function MaterialRow({ material }) {
           className="touch-target text-start text-body font-medium text-accent hover:text-accent-strong hover:underline disabled:opacity-60"
         >
           {material.filename}
+          {/* A link material opens a tab; the shared hidden sentence says so
+              in the control's own name (issue #236, ExternalLink.jsx). A
+              file material never opens one — it is handed to the browser's
+              save behavior through a throwaway download anchor — so the
+              sentence would be a lie there, and ExternalLink.jsx's own rule
+              forbids that. */}
+          {material.type === 'link' ? <NewTabNote /> : null}
         </button>
         <span className="font-data text-caption text-text-secondary">
           {TYPE_LABEL[material.type] ?? material.type}
