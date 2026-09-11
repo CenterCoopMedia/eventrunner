@@ -170,8 +170,8 @@
           <tr><th>Device</th><th>Component</th><th>What it is</th><th>The rule</th></tr>
           </thead>
           <tbody>
-          <tr><td>Site header</td><td><code>Header</code></td><td>The site identity plus the navigation, in one of four treatments: <code>standard</code>, <code>masthead</code>, <code>compact</code>, <code>minimal</code> (internal values; staff pick a <strong>Header style</strong> — Vocabulary above).</td><td>See Headers below. The theme names the default and a page may override it. Type and rules only — never a hero banner, never a photo behind the name. The identity repeats on every page, so it is NEVER a heading: Each page owns its own <code>h1</code>. An unrecognized value renders the base rather than no header at all.</td></tr>
-          <tr><td>Masthead nameplate</td><td><code>Nameplate</code></td><td>The rule-bounded title block: Event name, dates, edition line.</td><td>The device the header treatments draw: <code>full</code> is the <code>masthead</code> header, <code>compact</code> is the <code>compact</code> one. It is no longer the shell&#39;s only header, and its shape is unchanged. A theme chooses it; it is never mandatory.</td></tr>
+          <tr><td>Site header</td><td><code>Header</code></td><td>The site identity plus the navigation, in one of four treatments: <code>standard</code>, <code>masthead</code>, <code>compact</code>, <code>minimal</code> (internal values; staff pick a <strong>Header style</strong> — Vocabulary above).</td><td>See Headers below. The theme names the default and a page may override it. Compact identity and navigation. Page-owned EventHero is separate from this repeated header. The identity repeats on every page, so it is NEVER a heading: Each page owns its own <code>h1</code>. An unrecognized value renders the base rather than no header at all.</td></tr>
+          <tr><td>Masthead nameplate</td><td><code>Nameplate</code></td><td>The rule-bounded title block: Event name, dates, edition line.</td><td>The device the header treatments draw: <code>compact</code> is the compact header; the full device remains available to editorial compositions. It is no longer the shell&#39;s only header, and its shape is unchanged. A theme chooses it; it is never mandatory.</td></tr>
           <tr><td>Lead image</td><td><code>LeadImage</code></td><td>One optional picture beside the opening copy, or below it at narrow viewports.</td><td>Alt text is required or the image does not render. The crop is fixed by token and the editor states the focal point. Text never sits over it. One per page.</td></tr>
           <tr><td>Folio</td><td><code>Folio</code></td><td>A small-caps plain-text label sitting on a hairline rule.</td><td>Text plus rule. Never a chip, never a pill, never a colored badge. <strong>Never directly above a heading</strong> — see the eyebrow ban below.</td></tr>
           <tr><td>Rule</td><td><code>Rule</code></td><td>A standalone hairline, strong, or nameplate rule.</td><td>A rule replaces a card border. A rule never carries brand color and reads only the <code>--rule-*</code> tokens. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node.</td></tr>
@@ -205,7 +205,7 @@
           </thead>
           <tbody>
           <tr><td><code>standard</code></td><td>The event name at heading size, the dates and place beside it, the navigation under a hairline. The base.</td></tr>
-          <tr><td><code>masthead</code></td><td>The nameplate device at full size, with the navigation under it.</td></tr>
+          <tr><td><code>masthead</code></td><td>A compact event identity beside the navigation.</td></tr>
           <tr><td><code>compact</code></td><td>The nameplate device at running-header size: Short name and dates on one baseline.</td></tr>
           <tr><td><code>minimal</code></td><td>The client&#39;s mark and the navigation, and nothing else.</td></tr>
           </tbody>
@@ -214,7 +214,7 @@
           <ul>
           <li>Every treatment carries the site identity <strong>and</strong> the navigation. Dropping either fails review.</li>
           <li>The identity repeats on every page, so it is never a heading. Every page owns its own <code>&lt;h1&gt;</code>.</li>
-          <li><code>masthead</code> sets the event name at display size, so a page headline that is that same name keeps its <code>&lt;h1&gt;</code> for structure and is not printed a second time. The other three set the identity at running-header size, where no repetition is visible.</li>
+          <li><code>masthead</code> places a compact event name beside navigation. The home page keeps its visible h1 in its own hero.</li>
           <li>No treatment puts text over an image, and none of them is a hero banner.</li>
           <li>Never make one treatment mandatory across every deployment.</li>
           </ul>
@@ -435,6 +435,9 @@
           <li>Empty states orient the reader and offer exactly one next action.</li>
           <li>Address readers as &quot;you&quot;, not &quot;the user&quot;.</li>
           </ul>
+          <h3 id="event-hero-and-demo-preview">Event hero and demo preview<a class="heading-anchor" href="#event-hero-and-demo-preview" aria-label="Link to this section">#</a></h3>
+          <p>The September 11 update in the binding design brief defines EventHero as the shared home and schedule hero. Home owns the h1 and all configured hero actions. Schedule uses a paragraph for the event identity before its own h1. The component preserves safe image URLs, required alt text, focal points, and captions. A surface-color opacity veil is allowed only over hero artwork for readable live text; phone layouts place artwork below the copy. Each preset owns its composition through component tokens.</p>
+          <p>Demo preview hides the disclosure and style controls until Exit preview or Escape. It preserves theme, mode, and route. Client builds have no preview controls. Uploaded client marks remain supported, with no fallback square for an absent mark.</p>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/interface-guidelines.md"><code>docs/interface-guidelines.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">

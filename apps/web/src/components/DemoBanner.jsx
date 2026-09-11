@@ -8,7 +8,7 @@
 // vocabulary as the site under it: the STAGE it shares with the header, the
 // page and the footer, the alternate ground, a hairline, the heading face
 // for the style's name, the body face for the line that describes it, and
-// four controls in one row at the shared control height. No pill, no
+// five controls in one row at the shared control height. No pill, no
 // shadow, no gradient, and nothing that can push the page sideways at
 // 390px.
 //
@@ -16,7 +16,7 @@
 // at 1440px its content box ran 224 to 1216 against the header's 164 to
 // 1276: 60px inside the frame at each end. A band that does not line up
 // with the page under it is the one thing a demo band must not be.
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { recommendedConfiguration } from '../lib/themeRuntime.js';
@@ -69,17 +69,52 @@ const selectClass =
   'px-sm font-data text-caption text-text-primary';
 
 const bandActionClass = `${quietActionClass} justify-center`;
+const exitPreviewClass =
+  `${quietActionClass} no-print fixed bottom-md start-md z-40 bg-surface`;
+
+function attemptFullscreenCall(target, method) {
+  if (typeof method !== 'function') return;
+  try {
+    const result = method.call(target);
+    if (typeof result?.catch === 'function') void result.catch(() => {});
+  } catch {
+    // In-page preview remains available when the browser refuses fullscreen.
+  }
+}
 
 export function DemoBannerContent({
   location = window.location,
   history = window.history,
+  pageDocument = document,
 }) {
   const { theme, setDemoTheme } = useEventConfig();
   const initialDisplay = readDemoDisplay(location.search, theme);
   const [styleId, setStyleId] = useState(initialDisplay.style);
   const [mode, setMode] = useState(initialDisplay.mode);
+  const [previewing, setPreviewing] = useState(false);
   const selectId = useId();
+  const previewButtonRef = useRef(null);
+  const exitButtonRef = useRef(null);
+  const restoreFocusRef = useRef(false);
   const activeStyle = getDemoStyleOption(styleId);
+
+  const restoreControls = useCallback(() => {
+    restoreFocusRef.current = true;
+    setPreviewing(false);
+  }, []);
+
+  const enterPreview = useCallback(() => {
+    setPreviewing(true);
+    const root = pageDocument?.documentElement;
+    attemptFullscreenCall(root, root?.requestFullscreen);
+  }, [pageDocument]);
+
+  const exitPreview = useCallback(() => {
+    restoreControls();
+    if (pageDocument?.fullscreenElement) {
+      attemptFullscreenCall(pageDocument, pageDocument.exitFullscreen);
+    }
+  }, [pageDocument, restoreControls]);
 
   useEffect(() => {
     if (typeof setDemoTheme !== 'function') return;
@@ -99,6 +134,44 @@ export function DemoBannerContent({
     },
     [setDemoTheme],
   );
+
+  useEffect(() => {
+    if (previewing) {
+      exitButtonRef.current?.focus();
+    } else if (restoreFocusRef.current) {
+      restoreFocusRef.current = false;
+      previewButtonRef.current?.focus();
+    }
+  }, [previewing]);
+
+  useEffect(() => {
+    if (!previewing) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') exitPreview();
+    };
+    const handleFullscreenChange = () => {
+      if (!pageDocument.fullscreenElement) restoreControls();
+    };
+    pageDocument.addEventListener('keydown', handleKeyDown);
+    pageDocument.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      pageDocument.removeEventListener('keydown', handleKeyDown);
+      pageDocument.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [exitPreview, pageDocument, previewing, restoreControls]);
+
+  if (previewing) {
+    return (
+      <button
+        ref={exitButtonRef}
+        type="button"
+        className={exitPreviewClass}
+        onClick={exitPreview}
+      >
+        Exit preview
+      </button>
+    );
+  }
 
   return (
     <section
@@ -170,6 +243,15 @@ export function DemoBannerContent({
             }
           >
             {mode === 'dark' ? 'Use light mode' : 'Use dark mode'}
+          </button>
+
+          <button
+            ref={previewButtonRef}
+            type="button"
+            className={bandActionClass}
+            onClick={enterPreview}
+          >
+            Preview full screen
           </button>
         </div>
 

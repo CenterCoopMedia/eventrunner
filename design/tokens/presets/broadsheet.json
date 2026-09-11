@@ -57,7 +57,12 @@
   "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule uses tight vertical padding and the data font for folio text.",
   "tokens": {
     "--session-card-pad-block": "var(--space-sm)",
-    "--folio-font": "var(--font-data)"
+    "--folio-font": "var(--font-data)",
+    "--hero-rule-block-start": "var(--rule-strong-width) double rgb(var(--rule-strong-rgb))",
+    "--hero-art-width": "75%",
+    "--hero-art-position": "85% 50%",
+    "--hero-title-style": "normal",
+    "--hero-title-tracking": "-.055em"
   },
 
   "options": {

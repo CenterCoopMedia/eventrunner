@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import { recommendedConfiguration } from '../lib/themeRuntime.js';
@@ -12,6 +12,7 @@ import { DEMO_STYLE_OPTIONS } from './demoStyleOptions.js';
 function renderControls({
   search = '',
   theme = { preset: 'newsroom', mode: 'light' },
+  pageDocument = document,
 } = {}) {
   const setDemoTheme = vi.fn();
   const location = {
@@ -24,13 +25,17 @@ function renderControls({
     replaceState: vi.fn(),
   };
 
-  render(
+  const view = render(
     <EventConfigContext.Provider value={{ theme, setDemoTheme }}>
-      <DemoBannerContent location={location} history={history} />
+      <DemoBannerContent
+        location={location}
+        history={history}
+        pageDocument={pageDocument}
+      />
     </EventConfigContext.Provider>,
   );
 
-  return { history, location, setDemoTheme };
+  return { history, location, setDemoTheme, view };
 }
 
 describe('demo display query', () => {
@@ -121,6 +126,80 @@ describe('DemoBannerContent', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next site style' }));
     expect(screen.getByLabelText('Site style')).toHaveValue(first.id);
   });
+
+  it('enters fullscreen preview and restores controls and focus on browser exit or Escape', async () => {
+    const pageDocument = new EventTarget();
+    pageDocument.documentElement = {};
+    pageDocument.fullscreenElement = null;
+    pageDocument.documentElement.requestFullscreen = vi.fn(async () => {
+      pageDocument.fullscreenElement = pageDocument.documentElement;
+    });
+    pageDocument.exitFullscreen = vi.fn(async () => {
+      pageDocument.fullscreenElement = null;
+    });
+    const { history } = renderControls({
+      search: '?style=zine&mode=dark',
+      pageDocument,
+    });
+
+    const previewButton = screen.getByRole('button', { name: 'Preview full screen' });
+    previewButton.focus();
+    fireEvent.click(previewButton);
+    expect(pageDocument.documentElement.requestFullscreen).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('note', { name: 'Demo controls' })).toBeNull();
+    const exitButton = screen.getByRole('button', { name: 'Exit preview' });
+    expect(exitButton).toHaveFocus();
+    expect(exitButton.className).toContain('fixed');
+    expect(exitButton.className).toContain('bottom-md');
+    expect(exitButton.className).toContain('start-md');
+
+    pageDocument.fullscreenElement = null;
+    act(() => pageDocument.dispatchEvent(new Event('fullscreenchange')));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Preview full screen' })).toHaveFocus();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview full screen' }));
+    act(() => pageDocument.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Preview full screen' })).toHaveFocus();
+    });
+    expect(pageDocument.exitFullscreen).toHaveBeenCalledOnce();
+    expect(screen.getByLabelText('Site style')).toHaveValue('zine');
+    expect(screen.getByRole('button', { name: 'Use light mode' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(history.replaceState).toHaveBeenLastCalledWith(
+      null,
+      '',
+      '/eventrunner/demo/?style=zine&mode=dark#/schedule',
+    );
+  });
+
+  it('keeps the in-page preview when fullscreen is unavailable or denied', async () => {
+    const unsupportedDocument = new EventTarget();
+    unsupportedDocument.documentElement = {};
+    unsupportedDocument.fullscreenElement = null;
+    const first = renderControls({ pageDocument: unsupportedDocument });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview full screen' }));
+    expect(screen.getByRole('button', { name: 'Exit preview' })).toBeInTheDocument();
+    first.view.unmount();
+
+    const deniedDocument = new EventTarget();
+    deniedDocument.documentElement = {
+      requestFullscreen: vi.fn(() => Promise.reject(new Error('denied'))),
+    };
+    deniedDocument.fullscreenElement = null;
+    renderControls({ pageDocument: deniedDocument });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview full screen' }));
+    await waitFor(() => {
+      expect(deniedDocument.documentElement.requestFullscreen).toHaveBeenCalledOnce();
+    });
+    expect(screen.getByRole('button', { name: 'Exit preview' })).toBeInTheDocument();
+  });
 });
 
 describe('the demo band', () => {
@@ -135,7 +214,7 @@ describe('the demo band', () => {
     expect(name.previousElementSibling).toBeNull();
   });
 
-  it('keeps the four controls in one row at the shared control height', () => {
+  it('keeps the five controls in one row at the shared control height', () => {
     renderControls({ search: '?style=newsroom&mode=light' });
 
     const controls = [
@@ -143,6 +222,7 @@ describe('the demo band', () => {
       screen.getByLabelText('Site style'),
       screen.getByRole('button', { name: 'Next site style' }),
       screen.getByRole('button', { name: 'Use dark mode' }),
+      screen.getByRole('button', { name: 'Preview full screen' }),
     ];
     for (const control of controls) {
       // `touch-target` is the 44px floor every control on the site takes.

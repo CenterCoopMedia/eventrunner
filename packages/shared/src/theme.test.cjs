@@ -692,3 +692,15 @@ test('a legible brand colour is used as the action colour exactly as given', () 
   );
   assert.deepEqual(scheme.tokens['--admin-action-rgb'], [122, 31, 61]);
 });
+
+
+test('each preset resets component values left by the generated baseline', () => {
+  const newsroom = resolvePresetTokens({ preset: 'newsroom' }, { resetComponents: true });
+  const atlas = resolvePresetTokens({ preset: 'atlas' }, { resetComponents: true });
+  const civic = resolvePresetTokens({ preset: 'civic' }, { resetComponents: true });
+  assert.notEqual(newsroom['--hero-copy-border-inline-start'], atlas['--hero-copy-border-inline-start']);
+  assert.equal(atlas['--hero-copy-border-inline-start'], '0 solid transparent');
+  assert.equal(atlas['--hero-route-display'], 'block');
+  assert.equal(civic['--hero-route-display'], 'none');
+  assert.equal(civic['--hero-sign-display'], 'none');
+});

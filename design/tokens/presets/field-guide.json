@@ -66,7 +66,11 @@
     "--specimen-label-pad": "var(--space-2xs)",
     "--specimen-label-key-display": "inline",
     "--folio-font": "var(--font-data)",
-    "--marginalia-display": "none"
+    "--marginalia-display": "none",
+    "--hero-art-width": "67%",
+    "--hero-art-position": "75% 45%",
+    "--hero-title-style": "italic",
+    "--hero-title-weight": "var(--weight-semibold)"
   },
 
   "options": {

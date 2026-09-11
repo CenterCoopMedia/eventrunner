@@ -285,6 +285,11 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
     copy[id] = copyValues(preset);
   }
 
+  const componentContracts = stripNotes(readJson(path.join(tokensDir, 'components.json')));
+  const componentDefaults = Object.fromEntries(Object.values(componentContracts)
+    .flatMap((contract) => Object.entries(contract))
+    .filter(([name]) => !name.endsWith('-rgb')));
+
   const adminSource = readJson(path.join(tokensDir, 'admin.json'));
   const admin = {
     colors: stripNotes(adminSource.colors),
@@ -325,11 +330,13 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
     '',
     `const PRESETS = Object.freeze(${jsValue(presets)});`,
     '',
+    `const COMPONENT_TOKEN_DEFAULTS = Object.freeze(${jsValue(componentDefaults)});`,
+    '',
     `const ADMIN_TOKENS = Object.freeze(${jsValue(admin)});`,
     '',
     `const MOTIF_SET_IDS = Object.freeze(${jsValue(motifSetIds)});`,
     '',
-    'module.exports = { PRESETS, ADMIN_TOKENS, MOTIF_SET_IDS };',
+    'module.exports = { PRESETS, COMPONENT_TOKEN_DEFAULTS, ADMIN_TOKENS, MOTIF_SET_IDS };',
     '',
   ].join('\n');
 

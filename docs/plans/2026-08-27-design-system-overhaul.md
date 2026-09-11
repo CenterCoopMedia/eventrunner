@@ -1242,3 +1242,14 @@ its mono role there.
 `docs/plans/2026-08-27-preset-visual-stories.md`, part 6 of each page. Every one of them must clear
 the four tests when it is bundled. Verify each licence and each Latin-subset size at bundling time,
 in PR2. Nothing here blocks PR1.
+
+
+## September 11, 2026: approved hero and header update
+
+The approved Harborlight mockups supersede the earlier home lead and full-size masthead restrictions for this scope. The shared header keeps a compact event identity beside navigation. The home page owns its visible heading in EventHero. The public schedule may repeat the event identity as a paragraph in the same hero before its own Schedule heading. Other inner routes retain their compact header without a hero.
+
+Each style has its own artwork and composition: newsroom editorial collage, civic architecture, broadsheet engraving, field-guide natural history, zine print collage, and Atlas waterfront transit in day and night versions. Atlas carries a yellow route through the hero and restrained stops along the schedule. Real client logos remain supported; an absent logo does not gain a decorative square.
+
+A surface-color opacity veil is permitted only within the illustrated EventHero to keep live text readable over artwork. It is not permitted as decoration elsewhere. Mobile places the image below the copy. Safe image URLs, required alt text, focal points, captions, live text, editor-authored actions, keyboard access, and one h1 per page remain required. Theme variations use declared component tokens.
+
+The static demo has a full-screen preview control. It hides demo controls while exploring, has an always-available exit, supports Escape, and preserves the selected style and route. A client build includes no demo controls. Fictional content keeps its clear demo disclosure outside preview without repeated bracketed prefixes in every label.

@@ -122,12 +122,12 @@ describe('Nameplate', () => {
     expect(container.querySelectorAll('.nameplate p')).toHaveLength(1);
   });
 
-  it('holds the mark slot for the motif, and yields it to a client mark', () => {
-    // Brief §3.8: the nameplate-mark slot. A client's own branding mark
-    // wins — a paper prints its own flag, not the printer's ornament — and
-    // the slot renders nothing at all under the `none` set (index.css).
+  it('has no fallback mark, and retains a client mark', () => {
+    // A deployment without an uploaded mark keeps the title block clear.
+    // A client's own branding mark remains part of the name lockup.
     const { container, rerender } = renderPlate({ name: 'X' });
-    expect(container.querySelector('[data-motif-slot="nameplate-mark"]')).not.toBeNull();
+    expect(container.querySelector('[data-motif-slot="nameplate-mark"]')).toBeNull();
+    expect(container.querySelector('img')).toBeNull();
 
     rerender(
       <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -135,7 +135,7 @@ describe('Nameplate', () => {
       </MemoryRouter>,
     );
     expect(container.querySelector('[data-motif-slot="nameplate-mark"]')).toBeNull();
-    expect(container.querySelector('img')).not.toBeNull();
+    expect(container.querySelector('img')).toHaveAttribute('src', '/branding/mark.svg');
   });
 
   it('closes the full treatment with the divider slot, and the running head without it', () => {

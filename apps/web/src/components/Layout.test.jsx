@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
 
@@ -155,7 +155,9 @@ describe('Layout header', () => {
   it('takes the header the theme names, on every page alike', () => {
     for (const path of ['/', '/schedule']) {
       const { container } = renderShell({}, { path, header: 'masthead' });
-      expect(container.querySelector('header .nameplate')).not.toBeNull();
+      expect(container.querySelector('header .site-masthead__bar')).not.toBeNull();
+      expect(container.querySelector('header .nameplate')).toBeNull();
+      expect(container.querySelector('header .event-hero')).toBeNull();
     }
   });
 
@@ -201,6 +203,14 @@ describe('Layout navigation (built from page documents)', () => {
   // same page list (M7 issue 3), so a bare `nav a` would count both.
   const MAIN_NAV = 'nav[aria-label="Main"] a';
   const navLabels = (root) => [...root.querySelectorAll(MAIN_NAV)].map((a) => a.textContent);
+  const MANY_PAGES = Array.from({ length: 7 }, (_, index) => ({
+    id: `page-${index + 1}`,
+    label: `Page ${index + 1}`,
+    path: `/page-${index + 1}`,
+    order: index,
+    visible: true,
+    systemPage: false,
+  }));
 
   it('lists a seeded content page and leaves a hidden one out', () => {
     const { container } = renderShell(
@@ -234,6 +244,54 @@ describe('Layout navigation (built from page documents)', () => {
       '/faq',
       '/signin',
     ]);
+  });
+
+  it('keeps five page links in the top row and returns focus to More on Escape', () => {
+    const view = renderShell({}, { pageDocs: MANY_PAGES });
+    const mainNav = view.getByRole('navigation', { name: 'Main' });
+    const topItems = [...mainNav.querySelector(':scope > ul').children];
+    expect(topItems.slice(0, 5).map((item) => item.querySelector(':scope > a').textContent))
+      .toEqual(['Page 1', 'Page 2', 'Page 3', 'Page 4', 'Page 5']);
+
+    const details = mainNav.querySelector('details.site-nav-more');
+    const summary = within(details).getByText('More');
+    expect(within(details).getAllByRole('link').map((link) => link.textContent))
+      .toEqual(['Page 6', 'Page 7']);
+
+    fireEvent.click(summary);
+    expect(details.open).toBe(true);
+    const overflowLink = within(details).getByRole('link', { name: 'Page 6' });
+    overflowLink.focus();
+    fireEvent.keyDown(overflowLink, { key: 'Escape' });
+    expect(details.open).toBe(false);
+    expect(summary).toHaveFocus();
+  });
+
+  it('closes More after route selection, while the footer and side nav keep every page', () => {
+    const top = renderShell({}, { pageDocs: MANY_PAGES });
+    const mainNav = top.getByRole('navigation', { name: 'Main' });
+    const details = mainNav.querySelector('details.site-nav-more');
+    fireEvent.click(within(details).getByText('More'));
+    const route = within(details).getByRole('link', { name: 'Page 7' });
+    fireEvent.click(route);
+    expect(details.open).toBe(false);
+    expect(route).toHaveAttribute('aria-current', 'page');
+    expect(within(details).getByText('More')).toHaveClass('touch-target', 'border-b-rule-strong', 'font-semibold');
+    expect(
+      within(top.getByRole('navigation', { name: 'Site pages' }))
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(MANY_PAGES.map((item) => item.label));
+    top.unmount();
+
+    const side = renderShell({}, {
+      pageDocs: MANY_PAGES,
+      themeDoc: { navPlacement: 'side' },
+    });
+    const sideNav = side.getByRole('navigation', { name: 'Main' });
+    expect(sideNav.querySelector('details.site-nav-more')).toBeNull();
+    expect(within(sideNav).getAllByRole('link').map((link) => link.textContent))
+      .toEqual([...MANY_PAGES.map((item) => item.label), 'Sign in']);
   });
 
   it('still gates a system page on its feature flag', () => {
@@ -817,13 +875,14 @@ describe('Layout on the stage', () => {
 
 describe('Layout variants (brief §6.1)', () => {
   it('takes the treatment the page states, over the shell’s own rule', () => {
-    // An inner page that asks for the full masthead gets it...
+    // An inner page that asks for the masthead gets its compact site bar...
     const { container: full } = renderShell(
       {},
       { path: '/schedule', pageDoc: { path: '/schedule', layout: { header: 'nameplate' } } },
     );
-    expect(full.querySelector('.nameplate')).not.toHaveClass('nameplate--compact');
-    expect(full.querySelector('.nameplate').textContent).toContain(
+    expect(full.querySelector('.site-masthead__bar')).not.toBeNull();
+    expect(full.querySelector('.nameplate')).toBeNull();
+    expect(full.querySelector('.site-masthead__identity').textContent).toContain(
       '[Fixture] Example Conference 2027',
     );
 
@@ -858,8 +917,8 @@ describe('Layout variants (brief §6.1)', () => {
     // not an instruction to render no header: the theme's own answer stands,
     // the same way an unrecognized theme value falls to the base rather than
     // to nothing (shared/theme resolveHeader).
-    expect(container.querySelector('.nameplate')).not.toBeNull();
-    expect(container.querySelector('.nameplate')).not.toHaveClass('nameplate--compact');
+    expect(container.querySelector('.site-masthead__bar')).not.toBeNull();
+    expect(container.querySelector('.nameplate')).toBeNull();
   });
 
   it('moves the nav to the leading edge without changing what it is', () => {

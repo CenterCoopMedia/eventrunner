@@ -57,7 +57,11 @@
   "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses the data font for folio text and a strong rule below each section heading.",
   "tokens": {
     "--folio-font": "var(--font-data)",
-    "--section-rule-width": "var(--rule-strong-width)"
+    "--section-rule-width": "var(--rule-strong-width)",
+    "--hero-art-width": "56%",
+    "--hero-copy-pad-inline-start": "var(--space-md)",
+    "--hero-copy-border-inline-start": ".35rem solid rgb(var(--color-accent-rgb))",
+    "--hero-veil-background": "linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%)"
   },
 
   "options": {

@@ -38,8 +38,11 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
       if (section === 'info') return infoBlocks;
       return sectionBlocks[section] ?? [];
     },
-    getBlock: (section, field) =>
-      section === 'hero' && field === 'title' ? { value: 'Fallback title' } : null,
+    getBlock: (section, field) => {
+      if (section !== 'hero') return null;
+      return heroBlocks.find((block) => block.field === field)
+        ?? (field === 'title' ? { value: 'Fallback title' } : null);
+    },
   }),
 }));
 
@@ -90,14 +93,15 @@ describe('Home', () => {
     expect(() => render(<Home />)).not.toThrow();
   });
 
-  it('does not print the event name twice under a masthead', () => {
-    // The masthead has already set the name at display size. The page keeps
-    // exactly one <h1>, and only its second printing goes.
+  it('keeps the page heading visible under the compact masthead', () => {
+    // The running masthead is compact site identity. Home still owns the
+    // visible page heading, including when it is the event name.
     eventConfig = { name: 'Fallback title', days: [] };
     theme = { header: 'masthead' };
     render(<Home />);
     const heading = screen.getByRole('heading', { level: 1, name: 'Fallback title' });
-    expect(heading.className).toBe('sr-only');
+    expect(heading).toHaveClass('event-hero__title');
+    expect(heading).not.toHaveClass('sr-only');
   });
 
   it('prints the page headline under a masthead when it is not the event name', () => {
@@ -132,16 +136,22 @@ describe('Home lead image', () => {
     expect(container.querySelector('img')).toBeNull();
   });
 
-  it('renders the stored image beside the opening copy, never behind it', () => {
-    heroBlocks = [LEAD];
+  it('preserves the CMS copy and action over a safe, labelled image', () => {
+    heroBlocks = [
+      { section: 'hero', field: 'title', blockType: 'text', value: 'Opening headline' },
+      { section: 'hero', field: 'subtitle', blockType: 'text', value: 'Opening subtitle' },
+      { ...LEAD, focalX: 25, focalY: 70, caption: 'The room before opening.' },
+      { section: 'hero', field: 'programme', blockType: 'cta', label: 'See the programme', url: 'https://example.org/programme' },
+    ];
     const { container } = render(<Home />);
-    const heading = screen.getByRole('heading', { level: 1 });
-    const figure = container.querySelector('figure');
-    expect(figure).not.toBeNull();
-    // Copy and picture are siblings in the flow, so no text sits over the
-    // image and no image sits behind the text.
-    expect(figure.parentElement).toBe(heading.parentElement.parentElement);
-    expect(container.querySelector('[style*="background-image"]')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Opening headline' })).toBeVisible();
+    expect(screen.getByText('Opening subtitle')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'See the programme' })).toHaveAttribute('href', 'https://example.org/programme');
+    const image = screen.getByRole('img', { name: 'The main hall before doors open' });
+    expect(image).toHaveAttribute('src', 'https://example.org/lead.jpg');
+    expect(image).toHaveStyle({ objectPosition: '25% 70%' });
+    expect(screen.getByText('The room before opening.')).toHaveClass('event-hero__caption');
+    expect(container.querySelector('.event-hero__veil')).not.toBeNull();
   });
 
   it('takes one lead image, not a gallery', () => {
@@ -151,10 +161,15 @@ describe('Home lead image', () => {
     expect(container.querySelector('img')).toHaveAttribute('src', 'https://example.org/lead.jpg');
   });
 
-  it('skips a stored image with no alt text rather than rendering it unlabelled', () => {
+  it('skips a stored image unless its URL is safe and its alt text is present', () => {
     heroBlocks = [{ ...LEAD, alt: '' }];
-    const { container } = render(<Home />);
-    expect(container.querySelector('img')).toBeNull();
+    const missingAlt = render(<Home />);
+    expect(missingAlt.container.querySelector('img')).toBeNull();
+    missingAlt.unmount();
+
+    heroBlocks = [{ ...LEAD, url: 'javascript:alert(1)' }];
+    const unsafeUrl = render(<Home />);
+    expect(unsafeUrl.container.querySelector('img')).toBeNull();
   });
 });
 

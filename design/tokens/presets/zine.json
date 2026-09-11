@@ -63,7 +63,12 @@
     "--folio-rule-width": "var(--rule-strong-width)",
     "--folio-font": "var(--font-mono)",
     "--callout-angle": "-2.5deg",
-    "--marginalia-display": "none"
+    "--marginalia-display": "none",
+    "--hero-art-width": "64%",
+    "--hero-title-size": "clamp(2.8rem, 6vw, 6rem)",
+    "--hero-title-tracking": "-.06em",
+    "--hero-title-transform": "uppercase",
+    "--hero-press-display": "block"
   },
 
   "options": {

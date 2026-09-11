@@ -1,24 +1,5 @@
-// Home page — the cmsPages 'home' document rendered section by section
-// (spec §5.2). The lead section keeps a handcrafted treatment (headline,
-// supporting line, primary action); every other section renders generically
-// through SectionBlocks, so editors can add stats, body copy, or footer
-// links without a code change. All copy comes from the snapshot/runtime
-// content — nothing event-specific lives here.
-//
-// The page owns its own <h1>: the shell's header carries the running site
-// identity, not this page's subject. Nothing sits above that heading.
-//
-// The opening section may carry one lead image, beside the copy or below it.
-//
-// THE PAGE IS BUILT ON THE STAGE (2026-09-10 vocabulary expansion). The
-// masthead runs the full stage; the lead sentence sits at the measure with
-// the lead image in the margin beside it; and then ONE composed moment —
-// the summary row: the dates, the key facts, and the clock, three equal
-// cells across the stage, separated by hairlines, each with its own head.
-// Below `lg` the row stacks. It is not a bento grid and it is not a set of
-// cards: no cell has a ground, a border or a shadow, and every cell holds
-// real content. Everything after it is the ordinary section flow.
-import { resolveHeader } from 'shared/theme';
+// Home owns the visible hero heading, CMS actions, and optional artwork.
+// Other CMS sections stay in their authored order through SystemPage.
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -26,7 +7,9 @@ import SystemPage from '../components/SystemPage.jsx';
 import CtaBlock from '../components/blocks/CtaBlock.jsx';
 import EventCountdown, { countdownDraws } from '../components/EventCountdown.jsx';
 import InfoCards, { groupIntoCards } from '../components/InfoCards.jsx';
-import LeadImage from '../components/LeadImage.jsx';
+import EventHero from '../components/EventHero.jsx';
+import { demoHero } from '../lib/demoHero.js';
+import { buildNameplate } from '../components/editorial/Nameplate.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import RegistrationAction, {
   resolveRegistrationLink,
@@ -206,12 +189,7 @@ export default function Home() {
   // One lead image at most. An editor who stores several images in the
   // opening section gets the first one, never a gallery.
   const lead = heroBlocks.find((block) => block.blockType === 'image') ?? null;
-  // The masthead sets the event name at display size, so a headline that
-  // only repeats it would print the same words twice down the page. The
-  // page keeps its <h1> either way — a reader on a screen reader still
-  // hears exactly one — and only the second printing goes.
-  const titleRepeatsMasthead =
-    resolveHeader(theme?.header) === 'masthead' && leadTitle === eventConfig.name;
+  const plate = buildNameplate(eventConfig);
 
   return (
     // data-content-source mirrors ContentContext's own `source` field
@@ -235,58 +213,23 @@ export default function Home() {
       <section
         {...(leadTitle ? { 'aria-labelledby': 'hero-title' } : { 'aria-label': 'Introduction' })}
       >
-        {/* The measure and the margin beside it: the opening copy runs to
-            the measure and the lead image sits in the margin column at
-            `lg` and above. Below `lg` the margin closes and the copy fills
-            the stage. */}
-        <div className="stage-split">
-          <div className="min-w-0">
-            {leadTitle ? (
-              <h1
-                id="hero-title"
-                className={
-                  titleRepeatsMasthead
-                    ? 'sr-only'
-                    : 'font-heading text-h1 font-semibold text-text-primary'
-                }
-              >
-                {leadTitle}
-              </h1>
-            ) : null}
-            {tagline ? (
-              <p
-                className={[
-                  'max-w-prose text-lead text-text-secondary text-pretty',
-                  leadTitle && !titleRepeatsMasthead ? 'mt-sm' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                {tagline}
-              </p>
-            ) : null}
-            {subtitle ? (
-              <p className="mt-sm max-w-prose text-body text-text-secondary text-pretty">
-                {subtitle.value}
-              </p>
-            ) : null}
-            {/* The registration action leads the row: it is the event's own
-                configured action, and the hero's cta blocks are whatever
-                else an editor wanted beside it. The row itself is drawn
-                only when something is in it — an empty flex row is a stray
-                gap down the page, and an unset registration destination is
-                the ordinary state of a fresh deployment. */}
-            {registrationAction || heroCtas.length ? (
-              <div className="mt-lg flex flex-wrap gap-sm">
-                <RegistrationAction placement="lead" />
-                {heroCtas.map((block) => (
-                  <CtaBlock key={`${block.section}__${block.field}`} block={block} />
-                ))}
-              </div>
-            ) : null}
-          </div>
-          {lead ? <LeadImage block={lead} /> : null}
-        </div>
+        <EventHero
+          name={leadTitle}
+          nameAs="h1"
+          nameId="hero-title"
+          dates={plate.dates}
+          place={plate.edition}
+          tagline={tagline}
+          image={demoHero(theme) ?? lead}
+        >
+          {subtitle?.value ? <p className="mt-sm max-w-prose text-body text-text-secondary text-pretty">{subtitle.value}</p> : null}
+          {registrationAction || heroCtas.length ? (
+            <div className="mt-lg flex flex-wrap gap-sm">
+              <RegistrationAction placement="lead" />
+              {heroCtas.map((block) => <CtaBlock key={`${block.section}__${block.field}`} block={block} />)}
+            </div>
+          ) : null}
+        </EventHero>
       </section>
 
       {features?.liveUpdates ? (

@@ -1,5 +1,8 @@
 # Site design reference
 
+> September 11, 2026 update: the approved hero mockups supersede the full-size shell masthead and image-free lead descriptions below. Header now uses a compact identity beside navigation; Home and Schedule own EventHero with style-specific artwork and component tokens. The hero alone permits a surface-color opacity veil for text readability. See the dated update in [the binding design brief](plans/2026-08-27-design-system-overhaul.md).
+
+
 Everything the look of a client site is made of: The six site styles, the type, the illustrations, the headers, the page templates, the colour, the tokens under all of it, what prints, and where a developer extends it.
 
 **This is the deep end, and you do not need it to run a site.** [`ADMIN_GUIDE.md`](ADMIN_GUIDE.md) is the operator's path — pick a style, add your logo, set your colour, preview, publish — and it is a complete answer for almost every event. Come here when you want to know what a control is doing underneath, when a recommended configuration is not quite right, or when you are adding to the system rather than using it.

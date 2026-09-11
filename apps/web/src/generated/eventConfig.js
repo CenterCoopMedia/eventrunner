@@ -8,9 +8,9 @@
 // emitted here (§2.4).
 
 export const eventConfig = {
-  name: '[Demo] Harborlight Media Summit',
-  shortName: 'DEMO-SUMMIT',
-  tagline: 'A three-day event for people who operate local and cooperative newsrooms.',
+  name: 'Harborlight Media Summit',
+  shortName: 'Harborlight',
+  tagline: 'Stronger local news. Further together.',
   timezone: 'America/New_York',
   days: [
     {
@@ -52,7 +52,7 @@ export const eventConfig = {
     actionLabel: null,
   },
   venue: {
-    name: '[Demo] Harborlight Hall',
+    name: 'Harborlight Hall',
     addressLine1: '1 Harborlight Way',
     addressLine2: null,
     city: 'Millhaven',
@@ -137,14 +137,14 @@ export const eventConfig = {
   },
   sender: {
     email: 'summit@example.org',
-    name: '[Demo] Harborlight Media Summit',
+    name: 'Harborlight Media Summit',
     replyTo: null,
     domainVerified: false,
     domainVerifiedAt: null,
   },
   legal: {
-    operatorName: '[Demo] Harborlight Cooperative',
-    postalAddressHtml: '<p>[Demo] Harborlight Cooperative<br>1 Harborlight Way<br>Millhaven, MH 58211</p>',
+    operatorName: 'Harborlight Cooperative',
+    postalAddressHtml: '<p>Harborlight Cooperative<br>1 Harborlight Way<br>Millhaven, MH 58211</p>',
     supportEmail: 'support@example.org',
     conductEmail: 'conduct@example.org',
     reviewRequired: true,
@@ -156,9 +156,9 @@ export const eventConfig = {
   announcedAt: '2026-05-01T12:00:00',
   archivedAt: null,
   seo: {
-    description: 'Schedule, speaker, workshop, and travel information for the fictional [Demo] Harborlight Media Summit.',
+    description: 'Schedule, speaker, workshop, and travel information for the fictional Harborlight Media Summit.',
     defaultOgImagePath: 'branding/og-default.svg',
-    organizerName: '[Demo] Harborlight Cooperative',
+    organizerName: 'Harborlight Cooperative',
     organizerUrl: 'https://example.org',
   },
   auth: {
@@ -199,7 +199,7 @@ export const theme = {
   header: 'masthead',
   logos: {
     primary: 'branding/logo.svg',
-    mark: 'branding/mark.svg',
+    mark: null,
     footer: 'branding/mark.svg',
     ogDefault: 'branding/og-default.svg',
     favicon: 'branding/favicon.svg',
