@@ -281,5 +281,5 @@ test('binds the short receipt to one immutable full-SHA run before completion', 
 // The immutable run binding requires a record for every reviewed head.
 test('CI retains an unfiltered pull request trigger for receipt binding', () => {
   const workflow = fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci.yml'), 'utf8');
-  assert.match(workflow, /\n  pull_request:\s*\n\npermissions:/);
+  assert.match(workflow, /\n {2}pull_request:\s*\n\npermissions:/);
 });
