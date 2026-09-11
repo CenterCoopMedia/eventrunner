@@ -12,7 +12,7 @@ const { useBookmarkCounts } = await import('./useBookmarkCounts.js');
 describe('useBookmarkCounts', () => {
   it('starts empty, then carries the map the source hands over', async () => {
     subscribeMock.mockReset();
-    subscribeMock.mockImplementation((_onNext) => () => {});
+    subscribeMock.mockImplementation(() => () => {});
     const { result } = renderHook(() => useBookmarkCounts());
     expect(result.current.countsById).toEqual(new Map());
 

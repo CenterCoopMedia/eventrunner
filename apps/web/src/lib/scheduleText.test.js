@@ -68,10 +68,9 @@ describe('schedulePlainText', () => {
   });
 
   it('draws a calling point under its parent, never as a row of its own', () => {
-    expect(text).toMatch(/9:20 AM  Breakout clinic \(part of Morning kickoff\)/);
+    expect(text).toMatch(/9:20 AM {2}Breakout clinic \(part of Morning kickoff\)/);
     expect(text.match(/^9:20 AM/m)).toBeNull();
   });
-
   it('states an empty day rather than skipping it', () => {
     expect(text).toContain('No sessions are announced for this day.');
   });

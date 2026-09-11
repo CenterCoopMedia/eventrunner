@@ -653,7 +653,7 @@ describe('schedule filters', () => {
 });
 
 describe('the view in the URL', () => {
-  function renderAt(search, props = {}) {
+  function renderAt(search) {
     return render(
       <MemoryRouter
         initialEntries={[`/${search}`]}

@@ -88,7 +88,7 @@ describe('subscribeBookmarkCounts', () => {
     const onNext = vi.fn();
     const onError = vi.fn();
     sub(onNext, onError);
-    const [, callback, errorCallbacks] = onSnapshotMock.mock.calls[0];
+    const [, , errorCallbacks] = onSnapshotMock.mock.calls[0];
     const failure = new Error('denied');
     errorCallbacks(failure);
     expect(onError).toHaveBeenCalledWith(failure);
