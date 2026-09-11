@@ -1,6 +1,7 @@
 // Attendee directory: the feature gate, the two query shapes, and the
 // fail-soft states (issue #17, spec §3.4).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent } from '@testing-library/react';
 import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -217,5 +218,49 @@ describe('Attendees', () => {
       expect(heads[0].startsWith('A')).toBe(true);
       expect(heads[1].startsWith('Z')).toBe(true);
     });
+  });
+});
+
+describe('directory search and organization filter', () => {
+  const PEOPLE = [
+    { id: 'u1', displayName: 'Amara Diallo', organization: 'Acme News', jobTitle: 'Editor' },
+    { id: 'u2', displayName: 'Zeke Alvarez', organization: 'Borealis Post', jobTitle: 'Reporter' },
+    { id: 'u3', displayName: 'Ana Costa', organization: 'Acme News', jobTitle: 'Publisher' },
+  ];
+
+  it('the query narrows the index, and the letter groups follow the narrowed set', () => {
+    renderPage();
+    pushProfiles(PEOPLE);
+
+    fireEvent.change(screen.getByLabelText('Search the directory'), { target: { value: 'acme' } });
+    const index = document.querySelector('.attendee-index');
+    const heads = index ? [...index.querySelectorAll('h2')] : [];
+    expect(heads.map((head) => head.textContent)).toEqual(['A']);
+    expect(screen.getByText('2 attendees match “acme”')).toBeInTheDocument();
+
+    // Clearing restores the whole index.
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect([...document.querySelector('.attendee-index').querySelectorAll('h2')].map((head) => head.textContent)).toEqual(['A', 'Z']);
+  });
+
+  it('the organization filter narrows the index, and its clear control restores it', () => {
+    renderPage();
+    pushProfiles(PEOPLE);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Borealis Post (1)' }));
+    expect([...document.querySelector('.attendee-index').querySelectorAll('h2')].map((head) => head.textContent)).toEqual(['Z']);
+    expect(screen.queryByText('Ana Costa')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear organization filter' }));
+    expect(screen.getByText('Ana Costa')).toBeInTheDocument();
+  });
+
+  it('an empty result states what was searched', () => {
+    renderPage();
+    pushProfiles(PEOPLE);
+
+    fireEvent.change(screen.getByLabelText('Search the directory'), { target: { value: 'nobody' } });
+    expect(screen.getByRole('heading', { name: 'No attendees match' })).toBeInTheDocument();
+    expect(screen.getByText(/Nothing in the directory matches “nobody”/)).toBeInTheDocument();
   });
 });

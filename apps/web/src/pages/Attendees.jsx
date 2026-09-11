@@ -36,11 +36,14 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { subscribeDirectory } from '../lib/profileSource.js';
 import { badgeLabel, visibleBadgeIds } from '../lib/badgeDisplay.js';
+import { collectOrganizations, directorySearchText, matchesDirectoryFilters } from '../lib/directoryView.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
+import SearchField from '../components/forms/SearchField.jsx';
+import FilterGroup from '../components/forms/FilterGroup.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import Tag from '../components/editorial/Tag.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
@@ -134,6 +137,32 @@ export default function Attendees() {
         .sort((a, b) => a.displayName.localeCompare(b.displayName)),
     [profiles],
   );
+
+  // The narrowing controls (issue #174): a query over name, organization,
+  // and role, and a filter by organization. Local state — the directory is
+  // a lookup, not a view somebody shares, unlike the schedule's URL state.
+  const [query, setQuery] = useState('');
+  const [organizations, setOrganizations] = useState([]);
+  const organizationOptions = useMemo(() => collectOrganizations(sorted), [sorted]);
+  // The folded search text, rebuilt only when the directory changes — not
+  // per keystroke.
+  const searchIndex = useMemo(() => {
+    const index = new Map();
+    for (const profile of sorted) index.set(profile.id, directorySearchText(profile));
+    return index;
+  }, [sorted]);
+  const filtered = useMemo(
+    () =>
+      sorted.filter((profile) =>
+        matchesDirectoryFilters(profile, {
+          q: query.trim(),
+          organizations,
+          searchIndex,
+        }),
+      ),
+    [sorted, query, organizations, searchIndex],
+  );
+  const narrowed = query.trim().length > 0 || organizations.length > 0;
   // null = no snapshot has arrived yet; [] = the directory really is empty.
   // Conflating them tells a visitor nobody signed up while the query is
   // still in flight.
@@ -193,9 +222,53 @@ export default function Attendees() {
             />
           </div>
         ) : (
-          // The index: letter groups, compact entries, nothing boxed.
-          <div className="attendee-index mt-lg">
-            {groupByLetter(sorted).map((group) => (
+          <>
+            {/* The controls that narrow the index (issue #174). They sit
+                above the letter groups, and the groups are derived from the
+                narrowed list, so the index is always in step with them. */}
+            <div className="no-print mt-lg flex flex-wrap items-start gap-lg">
+              <div className="w-full max-w-prose lg:w-auto lg:flex-1">
+                <SearchField
+                  label="Search the directory"
+                  value={query}
+                  onChange={setQuery}
+                  status={
+                    query.trim()
+                      ? `${filtered.length} ${filtered.length === 1 ? 'attendee matches' : 'attendees match'} “${query.trim()}”`
+                      : undefined
+                  }
+                  placeholder="Name, organization, role…"
+                />
+              </div>
+              {organizationOptions.length > 0 ? (
+                <div className="flex-1">
+                  <FilterGroup
+                    legend="Organization"
+                    options={organizationOptions}
+                    selected={organizations}
+                    onChange={setOrganizations}
+                    clearLabel="Clear organization filter"
+                  />
+                </div>
+              ) : null}
+            </div>
+            {narrowed && filtered.length === 0 ? (
+              // An empty result states what was searched, so an empty page
+              // is never mistaken for an empty directory.
+              <div className="mt-lg">
+                <EmptyState
+                  title="No attendees match"
+                  description={`Nothing in the directory matches ${
+                    query.trim() ? `“${query.trim()}”` : 'that organization filter'
+                  }. Clear the search or the filter to see everybody.`}
+                />
+              </div>
+            ) : (
+              // The index: letter groups, compact entries, nothing boxed —
+              // derived from the narrowed list, so a letter nobody survives
+              // into has no group at all.
+              <div className="attendee-index mt-lg">
+                {groupByLetter(filtered).map((group) => (
               <section
                 key={group.letter}
                 aria-labelledby={`attendee-letter-${group.letter}`}
@@ -270,10 +343,12 @@ export default function Attendees() {
                       </li>
                     );
                   })}
-                </ul>
-              </section>
-            ))}
-          </div>
+                 </ul>
+               </section>
+             ))}
+           </div>
+            )}
+          </>
         )}
       </SystemPage>
       <ProfileSidebar />
