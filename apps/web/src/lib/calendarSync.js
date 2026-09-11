@@ -34,15 +34,27 @@ function calendarStorageKey(user) {
 }
 
 export function readCalendarId(user) {
-  return localStorage.getItem(calendarStorageKey(user));
+  try {
+    return localStorage.getItem(calendarStorageKey(user));
+  } catch {
+    return null;
+  }
 }
 
 export function saveCalendarId(user, calendarId) {
-  localStorage.setItem(calendarStorageKey(user), calendarId);
+  try {
+    localStorage.setItem(calendarStorageKey(user), calendarId);
+  } catch {
+    // Persistence is optional. The mounted sync control keeps this id in memory.
+  }
 }
 
 export function clearCalendarId(user) {
-  localStorage.removeItem(calendarStorageKey(user));
+  try {
+    localStorage.removeItem(calendarStorageKey(user));
+  } catch {
+    // An unavailable store is already equivalent to having no saved id.
+  }
 }
 
 async function call(doFetch, token, method, path, body, signal) {

@@ -335,3 +335,23 @@ it('stores only the calendar id and isolates it by attendee, project and Google 
   expect(readCalendarId(user)).toBeNull();
   expect(localStorage.length).toBe(0);
 });
+
+it('continues without persisted calendar ids when browser storage is unavailable', () => {
+  const user = { uid: 'u1', auth: { app: { options: { projectId: 'demo-run-of-show' } } },
+    providerData: [{ providerId: 'google.com', uid: 'g1' }] };
+  const unavailable = () => { throw new DOMException('Storage unavailable', 'SecurityError'); };
+
+  const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(unavailable);
+  expect(readCalendarId(user)).toBeNull();
+  getItem.mockRestore();
+
+  const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(unavailable);
+  expect(() => saveCalendarId(user, 'calendar-id')).not.toThrow();
+  expect(setItem).toHaveBeenCalledOnce();
+  setItem.mockRestore();
+
+  const removeItem = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(unavailable);
+  expect(() => clearCalendarId(user)).not.toThrow();
+  expect(removeItem).toHaveBeenCalledOnce();
+  removeItem.mockRestore();
+});
