@@ -103,6 +103,7 @@ function renderSchedule({
   eventConfig = fixtureConfig,
   features = { schedule: true },
   scheduleData = fixtureSessions,
+  speakers: speakerRows = [],
   loading = false,
   auth = { user: null, isAdmin: false, loading: false },
   profile = { attendeeAccess: false },
@@ -119,7 +120,7 @@ function renderSchedule({
                 readSource: 'published',
                 siteContent: {},
                 scheduleData,
-                speakers: [],
+                speakers: speakerRows,
                 organizationsData: [],
                 loading,
                 getBlock: () => null,
@@ -485,6 +486,89 @@ describe('the two views of a day', () => {
         expect(screen.queryByText(/Transfer from/)).toBeNull();
       });
     });
+  });
+});
+
+describe('schedule search', () => {
+  // The fixture speakers resolve fx-speaker-1 to a name the schedule can be
+  // searched by (issue #162).
+  const fixtureSpeakers = [{ id: 'fx-speaker-1', displayName: '[Fixture] Dana Reporter', slug: 'dana' }];
+
+  function type(query) {
+    fireEvent.change(screen.getByLabelText('Search this day'), { target: { value: query } });
+  }
+
+  it('narrows the day to the sessions that match, and says what was searched', () => {
+    renderSchedule({ speakers: fixtureSpeakers });
+
+    type('editing');
+    expect(onScreen().getByText('[Fixture] Afternoon editing lab')).toBeInTheDocument();
+    expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('1 sessions match “editing”');
+    // The empty state names the query (done when).
+    type('nothing names this');
+    expect(
+      onScreen().getByText(/No sessions on Day one match “nothing names this”/),
+    ).toBeInTheDocument();
+  });
+
+  it('matches the room, the track name, and the resolved speaker name', () => {
+    renderSchedule({ speakers: fixtureSpeakers });
+
+    type('Room B');
+    expect(onScreen().getByText('[Fixture] Afternoon editing lab')).toBeInTheDocument();
+    expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
+
+    type('Dana');
+    expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+    expect(onScreen().queryByText('[Fixture] Afternoon editing lab')).toBeNull();
+  });
+
+  it('clearing restores the full day', () => {
+    renderSchedule({ speakers: fixtureSpeakers });
+
+    type('editing');
+    expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+    expect(onScreen().getByText('[Fixture] Afternoon editing lab')).toBeInTheDocument();
+  });
+
+  it('narrows the grid too', () => {
+    const original = window.matchMedia;
+    window.matchMedia = () => ({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    try {
+      const tracked = [
+        { ...fixtureSessions[1], track: 'A' },
+        { ...fixtureSessions[0], track: 'B' },
+      ];
+      renderSchedule({
+        speakers: fixtureSpeakers,
+        scheduleData: tracked,
+        eventConfig: {
+          ...fixtureConfig,
+          tracks: [
+            { letter: 'A', name: 'Practice' },
+            { letter: 'B', name: 'Craft' },
+          ],
+        },
+      });
+      expect(screen.getByRole('table')).toBeInTheDocument();
+
+      type('craft');
+      expect(within(screen.getByRole('table')).getByText('[Fixture] Afternoon editing lab')).toBeInTheDocument();
+      expect(within(screen.getByRole('table')).queryByText('[Fixture] Morning kickoff')).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+      expect(within(screen.getByRole('table')).getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });
 

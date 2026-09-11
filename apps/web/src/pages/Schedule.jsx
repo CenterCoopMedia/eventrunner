@@ -22,10 +22,12 @@ import SessionCard from '../components/SessionCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { PlateNumber } from '../components/editorial/Plate.jsx';
 import Marginalia from '../components/editorial/Marginalia.jsx';
+import SearchField from '../components/forms/SearchField.jsx';
 import ScheduleGrid from '../components/ScheduleGrid.jsx';
 import SchedulePrint from '../components/SchedulePrint.jsx';
 import HorizontalScrollRegion from '../components/HorizontalScrollRegion.jsx';
-import { resolveTracks, withCallingPoints } from '../lib/scheduleGrid.js';
+import { resolveTracks } from '../lib/scheduleGrid.js';
+import { buildSearchIndex, filterEntries, matchesQuery } from '../lib/scheduleView.js';
 import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
@@ -63,7 +65,7 @@ export function sortSessions(sessions) {
 
 export default function Schedule() {
   const { eventConfig, features } = useEventConfig();
-  const { scheduleData, loading } = useContent();
+  const { scheduleData, speakers, loading } = useContent();
   const { user } = useAuth();
   const { attendeeAccess } = useProfile();
   const { bookmarkedIds } = useMyBookmarks();
@@ -72,6 +74,11 @@ export default function Schedule() {
   // browser that cannot be asked gets the accessible baseline rather than a
   // grid it has no room for.
   const wide = useMediaQuery(WIDE_VIEWPORT);
+
+  // The search narrows the loaded set client side (issue #162). The field
+  // owns the query; every narrowing below reads it, and clearing restores
+  // the full day by construction.
+  const [query, setQuery] = useState('');
 
   // Days are runtime config — a live config/event write could deliver a
   // malformed entry; drop anything without a usable string id rather than
@@ -105,6 +112,27 @@ export default function Schedule() {
     [scheduleData],
   );
 
+  // The resolved display name of every published speaker, once: the search
+  // text a reader types has to meet the speaker's name, not the id the
+  // session stores (lib/scheduleView.js).
+  const speakerNamesById = useMemo(() => {
+    const names = new Map();
+    for (const speaker of Array.isArray(speakers) ? speakers : []) {
+      if (speaker && typeof speaker.id === 'string' && typeof speaker.displayName === 'string') {
+        names.set(speaker.id, speaker.displayName);
+      }
+    }
+    return names;
+  }, [speakers]);
+
+  // The folded search text of every visible session, once per data change.
+  const searchIndex = useMemo(
+    () => buildSearchIndex(scheduleData, speakerNamesById, resolveTracks(eventConfig)),
+    [scheduleData, speakerNamesById, eventConfig],
+  );
+
+  // Every hook sits above this point: the branch below can end the
+  // component before any of the work further down runs.
   if (!features.schedule) {
     return (
       <EmptyState
@@ -121,10 +149,21 @@ export default function Schedule() {
 
   const activeDay = days.find((d) => d.id === activeDayId) ?? null;
   const activeSessions = activeDayId ? (sessionsByDay.get(activeDayId) ?? []) : [];
-  // The day as top-level entries, each carrying its calling points. Both
-  // views render from this, so a child session appears under its parent in
-  // the grid and in the list, and never as a row of its own.
-  const entries = withCallingPoints(activeSessions);
+  // The day narrowed by the search (issue #162). An empty query keeps the
+  // whole day, so clearing restores it by construction. A calling point a
+  // query matches keeps its parent's row, and a matched parent keeps all of
+  // its calling points — lib/scheduleView.js owns those rules, and with an
+  // all-keeping predicate it folds exactly the entries withCallingPoints
+  // would.
+  const entries = filterEntries(
+    activeSessions,
+    query.trim()
+      ? (session) => matchesQuery(searchIndex.get(session.id) ?? '', query)
+      : () => true,
+  );
+  // What the count sentence says: every session still in the document,
+  // calling points included — they are sessions a reader can pick too.
+  const matchedCount = entries.reduce((count, entry) => count + 1 + entry.children.length, 0);
   // The event's lines, in the client's own order (config/event.tracks). No
   // lines means no second axis, so there is nothing for a grid to be.
   const columns = resolveTracks(eventConfig);
@@ -216,6 +255,21 @@ export default function Schedule() {
               </div>
             ) : null}
 
+          {/* The controls that narrow what the day shows. Controls do not
+              print: a button on paper is a lie (index.css, the print
+              block), and so is a search box. */}
+          <div className="no-print mt-md max-w-prose">
+            <SearchField
+              label="Search this day"
+              value={query}
+              onChange={setQuery}
+              status={
+                query.trim() ? `${matchedCount} sessions match “${query.trim()}”` : undefined
+              }
+              placeholder="Title, room, speaker…"
+            />
+          </div>
+
           {/* The sheet the programme is drawn on (brief §4.6): a faint
               coordinate grid, below hairline contrast and inert to the
               pointer. It lives HERE and not on the shell, because a
@@ -272,6 +326,13 @@ export default function Schedule() {
               {activeSessions.length === 0 ? (
                 <p className="mt-md max-w-prose text-body text-text-secondary">
                   No sessions are announced for {activeDay.label} yet.
+                </p>
+              ) : entries.length === 0 ? (
+                // An empty result states what was searched (issue #162), so
+                // an empty page is never mistaken for an empty day.
+                <p className="mt-md max-w-prose text-body text-text-secondary">
+                  No sessions on {activeDay.label} match “{query.trim()}”. Clear the search to see
+                  the whole day.
                 </p>
               ) : showGrid ? (
                 // The programme page: time down, lettered lines across (brief
