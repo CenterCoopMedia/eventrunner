@@ -273,11 +273,11 @@ export default function EditorialSection({ folio }) {
         contract={null}
         note="The four-part shape first: the finding in words, the figure, what it counts, and where it came from. The stored two-part shape follows it."
       >
-        <dl>
+        {/* A dl's div may hold only dt and dd, so the gap between the two
+            blocks lives on the list itself rather than on a wrapper. */}
+        <dl className="flex flex-col gap-lg">
           <StatBlock block={FULL_STAT} />
-          <div className="mt-lg">
-            <StatBlock block={LEGACY_STAT} />
-          </div>
+          <StatBlock block={LEGACY_STAT} />
         </dl>
       </Figure>
     </SpecimenSection>

@@ -43,16 +43,25 @@ export default function RulesSection({ folio }) {
       >
         <dl>
           {RULE_WEIGHTS.map((entry) => (
-            <div key={entry.weight} className="mt-md first:mt-0">
-              <Rule weight={entry.weight} />
-              <div className="mt-2xs flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
-                <dt className="font-data text-caption font-semibold text-text-primary">
-                  {entry.label}
-                </dt>
-                <dd className="font-data text-caption text-text-secondary">
-                  {entry.job} <MeasuredValue token={`--rule-${entry.weight}-width`} />
-                </dd>
-              </div>
+            // A <dl>'s <div> may hold only <dt> and <dd> children (the same
+            // correction LayoutSection's width bands went through), so the
+            // drawn rule is the group's first <dd>: it is part of that
+            // weight's description, drawn ahead of the words. Flex order
+            // paints it on its own full-width line above the term, so the
+            // rows read as they did before the structural fix.
+            <div
+              key={entry.weight}
+              className="mt-md flex flex-wrap items-baseline gap-x-sm gap-y-3xs first:mt-0"
+            >
+              <dt className="order-2 font-data text-caption font-semibold text-text-primary">
+                {entry.label}
+              </dt>
+              <dd aria-hidden="true" className="order-1 w-full">
+                <Rule weight={entry.weight} />
+              </dd>
+              <dd className="order-3 font-data text-caption text-text-secondary">
+                {entry.job} <MeasuredValue token={`--rule-${entry.weight}-width`} />
+              </dd>
             </div>
           ))}
         </dl>
