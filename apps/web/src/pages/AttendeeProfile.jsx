@@ -138,7 +138,7 @@ export default function AttendeeProfile() {
           <section className="mt-xl">
             <SectionHead level={2} title="Badges" />
             <ul className="mt-sm flex flex-wrap gap-2xs">
-              {badges.map((badgeId) => (
+              {features.badges && badges.map((badgeId) => (
                 <li key={badgeId}>
                   <Tag>{badgeLabel(badgesConfig, badgeId)}</Tag>
                 </li>

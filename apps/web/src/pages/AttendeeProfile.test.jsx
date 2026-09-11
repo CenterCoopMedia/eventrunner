@@ -107,19 +107,21 @@ describe('AttendeeProfile', () => {
     expect(screen.queryByText('left-over-id')).toBeNull();
   });
 
-  it('shows only custom badges allowed by the live config when the feature is on', async () => {
+  it.each([true, false])('keeps predefined and custom badge visibility independent (badges=%s)', async (badgesEnabled) => {
+    features.badges = badgesEnabled;
     features.customBadges = true;
     badgesConfig = { ...badgesConfig, customBadgeBlockList: ['crypto'] };
     fetchPublicProfileMock.mockResolvedValue({
       id: 'u1',
       displayName: 'Amara Diallo',
-      badges: [],
+      badges: ['writer'],
       customBadges: ['News nerd', 'Crypto fan', 'Admin'],
     });
 
     renderPage();
     await screen.findByRole('heading', { name: 'Amara Diallo' });
     expect(screen.getByText('News nerd')).toBeInTheDocument();
+    expect(Boolean(screen.queryByText('Writer'))).toBe(badgesEnabled);
     expect(screen.queryByText('Crypto fan')).toBeNull();
     expect(screen.queryByText('Admin')).toBeNull();
   });
