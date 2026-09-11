@@ -1,7 +1,7 @@
 // hooks/useSessionNote.js — the note saved as the attendee types (issue
 // #170).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 
 const subscribeMock = vi.fn(() => () => {});
 const saveMock = vi.fn(async () => {});
