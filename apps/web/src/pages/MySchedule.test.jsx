@@ -160,6 +160,21 @@ describe('MySchedule', () => {
     expect(note.closest('div').querySelector('[role="status"]')).not.toBeNull();
   });
 
+  it('offers no calendar sync while the flag is off — the old state is the default state', () => {
+    renderMySchedule({ features: { schedule: true, sessionBookmarks: true }, bookmarkedIds: new Set(['fx-late']) });
+    expect(screen.queryByRole('heading', { name: 'Google Calendar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /sync my sessions/i })).toBeNull();
+  });
+
+  it('offers the calendar sync when the operator turned the flag on', () => {
+    renderMySchedule({
+      features: { schedule: true, sessionBookmarks: true, calendarSync: true },
+      bookmarkedIds: new Set(['fx-late']),
+    });
+    expect(screen.getByRole('heading', { name: 'Google Calendar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sync my sessions/i })).toBeInTheDocument();
+  });
+
   it('prompts a signed-out visitor to sign in, rather than showing an empty list', () => {
     renderMySchedule({ auth: { user: null, loading: false }, profile: { attendeeAccess: false } });
     expect(screen.getByRole('heading', { name: 'Sign in to see your schedule' })).toBeInTheDocument();

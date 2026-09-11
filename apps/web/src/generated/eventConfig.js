@@ -183,6 +183,7 @@ export const features = {
   feedbackInbox: false,
   schedulePdf: false,
   icsExport: false,
+  calendarSync: false,
   updates: false,
   autoApproveTicketHolders: false,
   publicAttendeeProfiles: false,

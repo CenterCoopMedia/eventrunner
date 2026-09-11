@@ -210,6 +210,35 @@ run repeatedly, not once.
 4. Add this client to `AUTO_DEPLOY_ENVIRONMENTS` now, if they're ready to auto-deploy on merge to
    `main` — or keep them on manual dispatch and revisit later (`docs/DEPLOY_RUNBOOK.md` §4).
 
+## 6. Optional: Google Calendar sync (`config/features.calendarSync`)
+
+Attendees can keep their saved sessions on their own Google Calendar. This integration is **off by
+default**; the decision record is [`docs/adr/0003-optional-google-calendar-sync.md`](adr/0003-optional-google-calendar-sync.md).
+A client who skips these steps keeps the `.ics` file export and the per-session calendar links,
+which never need a Google grant.
+
+Provisioning (the OPERATOR performs these steps in the CLIENT's own Firebase/GCP project — the
+client is the consent screen's verified owner and answers Google's review as the API user):
+
+1. In the client's Google Cloud console, enable the **Google Calendar API** for the project the
+   deployment already uses.
+2. In the OAuth consent screen: add the scope `https://www.googleapis.com/auth/calendar.events`
+   (marked sensitive). Fill in the client's own product name, support address, and domain — the
+   screen must speak as the event, not as the platform.
+3. Add every attendee account that should pilot the sync as a **test user** while the screen is
+   unverified. Google shows an unverified-screen warning to anyone else, and production
+   attendees cannot complete the grant at all until verification clears.
+4. Submit the consent screen for **verification** with the client as the API user. Typical review
+   time is days, not weeks; the runbook of record for the exact form fields is Google's OAuth
+   API verification docs.
+5. After verification (or for a deliberate pilot with test users), set
+   `config/features.calendarSync` to `true` in the admin Features editor and publish. The sync
+   control appears on the attendee's personal schedule.
+
+Flag behavior when a client skips verification: leave `calendarSync` off (the default). Nothing
+renders, nothing requests a scope, and the file export remains the calendar path — the pre-feature
+state, not a broken one.
+
 ## Handoff to the client
 
 Once the site is live, point the client at the two handbook pages instead of re-explaining their

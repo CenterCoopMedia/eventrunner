@@ -118,6 +118,7 @@
               <li><a href="#3-the-56-items">3. The §5.6 items</a></li>
               <li><a href="#4-readiness-gating---check">4. Readiness gating (--check)</a></li>
               <li><a href="#5-go-live">5. Go live</a></li>
+              <li><a href="#6-optional-google-calendar-sync-configfeaturescalendarsync">6. Optional: Google Calendar sync (config/features.calendarSync)</a></li>
               <li><a href="#handoff-to-the-client">Handoff to the client</a></li>
             </ul>
           </nav>
@@ -294,6 +295,32 @@
           <li>Add this client to <code>AUTO_DEPLOY_ENVIRONMENTS</code> now, if they&#39;re ready to auto-deploy on merge to
           <code>main</code> — or keep them on manual dispatch and revisit later (<code>docs/DEPLOY_RUNBOOK.md</code> §4).</li>
           </ol>
+          <h2 id="6-optional-google-calendar-sync-configfeaturescalendarsync">6. Optional: Google Calendar sync (<code>config/features.calendarSync</code>)<a class="heading-anchor" href="#6-optional-google-calendar-sync-configfeaturescalendarsync" aria-label="Link to this section">#</a></h2>
+          <p>Attendees can keep their saved sessions on their own Google Calendar. This integration is <strong>off by
+          default</strong>; the decision record is <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0003-optional-google-calendar-sync.md"><code>docs/adr/0003-optional-google-calendar-sync.md</code></a>.
+          A client who skips these steps keeps the <code>.ics</code> file export and the per-session calendar links,
+          which never need a Google grant.</p>
+          <p>Provisioning (the OPERATOR performs these steps in the CLIENT&#39;s own Firebase/GCP project — the
+          client is the consent screen&#39;s verified owner and answers Google&#39;s review as the API user):</p>
+          <ol>
+          <li>In the client&#39;s Google Cloud console, enable the <strong>Google Calendar API</strong> for the project the
+          deployment already uses.</li>
+          <li>In the OAuth consent screen: add the scope <code>https://www.googleapis.com/auth/calendar.events</code>
+          (marked sensitive). Fill in the client&#39;s own product name, support address, and domain — the
+          screen must speak as the event, not as the platform.</li>
+          <li>Add every attendee account that should pilot the sync as a <strong>test user</strong> while the screen is
+          unverified. Google shows an unverified-screen warning to anyone else, and production
+          attendees cannot complete the grant at all until verification clears.</li>
+          <li>Submit the consent screen for <strong>verification</strong> with the client as the API user. Typical review
+          time is days, not weeks; the runbook of record for the exact form fields is Google&#39;s OAuth
+          API verification docs.</li>
+          <li>After verification (or for a deliberate pilot with test users), set
+          <code>config/features.calendarSync</code> to <code>true</code> in the admin Features editor and publish. The sync
+          control appears on the attendee&#39;s personal schedule.</li>
+          </ol>
+          <p>Flag behavior when a client skips verification: leave <code>calendarSync</code> off (the default). Nothing
+          renders, nothing requests a scope, and the file export remains the calendar path — the pre-feature
+          state, not a broken one.</p>
           <h2 id="handoff-to-the-client">Handoff to the client<a class="heading-anchor" href="#handoff-to-the-client" aria-label="Link to this section">#</a></h2>
           <p>Once the site is live, point the client at the two handbook pages instead of re-explaining their
           content here:</p>

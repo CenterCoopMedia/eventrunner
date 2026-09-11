@@ -21,6 +21,7 @@ import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import SessionNote from '../components/session/SessionNote.jsx';
 import ShareSchedule from '../components/schedule/ShareSchedule.jsx';
+import CalendarSyncCard from '../components/schedule/CalendarSyncCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import TransferLine from '../components/TransferLine.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
@@ -267,6 +268,13 @@ export default function MySchedule() {
           offered at every level because it never lies about what a visitor
           would receive. */}
       {user ? <ShareSchedule uid={user.uid} /> : null}
+
+      {/* Optional Google Calendar sync (issue #177, ADR 0003): the flag
+          gates the whole card, and the .ics download above it stays the
+          answer whenever the grant is refused or the flag is off. */}
+      {features.calendarSync && user && mySessions.length > 0 ? (
+        <CalendarSyncCard sessions={mySessions} eventConfig={eventConfig} />
+      ) : null}
     </article>
   );
 }

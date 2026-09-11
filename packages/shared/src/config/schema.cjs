@@ -115,7 +115,7 @@ const KNOWN_FEATURE_KEYS = [
   'schedule', 'speakers', 'sponsors', 'attendeeDirectory',
   'sessionBookmarks', 'sessionReactions', 'sessionMaterials',
   'badges', 'customBadges', 'liveUpdates', 'feedbackInbox',
-  'schedulePdf', 'icsExport', 'updates',
+  'schedulePdf', 'icsExport', 'calendarSync', 'updates',
   'autoApproveTicketHolders', 'publicAttendeeProfiles',
   'webmcpPublic',
   'webmcpAdmin',
