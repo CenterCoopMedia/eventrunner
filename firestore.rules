@@ -272,6 +272,32 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // schedule_shares/{uid}: the shared personal schedule projection
+    // (issue #172). It exists because a shared schedule CANNOT ride on
+    // users_public — the rules above authorize that whole document from
+    // the profile's own profileVisibility, so saved sessions stored there
+    // would inherit the profile's level and every existing public profile
+    // would start leaking them. This projection carries only session ids
+    // and a display name, and its consent is its OWN field:
+    //
+    //   - scheduleVisibility is a closed list, and the DEFAULT FAILS
+    //     CLOSED: a missing, unknown, or malformed value matches none of
+    //     the read branches, so it reads as private. There is no fallback
+    //     that widens.
+    //   - Consent is separate from the profile's visibility choice: the
+    //     owner sets scheduleVisibility through setScheduleVisibility, and
+    //     every client write is denied — the projection is the server's.
+    //   - An account with a public profile and no schedule consent has no
+    //     readable document here at all (or one whose value is private),
+    //     which is exactly the leak this collection exists to prevent.
+    match /schedule_shares/{userId} {
+      allow read: if isSelf(userId);
+      allow read: if resource.data.scheduleVisibility == 'public';
+      allow read: if resource.data.scheduleVisibility == 'attendees_only'
+        && requesterIsApprovedAttendee();
+      allow write: if false;
+    }
+
     // Canonical speakers and their public projection (spec §4.3).
     //
     // speakers/{speakerId} is the single source of truth. It carries the

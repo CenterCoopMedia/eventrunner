@@ -20,6 +20,7 @@ const adminFeedback = require('./src/admin/feedback.cjs');
 const webMcpDiagnostics = require('./src/admin/webMcpDiagnostics.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
 const schedulePdf = require('./src/schedule/pdf.cjs');
+const scheduleShare = require('./src/schedule/share.cjs');
 const publicOg = require('./src/public/og.cjs');
 const scheduleReactions = require('./src/schedule/reactions.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
@@ -63,6 +64,7 @@ module.exports = {
   ...webMcpDiagnostics.handlers,
   ...scheduleBookmarks.handlers,
   ...schedulePdf.handlers,
+  ...scheduleShare.handlers,
   ...publicOg.handlers,
   ...scheduleReactions.handlers,
   ...usersLifecycle.handlers,

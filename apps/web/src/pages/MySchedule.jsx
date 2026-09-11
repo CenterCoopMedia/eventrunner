@@ -20,6 +20,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import SessionNote from '../components/session/SessionNote.jsx';
+import ShareSchedule from '../components/schedule/ShareSchedule.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import TransferLine from '../components/TransferLine.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
@@ -260,6 +261,12 @@ export default function MySchedule() {
             </section>
           ))
       )}
+
+      {/* The owner's own consent panel (issue #172): its choice is separate
+          from the profile's, widening asks twice, and the copy link is
+          offered at every level because it never lies about what a visitor
+          would receive. */}
+      {user ? <ShareSchedule uid={user.uid} /> : null}
     </article>
   );
 }

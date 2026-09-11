@@ -157,7 +157,7 @@ describe('MySchedule', () => {
     expect(note.placeholder).toBe('Only you can see this.');
     // The save answer lives in a status line beside the field, not in a
     // toast that belongs to the page.
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(note.closest('div').querySelector('[role="status"]')).not.toBeNull();
   });
 
   it('prompts a signed-out visitor to sign in, rather than showing an empty list', () => {

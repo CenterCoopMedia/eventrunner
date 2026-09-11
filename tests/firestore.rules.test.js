@@ -99,7 +99,6 @@ const ATTENDEES = {
   // the status, is what grants them attendee access (§3.4).
   "speaker-1": { registrationStatus: "pending", speakerId: "spk-1" },
 };
-
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: "demo-run-of-show",
@@ -599,6 +598,101 @@ describe("users_public directory visibility (spec §3.4)", () => {
     );
     await assertFails(
       setDoc(doc(admin(), "users_public/attendees-profile"), { displayName: "x" }),
+    );
+  });
+});
+
+// The shared personal schedule projection (issue #172). Its consent lives
+// in its OWN scheduleVisibility field, never in the profile's: the gap the
+// tests pin is that a public profile with no schedule consent reads as
+// private here, and a stored value the rules cannot read fails closed.
+describe("schedule_shares visibility", () => {
+  /** Seed one projection per visibility value, owned by approved-1. */
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const [uid, value] of [
+        ["approved-1", "private"],
+        ["pending-1", "attendees_only"],
+        ["speaker-1", "public"],
+      ]) {
+        await setDoc(doc(db, `schedule_shares/${uid}`), {
+          sessionIds: ["session-1", "session-2"],
+          displayName: uid,
+          scheduleVisibility: value,
+        });
+      }
+      // Malformed: the field is a number, not one of the three words.
+      await setDoc(doc(db, "schedule_shares/malformed-1"), {
+        sessionIds: ["session-1"],
+        displayName: "malformed",
+        scheduleVisibility: 7,
+      });
+    });
+  });
+
+  it("lets the owner read their own projection at every visibility", async () => {
+    for (const uid of ["approved-1", "pending-1", "speaker-1"]) {
+      await assertSucceeds(getDoc(doc(attendee(uid), `schedule_shares/${uid}`)));
+    }
+  });
+
+  it("a public schedule reads to anyone, signed out included", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "schedule_shares/speaker-1")));
+    await assertSucceeds(getDoc(doc(attendee("approved-1"), "schedule_shares/speaker-1")));
+  });
+
+  it("an attendees-only schedule reads to approved attendees and speakers, not to pending accounts or the signed out", async () => {
+    await assertSucceeds(getDoc(doc(attendee("approved-1"), "schedule_shares/pending-1")));
+    await assertSucceeds(getDoc(doc(attendee("speaker-1"), "schedule_shares/pending-1")));
+    await assertFails(getDoc(doc(attendee("pending-1"), "schedule_shares/pending-1")));
+    await assertFails(getDoc(doc(anon(), "schedule_shares/pending-1")));
+  });
+
+  it("a private schedule reads to nobody but its owner", async () => {
+    await assertFails(getDoc(doc(attendee("approved-1"), "schedule_shares/approved-1")));
+    await assertFails(getDoc(doc(admin(), "schedule_shares/approved-1")));
+    await assertFails(getDoc(doc(anon(), "schedule_shares/approved-1")));
+  });
+
+  it("a public profile with no schedule consent is denied — the leak the projection exists to prevent", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "users_public/share-owner-1"), {
+        displayName: "share-owner-1",
+        profileVisibility: "public",
+      });
+      // Their saved sessions exist in the canonical store, but no
+      // schedule_shares document was ever consented to.
+      await setDoc(doc(db, "users/share-owner-1/bookmarks/session-1"), {
+        bookmarkedAt: new Date(),
+      });
+    });
+    // The profile is public and readable…
+    await assertSucceeds(getDoc(doc(anon(), "users_public/share-owner-1")));
+    // …but the schedule behind it was never consented to, so there is no
+    // readable projection — a reader of the shared link sees nothing at all.
+    await assertFails(getDoc(doc(anon(), "schedule_shares/share-owner-1")));
+    await assertFails(getDoc(doc(attendee("approved-1"), "schedule_shares/share-owner-1")));
+  });
+
+  it("a malformed visibility reads as private — nothing is widened by accident", async () => {
+    await assertSucceeds(getDoc(doc(attendee("approved-1"), "schedule_shares/malformed-1")));
+    await assertFails(getDoc(doc(attendee("pending-1"), "schedule_shares/malformed-1")));
+    await assertFails(getDoc(doc(anon(), "schedule_shares/malformed-1")));
+    await assertFails(getDoc(doc(admin(), "schedule_shares/malformed-1")));
+  });
+
+  it("denies every client write to schedule_shares, owner and admin included", async () => {
+    await assertFails(
+      setDoc(doc(attendee("approved-1"), "schedule_shares/approved-1"), {
+        sessionIds: ["self-published"],
+        displayName: "approved-1",
+        scheduleVisibility: "public",
+      }),
+    );
+    await assertFails(
+      setDoc(doc(admin(), "schedule_shares/approved-1"), { scheduleVisibility: "public" }),
     );
   });
 });

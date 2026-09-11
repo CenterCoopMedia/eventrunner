@@ -48,6 +48,7 @@
     "bookmarkSession",
     "buildSchedulePdf",
     "buildMySchedulePdf",
+    "setScheduleVisibility",
     "updatesMeta",
     "routeMeta",
     "reactToSession",
