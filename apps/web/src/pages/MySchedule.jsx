@@ -19,6 +19,7 @@ import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
+import SessionNote from '../components/session/SessionNote.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import TransferLine from '../components/TransferLine.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
@@ -211,6 +212,10 @@ export default function MySchedule() {
                         eventConfig={eventConfig}
                         features={features}
                         bookmarked
+                        // The attendee's private note on this session
+                        // (issue #170): the row is theirs, and so is the
+                        // text under it. The public page passes nothing.
+                        noteSlot={<SessionNote uid={user.uid} sessionId={session.id} />}
                       />
                     </Fragment>
                   );

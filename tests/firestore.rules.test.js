@@ -428,6 +428,72 @@ describe("the private bookmarks subcollection under users/{uid}", () => {
   });
 });
 
+// Private per-session notes (issue #170): the owner's own subtree, read and
+// written directly. The gap the tests pin: another account — admin included
+// in every branch but isSelf — can neither read nor write the subtree, and
+// the shape a note may take is text and only text.
+describe("the private session notes under users/{uid}/sessionNotes", () => {
+  const noteRef = (uid, sessionId) => doc(nonAdmin(), `users/${uid}/sessionNotes/${sessionId}`);
+
+  it("allows the owner to create, read, and rewrite their own note", async () => {
+    await assertSucceeds(setDoc(noteRef("attendee-1", "session-1"), { text: "Ask about funding" }));
+    await assertSucceeds(getDoc(noteRef("attendee-1", "session-1")));
+    await assertSucceeds(
+      setDoc(noteRef("attendee-1", "session-1"), { text: "Ask about funding at the Q&A" }),
+    );
+  });
+
+  it("allows the owner to clear a note by deleting the document", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users/attendee-1/sessionNotes/session-1"), {
+        text: "temporary",
+      });
+    });
+    await assertSucceeds(deleteDoc(noteRef("attendee-1", "session-1")));
+  });
+
+  it("denies another account a read, a write, or a delete", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users/attendee-1/sessionNotes/session-1"), {
+        text: "private",
+      });
+    });
+    const other = testEnv
+      .authenticatedContext("attendee-2", { email: "other@example.com", email_verified: true })
+      .firestore();
+    await assertFails(getDoc(doc(other, "users/attendee-1/sessionNotes/session-1")));
+    await assertFails(
+      setDoc(doc(other, "users/attendee-1/sessionNotes/session-1"), { text: "nope" }),
+    );
+    await assertFails(deleteDoc(doc(other, "users/attendee-1/sessionNotes/session-1")));
+    await assertFails(getDoc(doc(anon(), "users/attendee-1/sessionNotes/session-1")));
+  });
+
+  it("denies an admin a read — the subtree is the owner's, not staff's", async () => {
+    await assertFails(getDoc(doc(admin(), "users/attendee-1/sessionNotes/session-1")));
+  });
+
+  it("refuses a note that is not text, or text past the cap", async () => {
+    await assertFails(setDoc(noteRef("attendee-1", "session-2"), { body: "nope" }));
+    await assertFails(setDoc(noteRef("attendee-1", "session-2"), { text: 42 }));
+    await assertFails(
+      setDoc(noteRef("attendee-1", "session-2"), { text: "x".repeat(10001) }),
+    );
+    await assertSucceeds(
+      setDoc(noteRef("attendee-1", "session-2"), { text: "x".repeat(10000) }),
+    );
+  });
+
+  it("refuses a note that smuggles extra fields", async () => {
+    await assertFails(
+      setDoc(noteRef("attendee-1", "session-3"), {
+        text: "fine",
+        profileVisibility: "public",
+      }),
+    );
+  });
+});
+
 // The six branches issue #17 requires pinned, plus the self-read and
 // list-query shapes §3.4 calls out. The gap being closed: `attendees_only`
 // used to be readable by ANY authenticated user, so a brand-new pending

@@ -149,6 +149,17 @@ describe('MySchedule', () => {
     ).toBeInTheDocument();
   });
 
+  it('carries a private note field on each bookmarked session, named to the owner only', () => {
+    renderMySchedule({ bookmarkedIds: new Set(['fx-late']) });
+    const note = screen.getByLabelText('Private note');
+    // The field states who can read it, in the placeholder the reader meets
+    // before they type.
+    expect(note.placeholder).toBe('Only you can see this.');
+    // The save answer lives in a status line beside the field, not in a
+    // toast that belongs to the page.
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
   it('prompts a signed-out visitor to sign in, rather than showing an empty list', () => {
     renderMySchedule({ auth: { user: null, loading: false }, profile: { attendeeAccess: false } });
     expect(screen.getByRole('heading', { name: 'Sign in to see your schedule' })).toBeInTheDocument();

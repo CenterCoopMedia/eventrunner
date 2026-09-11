@@ -117,7 +117,8 @@ export function SpeakerNames({
  *           bookmarked?: boolean, linkToDetail?: boolean,
  *           callingPoints?: object[], backIssue?: boolean,
  *           position?: number | null, lead?: boolean,
- *           savedCount?: number, state?: 'running' | 'finished' | null }} props
+ *           savedCount?: number, state?: 'running' | 'finished' | null,
+ *           noteSlot?: import('react').ReactNode }} props
  *
  * `position` is the session's real place in its day, counted from one. It
  * renders only where the Schedule style numbers the programme, and it is
@@ -127,6 +128,9 @@ export function SpeakerNames({
  * the session's aggregate bookmark figure (issue #165); a session nobody
  * saved draws nothing. `state` is where the session stands against the
  * event clock (issue #167); a session that has not started draws nothing.
+ * `noteSlot` is the caller's own block at the foot of the row — the
+ * personal schedule's private note field (#170); the public page passes
+ * nothing and renders nothing.
  */
 export default function SessionCard({
   session,
@@ -140,6 +144,7 @@ export default function SessionCard({
   lead = false,
   savedCount,
   state = null,
+  noteSlot = null,
 }) {
   const speakerNames = useSessionSpeakerNames(session.speakerIds);
   const range = formatSessionTimeRange(eventConfig, session);
@@ -241,6 +246,7 @@ export default function SessionCard({
               backIssue={backIssue}
             />
           </div>
+          {noteSlot}
         </div>
       </article>
     </li>

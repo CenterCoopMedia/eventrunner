@@ -220,6 +220,21 @@ service cloud.firestore {
         allow read: if isSelf(userId);
         allow write: if false;
       }
+
+      // Private per-session notes (issue #170). The owner reads, writes,
+      // and clears their own subtree directly — a note is the attendee's own
+      // words about their own programme, so unlike bookmarks there is no
+      // server function in between the reader and the document. A note is
+      // text and only text, capped in length; any other shape is refused
+      // rather than stored, so this subtree can never grow into a second
+      // profile nobody audited.
+      match /sessionNotes/{noteId} {
+        allow read, delete: if isSelf(userId);
+        allow create, update: if isSelf(userId)
+          && request.resource.data.keys() == ['text']
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 10000;
+      }
     }
 
     // The requester's OWN registration state, read from their users doc.
