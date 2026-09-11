@@ -104,7 +104,7 @@ export function matchesFilters(session, selected) {
   const formats = Array.isArray(selected?.formats) ? selected.formats : [];
   if (formats.length > 0 && !formats.includes(session?.type)) return false;
   const tracks = Array.isArray(selected?.tracks) ? selected.tracks : [];
-  if (tracks.length > 0 && !tracks.includes(fold(session?.track))) return false;
+  if (tracks.length > 0 && !tracks.map(fold).includes(fold(session?.track))) return false;
   return true;
 }
 

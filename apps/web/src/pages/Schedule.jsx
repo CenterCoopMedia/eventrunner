@@ -23,11 +23,12 @@ import SectionHead from '../components/editorial/SectionHead.jsx';
 import { PlateNumber } from '../components/editorial/Plate.jsx';
 import Marginalia from '../components/editorial/Marginalia.jsx';
 import SearchField from '../components/forms/SearchField.jsx';
+import FilterGroup from '../components/forms/FilterGroup.jsx';
 import ScheduleGrid from '../components/ScheduleGrid.jsx';
 import SchedulePrint from '../components/SchedulePrint.jsx';
 import HorizontalScrollRegion from '../components/HorizontalScrollRegion.jsx';
 import { resolveTracks } from '../lib/scheduleGrid.js';
-import { buildSearchIndex, filterEntries, matchesQuery } from '../lib/scheduleView.js';
+import { buildSearchIndex, collectFormats, filterEntries, matchesFilters, matchesQuery } from '../lib/scheduleView.js';
 import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
@@ -79,6 +80,11 @@ export default function Schedule() {
   // owns the query; every narrowing below reads it, and clearing restores
   // the full day by construction.
   const [query, setQuery] = useState('');
+  // The facet filters narrow the same set (issue #163). Selection is the
+  // shared checkbox device's job — weight and a drawn mark, never color
+  // alone — and each group carries its own clear control and count.
+  const [formats, setFormats] = useState([]);
+  const [tracks, setTracks] = useState([]);
 
   // Days are runtime config — a live config/event write could deliver a
   // malformed entry; drop anything without a usable string id rather than
@@ -131,6 +137,23 @@ export default function Schedule() {
     [scheduleData, speakerNamesById, eventConfig],
   );
 
+  // One filter group per facet, and neither list is fixed in code: the
+  // formats come from the session records (issue #163), the tracks from
+  // config/event.tracks. Counts describe the whole programme, so a count is
+  // true whichever day is open.
+  const formatOptions = useMemo(() => collectFormats(visibleSessions), [visibleSessions]);
+  const trackOptions = useMemo(
+    () =>
+      resolveTracks(eventConfig).map((column) => ({
+        value: column.letter,
+        label: `${column.letter} · ${column.name}`,
+        count: visibleSessions.filter(
+          (session) => String(session?.track ?? '').trim().toUpperCase() === column.letter,
+        ).length,
+      })),
+    [eventConfig, visibleSessions],
+  );
+
   // Every hook sits above this point: the branch below can end the
   // component before any of the work further down runs.
   if (!features.schedule) {
@@ -149,18 +172,16 @@ export default function Schedule() {
 
   const activeDay = days.find((d) => d.id === activeDayId) ?? null;
   const activeSessions = activeDayId ? (sessionsByDay.get(activeDayId) ?? []) : [];
-  // The day narrowed by the search (issue #162). An empty query keeps the
-  // whole day, so clearing restores it by construction. A calling point a
-  // query matches keeps its parent's row, and a matched parent keeps all of
-  // its calling points — lib/scheduleView.js owns those rules, and with an
-  // all-keeping predicate it folds exactly the entries withCallingPoints
-  // would.
-  const entries = filterEntries(
-    activeSessions,
-    query.trim()
-      ? (session) => matchesQuery(searchIndex.get(session.id) ?? '', query)
-      : () => true,
-  );
+  // The day narrowed by the search and the facets (issues #162, #163). An
+  // empty query and empty facets keep the whole day, so clearing restores
+  // it by construction. A calling point a predicate matches keeps its
+  // parent's row, and a matched parent keeps all of its calling points —
+  // lib/scheduleView.js owns those rules, and with an all-keeping
+  // predicate it folds exactly the entries withCallingPoints would.
+  const entries = filterEntries(activeSessions, (session) => {
+    if (query.trim() && !matchesQuery(searchIndex.get(session.id) ?? '', query)) return false;
+    return matchesFilters(session, { formats, tracks });
+  });
   // What the count sentence says: every session still in the document,
   // calling points included — they are sessions a reader can pick too.
   const matchedCount = entries.reduce((count, entry) => count + 1 + entry.children.length, 0);
@@ -258,16 +279,42 @@ export default function Schedule() {
           {/* The controls that narrow what the day shows. Controls do not
               print: a button on paper is a lie (index.css, the print
               block), and so is a search box. */}
-          <div className="no-print mt-md max-w-prose">
-            <SearchField
-              label="Search this day"
-              value={query}
-              onChange={setQuery}
-              status={
-                query.trim() ? `${matchedCount} sessions match “${query.trim()}”` : undefined
-              }
-              placeholder="Title, room, speaker…"
-            />
+          <div className="no-print mt-md flex flex-wrap items-start gap-lg">
+            <div className="w-full max-w-prose lg:w-auto lg:flex-1">
+              <SearchField
+                label="Search this day"
+                value={query}
+                onChange={setQuery}
+                status={
+                  query.trim() ? `${matchedCount} sessions match “${query.trim()}”` : undefined
+                }
+                placeholder="Title, room, speaker…"
+              />
+            </div>
+            {/* A group renders only when its facet has something to offer:
+                a filter over nothing is a dead control. */}
+            {formatOptions.length > 0 ? (
+              <div className="flex-1">
+                <FilterGroup
+                  legend="Format"
+                  options={formatOptions}
+                  selected={formats}
+                  onChange={setFormats}
+                  clearLabel="Clear format filter"
+                />
+              </div>
+            ) : null}
+            {trackOptions.length > 0 ? (
+              <div className="flex-1">
+                <FilterGroup
+                  legend="Track"
+                  options={trackOptions}
+                  selected={tracks}
+                  onChange={setTracks}
+                  clearLabel="Clear track filter"
+                />
+              </div>
+            ) : null}
           </div>
 
           {/* The sheet the programme is drawn on (brief §4.6): a faint

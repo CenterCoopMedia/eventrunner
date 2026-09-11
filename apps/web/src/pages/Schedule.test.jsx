@@ -572,6 +572,68 @@ describe('schedule search', () => {
   });
 });
 
+describe('schedule filters', () => {
+  const tracked = [
+    { ...fixtureSessions[1], track: 'A' },
+    { ...fixtureSessions[0], track: 'B' },
+  ];
+  const eventWithTracks = {
+    ...fixtureConfig,
+    tracks: [
+      { letter: 'A', name: 'Practice' },
+      { letter: 'B', name: 'Craft' },
+    ],
+  };
+
+  it('a format filter narrows the day, and its clear control restores it', () => {
+    renderSchedule();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'workshop (1)' }));
+    expect(onScreen().getByText('[Fixture] Afternoon editing lab')).toBeInTheDocument();
+    expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
+    // The active count is part of the group's own legend.
+    expect(screen.getByText('Format')).toBeInTheDocument();
+    expect(screen.getByText(/— 1 on/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear format filter' }));
+    expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+    expect(screen.queryByText(/— 1 on/)).toBeNull();
+  });
+
+  it('a track filter narrows both views, and clearing restores them', () => {
+    const original = window.matchMedia;
+    window.matchMedia = () => ({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    try {
+      renderSchedule({ scheduleData: tracked, eventConfig: eventWithTracks });
+      expect(screen.getByRole('table')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'A · Practice (1)' }));
+      expect(
+        within(screen.getByRole('table')).getByText('[Fixture] Morning kickoff'),
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('table')).queryByText('[Fixture] Afternoon editing lab'),
+      ).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear track filter' }));
+      expect(
+        within(screen.getByRole('table')).getByText('[Fixture] Afternoon editing lab'),
+      ).toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it('offers no format group when no session names a format', () => {
+    renderSchedule({ scheduleData: [{ ...fixtureSessions[0], type: null }] });
+    expect(screen.queryByText('Format')).toBeNull();
+  });
+});
+
 describe('the back issue', () => {
   // The fixture event runs in October 2026. These render it from a day the
   // event has already passed, and from an operator's archive date.

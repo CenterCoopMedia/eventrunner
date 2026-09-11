@@ -103,6 +103,7 @@ describe('matchesFilters', () => {
 
   it('a track filter compares the letter the session stores', () => {
     expect(matchesFilters(day[3], { tracks: ['b'] })).toBe(true);
+    expect(matchesFilters(day[3], { tracks: ['B'] })).toBe(true);
     expect(matchesFilters(day[1], { tracks: ['b'] })).toBe(false);
   });
 
