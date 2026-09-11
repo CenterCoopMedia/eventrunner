@@ -97,8 +97,17 @@ export default function Nameplate({
   // is what lets the row fit a box narrower than its longest word. It
   // breaks only a word that cannot fit, so nothing changes at a width where
   // the word fits (interface guidelines, Responsive).
+  //
+  // `items-start`, not `items-center` (issue #252): centring aligned the
+  // mark with the middle of the whole row, so a name that wrapped to two
+  // lines stranded the mark beside the second line instead of the first —
+  // the demo name rendered as "Harborlig / ht Media Summit" at 320px with
+  // the mark floating between them. Starting the alignment pins the mark to
+  // the first line at every width, and to the only line when the name does
+  // not wrap: a single-line row keeps its height, so the at-rest figure in
+  // every style moves by at most the mark's own overhang, a few pixels.
   const nameBody = (
-    <span className="inline-flex items-center gap-xs wrap-anywhere">
+    <span className="inline-flex items-start gap-xs wrap-anywhere">
       {mark ?? (
         <Motif
           slot="nameplate-mark"

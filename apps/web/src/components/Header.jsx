@@ -55,8 +55,13 @@ export default function Header({
   // the same shape the nameplate carries; the measurement is written up
   // there (interface guidelines, Responsive: no page scrolls sideways at
   // 320px).
+  //
+  // `items-start`, not `items-center`: when the name wraps to a second
+  // line, centring put the mark beside the middle line of its own row;
+  // starting it puts the mark beside the first line at every width, and
+  // beside the only line when the name does not wrap (issue #252).
   const wordmark = (
-    <span className="inline-flex items-center gap-xs wrap-anywhere">
+    <span className="inline-flex items-start gap-xs wrap-anywhere">
       {mark}
       {name}
     </span>

@@ -114,6 +114,20 @@ describe('Header treatments', () => {
     expect(row.className).toContain('wrap-anywhere');
   });
 
+  it.each([...THEME_HEADERS].filter((variant) => variant !== 'minimal'))('%s keeps the mark beside the first line when the wordmark wraps', (variant) => {
+    // `items-start`, not `items-center` (issue #252): centring aligned the
+    // mark with the middle of the whole row, so a wrapped name stranded it
+    // beside a later line. The minimal treatment hides the name behind the
+    // mark and has no wrapping wordmark row, so it is not in this list.
+    // jsdom lays flex out only through the class, so the alignment class is
+    // what is asserted — the same shape the nameplate's own test pins.
+    const { container } = renderHeader({ variant, mark: <img src="/branding/mark.svg" alt="" /> });
+    const row = container.querySelector('span.inline-flex.wrap-anywhere');
+    expect(row, 'the wordmark is not one flex row').toBeTruthy();
+    expect(row.className).toContain('items-start');
+    expect(row.className).not.toContain('items-center');
+  });
+
   it('renders no dateline at all rather than an empty line', () => {
     const { container } = renderHeader({ variant: 'standard', dates: null, place: null });
     expect(container.querySelectorAll('p')).toHaveLength(1);

@@ -176,6 +176,30 @@ describe('Nameplate', () => {
     expect(row.className).not.toContain('break-words');
   });
 
+  it.each(['full', 'compact'])('keeps the mark beside the first line when the name wraps (%s)', (variant) => {
+    // `items-start`, not `items-center` (issue #252): with centring, a name
+    // that wrapped to two lines stranded the mark beside the middle of its
+    // own row — the demo name rendered as "Harborlig / ht Media Summit" at
+    // 320px with the mark floating between them. Starting the alignment
+    // pins the mark to the first line at every width, and to the only line
+    // when the name does not wrap, so the at-rest figure moves by at most
+    // the mark's own overhang. jsdom lays flex out only through the class,
+    // so the class is what is asserted, in both treatments and with both
+    // the motif slot and a client mark.
+    const motif = renderPlate({ name: 'Harborlight Media Summit', variant });
+    const row = motif.container.querySelector('.nameplate__name span');
+    expect(row.className).toContain('items-start');
+    expect(row.className).not.toContain('items-center');
+
+    const marked = renderPlate({
+      name: 'Harborlight Media Summit',
+      variant,
+      mark: <img src="/branding/mark.svg" alt="" />,
+    });
+    const markedRow = marked.container.querySelector('.nameplate__name span');
+    expect(markedRow.className).toContain('items-start');
+  });
+
   it('lays the lockup out the way the Header style sets the block', () => {
     // A start-aligned masthead puts the name at one end of the measure and
     // the dateline at the other, which is space-between. A CENTRED one wants
