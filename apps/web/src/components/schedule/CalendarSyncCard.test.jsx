@@ -1,11 +1,13 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ grant: vi.fn(), sync: vi.fn(), read: vi.fn(), save: vi.fn(), user: { uid: 'u1' } }));
+const mocks = vi.hoisted(() => ({
+  grant: vi.fn(), sync: vi.fn(), read: vi.fn(), save: vi.fn(), clear: vi.fn(), user: { uid: 'u1' },
+}));
 vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ user: mocks.user }) }));
 vi.mock('../../lib/calendarSync.js', () => ({
   CalendarScopeRefusedError: class extends Error {},
   requestCalendarAccess: mocks.grant, syncBookmarksToCalendar: mocks.sync,
-  readCalendarId: mocks.read, saveCalendarId: mocks.save,
+  readCalendarId: mocks.read, saveCalendarId: mocks.save, clearCalendarId: mocks.clear,
 }));
 import CalendarSyncCard from './CalendarSyncCard.jsx';
 const eventConfig = { days: [], timezone: 'UTC' };
@@ -17,6 +19,7 @@ beforeEach(() => {
   mocks.sync.mockReset().mockResolvedValue(result);
   mocks.read.mockReset().mockReturnValue('c1');
   mocks.save.mockReset();
+  mocks.clear.mockReset();
 });
 it('updates content changes and deletes the final removed bookmark without concurrent passes', async () => {
   let finish;
@@ -50,6 +53,26 @@ it('requests a fresh token after expiry', async () => {
   fireEvent.click(screen.getByRole('button', { name: /sync my sessions/i }));
   await screen.findByText(/Your calendar is up to date/);
   expect(mocks.grant).toHaveBeenCalledTimes(2);
+});
+it('clears a missing remembered calendar before the next user retry', async () => {
+  mocks.sync.mockImplementationOnce(async (options) => {
+    options.onCalendarMissing('c1');
+    throw Object.assign(new Error('create failed'), { status: 503 });
+  });
+  render(<CalendarSyncCard sessions={[session]} eventConfig={eventConfig} />);
+
+  fireEvent.click(screen.getByRole('button', { name: /sync my sessions/i }));
+  await screen.findByText(/could not be updated just now/);
+  expect(mocks.clear).toHaveBeenCalledWith(mocks.user);
+
+  mocks.sync.mockImplementationOnce(async (options) => {
+    expect(options.previous.calendarId).toBeNull();
+    options.onCalendarCreated('replacement');
+    return { ...result, calendarId: 'replacement' };
+  });
+  fireEvent.click(screen.getByRole('button', { name: /sync my sessions/i }));
+  await screen.findByText(/Your calendar is up to date/);
+  expect(mocks.save).toHaveBeenCalledWith(mocks.user, 'replacement');
 });
 it('aborts pending requests and clears grant ownership when the account changes', async () => {
   let finish;

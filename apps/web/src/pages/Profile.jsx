@@ -116,6 +116,8 @@ export default function Profile() {
   const [customBadgeError, setCustomBadgeError] = useState(null);
   const nameRef = useRef(null);
   const customBadgeRefs = useRef([]);
+  const savedCustomBadgesRef = useRef([]);
+  const remoteCustomBadgesRef = useRef([]);
   // The photo path the SAVED profile currently references. Removing or
   // replacing a photo only changes the form; the old object is deleted once
   // a save has committed, so an abandoned edit never leaves the directory
@@ -127,6 +129,8 @@ export default function Profile() {
   // clobber what the person is currently typing, so this seeds once.
   useEffect(() => {
     if (form != null || profile == null) return;
+    savedCustomBadgesRef.current = Array.isArray(profile.customBadges) ? profile.customBadges : [];
+    remoteCustomBadgesRef.current = savedCustomBadgesRef.current;
     setForm({
       displayName: profile.displayName ?? '',
       pronouns: profile.pronouns ?? '',
@@ -143,6 +147,23 @@ export default function Profile() {
     savedPhotoPathRef.current =
       typeof profile.photoPath === 'string' ? profile.photoPath : null;
   }, [profile, form]);
+
+  // Preserve local text, but never restore a badge removed by moderation
+  // through a later save of an unrelated field.
+  useEffect(() => {
+    if (!profile) return;
+    const key = (badge) => typeof badge === 'string' ? badge.trim().replace(/\s+/g, ' ').toLowerCase() : '';
+    const latest = Array.isArray(profile.customBadges) ? profile.customBadges : [];
+    const remaining = new Set(latest.map(key));
+    const removed = new Set(remoteCustomBadgesRef.current.map(key).filter((badge) => !remaining.has(badge)));
+    remoteCustomBadgesRef.current = latest;
+    if (!removed.size) return;
+    savedCustomBadgesRef.current = savedCustomBadgesRef.current.filter((badge) => !removed.has(key(badge)));
+    setForm((current) => current ? {
+      ...current,
+      customBadges: current.customBadges.map((badge) => removed.has(key(badge)) ? '' : badge),
+    } : current);
+  }, [profile]);
 
   if (!user) {
     return (
@@ -208,6 +229,11 @@ export default function Profile() {
     }
     setNameError(null);
     let customBadges;
+    const normalizedBadges = (values) => validateCustomBadges(values, {
+      blockList: badgesConfig?.customBadgeBlockList,
+    }).valid;
+    const customBadgesChanged = JSON.stringify(normalizedBadges(form.customBadges)) !==
+      JSON.stringify(normalizedBadges(savedCustomBadgesRef.current));
     if (features.customBadges === true) {
       const enteredBadges = form.customBadges.filter((badge) => badge.trim().length > 0);
       const result = validateCustomBadges(enteredBadges, {
@@ -250,12 +276,13 @@ export default function Profile() {
         bio: form.bio.trim(),
         profileVisibility: form.profileVisibility,
         badges: form.badges,
-        ...(features.customBadges === true ? { customBadges } : {}),
+        ...(features.customBadges === true && customBadgesChanged ? { customBadges } : {}),
         // Empty string means "no photo". The rules accept a string or null
         // for photoPath (firestore.rules validSelfProfileTypes), and the
         // projection coerces either to nothing rendered.
         photoPath: form.photoPath ? form.photoPath : null,
       });
+      if (features.customBadges === true && customBadgesChanged) savedCustomBadgesRef.current = customBadges;
       // The save committed, so nothing points at the previous object any
       // more: clean it up. Best effort by design — a failed delete leaves an
       // orphan, which costs storage and nothing else, while failing the save

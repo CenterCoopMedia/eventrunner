@@ -41,6 +41,10 @@ export function saveCalendarId(user, calendarId) {
   localStorage.setItem(calendarStorageKey(user), calendarId);
 }
 
+export function clearCalendarId(user) {
+  localStorage.removeItem(calendarStorageKey(user));
+}
+
 async function call(doFetch, token, method, path, body, signal) {
   const response = await doFetch(`${DISCOVERY}${path}`, {
     method,
@@ -76,33 +80,54 @@ export function calendarEventBody(session, { eventConfig }) {
  */
 export async function syncBookmarksToCalendar({
   token, sessions, eventConfig, previous = null, fetchImpl,
-  onCalendarCreated = () => {}, signal,
+  onCalendarCreated = () => {}, onCalendarMissing = () => {}, signal,
 } = {}) {
   const doFetch = fetchImpl ?? fetch;
   const request = (method, path, body) => call(doFetch, token, method, path, body, signal);
-  let calendarId = previous?.calendarId ?? null;
-  if (!calendarId) {
+  const createCalendar = async () => {
     const calendar = await request('POST', '/calendars', {
       summary: eventConfig.name ? `${eventConfig.name} — my sessions` : 'My event sessions',
     });
-    calendarId = calendar.id;
     // Save before any event write: a partial failure must not create a
     // second calendar on the next attempt.
-    onCalendarCreated(calendarId);
-  }
-  const path = `/calendars/${encodeURIComponent(calendarId)}/events`;
-  const known = new Map();
-  let pageToken;
-  do {
+    onCalendarCreated(calendar.id);
+    return calendar.id;
+  };
+  const listPage = (path, pageToken) => {
     const params = new URLSearchParams({ maxResults: '2500', showDeleted: 'false' });
     if (pageToken) params.set('pageToken', pageToken);
-    const listed = await request('GET', `${path}?${params}`);
+    return request('GET', `${path}?${params}`);
+  };
+
+  let calendarId = previous?.calendarId ?? null;
+  const rememberedCalendarId = calendarId;
+  if (!calendarId) {
+    calendarId = await createCalendar();
+  }
+  let path = `/calendars/${encodeURIComponent(calendarId)}/events`;
+  const known = new Map();
+  let listed;
+  try {
+    listed = await listPage(path);
+  } catch (error) {
+    const missingRememberedCalendar = rememberedCalendarId &&
+      (error.status === 404 || error.status === 410) && !signal?.aborted;
+    if (!missingRememberedCalendar) throw error;
+    onCalendarMissing(rememberedCalendarId);
+    calendarId = await createCalendar();
+    path = `/calendars/${encodeURIComponent(calendarId)}/events`;
+    // This fresh calendar gets one list attempt. A second missing response
+    // is an API failure, not permission to create calendars in a loop.
+    listed = await listPage(path);
+  }
+
+  while (listed) {
     for (const item of listed.items ?? []) {
       const sessionId = item.extendedProperties?.private?.[SESSION_PROPERTY];
       if (sessionId && item.status !== 'cancelled') known.set(sessionId, item.id);
     }
-    pageToken = listed.nextPageToken;
-  } while (pageToken);
+    listed = listed.nextPageToken ? await listPage(path, listed.nextPageToken) : null;
+  }
 
   const applied = { calendarId, created: 0, updated: 0, deleted: 0, failed: 0, events: {} };
   const wanted = new Map(sessions.map((session) => [session.id, session]));

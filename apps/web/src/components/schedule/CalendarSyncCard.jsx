@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import {
   CalendarScopeRefusedError,
+  clearCalendarId,
   requestCalendarAccess,
   readCalendarId,
   saveCalendarId,
@@ -64,6 +65,10 @@ export default function CalendarSyncCard({ sessions, eventConfig }) {
         onCalendarCreated: (calendarId) => {
           previousRef.current = { calendarId };
           saveCalendarId(user, calendarId);
+        },
+        onCalendarMissing: () => {
+          previousRef.current = { calendarId: null };
+          clearCalendarId(user);
         },
       });
       if (controller.signal.aborted) return;

@@ -12,7 +12,10 @@ vi.mock('firebase/auth', () => ({
   linkWithPopup: authMocks.link,
   reauthenticateWithPopup: authMocks.reauth,
 }));
-const { syncBookmarksToCalendar, calendarEventBody, requestCalendarAccess, readCalendarId, saveCalendarId } = await import('./calendarSync.js');
+const {
+  syncBookmarksToCalendar, calendarEventBody, requestCalendarAccess,
+  readCalendarId, saveCalendarId, clearCalendarId,
+} = await import('./calendarSync.js');
 
 const EVENT = {
   name: '[Fixture] Lakeshore Docs Camp',
@@ -154,6 +157,101 @@ describe('syncBookmarksToCalendar', () => {
     const inserts = calls.filter((call) => call.method === 'POST' && call.url.includes('/events'));
     expect(inserts).toHaveLength(0);
   });
+
+  it.each([404, 410])('replaces a remembered calendar when its first listing returns %i', async (status) => {
+    const calls = [];
+    const missing = vi.fn();
+    const created = vi.fn();
+    const fetchImpl = vi.fn(async (url, init) => {
+      calls.push({ url, method: init.method });
+      if (url.includes('/calendars/stale/events') && init.method === 'GET') {
+        return { ok: false, status };
+      }
+      if (url.endsWith('/calendars') && init.method === 'POST') {
+        return { ok: true, status: 200, json: async () => ({ id: 'replacement' }) };
+      }
+      if (url.includes('/calendars/replacement/events') && init.method === 'GET') {
+        return { ok: true, status: 200, json: async () => ({ items: [] }) };
+      }
+      if (url.includes('/calendars/replacement/events') && init.method === 'POST') {
+        return { ok: true, status: 200, json: async () => ({ id: 'new-event' }) };
+      }
+      return { ok: false, status: 500 };
+    });
+
+    const result = await syncBookmarksToCalendar({
+      token: 'tok', sessions: [SESSION], eventConfig: EVENT,
+      previous: { calendarId: 'stale' }, fetchImpl,
+      onCalendarMissing: missing, onCalendarCreated: created,
+    });
+
+    expect(missing).toHaveBeenCalledWith('stale');
+    expect(created).toHaveBeenCalledWith('replacement');
+    expect(result.calendarId).toBe('replacement');
+    expect(result.created).toBe(1);
+    expect(calls.filter((entry) => entry.url.endsWith('/calendars'))).toHaveLength(1);
+  });
+
+  it.each([401, 403])('does not replace a remembered calendar after a %i listing error', async (status) => {
+    const missing = vi.fn();
+    const created = vi.fn();
+    const fetchImpl = vi.fn(async () => ({ ok: false, status }));
+
+    await expect(syncBookmarksToCalendar({
+      token: 'tok', sessions: [], eventConfig: EVENT,
+      previous: { calendarId: 'stale' }, fetchImpl,
+      onCalendarMissing: missing, onCalendarCreated: created,
+    })).rejects.toMatchObject({ status });
+    expect(missing).not.toHaveBeenCalled();
+    expect(created).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not mistake an event-item 404 for a missing calendar', async () => {
+    const missing = vi.fn();
+    const fetchImpl = vi.fn(async (url, init) => {
+      if (init.method === 'GET') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            items: [{
+              id: 'missing-event',
+              extendedProperties: { private: { 'eventrunner/sessionId': 's1' } },
+            }],
+          }),
+        };
+      }
+      if (url.includes('/events/missing-event') && init.method === 'PUT') {
+        return { ok: false, status: 404 };
+      }
+      return { ok: false, status: 500 };
+    });
+
+    const result = await syncBookmarksToCalendar({
+      token: 'tok', sessions: [SESSION], eventConfig: EVENT,
+      previous: { calendarId: 'kept' }, fetchImpl, onCalendarMissing: missing,
+    });
+    expect(result.calendarId).toBe('kept');
+    expect(result.failed).toBe(1);
+    expect(missing).not.toHaveBeenCalled();
+    expect(fetchImpl.mock.calls.some(([url]) => url.endsWith('/calendars'))).toBe(false);
+  });
+
+  it('does not create a second replacement when the fresh calendar listing fails', async () => {
+    const fetchImpl = vi.fn(async (url, init) => {
+      if (url.endsWith('/calendars') && init.method === 'POST') {
+        return { ok: true, status: 200, json: async () => ({ id: 'replacement' }) };
+      }
+      return { ok: false, status: 404 };
+    });
+
+    await expect(syncBookmarksToCalendar({
+      token: 'tok', sessions: [], eventConfig: EVENT,
+      previous: { calendarId: 'stale' }, fetchImpl,
+    })).rejects.toMatchObject({ status: 404 });
+    expect(fetchImpl.mock.calls.filter(([url]) => url.endsWith('/calendars'))).toHaveLength(1);
+  });
 });
 
 describe('calendarEventBody', () => {
@@ -233,4 +331,7 @@ it('stores only the calendar id and isolates it by attendee, project and Google 
   expect(readCalendarId({ ...user, auth: { app: { options: { projectId: 'demo-other' } } } })).toBeNull();
   expect(localStorage.length).toBe(1);
   expect(localStorage.getItem(localStorage.key(0))).toBe('calendar-id');
+  clearCalendarId(user);
+  expect(readCalendarId(user)).toBeNull();
+  expect(localStorage.length).toBe(0);
 });

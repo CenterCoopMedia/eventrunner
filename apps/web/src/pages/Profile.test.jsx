@@ -203,6 +203,30 @@ describe('Profile', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/blocked or repeated badge/i);
   });
 
+  it('does not resend unchanged custom badges with unrelated profile edits', async () => {
+    features.customBadges = true;
+    profileValue = { ...profileValue, profile: { ...SEEDED_PROFILE, customBadges: ['News nerd'] } };
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Organization'), { target: { value: 'New desk' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(saveProfileMock.mock.calls[0][0]).not.toHaveProperty('customBadges');
+  });
+
+  it('merges remote removals while preserving a different unsaved custom badge', async () => {
+    features.customBadges = true;
+    profileValue = { ...profileValue, profile: { ...SEEDED_PROFILE, customBadges: ['News nerd', 'Local editor'] } };
+    const view = renderPage();
+    fireEvent.change(screen.getByLabelText('Custom badge 2'), { target: { value: 'Community editor' } });
+    profileValue = { ...profileValue, profile: { ...profileValue.profile, customBadges: ['Local editor'] } };
+    view.rerender(<MemoryRouter><Profile /></MemoryRouter>);
+    expect(screen.getByLabelText('Custom badge 1')).toHaveValue('');
+    expect(screen.getByLabelText('Custom badge 2')).toHaveValue('Community editor');
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(saveProfileMock.mock.calls[0][0].customBadges).toEqual(['Community editor']);
+  });
+
   it('omits custom badges from the save when the feature is not exactly true', async () => {
     features.customBadges = 'true';
     profileValue = {

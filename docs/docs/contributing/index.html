@@ -273,13 +273,21 @@
           <p>Every change to <code>main</code> must use a pull request. Branch protection applies to administrators,
           blocks force pushes and deletion, requires an up-to-date <code>CI gate</code>, and requires resolved
           review conversations. Do not bypass or disable these rules to land a repair.</p>
-          <p>The <code>Connector review</code> check waits for the authenticated Codex connector&#39;s completed summary
+          <p>The <code>Connector review</code> check runs gate code from the protected base revision and waits for the authenticated Codex connector&#39;s completed summary
           for the current pull-request commit, then checks every review thread, including outdated
           threads. An ordinary comment, a review that is still running, or a summary for an older
           commit does not pass. Fix verified findings, run the affected checks, push the fix, and resolve
           only completed conversations. A timeout or unavailable connector blocks merging; it is not
           permission to mark the check successful. After a later push, a new connector review may be
-          needed because automatic review currently runs on opening a ready PR, not every push.</p>
+          needed because automatic review currently runs on opening a ready PR, not every push.
+          GitHub does not expose thread-resolution webhooks as Actions triggers. A scheduled check
+          re-evaluates open PRs every ten minutes after a timeout; connector summary comments and manual
+          workflow dispatch also re-evaluate. These checks never request or fabricate a connector review.
+          The installation fallback is pinned to the reviewed gate in commit <code>a8e1cf8</code> and restricted to
+          PR #257 against its original base; subsequent PRs use protected-base code.</p>
+          <p>The required check is produced by GitHub Actions. A credential that can change repository
+          settings or author privileged workflows can still alter or forge this control. A separate
+          GitHub App or organization-enforced workflow is needed to isolate it from workflow writers.</p>
           <p>When web source changes, regenerate both the synthetic content and the committed demo with
           <code>node scripts/generate-content.cjs --demo</code> and <code>node scripts/build-demo.cjs</code>, then run their
           <code>--check</code> modes. Regenerate documentation with <code>node scripts/build-pages.cjs</code> after source

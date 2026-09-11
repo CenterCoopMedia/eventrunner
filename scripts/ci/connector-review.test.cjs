@@ -211,16 +211,49 @@ test('fails immediately when the current pull request head differs from the even
   assert.equal(calls.graphql.length, 0);
 });
 
-test('workflow has only the requested read-only pull request triggers', () => {
+test('workflow executes protected-base code and limits the installation exception', () => {
   const workflowPath = path.resolve(__dirname, '..', '..', '.github', 'workflows', 'connector-review.yml');
   const workflow = fs.readFileSync(workflowPath, 'utf8');
+  assert.match(workflow, /pull_request_target:/);
+  assert.match(workflow, /ref: \$\{\{ github.event.pull_request.base.sha \|\| github.event.repository.default_branch \}\}/);
+  assert.doesNotMatch(workflow, /ref:.*head.sha/);
+  assert.match(workflow, /test "\$PULL_NUMBER" = 257/);
+  assert.match(workflow, /git show a8e1cf86b9877bb05b60dad96abeca7fd5c61536:scripts\/ci\/connector-review.cjs/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /issue_comment:/);
+  assert.match(workflow, /schedule:/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /pull_request_review_thread:/);
+  assert.doesNotMatch(workflow, /createComment|requestReviewers|createCommitStatus/);
+});
 
-  assert.match(workflow, /^name: Connector review$/m);
-  assert.match(workflow, /pull_request:\n\s+types: \[opened, synchronize, reopened, ready_for_review\]/);
-  assert.match(workflow, /pull_request_review:\n\s+types: \[submitted, edited, dismissed\]/);
-  assert.doesNotMatch(workflow, /^\s*push:/m);
-  assert.match(workflow, /permissions:\n\s+contents: read\n\s+pull-requests: read\n\s+issues: read/);
-  assert.match(workflow, /name: Connector review[\s\S]*timeout-minutes: 30/);
-  assert.match(workflow, /actions\/checkout@v4[\s\S]*actions\/github-script@v7/);
-  assert.doesNotMatch(workflow, /statuses: write|checks: write|createComment|requestReviewers|createCommitStatus/);
+test('scheduled recovery reports the evaluated PR head, never an unrelated base commit', async () => {
+  const workflowPath = path.resolve(__dirname, '..', '..', '.github', 'workflows', 'connector-review.yml');
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const inline = workflow.split('          script: |\n')[1].split('\n').map((line) => line.slice(12)).join('\n');
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const evaluate = new AsyncFunction('require', 'github', 'context', 'core', inline);
+  const created = [];
+  const updated = [];
+  const pull = { number: 257, state: 'open', draft: false, base: { ref: 'main' }, head: { sha: HEAD_SHA } };
+  const github = {
+    paginate: async () => [pull],
+    rest: { pulls: { list() {} }, checks: {
+      create: async (args) => { created.push(args); return { data: { id: 5 } }; },
+      update: async (args) => updated.push(args),
+    } },
+  };
+  let ready = false;
+  const requireGate = () => ({ inspectConnectorReview: async (args) => {
+    assert.equal(args.expectedHeadSha, HEAD_SHA);
+    return { ready, reason: '1 unresolved review thread(s)', threadCount: 1 };
+  } });
+  const context = { repo: { owner: 'CenterCoopMedia', repo: 'eventrunner' }, payload: {}, eventName: 'schedule', serverUrl: 'https://github.com', runId: 1 };
+  await evaluate(requireGate, github, context, { warning() {} });
+  assert.equal(created[0].head_sha, HEAD_SHA);
+  assert.equal(created[0].name, 'Connector review');
+  assert.equal(updated[0].conclusion, 'failure');
+  ready = true;
+  await evaluate(requireGate, github, context, { warning() {} });
+  assert.equal(updated[1].conclusion, 'success');
 });
