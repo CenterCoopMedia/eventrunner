@@ -84,6 +84,12 @@ describe('useSessionNote', () => {
     });
     expect(result.current.state).toBe('error');
     expect(result.current.draft).toBe('kept');
+
+    act(() => {
+      subscribeMock.mock.calls[0][2]('From the listener');
+    });
+    expect(result.current.state).toBe('error');
+    expect(result.current.draft).toBe('kept');
   });
 
   it('flushes the latest draft on blur without waiting for the debounce', async () => {
@@ -244,15 +250,48 @@ describe('useSessionNote', () => {
     expect(result.current.draft).toBe('');
   });
 
-  it('exposes listener errors without discarding the draft', () => {
+  it('clears a listener error when that listener delivers a later snapshot', () => {
+    const { result } = renderHook(() => useSessionNote('u1', 's1'));
+
+    act(() => {
+      subscribeMock.mock.calls[0][3](new Error('offline'));
+    });
+    expect(result.current.state).toBe('error');
+
+    act(() => {
+      subscribeMock.mock.calls[0][2]('Recovered text');
+    });
+    expect(result.current.state).toBe('saved');
+    expect(result.current.saved).toBe('Recovered text');
+    expect(result.current.draft).toBe('Recovered text');
+  });
+
+  it('listener errors do not replace a pending edit or save, or discard its draft', async () => {
+    const delayedSave = deferred();
+    saveMock.mockImplementationOnce(() => delayedSave.promise);
     const { result } = renderHook(() => useSessionNote('u1', 's1'));
 
     act(() => {
       result.current.edit('kept');
       subscribeMock.mock.calls[0][3](new Error('offline'));
     });
-    expect(result.current.state).toBe('error');
+    expect(result.current.state).toBe('editing');
     expect(result.current.draft).toBe('kept');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800);
+    });
+    expect(result.current.state).toBe('saving');
+    act(() => {
+      subscribeMock.mock.calls[0][3](new Error('still offline'));
+    });
+    expect(result.current.state).toBe('saving');
+    expect(result.current.draft).toBe('kept');
+
+    await act(async () => {
+      delayedSave.resolve();
+      await delayedSave.promise;
+    });
   });
 
   it('a session with no identity neither subscribes nor saves', async () => {

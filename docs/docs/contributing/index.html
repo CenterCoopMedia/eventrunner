@@ -275,7 +275,11 @@
           review conversations. Do not bypass or disable these rules to land a repair.</p>
           <p>The <code>Connector review</code> check runs gate code from the protected base revision and waits for the authenticated Codex connector&#39;s completed summary
           for the current pull-request commit, then checks every review thread, including outdated
-          threads. An ordinary comment, a review that is still running, or a summary for an older
+          threads. The short commit ID in the summary must identify exactly one full commit ID in
+          GitHub PR workflow runs created before the reported completion time. Missing or ambiguous
+          run history blocks merging; matching a short prefix alone is insufficient. CI must retain
+          an unfiltered pull-request trigger. Run records must identify this PR; fork runs without
+          that association fail closed. An ordinary comment, a review that is still running, or a summary for an older
           commit does not pass. Fix verified findings, run the affected checks, push the fix, and resolve
           only completed conversations. A timeout or unavailable connector blocks merging; it is not
           permission to mark the check successful. After a later push, a new connector review may be
@@ -283,7 +287,7 @@
           GitHub does not expose thread-resolution webhooks as Actions triggers. A scheduled check
           re-evaluates open PRs every ten minutes after a timeout; connector summary comments and manual
           workflow dispatch also re-evaluate. These checks never request or fabricate a connector review.
-          The installation fallback is pinned to the reviewed gate in commit <code>a8e1cf8</code> and restricted to
+          The installation fallback is pinned to the reviewed gate in commit <code>a6ef882</code> and restricted to
           PR #257 against its original base; subsequent PRs use protected-base code.</p>
           <p>The required check is produced by GitHub Actions. A credential that can change repository
           settings or author privileged workflows can still alter or forge this control. A separate

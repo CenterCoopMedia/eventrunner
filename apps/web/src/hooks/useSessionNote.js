@@ -36,6 +36,7 @@ export function useSessionNote(uid, sessionId) {
   const identityRef = useRef(null);
   const renderedIdentityRef = useRef(null);
   const latestEditRef = useRef(null);
+  const listenerErrorRef = useRef(false);
   const writeQueueRef = useRef(Promise.resolve());
   renderedIdentityRef.current = { uid, sessionId };
 
@@ -75,6 +76,7 @@ export function useSessionNote(uid, sessionId) {
       () => {
         editRecord.queued = false;
         if (identityRef.current === editRecord.identity && latestEditRef.current === editRecord) {
+          listenerErrorRef.current = false;
           setState('error');
         }
       },
@@ -84,6 +86,7 @@ export function useSessionNote(uid, sessionId) {
   useEffect(() => {
     clearTimeout(timerRef.current);
     timerRef.current = null;
+    listenerErrorRef.current = false;
     setSaved('');
     setDraft(null);
 
@@ -103,14 +106,23 @@ export function useSessionNote(uid, sessionId) {
       sessionId,
       (text) => {
         if (identityRef.current !== identity) return;
+        const recoveredListenerError = listenerErrorRef.current;
+        listenerErrorRef.current = false;
         setSaved(text);
         setLoading(false);
-        setState((current) => (current === 'loading' ? 'saved' : current));
+        setState((current) => {
+          if (current === 'loading') return 'saved';
+          if (recoveredListenerError && current === 'error' && !latestEditRef.current) {
+            return 'saved';
+          }
+          return current;
+        });
       },
       () => {
         if (identityRef.current !== identity) return;
+        listenerErrorRef.current = true;
         setLoading(false);
-        setState('error');
+        if (latestEditRef.current?.identity !== identity) setState('error');
       },
     );
     return () => {

@@ -203,6 +203,22 @@ describe('Profile', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/blocked or repeated badge/i);
   });
 
+  it('persists clearing a stored badge newly rejected by the live block list', async () => {
+    features.customBadges = true;
+    badgesConfig = { customBadgeBlockList: ['crypto'] };
+    profileValue = {
+      ...profileValue,
+      profile: { ...SEEDED_PROFILE, customBadges: ['Crypto fan'] },
+    };
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('Custom badge 1'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(saveProfileMock.mock.calls[0][0].customBadges).toEqual([]);
+  });
+
   it('does not resend unchanged custom badges with unrelated profile edits', async () => {
     features.customBadges = true;
     profileValue = { ...profileValue, profile: { ...SEEDED_PROFILE, customBadges: ['News nerd'] } };

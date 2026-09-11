@@ -221,7 +221,7 @@ test('workflow executes protected-base code and limits the installation exceptio
   assert.match(workflow, /ref: \$\{\{ github.event.pull_request.base.sha \|\| github.event.repository.default_branch \}\}/);
   assert.doesNotMatch(workflow, /ref:.*head.sha/);
   assert.match(workflow, /test "\$PULL_NUMBER" = 257/);
-  assert.match(workflow, /git show a8e1cf86b9877bb05b60dad96abeca7fd5c61536:scripts\/ci\/connector-review.cjs/);
+  assert.match(workflow, /git show a6ef882577ee61b9e61d500c7b2bc9670462d373:scripts\/ci\/connector-review.cjs/);
   assert.match(workflow, /persist-credentials: false/);
   assert.match(workflow, /issue_comment:/);
   assert.match(workflow, /schedule:/);

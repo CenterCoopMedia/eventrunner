@@ -229,13 +229,13 @@ export default function Profile() {
     }
     setNameError(null);
     let customBadges;
-    const normalizedBadges = (values) => validateCustomBadges(values, {
-      blockList: badgesConfig?.customBadgeBlockList,
-    }).valid;
-    const customBadgesChanged = JSON.stringify(normalizedBadges(form.customBadges)) !==
-      JSON.stringify(normalizedBadges(savedCustomBadgesRef.current));
+    const nonEmptyCustomBadges = (values) => values.filter(
+      (badge) => typeof badge === 'string' && badge.trim().length > 0,
+    );
+    const enteredBadges = nonEmptyCustomBadges(form.customBadges);
+    const savedBadges = nonEmptyCustomBadges(savedCustomBadgesRef.current);
+    const customBadgesChanged = JSON.stringify(enteredBadges) !== JSON.stringify(savedBadges);
     if (features.customBadges === true) {
-      const enteredBadges = form.customBadges.filter((badge) => badge.trim().length > 0);
       const result = validateCustomBadges(enteredBadges, {
         blockList: badgesConfig?.customBadgeBlockList,
       });

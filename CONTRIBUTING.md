@@ -176,7 +176,11 @@ review conversations. Do not bypass or disable these rules to land a repair.
 
 The `Connector review` check runs gate code from the protected base revision and waits for the authenticated Codex connector's completed summary
 for the current pull-request commit, then checks every review thread, including outdated
-threads. An ordinary comment, a review that is still running, or a summary for an older
+threads. The short commit ID in the summary must identify exactly one full commit ID in
+GitHub PR workflow runs created before the reported completion time. Missing or ambiguous
+run history blocks merging; matching a short prefix alone is insufficient. CI must retain
+an unfiltered pull-request trigger. Run records must identify this PR; fork runs without
+that association fail closed. An ordinary comment, a review that is still running, or a summary for an older
 commit does not pass. Fix verified findings, run the affected checks, push the fix, and resolve
 only completed conversations. A timeout or unavailable connector blocks merging; it is not
 permission to mark the check successful. After a later push, a new connector review may be
@@ -184,7 +188,7 @@ needed because automatic review currently runs on opening a ready PR, not every 
 GitHub does not expose thread-resolution webhooks as Actions triggers. A scheduled check
 re-evaluates open PRs every ten minutes after a timeout; connector summary comments and manual
 workflow dispatch also re-evaluate. These checks never request or fabricate a connector review.
-The installation fallback is pinned to the reviewed gate in commit `a8e1cf8` and restricted to
+The installation fallback is pinned to the reviewed gate in commit `a6ef882` and restricted to
 PR #257 against its original base; subsequent PRs use protected-base code.
 
 The required check is produced by GitHub Actions. A credential that can change repository
