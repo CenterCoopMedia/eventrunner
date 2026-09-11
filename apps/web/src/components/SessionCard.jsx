@@ -13,6 +13,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';
+import SavedCount from './session/SavedCount.jsx';
 import SessionActions from './session/SessionActions.jsx';
 import SessionFormat from './session/SessionFormat.jsx';
 import CallingPoints from './CallingPoints.jsx';
@@ -114,13 +115,16 @@ export function SpeakerNames({
  * @param {{ session: object, eventConfig: object, features?: object,
  *           bookmarked?: boolean, linkToDetail?: boolean,
  *           callingPoints?: object[], backIssue?: boolean,
- *           position?: number | null, lead?: boolean }} props
+ *           position?: number | null, lead?: boolean,
+ *           savedCount?: number }} props
  *
  * `position` is the session's real place in its day, counted from one. It
  * renders only where the Schedule style numbers the programme, and it is
  * sequence data rather than decoration — the same rule the plate number
  * follows (brief §2.4). `lead` marks the first session of a day, which the
- * lead-and-rest Schedule style sets larger than the rest.
+ * lead-and-rest Schedule style sets larger than the rest. `savedCount` is
+ * the session's aggregate bookmark figure (issue #165); a session nobody
+ * saved draws nothing.
  */
 export default function SessionCard({
   session,
@@ -132,6 +136,7 @@ export default function SessionCard({
   backIssue = false,
   position = null,
   lead = false,
+  savedCount,
 }) {
   const speakerNames = useSessionSpeakerNames(session.speakerIds);
   const range = formatSessionTimeRange(eventConfig, session);
@@ -181,6 +186,7 @@ export default function SessionCard({
             )}
           </h3>
           <SessionFormat format={session.type} />
+          <SavedCount count={savedCount} />
         </div>
         <p className="session-block__data mt-2xs font-mono text-text-secondary sm:col-start-1 sm:row-start-1 sm:row-span-2 sm:mt-0">
           {position ? <span className="session-block__number">{position}</span> : null}

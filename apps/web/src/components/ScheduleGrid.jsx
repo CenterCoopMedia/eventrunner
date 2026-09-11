@@ -39,6 +39,7 @@ import { Link, useLocation } from 'react-router-dom';
 import RouteMark from './editorial/RouteMark.jsx';
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';
 import CallingPoints from './CallingPoints.jsx';
+import SavedCount from './session/SavedCount.jsx';
 import SessionFormat from './session/SessionFormat.jsx';
 import RecordingLink, { sessionRecordingUrl } from './session/RecordingLink.jsx';
 import { buildGridRows } from '../lib/scheduleGrid.js';
@@ -58,7 +59,7 @@ import { formatSessionStart, formatSessionTimeRange } from '../lib/eventTime.js'
  * every desktop reader to the session page to find out whether a recording
  * existed at all.
  */
-function GridEntry({ entry, eventConfig }) {
+function GridEntry({ entry, eventConfig, countsById }) {
   const recordingUrl = sessionRecordingUrl(entry.session);
   const { search } = useLocation();
   const range = formatSessionTimeRange(eventConfig, entry.session);
@@ -74,6 +75,7 @@ function GridEntry({ entry, eventConfig }) {
           </Link>
         </h3>
         <SessionFormat format={entry.session.type} />
+        <SavedCount count={countsById?.get(entry.session.id)} />
       </div>
       {range?.endLabel ? (
         <p className="mt-3xs font-mono text-caption text-text-secondary">
@@ -110,9 +112,10 @@ function GridEntry({ entry, eventConfig }) {
  *   entries: Array<{ session: object, children: object[] }>,
  *   columns: Array<{ letter: string, name: string }>,
  *   eventConfig: object,
+ *   countsById?: Map<string, number>,
  * }} props
  */
-export default function ScheduleGrid({ day, entries, columns, eventConfig }) {
+export default function ScheduleGrid({ day, entries, columns, eventConfig, countsById }) {
   // Two states, because the reader is doing two things. `focused` is the
   // preview that follows the keyboard; `pinned` is the choice a press
   // keeps. Focus wins while it lasts, which is what makes tabbing across
@@ -174,7 +177,7 @@ export default function ScheduleGrid({ day, entries, columns, eventConfig }) {
                 // runs across the whole row.
                 <td className="schedule-grid__cell" colSpan={columns.length}>
                   {row.span.map((entry) => (
-                    <GridEntry key={entry.session.id} entry={entry} eventConfig={eventConfig} />
+                    <GridEntry key={entry.session.id} entry={entry} eventConfig={eventConfig} countsById={countsById} />
                   ))}
                 </td>
               ) : (
@@ -186,7 +189,7 @@ export default function ScheduleGrid({ day, entries, columns, eventConfig }) {
                     data-track-forward={forward === cell.track ? 'true' : undefined}
                   >
                     {cell.entries.map((entry) => (
-                      <GridEntry key={entry.session.id} entry={entry} eventConfig={eventConfig} />
+                      <GridEntry key={entry.session.id} entry={entry} eventConfig={eventConfig} countsById={countsById} />
                     ))}
                   </td>
                 ))

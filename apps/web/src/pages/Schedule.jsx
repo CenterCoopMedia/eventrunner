@@ -15,6 +15,7 @@ import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
+import { useBookmarkCounts } from '../hooks/useBookmarkCounts.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
@@ -80,6 +81,10 @@ export default function Schedule() {
   const { user } = useAuth();
   const { attendeeAccess } = useProfile();
   const { bookmarkedIds } = useMyBookmarks();
+  // The public aggregate counts (issue #165): the figure beside each
+  // session, the legend in the header, and the most-saved sort all read
+  // this one listener.
+  const { countsById } = useBookmarkCounts();
   // Which of the two views is in the document at all (lib/viewport.js). The
   // list is the answer until the viewport is measured and found wide, so a
   // browser that cannot be asked gets the accessible baseline rather than a
@@ -230,9 +235,7 @@ export default function Schedule() {
       return matchesFilters(session, { formats, tracks });
     }),
     sort,
-    // The bookmark counts land with the counts row; until then most saved
-    // degrades to programme order (sortEntries).
-    null,
+    countsById,
   );
   // What the count sentence says: every session still in the document,
   // calling points included — they are sessions a reader can pick too.
@@ -263,6 +266,14 @@ export default function Schedule() {
           {eventZoneLabel ? (
             <p className="mt-2xs font-data text-caption text-text-secondary">
               All times are shown in {eventZoneLabel}.
+            </p>
+          ) : null}
+          {/* The legend for the saved figure (issue #165). It sits on the
+              schedule header because the figure is meaningless without it:
+              a number is not self-describing. */}
+          {features.sessionBookmarks ? (
+            <p className="mt-2xs font-data text-caption text-text-secondary">
+              “Saved” is how many attendees bookmarked a session.
             </p>
           ) : null}
         </div>
@@ -456,6 +467,7 @@ export default function Schedule() {
                     entries={entries}
                     columns={columns}
                     eventConfig={eventConfig}
+                    countsById={countsById}
                   />
                 </HorizontalScrollRegion>
               ) : (
@@ -474,6 +486,7 @@ export default function Schedule() {
                       bookmarked={bookmarkedIds.has(entry.session.id)}
                       backIssue={backIssue}
                       callingPoints={entry.children}
+                      savedCount={countsById.get(entry.session.id)}
                       // The session's real place in the day, counted from
                       // one: the numbered-agenda Schedule style prints it,
                       // and the lead-and-rest style sets the first row

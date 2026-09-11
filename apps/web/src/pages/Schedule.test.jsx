@@ -3,7 +3,7 @@
 // no Firebase, no network (spec §8.1 credential-free CI). The fixture event
 // is fictional and distinct from the committed snapshot so nothing here
 // accidentally passes by matching demo copy.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
@@ -13,6 +13,13 @@ import ProfileContext from '../contexts/ProfileContext.jsx';
 import ToastContext from '../contexts/ToastContext.jsx';
 import Schedule from './Schedule.jsx';
 import { formatSessionTimeRange, zonedDateTime } from '../lib/eventTime.js';
+
+// The aggregate counts (issue #165) are steered per test through this
+// holder; the hook module is replaced wholesale, so no listener attaches.
+const countsHolder = { countsById: new Map() };
+vi.mock('../hooks/useBookmarkCounts.js', () => ({
+  useBookmarkCounts: () => ({ countsById: countsHolder.countsById }),
+}));
 
 // Non-UTC zone on purpose: America/Chicago is UTC−5 (CDT) on the fixture
 // dates, so a renderer that ignored config.timezone would be caught.
@@ -116,23 +123,25 @@ function renderSchedule({
       >
         <AuthContext.Provider value={auth}>
           <ProfileContext.Provider value={profile}>
-            <ContentContext.Provider
-              value={{
-                readSource: 'published',
-                siteContent: {},
-                scheduleData,
-                speakers: speakerRows,
-                organizationsData: [],
-                loading,
-                getBlock: () => null,
-                // The page shell reads the page document for its layout and
-                // its slot sections (components/SystemPage.jsx).
-                getPage: () => null,
-                getSectionBlocks: () => [],
-              }}
-            >
-              <Schedule />
-            </ContentContext.Provider>
+            <ToastContext.Provider value={{ showToast: () => {}, dismiss: () => {} }}>
+              <ContentContext.Provider
+                value={{
+                  readSource: 'published',
+                  siteContent: {},
+                  scheduleData,
+                  speakers: speakerRows,
+                  organizationsData: [],
+                  loading,
+                  getBlock: () => null,
+                  // The page shell reads the page document for its layout and
+                  // its slot sections (components/SystemPage.jsx).
+                  getPage: () => null,
+                  getSectionBlocks: () => [],
+                }}
+              >
+                <Schedule />
+              </ContentContext.Provider>
+            </ToastContext.Provider>
           </ProfileContext.Provider>
         </AuthContext.Provider>
       </EventConfigContext.Provider>
@@ -707,6 +716,81 @@ describe('the view in the URL', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Day two' }));
     expect(onScreen().getByText('[Fixture] Day-two roundtable')).toBeInTheDocument();
     expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
+  });
+});
+
+describe('bookmark counts on the schedule', () => {
+  // The count holder is module scope; every test sets what it needs.
+  function renderWithCounts(counts, props = {}) {
+    countsHolder.countsById = counts;
+    return renderSchedule({ features: { schedule: true, sessionBookmarks: true }, ...props });
+  }
+
+  it('a bookmarked session shows the count as a labelled figure, with the legend on the header', () => {
+    renderWithCounts(new Map([['fx-early', 7]]));
+
+    expect(screen.getByText('“Saved” is how many attendees bookmarked a session.')).toBeInTheDocument();
+    // The figure is a number in the mono face and the word beside it, so
+    // the sentence is matched across the two.
+    const savedFigure = (count) =>
+      onScreen().getByText((content, element) => element.tagName === 'P' && element.textContent === `${count} saved`);
+    expect(savedFigure(7)).toBeInTheDocument();
+    // A session nobody saved draws no figure at all — a row of zeros is noise.
+    expect(onScreen().queryByText((content, element) => element.tagName === 'P' && element.textContent === '0 saved')).toBeNull();
+    countsHolder.countsById = new Map();
+  });
+
+  it('the figure appears in the grid too', () => {
+    const original = window.matchMedia;
+    window.matchMedia = () => ({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    try {
+      const tracked = [
+        { ...fixtureSessions[1], track: 'A' },
+        { ...fixtureSessions[0], track: 'B' },
+      ];
+      renderWithCounts(new Map([['fx-early', 3]]), {
+        scheduleData: tracked,
+        eventConfig: {
+          ...fixtureConfig,
+          tracks: [
+            { letter: 'A', name: 'Practice' },
+            { letter: 'B', name: 'Craft' },
+          ],
+        },
+      });
+      expect(
+        within(screen.getByRole('table')).getByText(
+          (content, element) => element.tagName === 'P' && element.textContent === '3 saved',
+        ),
+      ).toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+      countsHolder.countsById = new Map();
+    }
+  });
+
+  it('the most saved sort orders by the counts', () => {
+    renderWithCounts(
+      new Map([
+        ['fx-late', 5],
+        ['fx-early', 1],
+      ]),
+    );
+
+    // The page opens sorted by time; choosing most saved reorders it.
+    const times = () =>
+      onScreen()
+        .getAllByRole('heading', { level: 3 })
+        .map((heading) => heading.textContent);
+    expect(times()).toEqual(['[Fixture] Morning kickoff', '[Fixture] Afternoon editing lab']);
+
+    fireEvent.change(screen.getByLabelText('Sort sessions'), { target: { value: 'saved' } });
+    expect(times()).toEqual(['[Fixture] Afternoon editing lab', '[Fixture] Morning kickoff']);
+    countsHolder.countsById = new Map();
   });
 });
 
