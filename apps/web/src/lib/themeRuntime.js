@@ -342,7 +342,7 @@ export function buildRuntimeThemeCss(themeDoc) {
   // The preset's own token remaps, then the picked options'. Every name is
   // a tier 2 or tier 3 token the generated stylesheet already declares: an
   // option never adds a property name (brief §3.4).
-  for (const [name, value] of Object.entries(resolvePresetTokens(themeDoc))) {
+  for (const [name, value] of Object.entries(resolvePresetTokens(themeDoc, { resetComponents: true }))) {
     rootLines.push(`  ${name}: ${value};`);
   }
 

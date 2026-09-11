@@ -1,29 +1,7 @@
-// Nameplate — the rule-bounded title block: the event name, the dates, and
-// the edition line, in type and rules only. `full` is the `masthead` header
-// and `compact` is the `compact` one (Header.jsx).
-//
-// The device and its rules: docs/interface-guidelines.md, Editorial devices.
-//
-// Three things the guidelines do not carry, because they are wiring:
-//
-// WHERE THE DATELINE SITS is the Header style's decision, not this file's.
-// The dates and the edition line always sit inside the rule-bounded block —
-// that is what keeps them the nameplate device rather than an eyebrow — and
-// `--nameplate-meta-placement` chooses between a line of their own under the
-// name and the name's own baseline at the far end of the measure. The
-// `.nameplate__lockup` rule in index.css draws it.
-//
-// THE NAME IS A HEADING ON EXACTLY ONE PAGE. A running masthead repeats
-// everywhere, so on an inner page it is a <p> and the page's own <h1> is
-// that page's subject. On the home page the masthead IS the subject, so the
-// shell passes `nameAs="h1"` there. Either way a page carries exactly one
-// <h1>.
-//
-// TWO MOTIF SLOTS land inside the block: the `nameplate-mark` beside the
-// name, and the `divider` closing the full treatment. Both render only where
-// the active set carries them, so a preset on the `none` set gets exactly
-// the block it had before. The mark yields to a client's own branding mark —
-// a paper prints its own flag, not the printer's ornament.
+// Nameplate is the optional editorial title block. Compact headers reuse
+// its running identity; the masthead Header now has a compact navigation bar.
+// A real client mark is optional. Only the closing divider uses a motif.
+// The page owns its h1; the repeated site identity is a paragraph.
 import { Link } from 'react-router-dom';
 import { formatEventDateRange } from '../../lib/eventTime.js';
 import Motif from './Motif.jsx';
@@ -108,12 +86,7 @@ export default function Nameplate({
   // every style moves by at most the mark's own overhang, a few pixels.
   const nameBody = (
     <span className="inline-flex items-start gap-xs wrap-anywhere">
-      {mark ?? (
-        <Motif
-          slot="nameplate-mark"
-          className={compact ? 'h-6 w-6 shrink-0' : 'h-10 w-10 shrink-0'}
-        />
-      )}
+      {mark}
       {name}
     </span>
   );

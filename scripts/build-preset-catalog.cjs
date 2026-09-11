@@ -285,6 +285,22 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
     copy[id] = copyValues(preset);
   }
 
+  // Only preset-remapped properties need explicit resets on a style change.
+  // Untouched component defaults already remain in the generated stylesheet.
+  const remappedNames = new Set();
+  function collectRemaps(value) {
+    if (!value || typeof value !== 'object') return;
+    for (const [name, child] of Object.entries(value)) {
+      if (name.startsWith('--')) remappedNames.add(name);
+      collectRemaps(child);
+    }
+  }
+  collectRemaps(presets);
+  const componentContracts = stripNotes(readJson(path.join(tokensDir, 'components.json')));
+  const componentDefaults = Object.fromEntries(Object.values(componentContracts)
+    .flatMap((contract) => Object.entries(contract))
+    .filter(([name]) => !name.endsWith('-rgb') && remappedNames.has(name)));
+
   const adminSource = readJson(path.join(tokensDir, 'admin.json'));
   const admin = {
     colors: stripNotes(adminSource.colors),
@@ -325,11 +341,13 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
     '',
     `const PRESETS = Object.freeze(${jsValue(presets)});`,
     '',
+    `const COMPONENT_TOKEN_DEFAULTS = Object.freeze(${jsValue(componentDefaults)});`,
+    '',
     `const ADMIN_TOKENS = Object.freeze(${jsValue(admin)});`,
     '',
     `const MOTIF_SET_IDS = Object.freeze(${jsValue(motifSetIds)});`,
     '',
-    'module.exports = { PRESETS, ADMIN_TOKENS, MOTIF_SET_IDS };',
+    'module.exports = { PRESETS, COMPONENT_TOKEN_DEFAULTS, ADMIN_TOKENS, MOTIF_SET_IDS };',
     '',
   ].join('\n');
 

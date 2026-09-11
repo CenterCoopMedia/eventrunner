@@ -20,6 +20,9 @@ import { useEventClock } from '../hooks/useEventClock.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
+import EventHero from '../components/EventHero.jsx';
+import { demoHero } from '../lib/demoHero.js';
+import { buildNameplate } from '../components/editorial/Nameplate.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { PlateNumber } from '../components/editorial/Plate.jsx';
@@ -81,8 +84,8 @@ export function sortSessions(sessions) {
 }
 
 export default function Schedule() {
-  const { eventConfig, features } = useEventConfig();
-  const { scheduleData, speakers, loading } = useContent();
+  const { eventConfig, features, theme } = useEventConfig();
+  const { scheduleData, speakers, loading, getSectionBlocks } = useContent();
   const { user } = useAuth();
   const { attendeeAccess } = useProfile();
   const { bookmarkedIds } = useMyBookmarks();
@@ -306,7 +309,14 @@ export default function Schedule() {
 
   return (
     <SystemPage pageId="schedule">
-      <header className="flex flex-wrap items-baseline justify-between gap-md">
+      <EventHero
+        name={eventConfig.name}
+        dates={buildNameplate(eventConfig).dates}
+        place={buildNameplate(eventConfig).edition}
+        tagline={eventConfig.tagline}
+        image={demoHero(theme) ?? getSectionBlocks?.('hero')?.find((block) => block.blockType === 'image')}
+      />
+      <header className="mt-xl flex flex-wrap items-baseline justify-between gap-md">
         <div>
           <h1 className="font-heading text-h1 font-semibold text-text-primary">Schedule</h1>
           {eventZoneLabel ? (
@@ -390,7 +400,7 @@ export default function Schedule() {
               <div
                 role="group"
                 aria-label="Event days"
-                className="mt-lg flex flex-wrap gap-x-md border-b-hairline border-b-rule-hairline"
+                className="schedule-days mt-lg flex flex-wrap"
               >
                 {days.map((day) => {
                   const isActive = day.id === activeDayId;
@@ -548,7 +558,7 @@ export default function Schedule() {
                 // column order, tabular figures, every relationship stated.
                 // No gap: every row opens with its own hairline, so the rules
                 // are the separation a card border used to be.
-                <ul className="mt-sm">
+                <ul className="schedule-route mt-sm">
                   {entries.map((entry, index) => (
                     <SessionCard
                       key={entry.session.id}

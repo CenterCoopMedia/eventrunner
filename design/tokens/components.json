@@ -38,6 +38,25 @@
     "--lead-image-aspect": "3 / 2",
     "--lead-image-width": "22rem"
   },
+  "$hero-note": "The event hero keeps one content contract while each preset composes its photograph, veil, title, and the one permitted decorative mark. Hidden route and press marks keep those devices exclusive to Atlas and Zine.",
+  "hero": {
+    "--hero-rule-block-start": "var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb))",
+    "--hero-art-width": "70%",
+    "--hero-art-position": "70% 50%",
+    "--hero-veil-background": "linear-gradient(90deg, rgb(var(--color-surface-rgb)) 0%, rgb(var(--color-surface-rgb)) 35%, rgb(var(--color-surface-rgb) / .92) 43%, rgb(var(--color-surface-rgb) / 0) 73%)",
+    "--hero-copy-pad-inline-start": "0",
+    "--hero-copy-border-inline-start": "0 solid transparent",
+    "--hero-copy-pad-block-end": "var(--space-2xl)",
+    "--hero-title-size": "clamp(2.7rem, 5.8vw, 5.75rem)",
+    "--hero-title-style": "normal",
+    "--hero-title-weight": "var(--weight-bold)",
+    "--hero-title-tracking": "-.045em",
+    "--hero-title-transform": "none",
+    "--hero-route-display": "none",
+    "--hero-route-color": "rgb(var(--color-accent-rgb))",
+    "--hero-sign-display": "none",
+    "--hero-press-display": "none"
+  },
   "$venue-map-note": "The uploaded venue map (config/event.venue.map). The frame takes the picture's own shape, because the room markers sit on it at percentage coordinates and a frame wider or taller than the plan puts every marker on the wrong room. All that is set here is how tall a plan may get before it is scaled down; a preset may retune it.",
   "venue-map": {
     "--venue-map-max-block-size": "38rem"
@@ -80,7 +99,22 @@
     "--schedule-cell-pad-inline": "var(--space-sm)",
     "--schedule-time-width": "7rem",
     "--schedule-forward-lift": "var(--space-3xs)",
-    "--schedule-trace-width": "0"
+    "--schedule-trace-width": "0",
+    "--schedule-days-gap": "0 var(--space-md)",
+    "--schedule-days-border-block-end": "var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb))",
+    "--schedule-day-min-inline-size": "2.75rem",
+    "--schedule-day-pad-inline": "var(--space-2xs)",
+    "--schedule-day-border": "0 solid transparent",
+    "--schedule-day-border-block-end": "var(--rule-strong-width) solid transparent",
+    "--schedule-day-radius": "0",
+    "--schedule-day-background": "transparent",
+    "--schedule-day-active-color": "rgb(var(--color-text-primary-rgb))",
+    "--schedule-day-active-background": "transparent",
+    "--schedule-day-active-border-color": "rgb(var(--rule-strong-rgb))",
+    "--schedule-route-pad-inline-start": "0",
+    "--schedule-route-line-width": "0",
+    "--schedule-route-stop-size": "0",
+    "--schedule-route-stop-border-width": "0"
   },
   "$back-issue-note": "The back issue (brief §2.1): a past day, or a past event, drops to the archive tokens, gains the \"Back issue\" folio, and loses its live controls. NOTHING IS HIDDEN. The device REDUCES a palette rather than introducing one: inside a back issue the accents resolve to the archive ink, which is the same text-secondary the contrast test already measures on both grounds, so an archive is quieter without ever being less readable.",
   "back-issue": {

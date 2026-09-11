@@ -660,7 +660,7 @@ function resolveMode(policy, prefersDark) {
  * Presets (brief §4) and the one publish-time resolver (brief §5.2).
  * ---------------------------------------------------------------------- */
 
-const { PRESETS, ADMIN_TOKENS, MOTIF_SET_IDS } = require('./presetCatalog.cjs');
+const { PRESETS, COMPONENT_TOKEN_DEFAULTS, ADMIN_TOKENS, MOTIF_SET_IDS } = require('./presetCatalog.cjs');
 
 /** The six preset ids (brief §4). `data-theme` carries one of these. */
 const THEME_PRESET_IDS = Object.freeze(Object.keys(PRESETS));
@@ -863,10 +863,12 @@ function resolveComponentFonts(theme) {
  * @param {object} theme
  * @returns {Record<string, string>} custom property → CSS value
  */
-function resolvePresetTokens(theme) {
+function resolvePresetTokens(theme, { resetComponents = false } = {}) {
   const preset = getPreset(themePresetId(theme));
   if (!preset) return {};
-  const tokens = { ...(preset.tokens || {}) };
+  // A complete preset must reset the generated baseline before its remaps.
+  // Otherwise switching from Newsroom retains its hero border in Atlas.
+  const tokens = { ...(resetComponents ? COMPONENT_TOKEN_DEFAULTS : {}), ...(preset.tokens || {}) };
   for (const choice of pickedChoices(theme)) Object.assign(tokens, choice.tokens || {});
   return tokens;
 }

@@ -68,9 +68,9 @@ const DEMO_TIER_A = Object.freeze({
 const DEMO_ANSWERS = Object.freeze({
   adminEmails: ['demo-admin@example.org', 'demo-operator@example.org'],
   event: {
-    name: '[Demo] Harborlight Media Summit',
-    shortName: 'DEMO-SUMMIT',
-    tagline: 'A three-day event for people who operate local and cooperative newsrooms.',
+    name: 'Harborlight Media Summit',
+    shortName: 'Harborlight',
+    tagline: 'Stronger local news. Further together.',
     timezone: 'America/New_York',
     days: [
       { id: 'day-1', label: 'Day one', date: '2026-10-14', startTime: '09:00', endTime: '17:00' },
@@ -107,7 +107,7 @@ const DEMO_ANSWERS = Object.freeze({
       actionLabel: null,
     },
     venue: {
-      name: '[Demo] Harborlight Hall',
+      name: 'Harborlight Hall',
       addressLine1: '1 Harborlight Way',
       addressLine2: null,
       city: 'Millhaven',
@@ -181,17 +181,17 @@ const DEMO_ANSWERS = Object.freeze({
         ],
       },
     },
-    sender: { email: 'summit@example.org', name: '[Demo] Harborlight Media Summit', replyTo: null },
+    sender: { email: 'summit@example.org', name: 'Harborlight Media Summit', replyTo: null },
     legal: {
-      operatorName: '[Demo] Harborlight Cooperative',
-      postalAddressHtml: '<p>[Demo] Harborlight Cooperative<br>1 Harborlight Way<br>Millhaven, MH 58211</p>',
+      operatorName: 'Harborlight Cooperative',
+      postalAddressHtml: '<p>Harborlight Cooperative<br>1 Harborlight Way<br>Millhaven, MH 58211</p>',
       supportEmail: 'support@example.org',
       conductEmail: 'conduct@example.org',
     },
     seo: {
       description:
-        'Schedule, speaker, workshop, and travel information for the fictional [Demo] Harborlight Media Summit.',
-      organizerName: '[Demo] Harborlight Cooperative',
+        'Schedule, speaker, workshop, and travel information for the fictional Harborlight Media Summit.',
+      organizerName: 'Harborlight Cooperative',
     },
   },
   // Overlaid on `defaultTheme()` (spec §2.2, §7.2). The product default is
@@ -388,7 +388,7 @@ function demoExtraDoc(section, field, blockType, fields, order) {
  * These are extra docs, not overlays, built directly against the section
  * ids and allowed block types `defaultPages()` declares for `recap`,
  * `guidelines`, and `city_guide` — fictional throughout, no real names,
- * places, or organizations, following the [Demo] Harborlight Media Summit
+ * places, or organizations, following the Harborlight Media Summit
  * already established above. The city guide entries name fictional
  * establishments in the fixture's own fictional town (Millhaven), never a
  * real restaurant, attraction, or transit line.
@@ -403,7 +403,7 @@ const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
   // a year ahead of the configured days rather than inside them.
   demoExtraDoc('recap_summary', 'body', 'richtext', {
     value:
-      '<p>A look back at the previous edition of the [Demo] Harborlight Media Summit, held ' +
+      '<p>A look back at the previous edition of the Harborlight Media Summit, held ' +
       'over three days in October 2025. Turnout was the highest yet, and the workshop tracks ' +
       'filled within a day of registration opening.</p>',
   }, 0),
@@ -465,7 +465,7 @@ const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
   }, 0),
   demoExtraDoc('guidelines_intro', 'welcome', 'richtext', {
     value:
-      '<p>Everything a [Demo] Harborlight Media Summit speaker needs to know before session ' +
+      '<p>Everything a Harborlight Media Summit speaker needs to know before session ' +
       'day, from format to on-site setup.</p>',
   }, 0),
   demoExtraDoc('guidelines_formats', 'keynote', 'list_item', {
@@ -502,25 +502,25 @@ const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
       'Everything below is an easy walk or a short ride from Harborlight Hall.</p>',
   }, 0),
   demoExtraDoc('city_guide_eat', 'diner', 'list_item', {
-    text: '[Demo] Foghorn Diner: a short walk from Harborlight Hall, open for breakfast and lunch every day of the summit.',
+    text: 'Foghorn Diner: a short walk from Harborlight Hall, open for breakfast and lunch every day of the summit.',
   }, 0),
   demoExtraDoc('city_guide_eat', 'bakery', 'list_item', {
-    text: '[Demo] Cedar Street Bakery: coffee and pastries, with seating for a quick working breakfast before the first session.',
+    text: 'Cedar Street Bakery: coffee and pastries, with seating for a quick working breakfast before the first session.',
   }, 1),
   demoExtraDoc('city_guide_eat', 'noodle_house', 'list_item', {
-    text: '[Demo] Old Mill Noodle House: a sit-down dinner option a few blocks from the venue, busiest after the last session of the day.',
+    text: 'Old Mill Noodle House: a sit-down dinner option a few blocks from the venue, busiest after the last session of the day.',
   }, 2),
   demoExtraDoc('city_guide_see', 'harbor_walk', 'list_item', {
-    text: '[Demo] Millhaven Harbor Walk: a paved path along the water, level the whole way and about twenty minutes end to end.',
+    text: 'Millhaven Harbor Walk: a paved path along the water, level the whole way and about twenty minutes end to end.',
   }, 0),
   demoExtraDoc('city_guide_see', 'exchange_museum', 'list_item', {
-    text: '[Demo] Grain Exchange Museum: a small local-history museum in the old exchange building, open afternoons.',
+    text: 'Grain Exchange Museum: a small local-history museum in the old exchange building, open afternoons.',
   }, 1),
   demoExtraDoc('city_guide_see', 'sculpture_park', 'list_item', {
-    text: '[Demo] Riverside Sculpture Park: an outdoor gallery of local artists’ work, free to enter.',
+    text: 'Riverside Sculpture Park: an outdoor gallery of local artists’ work, free to enter.',
   }, 2),
   demoExtraDoc('city_guide_around', 'streetcar', 'list_item', {
-    text: '[Demo] Millhaven Streetcar stops directly outside Harborlight Hall and runs every fifteen minutes on weekdays.',
+    text: 'Millhaven Streetcar stops directly outside Harborlight Hall and runs every fifteen minutes on weekdays.',
   }, 0),
   demoExtraDoc('city_guide_around', 'rideshare', 'list_item', {
     text: 'Rideshare pickup and drop-off is at the east entrance of Harborlight Hall, away from the main doors.',
@@ -701,7 +701,7 @@ const DEMO_SESSIONS = Object.freeze([
 const DEMO_SPEAKERS = Object.freeze([
   {
     id: 'speaker-placeholder-1',
-    firstName: '[Demo] Marisol',
+    firstName: 'Marisol',
     lastName: 'Reyes',
     slug: 'demo-marisol-reyes',
     email: null,
@@ -720,7 +720,7 @@ const DEMO_SPEAKERS = Object.freeze([
   },
   {
     id: 'speaker-placeholder-2',
-    firstName: '[Demo] Devon',
+    firstName: 'Devon',
     lastName: 'Achebe',
     slug: 'demo-devon-achebe',
     email: null,
@@ -739,7 +739,7 @@ const DEMO_SPEAKERS = Object.freeze([
   },
   {
     id: 'speaker-placeholder-3',
-    firstName: '[Demo] Priya',
+    firstName: 'Priya',
     lastName: 'Natarajan',
     slug: 'demo-priya-natarajan',
     email: null,
@@ -762,7 +762,7 @@ const DEMO_SPEAKERS = Object.freeze([
 const DEMO_ORGANIZATIONS = Object.freeze([
   {
     id: 'org-placeholder-1',
-    name: '[Demo] Beacon Community Fund',
+    name: 'Beacon Community Fund',
     tier: 'presenting',
     url: 'https://example.org',
     logoPath: 'branding/mark.svg',
@@ -773,7 +773,7 @@ const DEMO_ORGANIZATIONS = Object.freeze([
   },
   {
     id: 'org-placeholder-2',
-    name: '[Demo] Lighthouse Press Trust',
+    name: 'Lighthouse Press Trust',
     tier: 'supporting',
     url: 'https://example.org',
     logoPath: 'branding/mark.svg',
@@ -784,7 +784,7 @@ const DEMO_ORGANIZATIONS = Object.freeze([
   },
   {
     id: 'org-placeholder-3',
-    name: '[Demo] Tidewater Media Collective',
+    name: 'Tidewater Media Collective',
     tier: 'partner',
     url: 'https://example.org',
     logoPath: 'branding/mark.svg',
@@ -814,6 +814,7 @@ function demoEvent() {
     throw new Error(`demo fixture no longer validates: ${built.errors.join('; ')}`);
   }
   const config = built.docs;
+  config.theme.logos.mark = null;
   Object.assign(config.event, DEMO_EVENT_OVERRIDES);
 
   const pages = defaultPages().map((page) => ({ ...page, seeded: true }));

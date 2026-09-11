@@ -37,8 +37,8 @@ Typography and rules do the visual work. Color decorates very little, and shadow
 
 | Device | Component | What it is | The rule |
 |---|---|---|---|
-| Site header | `Header` | The site identity plus the navigation, in one of four treatments: `standard`, `masthead`, `compact`, `minimal` (internal values; staff pick a **Header style** — Vocabulary above). | See Headers below. The theme names the default and a page may override it. Type and rules only — never a hero banner, never a photo behind the name. The identity repeats on every page, so it is NEVER a heading: Each page owns its own `h1`. An unrecognized value renders the base rather than no header at all. |
-| Masthead nameplate | `Nameplate` | The rule-bounded title block: Event name, dates, edition line. | The device the header treatments draw: `full` is the `masthead` header, `compact` is the `compact` one. It is no longer the shell's only header, and its shape is unchanged. A theme chooses it; it is never mandatory. |
+| Site header | `Header` | The site identity plus the navigation, in one of four treatments: `standard`, `masthead`, `compact`, `minimal` (internal values; staff pick a **Header style** — Vocabulary above). | See Headers below. The theme names the default and a page may override it. Compact identity and navigation. Page-owned EventHero is separate from this repeated header. The identity repeats on every page, so it is NEVER a heading: Each page owns its own `h1`. An unrecognized value renders the base rather than no header at all. |
+| Masthead nameplate | `Nameplate` | The rule-bounded title block: Event name, dates, edition line. | The device the header treatments draw: `compact` is the compact header; the full device remains available to editorial compositions. It is no longer the shell's only header, and its shape is unchanged. A theme chooses it; it is never mandatory. |
 | Lead image | `LeadImage` | One optional picture beside the opening copy, or below it at narrow viewports. | Alt text is required or the image does not render. The crop is fixed by token and the editor states the focal point. Text never sits over it. One per page. |
 | Folio | `Folio` | A small-caps plain-text label sitting on a hairline rule. | Text plus rule. Never a chip, never a pill, never a colored badge. **Never directly above a heading** — see the eyebrow ban below. |
 | Rule | `Rule` | A standalone hairline, strong, or nameplate rule. | A rule replaces a card border. A rule never carries brand color and reads only the `--rule-*` tokens. Where the rule belongs to a row that already exists, put the border on that row instead of adding a node. |
@@ -76,13 +76,13 @@ A public page renders one of four headers (design brief §2.5.1). `config/theme.
 | Treatment | What it draws |
 |---|---|
 | `standard` | The event name at heading size, the dates and place beside it, the navigation under a hairline. The base. |
-| `masthead` | The nameplate device at full size, with the navigation under it. |
+| `masthead` | A compact event identity beside the navigation. |
 | `compact` | The nameplate device at running-header size: Short name and dates on one baseline. |
 | `minimal` | The client's mark and the navigation, and nothing else. |
 
 - Every treatment carries the site identity **and** the navigation. Dropping either fails review.
 - The identity repeats on every page, so it is never a heading. Every page owns its own `<h1>`.
-- `masthead` sets the event name at display size, so a page headline that is that same name keeps its `<h1>` for structure and is not printed a second time. The other three set the identity at running-header size, where no repetition is visible.
+- `masthead` places a compact event name beside navigation. The home page keeps its visible h1 in its own hero.
 - No treatment puts text over an image, and none of them is a hero banner.
 - Never make one treatment mandatory across every deployment.
 
@@ -310,3 +310,10 @@ The brief names exactly two exceptions, both narrow: A bento grid that passes al
 - Toggles are labeled by their enabled state: "Send read receipts", not "Disable read receipts".
 - Empty states orient the reader and offer exactly one next action.
 - Address readers as "you", not "the user".
+
+
+### Event hero and demo preview
+
+The September 11 update in the binding design brief defines EventHero as the shared home and schedule hero. Home owns the h1 and all configured hero actions. Schedule uses a paragraph for the event identity before its own h1. The component preserves safe image URLs, required alt text, focal points, and captions. A surface-color opacity veil is allowed only over hero artwork for readable live text; phone layouts place artwork below the copy. Each preset owns its composition through component tokens.
+
+Demo preview hides the disclosure and style controls until Exit preview or Escape. It preserves theme, mode, and route. Client builds have no preview controls. Uploaded client marks remain supported, with no fallback square for an absent mark.

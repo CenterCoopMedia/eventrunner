@@ -59,13 +59,15 @@ describe('Header treatments', () => {
     expect(container.querySelector('.font-semibold')).toBeNull();
   });
 
-  it('masthead draws the nameplate device', () => {
+  it('masthead keeps the identity and navigation in its compact site bar', () => {
     const { container } = renderHeader({ variant: 'masthead' });
-    const plate = container.querySelector('.nameplate');
-    expect(plate).not.toBeNull();
-    expect(plate.classList.contains('nameplate--compact')).toBe(false);
-    expect(plate.textContent).toContain('October 14–16, 2026');
-    expect(plate.textContent).toContain('Fixtureville, FX');
+    const bar = container.querySelector('.site-masthead__bar');
+    expect(bar).not.toBeNull();
+    expect(bar.querySelector('.site-masthead__identity')).not.toBeNull();
+    expect(bar.querySelector('nav[aria-label="Main"]')).not.toBeNull();
+    expect(container.querySelector('.nameplate')).toBeNull();
+    expect(container.textContent).not.toContain('October 14–16, 2026');
+    expect(container.textContent).not.toContain('Fixtureville, FX');
   });
 
   it('compact draws the nameplate device at running-header size', () => {

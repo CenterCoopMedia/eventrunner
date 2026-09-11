@@ -151,9 +151,9 @@ export const scheduleData = [
 export const speakers = [
   {
     id: 'speaker-placeholder-1',
-    firstName: '[Demo] Marisol',
+    firstName: 'Marisol',
     lastName: 'Reyes',
-    displayName: '[Demo] Marisol Reyes',
+    displayName: 'Marisol Reyes',
     slug: 'demo-marisol-reyes',
     bio: 'Managing editor at a bilingual community newsroom, focused on collaborative investigations with rural partner outlets.',
     headshotPath: 'branding/mark.svg',
@@ -163,9 +163,9 @@ export const speakers = [
   },
   {
     id: 'speaker-placeholder-2',
-    firstName: '[Demo] Devon',
+    firstName: 'Devon',
     lastName: 'Achebe',
-    displayName: '[Demo] Devon Achebe',
+    displayName: 'Devon Achebe',
     slug: 'demo-devon-achebe',
     bio: 'Runs audience engagement for a three-station public radio network and teaches newsroom data-literacy workshops.',
     headshotPath: 'branding/mark.svg',
@@ -175,9 +175,9 @@ export const speakers = [
   },
   {
     id: 'speaker-placeholder-3',
-    firstName: '[Demo] Priya',
+    firstName: 'Priya',
     lastName: 'Natarajan',
-    displayName: '[Demo] Priya Natarajan',
+    displayName: 'Priya Natarajan',
     slug: 'demo-priya-natarajan',
     bio: 'Co-founded a reader-funded local news cooperative and advises other outlets on member-supported revenue models.',
     headshotPath: 'branding/mark.svg',

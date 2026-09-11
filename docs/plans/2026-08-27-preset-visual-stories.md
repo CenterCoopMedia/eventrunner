@@ -1,5 +1,8 @@
 # Preset visual stories — six specs
 
+> September 11, 2026 update: the approved hero mockups supersede the full-size shell masthead and image-free lead descriptions below. Header now uses a compact identity beside navigation; Home and Schedule own EventHero with style-specific artwork and component tokens. The hero alone permits a surface-color opacity veil for text readability. See the dated update in [the binding design brief](2026-08-27-design-system-overhaul.md).
+
+
 **Date:** 2026-08-27
 **Status:** Settled. Read before preset work starts (brief §7, PR2).
 **Binding source:** `docs/plans/2026-08-27-design-system-overhaul.md`. Where this document and the

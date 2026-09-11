@@ -6,6 +6,9 @@
 // compared on the identity rather than on how many links a site has.
 import { Link } from 'react-router-dom';
 import Header from '../../../components/Header.jsx';
+import EventHero from '../../../components/EventHero.jsx';
+import { useEventConfig } from '../../../contexts/EventConfigContext.jsx';
+import { demoHero } from '../../../lib/demoHero.js';
 import { buildNameplate } from '../../../components/editorial/Nameplate.jsx';
 import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
@@ -20,7 +23,7 @@ const TREATMENTS = Object.freeze([
   Object.freeze({
     variant: 'masthead',
     label: 'Masthead',
-    note: 'The nameplate at full size, for a front page or a single-day event.',
+    note: 'A compact event identity beside the navigation.',
   }),
   Object.freeze({
     variant: 'compact',
@@ -63,6 +66,7 @@ function SpecimenNav() {
 }
 
 export default function HeadersSection({ folio }) {
+  const { theme } = useEventConfig();
   const identity = buildNameplate(eventConfig);
   const compact = buildNameplate(eventConfig, { compact: true });
 
@@ -94,6 +98,9 @@ export default function HeadersSection({ folio }) {
           </Header>
         </Figure>
       ))}
+      <Figure name="Event hero" file="components/EventHero.jsx" contract="event-hero" note="The page owns its hero; each style supplies the composition and artwork.">
+        <EventHero name={identity.name} dates={identity.dates} place={identity.edition} tagline={eventConfig.tagline} image={demoHero(theme)} />
+      </Figure>
     </SpecimenSection>
   );
 }

@@ -111,7 +111,7 @@ test('the demo fixture is a three-day event with content on every day', () => {
   assert.ok(demo.organizations.length >= 3);
 });
 
-test('every demo page is a valid page doc, and every demo name is fictional', () => {
+test('every demo page is a valid page doc, and the demo names stay fictional', () => {
   const demo = demoEvent();
   for (const page of demo.pages) {
     const { seeded, ...contract } = page;
@@ -125,9 +125,16 @@ test('every demo page is a valid page doc, and every demo name is fictional', ()
     demo.config.event.name,
     demo.config.event.legal.operatorName,
   ];
-  for (const name of names) {
-    assert.match(name, /^\[Demo\]/, `${name} does not read as demo content`);
-  }
+  assert.deepEqual(names, [
+    'Marisol Reyes',
+    'Devon Achebe',
+    'Priya Natarajan',
+    'Beacon Community Fund',
+    'Lighthouse Press Trust',
+    'Tidewater Media Collective',
+    'Harborlight Media Summit',
+    'Harborlight Cooperative',
+  ]);
 });
 
 test('demo speakers are canonical documents, and the bundle ships only their projection', () => {

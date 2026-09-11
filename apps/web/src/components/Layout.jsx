@@ -54,7 +54,7 @@
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
 import { useMemo, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
 import { safeUrlHref } from 'shared/urlSafety';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -328,6 +328,9 @@ export default function Layout() {
   // config or content snapshot, and the list only changes when the pages or
   // the flags do.
   const navItems = useMemo(() => buildNavItems(pages, features), [pages, features]);
+  const primaryNavItems = navPlacement === 'side' ? navItems : navItems.slice(0, 5);
+  const moreNavItems = navPlacement === 'side' ? [] : navItems.slice(5);
+  const moreIsActive = moreNavItems.some((item) => matchPath({ path: item.to, end: item.end }, pathname));
 
   // The event's own social accounts, if it has recorded any (M7 issue 3).
   const socialLinks = useMemo(() => socialAccounts(eventConfig?.social), [eventConfig?.social]);
@@ -351,8 +354,8 @@ export default function Layout() {
       aria-label="Main"
       className={
         navPlacement === 'side'
-          ? 'border-b-hairline border-b-rule-hairline lg:w-48 lg:shrink-0 lg:self-stretch lg:border-b-0 lg:border-e-hairline lg:border-e-rule-hairline lg:pe-md lg:pt-xl'
-          : 'border-b-hairline border-b-rule-hairline'
+          ? 'relative border-b-hairline border-b-rule-hairline lg:w-48 lg:shrink-0 lg:self-stretch lg:border-b-0 lg:border-e-hairline lg:border-e-rule-hairline lg:pe-md lg:pt-xl'
+          : 'relative border-b-hairline border-b-rule-hairline'
       }
     >
       <ul
@@ -362,13 +365,35 @@ export default function Layout() {
             : 'flex flex-wrap items-center gap-x-md'
         }
       >
-        {navItems.map((item) => (
+        {primaryNavItems.map((item) => (
           <li key={item.to}>
             <NavLink to={item.to} end={item.end} className={navClass}>
               {item.label}
             </NavLink>
           </li>
         ))}
+        {moreNavItems.length ? (
+          <li>
+            <details className="site-nav-more" onKeyDown={(event) => {
+              if (event.key !== 'Escape') return;
+              event.currentTarget.open = false;
+              event.currentTarget.querySelector('summary').focus();
+            }}>
+              <summary className={`touch-target font-data text-caption border-b-strong ${moreIsActive
+                ? 'border-b-rule-strong font-semibold text-text-primary'
+                : 'border-b-transparent text-text-secondary'}`}>More</summary>
+              <ul className="site-nav-more__links">
+                {moreNavItems.map((item) => (
+                  <li key={item.to}>
+                    <NavLink to={item.to} end={item.end} className={navClass} onClick={(event) => {
+                      event.currentTarget.closest('details').open = false;
+                    }}>{item.label}</NavLink>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </li>
+        ) : null}
         <li>
           <NavLink to={account.to} end={account.end} className={accountClass}>
             {account.label}
@@ -390,7 +415,7 @@ export default function Layout() {
       className={
         navPlacement === 'side'
           ? 'min-w-0 flex-1 pb-2xl pt-xl'
-          : 'stage flex-1 pb-2xl pt-xl'
+          : 'stage flex-1 pb-2xl pt-md'
       }
     >
       <Outlet />

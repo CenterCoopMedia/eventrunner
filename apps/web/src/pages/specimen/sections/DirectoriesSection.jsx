@@ -24,9 +24,7 @@ import { pagesData } from '@generated/pagesData.js';
 import { siteContent } from '@generated/siteContent.js';
 
 const SHELF = speakers.slice(0, 3);
-// The index's own grouping rule, not a letter chosen by hand: every
-// seeded name opens with the [Demo] marker, so all three file under `#`,
-// which is the rule this device exists to make visible.
+// Use the directory's grouping rule with the current fictional names.
 const INDEX_GROUPS = groupByLetter(SHELF);
 
 const FEED_SOURCES = Object.freeze([

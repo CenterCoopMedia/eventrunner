@@ -74,9 +74,11 @@ export default function Header({
 
   if (treatment === 'masthead') {
     return (
-      <div className="border-b-hairline border-b-rule-hairline">
-        <Nameplate name={name} dates={dates} edition={place} to={to} mark={mark} />
-        {children}
+      <div className="site-masthead">
+        <div className="site-masthead__bar">
+          <p className="site-masthead__identity font-heading">{identityLink(wordmark)}</p>
+          {children}
+        </div>
       </div>
     );
   }

@@ -9,7 +9,7 @@
 export const organizationsData = [
   {
     id: 'org-placeholder-1',
-    name: '[Demo] Beacon Community Fund',
+    name: 'Beacon Community Fund',
     tier: 'presenting',
     url: 'https://example.org',
     logoPath: 'branding/mark.svg',
@@ -20,7 +20,7 @@ export const organizationsData = [
   },
   {
     id: 'org-placeholder-2',
-    name: '[Demo] Lighthouse Press Trust',
+    name: 'Lighthouse Press Trust',
     tier: 'supporting',
     url: 'https://example.org',
     logoPath: 'branding/mark.svg',
@@ -31,7 +31,7 @@ export const organizationsData = [
   },
   {
     id: 'org-placeholder-3',
-    name: '[Demo] Tidewater Media Collective',
+    name: 'Tidewater Media Collective',
     tier: 'partner',
     url: 'https://example.org',
     logoPath: 'branding/mark.svg',

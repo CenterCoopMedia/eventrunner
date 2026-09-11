@@ -17,7 +17,6 @@ import ProfileSetupRedirect from './components/ProfileSetupRedirect.jsx';
 import RouteTitle from './components/RouteTitle.jsx';
 import ScrollReset from './components/ScrollReset.jsx';
 import Home from './pages/Home.jsx';
-import Login from './pages/Login.jsx';
 import LoadingState from './components/LoadingState.jsx';
 import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';
 import DeferredPage from './components/DeferredPage.jsx';
@@ -44,6 +43,7 @@ function lazyPage(importer) {
   );
 }
 
+const Login = lazyPage(() => import('./pages/Login.jsx'));
 const Schedule = lazyPage(() => import('./pages/Schedule.jsx'));
 const SessionDetail = lazyPage(() => import('./pages/SessionDetail.jsx'));
 const MySchedule = lazyPage(() => import('./pages/MySchedule.jsx'));
@@ -106,7 +106,7 @@ export function AppRoutes() {
         <Route path="sponsors" element={<DeferredPage component={Sponsors} label="sponsors" />} />
         <Route path="updates" element={<DeferredPage component={Updates} label="updates" />} />
         <Route path="updates/:id" element={<DeferredPage component={UpdateDetail} label="update" />} />
-        <Route path="signin" element={<Login />} />
+        <Route path="signin" element={<DeferredPage component={Login} label="sign in" />} />
         {/* Speaker invite acceptance (issue #21). Singular `speaker`, and
             reserved in shared/routing alongside the plural directory route:
             every invitation email ever sent links here, so a generic
