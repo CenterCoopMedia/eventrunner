@@ -8,8 +8,8 @@
 // sessionBookmarks) and ICS/calendar-link export (features.icsExport) are
 // wired through SessionCard, which also carries the per-session detail
 // link (/schedule/:sessionId, SessionDetail.jsx).
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -24,11 +24,21 @@ import { PlateNumber } from '../components/editorial/Plate.jsx';
 import Marginalia from '../components/editorial/Marginalia.jsx';
 import SearchField from '../components/forms/SearchField.jsx';
 import FilterGroup from '../components/forms/FilterGroup.jsx';
+import SortControl from '../components/forms/SortControl.jsx';
 import ScheduleGrid from '../components/ScheduleGrid.jsx';
 import SchedulePrint from '../components/SchedulePrint.jsx';
 import HorizontalScrollRegion from '../components/HorizontalScrollRegion.jsx';
 import { resolveTracks } from '../lib/scheduleGrid.js';
-import { buildSearchIndex, collectFormats, filterEntries, matchesFilters, matchesQuery } from '../lib/scheduleView.js';
+import {
+  buildSearchIndex,
+  collectFormats,
+  filterEntries,
+  matchesFilters,
+  matchesQuery,
+  readScheduleView,
+  sortEntries,
+  writeScheduleView,
+} from '../lib/scheduleView.js';
 import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
@@ -76,28 +86,23 @@ export default function Schedule() {
   // grid it has no room for.
   const wide = useMediaQuery(WIDE_VIEWPORT);
 
-  // The search narrows the loaded set client side (issue #162). The field
-  // owns the query; every narrowing below reads it, and clearing restores
-  // the full day by construction.
-  const [query, setQuery] = useState('');
-  // The facet filters narrow the same set (issue #163). Selection is the
-  // shared checkbox device's job — weight and a drawn mark, never color
-  // alone — and each group carries its own clear control and count.
-  const [formats, setFormats] = useState([]);
-  const [tracks, setTracks] = useState([]);
+  // The whole view lives in the URL (issue #164): the search, the facet
+  // filters, the day, and the sort all round trip through query parameters,
+  // so a filtered view is a link a reader can hand to somebody else, and
+  // the back button walks the changes back. The URL is untrusted input —
+  // readScheduleView falls back to the default for every unknown value.
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Days are runtime config — a live config/event write could deliver a
   // malformed entry; drop anything without a usable string id rather than
   // let day.id/day.label dereferences below throw and blank the page.
-  const days = Array.isArray(eventConfig.days)
-    ? eventConfig.days.filter((d) => d && typeof d.id === 'string')
-    : [];
-  const [selectedDayId, setSelectedDayId] = useState(null);
-  // Days are runtime config — if the selected id disappears, fall back to
-  // the first configured day rather than an empty view.
-  const activeDayId = days.some((d) => d.id === selectedDayId)
-    ? selectedDayId
-    : (days[0]?.id ?? null);
+  const days = useMemo(
+    () =>
+      Array.isArray(eventConfig.days)
+        ? eventConfig.days.filter((d) => d && typeof d.id === 'string')
+        : [],
+    [eventConfig.days],
+  );
 
   const sessionsByDay = useMemo(() => {
     const grouped = new Map();
@@ -154,6 +159,48 @@ export default function Schedule() {
     [eventConfig, visibleSessions],
   );
 
+  // The view, read once per URL and facet-set change. Everything above the
+  // feature branch is a hook or a pure read of runtime data.
+  const knownView = useMemo(
+    () => ({
+      dayIds: new Set(days.map((day) => day.id)),
+      formats: formatOptions.map((option) => option.value),
+      tracks: trackOptions.map((option) => option.value),
+    }),
+    [days, formatOptions, trackOptions],
+  );
+  const view = useMemo(() => readScheduleView(searchParams, knownView), [searchParams, knownView]);
+  // The sort control offers most saved only where bookmarking exists, so a
+  // stale URL cannot select an order the page never offered.
+  const sort = view.sort === 'saved' && features.sessionBookmarks ? 'saved' : 'time';
+  const sortOptions = [
+    { value: 'time', label: 'By time' },
+    ...(features.sessionBookmarks ? [{ value: 'saved', label: 'Most saved' }] : []),
+  ];
+  const query = view.q;
+  const formats = view.formats;
+  const tracks = view.tracks;
+  // The URL's day, or the first configured day. An id the event no longer
+  // carries already fell back at read time.
+  const activeDayId = view.day ?? days[0]?.id ?? null;
+
+  /**
+   * Patch the view in the URL. Discrete control changes (a day, a filter, a
+   * sort) push a history entry, so the back button undoes them; typing in
+   * the search field replaces, so it does not spend a history entry per
+   * keystroke.
+   */
+  function updateView(patch, { replace = false } = {}) {
+    setSearchParams(
+      (prev) =>
+        writeScheduleView(
+          { ...readScheduleView(prev, knownView), ...patch },
+          { firstDayId: days[0]?.id ?? null },
+        ),
+      { replace },
+    );
+  }
+
   // Every hook sits above this point: the branch below can end the
   // component before any of the work further down runs.
   if (!features.schedule) {
@@ -172,16 +219,21 @@ export default function Schedule() {
 
   const activeDay = days.find((d) => d.id === activeDayId) ?? null;
   const activeSessions = activeDayId ? (sessionsByDay.get(activeDayId) ?? []) : [];
-  // The day narrowed by the search and the facets (issues #162, #163). An
-  // empty query and empty facets keep the whole day, so clearing restores
-  // it by construction. A calling point a predicate matches keeps its
-  // parent's row, and a matched parent keeps all of its calling points —
-  // lib/scheduleView.js owns those rules, and with an all-keeping
-  // predicate it folds exactly the entries withCallingPoints would.
-  const entries = filterEntries(activeSessions, (session) => {
-    if (query.trim() && !matchesQuery(searchIndex.get(session.id) ?? '', query)) return false;
-    return matchesFilters(session, { formats, tracks });
-  });
+  // The day narrowed by the search and the facets (issues #162, #163), then
+  // ordered by the chosen sort (#164). An empty query and empty facets keep
+  // the whole day, so clearing restores it by construction. A calling point
+  // a predicate matches keeps its parent's row, and a matched parent keeps
+  // all of its calling points — lib/scheduleView.js owns those rules.
+  const entries = sortEntries(
+    filterEntries(activeSessions, (session) => {
+      if (query.trim() && !matchesQuery(searchIndex.get(session.id) ?? '', query)) return false;
+      return matchesFilters(session, { formats, tracks });
+    }),
+    sort,
+    // The bookmark counts land with the counts row; until then most saved
+    // degrades to programme order (sortEntries).
+    null,
+  );
   // What the count sentence says: every session still in the document,
   // calling points included — they are sessions a reader can pick too.
   const matchedCount = entries.reduce((count, entry) => count + 1 + entry.children.length, 0);
@@ -266,7 +318,7 @@ export default function Schedule() {
                       key={day.id}
                       type="button"
                       aria-pressed={isActive}
-                      onClick={() => setSelectedDayId(day.id)}
+                      onClick={() => updateView({ day: day.id })}
                       className={dayClass(isActive)}
                     >
                       {day.label}
@@ -276,15 +328,15 @@ export default function Schedule() {
               </div>
             ) : null}
 
-          {/* The controls that narrow what the day shows. Controls do not
-              print: a button on paper is a lie (index.css, the print
+          {/* The controls that narrow and order what the day shows. Controls
+              do not print: a button on paper is a lie (index.css, the print
               block), and so is a search box. */}
           <div className="no-print mt-md flex flex-wrap items-start gap-lg">
             <div className="w-full max-w-prose lg:w-auto lg:flex-1">
               <SearchField
                 label="Search this day"
                 value={query}
-                onChange={setQuery}
+                onChange={(next) => updateView({ q: next }, { replace: true })}
                 status={
                   query.trim() ? `${matchedCount} sessions match “${query.trim()}”` : undefined
                 }
@@ -299,7 +351,7 @@ export default function Schedule() {
                   legend="Format"
                   options={formatOptions}
                   selected={formats}
-                  onChange={setFormats}
+                  onChange={(next) => updateView({ formats: next })}
                   clearLabel="Clear format filter"
                 />
               </div>
@@ -310,8 +362,18 @@ export default function Schedule() {
                   legend="Track"
                   options={trackOptions}
                   selected={tracks}
-                  onChange={setTracks}
+                  onChange={(next) => updateView({ tracks: next })}
                   clearLabel="Clear track filter"
+                />
+              </div>
+            ) : null}
+            {sortOptions.length > 1 ? (
+              <div className="flex-1">
+                <SortControl
+                  label="Sort sessions"
+                  options={sortOptions}
+                  value={sort}
+                  onChange={(next) => updateView({ sort: next })}
                 />
               </div>
             ) : null}

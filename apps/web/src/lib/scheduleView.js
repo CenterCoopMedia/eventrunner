@@ -162,3 +162,100 @@ export function filterEntries(sessions, keep) {
   }
   return entries;
 }
+
+// ------------------------------------------------------------- URL state
+//
+// The whole view round trips through query parameters (issue #164), so a
+// filtered day is a link a reader can hand to somebody else. `read` treats
+// every unknown value as the default, because the URL is untrusted input a
+// bookmark may carry for years: a day the event no longer runs, a sort the
+// page never offered, a filter token for a facet that is gone — each falls
+// back rather than rendering a wrong or empty page.
+
+/** The sort orders the schedule offers. 'saved' needs the bookmark counts. */
+export const SCHEDULE_SORTS = Object.freeze(['time', 'saved']);
+
+/** A comma-separated parameter as a list, kept only where `allowed` knows a token. */
+function csvParam(value, allowed) {
+  if (typeof value !== 'string' || !value) return [];
+  const tokens = value.split(',').map((token) => token.trim()).filter(Boolean);
+  if (!Array.isArray(allowed) || allowed.length === 0) return tokens;
+  const known = new Set(allowed);
+  return tokens.filter((token) => known.has(token));
+}
+
+/**
+ * The view one URLSearchParams carries.
+ *
+ * @param {URLSearchParams} searchParams
+ * @param {{ dayIds?: string[] | Set<string>, formats?: string[], tracks?: string[] }} [known]
+ * @returns {{ q: string, formats: string[], tracks: string[], day: string | null, sort: string }}
+ *   `day` is null where the URL names no usable day, which the caller reads
+ *   as its first configured day.
+ */
+export function readScheduleView(searchParams, known = {}) {
+  const get = (key) => {
+    try {
+      return searchParams?.get(key);
+    } catch {
+      return null;
+    }
+  };
+  const dayIds = known.dayIds instanceof Set ? known.dayIds : new Set(known.dayIds ?? []);
+  const day = get('day');
+  return {
+    q: get('q') ?? '',
+    formats: csvParam(get('format'), known.formats),
+    tracks: csvParam(get('track'), known.tracks),
+    day: day && dayIds.has(day) ? day : null,
+    sort: SCHEDULE_SORTS.includes(get('sort')) ? get('sort') : 'time',
+  };
+}
+
+/**
+ * The URLSearchParams one view produces. Defaults are omitted, so a cleared
+ * view keeps the clean URL it started from.
+ *
+ * @param {{ q?: string, formats?: string[], tracks?: string[], day?: string | null, sort?: string }} view
+ * @param {{ firstDayId?: string | null }} [defaults]
+ */
+export function writeScheduleView(view, defaults = {}) {
+  const params = new URLSearchParams();
+  if (typeof view.q === 'string' && view.q) params.set('q', view.q);
+  if (Array.isArray(view.formats) && view.formats.length > 0) {
+    params.set('format', view.formats.join(','));
+  }
+  if (Array.isArray(view.tracks) && view.tracks.length > 0) {
+    params.set('track', view.tracks.join(','));
+  }
+  if (view.day && view.day !== defaults.firstDayId) params.set('day', view.day);
+  if (view.sort === 'saved') params.set('sort', 'saved');
+  return params;
+}
+
+// ------------------------------------------------------------------- sort
+
+/**
+ * Entries in the chosen order (issue #164). 'time' is the programme order
+ * the caller's sortSessions already produced; 'saved' puts the sessions the
+ * most attendees bookmarked first, with an absent count reading as zero and
+ * ties keeping the programme order (the platform's sort is stable).
+ *
+ * @param {Array<{ session: object, children: object[] }>} entries
+ * @param {string} sort
+ * @param {Map<string, number> | null} [countsById] aggregate bookmark counts
+ * @returns {Array<{ session: object, children: object[] }>}
+ */
+export function sortEntries(entries, sort, countsById = null) {
+  const list = [...(Array.isArray(entries) ? entries : [])];
+  if (sort !== 'saved') return list;
+  const countOf = (entry) =>
+    countsById instanceof Map ? countsById.get(entry.session?.id) ?? 0 : 0;
+  return list.sort(
+    (a, b) =>
+      countOf(b) - countOf(a) ||
+      String(a.session?.startTime ?? '').localeCompare(String(b.session?.startTime ?? '')) ||
+      (a.session?.order ?? 0) - (b.session?.order ?? 0) ||
+      String(a.session?.title ?? '').localeCompare(String(b.session?.title ?? '')),
+  );
+}

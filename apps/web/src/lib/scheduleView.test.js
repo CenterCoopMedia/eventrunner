@@ -6,6 +6,9 @@ import {
   filterEntries,
   matchesFilters,
   matchesQuery,
+  readScheduleView,
+  sortEntries,
+  writeScheduleView,
 } from './scheduleView.js';
 
 const speakers = new Map([
@@ -147,5 +150,86 @@ describe('filterEntries', () => {
   it('refuses a session that names itself as its parent', () => {
     const loop = [{ id: 'x', title: 'T', parentId: 'x' }];
     expect(filterEntries(loop, () => true).map((entry) => entry.session.id)).toEqual(['x']);
+  });
+});
+
+describe('the view in the URL', () => {
+  const known = {
+    dayIds: ['day-1', 'day-2'],
+    formats: ['panel', 'workshop'],
+    tracks: ['A', 'B'],
+  };
+
+  it('round trips: what write carries, read gives back', () => {
+    const view = {
+      q: 'editing',
+      formats: ['workshop'],
+      tracks: ['B'],
+      day: 'day-2',
+      sort: 'saved',
+    };
+    const params = writeScheduleView(view, { firstDayId: 'day-1' });
+    expect(params.toString()).toBe('q=editing&format=workshop&track=B&day=day-2&sort=saved');
+    expect(readScheduleView(params, known)).toEqual(view);
+  });
+
+  it('omits the defaults, so a cleared view keeps a clean URL', () => {
+    const params = writeScheduleView(
+      { q: '', formats: [], tracks: [], day: 'day-1', sort: 'time' },
+      { firstDayId: 'day-1' },
+    );
+    expect(params.toString()).toBe('');
+  });
+
+  it('unknown values fall back to the default', () => {
+    const params = new URLSearchParams(
+      'q=&format=ghost,panel&track=Z&day=day-9&sort=controversial',
+    );
+    expect(readScheduleView(params, known)).toEqual({
+      q: '',
+      formats: ['panel'],
+      tracks: [],
+      day: null,
+      sort: 'time',
+    });
+  });
+
+  it('reads safely when handed nothing usable', () => {
+    expect(readScheduleView(null, known)).toEqual({
+      q: '',
+      formats: [],
+      tracks: [],
+      day: null,
+      sort: 'time',
+    });
+  });
+});
+
+describe('sortEntries', () => {
+  const entry = (id, startTime, order = 0, title = id) => ({
+    session: { id, startTime, order, title },
+    children: [],
+  });
+  const entries = [entry('a', '10:00'), entry('b', '09:00'), entry('c', '11:00')];
+
+  it('time keeps the programme order the caller produced', () => {
+    expect(sortEntries(entries, 'time').map((e) => e.session.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('saved puts the most bookmarked first, ties keeping programme order', () => {
+    const counts = new Map([['b', 4], ['c', 4], ['a', 1]]);
+    expect(sortEntries(entries, 'saved', counts).map((e) => e.session.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('an absent count reads as zero', () => {
+    const counts = new Map([['a', 2]]);
+    expect(sortEntries(entries, 'saved', counts).map((e) => e.session.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('no counts at all falls back to the programme time order', () => {
+    // Without counts every session reads as zero, so the time tiebreaker
+    // decides — which is the honest order to fall back to.
+    expect(sortEntries(entries, 'saved', null).map((e) => e.session.id)).toEqual(['b', 'a', 'c']);
+    expect(sortEntries(entries, 'saved').map((e) => e.session.id)).toEqual(['b', 'a', 'c']);
   });
 });

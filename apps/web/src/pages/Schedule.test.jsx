@@ -10,6 +10,7 @@ import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
+import ToastContext from '../contexts/ToastContext.jsx';
 import Schedule from './Schedule.jsx';
 import { formatSessionTimeRange, zonedDateTime } from '../lib/eventTime.js';
 
@@ -631,6 +632,81 @@ describe('schedule filters', () => {
   it('offers no format group when no session names a format', () => {
     renderSchedule({ scheduleData: [{ ...fixtureSessions[0], type: null }] });
     expect(screen.queryByText('Format')).toBeNull();
+  });
+});
+
+describe('the view in the URL', () => {
+  function renderAt(search, props = {}) {
+    return render(
+      <MemoryRouter
+        initialEntries={[`/${search}`]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <EventConfigContext.Provider
+          value={{
+            eventConfig: fixtureConfig,
+            features: { schedule: true, sessionBookmarks: true },
+            theme: {},
+            badges: null,
+            source: 'snapshot',
+          }}
+        >
+          <AuthContext.Provider value={{ user: null, isAdmin: false, loading: false }}>
+            <ProfileContext.Provider value={{ attendeeAccess: false }}>
+              <ToastContext.Provider value={{ showToast: () => {}, dismiss: () => {} }}>
+                <ContentContext.Provider
+                  value={{
+                    readSource: 'published',
+                    siteContent: {},
+                    scheduleData: fixtureSessions,
+                    speakers: [],
+                    organizationsData: [],
+                    loading: false,
+                    getBlock: () => null,
+                    getPage: () => null,
+                    getSectionBlocks: () => [],
+                  }}
+                >
+                  <Schedule />
+                </ContentContext.Provider>
+              </ToastContext.Provider>
+            </ProfileContext.Provider>
+          </AuthContext.Provider>
+        </EventConfigContext.Provider>
+      </MemoryRouter>,
+    );
+  }
+
+  it('a shared link reopens the same filtered view', () => {
+    renderAt('?q=editing&sort=time&day=fx-day-1');
+    expect(onScreen().getByText('[Fixture] Afternoon editing lab')).toBeInTheDocument();
+    expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
+    expect(screen.getByLabelText('Search this day')).toHaveValue('editing');
+  });
+
+  it('a link carrying every control reopens the day, the sort, and the filters', () => {
+    renderAt('?day=fx-day-2&sort=time&track=&format=panel');
+    // Day two opens, narrowed to its one panel.
+    expect(onScreen().getByText('[Fixture] Day-two roundtable')).toBeInTheDocument();
+    expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
+    // The count the label carries is of published sessions.
+    expect(screen.getByRole('checkbox', { name: 'panel (1)' })).toBeChecked();
+  });
+
+  it('unknown values fall back to the default view', () => {
+    renderAt('?day=day-9&sort=controversial&q=&format=ghost');
+    expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
+    expect(screen.getByLabelText('Search this day')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Day one' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('put a changed day in the URL, so the filtered view is a shareable link', () => {
+    const { container } = renderAt('');
+    // The router starts empty; the first URL it produces is the clean one.
+    expect(container.ownerDocument).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Day two' }));
+    expect(onScreen().getByText('[Fixture] Day-two roundtable')).toBeInTheDocument();
+    expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
   });
 });
 
