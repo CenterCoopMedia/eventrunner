@@ -255,10 +255,8 @@
           </tbody>
           </table>
           </div>
-          <p>Changes that match more than one row run the union of the selected tiers. The
-          main branch protection rule should require <code>CI gate</code> after this workflow is
-          merged; the existing <code>Shared package tests</code> requirement remains unchanged
-          until that operator update is made.</p>
+          <p>Changes that match more than one row run the union of the selected tiers.
+          The main branch protection rule requires the stable <code>CI gate</code> check.</p>
           <p><code>npm run test:e2e</code> needs Java 21+ (the same Firestore/Storage emulators <code>test:rules</code> uses) and a Chromium build Playwright can find. It never runs <code>playwright install</code> itself: point <code>PLAYWRIGHT_BROWSERS_PATH</code> at an existing install, or run <code>npx playwright install --with-deps chromium</code> once yourself first — <code>.github/workflows/ci.yml</code>&#39;s <code>e2e</code> job does the latter, cached.</p>
           <h2 id="releases">Releases<a class="heading-anchor" href="#releases" aria-label="Link to this section">#</a></h2>
           <p>Tags, <code>CHANGELOG.md</code> hygiene, and what a release includes are in <a href="/eventrunner/docs/releasing/">RELEASING.md</a>.</p>
@@ -271,6 +269,24 @@
           <li>Handbook for attendees, staff, and clients: <a href="https://github.com/CenterCoopMedia/eventrunner/wiki">wiki</a></li>
           <li>Hosted-event support: info@eventrunner.org</li>
           </ul>
+          <h3 id="required-branch-and-connector-checks">Required branch and connector checks<a class="heading-anchor" href="#required-branch-and-connector-checks" aria-label="Link to this section">#</a></h3>
+          <p>Every change to <code>main</code> must use a pull request. Branch protection applies to administrators,
+          blocks force pushes and deletion, requires an up-to-date <code>CI gate</code>, and requires resolved
+          review conversations. Do not bypass or disable these rules to land a repair.</p>
+          <p>The <code>Connector review</code> check waits for the authenticated Codex connector&#39;s completed summary
+          for the current pull-request commit, then checks every review thread, including outdated
+          threads. An ordinary comment, a review that is still running, or a summary for an older
+          commit does not pass. Fix verified findings, run the affected checks, push the fix, and resolve
+          only completed conversations. A timeout or unavailable connector blocks merging; it is not
+          permission to mark the check successful. After a later push, a new connector review may be
+          needed because automatic review currently runs on opening a ready PR, not every push.</p>
+          <p>When web source changes, regenerate both the synthetic content and the committed demo with
+          <code>node scripts/generate-content.cjs --demo</code> and <code>node scripts/build-demo.cjs</code>, then run their
+          <code>--check</code> modes. Regenerate documentation with <code>node scripts/build-pages.cjs</code> after source
+          Markdown changes. Sign off all repair commits with <code>git commit -s</code>.</p>
+          <p>Branch rules control Git operations. An administrator credential can still edit those rules.
+          Agents should use a separate identity with write access and no repository or organization
+          administration permission; keep rule administration with the human owner.</p>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CONTRIBUTING.md"><code>CONTRIBUTING.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">

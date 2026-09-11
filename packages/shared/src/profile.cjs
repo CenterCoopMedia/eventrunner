@@ -75,7 +75,9 @@ const PUBLIC_PROFILE_FIELDS = Object.freeze([
   'customBadges',
   'profileVisibility',
   'speakerId',
-]);/** @param {*} v @returns {boolean} */
+]);
+
+/** @param {*} v @returns {boolean} */
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
 }
@@ -181,6 +183,8 @@ function buildPublicProfile(user, badgesConfig, features = null) {
     out.customBadges = validateCustomBadges(source.customBadges, {
       blockList: badgesConfig?.customBadgeBlockList,
     }).valid;
+  } else {
+    delete out.customBadges;
   }
 
   return out;

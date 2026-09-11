@@ -14,7 +14,7 @@ Not in the product. Staff post live updates from the admin. Operator alerts go t
 
 ## Can attendees make their own badges?
 
-They pick from the list you set. Free-text badges are not in v1.
+They pick from the list you set. An optional custom-badge feature also lets them enter up to three badges of 24 characters each. It is off by default. Validation blocks reserved role words and any additional words configured for the event; staff can remove a badge.
 
 ## Will you add social feeds or speaker chat?
 

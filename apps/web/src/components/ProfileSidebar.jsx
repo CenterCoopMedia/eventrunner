@@ -11,6 +11,8 @@
 // two actions are the shared filled and outlined controls (design brief
 // §3.1, §3.7) — the vocabulary SessionCard and the restyled pages use.
 import { Link } from 'react-router-dom';
+import { validateCustomBadges } from 'shared/badges';
+import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 
@@ -38,6 +40,7 @@ const cardClass =
 const headingClass = 'font-heading text-h3 font-semibold text-text-primary';
 
 export default function ProfileSidebar() {
+  const { features, badges: badgesConfig } = useEventConfig();
   const { profile, status, needsProfileSetup } = useProfile();
 
   if (status === 'signed-out') {
@@ -71,7 +74,13 @@ export default function ProfileSidebar() {
 
   const registrationLabel = STATUS_LABELS[profile?.registrationStatus] ?? null;
   const visibilityLabel = VISIBILITY_LABELS[profile?.profileVisibility] ?? null;
-  const badgeCount = Array.isArray(profile?.badges) ? profile.badges.length : 0;
+  const predefinedBadgeCount = Array.isArray(profile?.badges) ? profile.badges.length : 0;
+  const customBadgeCount = features.customBadges === true
+    ? validateCustomBadges(profile?.customBadges, {
+        blockList: badgesConfig?.customBadgeBlockList,
+      }).valid.length
+    : 0;
+  const badgeCount = predefinedBadgeCount + customBadgeCount;
 
   return (
     <aside aria-labelledby="profile-sidebar-heading" className={cardClass}>

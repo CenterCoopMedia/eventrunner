@@ -32,7 +32,7 @@ function renderPage(uid = 'u1') {
 }
 
 beforeEach(() => {
-  features = { attendeeDirectory: true, badges: true };
+  features = { attendeeDirectory: true, badges: true, customBadges: false };
   badgesConfig = {
     categories: [{ id: 'craft', label: 'Craft', maxPicks: 2, badges: [{ id: 'writer', label: 'Writer' }] }],
   };
@@ -105,6 +105,37 @@ describe('AttendeeProfile', () => {
     // A badge the operator removed from config/badges is not shown, even
     // though the stored projection still carries it.
     expect(screen.queryByText('left-over-id')).toBeNull();
+  });
+
+  it('shows only custom badges allowed by the live config when the feature is on', async () => {
+    features.customBadges = true;
+    badgesConfig = { ...badgesConfig, customBadgeBlockList: ['crypto'] };
+    fetchPublicProfileMock.mockResolvedValue({
+      id: 'u1',
+      displayName: 'Amara Diallo',
+      badges: [],
+      customBadges: ['News nerd', 'Crypto fan', 'Admin'],
+    });
+
+    renderPage();
+    await screen.findByRole('heading', { name: 'Amara Diallo' });
+    expect(screen.getByText('News nerd')).toBeInTheDocument();
+    expect(screen.queryByText('Crypto fan')).toBeNull();
+    expect(screen.queryByText('Admin')).toBeNull();
+  });
+
+  it('does not show custom badges unless the feature is exactly true', async () => {
+    features.customBadges = 'true';
+    fetchPublicProfileMock.mockResolvedValue({
+      id: 'u1',
+      displayName: 'Amara Diallo',
+      badges: [],
+      customBadges: ['News nerd'],
+    });
+
+    renderPage();
+    await screen.findByRole('heading', { name: 'Amara Diallo' });
+    expect(screen.queryByText('News nerd')).toBeNull();
   });
 
   it('re-reads the profile when the viewer’s access changes, so a denial does not stick', async () => {

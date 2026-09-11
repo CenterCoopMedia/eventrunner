@@ -272,8 +272,8 @@ export default function MySchedule() {
       {/* Optional Google Calendar sync (issue #177, ADR 0003): the flag
           gates the whole card, and the .ics download above it stays the
           answer whenever the grant is refused or the flag is off. */}
-      {features.calendarSync && user && mySessions.length > 0 ? (
-        <CalendarSyncCard sessions={mySessions} eventConfig={eventConfig} />
+      {features.calendarSync && user && !loading && !bookmarksLoading ? (
+        <CalendarSyncCard key={user.uid} sessions={mySessions} eventConfig={eventConfig} />
       ) : null}
     </article>
   );

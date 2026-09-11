@@ -25,7 +25,7 @@ const STATE_TEXT = {
  * @param {{ uid: string, sessionId: string, noteId?: string }} props
  */
 export default function SessionNote({ uid, sessionId, noteId }) {
-  const { draft, state, maxLength, edit } = useSessionNote(uid, sessionId);
+  const { draft, state, maxLength, edit, flush } = useSessionNote(uid, sessionId);
   const labelId = `note-${noteId ?? sessionId}`;
 
   return (
@@ -43,6 +43,7 @@ export default function SessionNote({ uid, sessionId, noteId }) {
         maxLength={maxLength}
         placeholder="Only you can see this."
         onChange={(event) => edit(event.target.value)}
+        onBlur={flush}
       />
       {/* The answer is stated, and an error is announced, not painted. */}
       <p

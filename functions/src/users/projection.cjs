@@ -216,6 +216,18 @@ function buildHandlers() {
       const db = getDb();
       await createRefreshUserPublicBadges({ db })();
     }),
+    refreshUserPublicFeatures: onDocumentWritten({
+      region,
+      retry: true,
+      timeoutSeconds: 540,
+      document: 'config/features',
+    }, async (event) => {
+      const before = event.data?.before?.data()?.customBadges === true;
+      const after = event.data?.after?.data()?.customBadges === true;
+      if (before === after) return;
+      const { getDb } = require('../core/firestore.cjs');
+      await createRefreshUserPublicBadges({ db: getDb() })();
+    }),
   };
 }
 

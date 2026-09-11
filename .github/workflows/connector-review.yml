@@ -1,0 +1,26 @@
+name: Connector review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  connector-review:
+    name: Connector review
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for the Codex connector review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { waitForConnectorReview } = require('./scripts/ci/connector-review.cjs');
+            await waitForConnectorReview({ github, context, log: core });

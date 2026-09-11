@@ -288,7 +288,8 @@ export default function Schedule() {
   // What the count sentence says: every session still in the document,
   // calling points included — they are sessions a reader can pick too.
   const matchedCount = entries.reduce((count, entry) => count + 1 + entry.children.length, 0);
-  const showGrid = wide && columns.length > 0 && entries.length > 0;
+  // A time/track grid groups sessions and cannot preserve a popularity rank.
+  const showGrid = sort === 'time' && wide && columns.length > 0 && entries.length > 0;
   // The back issue (brief §2.1): a day the event has moved past, or a whole
   // event the operator has archived. Nothing is hidden — the palette drops
   // to the archive tokens, the day head says so, and the controls that act
@@ -520,8 +521,9 @@ export default function Schedule() {
                 // An empty result states what was searched (issue #162), so
                 // an empty page is never mistaken for an empty day.
                 <p className="mt-md max-w-prose text-body text-text-secondary">
-                  No sessions on {activeDay.label} match “{query.trim()}”. Clear the search to see
-                  the whole day.
+                  {query.trim()
+                    ? `No sessions on ${activeDay.label} match “${query.trim()}”. Clear the search or a filter to see more sessions.`
+                    : `No sessions on ${activeDay.label} match the selected filters. Clear a filter to see more sessions.`}
                 </p>
               ) : showGrid ? (
                 // The programme page: time down, lettered lines across (brief

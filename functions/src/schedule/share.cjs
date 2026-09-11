@@ -81,7 +81,7 @@ function sameProjection(stored, next) {
   return (
     sameList &&
     (stored.displayName ?? null) === next.displayName &&
-    storedVisibility(stored.scheduleVisibility) === next.scheduleVisibility
+    stored.scheduleVisibility === next.scheduleVisibility
   );
 }
 
@@ -92,44 +92,37 @@ function sameProjection(stored, next) {
  *           visibility?: string, log?: Pick<Console, 'warn'> }} args
  * @returns {Promise<boolean>} whether a write was needed
  */
-async function syncScheduleShare({ db, uid, now = new Date(), visibility, log = console }) {
-  const [membersSnap, userSnap, shareSnap] = await Promise.all([
-    db.collection(`users/${uid}/bookmarks`).get(),
-    db
-      .collection('users')
-      .doc(uid)
-      .get()
-      .catch((err) => {
-        log.warn(`schedule share: users/${uid} read failed`, err);
-        return null;
-      }),
-    db
-      .collection('schedule_shares')
-      .doc(uid)
-      .get()
-      .catch((err) => {
-        log.warn(`schedule share: schedule_shares/${uid} read failed`, err);
-        return null;
-      }),
-  ]);
-
-  const next = buildScheduleShare({
-    sessionIds: membersSnap.docs.map((d) => d.id),
-    displayName: userSnap?.exists ? userSnap.data()?.displayName : null,
-    existing: shareSnap?.exists ? shareSnap.data() : null,
-    visibility,
-    now,
+async function syncScheduleShare({ db, uid, now = new Date(), visibility }) {
+  const userRef = db.collection('users').doc(uid);
+  const shareRef = db.collection('schedule_shares').doc(uid);
+  const membersRef = db.collection(`users/${uid}/bookmarks`);
+  // Read consent and write its projection in one transaction. A delayed
+  // bookmark trigger must retry after a newer privacy choice, not undo it.
+  return db.runTransaction(async (tx) => {
+    const [userSnap, shareSnap, membersSnap] = await Promise.all([
+      tx.get(userRef), tx.get(shareRef), tx.get(membersRef),
+    ]);
+    if (!userSnap.exists) {
+      if (shareSnap.exists) tx.delete(shareRef);
+      return shareSnap.exists;
+    }
+    const stored = shareSnap.exists ? shareSnap.data() : null;
+    const next = buildScheduleShare({
+      sessionIds: membersSnap.docs.map((d) => d.id),
+      displayName: userSnap.data()?.displayName,
+      existing: stored,
+      visibility,
+      now,
+    });
+    if (sameProjection(stored, next)) return false;
+    tx.set(shareRef, next);
+    return true;
   });
-
-  const stored = shareSnap?.exists ? shareSnap.data() : null;
-  if (sameProjection(stored, next)) return false;
-  await db.collection('schedule_shares').doc(uid).set(next);
-  return true;
 }
 
 // ------------------------------------------------------------------ server
 
-const { requireAttendeeAccess } = require('../core/auth.cjs');
+const { requireAttendeeAccess, verifyAuthToken } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 
 /**
@@ -146,17 +139,21 @@ function createSetScheduleVisibilityHandler({ db, auth, getConfig, now = Date.no
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
-    const gate = await requireAttendeeAccess({ auth, db, getConfig }, req);
-    if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
-
     const { visibility } = req.body || {};
+    const identity = await verifyAuthToken({ auth }, req);
+    if (!identity?.uid) return sendError(res, 401, 'unauthorized', 'Authentication required.');
     if (!VISIBILITIES.includes(visibility)) {
       return badRequest(res, 'visibility: must be one of private, attendees_only, public');
     }
+    // Revoking consent must remain possible after attendee access is lost.
+    if (visibility !== 'private') {
+      const gate = await requireAttendeeAccess({ auth, db, getConfig }, req);
+      if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+    }
 
     try {
-      await syncScheduleShare({ db, uid: gate.uid, visibility, now: new Date(now()) });
-      const share = await db.collection('schedule_shares').doc(gate.uid).get();
+      await syncScheduleShare({ db, uid: identity.uid, visibility, now: new Date(now()) });
+      const share = await db.collection('schedule_shares').doc(identity.uid).get();
       res.status(200).json({
         scheduleVisibility: share.exists ? share.data()?.scheduleVisibility : visibility,
         sessionIds: share.exists ? share.data()?.sessionIds ?? [] : [],
@@ -218,8 +215,8 @@ function buildHandlers() {
   return {
     // A bookmark membership write, or a rename on the account, is the only
     // thing that can change the projection's content.
-    syncScheduleShare: onDocumentWritten({ region, document: 'users/{uid}/bookmarks/{sessionId}' }, runSync()),
-    syncScheduleShareOnAccountWrite: onDocumentWritten({ region, document: 'users/{uid}' }, runSync()),
+    syncScheduleShare: onDocumentWritten({ region, retry: true, document: 'users/{uid}/bookmarks/{sessionId}' }, runSync()),
+    syncScheduleShareOnAccountWrite: onDocumentWritten({ region, retry: true, document: 'users/{uid}' }, runSync()),
     setScheduleVisibility: onRequest({ region }, withCors(async (req, res) => {
       await createSetScheduleVisibilityHandler(buildDeps())(req, res);
     })),

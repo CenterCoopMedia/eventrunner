@@ -32,6 +32,7 @@
 // gives a day.
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { validateCustomBadges } from 'shared/badges';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { subscribeDirectory } from '../lib/profileSource.js';
@@ -291,6 +292,11 @@ export default function Attendees() {
                     const badges = features.badges
                       ? visibleBadgeIds(profile.badges, badgesConfig)
                       : [];
+                    const customBadges = features.customBadges === true
+                      ? validateCustomBadges(profile.customBadges, {
+                          blockList: badgesConfig?.customBadgeBlockList,
+                        }).valid
+                      : [];
                     const affiliation = [text(profile.jobTitle), text(profile.organization)]
                       .filter(Boolean)
                       .join(' · ');
@@ -326,7 +332,7 @@ export default function Attendees() {
                             {affiliation}
                           </span>
                         ) : null}
-                        {profile.speakerId || badges.length > 0 ? (
+                        {profile.speakerId || badges.length > 0 || customBadges.length > 0 ? (
                           <ul className="flex flex-wrap gap-2xs">
                             {profile.speakerId ? (
                               <li>
@@ -336,6 +342,11 @@ export default function Attendees() {
                             {badges.map((badgeId) => (
                               <li key={badgeId}>
                                 <Tag>{badgeLabel(badgesConfig, badgeId)}</Tag>
+                              </li>
+                            ))}
+                            {customBadges.map((badge) => (
+                              <li key={`custom-${badge}`}>
+                                <Tag>{badge}</Tag>
                               </li>
                             ))}
                           </ul>

@@ -17,6 +17,19 @@ const BADGES_CONFIG = {
   ],
 };
 
+test('custom badges are omitted when the flag is off, missing, or malformed', () => {
+  for (const features of [null, {}, { customBadges: false }, { customBadges: 'true' }]) {
+    const pub = buildPublicProfile(user({ customBadges: ['Admin', 'Reader'] }), BADGES_CONFIG, features);
+    assert.equal(Object.hasOwn(pub, 'customBadges'), false);
+  }
+});
+
+test('enabled custom badges are validated against the platform and event block lists', () => {
+  const pub = buildPublicProfile(user({ customBadges: ['Admin', 'Reader', 'Writer'] }),
+    { ...BADGES_CONFIG, customBadgeBlockList: ['Reader'] }, { customBadges: true });
+  assert.deepEqual(pub.customBadges, ['Writer']);
+});
+
 function user(overrides = {}) {
   return {
     displayName: 'Rae Okonkwo',

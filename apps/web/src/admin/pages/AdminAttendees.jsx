@@ -102,6 +102,8 @@ export default function AdminAttendees() {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [busyUid, setBusyUid] = useState(null);
+  const [removingBadges, setRemovingBadges] = useState([]);
+  const [badgeRemovalResult, setBadgeRemovalResult] = useState(null);
 
   useEffect(() => {
     return subscribeAdminCollection(
@@ -133,6 +135,22 @@ export default function AdminAttendees() {
       showToast(err.message, { tone: 'error' });
     } finally {
       setBusyUid(null);
+    }
+  }
+
+  async function removeCustomBadge(uid, badge) {
+    const pendingKey = `${uid}:${badge}`;
+    setRemovingBadges((current) => [...current, pendingKey]);
+    setBadgeRemovalResult(null);
+    try {
+      await call('removeUserCustomBadge', { uid, badge });
+      setBadgeRemovalResult({ uid, tone: 'ok', message: `“${badge}” was removed.` });
+      showToast('Custom badge removed.');
+    } catch (err) {
+      setBadgeRemovalResult({ uid, tone: 'error', message: err.message });
+      showToast(err.message, { tone: 'error' });
+    } finally {
+      setRemovingBadges((current) => current.filter((key) => key !== pendingKey));
     }
   }
 
@@ -193,6 +211,40 @@ export default function AdminAttendees() {
                       {row.speakerId ? <StatusBadge tone="info">Speaker</StatusBadge> : null}
                     </div>
                     <p className={`mt-3xs truncate ${rowMetaClass}`}>{row.email}</p>
+                    {Array.isArray(row.customBadges) && row.customBadges.length > 0 ? (
+                      <div className="mt-xs">
+                        <p className={rowMetaClass}>Custom badges</p>
+                        <ul className="mt-2xs flex flex-wrap gap-xs">
+                          {row.customBadges.map((badge, index) => {
+                            if (typeof badge !== 'string' || !badge.trim()) return null;
+                            const pendingKey = `${row.id}:${badge}`;
+                            return (
+                              <li key={`${badge}-${index}`} className="flex items-center gap-2xs">
+                                <StatusBadge>{badge}</StatusBadge>
+                                <DestructiveConfirm
+                                  trigger={`Remove “${badge}”`}
+                                  title={`Remove “${badge}”`}
+                                  confirmLabel={`Remove “${badge}”`}
+                                  busyLabel="Removing…"
+                                  busy={removingBadges.includes(pendingKey)}
+                                  disabled={removingBadges.includes(pendingKey)}
+                                  consequence="This custom badge disappears from the attendee’s profile."
+                                  onConfirm={() => removeCustomBadge(row.id, badge)}
+                                />
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {badgeRemovalResult?.uid === row.id ? (
+                      <div className="mt-xs">
+                        <Notice
+                          tone={badgeRemovalResult.tone}
+                          message={badgeRemovalResult.message}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                   <div className="flex shrink-0 gap-xs">
                     {canApprove(row) ? (

@@ -25,7 +25,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PROFILE_VISIBILITIES } from 'shared/profile';
-import { MAX_TOTAL_BADGES } from 'shared/badges';
+import {
+  MAX_CUSTOM_BADGE_LENGTH,
+  MAX_CUSTOM_BADGES,
+  MAX_TOTAL_BADGES,
+  validateCustomBadges,
+} from 'shared/badges';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
@@ -108,7 +113,9 @@ export default function Profile() {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState(null);
+  const [customBadgeError, setCustomBadgeError] = useState(null);
   const nameRef = useRef(null);
+  const customBadgeRefs = useRef([]);
   // The photo path the SAVED profile currently references. Removing or
   // replacing a photo only changes the form; the old object is deleted once
   // a save has committed, so an abandoned edit never leaves the directory
@@ -128,6 +135,9 @@ export default function Profile() {
       bio: profile.bio ?? '',
       profileVisibility: profile.profileVisibility ?? 'attendees_only',
       badges: Array.isArray(profile.badges) ? profile.badges : [],
+      customBadges: Array.from({ length: MAX_CUSTOM_BADGES }, (_, index) =>
+        typeof profile.customBadges?.[index] === 'string' ? profile.customBadges[index] : '',
+      ),
       photoPath: typeof profile.photoPath === 'string' ? profile.photoPath : '',
     });
     savedPhotoPathRef.current =
@@ -179,6 +189,16 @@ export default function Profile() {
         : [...current.badges, badgeId],
     }));
 
+  const setCustomBadge = (index, value) => {
+    setForm((current) => ({
+      ...current,
+      customBadges: current.customBadges.map((badge, badgeIndex) =>
+        badgeIndex === index ? value : badge,
+      ),
+    }));
+    setCustomBadgeError(null);
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (form.displayName.trim().length === 0) {
@@ -187,6 +207,39 @@ export default function Profile() {
       return;
     }
     setNameError(null);
+    let customBadges;
+    if (features.customBadges === true) {
+      const enteredBadges = form.customBadges.filter((badge) => badge.trim().length > 0);
+      const result = validateCustomBadges(enteredBadges, {
+        blockList: badgesConfig?.customBadgeBlockList,
+      });
+      if (result.rejected.length > 0) {
+        let firstRejectedIndex = 0;
+        let entered = [];
+        for (let index = 0; index < form.customBadges.length; index += 1) {
+          const badge = form.customBadges[index];
+          if (!badge.trim()) continue;
+          entered = [...entered, badge];
+          if (
+            validateCustomBadges(entered, {
+              blockList: badgesConfig?.customBadgeBlockList,
+            }).rejected.length > 0
+          ) {
+            firstRejectedIndex = index;
+            break;
+          }
+        }
+        setCustomBadgeError({
+          index: firstRejectedIndex,
+          message:
+            'Choose another custom badge. Use 24 characters or fewer, use only letters, numbers, spaces, apostrophes, hyphens, or periods, and do not use a blocked or repeated badge.',
+        });
+        customBadgeRefs.current[firstRejectedIndex]?.focus();
+        return;
+      }
+      customBadges = result.valid;
+    }
+    setCustomBadgeError(null);
     setSaving(true);
     try {
       await saveProfile({
@@ -197,6 +250,7 @@ export default function Profile() {
         bio: form.bio.trim(),
         profileVisibility: form.profileVisibility,
         badges: form.badges,
+        ...(features.customBadges === true ? { customBadges } : {}),
         // Empty string means "no photo". The rules accept a string or null
         // for photoPath (firestore.rules validSelfProfileTypes), and the
         // projection coerces either to nothing rendered.
@@ -370,6 +424,46 @@ export default function Profile() {
                 </fieldset>
               );
             })}
+          </section>
+        ) : null}
+
+        {features.customBadges === true ? (
+          <section className="mt-xl">
+            <SectionHead level={2} title="Custom badges" />
+            <div className="mt-md grid gap-md sm:grid-cols-3">
+              {form.customBadges.map((badge, index) => {
+                const error = customBadgeError?.index === index ? customBadgeError.message : null;
+                return (
+                  <div key={index}>
+                    <label
+                      htmlFor={`customBadge-${index}`}
+                      className="block font-semibold text-text-primary"
+                    >
+                      Custom badge {index + 1}
+                    </label>
+                    <input
+                      id={`customBadge-${index}`}
+                      ref={(node) => { customBadgeRefs.current[index] = node; }}
+                      className={`mt-2xs ${inputClass}`}
+                      value={badge}
+                      maxLength={MAX_CUSTOM_BADGE_LENGTH}
+                      onChange={(event) => setCustomBadge(index, event.target.value)}
+                      aria-invalid={error ? 'true' : undefined}
+                      aria-describedby={error ? `customBadge-${index}-error` : undefined}
+                    />
+                    {error ? (
+                      <p
+                        id={`customBadge-${index}-error`}
+                        role="alert"
+                        className="mt-2xs font-data text-caption text-danger"
+                      >
+                        {error}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           </section>
         ) : null}
 

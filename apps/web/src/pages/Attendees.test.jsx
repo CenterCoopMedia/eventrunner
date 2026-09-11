@@ -168,6 +168,51 @@ describe('Attendees', () => {
     expect(screen.queryByText('Writer')).toBeNull();
   });
 
+  it('renders only custom badges allowed by live config when their feature is on', () => {
+    features.customBadges = true;
+    badgesConfig = { customBadgeBlockList: ['crypto'] };
+    renderPage();
+    pushProfiles([
+      {
+        id: 'u1',
+        displayName: 'Amara Diallo',
+        customBadges: ['News nerd', 'Crypto fan', 'Speaker'],
+      },
+    ]);
+
+    expect(screen.getByText('News nerd')).toBeInTheDocument();
+    expect(screen.queryByText('Crypto fan')).toBeNull();
+    expect(screen.queryByText('Speaker')).toBeNull();
+  });
+
+  it('does not render custom badges unless their feature is exactly true', () => {
+    features.customBadges = 'true';
+    renderPage();
+    pushProfiles([
+      { id: 'u1', displayName: 'Amara Diallo', customBadges: ['News nerd'] },
+    ]);
+    expect(screen.queryByText('News nerd')).toBeNull();
+  });
+
+  it('adds only allowed custom badges to the profile sidebar count when enabled', () => {
+    features.customBadges = true;
+    badgesConfig = { customBadgeBlockList: ['crypto'] };
+    profileValue = {
+      status: 'ready',
+      attendeeAccess: true,
+      needsProfileSetup: false,
+      profile: {
+        displayName: 'Amara Diallo',
+        badges: ['writer'],
+        customBadges: ['News nerd', 'Crypto fan', 'Speaker'],
+      },
+    };
+
+    renderPage();
+
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+  });
+
   it('says the directory is unavailable when the listener fails, rather than showing it empty', () => {
     renderPage();
     const [, , onFail] = subscribeDirectoryMock.mock.calls[0];

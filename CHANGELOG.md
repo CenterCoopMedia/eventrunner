@@ -102,6 +102,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Shared schedules no longer survive account deletion or regain public visibility after a
+  concurrent privacy change. Owners can revoke sharing after losing attendee access (#172).
+- Custom badges now have profile, directory, and moderation controls. Disabling the feature
+  removes badges from public projections without blocking other profile edits (#176).
+- Private notes save in order and flush pending edits when the attendee leaves the field or page
+  (#170). Desktop popularity sorting preserves rank, stale filters clear, and plain-text export
+  omits an unknown end time (#164, #166).
+- Optional calendar sync uses a dedicated-calendar grant, reuses its calendar after a reload,
+  reads all event pages, and retries incomplete writes. It remains off pending client setup and
+  verification (#177).
+- Pull requests now have a connector completion check for the current commit and unresolved
+  review threads. The main branch requires this check and CI, including for administrators.
+
 - Pressing Save in an admin editor with an invalid field did nothing and said nothing, because the
   control was disabled. Save now stays enabled until the request starts, sends nothing while a
   field is wrong, and moves the operator to the first field that refused.

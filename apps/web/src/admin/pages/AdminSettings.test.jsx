@@ -675,6 +675,7 @@ describe('badges', () => {
   it('round-trips the configured badge set through updateBadges', async () => {
     await renderAt('/admin/badges');
     await pushConfig('badges', {
+      customBadgeBlockList: ['Restricted'],
       categories: [
         { id: 'role', label: 'Role', maxPicks: 2, badges: [{ id: 'editor', label: 'Editor' }] },
       ],
@@ -697,6 +698,7 @@ describe('badges', () => {
       'producer',
     ]);
     expect(bodyOf(0).badges.categories[0].maxPicks).toBe(2);
+    expect(bodyOf(0).badges.customBadgeBlockList).toEqual(['Restricted']);
   });
 
   it('surfaces a duplicate-id rejection against the offending category', async () => {

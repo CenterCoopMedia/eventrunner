@@ -3,7 +3,16 @@
 // summary it returns.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { syncBookmarksToCalendar, calendarEventBody } = await import('./calendarSync.js');
+const authMocks = vi.hoisted(() => ({ link: vi.fn(), reauth: vi.fn(), scope: vi.fn(), credential: vi.fn() }));
+vi.mock('firebase/auth', () => ({
+  GoogleAuthProvider: class {
+    addScope(value) { authMocks.scope(value); }
+    static credentialFromResult(value) { return authMocks.credential(value); }
+  },
+  linkWithPopup: authMocks.link,
+  reauthenticateWithPopup: authMocks.reauth,
+}));
+const { syncBookmarksToCalendar, calendarEventBody, requestCalendarAccess, readCalendarId, saveCalendarId } = await import('./calendarSync.js');
 
 const EVENT = {
   name: '[Fixture] Lakeshore Docs Camp',
@@ -21,7 +30,7 @@ const SESSION = {
   location: 'Main hall',
 };
 
-function fakeFetch() {
+function fakeFetch(known = {}) {
   const calls = [];
   const fetchImpl = vi.fn(async (url, init = {}) => {
     calls.push({ url, method: init.method ?? 'GET', body: init.body ? JSON.parse(init.body) : null });
@@ -43,6 +52,7 @@ function fakeFetch() {
         status: 200,
         json: async () => ({
           items: [
+            ...Object.entries(known).map(([sessionId, id]) => ({ id, extendedProperties: { private: { 'eventrunner/sessionId': sessionId } } })),
             {
               id: 'ev-listed',
               status: 'cancelled',
@@ -57,7 +67,13 @@ function fakeFetch() {
   return { fetchImpl, calls };
 }
 
-beforeEach(() => {});
+beforeEach(() => {
+  authMocks.link.mockReset().mockResolvedValue({});
+  authMocks.reauth.mockReset().mockResolvedValue({});
+  authMocks.scope.mockReset();
+  authMocks.credential.mockReset().mockReturnValue({ accessToken: 'fixture-token' });
+  localStorage.clear();
+});
 afterEach(() => {});
 
 describe('syncBookmarksToCalendar', () => {
@@ -83,7 +99,7 @@ describe('syncBookmarksToCalendar', () => {
   });
 
   it('a second pass with the same set inserts nothing new', async () => {
-    const { fetchImpl, calls } = fakeFetch();
+    const { fetchImpl, calls } = fakeFetch({ s1: 'ev-known' });
     await syncBookmarksToCalendar({
       token: 'tok',
       sessions: [SESSION],
@@ -99,7 +115,7 @@ describe('syncBookmarksToCalendar', () => {
   });
 
   it('a removed bookmark deletes its event, and an edit updates in place', async () => {
-    const { fetchImpl, calls } = fakeFetch();
+    const { fetchImpl, calls } = fakeFetch({ s1: 'ev-known' });
     const result = await syncBookmarksToCalendar({
       token: 'tok',
       sessions: [],
@@ -112,7 +128,9 @@ describe('syncBookmarksToCalendar', () => {
   });
 
   it('a refused or failing call counts as failed and never throws away the pass', async () => {
-    const fetchImpl = vi.fn(async () => ({ ok: false, status: 429, json: async () => ({}) }));
+    const fetchImpl = vi.fn(async (_url, init) => init.method === 'GET'
+      ? { ok: true, status: 200, json: async () => ({ items: [] }) }
+      : { ok: false, status: 429, json: async () => ({}) });
     const result = await syncBookmarksToCalendar({
       token: 'tok',
       sessions: [SESSION],
@@ -150,4 +168,69 @@ describe('calendarEventBody', () => {
   it('an unresolvable session produces no body at all', () => {
     expect(calendarEventBody({ ...SESSION, startTime: null }, { calendarId: 'c', eventConfig: EVENT })).toBeNull();
   });
+});
+
+it('re-reads every page and retries failed deletions without touching untagged events', async () => {
+  const calls = [];
+  let refuse = true;
+  const fetchImpl = vi.fn(async (url, init) => {
+    calls.push({ url, method: init.method });
+    if (init.method === 'GET') return { ok: true, status: 200, json: async () => url.includes('pageToken=next')
+      ? { items: [{ id: 'ours', extendedProperties: { private: { 'eventrunner/sessionId': 's1' } } }] }
+      : { items: [{ id: 'personal' }], nextPageToken: 'next' } };
+    return { ok: !refuse, status: refuse ? 429 : 204 };
+  });
+  const args = { token: 'tok', sessions: [], eventConfig: EVENT, previous: { calendarId: 'c' }, fetchImpl };
+  const failed = await syncBookmarksToCalendar(args);
+  expect(failed.failed).toBe(1);
+  expect(failed.events.s1).toBe('ours');
+  refuse = false;
+  const retried = await syncBookmarksToCalendar({ ...args, previous: failed });
+  expect(retried.deleted).toBe(1);
+  expect(calls.filter((c) => c.method === 'DELETE').every((c) => c.url.endsWith('/ours'))).toBe(true);
+});
+
+it('retains the calendar id before a later request fails', async () => {
+  const saved = vi.fn();
+  const fetchImpl = vi.fn(async (_url, init) => init.method === 'POST'
+    ? { ok: true, status: 200, json: async () => ({ id: 'new-calendar' }) }
+    : { ok: false, status: 503 });
+  await expect(syncBookmarksToCalendar({ token: 'tok', sessions: [], eventConfig: EVENT,
+    onCalendarCreated: saved, fetchImpl })).rejects.toThrow('503');
+  expect(saved).toHaveBeenCalledWith('new-calendar');
+});
+
+it('reports an expired token so the control can obtain a new grant', async () => {
+  const fetchImpl = vi.fn(async (_url, init) => init.method === 'GET'
+    ? { ok: true, status: 200, json: async () => ({ items: [] }) }
+    : { ok: false, status: 401 });
+  await expect(syncBookmarksToCalendar({ token: 'tok', sessions: [SESSION], eventConfig: EVENT,
+    previous: { calendarId: 'c' }, fetchImpl })).rejects.toMatchObject({ status: 401 });
+});
+
+it('refuses a session without a usable end time', () => {
+  expect(calendarEventBody({ ...SESSION, endTime: null }, { eventConfig: EVENT })).toBeNull();
+});
+
+it('requests permission to create the dedicated calendar and links an email account only once', async () => {
+  const emailUser = { uid: 'u1', providerData: [] };
+  expect(await requestCalendarAccess(emailUser)).toBe('fixture-token');
+  expect(authMocks.scope).toHaveBeenCalledWith('https://www.googleapis.com/auth/calendar.app.created');
+  expect(authMocks.link).toHaveBeenCalledWith(emailUser, expect.anything());
+  const linked = { ...emailUser, providerData: [{ providerId: 'google.com', uid: 'g1' }] };
+  await requestCalendarAccess(linked);
+  expect(authMocks.link).toHaveBeenCalledTimes(1);
+  expect(authMocks.reauth).toHaveBeenCalledWith(linked, expect.anything());
+});
+
+it('stores only the calendar id and isolates it by attendee, project and Google identity', () => {
+  const user = { uid: 'u1', auth: { app: { options: { projectId: 'demo-run-of-show' } } },
+    providerData: [{ providerId: 'google.com', uid: 'g1' }] };
+  saveCalendarId(user, 'calendar-id');
+  expect(readCalendarId(user)).toBe('calendar-id');
+  expect(readCalendarId({ ...user, uid: 'u2' })).toBeNull();
+  expect(readCalendarId({ ...user, providerData: [{ providerId: 'google.com', uid: 'g2' }] })).toBeNull();
+  expect(readCalendarId({ ...user, auth: { app: { options: { projectId: 'demo-other' } } } })).toBeNull();
+  expect(localStorage.length).toBe(1);
+  expect(localStorage.getItem(localStorage.key(0))).toBe('calendar-id');
 });

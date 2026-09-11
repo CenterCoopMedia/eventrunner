@@ -205,6 +205,7 @@ function makeFakeDb(seed = {}) {
     },
     collection(name) {
       return {
+        _kind: 'query',
         doc(id) {
           return docRef(name, id === undefined ? randomBytes(10).toString('hex') : id);
         },

@@ -94,7 +94,11 @@ export default function AdminBadgeSettings() {
     setError(null);
     setStatus('');
     try {
-      await call('updateBadges', { badges: toPayload(categories) });
+      await call('updateBadges', { badges: {
+        ...toPayload(categories),
+        ...(Array.isArray(badges?.customBadgeBlockList)
+          ? { customBadgeBlockList: badges.customBadgeBlockList } : {}),
+      } });
       setStatus('Saved. Attendees see the new set immediately.');
       showToast('Badges saved.');
     } catch (err) {

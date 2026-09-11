@@ -45,10 +45,10 @@ const SESSIONS = [
   },
 ];
 
-function renderShared({ share, error = false, auth = { user: null, isAdmin: false, loading: false }, profile = { attendeeAccess: false }, features = { schedule: true, sessionBookmarks: true } } = {}) {
+function sharedTree({ share, error = false, auth = { user: null, isAdmin: false, loading: false }, profile = { attendeeAccess: false }, features = { schedule: true, sessionBookmarks: true } } = {}) {
   holder.share = share;
   holder.error = error;
-  return render(
+  return (
     <MemoryRouter initialEntries={['/schedule/user/owner-1']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="schedule/user/:uid" element={
@@ -77,9 +77,11 @@ function renderShared({ share, error = false, auth = { user: null, isAdmin: fals
           </EventConfigContext.Provider>
         } />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
+
+function renderShared(options) { return render(sharedTree(options)); }
 
 describe('the shared schedule page', () => {
   it('a permitted viewer sees the owner named and their saved sessions, as the usual rows', () => {
@@ -133,4 +135,15 @@ describe('the shared schedule page', () => {
     });
     expect(screen.getByRole('heading', { name: 'No saved sessions to show' })).toBeInTheDocument();
   });
+});
+
+it('retries a denied subscription when the viewer signs in with attendee access', () => {
+  const { rerender } = renderShared({ error: true });
+  expect(screen.getByRole('heading', { name: 'This schedule is private' })).toBeInTheDocument();
+  rerender(sharedTree({
+    share: { scheduleVisibility: 'attendees_only', displayName: 'Alex', sessionIds: ['fx-s1'] },
+    auth: { user: { uid: 'viewer-1' }, isAdmin: false, loading: false },
+    profile: { attendeeAccess: true },
+  }));
+  expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Morning kickoff' })).toBeInTheDocument();
 });

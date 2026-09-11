@@ -183,7 +183,8 @@ service cloud.firestore {
 
     function validCustomBadgesList() {
       let custom = request.resource.data.get('customBadges', null);
-      return custom == null
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['customBadges'])
+        || custom == null
         || (customBadgesEnabled()
             && custom is list
             && custom.size() <= 3
