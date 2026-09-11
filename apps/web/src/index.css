@@ -1949,7 +1949,6 @@
 @layer components {
   .site-nav-more { position: relative; }
   .site-nav-more > summary { cursor: pointer; padding-block: var(--space-sm); }
-  .site-nav-more > summary:focus-visible { outline: 2px solid rgb(var(--color-accent-rgb)); outline-offset: 3px; }
   .site-nav-more .site-nav-more__links {
     position: absolute;
     inset: 100% 0 auto auto;
@@ -1962,6 +1961,14 @@
     background: rgb(var(--color-surface-rgb));
   }
   .site-nav-more__links a { display: block; }
+  @media (max-width: 767px) {
+    .site-nav-more { position: static; }
+    .site-nav-more .site-nav-more__links {
+      inset: 100% 0 auto;
+      min-inline-size: 0;
+      max-inline-size: 100%;
+    }
+  }
 }
 
 .schedule-print {
@@ -1969,14 +1976,25 @@
 }
 
 @media print {
-  /* No controls: a button on paper is a lie. */
-  .event-hero,
+  /* Keep the page heading and authored copy; omit decorative artwork. */
+  .event-hero__figure,
+  .event-hero__veil,
   .no-print,
   nav,
   footer,
   .skip-link {
     display: none;
   }
+
+  .event-hero {
+    display: block;
+    min-block-size: 0;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .event-hero__copy { inline-size: 100%; padding: 0; border: 0; }
+  .event-hero__title { font-size: var(--text-h1); line-height: var(--text-h1-leading); }
 
   .schedule-screen {
     display: none;

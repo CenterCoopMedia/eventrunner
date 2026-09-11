@@ -12,7 +12,11 @@ The browser matrix covered 24 schedule views: six styles, two modes, and
 1440px/390px viewports. Every view had its expected loaded hero image, one
 Schedule heading, a print control, and no document horizontal overflow.
 Home, full-screen entry and exit, focus restoration, retained style/mode/route,
-and the More navigation menu were checked separately. Fresh browser console
+and the More navigation menu were checked separately. The open menu also stays
+inside the viewport at 320px and 390px in all six styles, with all nine links
+reachable and the shared keyboard focus ring visible. Print emulation keeps
+the Home heading and authored copy while hiding art and actions; the hero
+shrinks to its text rather than leaving a large blank frame. Fresh browser console
 and page-error logs were empty.
 
 The demo uses synthetic content and disables account features. These checks

@@ -224,7 +224,7 @@ export default function Home() {
         >
           {subtitle?.value ? <p className="mt-sm max-w-prose text-body text-text-secondary text-pretty">{subtitle.value}</p> : null}
           {registrationAction || heroCtas.length ? (
-            <div className="mt-lg flex flex-wrap gap-sm">
+            <div className="no-print mt-lg flex flex-wrap gap-sm">
               <RegistrationAction placement="lead" />
               {heroCtas.map((block) => <CtaBlock key={`${block.section}__${block.field}`} block={block} />)}
             </div>

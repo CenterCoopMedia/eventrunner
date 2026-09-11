@@ -354,8 +354,8 @@ export default function Layout() {
       aria-label="Main"
       className={
         navPlacement === 'side'
-          ? 'border-b-hairline border-b-rule-hairline lg:w-48 lg:shrink-0 lg:self-stretch lg:border-b-0 lg:border-e-hairline lg:border-e-rule-hairline lg:pe-md lg:pt-xl'
-          : 'border-b-hairline border-b-rule-hairline'
+          ? 'relative border-b-hairline border-b-rule-hairline lg:w-48 lg:shrink-0 lg:self-stretch lg:border-b-0 lg:border-e-hairline lg:border-e-rule-hairline lg:pe-md lg:pt-xl'
+          : 'relative border-b-hairline border-b-rule-hairline'
       }
     >
       <ul

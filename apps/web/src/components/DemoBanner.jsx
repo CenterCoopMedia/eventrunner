@@ -73,12 +73,13 @@ const exitPreviewClass =
   `${quietActionClass} no-print fixed bottom-md start-md z-40 bg-surface`;
 
 function attemptFullscreenCall(target, method) {
-  if (typeof method !== 'function') return;
+  if (typeof method !== 'function') return null;
   try {
     const result = method.call(target);
-    if (typeof result?.catch === 'function') void result.catch(() => {});
+    return typeof result?.catch === 'function' ? result.catch(() => {}) : null;
   } catch {
     // In-page preview remains available when the browser refuses fullscreen.
+    return null;
   }
 }
 
@@ -96,17 +97,27 @@ export function DemoBannerContent({
   const previewButtonRef = useRef(null);
   const exitButtonRef = useRef(null);
   const restoreFocusRef = useRef(false);
+  const previewDesiredRef = useRef(false);
   const activeStyle = getDemoStyleOption(styleId);
 
   const restoreControls = useCallback(() => {
+    previewDesiredRef.current = false;
     restoreFocusRef.current = true;
     setPreviewing(false);
   }, []);
 
   const enterPreview = useCallback(() => {
+    previewDesiredRef.current = true;
     setPreviewing(true);
     const root = pageDocument?.documentElement;
-    attemptFullscreenCall(root, root?.requestFullscreen);
+    const request = attemptFullscreenCall(root, root?.requestFullscreen);
+    if (request) {
+      void request.then(() => {
+        if (!previewDesiredRef.current && pageDocument?.fullscreenElement) {
+          attemptFullscreenCall(pageDocument, pageDocument.exitFullscreen);
+        }
+      });
+    }
   }, [pageDocument]);
 
   const exitPreview = useCallback(() => {
@@ -130,6 +141,7 @@ export function DemoBannerContent({
 
   useEffect(
     () => () => {
+      previewDesiredRef.current = false;
       if (typeof setDemoTheme === 'function') setDemoTheme(null);
     },
     [setDemoTheme],

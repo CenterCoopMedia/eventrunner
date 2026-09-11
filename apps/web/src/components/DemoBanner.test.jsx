@@ -177,6 +177,35 @@ describe('DemoBannerContent', () => {
     );
   });
 
+  it('exits fullscreen when a delayed request resolves after preview was cancelled', async () => {
+    let resolveRequest;
+    const request = new Promise((resolve) => {
+      resolveRequest = resolve;
+    });
+    const pageDocument = new EventTarget();
+    pageDocument.documentElement = {
+      requestFullscreen: vi.fn(() => request),
+    };
+    pageDocument.fullscreenElement = null;
+    pageDocument.exitFullscreen = vi.fn(async () => {
+      pageDocument.fullscreenElement = null;
+    });
+    renderControls({ pageDocument });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview full screen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Exit preview' }));
+    expect(pageDocument.exitFullscreen).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Preview full screen' })).toBeInTheDocument();
+
+    await act(async () => {
+      pageDocument.fullscreenElement = pageDocument.documentElement;
+      resolveRequest();
+      await request;
+    });
+    await waitFor(() => expect(pageDocument.exitFullscreen).toHaveBeenCalledOnce());
+    expect(pageDocument.fullscreenElement).toBeNull();
+  });
+
   it('keeps the in-page preview when fullscreen is unavailable or denied', async () => {
     const unsupportedDocument = new EventTarget();
     unsupportedDocument.documentElement = {};

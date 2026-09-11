@@ -29,7 +29,7 @@ function renderSignIn() {
 }
 
 async function requestCode(email = 'attendee@example.org') {
-  fireEvent.change(screen.getByLabelText('Email address'), {
+  fireEvent.change(await screen.findByLabelText('Email address'), {
     target: { value: email },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
@@ -151,7 +151,7 @@ describe('emailed-code sign-in', () => {
     );
     renderSignIn();
 
-    fireEvent.change(screen.getByLabelText('Email address'), {
+    fireEvent.change(await screen.findByLabelText('Email address'), {
       target: { value: 'attendee@example.org' },
     });
     const submit = screen.getByRole('button', { name: 'Email me a code' });
@@ -200,7 +200,7 @@ describe('emailed-code sign-in', () => {
     );
     renderSignIn();
 
-    fireEvent.change(screen.getByLabelText('Email address'), {
+    fireEvent.change(await screen.findByLabelText('Email address'), {
       target: { value: 'attendee@example.org' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
@@ -243,7 +243,7 @@ describe('emailed-code sign-in', () => {
 
   it('validates the email on submit with focus moved to the error', async () => {
     renderSignIn();
-    fireEvent.change(screen.getByLabelText('Email address'), {
+    fireEvent.change(await screen.findByLabelText('Email address'), {
       target: { value: 'not-an-email' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));

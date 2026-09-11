@@ -285,10 +285,21 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
     copy[id] = copyValues(preset);
   }
 
+  // Only preset-remapped properties need explicit resets on a style change.
+  // Untouched component defaults already remain in the generated stylesheet.
+  const remappedNames = new Set();
+  function collectRemaps(value) {
+    if (!value || typeof value !== 'object') return;
+    for (const [name, child] of Object.entries(value)) {
+      if (name.startsWith('--')) remappedNames.add(name);
+      collectRemaps(child);
+    }
+  }
+  collectRemaps(presets);
   const componentContracts = stripNotes(readJson(path.join(tokensDir, 'components.json')));
   const componentDefaults = Object.fromEntries(Object.values(componentContracts)
     .flatMap((contract) => Object.entries(contract))
-    .filter(([name]) => !name.endsWith('-rgb')));
+    .filter(([name]) => !name.endsWith('-rgb') && remappedNames.has(name)));
 
   const adminSource = readJson(path.join(tokensDir, 'admin.json'));
   const admin = {
