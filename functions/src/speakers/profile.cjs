@@ -51,16 +51,19 @@ function isPlainObject(v) {
 }
 
 /**
- * True when `path` is null, or a Storage object path this speaker actually
- * owns (issue #22 review finding P2-4). Self-service headshotPath was
- * previously checked only for "is it a string" — a speaker could submit
- * another speaker's `speaker-photos/{otherId}/…` path (or an arbitrary
- * bucket path) and have it accepted onto their own record, and once
- * approved that other speaker's photo would render as theirs on the public
- * page. Prefix-scoped rather than existence-checked: speakerPhotoUpload
- * already guarantees anything under this prefix was written for this
- * speaker (by the speaker themselves or an admin), so the prefix check is
- * sufficient and needs no extra Storage read.
+ * True when `path` is null, a Storage object path this speaker actually
+ * owns (issue #22 review finding P2-4), or one of the bundled neutral
+ * default avatars (issue #175). Self-service headshotPath was previously
+ * checked only for "is it a string" — a speaker could submit another
+ * speaker's `speaker-photos/{otherId}/…` path (or an arbitrary bucket
+ * path) and have it accepted onto their own record, and once approved that
+ * other speaker's photo would render as theirs on the public page.
+ * Prefix-scoped rather than existence-checked: speakerPhotoUpload already
+ * guarantees anything under this prefix was written for this speaker (by
+ * the speaker themselves or an admin), so the prefix check is sufficient
+ * and needs no extra Storage read. `default-avatars/` names a bundled site
+ * asset, never a bucket object — nothing of anybody's is reachable
+ * through it, which is exactly why the prefix is safe to allow wholesale.
  *
  * @param {string} speakerId
  * @param {unknown} path
@@ -68,7 +71,10 @@ function isPlainObject(v) {
  */
 function isOwnHeadshotPath(speakerId, path) {
   if (path === null) return true;
-  return typeof path === 'string' && path.startsWith(`speaker-photos/${speakerId}/`);
+  return (
+    typeof path === 'string' &&
+    (path.startsWith(`speaker-photos/${speakerId}/`) || path.startsWith('default-avatars/'))
+  );
 }
 
 /** Defaults a brand-new canonical record carries for every optional field. */

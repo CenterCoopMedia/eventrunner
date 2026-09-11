@@ -19,7 +19,7 @@
 // text beside it, so the whole component is aria-hidden when there is no
 // photo, and a photo carries an empty alt for the same reason.
 import { useEffect, useState } from 'react';
-import { assetUrl, storagePath } from '../../lib/mediaSource.js';
+import { assetUrl, isDefaultAvatarPath, storagePath } from '../../lib/mediaSource.js';
 
 /** The first letter of a display name, for the stand-in. */
 export function initialOf(displayName) {
@@ -27,8 +27,15 @@ export function initialOf(displayName) {
   return name ? Array.from(name)[0].toUpperCase() : '?';
 }
 
-/** Only an object under the owner-bound namespace is rendered. */
+/**
+ * A displayable URL for the stored photoPath, or null. Two namespaces
+ * render: the owner's own `profile-photos/` objects, and the bundled
+ * `default-avatars/` a person may choose instead of uploading anything
+ * (issue #175). Anything else is treated as no photo rather than fetched —
+ * the same guard as before, one namespace wider.
+ */
 export function profilePhotoUrl(photoPath) {
+  if (isDefaultAvatarPath(photoPath)) return assetUrl(photoPath);
   const path = storagePath(photoPath);
   if (!path || !path.startsWith('profile-photos/')) return null;
   return assetUrl(path);

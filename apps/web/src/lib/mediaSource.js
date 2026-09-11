@@ -58,6 +58,41 @@ export function typeLabel(contentType) {
   return String(contentType).replace(/^image\//, '').replace('+xml', '').toUpperCase();
 }
 
+// --- Neutral default avatars (issue #175) ---------------------------------
+//
+// A RESERVED PATH PREFIX, not a bucket folder: a photoPath of
+// `default-avatars/<file>` names an image shipped in the site bundle, and
+// assetUrl resolves it to that static asset in every mode. Nothing is
+// uploaded, so a chosen default costs no storage and survives even when a
+// person never touches the uploader. The prefix is the boundary the
+// renderers accept (ProfilePhoto) and the speaker path guard
+// (functions/src/speakers/profile.cjs) allows — one namespace, three
+// checkpoints that agree.
+
+export const DEFAULT_AVATAR_PREFIX = 'default-avatars/';
+
+/** The neutral defaults, in the order the picker offers them. */
+export const DEFAULT_AVATARS = Object.freeze(
+  ['avatar-01', 'avatar-02', 'avatar-03', 'avatar-04', 'avatar-05', 'avatar-06'].map((name) => ({
+    path: `${DEFAULT_AVATAR_PREFIX}${name}.svg`,
+    label: `Default avatar ${name.slice(-2)}`,
+  })),
+);
+
+/** Whether a photoPath names one of the bundled defaults. */
+export function isDefaultAvatarPath(path) {
+  return (
+    typeof path === 'string' &&
+    path.startsWith(DEFAULT_AVATAR_PREFIX) &&
+    /^default-avatars\/avatar-0[1-6]\.svg$/.test(path)
+  );
+}
+
+/** The static URL a default avatar's path resolves to, or null. */
+export function defaultAvatarUrl(path) {
+  return isDefaultAvatarPath(path) ? `${import.meta.env.BASE_URL}avatars/${path.slice(DEFAULT_AVATAR_PREFIX.length)}` : null;
+}
+
 /** A size a person can read: `840 KB`, `1.4 MB`. */
 export function formatBytes(size) {
   const bytes = Number(size);
@@ -144,6 +179,9 @@ export function storagePath(value) {
  * @returns {string|null} null when the value is not a usable object path
  */
 export function assetUrl(path) {
+  // The bundled defaults are not bucket objects: the prefix names an asset
+  // that ships with the site, in every mode, with no Storage behind it.
+  if (isDefaultAvatarPath(path)) return defaultAvatarUrl(path);
   const object = storagePath(path);
   if (!object) return null;
   // Static demo build: there is no Storage bucket behind the site, so a

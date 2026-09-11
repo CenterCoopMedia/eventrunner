@@ -2,8 +2,9 @@
 // ProfilePhotoField, uploading through speakerPhotoUpload (server-authorized;
 // speaker-photos/ is `write: if false` in storage.rules) instead of a direct
 // Storage SDK PUT.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { chooseAndApplyCrop, installPhotoCropStubs, uninstallPhotoCropStubs } from '../../test/photoCropStubs.js';
 
 const uploadSpeakerPhotoMock = vi.fn(async ({ speakerId }) => ({
   path: `speaker-photos/${speakerId}/photo.png`,
@@ -22,6 +23,11 @@ const user = { getIdToken: async () => 't' };
 
 beforeEach(() => {
   uploadSpeakerPhotoMock.mockClear();
+  installPhotoCropStubs();
+});
+
+afterEach(() => {
+  uninstallPhotoCropStubs();
 });
 
 function pick(file) {
@@ -33,7 +39,10 @@ function pick(file) {
 describe('SpeakerPhotoField', () => {
   it('renders the placeholder as a square portrait on the brand radius, never a circle', () => {
     render(<SpeakerPhotoField user={user} speakerId="rae" value="" onChange={vi.fn()} />);
-    const stub = screen.getByText('None');
+    const stub = screen
+      .getAllByText('None')
+      .find((node) => node.className.includes('rounded-brand'));
+    expect(stub).toBeTruthy();
     expect(stub).toHaveClass('rounded-brand');
     expect(stub).not.toHaveClass('rounded-full');
   });
@@ -52,10 +61,10 @@ describe('SpeakerPhotoField', () => {
     expect(image).not.toHaveClass('rounded-full');
   });
 
-  it('uploads to the speaker’s own folder through speakerPhotoUpload and reports the path', async () => {
+  it('uploads to the speaker’s own folder through speakerPhotoUpload, after the crop, and reports the path', async () => {
     const onChange = vi.fn();
     render(<SpeakerPhotoField user={user} speakerId="rae" value="" onChange={onChange} />);
-    pick(new File(['x'], 'me.png', { type: 'image/png' }));
+    await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your speaker photo/);
 
     await waitFor(() => expect(onChange).toHaveBeenCalled());
     expect(uploadSpeakerPhotoMock.mock.calls[0][0]).toMatchObject({ user, speakerId: 'rae' });
@@ -85,9 +94,25 @@ describe('SpeakerPhotoField', () => {
     uploadSpeakerPhotoMock.mockRejectedValueOnce(new Error('You may only upload a photo for your own speaker profile.'));
     const onChange = vi.fn();
     render(<SpeakerPhotoField user={user} speakerId="rae" value="" onChange={onChange} />);
-    pick(new File(['x'], 'me.png', { type: 'image/png' }));
+    await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your speaker photo/);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/own speaker profile/);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('opens the crop step between the picker and the upload, and Cancel uploads nothing', async () => {
+    const onChange = vi.fn();
+    render(<SpeakerPhotoField user={user} speakerId="rae" value="" onChange={onChange} />);
+    pick(new File(['x'], 'me.png', { type: 'image/png' }));
+
+    expect(
+      await screen.findByRole('application', { name: /position the crop/i }),
+    ).toBeInTheDocument();
+    expect(uploadSpeakerPhotoMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByLabelText(/Upload a photo/)).toBeInTheDocument();
+    expect(uploadSpeakerPhotoMock).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
   });
 });

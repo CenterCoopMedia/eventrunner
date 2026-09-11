@@ -7,8 +7,9 @@
 // writes `photoPath`, and it never deletes an object itself (Profile.jsx
 // does that after the save commits, so an abandoned edit cannot leave the
 // directory pointing at a deleted object).
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { chooseAndApplyCrop, installPhotoCropStubs, uninstallPhotoCropStubs } from '../../test/photoCropStubs.js';
 
 const uploadBytes = vi.fn(async () => ({}));
 const deleteObject = vi.fn(async () => {});
@@ -27,6 +28,11 @@ const { default: ProfilePhotoField } = await import('./ProfilePhotoField.jsx');
 beforeEach(() => {
   uploadBytes.mockClear();
   deleteObject.mockClear();
+  installPhotoCropStubs();
+});
+
+afterEach(() => {
+  uninstallPhotoCropStubs();
 });
 
 function pick(file) {
@@ -38,7 +44,10 @@ function pick(file) {
 describe('ProfilePhotoField', () => {
   it('renders the placeholder as a square portrait on the brand radius, never a circle', () => {
     render(<ProfilePhotoField uid="attendee-1" value="" onChange={vi.fn()} />);
-    const stub = screen.getByText('None');
+    // The picker's "None" radio also says None; the placeholder is the bare
+    // dashed span.
+    const stub = screen.getAllByText('None').find((node) => node.className.includes('rounded-brand'));
+    expect(stub).toBeTruthy();
     expect(stub).toHaveClass('rounded-brand');
     expect(stub).not.toHaveClass('rounded-full');
   });
@@ -56,10 +65,10 @@ describe('ProfilePhotoField', () => {
     expect(image).not.toHaveClass('rounded-full');
   });
 
-  it('uploads to the signed-in user’s own prefix and reports the path', async () => {
+  it('uploads to the signed-in user’s own prefix and reports the path, after the crop', async () => {
     const onChange = vi.fn();
     render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);
-    pick(new File(['x'], 'me.png', { type: 'image/png' }));
+    await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
 
     await waitFor(() => expect(onChange).toHaveBeenCalled());
     expect(uploadBytes.mock.calls[0][0]).toEqual({ path: 'profile-photos/attendee-1/photo.png' });
@@ -117,9 +126,26 @@ describe('ProfilePhotoField', () => {
     uploadBytes.mockRejectedValueOnce(new Error('permission denied'));
     const onChange = vi.fn();
     render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);
-    pick(new File(['x'], 'me.png', { type: 'image/png' }));
+    await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not be uploaded/);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('opens the crop step between the picker and the upload, and Cancel uploads nothing', async () => {
+    const onChange = vi.fn();
+    render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);
+    pick(new File(['x'], 'me.png', { type: 'image/png' }));
+
+    // The step is in the document before anything is uploaded.
+    expect(
+      await screen.findByRole('application', { name: /position the crop/i }),
+    ).toBeInTheDocument();
+    expect(uploadBytes).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByLabelText(/Upload a photo/)).toBeInTheDocument();
+    expect(uploadBytes).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
   });
 });

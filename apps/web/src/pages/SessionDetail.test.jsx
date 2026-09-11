@@ -257,7 +257,9 @@ describe('SessionDetail', () => {
     });
     renderDetail('fx-early', { features: { schedule: true, sessionMaterials: true } });
     expect(screen.getByRole('heading', { name: 'Materials' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Opening slides' })).toBeInTheDocument();
+    // A link material says in its own name that it opens a tab (#253); a
+    // file material downloads in place and says nothing.
+    expect(screen.getByRole('button', { name: 'Opening slides (opens in a new tab)' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'handout.pdf' })).toBeInTheDocument();
   });
 

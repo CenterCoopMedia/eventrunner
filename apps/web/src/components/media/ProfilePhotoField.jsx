@@ -30,14 +30,37 @@ import {
   checkFile,
   formatBytes,
   typeLabel,
+  defaultAvatarUrl,
 } from '../../lib/mediaSource.js';
 import { uploadProfilePhoto } from '../../lib/photoUpload.js';
 import AssetImage from './AssetImage.jsx';
+import PhotoCrop from './PhotoCrop.jsx';
+import DefaultAvatarPicker from './DefaultAvatarPicker.jsx';
 
 export default function ProfilePhotoField({ uid, value, onChange }) {
   const inputRef = useRef(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // The chosen-but-not-yet-cropped picture (issue #175): the crop step sits
+  // between the file picker and the upload.
+  const [cropFile, setCropFile] = useState(null);
+
+  async function upload(file) {
+    setBusy(true);
+    setError(null);
+    try {
+      const { path } = await uploadProfilePhoto({ uid, file });
+      onChange(path);
+    } catch {
+      // A rules refusal and a dropped connection read the same to the person
+      // holding the phone: the photo is not up there, try again.
+      setError('Your photo could not be uploaded. Try again.');
+    } finally {
+      setBusy(false);
+      setCropFile(null);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
 
   async function choose(event) {
     const file = event.target.files?.[0] ?? null;
@@ -50,21 +73,14 @@ export default function ProfilePhotoField({ uid, value, onChange }) {
     });
     if (problem) {
       setError(problem);
+      if (inputRef.current) inputRef.current.value = '';
       return;
     }
-    setBusy(true);
-    setError(null);
-    try {
-      const { path } = await uploadProfilePhoto({ uid, file });
-      onChange(path);
-    } catch {
-      // A rules refusal and a dropped connection read the same to the person
-      // holding the phone: the photo is not up there, try again.
-      setError('Your photo could not be uploaded. Try again.');
-    } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
+    // The upload starts only once the picture has been squared (issue
+    // #175); the picker's input is cleared now, so choosing again after a
+    // cancel re-fires the change event.
+    if (inputRef.current) inputRef.current.value = '';
+    setCropFile(file);
   }
 
   function remove() {
@@ -73,15 +89,23 @@ export default function ProfilePhotoField({ uid, value, onChange }) {
     onChange('');
   }
 
+  const defaultUrl = defaultAvatarUrl(value);
+
   return (
     <div className="flex flex-col gap-2">
       <span className="block font-semibold text-brand-ink">Photo</span>
       {/* Square portrait, brand radius (design brief §2.4) — not a circle. */}
       <div className="flex items-center gap-4">
-        {value ? (
+        {value && !defaultUrl ? (
           <AssetImage
             path={value}
             alt="Your current profile photo"
+            className="h-20 w-20 rounded-brand bg-brand-surface-alt object-cover"
+          />
+        ) : defaultUrl ? (
+          <img
+            src={defaultUrl}
+            alt="Your chosen default avatar"
             className="h-20 w-20 rounded-brand bg-brand-surface-alt object-cover"
           />
         ) : (
@@ -121,6 +145,15 @@ export default function ProfilePhotoField({ uid, value, onChange }) {
           ) : null}
         </div>
       </div>
+      {cropFile ? (
+        <PhotoCrop
+          file={cropFile}
+          label="your profile photo"
+          onApply={(file) => upload(file)}
+          onCancel={() => setCropFile(null)}
+        />
+      ) : null}
+      <DefaultAvatarPicker value={value} onChange={onChange} namePrefix="profile" />
       <p id="profile-photo-hint" className="text-sm text-brand-ink-muted">
         {PROFILE_PHOTO_TYPES.map(typeLabel).join(', ')} · up to{' '}
         {formatBytes(PROFILE_PHOTO_MAX_BYTES)}. Save your profile to publish the change.

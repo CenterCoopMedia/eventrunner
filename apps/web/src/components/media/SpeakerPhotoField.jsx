@@ -11,7 +11,7 @@
 // ordering applies here, and SpeakerProfile.jsx is what removes the
 // replaced object after a save commits.
 import { useRef, useState } from 'react';
-import { checkFile } from '../../lib/mediaSource.js';
+import { checkFile, defaultAvatarUrl } from '../../lib/mediaSource.js';
 import {
   SPEAKER_PHOTO_MAX_BYTES,
   SPEAKER_PHOTO_TYPES,
@@ -20,11 +20,30 @@ import {
   uploadSpeakerPhoto,
 } from '../../lib/speakerProfileApi.js';
 import AssetImage from './AssetImage.jsx';
+import PhotoCrop from './PhotoCrop.jsx';
+import DefaultAvatarPicker from './DefaultAvatarPicker.jsx';
 
 export default function SpeakerPhotoField({ user, speakerId, value, onChange }) {
   const inputRef = useRef(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // The chosen-but-not-yet-cropped picture (issue #175).
+  const [cropFile, setCropFile] = useState(null);
+
+  async function upload(file) {
+    setBusy(true);
+    setError(null);
+    try {
+      const { path } = await uploadSpeakerPhoto({ user, speakerId, file });
+      onChange(path);
+    } catch (err) {
+      setError(err?.message || 'Your photo could not be uploaded. Try again.');
+    } finally {
+      setBusy(false);
+      setCropFile(null);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
 
   async function choose(event) {
     const file = event.target.files?.[0] ?? null;
@@ -42,32 +61,31 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
       if (inputRef.current) inputRef.current.value = '';
       return;
     }
-    setBusy(true);
-    setError(null);
-    try {
-      const { path } = await uploadSpeakerPhoto({ user, speakerId, file });
-      onChange(path);
-    } catch (err) {
-      setError(err?.message || 'Your photo could not be uploaded. Try again.');
-    } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
+    if (inputRef.current) inputRef.current.value = '';
+    setCropFile(file);
   }
 
   function remove() {
     onChange('');
   }
 
+  const defaultUrl = defaultAvatarUrl(value);
+
   return (
     <div className="flex flex-col gap-2">
       <span className="block font-semibold text-brand-ink">Photo</span>
       {/* Square portrait, brand radius (design brief §2.4) — not a circle. */}
       <div className="flex items-center gap-4">
-        {value ? (
+        {value && !defaultUrl ? (
           <AssetImage
             path={value}
             alt="Your current speaker photo"
+            className="h-20 w-20 rounded-brand bg-brand-surface-alt object-cover"
+          />
+        ) : defaultUrl ? (
+          <img
+            src={defaultUrl}
+            alt="Your chosen default avatar"
             className="h-20 w-20 rounded-brand bg-brand-surface-alt object-cover"
           />
         ) : (
@@ -107,6 +125,15 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
           ) : null}
         </div>
       </div>
+      {cropFile ? (
+        <PhotoCrop
+          file={cropFile}
+          label="your speaker photo"
+          onApply={(file) => upload(file)}
+          onCancel={() => setCropFile(null)}
+        />
+      ) : null}
+      <DefaultAvatarPicker value={value} onChange={onChange} namePrefix="speaker" />
       <p id="speaker-photo-hint" className="text-sm text-brand-ink-muted">
         {SPEAKER_PHOTO_TYPES.map(typeLabel).join(', ')} · up to{' '}
         {formatBytes(SPEAKER_PHOTO_MAX_BYTES)}. Save to publish the change; an organizer reviews it
