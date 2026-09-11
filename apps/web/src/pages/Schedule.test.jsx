@@ -3,7 +3,7 @@
 // no Firebase, no network (spec §8.1 credential-free CI). The fixture event
 // is fictional and distinct from the committed snapshot so nothing here
 // accidentally passes by matching demo copy.
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
@@ -19,6 +19,14 @@ import { formatSessionTimeRange, zonedDateTime } from '../lib/eventTime.js';
 const countsHolder = { countsById: new Map() };
 vi.mock('../hooks/useBookmarkCounts.js', () => ({
   useBookmarkCounts: () => ({ countsById: countsHolder.countsById }),
+}));
+
+// The event clock (issue #167) is pinned per test the same way; a null
+// "now" marks nothing, which is the safe default for tests that do not
+// care.
+const clockHolder = { now: null };
+vi.mock('../hooks/useEventClock.js', () => ({
+  useEventClock: () => clockHolder.now,
 }));
 
 // Non-UTC zone on purpose: America/Chicago is UTC−5 (CDT) on the fixture
@@ -791,6 +799,36 @@ describe('bookmark counts on the schedule', () => {
     fireEvent.change(screen.getByLabelText('Sort sessions'), { target: { value: 'saved' } });
     expect(times()).toEqual(['[Fixture] Afternoon editing lab', '[Fixture] Morning kickoff']);
     countsHolder.countsById = new Map();
+  });
+});
+
+describe('running and finished marks', () => {
+  // The fixture day runs 2026-10-15 in America/Chicago (CDT, UTC−5):
+  // the morning session 09:05–09:45 (14:05Z–14:45Z), the afternoon one
+  // 13:30–14:15 (18:30Z–19:15Z). The clock is pinned per test.
+  afterEach(() => {
+    clockHolder.now = null;
+  });
+
+  it('marks a session running inside its window, in words', () => {
+    clockHolder.now = new Date('2026-10-15T14:30:00Z');
+    renderSchedule();
+    expect(onScreen().getByText('Running now')).toBeInTheDocument();
+    expect(onScreen().queryByText('Finished')).toBeNull();
+  });
+
+  it('marks a session whose end has passed as finished', () => {
+    clockHolder.now = new Date('2026-10-15T19:00:00Z');
+    renderSchedule();
+    expect(onScreen().getByText('Finished')).toBeInTheDocument();
+    expect(onScreen().getByText('Running now')).toBeInTheDocument();
+  });
+
+  it('marks nothing before the day starts', () => {
+    clockHolder.now = new Date('2026-10-15T13:00:00Z');
+    renderSchedule();
+    expect(onScreen().queryByText('Running now')).toBeNull();
+    expect(onScreen().queryByText('Finished')).toBeNull();
   });
 });
 

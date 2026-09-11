@@ -16,6 +16,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import { useBookmarkCounts } from '../hooks/useBookmarkCounts.js';
+import { useEventClock } from '../hooks/useEventClock.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
@@ -30,6 +31,7 @@ import ScheduleGrid from '../components/ScheduleGrid.jsx';
 import SchedulePrint from '../components/SchedulePrint.jsx';
 import HorizontalScrollRegion from '../components/HorizontalScrollRegion.jsx';
 import { resolveTracks } from '../lib/scheduleGrid.js';
+import { sessionStateOf } from '../lib/scheduleState.js';
 import {
   buildSearchIndex,
   collectFormats,
@@ -85,6 +87,9 @@ export default function Schedule() {
   // session, the legend in the header, and the most-saved sort all read
   // this one listener.
   const { countsById } = useBookmarkCounts();
+  // The event wall clock (issue #167), refreshed on a timer, so a session
+  // picks up its running and finished marks without a reload.
+  const now = useEventClock();
   // Which of the two views is in the document at all (lib/viewport.js). The
   // list is the answer until the viewport is measured and found wide, so a
   // browser that cannot be asked gets the accessible baseline rather than a
@@ -468,6 +473,7 @@ export default function Schedule() {
                     columns={columns}
                     eventConfig={eventConfig}
                     countsById={countsById}
+                    now={now}
                   />
                 </HorizontalScrollRegion>
               ) : (
@@ -487,6 +493,7 @@ export default function Schedule() {
                       backIssue={backIssue}
                       callingPoints={entry.children}
                       savedCount={countsById.get(entry.session.id)}
+                      state={sessionStateOf(eventConfig, entry.session, now)}
                       // The session's real place in the day, counted from
                       // one: the numbered-agenda Schedule style prints it,
                       // and the lead-and-rest style sets the first row

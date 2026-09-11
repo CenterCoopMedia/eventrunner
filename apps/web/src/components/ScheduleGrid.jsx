@@ -41,9 +41,11 @@ import SpecimenLabel from './editorial/SpecimenLabel.jsx';
 import CallingPoints from './CallingPoints.jsx';
 import SavedCount from './session/SavedCount.jsx';
 import SessionFormat from './session/SessionFormat.jsx';
+import SessionState from './session/SessionState.jsx';
 import RecordingLink, { sessionRecordingUrl } from './session/RecordingLink.jsx';
 import { buildGridRows } from '../lib/scheduleGrid.js';
 import { formatSessionStart, formatSessionTimeRange } from '../lib/eventTime.js';
+import { sessionStateOf } from '../lib/scheduleState.js';
 
 /**
  * One session inside a cell: the title, the room, its calling points, and
@@ -59,7 +61,7 @@ import { formatSessionStart, formatSessionTimeRange } from '../lib/eventTime.js'
  * every desktop reader to the session page to find out whether a recording
  * existed at all.
  */
-function GridEntry({ entry, eventConfig, countsById }) {
+function GridEntry({ entry, eventConfig, countsById, now }) {
   const recordingUrl = sessionRecordingUrl(entry.session);
   const { search } = useLocation();
   const range = formatSessionTimeRange(eventConfig, entry.session);
@@ -75,6 +77,7 @@ function GridEntry({ entry, eventConfig, countsById }) {
           </Link>
         </h3>
         <SessionFormat format={entry.session.type} />
+        <SessionState state={sessionStateOf(eventConfig, entry.session, now)} />
         <SavedCount count={countsById?.get(entry.session.id)} />
       </div>
       {range?.endLabel ? (
@@ -113,9 +116,10 @@ function GridEntry({ entry, eventConfig, countsById }) {
  *   columns: Array<{ letter: string, name: string }>,
  *   eventConfig: object,
  *   countsById?: Map<string, number>,
+ *   now?: Date,
  * }} props
  */
-export default function ScheduleGrid({ day, entries, columns, eventConfig, countsById }) {
+export default function ScheduleGrid({ day, entries, columns, eventConfig, countsById, now = null }) {
   // Two states, because the reader is doing two things. `focused` is the
   // preview that follows the keyboard; `pinned` is the choice a press
   // keeps. Focus wins while it lasts, which is what makes tabbing across
@@ -177,7 +181,13 @@ export default function ScheduleGrid({ day, entries, columns, eventConfig, count
                 // runs across the whole row.
                 <td className="schedule-grid__cell" colSpan={columns.length}>
                   {row.span.map((entry) => (
-                    <GridEntry key={entry.session.id} entry={entry} eventConfig={eventConfig} countsById={countsById} />
+                    <GridEntry
+                      key={entry.session.id}
+                      entry={entry}
+                      eventConfig={eventConfig}
+                      countsById={countsById}
+                      now={now}
+                    />
                   ))}
                 </td>
               ) : (
@@ -189,7 +199,13 @@ export default function ScheduleGrid({ day, entries, columns, eventConfig, count
                     data-track-forward={forward === cell.track ? 'true' : undefined}
                   >
                     {cell.entries.map((entry) => (
-                      <GridEntry key={entry.session.id} entry={entry} eventConfig={eventConfig} countsById={countsById} />
+                    <GridEntry
+                      key={entry.session.id}
+                      entry={entry}
+                      eventConfig={eventConfig}
+                      countsById={countsById}
+                      now={now}
+                    />
                     ))}
                   </td>
                 ))
