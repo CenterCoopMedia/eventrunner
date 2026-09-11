@@ -47,6 +47,7 @@ function lazyPage(importer) {
 const Schedule = lazyPage(() => import('./pages/Schedule.jsx'));
 const SessionDetail = lazyPage(() => import('./pages/SessionDetail.jsx'));
 const MySchedule = lazyPage(() => import('./pages/MySchedule.jsx'));
+const SharedSchedule = lazyPage(() => import('./pages/SharedSchedule.jsx'));
 const Speakers = lazyPage(() => import('./pages/Speakers.jsx'));
 const SpeakerDetail = lazyPage(() => import('./pages/SpeakerDetail.jsx'));
 const Sponsors = lazyPage(() => import('./pages/Sponsors.jsx'));
@@ -95,6 +96,10 @@ export function AppRoutes() {
         <Route index element={<Home />} />
         <Route path="schedule" element={<DeferredPage component={Schedule} label="schedule" />} />
         <Route path="schedule/mine" element={<DeferredPage component={MySchedule} label="your schedule" />} />
+        {/* A shared personal schedule (issue #173): reads the projection of
+            issue #172 — never users_public — and answers denial as privacy.
+            It sits under the reserved `schedule` segment, beside /mine. */}
+        <Route path="schedule/user/:uid" element={<DeferredPage component={SharedSchedule} label="shared schedule" />} />
         <Route path="schedule/:sessionId" element={<DeferredPage component={SessionDetail} label="session" />} />
         <Route path="speakers" element={<DeferredPage component={Speakers} label="speakers" />} />
         <Route path="speakers/:slug" element={<DeferredPage component={SpeakerDetail} label="speaker" />} />

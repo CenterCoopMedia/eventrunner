@@ -53,8 +53,15 @@ export function subscribeOwnScheduleShare(uid, onNext, onError) {
   );
 }
 
-/** Thrown by {@link setScheduleVisibility} on any non-2xx response. */
-export class ScheduleShareError extends Error {
+/**
+ * Any viewer the projection permits reads it exactly the way its owner
+ * does — one subscription shape for both directions of the share (issue
+ * #173). The rules decide what this listener actually receives; a refusal
+ * arrives at onError and the page answers it as privacy.
+ */
+export { subscribeOwnScheduleShare as subscribeScheduleShare };
+
+/** Thrown by {@link setScheduleVisibility} on any non-2xx response. */export class ScheduleShareError extends Error {
   constructor({ message, status }) {
     super(message);
     this.name = 'ScheduleShareError';
