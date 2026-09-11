@@ -25,9 +25,9 @@ Whatever comes out of that is resolved once, in one place, and everything reads 
 
 Every style is finished work: Two authored palettes, a type pairing that has been set against real event content, its own devices, and its own answers in every option group. None of them is a skin over another, and none of them is a lesser version of the default. What they differ in is what an event is *for*.
 
-Three of them are the **launch surface** — run against real client content, and the ones the picker offers first. The other three are **still being proved**: Fully functional, holding every gate, and grouped behind their own disclosure so staff try them on their own content before an event depends on them.
+The catalog is one flat, ordered list: Six styles, every one of them finished work, with the picker's order as the only ranking between them.
 
-### Institutional — launch surface, and the default
+### Institutional — the default
 
 *The public record of a public event.* Plain, patient, unambiguous, with nothing between the reader and the information.
 
@@ -39,7 +39,7 @@ Three of them are the **launch surface** — run against real client content, an
 - **Why it is the default**: It is the plainest of the six, it targets the highest accessibility bar, and it is the look a client is least likely to have to undo. A fresh deployment starts here.
 - **Deeper controls**: The heading face can move to Source Serif 4 (warmer) or to Public Sans bold (drops the serif entirely, for an event that is not a document). The header can become a two-part lockup, for an event run by two organizations, or a compact standing head. The schedule can number its agenda items, which a formal proceeding often wants.
 
-### Newsroom — launch surface
+### Newsroom
 
 *A well-made news site on a good day.* Named sections, one strong rule each, numbers that never borrow the headline face.
 
@@ -50,7 +50,7 @@ Three of them are the **launch surface** — run against real client content, an
 - **Illustrations**: None.
 - **Deeper controls**: The heading face can move to Newsreader at display weights (one family throughout, quieter) or to Archivo bold condensed (more sessions per screen in a headline). The header can stack with a deck, which suits an event whose name needs a sentence after it, or become section-aware so the running header names where the reader is. Sessions can run as "lead and rest", which gives the first session of a day the room a keynote deserves.
 
-### Zine — launch surface
+### Zine
 
 *Made by hand, at a copier, the week before.* One loud display face, an even rhythm under it, and an accent spent twice a page.
 
@@ -62,7 +62,7 @@ Three of them are the **launch surface** — run against real client content, an
 - **The one exception in the whole system**: Zine may print a session block off-register, like a stamp that missed. It is the only place the design brief grants a deliberate imperfection, and it is **off by default** — a printing artefact is something a client turns on, not something they discover on their own schedule page.
 - **Deeper controls**: The heading face can move to Bagnard or Avara. The header can become a stacked block or a boxed bill. The session block can take the off-register stamp or the struck folio. Pen marks — the hand that went over the page afterwards — can be turned on, and they are their own control, so a client can take the stamp without the pen.
 
-### Broadsheet — being proved
+### Broadsheet
 
 *The paper of record.* The masthead is the loudest thing on the page, and rules do the dividing.
 
@@ -73,7 +73,7 @@ Three of them are the **launch surface** — run against real client content, an
 - **Illustrations**: None.
 - **Deeper controls**: The heading face can move to Libre Baskerville or Spectral semibold. The header can centre itself under a double rule, or compact to the left with a standing edition line. The schedule can drop to an agate block — the dense small-type listing a printed programme uses when the day is long.
 
-### Field Guide — being proved
+### Field Guide
 
 *A naturalist's expedition handbook.* Plates, specimen labels, and observation notes, with the linework carrying the character.
 
@@ -84,7 +84,7 @@ Three of them are the **launch surface** — run against real client content, an
 - **Illustrations**: The botanical set exists for this style and ships **off**. Drawings on every page of a real programme read as decoration rather than as observation. Turn them on for an event where they mean something.
 - **Deeper controls**: The heading face can move to Vollkorn at display size or to Spectral semibold. The header can become a framed title page or a plate-and-label lockup. Sessions can run as a field-notes column. A pencil line can be turned on in the margins. The empty-state plate stays framed whatever you pick, because a blank sheet really is one.
 
-### Atlas — being proved
+### Atlas
 
 *A mapped city on its transit network.* A survey sheet and a departure board at once: Lines, stations, transfers.
 
@@ -333,7 +333,7 @@ Thirteen sections, in this order: type, colour, rules and spacing, layout, heade
 
 What a developer can add, and what the system will refuse.
 
-**A new site style.** Add its JSON under `design/tokens/presets/`, with both palettes, its type map, its shape, its option groups, and its tier. A style that names no tier reads as still-being-proved, so a new one cannot reach the launch surface by accident. It must clear the contrast gate in both modes before it ships.
+**A new site style.** Add its JSON under `design/tokens/presets/`, with both palettes, its type map, its shape, and its option groups. A style joins the catalog only when it is complete: It is built to that standard on its branch, it clears the contrast gate in both modes, and only then does it register — so nothing half-finished can reach the picker, and no registration carries a stability tier, because the catalog has none.
 
 **A new option inside a style.** An option remaps tokens the style already declares. It may not introduce a property name and it may not introduce a class. If it needs a name that does not exist, the thing you are adding is a token, not an option.
 
