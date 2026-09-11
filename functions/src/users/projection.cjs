@@ -32,6 +32,7 @@ const { buildPublicProfile } = require('shared/profile');
 const USERS = 'users';
 const USERS_PUBLIC = 'users_public';
 const BADGES_CONFIG = 'badges';
+const FEATURES_CONFIG = 'features';
 const REFRESH_CONCURRENCY = 25;
 
 /** Shallow-equal over the projection payload (values are scalars, string
@@ -79,13 +80,19 @@ function sameProjection(a, b) {
 function createSyncUserPublic({
   db,
   getBadgesConfig,
+  getFeaturesConfig,
   failClosedOnConfigError = true,
   now = () => new Date(),
   log = console,
 }) {
   const badgesRef = db.collection('config').doc(BADGES_CONFIG);
+  const featuresRef = db.collection('config').doc(FEATURES_CONFIG);
   const readBadgesConfig = getBadgesConfig ?? (async (tx) => {
     const snap = await tx.get(badgesRef);
+    return snap.exists ? snap.data() : null;
+  });
+  const readFeaturesConfig = getFeaturesConfig ?? (async (tx) => {
+    const snap = await tx.get(featuresRef);
     return snap.exists ? snap.data() : null;
   });
 
@@ -100,17 +107,21 @@ function createSyncUserPublic({
 
     return db.runTransaction(async (tx) => {
       let badgesConfig = null;
+      let featuresConfig = null;
       try {
-        // Read config/badges in the projection transaction. Config trigger
-        // deliveries can arrive out of order, so an event snapshot or cached
-        // config could let an older delivery restore a removed badge.
+        // Read config/badges (and config/features, for the custom-badge
+        // flag) in the projection transaction. Config trigger deliveries
+        // can arrive out of order, so an event snapshot or cached config
+        // could let an older delivery restore a removed badge.
         badgesConfig = await readBadgesConfig(tx);
+        featuresConfig = await readFeaturesConfig(tx);
       } catch (err) {
         if (!failClosedOnConfigError) throw err;
-        // Fail closed on badges only: an unreadable config/badges must not
-        // publish an unvalidated badge set, and must not stop the rest of
-        // the profile (display name, visibility) from being projected.
-        log.error('syncUserPublic: config/badges unavailable; projecting no badges', err);
+        // Fail closed on badges only: an unreadable config must not publish
+        // an unvalidated badge set, and must not stop the rest of the
+        // profile (display name, visibility) from being projected. An
+        // unreadable features doc also means custom badges do not project.
+        log.error('syncUserPublic: config unavailable; projecting no badges, no custom badges', err);
       }
       const [userSnap, publicSnap] = await Promise.all([tx.get(userRef), tx.get(publicRef)]);
 
@@ -122,7 +133,7 @@ function createSyncUserPublic({
         return { action: 'deleted' };
       }
 
-      const payload = buildPublicProfile(userSnap.data(), badgesConfig);
+      const payload = buildPublicProfile(userSnap.data(), badgesConfig, featuresConfig);
       if (publicSnap.exists && sameProjection(stripStamps(publicSnap.data()), payload)) {
         return { action: 'unchanged' };
       }

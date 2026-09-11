@@ -15,6 +15,7 @@ const mediaUpload = require('./src/media/upload.cjs');
 const mediaMetadata = require('./src/media/metadata.cjs');
 const mediaUsage = require('./src/media/usage.cjs');
 const adminConfig = require('./src/admin/config.cjs');
+const adminCustomBadges = require('./src/admin/customBadges.cjs');
 const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
 const adminFeedback = require('./src/admin/feedback.cjs');
 const webMcpDiagnostics = require('./src/admin/webMcpDiagnostics.cjs');
@@ -59,6 +60,7 @@ module.exports = {
   ...mediaMetadata.handlers,
   ...mediaUsage.handlers,
   ...adminConfig.handlers,
+  ...adminCustomBadges.handlers,
   ...adminLiveUpdates.handlers,
   ...adminFeedback.handlers,
   ...webMcpDiagnostics.handlers,

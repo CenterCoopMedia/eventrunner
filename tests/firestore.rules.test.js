@@ -1260,3 +1260,51 @@ describe("the private sessionReactions/{sessionId}/users dedup subcollection", (
     );
   });
 });
+
+/** Flip config/features.customBadges (server-owned: rules-disabled). */
+async function setCustomBadgesFeature(enabled) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "config/features"), {
+      attendeeDirectory: true,
+      publicAttendeeProfiles: false,
+      customBadges: enabled,
+    });
+  });
+}
+
+// Free-text custom badges (issue #176): the field exists only when the
+// operator turned the flag on, and the rules pin its shape — a list, at
+// most three entries, no duplicates. The word list lives where the config
+// is readable: the profile form checks it as the reader types, and the
+// users_public projection re-validates before anything is published.
+describe("custom badges", () => {
+  const update = (uid, patch) => updateDoc(doc(attendee(uid), `users/${uid}`), patch);
+
+  it("refuses a customBadges write while the feature flag is off", async () => {
+    await setCustomBadgesFeature(false);
+    await assertFails(update("approved-1", { customBadges: ["First Timers"] }));
+  });
+
+  it("refuses a customBadges write while the features document is missing entirely", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("config/features").delete();
+    });
+    await assertFails(update("approved-1", { customBadges: ["First Timers"] }));
+  });
+
+  it("allows a shape-legal customBadges write with the flag on", async () => {
+    await setCustomBadgesFeature(true);
+    await assertSucceeds(
+      update("approved-1", { customBadges: ["First Timers", "Scholarship"] }),
+    );
+    await assertSucceeds(update("approved-1", { customBadges: [] }));
+  });
+
+  it("refuses more than three entries and rejects duplicates", async () => {
+    await setCustomBadgesFeature(true);
+    await assertFails(
+      update("approved-1", { customBadges: ["one", "two", "three", "four"] }),
+    );
+    await assertFails(update("approved-1", { customBadges: ["same", "same"] }));
+  });
+});

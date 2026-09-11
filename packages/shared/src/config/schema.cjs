@@ -114,7 +114,7 @@ function isHttpsUrl(v) {
 const KNOWN_FEATURE_KEYS = [
   'schedule', 'speakers', 'sponsors', 'attendeeDirectory',
   'sessionBookmarks', 'sessionReactions', 'sessionMaterials',
-  'badges', 'liveUpdates', 'feedbackInbox',
+  'badges', 'customBadges', 'liveUpdates', 'feedbackInbox',
   'schedulePdf', 'icsExport', 'updates',
   'autoApproveTicketHolders', 'publicAttendeeProfiles',
   'webmcpPublic',

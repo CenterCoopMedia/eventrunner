@@ -49,6 +49,7 @@
     "buildSchedulePdf",
     "buildMySchedulePdf",
     "setScheduleVisibility",
+    "removeUserCustomBadge",
     "updatesMeta",
     "routeMeta",
     "reactToSession",

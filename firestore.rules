@@ -122,7 +122,7 @@ service cloud.firestore {
     function editsOnlySelfProfileFields() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'displayName', 'pronouns', 'bio', 'organization', 'jobTitle',
-        'photoPath', 'socialHandles', 'badges', 'profileVisibility', 'updatedAt'
+        'photoPath', 'socialHandles', 'badges', 'customBadges', 'profileVisibility', 'updatedAt'
       ]);
     }
 
@@ -165,6 +165,31 @@ service cloud.firestore {
         && badges.toSet().size() == badges.size();
     }
 
+    // Free-text custom badges (issue #176): the field only exists at all
+    // when the operator turned config/features.customBadges on — a missing
+    // or half-seeded features doc fails closed, so the default event has no
+    // custom-badge write path. What the rules CAN afford here is the shape:
+    // a list, at most three entries, no duplicates. The word list and the
+    // per-entry length and character caps are checked where the config is
+    // readable — the profile form checks them as the reader types, and the
+    // users_public projection re-validates and drops what fails, so a
+    // blocked word never reaches the directory even if it reached the
+    // account document.
+    function customBadgesEnabled() {
+      return exists(/databases/$(database)/documents/config/features)
+        && get(/databases/$(database)/documents/config/features)
+             .data.get('customBadges', false) == true;
+    }
+
+    function validCustomBadgesList() {
+      let custom = request.resource.data.get('customBadges', null);
+      return custom == null
+        || (customBadgesEnabled()
+            && custom is list
+            && custom.size() <= 3
+            && custom.toSet().size() == custom.size());
+    }
+
     function validSelfProfileTypes() {
       let d = request.resource.data;
       return d.get('displayName', '') is string
@@ -175,6 +200,7 @@ service cloud.firestore {
         && (d.get('photoPath', null) == null || d.get('photoPath', '') is string)
         && d.get('socialHandles', {}) is map
         && validBadgesList()
+        && validCustomBadgesList()
         && (d.get('updatedAt', null) == null || d.get('updatedAt', null) is timestamp)
         && d.profileVisibility in ['public', 'attendees_only', 'private'];
     }

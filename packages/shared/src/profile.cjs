@@ -26,7 +26,7 @@
  * against.
  */
 
-const { validateBadgeSelection } = require('./badges.cjs');
+const { validateBadgeSelection, validateCustomBadges } = require('./badges.cjs');
 
 /** Profile/directory visibility vocabulary (§4.1, renamed from scheduleVisibility). */
 const PROFILE_VISIBILITIES = ['public', 'attendees_only', 'private'];
@@ -51,6 +51,7 @@ const SELF_EDITABLE_PROFILE_FIELDS = Object.freeze([
   'photoPath',
   'socialHandles',
   'badges',
+  'customBadges',
   'profileVisibility',
   'updatedAt',
 ]);
@@ -71,11 +72,10 @@ const PUBLIC_PROFILE_FIELDS = Object.freeze([
   'photoPath',
   'socialHandles',
   'badges',
+  'customBadges',
   'profileVisibility',
   'speakerId',
-]);
-
-/** @param {*} v @returns {boolean} */
+]);/** @param {*} v @returns {boolean} */
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
 }
@@ -122,10 +122,12 @@ function isProfileComplete(user) {
  *
  * @param {object | null | undefined} user - the users/{uid} document data
  * @param {object | null | undefined} badgesConfig - the config/badges document
+ * @param {object | null | undefined} [features] - the config/features document;
+ *   custom badges project only when `features.customBadges` is exactly true
  * @returns {object} the users_public/{uid} payload (no timestamps — the
  *   caller stamps `updatedAt` with a server value)
  */
-function buildPublicProfile(user, badgesConfig) {
+function buildPublicProfile(user, badgesConfig, features = null) {
   const source = user && typeof user === 'object' ? user : {};
   const out = {};
   for (const field of PUBLIC_PROFILE_FIELDS) {
@@ -169,6 +171,17 @@ function buildPublicProfile(user, badgesConfig) {
     );
   }
   out.speakerId = typeof source.speakerId === 'string' && source.speakerId ? source.speakerId : null;
+
+  // Free-text custom badges (issue #176) are re-validated at projection
+  // time — the word list and the caps are checked where the config is
+  // readable, exactly like `badges` above. A field the feature flag does
+  // not ask for (features.customBadges off, or the flag document absent or
+  // unreadable) is dropped entirely rather than published: fail closed.
+  if (features && typeof features === 'object' && features.customBadges === true) {
+    out.customBadges = validateCustomBadges(source.customBadges, {
+      blockList: badgesConfig?.customBadgeBlockList,
+    }).valid;
+  }
 
   return out;
 }

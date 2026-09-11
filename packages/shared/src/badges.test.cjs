@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
-const { validateBadgeSelection, MAX_TOTAL_BADGES } = require('./badges.cjs');
+const { validateBadgeSelection, validateCustomBadges, MAX_TOTAL_BADGES } = require('./badges.cjs');
 
 const CONFIG = {
   categories: [
@@ -51,4 +51,54 @@ test('MAX_TOTAL_BADGES matches the literal cap hand-written into firestore.rules
   const match = rulesText.match(/badges\.size\(\)\s*<=\s*(\d+)/);
   assert.ok(match, 'expected to find badges.size() <= N in firestore.rules');
   assert.equal(Number(match[1]), MAX_TOTAL_BADGES);
+});
+
+// --- free-text custom badges (issue #176) -----------------------------------
+
+test('custom badges: trims, collapses whitespace, and keeps good words', () => {
+  const result = validateCustomBadges(['  First   Timers  ', 'scholarship']);
+  assert.deepEqual(result, { valid: ['First Timers', 'scholarship'], rejected: [] });
+});
+
+test('custom badges: rejects empties, non-strings, and bad characters', () => {
+  const result = validateCustomBadges(['   ', 42, 'a<script>', 'bad😀word']);
+  assert.deepEqual(result.valid, []);
+  assert.equal(result.rejected.length, 4);
+});
+
+test('custom badges: caps length at 24 characters', () => {
+  const result = validateCustomBadges(['x'.repeat(24), 'x'.repeat(25)]);
+  assert.deepEqual(result.valid, ['x'.repeat(24)]);
+  assert.equal(result.rejected.length, 1);
+});
+
+test('custom badges: caps the count at three, overflow rejected in order', () => {
+  const result = validateCustomBadges(['one', 'two', 'three', 'four']);
+  assert.deepEqual(result.valid, ['one', 'two', 'three']);
+  assert.deepEqual(result.rejected, ['four']);
+});
+
+test('custom badges: duplicates rejected case-insensitively', () => {
+  const result = validateCustomBadges(['First Timers', 'first timers']);
+  assert.deepEqual(result.valid, ['First Timers']);
+  assert.deepEqual(result.rejected, ['first timers']);
+});
+
+test('custom badges: the default word list blocks role impersonation', () => {
+  const result = validateCustomBadges(['Admin', 'Speaker', 'volunteers']);
+  assert.deepEqual(result.valid, []);
+  assert.equal(result.rejected.length, 3);
+});
+
+test('custom badges: an operator block list extends the defaults, matched in a phrase', () => {
+  const result = validateCustomBadges(['crypto Fan', 'first timers'], {
+    blockList: ['crypto'],
+  });
+  assert.deepEqual(result.valid, ['first timers']);
+  assert.deepEqual(result.rejected, ['crypto Fan']);
+});
+
+test('custom badges: a missing or malformed list validates to nothing', () => {
+  assert.deepEqual(validateCustomBadges(null), { valid: [], rejected: [] });
+  assert.deepEqual(validateCustomBadges('word'), { valid: [], rejected: [] });
 });

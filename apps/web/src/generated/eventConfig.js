@@ -178,6 +178,7 @@ export const features = {
   sessionReactions: false,
   sessionMaterials: false,
   badges: false,
+  customBadges: false,
   liveUpdates: false,
   feedbackInbox: false,
   schedulePdf: false,
