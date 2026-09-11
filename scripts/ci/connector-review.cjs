@@ -112,6 +112,31 @@ async function inspectConnectorReview({ github, owner, repo, pullNumber, expecte
     return { ready: false, reason: 'no completed Codex summary for the current head' };
   }
 
+  // The connector displays a short SHA even for a clean review. Bind that
+  // display value to GitHub's immutable full-SHA PR run records created
+  // before completion. CI must keep an unfiltered pull_request trigger so
+  // every reviewed head has a record. A second head with the same prefix is ambiguous,
+  // and a head first pushed after completion has no qualifying receipt.
+  const row = codeReviewRow(summary.body);
+  const reviewed = [...row.matchAll(/`([0-9a-f]{7,40})`/gi)].map((match) => match[1].toLowerCase());
+  const completedAt = row.match(/datetime="([^"]+)"/)?.[1];
+  if (!completedAt || !Number.isFinite(Date.parse(completedAt))) {
+    return { ready: false, reason: 'connector completion has no timestamp' };
+  }
+  const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+    owner, repo, event: 'pull_request', branch: pullResponse.data.head.ref,
+    created: `<=${completedAt}`, per_page: 100,
+  });
+  const candidates = new Set(runs.filter((run) =>
+    run.pull_requests?.some((pr) => pr.number === pullNumber) &&
+    /^[0-9a-f]{40}$/i.test(run.head_sha) &&
+    Date.parse(run.created_at) <= Date.parse(completedAt) &&
+    reviewed.some((prefix) => run.head_sha.toLowerCase().startsWith(prefix))
+  ).map((run) => run.head_sha.toLowerCase()));
+  if (runs.length >= 1000 || candidates.size !== 1 || !candidates.has(expectedHeadSha.toLowerCase())) {
+    return { ready: false, reason: 'connector receipt does not identify one full reviewed PR head' };
+  }
+
   const threads = await listReviewThreads({ github, owner, repo, pullNumber });
   const unresolvedCount = threads.filter((thread) => thread?.isResolved !== true).length;
   if (unresolvedCount > 0) {

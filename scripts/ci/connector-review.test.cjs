@@ -18,7 +18,7 @@ const {
 const HEAD_SHA = 'abcdef1234567890abcdef1234567890abcdef12';
 
 function summaryBody(commit, status = '✅ **Completed**') {
-  return `${SUMMARY_MARKER}\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ${status} | \`${commit}\` | PR opened |`;
+  return `${SUMMARY_MARKER}\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ${status} <relative-time datetime="2026-09-11T12:00:00Z">completed</relative-time> | \`${commit}\` | PR opened |`;
 }
 
 function connectorComment(overrides = {}) {
@@ -52,11 +52,12 @@ function threadPage(nodes, hasNextPage = false, endCursor = null) {
   };
 }
 
-function fakeGithub({ actualHead = HEAD_SHA, comments = [], threadPages = [] } = {}) {
+function fakeGithub({ actualHead = HEAD_SHA, comments = [], threadPages = [], runs = [{ head_sha: HEAD_SHA, created_at: '2026-09-11T11:59:00Z', pull_requests: [{ number: 42 }] }] } = {}) {
   const calls = { pulls: [], comments: [], graphql: [] };
   const listComments = async () => {
     throw new Error('paginate must control issue comment pagination');
   };
+  const listWorkflowRunsForRepo = async () => {};
   let threadPageIndex = 0;
   const github = {
     rest: {
@@ -68,8 +69,10 @@ function fakeGithub({ actualHead = HEAD_SHA, comments = [], threadPages = [] } =
         },
       },
       issues: { listComments },
+      actions: { listWorkflowRunsForRepo },
     },
     paginate: async (method, options) => {
+      if (method === listWorkflowRunsForRepo) return runs;
       assert.equal(method, listComments);
       calls.comments.push(options);
       return comments.flat();
@@ -84,7 +87,7 @@ function fakeGithub({ actualHead = HEAD_SHA, comments = [], threadPages = [] } =
   return { github, calls };
 }
 
-test('accepts the trusted completed summary for a matching SHA prefix', () => {
+test('recognizes the trusted completed summary before full-SHA binding', () => {
   assert.equal(isCurrentCompletedSummary(connectorComment(), HEAD_SHA), true);
   assert.equal(
     isCurrentCompletedSummary(
@@ -256,4 +259,27 @@ test('scheduled recovery reports the evaluated PR head, never an unrelated base 
   ready = true;
   await evaluate(requireGate, github, context, { warning() {} });
   assert.equal(updated[1].conclusion, 'success');
+});
+
+
+test('binds the short receipt to one immutable full-SHA run before completion', async () => {
+  const run = { head_sha: HEAD_SHA, created_at: '2026-09-11T11:59:00Z', pull_requests: [{ number: 42 }] };
+  for (const runs of [
+    [],
+    [run, { ...run, head_sha: HEAD_SHA.slice(0, 7) + '0'.repeat(33) }],
+    [{ ...run, head_sha: HEAD_SHA.slice(0, 7) + '0'.repeat(33) }],
+    [{ ...run, created_at: '2026-09-11T12:01:00Z' }],
+    [{ ...run, pull_requests: [{ number: 99 }] }],
+  ]) {
+    const { github } = fakeGithub({ comments: [connectorComment()], runs });
+    const result = await inspectConnectorReview({ github, owner: 'owner', repo: 'repository', pullNumber: 42, expectedHeadSha: HEAD_SHA });
+    assert.equal(result.ready, false);
+    assert.match(result.reason, /full reviewed PR head/);
+  }
+});
+
+// The immutable run binding requires a record for every reviewed head.
+test('CI retains an unfiltered pull request trigger for receipt binding', () => {
+  const workflow = fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci.yml'), 'utf8');
+  assert.match(workflow, /\n  pull_request:\s*\n\npermissions:/);
 });
