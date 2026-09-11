@@ -290,7 +290,7 @@ describe('Layout navigation (built from page documents)', () => {
 describe('Layout account control', () => {
   const accountLink = (root) =>
     root.querySelector(
-      'nav[aria-label="Main"] a[href="/signin"], nav[aria-label="Main"] a[href="/profile"]',
+      'nav[aria-label="Main"] a[href="/signin"], nav[aria-label="Main"] a[href="/dashboard"]',
     );
 
   it('offers sign-in to a visitor who is not signed in', () => {
@@ -298,15 +298,15 @@ describe('Layout account control', () => {
     const link = accountLink(container);
     expect(link).toHaveAttribute('href', '/signin');
     expect(link.textContent).toBe('Sign in');
-    // One control, not two: a signed-out reader is never offered a profile.
-    expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/profile"]')).toHaveLength(0);
+    // One control, not two: a signed-out reader is never offered a dashboard.
+    expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/dashboard"]')).toHaveLength(0);
   });
 
-  it('offers the profile to a reader who is signed in', () => {
+  it('offers the dashboard to a reader who is signed in', () => {
     const { container } = renderShell({}, { user: { uid: 'u1' } });
     const link = accountLink(container);
-    expect(link).toHaveAttribute('href', '/profile');
-    expect(link.textContent).toBe('Your profile');
+    expect(link).toHaveAttribute('href', '/dashboard');
+    expect(link.textContent).toBe('Dashboard');
     expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/signin"]')).toHaveLength(0);
   });
 
@@ -320,7 +320,7 @@ describe('Layout account control', () => {
     expect(link.textContent).toBe('Sign in');
   });
 
-  it('does not offer the profile until the handshake has actually answered', () => {
+  it('does not offer the dashboard until the handshake has actually answered', () => {
     // A user object present WHILE loading is still true is not an answer.
     const { container } = renderShell({}, { user: { uid: 'u1' }, loading: true });
     expect(accountLink(container)).toHaveAttribute('href', '/signin');
@@ -366,16 +366,16 @@ describe('Layout account control', () => {
     expect(away).not.toHaveClass('font-semibold', 'underline');
   });
 
-  it('marks the profile page in view for a signed-in reader', () => {
-    const { container } = renderShell({}, { path: '/profile', user: { uid: 'u1' } });
+  it('marks the dashboard in view for a signed-in reader', () => {
+    const { container } = renderShell({}, { path: '/dashboard', user: { uid: 'u1' } });
     expect(accountLink(container)).toHaveAttribute('aria-current', 'page');
   });
 
-  it('stays marked on a route below the profile', () => {
-    // /profile owns no children today. When it does, the control has to go
-    // on saying where the reader is — the same rule SYSTEM_PAGES applies to
-    // every section that owns a subtree (lib/siteNavigation.js).
-    const { container } = renderShell({}, { path: '/profile/settings', user: { uid: 'u1' } });
+  it('stays marked on a route below the dashboard', () => {
+    // The dashboard owns no children today. When it does, the control has
+    // to go on saying where the reader is — the same rule SYSTEM_PAGES
+    // applies to every section that owns a subtree (lib/siteNavigation.js).
+    const { container } = renderShell({}, { path: '/dashboard/settings', user: { uid: 'u1' } });
     expect(accountLink(container)).toHaveAttribute('aria-current', 'page');
   });
 

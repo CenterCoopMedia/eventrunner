@@ -114,6 +114,9 @@ const STATIC_PRIVATE_ROUTES = Object.freeze([
     path: '/profile', access: 'authenticated', hasChildren: false, tokenBearing: false,
   }),
   Object.freeze({
+    path: '/dashboard', access: 'authenticated', hasChildren: false, tokenBearing: false,
+  }),
+  Object.freeze({
     path: '/schedule/mine', access: 'authenticated', hasChildren: false, tokenBearing: false,
   }),
   Object.freeze({

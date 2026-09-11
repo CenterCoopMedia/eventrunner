@@ -145,9 +145,12 @@ function navClass({ isActive }) {
 // match would quietly stop marking the control while the reader is inside
 // the section it names.
 const ACCOUNT_SIGNED_OUT = Object.freeze({ to: '/signin', label: 'Sign in', end: true });
-// "Your profile" is what the profile page and ProfileSidebar already call
-// it (docs/COPY_STYLE.md: one term for one concept).
-const ACCOUNT_SIGNED_IN = Object.freeze({ to: '/profile', label: 'Your profile', end: false });
+// "Dashboard" is the signed-in attendee's home (issue #168): the account
+// control lands there, and the dashboard carries the link to the profile
+// form beside it. Still not pinned to `end`, for the same reason /profile
+// was not: the day the dashboard grows children, an end match would quietly
+// stop marking the control while the reader is inside the section it names.
+const ACCOUNT_SIGNED_IN = Object.freeze({ to: '/dashboard', label: 'Dashboard', end: false });
 
 /**
  * Tailwind's font-weight utilities by name. Deliberately a closed list and

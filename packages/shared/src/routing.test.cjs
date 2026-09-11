@@ -29,6 +29,14 @@ test('specimen is reserved, so no page can take the segment the book ships at', 
   assert.equal(isReservedPathSegment('specimen'), true);
 });
 
+test('dashboard is reserved, so no page can take the signed-in reader’s home', () => {
+  // Statically mounted from issue #168; a generic page on the segment would
+  // be shadowed by the route and never served, or worse, confuse the reader
+  // about which of the two they are looking at.
+  assert.ok(RESERVED_PATH_SEGMENTS.includes('dashboard'));
+  assert.equal(isReservedPathSegment('dashboard'), true);
+});
+
 test('isReservedPathSegment matches only reserved segments', () => {
   assert.equal(isReservedPathSegment('schedule'), true);
   assert.equal(isReservedPathSegment('profile'), true);

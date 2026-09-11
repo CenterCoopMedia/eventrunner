@@ -59,6 +59,7 @@ const TicketClaim = lazyPage(() => import('./pages/TicketClaim.jsx'));
 const Profile = lazyPage(() => import('./pages/Profile.jsx'));
 const Attendees = lazyPage(() => import('./pages/Attendees.jsx'));
 const AttendeeProfile = lazyPage(() => import('./pages/AttendeeProfile.jsx'));
+const Dashboard = lazyPage(() => import('./pages/Dashboard.jsx'));
 
 // The specimen book (design vocabulary expansion, §7): every device in
 // every state, for review. It ships in the static demo and in a development
@@ -120,6 +121,11 @@ export function AppRoutes() {
             keep working. */}
         <Route path="ticket/claim" element={<DeferredPage component={TicketClaim} label="ticket claim" />} />
         <Route path="profile" element={<DeferredPage component={Profile} label="profile" />} />
+        {/* The signed-in attendee's home (issue #168): one place that shows
+            their status, their sessions, and the event's resources. `dashboard`
+            is reserved in shared/routing, so a generic cmsPages path can never
+            claim the segment. */}
+        <Route path="dashboard" element={<DeferredPage component={Dashboard} label="dashboard" />} />
         <Route path="attendees" element={<DeferredPage component={Attendees} label="attendees" />} />
         <Route path="attendees/:uid" element={<DeferredPage component={AttendeeProfile} label="attendee" />} />
         {SpecimenPage ? (

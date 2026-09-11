@@ -162,7 +162,7 @@ test('classifyPages splits public pages from excluded pages and appends the stat
 
   // Every static private route from apps/web/src/App.jsx is present, each
   // carrying no cmsPages id.
-  const staticPaths = ['/admin', '/signin', '/profile', '/schedule/mine', '/speaker/profile', '/speaker/accept', '/ticket/claim'];
+  const staticPaths = ['/admin', '/signin', '/profile', '/dashboard', '/schedule/mine', '/speaker/profile', '/speaker/accept', '/ticket/claim'];
   for (const path of staticPaths) {
     assert.ok(excluded.some((r) => r.path === path && r.id === null), `${path} must be a static excluded route`);
   }
@@ -175,6 +175,7 @@ test('only routes with their own subtree of further pages carry hasChildren', ()
   assert.equal(byPath['/updates'].hasChildren, true);
   assert.equal(byPath['/attendees'].hasChildren, true);
   assert.equal(byPath['/profile'].hasChildren, false);
+  assert.equal(byPath['/dashboard'].hasChildren, false);
   assert.equal(byPath['/signin'].hasChildren, false);
 });
 

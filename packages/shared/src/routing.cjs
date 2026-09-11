@@ -55,12 +55,17 @@
  * than a quoted literal, which is why the App.jsx sweep in
  * apps/web/src/lib/siteNavigation.test.js did not report it missing.
  *
+ * `dashboard` is the signed-in attendee's home (issue #168): /dashboard is
+ * statically mounted and reaches the profile form, the personal schedule,
+ * and the live updates card, so a generic page claiming the segment would
+ * sit between a signed-in reader and their own account pages.
+ *
  * Keep in sync with the static <Route path="..."> segments in App.jsx by
  * hand — there is no build-time check tying the two together.
  */
 const RESERVED_PATH_SEGMENTS = Object.freeze([
   'schedule', 'speakers', 'speaker', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin', 'updates',
-  'ticket', 'specimen',
+  'ticket', 'specimen', 'dashboard',
 ]);
 
 /**
