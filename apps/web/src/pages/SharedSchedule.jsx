@@ -58,7 +58,7 @@ export default function SharedSchedule() {
         setDenied(true);
       },
     );
-  }, [uid]);
+  }, [uid, user?.uid, attendeeAccess]);
 
   const days = useMemo(
     () =>

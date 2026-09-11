@@ -212,32 +212,32 @@ run repeatedly, not once.
 
 ## 6. Optional: Google Calendar sync (`config/features.calendarSync`)
 
-Attendees can keep their saved sessions on their own Google Calendar. This integration is **off by
-default**; the decision record is [`docs/adr/0003-optional-google-calendar-sync.md`](adr/0003-optional-google-calendar-sync.md).
-A client who skips these steps keeps the `.ics` file export and the per-session calendar links,
-which never need a Google grant.
+This feature is **off by default**. [ADR 0003](adr/0003-optional-google-calendar-sync.md)
+is proposed and still needs owner acceptance. Keep the flag off until that acceptance and
+client-specific verification are recorded. Existing file exports continue to work.
 
-Provisioning (the OPERATOR performs these steps in the CLIENT's own Firebase/GCP project — the
-client is the consent screen's verified owner and answers Google's review as the API user):
+After acceptance, the operator and the client's authorized project owner must:
 
-1. In the client's Google Cloud console, enable the **Google Calendar API** for the project the
-   deployment already uses.
-2. In the OAuth consent screen: add the scope `https://www.googleapis.com/auth/calendar.events`
-   (marked sensitive). Fill in the client's own product name, support address, and domain — the
-   screen must speak as the event, not as the platform.
-3. Add every attendee account that should pilot the sync as a **test user** while the screen is
-   unverified. Google shows an unverified-screen warning to anyone else, and production
-   attendees cannot complete the grant at all until verification clears.
-4. Submit the consent screen for **verification** with the client as the API user. Typical review
-   time is days, not weeks; the runbook of record for the exact form fields is Google's OAuth
-   API verification docs.
-5. After verification (or for a deliberate pilot with test users), set
-   `config/features.calendarSync` to `true` in the admin Features editor and publish. The sync
-   control appears on the attendee's personal schedule.
-
-Flag behavior when a client skips verification: leave `calendarSync` off (the default). Nothing
-renders, nothing requests a scope, and the file export remains the calendar path — the pre-feature
-state, not a broken one.
+1. Enable the Google Calendar API in the client's existing Firebase/GCP project.
+2. Enable Google as a Firebase Authentication provider. Check the OAuth web client and its
+   redirect URI, including `https://<auth-domain>/__/auth/handler`. Add the deployed site domain
+   to Firebase's authorized domains. Follow [Firebase's Google provider setup](https://firebase.google.com/docs/auth/web/google-signin).
+3. Configure the consent screen with the client's approved name, support contact, privacy
+   policy, domains, and `https://www.googleapis.com/auth/calendar.app.created` scope. This
+   scope permits the dedicated calendar's creation; `calendar.events` alone does not.
+4. Configure the intended audience and synthetic test users. Follow Google's current
+   [verification requirements](https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification)
+   for the scope and audience. Record the result; do not assume a fixed review time.
+5. Test the grant with an existing Google sign-in and an email sign-in. The latter links the
+   chosen Google account to the event account, as the control states. A refused grant must
+   leave file exports available.
+6. In a test deployment, verify creation, reload and reuse, changed session details, removal
+   of the final bookmark, retry after a failed write, account changes, and preservation of
+   events added by the attendee. Tokens must stay in memory. Only the calendar ID is saved
+   locally; clearing browser storage can create a new calendar.
+7. Enable `config/features.calendarSync` in the admin Features editor only after these checks
+   pass. Sync runs while the personal schedule page is open. Confirm the production audience
+   can grant access. Leave or set the flag off if setup or verification is incomplete.
 
 ## Handoff to the client
 

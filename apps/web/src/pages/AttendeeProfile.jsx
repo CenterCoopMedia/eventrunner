@@ -11,6 +11,7 @@
 // use — never a pill, never a colored chip.
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { validateCustomBadges } from 'shared/badges';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { fetchPublicProfile } from '../lib/profileSource.js';
@@ -92,6 +93,11 @@ export default function AttendeeProfile() {
   // being shown the moment the config changes. (The stored projection is
   // still stale — see the reprojection note in the PR.)
   const badges = visibleBadgeIds(profile.badges, badgesConfig);
+  const customBadges = features.customBadges === true
+    ? validateCustomBadges(profile.customBadges, {
+        blockList: badgesConfig?.customBadgeBlockList,
+      }).valid
+    : [];
 
   return (
     <div className="grid gap-xl lg:grid-cols-[2fr_1fr]">
@@ -128,13 +134,18 @@ export default function AttendeeProfile() {
             {text(profile.bio)}
           </p>
         ) : null}
-        {features.badges && badges.length > 0 ? (
+        {(features.badges && badges.length > 0) || customBadges.length > 0 ? (
           <section className="mt-xl">
             <SectionHead level={2} title="Badges" />
             <ul className="mt-sm flex flex-wrap gap-2xs">
-              {badges.map((badgeId) => (
+              {features.badges && badges.map((badgeId) => (
                 <li key={badgeId}>
                   <Tag>{badgeLabel(badgesConfig, badgeId)}</Tag>
+                </li>
+              ))}
+              {customBadges.map((badge) => (
+                <li key={`custom-${badge}`}>
+                  <Tag>{badge}</Tag>
                 </li>
               ))}
             </ul>

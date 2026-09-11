@@ -20,7 +20,9 @@ On a long page, a **Back to top** button appears in the bottom corner once you a
 
 ## Schedule
 
-The schedule is grouped by day. You can bookmark sessions and download a calendar file (ICS) or open a calendar link. The site does not write directly into Google Calendar for you.
+The schedule is grouped by day. Search and filter sessions, save bookmarks, and download a calendar file (ICS) or open a calendar link. Your personal schedule can also hold private notes and an optional PDF download. Sharing your schedule is a separate choice from sharing your profile; it starts private.
+
+Some events offer optional Google Calendar sync. It asks for your permission and runs while your personal schedule is open. If you signed in by email, the control explains that it links your chosen Google account to your event sign-in. Refusing access leaves file exports available. Tokens are not saved; only the calendar ID is kept in this browser. Clearing site data can create a new calendar the next time you sync.
 
 ## Materials
 
@@ -28,7 +30,7 @@ Session files and links stay closed until the session is over, unless staff rele
 
 ## Profile and directory
 
-Your public profile is the slice other attendees can see. The rest stays on your account. You pick badges from the list the event offers. You cannot invent a free-text badge.
+Your public profile is the slice other attendees can see. The rest stays on your account. You pick badges from the list the event offers. If the event enables custom badges, you can also enter up to three short badges on your profile. Each is limited to 24 characters. Blocked words and duplicate badges are refused. Staff can remove a custom badge.
 
 ## FAQ and long pages
 

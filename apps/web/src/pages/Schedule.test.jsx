@@ -418,6 +418,22 @@ describe('the two views of a day', () => {
     });
   });
 
+  it('uses ranked rows for most saved, including at a wide tracked viewport', () => {
+    withViewport(true, () => {
+      countsHolder.countsById = new Map([['fx-parallel', 9], ['fx-early', 1]]);
+      try {
+        renderSchedule({ eventConfig: eventWithTracks, scheduleData: tracked,
+          features: { schedule: true, sessionBookmarks: true } });
+        fireEvent.change(screen.getByLabelText('Sort sessions'), { target: { value: 'saved' } });
+        expect(screen.queryByRole('table')).toBeNull();
+        expect(onScreen().getAllByRole('heading', { level: 3 }).map((h) => h.textContent))
+          .toEqual(['[Fixture] Parallel session', '[Fixture] Morning kickoff']);
+      } finally {
+        countsHolder.countsById = new Map();
+      }
+    });
+  });
+
   it('keeps the list at a narrow viewport, with every session in it', () => {
     withViewport(false, () => {
       renderSchedule({ eventConfig: eventWithTracks, scheduleData: tracked });

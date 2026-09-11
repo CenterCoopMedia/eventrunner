@@ -35,6 +35,13 @@ function readBadge(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+/** Match labels using the same whitespace and case normalization as the shared validator. */
+function normalizedBadgeLabel(value) {
+  return typeof value === 'string'
+    ? value.trim().replace(/\s+/g, ' ').toLowerCase()
+    : null;
+}
+
 /**
  * Remove one custom badge from a user's account document.
  *
@@ -50,8 +57,9 @@ async function applyRemoveCustomBadge({ db, uid, badge }) {
       return { ok: false, status: 404, code: 'not-found', message: 'No such account.' };
     }
     const stored = Array.isArray(snap.data()?.customBadges) ? snap.data().customBadges : [];
-    const index = stored.findIndex((entry) => typeof entry === 'string' && entry.toLowerCase() === badge.toLowerCase());
-    if (index === -1) {
+    const requestedLabel = normalizedBadgeLabel(badge);
+    const removed = stored.find((entry) => normalizedBadgeLabel(entry) === requestedLabel);
+    if (removed === undefined) {
       return {
         ok: false,
         status: 404,
@@ -59,9 +67,9 @@ async function applyRemoveCustomBadge({ db, uid, badge }) {
         message: 'That account carries no such custom badge.',
       };
     }
-    const next = stored.filter((_, at) => at !== index);
+    const next = stored.filter((entry) => normalizedBadgeLabel(entry) !== requestedLabel);
     tx.set(ref, { customBadges: next }, { merge: true });
-    return { ok: true, removed: stored[index], customBadges: next };
+    return { ok: true, removed, customBadges: next };
   });
 }
 

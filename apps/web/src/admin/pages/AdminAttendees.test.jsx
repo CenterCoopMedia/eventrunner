@@ -124,6 +124,43 @@ describe('AdminAttendees', () => {
     );
   });
 
+  it('removes one custom badge through the admin endpoint and shows its pending state', async () => {
+    let finish;
+    callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    render(<AdminAttendees />);
+    pushRows([row({ customBadges: ['News nerd'] })]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove “News nerd”' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove “News nerd”' }));
+
+    expect(callMock).toHaveBeenCalledWith('removeUserCustomBadge', {
+      uid: 'uid-ada',
+      badge: 'News nerd',
+    });
+    expect(screen.getByRole('button', { name: 'Removing…' })).toBeDisabled();
+
+    await act(async () => { finish({ ok: true }); });
+    expect(showToastMock).toHaveBeenCalledWith('Custom badge removed.');
+  });
+
+  it('reports a custom badge removal error', async () => {
+    callMock.mockRejectedValueOnce(new Error('The custom badge could not be removed.'));
+    render(<AdminAttendees />);
+    pushRows([row({ customBadges: ['News nerd'] })]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove “News nerd”' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove “News nerd”' }));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(showToastMock).toHaveBeenCalledWith(
+      'The custom badge could not be removed.',
+      { tone: 'error' },
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The custom badge could not be removed.',
+    );
+  });
+
   it('shows an empty state when nothing matches', () => {
     render(<AdminAttendees />);
     pushRows([]);

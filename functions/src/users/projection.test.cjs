@@ -246,3 +246,17 @@ test('a missing uid is logged and writes nothing', async () => {
   assert.deepEqual(db.writes, []);
   assert.equal(errors.length, 1);
 });
+
+test('a features refresh removes stored custom badges when the flag is disabled', async () => {
+  const db = fakeDb({
+    'config/badges': BADGES_CONFIG,
+    'config/features': { customBadges: true },
+    'users/u1': userDoc({ customBadges: ['Reader'] }),
+  });
+  const refresh = createRefreshUserPublicBadges({ db });
+  await refresh();
+  assert.deepEqual(db.docs.get('users_public/u1').customBadges, ['Reader']);
+  db.docs.set('config/features', { customBadges: false });
+  await refresh();
+  assert.equal(Object.hasOwn(db.docs.get('users_public/u1'), 'customBadges'), false);
+});

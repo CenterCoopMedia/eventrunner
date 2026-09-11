@@ -59,7 +59,9 @@ export function schedulePlainText({
     for (const entry of entries) {
       const { session, children } = entry;
       const range = formatSessionTimeRange(eventConfig, session);
-      const time = range ? `${range.startLabel}–${range.endLabel}` : 'Time to be announced';
+      const time = range
+        ? `${range.startLabel}${range.endLabel ? `–${range.endLabel}` : ''}`
+        : 'Time to be announced';
       out.push('');
       out.push(`${time}  ${session.title}`);
       const meta = [lineLabel(session, safeColumns), session.location].filter(Boolean).join(' · ');

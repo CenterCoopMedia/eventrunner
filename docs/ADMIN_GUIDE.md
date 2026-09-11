@@ -8,7 +8,7 @@ How to run a client's site from the admin panel, in the order the work happens. 
 
 This is the whole visual setup, start to finish. It takes about twenty minutes and you do it once.
 
-1. **Pick a site style.** Settings → Branding, the first control. Six ship; three are the launch surface and three sit behind a disclosure until you have tried them on your own content. Picking one replaces every value you have not changed yourself, so do this first.
+1. **Pick a site style.** Settings → Branding, the first control. Six site styles are available. Try your chosen style on your own content. Picking one replaces every value you have not changed yourself, so do this first.
 2. **Add the identity assets.** Five slots: The primary logo and the square icon, then the footer logo, the social sharing image, and the favicon behind **More image slots**. Same picker the Media tab uses. A slot you leave empty falls back to the event name in type, which is a finished look and not a placeholder.
 3. **Set the Main brand colour.** One colour. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. You do not set them, and there is no second colour to set anywhere.
 4. **Preview representative pages.** The **Page preview** beside the controls renders *your* pages with the draft applied. Look at three: The home page, the schedule on its longest day, and one session. Check each light and dark, and turn the **stress test** on once.
@@ -25,7 +25,7 @@ One tab decides how the whole public site looks. Controls on one side, the **Pag
 
 Work down the controls in this order.
 
-**Site style.** The base look: A light palette, a dark palette, a type pairing, a shape, a header, and a default set of illustrations. Each one is finished work with a recommended configuration already chosen — you should not have to touch anything else to get a good result. The three on the launch surface have been run against real client content; the other three are fully functional and are grouped separately so you try them on your own event first. Picking a style replaces every value you have not changed yourself.
+**Site style.** The base look: A light palette, a dark palette, a type pairing, a shape, a header, and a default set of illustrations. Each one is finished work with a recommended configuration already chosen — you should not have to touch anything else to get a good result. Try the selected style on your event content before publishing. Picking a style replaces every value you have not changed yourself.
 
 **Logo and icon.** Two slots are asked for here — the primary logo and the square icon — and the other three sit behind **More image slots**: The footer logo, the social sharing image, and the favicon. All five use the same image picker the Media tab uses.
 
@@ -204,7 +204,11 @@ Feature flags, wired to a **whole-document replace** — every known flag is alw
 
 ## Settings → Badges
 
-The badge catalog: Categories, each with a max-picks cap and its list of badges, which attendees self-select from on their profile. Also a whole-document replace — editing one badge sends the complete set of categories back.
+The badge catalog: Categories, each with a max-picks cap and its list of badges, which attendees self-select from on their profile. Also a whole-document replace: editing one badge sends the complete set of categories back and preserves the configured custom-badge block list.
+
+**Custom badges.** The separate feature is off by default. When enabled, attendees can enter up to three badges of 24 characters each. Reserved role words are always blocked; `config/badges.customBadgeBlockList` adds event-specific words. The owner form and public projection use the same validator. The category editor preserves this list; an operator changes it through the badge configuration API.
+
+**Remove a custom badge.** In Attendees, select the removal action beside the badge and confirm. The result stays on the page and an `admin_logs` entry records the action. Turning the feature off removes custom badges from the public projection; attendees can still edit their other profile fields.
 
 ## Legal pages
 

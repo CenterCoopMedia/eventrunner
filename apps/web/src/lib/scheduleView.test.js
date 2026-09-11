@@ -233,3 +233,9 @@ describe('sortEntries', () => {
     expect(sortEntries(entries, 'saved').map((e) => e.session.id)).toEqual(['b', 'a', 'c']);
   });
 });
+
+it('discards stale URL filters when their configured facet has been removed', () => {
+  const view = readScheduleView(new URLSearchParams('format=panel&track=A'), { formats: [], tracks: [] });
+  expect(view.formats).toEqual([]);
+  expect(view.tracks).toEqual([]);
+});

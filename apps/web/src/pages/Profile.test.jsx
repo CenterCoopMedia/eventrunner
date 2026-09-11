@@ -166,6 +166,97 @@ describe('Profile', () => {
     expect(saveProfileMock.mock.calls[0][0].badges).toEqual(['writer']);
   });
 
+  it('loads and saves three custom badge fields only when the feature is on', async () => {
+    features.customBadges = true;
+    profileValue = {
+      ...profileValue,
+      profile: { ...SEEDED_PROFILE, customBadges: ['First Timers'] },
+    };
+    renderPage();
+
+    const fields = screen.getAllByLabelText(/Custom badge \d/);
+    expect(fields).toHaveLength(3);
+    expect(fields[0]).toHaveValue('First Timers');
+    expect(fields[0]).toHaveAttribute('maxlength', '24');
+    fireEvent.change(fields[1], { target: { value: '  News   nerd  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(saveProfileMock.mock.calls[0][0].customBadges).toEqual([
+      'First Timers',
+      'News nerd',
+    ]);
+  });
+
+  it('refuses a custom badge rejected by the live block list and focuses its field', () => {
+    features.customBadges = true;
+    badgesConfig = { customBadgeBlockList: ['crypto'] };
+    renderPage();
+
+    const blocked = screen.getByLabelText('Custom badge 2');
+    fireEvent.change(blocked, { target: { value: 'Crypto fan' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+    expect(saveProfileMock).not.toHaveBeenCalled();
+    expect(blocked).toHaveFocus();
+    expect(blocked).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent(/blocked or repeated badge/i);
+  });
+
+  it('persists clearing a stored badge newly rejected by the live block list', async () => {
+    features.customBadges = true;
+    badgesConfig = { customBadgeBlockList: ['crypto'] };
+    profileValue = {
+      ...profileValue,
+      profile: { ...SEEDED_PROFILE, customBadges: ['Crypto fan'] },
+    };
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('Custom badge 1'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(saveProfileMock.mock.calls[0][0].customBadges).toEqual([]);
+  });
+
+  it('does not resend unchanged custom badges with unrelated profile edits', async () => {
+    features.customBadges = true;
+    profileValue = { ...profileValue, profile: { ...SEEDED_PROFILE, customBadges: ['News nerd'] } };
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Organization'), { target: { value: 'New desk' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(saveProfileMock.mock.calls[0][0]).not.toHaveProperty('customBadges');
+  });
+
+  it('merges remote removals while preserving a different unsaved custom badge', async () => {
+    features.customBadges = true;
+    profileValue = { ...profileValue, profile: { ...SEEDED_PROFILE, customBadges: ['News nerd', 'Local editor'] } };
+    const view = renderPage();
+    fireEvent.change(screen.getByLabelText('Custom badge 2'), { target: { value: 'Community editor' } });
+    profileValue = { ...profileValue, profile: { ...profileValue.profile, customBadges: ['Local editor'] } };
+    view.rerender(<MemoryRouter><Profile /></MemoryRouter>);
+    expect(screen.getByLabelText('Custom badge 1')).toHaveValue('');
+    expect(screen.getByLabelText('Custom badge 2')).toHaveValue('Community editor');
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(saveProfileMock.mock.calls[0][0].customBadges).toEqual(['Community editor']);
+  });
+
+  it('omits custom badges from the save when the feature is not exactly true', async () => {
+    features.customBadges = 'true';
+    profileValue = {
+      ...profileValue,
+      profile: { ...SEEDED_PROFILE, customBadges: ['First Timers'] },
+    };
+    renderPage();
+
+    expect(screen.queryByLabelText('Custom badge 1')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+    expect(saveProfileMock.mock.calls[0][0]).not.toHaveProperty('customBadges');
+  });
+
   it('enforces the category maxPicks in the form, instead of letting the projection truncate silently', async () => {
     features.badges = true;
     badgesConfig = {

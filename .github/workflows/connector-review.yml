@@ -1,0 +1,95 @@
+name: Connector review
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  # Installation only: the target workflow does not exist on main yet.
+  # This path is limited to the reviewed installation PR below.
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created, edited]
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+  issues: read
+  checks: write
+
+jobs:
+  connector-review:
+    name: Evaluate connector receipt
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.repository == 'CenterCoopMedia/eventrunner' && github.event.pull_request.number == 257)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Load the reviewed installation gate when absent from the base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          PULL_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ ! -f scripts/ci/connector-review.cjs ]; then
+            test "$EVENT_NAME" = pull_request
+            test "$REPOSITORY" = CenterCoopMedia/eventrunner
+            test "$PULL_NUMBER" = 257
+            test "$BASE_SHA" = d95bf33d30868dca51bb926d0924ad7930e53bf8
+            mkdir -p scripts/ci
+            git show a6ef882577ee61b9e61d500c7b2bc9670462d373:scripts/ci/connector-review.cjs > scripts/ci/connector-review.cjs
+          fi
+      - name: Check the current head using only protected-base gate code
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { inspectConnectorReview, waitForConnectorReview } = require('./scripts/ci/connector-review.cjs');
+            const { owner, repo } = context.repo;
+            let pulls;
+            if (context.payload.pull_request) {
+              pulls = [context.payload.pull_request];
+            } else if (context.payload.issue?.pull_request) {
+              pulls = [(await github.rest.pulls.get({ owner, repo, pull_number: context.payload.issue.number })).data];
+            } else if (context.eventName === 'issue_comment') {
+              return;
+            } else {
+              pulls = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', base: 'main', per_page: 100 });
+            }
+            for (const pull of pulls) {
+              if (pull.state !== 'open' || pull.base.ref !== 'main' || pull.draft) continue;
+              const head = pull.head.sha;
+              const check = await github.rest.checks.create({
+                owner, repo, name: 'Connector review', head_sha: head, status: 'in_progress',
+                details_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+                output: { title: 'Checking connector receipt', summary: `Review must complete for ${head} and all threads must be resolved.` },
+              });
+              try {
+                let result;
+                if (context.eventName === 'pull_request' || context.eventName === 'pull_request_target') {
+                  result = await waitForConnectorReview({ github, context: { repo: context.repo, payload: { pull_request: pull } }, log: core });
+                } else {
+                  result = await inspectConnectorReview({ github, owner, repo, pullNumber: pull.number, expectedHeadSha: head });
+                }
+                await github.rest.checks.update({
+                  owner, repo, check_run_id: check.data.id, status: 'completed',
+                  conclusion: result.ready ? 'success' : 'failure',
+                  output: { title: result.ready ? 'Connector review complete' : 'Connector review pending', summary: result.ready ? `Current-head receipt verified; all ${result.threadCount} review threads resolved.` : result.reason },
+                });
+              } catch (error) {
+                await github.rest.checks.update({ owner, repo, check_run_id: check.data.id, status: 'completed', conclusion: 'failure', output: { title: 'Connector review blocked', summary: String(error.message).slice(0, 65000) } });
+                core.warning(error.message);
+              }
+            }

@@ -179,7 +179,7 @@ export const SCHEDULE_SORTS = Object.freeze(['time', 'saved']);
 function csvParam(value, allowed) {
   if (typeof value !== 'string' || !value) return [];
   const tokens = value.split(',').map((token) => token.trim()).filter(Boolean);
-  if (!Array.isArray(allowed) || allowed.length === 0) return tokens;
+  if (!Array.isArray(allowed)) return tokens;
   const known = new Set(allowed);
   return tokens.filter((token) => known.has(token));
 }

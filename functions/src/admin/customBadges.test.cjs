@@ -79,6 +79,21 @@ test('records the removal in admin_logs with the actor on it', async () => {
   assert.equal(logs[0].email, ADMIN);
 });
 
+test('normalizes stored and requested labels, removes every match, and records the action', async () => {
+  const db = seeded([' News nerd ', 'NEWS   NERD', 'News nerds', 'Scholarship']);
+  const res = makeRes();
+  await remove(db)(req('admin', { uid: 'uid-ada', badge: '  news nerd  ' }), res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.removed, ' News nerd ');
+  assert.deepEqual(res.body.customBadges, ['News nerds', 'Scholarship']);
+  assert.deepEqual(db.read('users', 'uid-ada').customBadges, ['News nerds', 'Scholarship']);
+  const logs = adminLogs(db);
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].action, 'removeUserCustomBadge');
+  assert.equal(logs[0].docPath, 'users/uid-ada');
+});
+
 test('an account with no such badge answers 404 and writes no log', async () => {
   const db = seeded(['First Timers']);
   const res = makeRes();

@@ -607,13 +607,13 @@ describe("users_public directory visibility (spec §3.4)", () => {
 // tests pin is that a public profile with no schedule consent reads as
 // private here, and a stored value the rules cannot read fails closed.
 describe("schedule_shares visibility", () => {
-  /** Seed one projection per visibility value, owned by approved-1. */
+  /** Separate owners from the viewer accounts used in denial tests. */
   beforeAll(async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       for (const [uid, value] of [
         ["approved-1", "private"],
-        ["pending-1", "attendees_only"],
+        ["share-owner-2", "attendees_only"],
         ["speaker-1", "public"],
       ]) {
         await setDoc(doc(db, `schedule_shares/${uid}`), {
@@ -632,7 +632,7 @@ describe("schedule_shares visibility", () => {
   });
 
   it("lets the owner read their own projection at every visibility", async () => {
-    for (const uid of ["approved-1", "pending-1", "speaker-1"]) {
+    for (const uid of ["approved-1", "share-owner-2", "speaker-1", "malformed-1"]) {
       await assertSucceeds(getDoc(doc(attendee(uid), `schedule_shares/${uid}`)));
     }
   });
@@ -643,14 +643,14 @@ describe("schedule_shares visibility", () => {
   });
 
   it("an attendees-only schedule reads to approved attendees and speakers, not to pending accounts or the signed out", async () => {
-    await assertSucceeds(getDoc(doc(attendee("approved-1"), "schedule_shares/pending-1")));
-    await assertSucceeds(getDoc(doc(attendee("speaker-1"), "schedule_shares/pending-1")));
-    await assertFails(getDoc(doc(attendee("pending-1"), "schedule_shares/pending-1")));
-    await assertFails(getDoc(doc(anon(), "schedule_shares/pending-1")));
+    await assertSucceeds(getDoc(doc(attendee("approved-1"), "schedule_shares/share-owner-2")));
+    await assertSucceeds(getDoc(doc(attendee("speaker-1"), "schedule_shares/share-owner-2")));
+    await assertFails(getDoc(doc(attendee("pending-1"), "schedule_shares/share-owner-2")));
+    await assertFails(getDoc(doc(anon(), "schedule_shares/share-owner-2")));
   });
 
   it("a private schedule reads to nobody but its owner", async () => {
-    await assertFails(getDoc(doc(attendee("approved-1"), "schedule_shares/approved-1")));
+    await assertFails(getDoc(doc(attendee("speaker-1"), "schedule_shares/approved-1")));
     await assertFails(getDoc(doc(admin(), "schedule_shares/approved-1")));
     await assertFails(getDoc(doc(anon(), "schedule_shares/approved-1")));
   });
@@ -677,7 +677,7 @@ describe("schedule_shares visibility", () => {
   });
 
   it("a malformed visibility reads as private — nothing is widened by accident", async () => {
-    await assertSucceeds(getDoc(doc(attendee("approved-1"), "schedule_shares/malformed-1")));
+    await assertFails(getDoc(doc(attendee("approved-1"), "schedule_shares/malformed-1")));
     await assertFails(getDoc(doc(attendee("pending-1"), "schedule_shares/malformed-1")));
     await assertFails(getDoc(doc(anon(), "schedule_shares/malformed-1")));
     await assertFails(getDoc(doc(admin(), "schedule_shares/malformed-1")));
@@ -1306,5 +1306,14 @@ describe("custom badges", () => {
       update("approved-1", { customBadges: ["one", "two", "three", "four"] }),
     );
     await assertFails(update("approved-1", { customBadges: ["same", "same"] }));
+  });
+
+  it("keeps other profile fields editable after custom badges are disabled", async () => {
+    await setCustomBadgesFeature(true);
+    await assertSucceeds(update("approved-1", { customBadges: ["Reader"] }));
+    await setCustomBadgesFeature(false);
+    await assertSucceeds(update("approved-1", { bio: "An updated profile." }));
+    await assertFails(update("approved-1", { customBadges: ["Writer"] }));
+    await assertSucceeds(update("approved-1", { customBadges: null }));
   });
 });

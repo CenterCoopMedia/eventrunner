@@ -11,7 +11,7 @@ You edit the site. You do not deploy it. CCM (or another operator) handles Fireb
 - Sponsors and organizations
 - Live updates (from the admin form, not from Slack)
 - Theme: colors and the bundled font sets
-- Badges from the predefined list
+- Badges from the predefined list and moderation of optional custom badges
 
 Legal pages ship as templates. They stay flagged until your counsel signs off. Do not publish another organization's terms.
 
@@ -22,6 +22,10 @@ Draft and live are separate. Publishing copies the draft to what attendees see. 
 ## Speakers
 
 Invite by email. They accept with a login code, the same way attendees sign in. Do not send them a magic link. One speaker record is the source of truth — if a name is wrong in three places, fix the speaker record.
+
+## Custom badges
+
+Custom badges are off by default. If enabled in Features, attendees can write up to three badges of 24 characters each. Reserved role words and the event block list are refused. In Attendees, select the removal action beside a custom badge and confirm it. The removal is recorded in the admin log. Turning the feature off hides these badges and keeps other profile fields editable.
 
 ## Materials
 

@@ -147,10 +147,8 @@ HTML has drifted from a fresh render — the same freshness rule
 | `firestore.rules` or `storage.rules` | Rules emulators and E2E |
 | Workflows, tool configuration, package manifests or locks, Firebase configuration, `e2e/**`, `publisher/**`, other scripts, or an unrecognized path | Full matrix: documentation checks, lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
 
-Changes that match more than one row run the union of the selected tiers. The
-main branch protection rule should require `CI gate` after this workflow is
-merged; the existing `Shared package tests` requirement remains unchanged
-until that operator update is made.
+Changes that match more than one row run the union of the selected tiers.
+The main branch protection rule requires the stable `CI gate` check.
 
 `npm run test:e2e` needs Java 21+ (the same Firestore/Storage emulators `test:rules` uses) and a Chromium build Playwright can find. It never runs `playwright install` itself: point `PLAYWRIGHT_BROWSERS_PATH` at an existing install, or run `npx playwright install --with-deps chromium` once yourself first — `.github/workflows/ci.yml`'s `e2e` job does the latter, cached.
 
@@ -169,3 +167,39 @@ Do not open a public issue for a vulnerability. Use [private reporting](https://
 - Product and "how do I": [Discussions](https://github.com/CenterCoopMedia/eventrunner/discussions)
 - Handbook for attendees, staff, and clients: [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki)
 - Hosted-event support: info@eventrunner.org
+
+### Required branch and connector checks
+
+Every change to `main` must use a pull request. Branch protection applies to administrators,
+blocks force pushes and deletion, requires an up-to-date `CI gate`, and requires resolved
+review conversations. Do not bypass or disable these rules to land a repair.
+
+The `Connector review` check runs gate code from the protected base revision and waits for the authenticated Codex connector's completed summary
+for the current pull-request commit, then checks every review thread, including outdated
+threads. The short commit ID in the summary must identify exactly one full commit ID in
+GitHub PR workflow runs created before the reported completion time. Missing or ambiguous
+run history blocks merging; matching a short prefix alone is insufficient. CI must retain
+an unfiltered pull-request trigger. Run records must identify this PR; fork runs without
+that association fail closed. An ordinary comment, a review that is still running, or a summary for an older
+commit does not pass. Fix verified findings, run the affected checks, push the fix, and resolve
+only completed conversations. A timeout or unavailable connector blocks merging; it is not
+permission to mark the check successful. After a later push, a new connector review may be
+needed because automatic review currently runs on opening a ready PR, not every push.
+GitHub does not expose thread-resolution webhooks as Actions triggers. A scheduled check
+re-evaluates open PRs every ten minutes after a timeout; connector summary comments and manual
+workflow dispatch also re-evaluate. These checks never request or fabricate a connector review.
+The installation fallback is pinned to the reviewed gate in commit `a6ef882` and restricted to
+PR #257 against its original base; subsequent PRs use protected-base code.
+
+The required check is produced by GitHub Actions. A credential that can change repository
+settings or author privileged workflows can still alter or forge this control. A separate
+GitHub App or organization-enforced workflow is needed to isolate it from workflow writers.
+
+When web source changes, regenerate both the synthetic content and the committed demo with
+`node scripts/generate-content.cjs --demo` and `node scripts/build-demo.cjs`, then run their
+`--check` modes. Regenerate documentation with `node scripts/build-pages.cjs` after source
+Markdown changes. Sign off all repair commits with `git commit -s`.
+
+Branch rules control Git operations. An administrator credential can still edit those rules.
+Agents should use a separate identity with write access and no repository or organization
+administration permission; keep rule administration with the human owner.
