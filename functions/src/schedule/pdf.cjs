@@ -342,20 +342,50 @@ function sanitizeForFont(font, text) {
  * pdf-lib itself — no Firestore, no network — so it is directly unit
  * testable against fixture config/sessions.
  *
+ * ONE GENERATOR, TWO DOCUMENTS. The public programme passes no owner; the
+ * personal path passes `ownerName` (whose name the header carries) and
+ * `onlySessionIds` (the caller's own bookmark filter). An `ownerName` with
+ * no `onlySessionIds` would mislabel the public programme as somebody's
+ * personal copy, so the pair is enforced here rather than trusted to the
+ * callers.
+ *
  * @param {{ event: object | null, theme: object | null,
- *           sessions: Array<object>, speakerNamesById?: Record<string, string> }} args
+ *           sessions: Array<object>, speakerNamesById?: Record<string, string>,
+ *           ownerName?: string | null, onlySessionIds?: string[] | null }} args
  * @returns {Promise<Uint8Array>}
  */
-async function buildSchedulePdf({ event, theme, sessions, speakerNamesById = {} }) {
+async function buildSchedulePdf({
+  event,
+  theme,
+  sessions,
+  speakerNamesById = {},
+  ownerName = null,
+  onlySessionIds = null,
+}) {
   const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+
+  if (ownerName && !Array.isArray(onlySessionIds)) {
+    throw new Error('buildSchedulePdf: an owner without a bookmark filter would mislabel the public programme.');
+  }
 
   const colors = resolveThemeColors(theme);
   const branding = resolveBranding(event);
   const days = Array.isArray(event?.days) ? event.days : [];
-  const grouped = groupSessionsByDay(sessions, days);
+  // A filter, even an empty one, IS the filter: an attendee with zero
+  // bookmarks gets an empty personal programme, never the public one.
+  let sourceSessions;
+  if (Array.isArray(onlySessionIds)) {
+    const wanted = new Set(onlySessionIds);
+    sourceSessions = (Array.isArray(sessions) ? sessions : []).filter((session) =>
+      wanted.has(session?.id),
+    );
+  } else {
+    sourceSessions = Array.isArray(sessions) ? sessions : [];
+  }
+  const grouped = groupSessionsByDay(sourceSessions, days);
 
   const doc = await PDFDocument.create();
-  doc.setTitle(branding.name);
+  doc.setTitle(ownerName ? `${ownerName}'s schedule` : branding.name);
   doc.setSubject(branding.tagline || 'Event schedule');
   doc.setProducer('run-of-show');
   doc.setCreator('run-of-show');
@@ -389,7 +419,16 @@ async function buildSchedulePdf({ event, theme, sessions, speakerNamesById = {} 
       font: boldFont,
       color: toColor(colors.surface),
     });
-    const sub = [branding.tagline, branding.venueLine].filter(isNonEmptyString).join(' · ');
+    // Whose personal copy this is, on the same line as the venue and the
+    // tagline — the slot below carries the day label on every page, and a
+    // personal document must keep naming its days too.
+    const sub = [
+      branding.tagline,
+      branding.venueLine,
+      isNonEmptyString(ownerName) ? `${ownerName} — personal schedule` : null,
+    ]
+      .filter(isNonEmptyString)
+      .join(' · ');
     if (sub) {
       page.drawText(safeBody(sub), {
         x: MARGIN,
@@ -510,7 +549,8 @@ async function buildSchedulePdf({ event, theme, sessions, speakerNamesById = {} 
 
 // -------------------------------------------------------------------- http
 
-const { methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
+const { methodNotAllowed, notFound, sendError, internal } = require('../core/errors.cjs');
+const { requireAttendeeAccess } = require('../core/auth.cjs');
 
 /**
  * @param {{ db: FirebaseFirestore.Firestore, getConfig: () => Promise<object>,
@@ -562,22 +602,93 @@ function createBuildSchedulePdfHandler({ db, getConfig, log = console }) {
 }
 
 /** Deployable export: buildSchedulePdf (public GET, spec §9). */
+function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console }) {
+  return async function handler(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+
+    // The same flag gates the personal document and the public one: a
+    // client that has turned the PDF off serves neither.
+    const config = await getConfig();
+    if (config?.features?.schedulePdf !== true) {
+      return notFound(res, 'The schedule PDF is not enabled for this event.');
+    }
+
+    // THE CALLER IS THE ONLY SUBJECT. The uid comes from the verified ID
+    // token and from nowhere else — the handler reads that caller's own
+    // users/{uid}/bookmarks and nobody else's. A body that names a uid
+    // names a different account: refused, never substituted, because a
+    // personal programme is not public and a "read another person's
+    // schedule" switch would make this endpoint the leak #172's projection
+    // exists to prevent.
+    const gate = await requireAttendeeAccess({ auth, db, getConfig }, req);
+    if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+    const requestedUid = (req.body ?? {}).uid;
+    if (typeof requestedUid === 'string' && requestedUid && requestedUid !== gate.uid) {
+      return sendError(res, 403, 'forbidden', 'A personal schedule is only issued to its owner.');
+    }
+
+    try {
+      const [membersSnap, userSnap, sessionsSnap, speakersSnap] = await Promise.all([
+        db.collection(`users/${gate.uid}/bookmarks`).get(),
+        db
+          .collection('users')
+          .doc(gate.uid)
+          .get()
+          .catch(() => null),
+        db.collection('cmsSchedule').where('visible', '==', true).get(),
+        db.collection('speakers').get().catch(() => ({ docs: [] })),
+      ]);
+
+      const onlySessionIds = membersSnap.docs.map((d) => d.id);
+      const storedName = userSnap?.exists ? userSnap.data()?.displayName : null;
+      const ownerName =
+        typeof storedName === 'string' && storedName.trim() ? storedName.trim() : null;
+
+      const sessions = sessionsSnap.docs.map((d) => d.data());
+      const speakerNamesById = {};
+      for (const d of speakersSnap.docs) {
+        const name = deriveApprovedSpeakerName(d.data());
+        if (name) speakerNamesById[d.id] = name;
+      }
+
+      const bytes = await buildSchedulePdf({
+        event: config.event,
+        theme: config.theme,
+        sessions,
+        speakerNamesById,
+        ownerName,
+        onlySessionIds,
+      });
+
+      res.status(200);
+      res.set('Content-Type', 'application/pdf');
+      res.set('Content-Disposition', 'inline; filename="my-schedule.pdf"');
+      res.send(Buffer.from(bytes));
+    } catch (err) {
+      log.error('buildMySchedulePdf failed', err);
+      internal(res, 'The schedule PDF could not be generated.');
+    }
+  };
+}
+
+/** Deployable exports: buildSchedulePdf (public GET), buildMySchedulePdf (owner POST). */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
 
   const buildDeps = () => {
     const { getDb } = require('../core/firestore.cjs');
+    const { getAuth } = require('firebase-admin/auth');
     const { getEventConfig } = require('../core/config.cjs');
     const db = getDb();
-    return { db, getConfig: () => getEventConfig({ db }) };
+    return { db, auth: getAuth(), getConfig: () => getEventConfig({ db }) };
   };
 
-  const withCors = (handler) => async (req, res) => {
+  const withCors = (handler, methods) => async (req, res) => {
     const { applyCors, parseAllowedOrigins } = require('../core/http.cjs');
     const handled = applyCors(req, res, {
       allowedOrigins: parseAllowedOrigins(process.env.EVENT_ALLOWED_ORIGINS),
-      methods: ['GET'],
+      methods,
     });
     if (handled) return;
     await handler(req, res);
@@ -586,13 +697,17 @@ function buildHandlers() {
   return {
     buildSchedulePdf: onRequest({ region }, withCors(async (req, res) => {
       await createBuildSchedulePdfHandler(buildDeps())(req, res);
-    })),
+    }, ['GET'])),
+    buildMySchedulePdf: onRequest({ region }, withCors(async (req, res) => {
+      await createBuildMySchedulePdfHandler(buildDeps())(req, res);
+    }, ['POST'])),
   };
 }
 
 module.exports = {
   buildSchedulePdf,
   createBuildSchedulePdfHandler,
+  createBuildMySchedulePdfHandler,
   get handlers() {
     return buildHandlers();
   },

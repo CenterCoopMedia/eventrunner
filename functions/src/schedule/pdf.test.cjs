@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   buildSchedulePdf,
   createBuildSchedulePdfHandler,
+  createBuildMySchedulePdfHandler,
   internals: {
     hexToRgb01,
     resolveThemeColors,
@@ -439,4 +440,147 @@ test('createBuildSchedulePdfHandler: tolerates a missing speakers collection', a
   const res = fakeRes();
   await handler({ method: 'GET' }, res);
   assert.equal(res.statusCode, 200);
+});
+
+// ---------------------------------------------------------------- personal
+
+test('buildSchedulePdf: onlySessionIds narrows the programme to the bookmarked set', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/s1': session({ id: 's1', title: 'Bookmarked one' }),
+    'cmsSchedule/s2': session({ id: 's2', title: 'Not bookmarked', dayId: 'day-2' }),
+    'cmsSchedule/s3': session({ id: 's3', title: 'Bookmarked two', dayId: 'day-3' }),
+  });
+  const sessionsSnap = await db.collection('cmsSchedule').get();
+  const bytes = await buildSchedulePdf({
+    event: EVENT,
+    theme: THEME,
+    sessions: sessionsSnap.docs.map((d) => d.data()),
+    onlySessionIds: ['s1', 's3'],
+  });
+  assert.equal(Buffer.from(bytes).toString('latin1', 0, 5), '%PDF-');
+});
+
+test('buildSchedulePdf: an empty bookmark filter yields an empty personal programme, never the public one', async () => {
+  const db = makeFakeDb({ 'cmsSchedule/s1': session({ id: 's1' }) });
+  const sessionsSnap = await db.collection('cmsSchedule').get();
+  const bytes = await buildSchedulePdf({
+    event: EVENT,
+    theme: THEME,
+    sessions: sessionsSnap.docs.map((d) => d.data()),
+    ownerName: 'Alex Rivera',
+    onlySessionIds: [],
+  });
+  assert.equal(Buffer.from(bytes).toString('latin1', 0, 5), '%PDF-');
+});
+
+test('buildSchedulePdf: an owner without a bookmark filter is a programming error', async () => {
+  await assert.rejects(
+    () =>
+      buildSchedulePdf({
+        event: EVENT,
+        theme: THEME,
+        sessions: [],
+        ownerName: 'Alex Rivera',
+      }),
+    /bookmark filter/u,
+  );
+});
+
+function fakeAuth(uid) {
+  return {
+    verifyIdToken: async (token) => {
+      if (token === 'valid-token') return { uid, email: 'attendee@example.com', email_verified: true };
+      throw new Error('bad token');
+    },
+  };
+}
+
+test('createBuildMySchedulePdfHandler: 405 on non-POST', async () => {
+  const handler = createBuildMySchedulePdfHandler({
+    db: makeFakeDb(),
+    auth: fakeAuth('u1'),
+    getConfig: async () => ({ features: { schedulePdf: true } }),
+  });
+  const res = fakeRes();
+  await handler({ method: 'GET' }, res);
+  assert.equal(res.statusCode, 405);
+});
+
+test('createBuildMySchedulePdfHandler: 401 without a token, 404 with the flag off', async () => {
+  const deps = { db: makeFakeDb(), auth: fakeAuth('u1'), getConfig: async () => ({ features: { schedulePdf: true } }) };
+  const res = fakeRes();
+  await createBuildMySchedulePdfHandler(deps)({ method: 'POST', headers: {} }, res);
+  assert.equal(res.statusCode, 401);
+
+  const res2 = fakeRes();
+  await createBuildMySchedulePdfHandler({
+    ...deps,
+    getConfig: async () => ({ features: {} }),
+  })({ method: 'POST', headers: { authorization: 'Bearer valid-token' } }, res2);
+  assert.equal(res2.statusCode, 404);
+});
+
+test('createBuildMySchedulePdfHandler: 200 with a PDF of the caller own bookmarked sessions', async () => {
+  const db = makeFakeDb({
+    'users/u1': { displayName: 'Alex Rivera', registrationStatus: 'approved' },
+    'users/u1/bookmarks/s1': { bookmarkedAt: new Date() },
+    'users/u1/bookmarks/s3': { bookmarkedAt: new Date() },
+    'cmsSchedule/s1': session({ id: 's1', title: 'Bookmarked one' }),
+    'cmsSchedule/s2': session({ id: 's2', title: 'Not bookmarked' }),
+    'cmsSchedule/s3': session({ id: 's3', title: 'Bookmarked two', dayId: 'day-2' }),
+  });
+  const handler = createBuildMySchedulePdfHandler({
+    db,
+    auth: fakeAuth('u1'),
+    getConfig: async () => ({ features: { schedulePdf: true }, event: EVENT, theme: THEME }),
+  });
+  const res = fakeRes();
+  await handler(
+    { method: 'POST', headers: { authorization: 'Bearer valid-token' }, body: {} },
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Content-Type'], 'application/pdf');
+  assert.equal(res.sent.toString('latin1', 0, 5), '%PDF-');
+});
+
+test('createBuildMySchedulePdfHandler: a request naming another uid is refused, never substituted', async () => {
+  const db = makeFakeDb({
+    'users/u1': { displayName: 'Alex Rivera', registrationStatus: 'approved' },
+    'users/u1/bookmarks/s1': { bookmarkedAt: new Date() },
+    'users/victim-1': { displayName: 'Someone Else', registrationStatus: 'approved' },
+    'users/victim-1/bookmarks/s2': { bookmarkedAt: new Date() },
+    'cmsSchedule/s1': session({ id: 's1' }),
+    'cmsSchedule/s2': session({ id: 's2', title: 'Someone else session' }),
+  });
+  const handler = createBuildMySchedulePdfHandler({
+    db,
+    auth: fakeAuth('u1'),
+    getConfig: async () => ({ features: { schedulePdf: true }, event: EVENT, theme: THEME }),
+  });
+  const res = fakeRes();
+  await handler(
+    { method: 'POST', headers: { authorization: 'Bearer valid-token' }, body: { uid: 'victim-1' } },
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+});
+
+test('createBuildMySchedulePdfHandler: a caller with no bookmarks still gets a valid, empty personal PDF', async () => {
+  const db = makeFakeDb({
+    'users/u2': { displayName: 'No Bookmarks', registrationStatus: 'approved' },
+    'cmsSchedule/s1': session({ id: 's1' }),
+  });
+  const handler = createBuildMySchedulePdfHandler({
+    db,
+    auth: fakeAuth('u2'),
+    getConfig: async () => ({ features: { schedulePdf: true }, event: EVENT, theme: THEME }),
+  });
+  const res = fakeRes();
+  await handler(
+    { method: 'POST', headers: { authorization: 'Bearer valid-token' }, body: {} },
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.sent.toString('latin1', 0, 5), '%PDF-');
 });

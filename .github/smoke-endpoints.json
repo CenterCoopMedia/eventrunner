@@ -47,6 +47,7 @@
     "emailDeliveryWebhook",
     "bookmarkSession",
     "buildSchedulePdf",
+    "buildMySchedulePdf",
     "updatesMeta",
     "routeMeta",
     "reactToSession",

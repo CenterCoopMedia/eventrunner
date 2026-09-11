@@ -52,3 +52,56 @@ export async function downloadSchedulePdf({ origin, fetchImpl, documentRef }) {
   // blob URL in some engines.
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
+
+/**
+ * Download the signed-in caller's OWN schedule PDF (issue #171).
+ *
+ * The endpoint reads the caller's bookmarks from the verified token and
+ * refuses a body that names another uid — the client passes none anyway.
+ * The Authorization header rides on a POST, the same shape the other
+ * authenticated endpoints use (fetchSessionMaterialUrl, bookmarkSession),
+ * so the CORS preflight is the one those already answer.
+ *
+ * @param {{
+ *   origin: string,
+ *   user: import('firebase/auth').User,
+ *   fetchImpl?: typeof fetch,
+ *   documentRef?: Document,
+ * }} args
+ * @returns {Promise<void>}
+ */
+export async function downloadMySchedulePdf({ origin, user, fetchImpl, documentRef }) {
+  const doFetch = fetchImpl ?? (typeof fetch === 'function' ? fetch : null);
+  const doc = documentRef ?? (typeof document === 'undefined' ? null : document);
+  if (!doFetch || !doc) {
+    throw new SchedulePdfError('The schedule PDF could not be generated.');
+  }
+  if (!user) {
+    throw new SchedulePdfError('Sign in to download your schedule.');
+  }
+  let response;
+  try {
+    response = await doFetch(`${origin}/buildMySchedulePdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${await user.getIdToken()}`,
+      },
+      body: JSON.stringify({}),
+    });
+  } catch {
+    throw new SchedulePdfError('We could not reach the server. Check your connection and try again.');
+  }
+  if (!response.ok) {
+    throw new SchedulePdfError('Your schedule PDF is not available right now.');
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = doc.createElement('a');
+  anchor.href = url;
+  anchor.download = 'my-schedule.pdf';
+  doc.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}

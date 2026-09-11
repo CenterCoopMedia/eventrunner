@@ -10,9 +10,9 @@
 // Editorial base restyle (design brief §2.1, §5.1): the day head is the same
 // folio-on-a-rule SectionHead device Schedule.jsx uses, and the page actions
 // are ruled rectangles rather than filled pill buttons.
-import { Fragment, useMemo } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
@@ -25,6 +25,7 @@ import TransferLine from '../components/TransferLine.jsx';
 import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
+import { downloadMySchedulePdf } from '../lib/schedulePdf.js';
 import { sessionMovement } from 'shared/venue';
 import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
@@ -49,6 +50,23 @@ export default function MySchedule() {
   const { scheduleData, loading } = useContent();
   const { user, loading: authLoading } = useAuth();
   const { bookmarkedIds, loading: bookmarksLoading } = useMyBookmarks();
+  // The personal PDF request's state (issue #171): the only local state on
+  // the page.
+  const [pdfState, setPdfState] = useState({ status: 'idle', message: '' });
+
+  /** Ask the server for this caller's own bookmarked programme. */
+  async function onDownloadPdf() {
+    setPdfState({ status: 'loading', message: '' });
+    try {
+      await downloadMySchedulePdf({ origin: functionsOrigin(), user });
+      setPdfState({ status: 'idle', message: '' });
+    } catch (err) {
+      setPdfState({
+        status: 'error',
+        message: err.message || 'Your schedule PDF could not be generated.',
+      });
+    }
+  }
 
   const days = useMemo(
     () =>
@@ -144,6 +162,24 @@ export default function MySchedule() {
             >
               Download my schedule (.ics)
             </button>
+          ) : null}
+          {/* The personal PDF (issue #171): the server reads the caller's
+              own bookmarks behind the verified token, so the button carries
+              nothing but the request. The same flag gates the public PDF. */}
+          {features.schedulePdf && mySessions.length > 0 ? (
+            <button
+              type="button"
+              onClick={onDownloadPdf}
+              disabled={pdfState.status === 'loading'}
+              className={quietActionClass}
+            >
+              Download my schedule (PDF)
+            </button>
+          ) : null}
+          {pdfState.status === 'error' ? (
+            <p role="alert" className="basis-full font-data text-caption text-danger">
+              {pdfState.message}
+            </p>
           ) : null}
         </div>
       </header>
