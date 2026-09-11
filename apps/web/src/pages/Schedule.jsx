@@ -8,9 +8,9 @@
 // sessionBookmarks) and ICS/calendar-link export (features.icsExport) are
 // wired through SessionCard, which also carries the per-session detail
 // link (/schedule/:sessionId, SessionDetail.jsx).
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
@@ -45,6 +45,9 @@ import {
 import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
+import { schedulePlainText } from '../lib/scheduleText.js';
+import { copyTextToClipboard } from '../lib/clipboard.js';
+import { downloadSchedulePdf } from '../lib/schedulePdf.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
@@ -179,14 +182,54 @@ export default function Schedule() {
     }),
     [days, formatOptions, trackOptions],
   );
-  const view = useMemo(() => readScheduleView(searchParams, knownView), [searchParams, knownView]);
-  // The sort control offers most saved only where bookmarking exists, so a
+  const view = useMemo(() => readScheduleView(searchParams, knownView), [searchParams, knownView]);  // The sort control offers most saved only where bookmarking exists, so a
   // stale URL cannot select an order the page never offered.
   const sort = view.sort === 'saved' && features.sessionBookmarks ? 'saved' : 'time';
   const sortOptions = [
     { value: 'time', label: 'By time' },
     ...(features.sessionBookmarks ? [{ value: 'saved', label: 'Most saved' }] : []),
   ];
+  // The take-it-with-you controls (issue #166): the PDF request's state and
+  // the copy action's answer are the only local state on the page.
+  const [pdfState, setPdfState] = useState({ status: 'idle', message: '' });
+  const [copyState, setCopyState] = useState('idle'); // idle | copied | error
+  // The event's lines, in the client's own order (config/event.tracks). No
+  // lines means no second axis, so there is nothing for a grid to be.
+  const columns = resolveTracks(eventConfig);
+  // The whole programme as plain text (issue #166), recomputed only when
+  // the data changes — the copy action and the visible text read the same
+  // string, so the two can never disagree.
+  const plainText = useMemo(
+    () =>
+      schedulePlainText({
+        days,
+        sessionsByDay,
+        columns,
+        eventConfig,
+        speakerNamesById,
+      }),
+    [days, sessionsByDay, columns, eventConfig, speakerNamesById],
+  );
+
+  /**
+   * Ask the server for the whole-event PDF. The endpoint is public — the
+   * programme is public — and the flag gates the control, not the data.
+   */
+  async function onDownloadPdf() {
+    setPdfState({ status: 'loading', message: '' });
+    try {
+      await downloadSchedulePdf({ origin: functionsOrigin() });
+      setPdfState({ status: 'idle', message: '' });
+    } catch (err) {
+      setPdfState({ status: 'error', message: err.message || 'The schedule PDF could not be generated.' });
+    }
+  }
+
+  /** Copy the plain text view. The answer is stated, never assumed. */
+  async function onCopyText() {
+    const copied = await copyTextToClipboard(plainText);
+    setCopyState(copied ? 'copied' : 'error');
+  }
   const query = view.q;
   const formats = view.formats;
   const tracks = view.tracks;
@@ -245,9 +288,6 @@ export default function Schedule() {
   // What the count sentence says: every session still in the document,
   // calling points included — they are sessions a reader can pick too.
   const matchedCount = entries.reduce((count, entry) => count + 1 + entry.children.length, 0);
-  // The event's lines, in the client's own order (config/event.tracks). No
-  // lines means no second axis, so there is nothing for a grid to be.
-  const columns = resolveTracks(eventConfig);
   const showGrid = wide && columns.length > 0 && entries.length > 0;
   // The back issue (brief §2.1): a day the event has moved past, or a whole
   // event the operator has archived. Nothing is hidden — the palette drops
@@ -300,6 +340,30 @@ export default function Schedule() {
             >
               Download schedule (.ics)
             </button>
+          ) : null}
+          {/* The take-it-with-you controls (issue #166). Print uses the
+              existing handout: the screen view hides and the print view
+              shows, which the stylesheet already owns. The PDF asks the
+              server for the same programme behind its feature flag. */}
+          {visibleSessions.length > 0 ? (
+            <button type="button" onClick={() => window.print()} className={quietActionClass}>
+              Print the schedule
+            </button>
+          ) : null}
+          {features.schedulePdf && visibleSessions.length > 0 ? (
+            <button
+              type="button"
+              onClick={onDownloadPdf}
+              disabled={pdfState.status === 'loading'}
+              className={quietActionClass}
+            >
+              Download schedule (PDF)
+            </button>
+          ) : null}
+          {pdfState.status === 'error' ? (
+            <p role="status" className="basis-full font-data text-caption text-text-secondary">
+              {pdfState.message}
+            </p>
           ) : null}
         </div>
       </header>
@@ -508,6 +572,34 @@ export default function Schedule() {
               )}
             </section>
           </div>
+          {/* The plain text view (issue #166): the whole programme, every
+              configured day, with a copy action. A details element is the
+              keyboard path — the browser owns the toggle — and the text sits
+              in the document, so a copy that will not happen can still be
+              selected by hand. Controls do not print. */}
+          <details className="no-print mt-xl border-t-hairline border-t-rule-hairline pt-sm">
+              <summary className="touch-target inline-flex cursor-pointer items-center font-data text-caption font-semibold text-text-primary">
+                Plain text schedule
+              </summary>
+              <p className="mt-2xs max-w-prose font-data text-caption text-text-secondary">
+                Every configured day, to paste where rich text will not go.
+              </p>
+              <div className="mt-sm flex flex-wrap items-center gap-xs">
+                <button type="button" onClick={onCopyText} className={quietActionClass}>
+                  Copy the schedule as text
+                </button>
+                <p role="status" className="font-data text-caption text-text-secondary">
+                  {copyState === 'copied'
+                    ? 'Copied.'
+                    : copyState === 'error'
+                      ? 'Copying did not work here. Select the text below to copy it by hand.'
+                      : ''}
+                </p>
+              </div>
+              <pre className="mt-sm max-w-full overflow-x-auto whitespace-pre-wrap font-mono text-caption text-text-secondary">
+                {plainText}
+              </pre>
+            </details>
           {/* The handout: every day, every session, every calling point,
               no controls (visual stories, part 2, "Print view"). */}
           <SchedulePrint

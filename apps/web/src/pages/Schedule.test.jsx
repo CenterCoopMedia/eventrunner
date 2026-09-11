@@ -522,7 +522,7 @@ describe('schedule search', () => {
     type('editing');
     expect(onScreen().getByText('[Fixture] Afternoon editing lab')).toBeInTheDocument();
     expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
-    expect(screen.getByRole('status')).toHaveTextContent('1 sessions match “editing”');
+    expect(screen.getByText('1 sessions match “editing”')).toBeInTheDocument();
     // The empty state names the query (done when).
     type('nothing names this');
     expect(
@@ -829,6 +829,66 @@ describe('running and finished marks', () => {
     renderSchedule();
     expect(onScreen().queryByText('Running now')).toBeNull();
     expect(onScreen().queryByText('Finished')).toBeNull();
+  });
+});
+
+describe('the take-it-with-you controls', () => {
+  it('the print control and the print handout agree: the page prints the handout', () => {
+    // The handout lists every day, even though the screen shows one.
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+    renderSchedule({ features: { schedule: true } });
+    fireEvent.click(screen.getByRole('button', { name: 'Print the schedule' }));
+    expect(printSpy).toHaveBeenCalledTimes(1);
+    printSpy.mockRestore();
+  });
+
+  it('the plain text view carries the whole programme, with a copy action that answers', async () => {
+    const writeText = vi.fn(async () => {});
+    const originalNavigator = window.navigator;
+    Object.defineProperty(window, 'navigator', {
+      value: { ...originalNavigator, clipboard: { writeText } },
+      configurable: true,
+    });
+    try {
+      renderSchedule({ features: { schedule: true } });
+
+      // Both days are in the text, not just the one on screen.
+      fireEvent.click(screen.getByText('Plain text schedule'));
+      const view = screen.getByText(/Every configured day, to paste/).parentElement;
+      const text = view.querySelector('pre').textContent;
+      expect(text).toContain('Day one · Thursday, October 15');
+      expect(text).toContain('Day two · Friday, October 16');
+      expect(text).toContain('[Fixture] Morning kickoff');
+      expect(text).toContain('[Fixture] Day-two roundtable');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Copy the schedule as text' }));
+      expect(await screen.findByText('Copied.')).toBeInTheDocument();
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Morning kickoff'));
+    } finally {
+      Object.defineProperty(window, 'navigator', { value: originalNavigator, configurable: true });
+    }
+  });
+
+  it('the PDF control asks the server and states a refusal', async () => {
+    const fetchMock = vi.fn(async (url) => ({ ok: false, url }));
+    const originalFetch = window.fetch;
+    window.fetch = fetchMock;
+    try {
+      renderSchedule({ features: { schedule: true, schedulePdf: true } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Download schedule (PDF)' }));
+      expect(await screen.findByText('The schedule PDF is not available for this event.')).toBeInTheDocument();
+    } finally {
+      window.fetch = originalFetch;
+    }
+  });
+
+  it('a client with the PDF flag off renders no PDF control at all', () => {
+    renderSchedule({ features: { schedule: true } });
+    expect(screen.queryByRole('button', { name: 'Download schedule (PDF)' })).toBeNull();
+    // The other two controls do not depend on the flag.
+    expect(screen.getByRole('button', { name: 'Print the schedule' })).toBeInTheDocument();
+    expect(screen.getByText('Plain text schedule')).toBeInTheDocument();
   });
 });
 
