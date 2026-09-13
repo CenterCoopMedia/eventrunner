@@ -8,8 +8,8 @@ The report measures the entry module and each static JavaScript import required 
 | 2026-08-24 | Demo | 995,175 | 265,035 | 1 |
 | 2026-09-09 | Normal | 986,933 | 264,368 | 1 |
 | 2026-09-09 | Demo | 979,849 | 262,790 | 1 |
-| 2026-09-13 | Normal | 1,040,518 | 279,247 | 1 |
-| 2026-09-13 | Demo | 1,044,705 | 281,430 | 1 |
+| 2026-09-13 | Normal | 1,039,908 | 279,231 | 1 |
+| 2026-09-13 | Demo | 1,044,095 | 281,409 | 1 |
 
 The parent demo build used 1,083,709 raw bytes and 286,942 gzip bytes before the route split. The split removes 88,534 raw bytes and 21,907 gzip bytes from that initial graph.
 
