@@ -278,6 +278,7 @@ const {
   systemPageIdForPath,
 } = require('shared/routing');
 const { pageHeading, isPublicPage } = require('shared/page');
+const { isValidDocId } = require('../cms/store.cjs');
 
 /**
  * @param {{ db: FirebaseFirestore.Firestore, getConfig: () => Promise<object>,
@@ -391,7 +392,8 @@ function createUpdatesMetaHandler({
 const ROUTE_CACHE_CONTROL = 'public, max-age=0, s-maxage=300, must-revalidate';
 
 /** Ceiling on a request path before it is even parsed. */
-const MAX_ROUTE_PATH_LENGTH = 512;
+// Allow percent-encoded organization IDs within the CMS document-ID limit.
+const MAX_ROUTE_PATH_LENGTH = 4096;
 
 /**
  * A record id or slug this handler will look up. Anything else is not a
@@ -474,6 +476,13 @@ async function resolveRouteSubject({ db, config, path }) {
   if (systemId) {
     const gate = SYSTEM_PAGE_ROUTES[systemId].feature;
     if (gate !== null && features[gate] !== true) return null;
+  }
+
+  if (segments.length === 2 && first === 'sponsors') {
+    if (features.sponsors !== true || !isValidDocId(second)) return null;
+    const snap = await db.collection('cmsOrganizations').doc(second).get();
+    const data = snap.exists ? snap.data() : null;
+    return data && data.visible === true ? { kind: 'sponsor', doc: data } : null;
   }
 
   // The two detail routes own their second segment outright: `schedule`
@@ -807,6 +816,15 @@ function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
       title: titled(subject.doc.title),
       description: excerpt(subject.doc.description) || eventDescription,
       ogType: 'article',
+    };
+  }
+  if (subject.kind === 'sponsor') {
+    if (!isNonEmptyString(subject.doc.name)) return shell;
+    return {
+      ...described,
+      title: titled(subject.doc.name),
+      url: `${base}/sponsors/${encodeURIComponent(path.slice('/sponsors/'.length))}`,
+      description: excerpt(subject.doc.description) || excerpt(subject.doc.bio) || eventDescription,
     };
   }
   if (subject.kind === 'speaker') {

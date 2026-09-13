@@ -12,6 +12,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import UpdateContent, { UpdateImage } from '../components/UpdateContent.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { publishDateLabel, toPublishDate } from '../lib/updateDates.js';
 import { primaryActionClass } from '../components/controlClasses.js';
@@ -70,11 +71,13 @@ export default function UpdateDetail() {
           </p>
         ) : null}
       </header>
+      {update.featuredImage ? <div className="mt-lg"><UpdateImage image={update.featuredImage} /></div> : null}
       {update.body ? (
         <p className="mt-lg max-w-prose whitespace-pre-wrap text-body text-text-secondary text-pretty">
           {update.body}
         </p>
       ) : null}
+      <UpdateContent key={update.id} content={update.content} />
     </article>
   );
 }

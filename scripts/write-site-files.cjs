@@ -69,7 +69,7 @@ const FLAGS = ['dist', 'generated', 'public-url', 'help'];
  * server, never in a client production build, and it is not a page anybody
  * should reach from a search result.
  *
- * A sitemap is built from cmsPages, sessions, speakers, and updates, so no
+ * A sitemap is built from cmsPages, sessions, speakers, sponsors, and updates, so no
  * ordinary change can put this path in one. That is exactly why the check
  * belongs here: the day a route table starts feeding the sitemap, this
  * fails instead of quietly publishing a review surface.
@@ -181,14 +181,15 @@ async function importGenerated(dir, file) {
  *
  * @param {{ generatedDir: string, importModule?: typeof importGenerated }} args
  * @returns {Promise<{ event: object, features: object, theme: object,
- *                     pages: object[], sessions: object[], speakers: object[],
+ *                     pages: object[], sessions: object[], speakers: object[], organizations: object[],
  *                     updates: object[] }>}
  */
 async function readGeneratedSnapshot({ generatedDir, importModule = importGenerated }) {
-  const [eventConfigMod, pagesMod, scheduleMod] = await Promise.all([
+  const [eventConfigMod, pagesMod, scheduleMod, organizationsMod] = await Promise.all([
     importModule(generatedDir, 'eventConfig.js'),
     importModule(generatedDir, 'pagesData.js'),
     importModule(generatedDir, 'scheduleData.js'),
+    importModule(generatedDir, 'organizationsData.js'),
   ]);
   return {
     event: eventConfigMod.eventConfig || {},
@@ -197,6 +198,7 @@ async function readGeneratedSnapshot({ generatedDir, importModule = importGenera
     pages: pagesMod.pagesData || [],
     sessions: scheduleMod.scheduleData || [],
     speakers: scheduleMod.speakers || [],
+    organizations: organizationsMod.organizationsData || [],
     // No build-time snapshot exists for cmsUpdates — see the module
     // docstring above.
     updates: [],

@@ -881,7 +881,7 @@ export const siteContent = {
     blockType: 'link_group',
     group: 'Around the venue',
     label: 'Open the Newark map',
-    url: 'https://www.google.com/maps/search/?api=1&query=The+Newark+Museum+of+Art+49+Washington+Street+Newark+NJ',
+    url: 'https://www.openstreetmap.org/?mlat=40.7426&mlon=-74.1712#map=17/40.7426/-74.1712',
     visible: true,
     order: 0,
     seeded: true,

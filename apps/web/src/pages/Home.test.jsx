@@ -8,7 +8,10 @@
 // defensively, independent of the write-boundary fix in
 // packages/shared/src/config/schema.cjs.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render as testingRender, screen } from '@testing-library/react';
+
+import { MemoryRouter } from 'react-router-dom';
+const render = (ui) => testingRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 let eventConfig;
 let heroBlocks;

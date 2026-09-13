@@ -20,6 +20,7 @@
  * logAdminAction); live cmsUpdates docs are written only by cms/publish.
  */
 
+const { validUpdateImage, validUpdateContent } = require('shared/update');
 const crypto = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
@@ -31,7 +32,7 @@ const UPDATES_COLLECTION = 'cmsUpdates';
 const UPDATES_DRAFTS = 'cmsUpdates_drafts';
 
 /** Keys a cmsUpdates doc may carry — anything else is rejected by name. */
-const UPDATE_KEYS = Object.freeze(['title', 'body', 'publishAt', 'pinned']);
+const UPDATE_KEYS = Object.freeze(['title', 'body', 'publishAt', 'pinned', 'featuredImage', 'content']);
 
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
@@ -70,6 +71,8 @@ function validateUpdateDoc(doc) {
     errors.push('publishAt: must be null, an ISO-8601 string, or epoch millis');
   }
   if (typeof doc.pinned !== 'boolean') errors.push('pinned: must be a boolean');
+  if (doc.featuredImage != null && !validUpdateImage(doc.featuredImage)) errors.push('featuredImage: invalid image');
+  if (doc.content !== undefined && !validUpdateContent(doc.content)) errors.push('content: invalid update blocks');
   return { ok: errors.length === 0, errors };
 }
 
@@ -105,6 +108,8 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
       body: update.body,
       publishAt: normalizePublishAt(update.publishAt),
       pinned: update.pinned,
+      ...(update.featuredImage !== undefined ? { featuredImage: update.featuredImage } : {}),
+      ...(update.content !== undefined ? { content: update.content } : {}),
     };
     try {
       await store.writeDraft({

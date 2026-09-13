@@ -303,7 +303,7 @@ async function writeQueueStatus({ db, queueId, patch, log = console }) {
  * @param {{ db: object }} args
  * @returns {Promise<{ event: object, features: object, theme: object,
  *                     pages: object[], sessions: object[],
- *                     speakers: object[], updates: object[] }>}
+ *                     speakers: object[], organizations: object[], updates: object[] }>}
  */
 async function readSiteDocs({ db }) {
   const configIds = ['event', 'features', 'theme'];
@@ -314,10 +314,11 @@ async function readSiteDocs({ db }) {
   });
   if (!config.event) throw new Error('config/event is missing — run scripts/init-event.cjs first');
 
-  const [pagesSnap, sessionsSnap, speakersSnap, updatesSnap] = await Promise.all([
+  const [pagesSnap, sessionsSnap, speakersSnap, organizationsSnap, updatesSnap] = await Promise.all([
     db.collection('cmsPages').get(),
     db.collection('cmsSchedule').where('visible', '==', true).get(),
     db.collection('speakers_public').get(),
+    db.collection('cmsOrganizations').where('visible', '==', true).get(),
     db.collection('cmsUpdates').where('visible', '==', true).get(),
   ]);
   const asDocs = (snap) => snap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
@@ -329,6 +330,7 @@ async function readSiteDocs({ db }) {
     pages: asDocs(pagesSnap),
     sessions: asDocs(sessionsSnap),
     speakers: asDocs(speakersSnap),
+    organizations: asDocs(organizationsSnap),
     updates: asDocs(updatesSnap),
   };
 }
@@ -347,10 +349,10 @@ async function readSiteDocs({ db }) {
 async function generateSiteFiles({ db, distDir, publicUrl, log = console }) {
   if (!db) throw new Error('generateSiteFiles: no Firestore handle available');
   const {
-    event, features, theme, pages, sessions, speakers, updates,
+    event, features, theme, pages, sessions, speakers, organizations, updates,
   } = await readSiteDocs({ db });
   const artifacts = buildSiteArtifacts({
-    event, features, theme, pages, sessions, speakers, updates, publicUrl,
+    event, features, theme, pages, sessions, speakers, organizations, updates, publicUrl,
   });
 
   fs.mkdirSync(distDir, { recursive: true });

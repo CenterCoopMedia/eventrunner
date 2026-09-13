@@ -364,7 +364,7 @@ function asFakeDocs(records) {
  * `readSiteDocs` actually runs.
  */
 function fakeSiteDb({
-  event, features, theme, pages, sessions = [], speakers = [], updates = [],
+  event, features, theme, pages, sessions = [], speakers = [], organizations = [], updates = [],
 }) {
   const configDocs = { event, features, theme };
   const filterableCollection = (records) => ({
@@ -379,6 +379,7 @@ function fakeSiteDb({
       if (name === 'config') return { doc: (id) => ({ __configId: id }) };
       if (name === 'cmsPages') return { async get() { return { docs: asFakeDocs(pages) }; } };
       if (name === 'cmsSchedule') return filterableCollection(sessions);
+      if (name === 'cmsOrganizations') return filterableCollection(organizations);
       if (name === 'cmsUpdates') return filterableCollection(updates);
       if (name === 'speakers_public') return { async get() { return { docs: asFakeDocs(speakers) }; } };
       throw new Error(`fakeSiteDb: unexpected collection ${name}`);
@@ -402,6 +403,7 @@ const SITE_DOCS = {
     { id: 'schedule', path: '/schedule', order: 1, visible: true, systemPage: true },
     // Public, so its speaker detail routes are eligible too.
     { id: 'speakers', path: '/speakers', order: 2, visible: true, systemPage: true },
+    { id: 'sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true },
     { id: 'travel', path: '/travel', order: 4, visible: true, systemPage: false },
     // Off by default (features.updates is false above).
     { id: 'updates', path: '/updates', order: 11, visible: true, systemPage: true },
@@ -413,6 +415,7 @@ const SITE_DOCS = {
     { id: 'draft-session', visible: false },
   ],
   speakers: [{ slug: 'rae-okonkwo' }],
+  organizations: [{ id: 'beacon', visible: true }, { id: 'hidden-sponsor', visible: false }],
   updates: [{ id: 'week-one', visible: true }],
 };
 
@@ -430,6 +433,7 @@ test('readSiteDocs filters cmsSchedule and cmsUpdates to visible === true, but n
     const docs = await readSiteDocs({ db });
     assert.deepEqual(docs.sessions.map((s) => s.id), ['keynote']);
     assert.deepEqual(docs.speakers.map((s) => s.slug), ['rae-okonkwo']);
+    assert.deepEqual(docs.organizations.map((organization) => organization.id), ['beacon']);
     // updates is off in SITE_DOCS.features, but readSiteDocs itself applies
     // no feature gate — that is buildSiteArtifacts's job.
     assert.deepEqual(docs.updates.map((u) => u.id), ['week-one']);
@@ -451,6 +455,8 @@ test('generateSiteFiles writes all three files, and the sitemap and robots agree
     assert.match(sitemap, /<loc>https:\/\/example\.org\/travel<\/loc>/);
     assert.match(sitemap, /<loc>https:\/\/example\.org\/schedule\/keynote<\/loc>/);
     assert.match(sitemap, /<loc>https:\/\/example\.org\/speakers\/rae-okonkwo<\/loc>/);
+    assert.match(sitemap, /<loc>https:\/\/example\.org\/sponsors\/beacon<\/loc>/);
+    assert.doesNotMatch(sitemap, /hidden-sponsor/);
     assert.doesNotMatch(sitemap, /\/schedule\/draft-session</);
     // features.updates is off in SITE_DOCS, so no update route at all,
     // even though a published cmsUpdates doc exists.

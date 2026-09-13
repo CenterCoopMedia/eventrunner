@@ -132,9 +132,7 @@ test('systemPageIdForPath resolves a detail path only under a route that mounts 
   assert.equal(systemPageIdForPath('/speakers/rae-okonkwo'), 'speakers');
   assert.equal(systemPageIdForPath('/updates/post-1'), 'updates');
   assert.equal(systemPageIdForPath('/attendees/uid-1'), 'attendees');
-  // Sponsors mounts no children, so nothing sits under it — describing
-  // /sponsors/anything as the sponsors page would title a 404.
-  assert.equal(systemPageIdForPath('/sponsors/anything'), null);
+  assert.equal(systemPageIdForPath('/sponsors/example'), 'sponsors');
 });
 
 test('systemPageIdForPath answers nothing for a route no system page mounts', () => {

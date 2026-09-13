@@ -26,6 +26,7 @@ function fakeImporter(modules) {
 }
 
 const MODULES = {
+  'organizationsData.js': { organizationsData: [{ id: 'beacon', visible: true }] },
   'eventConfig.js': {
     eventConfig: { name: 'Harborlight Summit', shortName: 'HARBOR' },
     features: { schedule: true, speakers: true, sponsors: true, attendeeDirectory: true, updates: false },
@@ -46,7 +47,7 @@ const MODULES = {
 
 // --- readGeneratedSnapshot ---------------------------------------------------
 
-test('readGeneratedSnapshot maps the three generated files into buildSiteArtifacts shape', async () => {
+test('readGeneratedSnapshot maps the generated files into buildSiteArtifacts shape', async () => {
   const snapshot = await readGeneratedSnapshot({ generatedDir: '/fake', importModule: fakeImporter(MODULES) });
   assert.equal(snapshot.event.name, 'Harborlight Summit');
   assert.equal(snapshot.features.schedule, true);
@@ -54,6 +55,7 @@ test('readGeneratedSnapshot maps the three generated files into buildSiteArtifac
   assert.equal(snapshot.pages.length, 3);
   assert.deepEqual(snapshot.sessions, [{ id: 'keynote', visible: true }]);
   assert.deepEqual(snapshot.speakers, [{ slug: 'rae-okonkwo' }]);
+  assert.deepEqual(snapshot.organizations, [{ id: 'beacon', visible: true }]);
   // cmsUpdates has no build-time snapshot at all — see the module docstring.
   assert.deepEqual(snapshot.updates, []);
 });
@@ -120,6 +122,7 @@ function writeFixtureGeneratedDir() {
     'export const pagesData = ['
     + "{ id: 'home', path: '/', order: 0, visible: true, systemPage: true },"
     + "{ id: 'schedule', path: '/schedule', order: 1, visible: true, systemPage: true },"
+    + "{ id: 'sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true },"
     + '];\n',
   );
   fs.writeFileSync(
@@ -127,6 +130,7 @@ function writeFixtureGeneratedDir() {
     "export const scheduleData = [{ id: 'keynote', visible: true }];\n"
     + "export const speakers = [{ slug: 'rae-okonkwo' }];\n",
   );
+  fs.writeFileSync(path.join(dir, 'organizationsData.js'), "export const organizationsData = [{ id: 'beacon', visible: true }];\n");
   return dir;
 }
 
@@ -143,6 +147,7 @@ test('a full run reads a real generated directory and writes all three files', a
     const sitemap = fs.readFileSync(path.join(distDir, 'sitemap.xml'), 'utf8');
     assert.match(sitemap, /<loc>https:\/\/example\.org\/<\/loc>/);
     assert.match(sitemap, /<loc>https:\/\/example\.org\/schedule<\/loc>/);
+    assert.match(sitemap, /<loc>https:\/\/example\.org\/sponsors\/beacon<\/loc>/);
 
     const robots = fs.readFileSync(path.join(distDir, 'robots.txt'), 'utf8');
     assert.match(robots, /^Sitemap: https:\/\/example\.org\/sitemap\.xml$/m);
@@ -238,6 +243,7 @@ test('the refusal names the reserved segment and the page that took it', async (
     'export const scheduleData = [];\nexport const speakers = [];\n',
   );
 
+  fs.writeFileSync(path.join(generatedDir, 'organizationsData.js'), 'export const organizationsData = [];\n');
   const errors = [];
   const code = await main(
     ['--dist', distDir, '--public-url', 'https://example.org', '--generated', generatedDir],

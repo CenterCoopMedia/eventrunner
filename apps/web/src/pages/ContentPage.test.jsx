@@ -94,9 +94,9 @@ describe('Home', () => {
     // organizations on the home page, in the section's own place: it comes
     // after the History section, which is where the seed puts it.
     expect(screen.getByText(siteContent.sponsors__lede.value)).toBeInTheDocument();
-    // Fictional sponsors have no external destination.
+    // Fictional sponsors open their internal profile.
     expect(screen.getByText(organizationsData[0].name)).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: organizationsData[0].name })).toBeNull();
+    expect(screen.getByRole('link', { name: organizationsData[0].name })).toHaveAttribute('href', `/sponsors/${organizationsData[0].id}`);
     const sectionOrder = home.sections
       .filter((s) => screen.queryByRole('heading', { name: s.label }))
       .map((s) => s.id);

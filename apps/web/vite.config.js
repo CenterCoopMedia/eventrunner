@@ -36,6 +36,7 @@ export default defineConfig({
       'shared/theme',
       'shared/urlSafety',
       'shared/venue',
+      'shared/update',
     ],
   },
   resolve: {

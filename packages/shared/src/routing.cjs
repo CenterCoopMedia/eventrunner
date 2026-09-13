@@ -168,7 +168,7 @@ const SYSTEM_PAGE_ROUTES = Object.freeze({
   home: Object.freeze({ to: '/', feature: null, children: false }),
   schedule: Object.freeze({ to: '/schedule', feature: 'schedule', children: true }),
   speakers: Object.freeze({ to: '/speakers', feature: 'speakers', children: true }),
-  sponsors: Object.freeze({ to: '/sponsors', feature: 'sponsors', children: false }),
+  sponsors: Object.freeze({ to: '/sponsors', feature: 'sponsors', children: true }),
   attendees: Object.freeze({ to: '/attendees', feature: 'attendeeDirectory', children: true }),
   updates: Object.freeze({ to: '/updates', feature: 'updates', children: true }),
 });
@@ -184,7 +184,7 @@ const SYSTEM_PAGE_ID_BY_ROUTE = Object.freeze(
  * the schedule. Null for anything no system route mounts.
  *
  * A detail path only resolves through a route that declares `children`, so
- * '/sponsors/anything' is not the sponsors page — nothing mounts it.
+ * '/sponsors/example' belongs to the sponsors page.
  *
  * @param {string} path a request path, normalized (no trailing slash)
  * @returns {string|null}
