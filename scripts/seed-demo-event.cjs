@@ -101,6 +101,7 @@ async function seedDemo({ db, store, args, now = Date.now }) {
     ['cmsContent', demo.content],
     ['cmsSchedule', demo.sessions],
     ['cmsOrganizations', demo.organizations],
+    ['cmsUpdates', demo.updates],
   ];
   for (const [collection, docs] of collections) {
     const result = await seedCollection({ db, store, collection, docs, dryRun, now, force });

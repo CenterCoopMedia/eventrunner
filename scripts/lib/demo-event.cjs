@@ -10,6 +10,7 @@ const { buildConfigDocs } = require('./answers.cjs');
 const { defaultPages, buildSeedContent } = require('./seed.cjs');
 const { buildPublicSpeaker } = require('shared/speaker');
 const { resolveLegacyColors } = require('shared/theme');
+const DEMO_UPDATES = require('./demo-updates.json');
 
 /** Newsroom is the demo's media-summit preset. */
 const DEMO_PRESET_ID = 'newsroom';
@@ -1902,6 +1903,7 @@ function demoEvent() {
     config,
     pages,
     content,
+    updates: DEMO_UPDATES.map((update) => ({ ...update })),
     sessions: DEMO_SESSIONS.map((s) => ({ ...s })),
     speakers: DEMO_SPEAKERS.map((s) => ({ ...s })),
     organizations: DEMO_ORGANIZATIONS.map((o) => ({ ...o })),

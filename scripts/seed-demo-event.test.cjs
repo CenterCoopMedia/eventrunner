@@ -114,3 +114,22 @@ test('a legacy canonical slug collision is found before config writes', async ()
   await assert.rejects(runSeed(db), { code: 'demo-speaker-conflict' });
   assert.deepEqual(db.writes, []);
 });
+
+
+test('demo announcements are seeded from the same fixture used by the static demo', async () => {
+  const updates = require('./lib/demo-updates.json');
+  const db = makeFakeDb();
+  await runSeed(db);
+  assert.equal(db.read('config', 'features').updates, true);
+  assert.deepEqual(db.ids('cmsUpdates').sort(), updates.map((update) => update.id).sort());
+  for (const { id, ...fields } of updates) {
+    const stored = db.read('cmsUpdates', id);
+    for (const [key, value] of Object.entries(fields)) assert.deepEqual(stored[key], value);
+  }
+});
+
+test('a demo dry run writes no announcements', async () => {
+  const db = makeFakeDb();
+  await runSeed(db, { 'dry-run': true });
+  assert.deepEqual(db.ids('cmsUpdates'), []);
+});
