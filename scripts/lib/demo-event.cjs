@@ -90,7 +90,7 @@ const DEMO_ANSWERS = Object.freeze({
       region: 'NJ',
       postalCode: '07102',
       country: 'US',
-      mapUrl: 'https://www.google.com/maps/search/?api=1&query=The+Newark+Museum+of+Art+49+Washington+Street+Newark+NJ',
+      mapUrl: 'https://www.openstreetmap.org/?mlat=40.7426&mlon=-74.1712#map=17/40.7426/-74.1712',
       places: [
         {
           id: 'main-hall',
@@ -1045,7 +1045,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '09:30',
     endTime: '10:00',
     title: 'Welcome and orientation',
-    description: 'Meet the hosts, choose a workshop track, and review the conduct and access arrangements in the demo plan.',
+    description: 'Start here if this is your first Harborlight summit or your first event with a partner newsroom. Marisol Reyes introduces the hosts and explains how the two workshop tracks fit together. Review the room plan, shared notes, conduct process, and quiet-space arrangements for this fictional event.\n\nChoose one question you want to answer during the three days. Share it with a neighbor and identify a session that can help. Bring your schedule and a notebook. You will leave with a first-day plan, a clear way to ask for help, and someone to compare notes with at the afternoon exchange.',
     location: 'Main hall',
     type: 'keynote',
     speakerIds: [
@@ -1062,7 +1062,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '10:00',
     endTime: '10:20',
     title: 'Local news as shared work',
-    description: 'A newsroom partnership starts with one useful promise. Marisol shares a reporting example and a method for agreeing on the work.',
+    description: 'What makes a partnership useful after the announcement? Marisol Reyes follows a fictional local investigation from its first tip to publication. She shows where reporting teams share work, where they need separate decisions, and how a small promise becomes a practical agreement.\n\nThis opening talk is for reporters, editors, and publishers who want to work across newsroom boundaries. Listen for one task your team could share and one responsibility it must keep. No preparation is needed. The takeaway is a short set of questions about ownership, editing, credit, and deadlines that you can use before agreeing to a joint story.',
     location: 'Main hall',
     type: 'keynote',
     speakerIds: [
@@ -1079,7 +1079,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '10:30',
     endTime: '12:00',
     title: 'Collaborative reporting basics',
-    description: 'Build a shared reporting plan. Agree on sources, editing, credit, and publication dates using a fictional investigation.',
+    description: 'This workshop is for reporters and editors starting a joint project, especially teams without a dedicated partnerships manager. Lucia Bennett and Amara Okafor introduce a fictional investigation and ask each group to divide the reporting work. Decide who checks sources, who edits each version, and who makes the final publication call.\n\nWork through a missed deadline and a disputed byline before they happen on a real assignment. Bring a project idea and a notebook or laptop; a sample brief is available if you need one. You will leave with a reporting plan, a short partner agreement, and a checklist for resolving questions before they delay the story.',
     location: 'Room A',
     type: 'workshop',
     speakerIds: [
@@ -1098,7 +1098,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '10:30',
     endTime: '12:00',
     title: 'A membership offer readers understand',
-    description: 'Write a clear membership offer and test it against three reader needs. Bring a draft message or use the sample newsroom.',
+    description: 'For publishers, membership staff, and anyone writing a reader appeal, this workshop starts with the reader\'s reason to support your work. Priya Natarajan and Omar Farouk compare three fictional membership offers. Identify the promise, the price, and the work needed to deliver each one.\n\nDraft a short invitation, then exchange it with a partner who has not seen your newsroom\'s pitch. Check whether the benefit is clear without insider language. Bring an existing appeal or use the sample copy. You will leave with a revised message, a simple cost check, and a plan to test one change before sending it to a larger audience.',
     location: 'Room B',
     type: 'workshop',
     speakerIds: [
@@ -1132,7 +1132,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '13:00',
     endTime: '14:30',
     title: 'Verify a local data story',
-    description: 'Clean a sample public-spending table, check totals, and record assumptions. Leave with a source note another reporter can follow.',
+    description: 'A spreadsheet can be tidy and still tell the wrong story. This lab is for reporters who can open a table but want a more reliable checking process. Samir Das provides a fictional public-spending file with duplicate rows, missing values, and inconsistent dates.\n\nWork in pairs to preserve the original, document each change, and compare your totals with the source notes. Then write a finding that states what the data can and cannot show. Bring a laptop with a spreadsheet tool; printed examples support the discussion. You will leave with a cleaning log, a verification checklist, and a source note another editor can follow without repeating every step.',
     location: 'Room A',
     type: 'workshop',
     speakerIds: [
@@ -1150,7 +1150,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '13:00',
     endTime: '14:30',
     title: 'Make your newsletter useful every week',
-    description: 'Choose a reader need, edit a sample issue, and design one small test. Use plain text and a clear call to action.',
+    description: 'For editors and audience staff responsible for a regular newsletter, this workshop focuses on a job the reader needs done. June Park asks each group to choose between three fictional audiences with different information needs. Edit a sample issue so the opening, links, and call to action serve that choice.\n\nTest the draft with a partner reading on a small screen. Check what they notice, what they skip, and whether the next step is clear. Bring a recent issue or use the sample. You will leave with a revised outline, an editing checklist, and a small test with a review date and a useful measure beyond opens.',
     location: 'Room B',
     type: 'workshop',
     speakerIds: [
@@ -1183,7 +1183,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '14:45',
     endTime: '16:15',
     title: 'Listening before the first interview',
-    description: 'Practice a community interview, explain consent, and build a plan to share findings with participants.',
+    description: 'This workshop is for reporters and community editors planning interviews, listening sessions, or reader callouts. Elena Santos and Devon Achebe start with a fictional neighborhood question. Practice an invitation that explains why you are asking, how notes will be used, and what participation does not promise.\n\nTake turns as interviewer, participant, and observer. Revise questions that assume an answer or ask someone to speak for a whole community. Bring a reporting question; no private source details are needed. You will leave with an interview guide, plain-language consent notes, and a plan to return findings to participants. The final discussion covers language support, payment, and how to report disagreement fairly.',
     location: 'Room A',
     type: 'workshop',
     speakerIds: [
@@ -1202,7 +1202,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '14:45',
     endTime: '16:15',
     title: 'Plan coverage without burning out',
-    description: 'Map a week of work, identify hidden tasks, and build a handoff that protects time for editing and rest.',
+    description: 'For editors and operations staff in small newsrooms, this workshop makes the hidden work visible. Nora Chen provides a fictional coverage week with reporting, editing, travel, reader replies, and an unexpected absence. Map who does each task and where the plan depends on unpaid extra time.\n\nReduce the assignment list, define a handoff, and decide what can wait when news breaks. Bring a typical weekly schedule without personnel details, or use the sample. You will leave with a workload map, a handoff note, and a rule for deciding when to stop adding work. Discuss how to review the plan with staff without treating a capacity problem as an individual failure.',
     location: 'Room B',
     type: 'workshop',
     speakerIds: [
@@ -1220,7 +1220,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '16:30',
     endTime: '17:00',
     title: 'What we will try next',
-    description: 'Compare one change from each workshop. Find a peer who can review your next draft.',
+    description: 'Turn the first day\'s notes into one change you can explain. Amara Okafor invites short reports from both tracks, then asks participants to compare a draft, a decision, or a question with someone from another newsroom. The aim is useful feedback before the idea loses its context.\n\nBring the worksheet or notes from your last session. Name the person who would use your proposed change and the first step needed to try it. You will leave with one revised action and a peer who can challenge your assumptions. Hosts collect shared questions for the next morning\'s partnership panel without including private project details.',
     location: 'Main hall',
     type: 'plenary',
     speakerIds: [
@@ -1252,7 +1252,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '09:30',
     endTime: '10:45',
     title: 'Sustaining local partnerships',
-    description: 'Three newsroom leaders explain how they fund shared coverage after the first year. Questions focus on costs, credit, and difficult decisions.',
+    description: 'For newsroom leaders and staff doing the day-to-day work of a partnership, this conversation looks beyond the first grant. Marisol Reyes, Priya Natarajan, and Amara Okafor discuss fictional examples of shared reporting, membership support, and cross-newsroom coordination. Each example names the costs, responsibilities, and decisions that became difficult after launch.\n\nCompare how the teams handle uneven workloads, a departing partner, and competing publication needs. Bring one practical question about a collaboration you manage or hope to start. Audience questions are part of the session. You will leave with a partnership health checklist and clearer questions to ask before renewing an agreement or adding another member.',
     location: 'Main hall',
     type: 'panel',
     speakerIds: [
@@ -1271,7 +1271,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '11:00',
     endTime: '12:00',
     title: 'A short audio scene with a clear purpose',
-    description: 'Record a short interview in pairs. Check consent, sound, and context before making the first edit.',
+    description: 'This practical session is for reporters who want to add a short audio scene to their work without building a new production team. Theo Brooks demonstrates how a location, a voice, and a clear question can carry a small story. Listen to two sample clips and identify what the listener still needs to know.\n\nRecord a brief interview in pairs, check permission, and make a simple edit plan from a transcript. Bring a phone with a recording app and headphones if available; paired work does not require your own equipment. You will leave with a short practice recording, a consent checklist, and a sequence for checking names, context, and sound before publication.',
     location: 'Room A',
     type: 'workshop',
     speakerIds: [
@@ -1289,7 +1289,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '11:00',
     endTime: '12:00',
     title: 'Sponsorship rules your team can use',
-    description: 'Work through a sample sponsor request. Draft a policy that separates editorial judgment from commercial support.',
+    description: 'For publishers, sales staff, and editors who review commercial requests, this workshop turns broad principles into decisions a team can make. Omar Farouk and Nora Chen present a fictional sponsor offer with a useful payment and several unclear conditions. Separate the financial terms from requests that affect editorial judgment.\n\nDraft a response, identify who approves it, and write the disclosure a reader would see. Bring an existing policy with confidential terms removed, or use the sample. You will leave with a short decision guide, a disclosure example, and an escalation path for disputed requests. The discussion also covers renewal pressure and how to record an exception without making it the new default.',
     location: 'Room B',
     type: 'workshop',
     speakerIds: [
@@ -1323,7 +1323,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '13:30',
     endTime: '15:00',
     title: 'Audience research on a small budget',
-    description: 'Start with one decision your newsroom needs to make. Draft a short survey, then move to the main hall for the linked review clinic.',
+    description: 'This workshop is for audience staff and editors who need a specific reader decision, not a large research report. Devon Achebe starts by asking what you would change if the answers surprised you. Choose a fictional newsroom problem or bring a question from your own work.\n\nThe first half-hour in Room B covers a small sample, a clear invitation, and questions readers can answer. At 2 p.m., the group moves to the main hall for the linked survey clinic and peer review. Bring up to three draft questions and a notebook or laptop. You will leave with a short survey, a sampling note, and a plan for using and sharing the results.',
     location: 'Room B',
     type: 'workshop',
     speakerIds: [
@@ -1341,7 +1341,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '13:30',
     endTime: '15:00',
     title: 'Budgets that survive a thin year',
-    description: 'Test a sample budget against the loss of one grant. Identify costs, reserves, and decisions to make before cash runs short.',
+    description: 'For publishers and operations staff responsible for a small newsroom budget, this workshop tests the plan before cash runs short. Priya Natarajan and Omar Farouk provide a fictional budget with one major grant ending. Separate committed costs from choices the team can still change.\n\nBuild a monthly cash view, compare two responses, and discuss what each means for staff and coverage. Bring a budget with private amounts removed, or use the sample workbook. No finance software is needed. You will leave with a scenario sheet, a list of decisions tied to dates, and a short explanation you can take to a board or team meeting without hiding the tradeoffs.',
     location: 'Room A',
     type: 'workshop',
     speakerIds: [
@@ -1360,7 +1360,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '14:00',
     endTime: '15:00',
     title: 'Bring your survey questions',
-    description: 'The second part of the audience workshop moves to the main hall. Review draft questions in small groups and remove leading language.',
+    description: 'This clinic is the second part of the audience research workshop. Participants move from Room B to the main hall at 2 p.m. Devon Achebe pairs groups to review the questions drafted during the opening exercise. Read each question aloud and explain what decision its answer would support.\n\nRemove leading language, split questions that ask two things, and add an answer choice for people whose experience does not fit your assumptions. Bring your draft and the intended audience description. You will leave with a revised question set, notes on who may be missing from the sample, and a small pilot plan. Attending the first part is useful; a sample draft is available for this exercise.',
     location: 'Main hall',
     type: 'workshop',
     speakerIds: [
@@ -1394,7 +1394,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '15:15',
     endTime: '16:15',
     title: 'Maps that answer a reader question',
-    description: 'Choose a useful map extent, check labels, and explain missing data. Review a sample neighborhood map at mobile size.',
+    description: 'For reporters and visual editors working with local data, this clinic asks whether a map answers the reader\'s question better than a table or sentence. Mateo Rivera and Samir Das introduce a fictional neighborhood dataset. Compare counts and rates, choose an area to show, and mark information the source does not provide.\n\nReview a draft at phone size. Check labels, color meaning, source notes, and the claim made by its title. Bring a map idea without private location data, or use the sample. You will leave with an annotated sketch, a checklist for uncertainty and access, and a reasoned choice about whether the story needs a map at all.',
     location: 'Room A',
     type: 'workshop',
     speakerIds: [
@@ -1413,7 +1413,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '15:15',
     endTime: '16:15',
     title: 'Test one product change',
-    description: 'Sketch a form or newsletter change, write a simple test, and decide what evidence would make you keep it.',
+    description: 'This workshop is for small teams considering a change to a form, newsletter, or local information page. June Park helps participants turn a broad complaint into one observable task. Choose a fictional reader problem and sketch the smallest change that could make that task easier.\n\nWrite a short test, try it with a partner, and record what happened before deciding whether the idea worked. Bring a screenshot or a plain description of a problem; no coding is required. You will leave with a test script, a list of findings, and a keep-or-change decision rule. The closing discussion covers maintenance time and how to avoid treating a preference as evidence.',
     location: 'Room B',
     type: 'workshop',
     speakerIds: [
@@ -1431,7 +1431,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '16:30',
     endTime: '17:00',
     title: 'Partnership exchange',
-    description: 'Share a reporting need or a skill your team can offer. Hosts help match ideas for follow-up after the summit.',
+    description: 'This exchange is for anyone seeking a reporting partner, a useful skill, or a second opinion on unfinished work. Amara Okafor and Nora Chen guide short introductions around two questions: What do you need, and what can your team offer? Keep the request small enough for another newsroom to assess.\n\nBring one idea from the workshops and be ready to name its first task, likely cost, and deadline. Pair with someone outside your usual role to test whether the request is clear. You will leave with a draft follow-up note and a next conversation to arrange. Sharing contact information is optional; ask before adding anyone to a list.',
     location: 'Main hall',
     type: 'plenary',
     speakerIds: [
@@ -1464,7 +1464,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '09:30',
     endTime: '11:30',
     title: 'Unconference blocks',
-    description: 'Pitch a question at morning coffee. Join a participant-led conversation about rural coverage, language access, or shared editing. Groups rotate halfway through.',
+    description: 'Bring a question that needs a conversation rather than a presentation. Elena Santos and Amara Okafor help participants group proposed topics at morning coffee. Possible starting points include rural coverage, language support, shared editing, and the work that falls between formal job roles. Participants choose the final topics.\n\nTwo rounds run across rooms A and B, with a pause to move between groups. Each group chooses a host and a note keeper, then records one useful finding and one unresolved question. No slides or prepared talk are needed. You will leave with peer examples, a short set of shared notes, and a next question to explore. Keep sensitive source and personnel details out of the discussion.',
     location: 'Rooms A and B',
     type: 'workshop',
     speakerIds: [
@@ -1481,7 +1481,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '11:30',
     endTime: '12:00',
     title: 'Report back from the unconference',
-    description: 'Each group shares one finding and one open question. Add useful resources to the shared notes.',
+    description: 'Hear what the other unconference groups learned without repeating every conversation. Elena Santos invites each note keeper to share one finding, one useful example, and one question that still needs work. This session is useful even if you joined only one of the morning groups.\n\nBring your group\'s notes and check that everyone agrees with the summary before sharing it. Distinguish a tested practice from an idea someone wants to try. You will leave with a compact set of peer lessons and questions to carry into the afternoon planning workshops. The host also identifies topics that need a separate follow-up rather than a hurried answer in the room.',
     location: 'Main hall',
     type: 'plenary',
     speakerIds: [
@@ -1513,7 +1513,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '13:00',
     endTime: '14:30',
     title: 'Build your next shared story plan',
-    description: 'Bring an idea from the summit. Define the first reporting step, the partner roles, and the evidence needed to publish.',
+    description: 'This working session is for reporters and editors ready to turn a summit idea into a shared assignment. Lucia Bennett, Theo Brooks, and Mateo Rivera help groups define a question, choose evidence, and decide which formats serve the story. Start with your own idea or a fictional brief.\n\nAssign the first reporting tasks, set an editing order, and identify a decision that could stop or change the project. Bring workshop notes and a notebook or laptop. You will leave with a one-page story plan, named roles, a source-checking sequence, and a first review date. Partners also read each other\'s plans to find missing assumptions before anyone commits staff time.',
     location: 'Room A',
     type: 'workshop',
     speakerIds: [
@@ -1533,7 +1533,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '13:00',
     endTime: '14:30',
     title: 'Your next 90 days',
-    description: 'Turn workshop notes into a short plan with an owner, a cost, and a review date for each action.',
+    description: 'For publishers, editors, and operations staff carrying several summit ideas home, this workshop helps choose what fits your team\'s capacity. Priya Natarajan and Nora Chen ask participants to list proposed changes, estimate the work, and select a small number to test. A longer list is not the goal.\n\nGive each action an owner, a cost, a first step, and a date to review the evidence. Discuss what you will pause or stop to make room. Bring your notes and a rough view of available staff time. You will leave with a 90-day plan and a short team-meeting agenda that explains why these actions come first and how you will judge progress.',
     location: 'Room B',
     type: 'workshop',
     speakerIds: [
@@ -1567,7 +1567,7 @@ const DEMO_SESSIONS = Object.freeze([
     startTime: '15:00',
     endTime: '16:00',
     title: 'Closing conversation',
-    description: 'Share the decisions from three days of work. Name the next action, find a follow-up partner, and leave time for final questions.',
+    description: 'Close the summit with a plan you can use the next working day. Priya Natarajan, Marisol Reyes, and Amara Okafor bring the two tracks together and invite participants to share decisions from the afternoon workshops. Name a specific action rather than a general ambition.\n\nBring your story plan or 90-day plan. Check that it has an owner, a first step, and a review date. Compare it with a peer and discuss what could prevent the first step from happening. You will leave with a revised commitment and a follow-up question for your team. The final conversation leaves time for unresolved program questions and feedback on what participants need next.',
     location: 'Main hall',
     type: 'plenary',
     speakerIds: [
@@ -1797,6 +1797,9 @@ const DEMO_ORGANIZATIONS = Object.freeze([
     url: null,
     logoPath: 'demo/sponsors/beacon-community-fund.webp',
     description: 'Funds the fictional travel-grant pool and shared plenary sessions.',
+    bio: 'Beacon Community Fund is a fictional grantmaker focused on the practical costs of public-service reporting. Its model supports small newsrooms that need time for records requests, editing, and collaboration. The fund asks teams to explain the information need, the work they will share, and how they will report back to readers. It does not select stories or approve coverage.\n\nAt Harborlight, Beacon represents a funder willing to pay for the work around a gathering, including travel support and time for participants to learn together. Its presence illustrates how an event can explain a sponsor\'s role without presenting financial support as editorial endorsement.',
+    supportDescription: 'Presenting support covers the fictional travel-grant pool and shared plenary sessions. The summit team sets the program and chooses speakers independently. This demo does not accept grant applications or offer real travel awards.',
+    readMorePath: '/schedule/session-closing',
     visible: true,
     order: 0,
     seeded: true
@@ -1808,6 +1811,9 @@ const DEMO_ORGANIZATIONS = Object.freeze([
     url: null,
     logoPath: 'demo/sponsors/lighthouse-press-trust.webp',
     description: 'Supports speaker preparation, peer coaching, and workshop materials.',
+    bio: 'Lighthouse Press Trust is a fictional nonprofit that helps newsroom teams build routines they can maintain. Its work centers on editor coaching, staff training, and the documents that make a handoff clear. A typical project pairs a short workshop with a later check on what the team used. The emphasis is on useful practice rather than a new platform.\n\nThe trust\'s role at Harborlight reflects that approach. It supports preparation time and materials so a speaker can bring an exercise that works for participants with different levels of experience. The fictional partnership also makes room for small-group questions after the main presentation.',
+    supportDescription: 'Supporting funds cover speaker preparation, peer coaching, and workshop materials in the demo event plan. Participants can use the exercises without joining a service or sharing their contact information with the sponsor.',
+    readMorePath: '/schedule/session-workshop-a',
     visible: true,
     order: 1,
     seeded: true
@@ -1819,6 +1825,9 @@ const DEMO_ORGANIZATIONS = Object.freeze([
     url: null,
     logoPath: 'demo/sponsors/tidewater-media-collective.webp',
     description: 'Contributes reporting mentors and hosts the partnership exchange.',
+    bio: 'Tidewater Media Collective is a fictional partnership of independent local outlets that share reporting tasks while keeping separate editorial identities. Members agree on project roles, source handling, editing, credit, and publication timing before work begins. The collective also keeps a record of staff time so partners can see whether the arrangement remains fair.\n\nAt Harborlight, Tidewater contributes the perspective of teams doing the daily coordination work. Its mentors help participants test a reporting agreement and make a clear request to a possible partner. The collective is a demo organization, and the event does not promise introductions to real newsrooms.',
+    supportDescription: 'Partner support includes reporting mentors and hosts for the afternoon partnership exchange. The fictional mentors help participants define one next task and a workable follow-up, with no requirement to join a network.',
+    readMorePath: '/schedule/session-day-two-exchange',
     visible: true,
     order: 2,
     seeded: true
@@ -1830,6 +1839,9 @@ const DEMO_ORGANIZATIONS = Object.freeze([
     url: null,
     logoPath: 'demo/sponsors/openfield-tools.webp',
     description: 'Supports the data lab with open worksheets and hands-on coaching.',
+    bio: 'Openfield Tools is a fictional small team that builds reporting worksheets and simple data-checking methods. It designs for newsrooms that need to inspect a source table, document an assumption, and hand the work to an editor. Its examples use ordinary spreadsheet functions and clear notes so the method remains useful when software changes.\n\nThe team supports Harborlight\'s data lab through teaching time and sample exercises. Its role is to help participants understand their evidence before choosing a tool. No paid account, product purchase, or upload of newsroom data is part of the fictional workshop arrangement.',
+    supportDescription: 'Supporting contributions cover sample data, verification worksheets, and hands-on coaching for the data lab. Exercises use fictional records. Participants should keep private source files and credentials out of shared examples.',
+    readMorePath: '/schedule/session-verification',
     visible: true,
     order: 3,
     seeded: true
@@ -1841,6 +1853,9 @@ const DEMO_ORGANIZATIONS = Object.freeze([
     url: null,
     logoPath: 'demo/sponsors/civic-thread-studio.webp',
     description: 'Contributes visual reporting clinics and accessible slide templates.',
+    bio: 'Civic Thread Studio is a fictional visual reporting practice that makes maps, diagrams, and explanatory graphics for local news teams. Its process begins with the reader\'s question, then checks whether a visual helps answer it. Editors review labels, source limits, mobile reading, and alternatives for readers who cannot see the image.\n\nAt Harborlight, the studio contributes clinic time and examples that participants can mark up together. Its support shows how a specialist partner can teach a repeatable review method rather than deliver a finished graphic that the newsroom cannot update. The sponsor is fictional and does not offer a real booking service here.',
+    supportDescription: 'Partner support covers visual reporting clinics and accessible slide examples. The summit\'s editors retain control of session content. Participants can bring a public example or work from the fictional map supplied for the exercise.',
+    readMorePath: '/schedule/session-mapping',
     visible: true,
     order: 4,
     seeded: true
@@ -1852,6 +1867,9 @@ const DEMO_ORGANIZATIONS = Object.freeze([
     url: null,
     logoPath: 'demo/sponsors/common-ground-coffee.webp',
     description: 'Supports the fictional coffee breaks and morning welcome tables.',
+    bio: 'Common Ground Coffee is a fictional neighborhood coffee cooperative built around shared ownership and a small, clearly priced menu. In the Harborlight scenario, it works with event teams to plan drinks, label ingredients, and keep service simple during short breaks. Its example makes the practical role of a local hospitality partner visible.\n\nThe cooperative\'s contribution supports the time between sessions, when participants compare notes and meet people outside their usual teams. It does not receive an attendee contact list. All food and drink arrangements on this site are part of the demo, with no real catering order or venue agreement.',
+    supportDescription: 'Partner support covers morning coffee, tea, and staffed welcome tables in the fictional event plan. A real event would confirm ingredients, service access, and dietary arrangements with its caterer before publishing final details.',
+    readMorePath: '/schedule/session-arrival-1',
     visible: true,
     order: 5,
     seeded: true

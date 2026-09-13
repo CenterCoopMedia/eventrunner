@@ -18,6 +18,7 @@
     "./routing": { "require": "./src/routing.cjs", "import": "./src/routing.mjs" },
     "./page": { "require": "./src/page.cjs", "import": "./src/page.mjs" },
     "./venue": { "require": "./src/venue.cjs", "import": "./src/venue.mjs" },
+    "./update": { "require": "./src/update.cjs", "import": "./src/update.mjs" },
     "./readiness": { "require": "./src/readiness.cjs", "import": "./src/readiness.mjs" }
   }
 }

@@ -16,7 +16,7 @@ describe('static demo community data', () => {
     const next = vi.fn();
     const unsubscribe = subscribeContentCollection('cmsUpdates', 'published', next);
     const updates = next.mock.calls[0][0];
-    expect(updates).toHaveLength(4);
+    expect(updates).toHaveLength(6);
     for (const update of updates) {
       expect(update.visible).toBe(true);
       expect(update.publishAt).toMatch(/^2026-09-/);

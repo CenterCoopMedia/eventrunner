@@ -7,7 +7,11 @@
 // organizations, and the three ways it must render nothing at all rather
 // than a heading over an empty acknowledgement.
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render as testingRender, screen, within } from '@testing-library/react';
+
+import { MemoryRouter } from 'react-router-dom';
+
+const render = (ui) => testingRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 let organizationsData;
 
@@ -210,4 +214,11 @@ describe('SponsorStrip', () => {
       unmount();
     }
   });
+});
+
+
+it('preserves draft preview in sponsor name and read-more links', () => {
+  testingRender(<MemoryRouter initialEntries={['/sponsors?preview=1']}><SponsorWall organizations={[org('one', 'Beacon', 'Presenting', { bio: 'Biography.' })]} /></MemoryRouter>);
+  expect(screen.getByRole('link', { name: 'Beacon' })).toHaveAttribute('href', '/sponsors/one?preview=1');
+  expect(screen.getByRole('link', { name: 'Read more about Beacon' })).toHaveAttribute('href', '/sponsors/one?preview=1');
 });

@@ -26,6 +26,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
 import VenueMap, { useVenueMapImage } from '../components/VenueMap.jsx';
+import AreaMap from '../components/AreaMap.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import SectionIndexNav from '../components/SectionIndexNav.jsx';
@@ -392,6 +393,7 @@ export default function ContentPage() {
               )}
               <div className={index === 0 ? undefined : 'mt-md'}>
                 <SectionBlocks blocks={blocks} />
+                {page.id === 'travel' && section.id === 'travel_local' ? <AreaMap url={eventConfig.venue?.mapUrl} /> : null}
                 <VenueMap
                   map={sectionMap}
                   image={venueMapImage}

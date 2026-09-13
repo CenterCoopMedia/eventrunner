@@ -263,3 +263,38 @@ test('cmsDeleteUpdate 404s when nothing exists, gates on admin', async () => {
   assert.equal(res.statusCode, 401);
   assert.equal(d.store.deletes.length, 0);
 });
+
+test('cmsSaveUpdate preserves validated rich media and rejects unsafe blocks', async () => {
+  const d = deps();
+  const featuredImage = { url: 'https://example.com/scene.webp', alt: 'Workshop scene' };
+  const content = [{ type: 'button', label: 'View schedule', href: '/schedule' }];
+  const res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ update: validUpdate({ featuredImage, content }) }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(d.store.writes[0].fields.featuredImage, featuredImage);
+  assert.deepEqual(d.store.writes[0].fields.content, content);
+  const invalid = validateUpdateDoc(validUpdate({ content: [{ type: 'button', label: 'Open', href: 'javascript:alert(1)' }] }));
+  assert.equal(invalid.ok, false);
+  assert.equal(validateUpdateDoc(validUpdate({ content: [{ type: 'poll', question: 'Live votes', options: ['A', 'B'] }] })).ok, false);
+});
+
+test('rich updates survive draft, publish, and version history', async () => {
+  const { makeFakeDb } = require('./firestoreFake.cjs');
+  const store = require('./store.cjs');
+  const db = makeFakeDb();
+  const actor = { uid: 'admin1', email: 'admin@example.org' };
+  const featuredImage = { url: 'demo/summit-gathering.webp', alt: 'Summit scene' };
+  const content = [{ type: 'columns', columns: [
+    { heading: 'Before', body: '<p>Bring notes.</p>' },
+    { heading: 'After', body: '<p>Share notes.</p>' },
+  ] }];
+  const d = { ...deps(), db, store };
+  const res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'rich-post', update: validUpdate({ featuredImage, content }) }), res);
+  assert.equal(res.statusCode, 200);
+  await store.publishDocs({ db, collection: 'cmsUpdates', docIds: ['rich-post'], actor });
+  assert.deepEqual(db.read('cmsUpdates', 'rich-post').featuredImage, featuredImage);
+  assert.deepEqual(db.read('cmsUpdates', 'rich-post').content, content);
+  const history = db.writes.find((write) => write.path.startsWith('cmsVersionHistory/'));
+  assert.deepEqual(db.read('cmsVersionHistory', history.path.split('/')[1]).fields.content, content);
+});

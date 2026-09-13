@@ -223,7 +223,7 @@ export default function SessionCard({
             fields={[{ key: 'Place', value: session.location }]}
           />
           {session.description ? (
-            <p className="session-block__text mt-xs max-w-prose text-text-secondary text-pretty">
+            <p className="session-block__text mt-xs line-clamp-3 max-w-prose text-text-secondary text-pretty">
               {session.description}
             </p>
           ) : null}

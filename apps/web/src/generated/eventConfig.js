@@ -59,7 +59,7 @@ export const eventConfig = {
     region: 'NJ',
     postalCode: '07102',
     country: 'US',
-    mapUrl: 'https://www.google.com/maps/search/?api=1&query=The+Newark+Museum+of+Art+49+Washington+Street+Newark+NJ',
+    mapUrl: 'https://www.openstreetmap.org/?mlat=40.7426&mlon=-74.1712#map=17/40.7426/-74.1712',
     places: [
       {
         id: 'main-hall',

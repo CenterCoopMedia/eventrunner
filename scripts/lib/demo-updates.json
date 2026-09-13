@@ -5,7 +5,46 @@
     "body": "Choose your first workshop and leave room for a conversation you did not plan. The October 14–16 program includes reporting labs, revenue workshops, peer clinics, and a two-hour unconference.\n\nThe Practice and Sustainability tracks run beside shared sessions and meals. Each workshop includes an exercise. Bring a notebook or laptop, and use the sample files if you do not have a project to bring.\n\nHarborlight is a fictional event. The schedule demonstrates a complete summit; there are no tickets or real bookings.",
     "publishAt": "2026-09-12T13:00:00.000Z",
     "visible": true,
-    "pinned": true
+    "pinned": true,
+    "featuredImage": {
+      "url": "demo/summit-gathering.webp",
+      "alt": "An illustrated scene of participants meeting at the fictional Harborlight summit",
+      "caption": "A preview of the conversations at Harborlight. Event scene for this demo."
+    },
+    "content": [
+      {
+        "type": "richtext",
+        "value": "<h2>Make the program your own</h2><p>Start with one problem you want to solve. Choose a workshop that gives you time to test an approach, then compare notes with someone from another newsroom.</p><blockquote>Bring a question you can explain in one minute. Leave with a next step you can test in one week.</blockquote>"
+      },
+      {
+        "type": "columns",
+        "columns": [
+          {
+            "heading": "Practice track",
+            "body": "<p>Try reporting methods with sample records, interview plans, and audience research exercises.</p><ul><li>Compare verification steps with a partner.</li><li>Test questions before a reader survey.</li><li>Build an accessible story presentation.</li></ul>"
+          },
+          {
+            "heading": "Sustainability track",
+            "body": "<p>Work through the decisions that keep a small newsroom running.</p><ul><li>Build a realistic membership offer.</li><li>Set clear partnership responsibilities.</li><li>Price work without hiding its full cost.</li></ul>"
+          }
+        ]
+      },
+      {
+        "type": "practicePoll",
+        "question": "Which workshop would you join first?",
+        "options": [
+          "Audience research",
+          "Local reporting tools",
+          "Newsroom revenue",
+          "Community partnerships"
+        ]
+      },
+      {
+        "type": "button",
+        "label": "Explore the full schedule",
+        "href": "/schedule"
+      }
+    ]
   },
   {
     "id": "demo-survey-clinic",
@@ -13,7 +52,39 @@
     "body": "What do you need to learn from your readers? Start with that decision before drafting a survey. Devon Achebe will lead the audience research workshop on Thursday, October 15, from 1:30 to 3 p.m.\n\nThe group starts in Room B. The linked review clinic moves to the main hall at 2 p.m. Bring three draft questions or use the fictional newsroom example. The goal is a short survey that readers can answer without guessing what you mean.",
     "publishAt": "2026-09-10T14:00:00.000Z",
     "visible": true,
-    "pinned": false
+    "pinned": false,
+    "content": [
+      {
+        "type": "image",
+        "image": {
+          "url": "demo/workshop-recap.webp",
+          "alt": "Fictional workshop participants reviewing notes around a table",
+          "caption": "Small groups make time to test a question and compare answers."
+        }
+      },
+      {
+        "type": "richtext",
+        "value": "<h2>What to bring</h2><ol><li>Name the decision your survey should help you make.</li><li>Write three questions in plain language.</li><li>Mark any answer you would not know how to use.</li></ol><p>Working without a project? Use the sample question: <strong>What would make a neighborhood newsletter useful enough to read each week?</strong></p>"
+      },
+      {
+        "type": "columns",
+        "columns": [
+          {
+            "heading": "During the workshop",
+            "body": "<p>Work in pairs. Ask your partner to read each question aloud and explain what they think it means. Note where they hesitate.</p>"
+          },
+          {
+            "heading": "At the review clinic",
+            "body": "<p>Bring one revised question to the main hall. The clinic focuses on wording, answer choices, and the next decision your results should support.</p>"
+          }
+        ]
+      },
+      {
+        "type": "button",
+        "label": "Meet the workshop speakers",
+        "href": "/speakers"
+      }
+    ]
   },
   {
     "id": "demo-newark-guide",
@@ -21,7 +92,27 @@
     "body": "The travel page now includes a real map anchor at The Newark Museum of Art, 49 Washington Street. Compare train routes through Newark Penn Station and Newark Broad Street Station before planning a visit.\n\nThe museum is a geographic reference for this demo. No event booking or partnership is implied. The room plan and walking times are illustrative. Check the museum website for current visitor information and parking guidance.",
     "publishAt": "2026-09-08T15:00:00.000Z",
     "visible": true,
-    "pinned": false
+    "pinned": false,
+    "content": [
+      {
+        "type": "columns",
+        "columns": [
+          {
+            "heading": "Before you travel",
+            "body": "<p>Check your arrival station and allow time to find the entrance. Save the travel page before leaving home.</p>"
+          },
+          {
+            "heading": "Once you arrive",
+            "body": "<p>The fictional welcome desk can help with room directions, quiet-space requests, and schedule questions. The illustrated floor plan is a demo, not a museum navigation guide.</p>"
+          }
+        ]
+      },
+      {
+        "type": "button",
+        "label": "Open the Newark travel guide",
+        "href": "/travel"
+      }
+    ]
   },
   {
     "id": "demo-speaker-preparation",
@@ -29,6 +120,81 @@
     "body": "Start with what participants should be able to do after your session. Build one exercise around that outcome, and leave time for questions.\n\nFor this fictional event, speaker bios and portraits are due September 30. Slides are due October 7. Use readable text, describe useful visuals aloud, and remove private source details from examples. The speaker guidelines page has the full preparation notes.",
     "publishAt": "2026-09-04T13:00:00.000Z",
     "visible": true,
-    "pinned": false
+    "pinned": false,
+    "content": [
+      {
+        "type": "richtext",
+        "value": "<h2>Build an accessible session</h2><ul><li>Use clear headings and high-contrast slides.</li><li>Describe charts and useful images aloud.</li><li>Provide a text version of the exercise.</li><li>Repeat audience questions before answering.</li><li>Leave a pause between each part of the task.</li></ul><h2>A useful rehearsal</h2><p>Ask a colleague to try the exercise with only your written instructions. If they need an explanation, add that detail before the session.</p>"
+      },
+      {
+        "type": "button",
+        "label": "Read the speaker guidelines",
+        "href": "/guidelines"
+      }
+    ]
+  },
+  {
+    "id": "demo-arrival-checklist",
+    "title": "Your first morning at Harborlight",
+    "body": "Plan a calm start to the summit. The fictional welcome desk opens Wednesday, October 14, at 8:30 a.m. before the opening session. Keep your first morning simple: collect your badge, find your room, and meet one person you have not met before.",
+    "publishAt": "2026-09-03T13:00:00.000Z",
+    "visible": true,
+    "pinned": false,
+    "content": [
+      {
+        "type": "columns",
+        "columns": [
+          {
+            "heading": "At the welcome desk",
+            "body": "<ol><li>Check the name and organization on your sample badge.</li><li>Ask for directions to your first session.</li><li>Tell the desk team if you need a quiet place or another accommodation.</li></ol>"
+          },
+          {
+            "heading": "Before the opening session",
+            "body": "<ul><li>Refill your water bottle.</li><li>Silence device notifications.</li><li>Save two sessions to your personal schedule.</li><li>Leave space in your notebook for follow-up questions.</li></ul>"
+          }
+        ]
+      },
+      {
+        "type": "richtext",
+        "value": "<h2>Travel light</h2><p>A notebook, charger, and refillable bottle are enough. Workshop sample material is provided in this fictional program. Do not bring private reporting notes or source records into group exercises.</p><p>These arrival arrangements demonstrate an event plan. They are not visitor instructions or a booking at the museum.</p>"
+      },
+      {
+        "type": "button",
+        "label": "Check the venue and travel notes",
+        "href": "/travel"
+      }
+    ]
+  },
+  {
+    "id": "demo-table-conversations",
+    "title": "Find a conversation at the community tables",
+    "body": "Not every useful exchange needs a stage. At the fictional community tables, join a small group over lunch to compare one problem, one experiment, and one next step. You can listen first or bring a question.",
+    "publishAt": "2026-09-02T13:00:00.000Z",
+    "visible": true,
+    "pinned": false,
+    "content": [
+      {
+        "type": "columns",
+        "columns": [
+          {
+            "heading": "Start with a question",
+            "body": "<p>What is one task your newsroom repeats every week? What makes it hard? Share the context before asking for a tool or a solution.</p><p>Leave names and private details out of examples.</p>"
+          },
+          {
+            "heading": "Close with a next step",
+            "body": "<p>Choose one idea to test after the summit. Ask another participant what result would tell you the experiment worked.</p><p>Exchange contact details only when both people agree.</p>"
+          }
+        ]
+      },
+      {
+        "type": "richtext",
+        "value": "<h2>Make room for everyone</h2><p>Keep your first turn brief. Invite someone who has not spoken to join, without putting them on the spot. You can step away, change tables, or take a quiet break at any time.</p>"
+      },
+      {
+        "type": "button",
+        "label": "Meet the sample attendee community",
+        "href": "/attendees"
+      }
+    ]
   }
 ]

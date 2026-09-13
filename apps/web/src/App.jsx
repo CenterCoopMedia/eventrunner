@@ -52,6 +52,7 @@ const Speakers = lazyPage(() => import('./pages/Speakers.jsx'));
 const SpeakerDetail = lazyPage(() => import('./pages/SpeakerDetail.jsx'));
 const Sponsors = lazyPage(() => import('./pages/Sponsors.jsx'));
 const Updates = lazyPage(() => import('./pages/Updates.jsx'));
+const SponsorDetail = lazyPage(() => import('./pages/SponsorDetail.jsx'));
 const UpdateDetail = lazyPage(() => import('./pages/UpdateDetail.jsx'));
 const ContentPage = lazyPage(() => import('./pages/ContentPage.jsx'));
 const SpeakerAccept = lazyPage(() => import('./pages/SpeakerAccept.jsx'));
@@ -104,6 +105,7 @@ export function AppRoutes() {
         <Route path="speakers" element={<DeferredPage component={Speakers} label="speakers" />} />
         <Route path="speakers/:slug" element={<DeferredPage component={SpeakerDetail} label="speaker" />} />
         <Route path="sponsors" element={<DeferredPage component={Sponsors} label="sponsors" />} />
+        <Route path="sponsors/:id" element={<DeferredPage component={SponsorDetail} label="sponsor" />} />
         <Route path="updates" element={<DeferredPage component={Updates} label="updates" />} />
         <Route path="updates/:id" element={<DeferredPage component={UpdateDetail} label="update" />} />
         <Route path="signin" element={<DeferredPage component={Login} label="sign in" />} />

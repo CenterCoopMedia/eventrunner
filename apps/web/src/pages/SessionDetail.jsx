@@ -124,7 +124,7 @@ export default function SessionDetail() {
       </header>
 
       {session.description ? (
-        <p className="mt-md max-w-prose text-lead text-text-secondary text-pretty">
+        <p className="mt-md max-w-prose whitespace-pre-line text-body text-text-secondary text-pretty">
           {session.description}
         </p>
       ) : null}

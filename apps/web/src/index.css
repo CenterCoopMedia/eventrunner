@@ -787,7 +787,6 @@
     block-size: calc(var(--logo-wall-mark-size) * 0.6);
     padding: var(--space-xs);
     border-radius: var(--radius-base);
-    background-color: rgb(var(--color-surface-alt-rgb));
   }
   .logo-wall__mark > img {
     max-inline-size: 100%;
@@ -2055,4 +2054,9 @@
     grid-template-columns: var(--schedule-time-width) 1fr;
     gap: var(--space-md);
   }
+}
+
+/* The fictional demo marks use a white version on dark page backgrounds. */
+:root[data-mode='dark'] img[src*='/demo/sponsors/'] {
+  filter: brightness(0) invert(1);
 }

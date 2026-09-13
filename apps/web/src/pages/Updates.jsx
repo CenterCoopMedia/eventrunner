@@ -24,6 +24,7 @@
 import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { UpdateImage } from '../components/UpdateContent.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
@@ -119,6 +120,7 @@ export default function Updates() {
                           <span>Undated</span>
                         )}
                       </p>
+                      {update.featuredImage ? <div className="mt-sm max-w-xl"><UpdateImage image={update.featuredImage} /></div> : null}
                       {body ? (
                         <p
                           className="mt-xs max-w-prose text-body text-text-secondary text-pretty"

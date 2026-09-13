@@ -1207,3 +1207,38 @@ test('resolveRouteSubject: a path the system could never have stored is refused 
     assert.equal(await resolveRouteSubject({ db, config, path }), null, path);
   }
 });
+
+test('routeMeta: a published sponsor has its own title, description, and canonical URL', async () => {
+  const docs = { ...SITE_DOCS, 'cmsOrganizations/beacon': {
+    name: 'Beacon community fund', description: 'Supports local reporting projects.', visible: true,
+  } };
+  const res = await getRoute(routeHandler({}, docs), '/sponsors/beacon');
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.sent.includes('<title>Beacon community fund · [Fixture] Harborlight Media Summit</title>'));
+  assert.ok(res.sent.includes('Supports local reporting projects.'));
+  assert.ok(res.sent.includes('<meta property="og:url" content="https://example.org/sponsors/beacon">'));
+  assert.ok(!res.sent.includes('<meta name="robots" content="noindex">'));
+});
+
+test('routeMeta: hidden, unpublished, and missing sponsors do not leak metadata', async () => {
+  const docs = { ...SITE_DOCS,
+    'cmsOrganizations/hidden': { name: 'Private supporter', description: 'Private detail.', visible: false },
+    'cmsOrganizations/unpublished': { name: 'Private supporter', description: 'Private detail.' },
+  };
+  for (const id of ['hidden', 'unpublished', 'missing']) {
+    const res = await getRoute(routeHandler({}, docs), `/sponsors/${id}`);
+    assert.equal(res.statusCode, 200);
+    assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
+    assert.ok(!res.sent.includes('Private supporter'));
+    assert.ok(!res.sent.includes('Private detail.'));
+  }
+});
+
+test('routeMeta: sponsor detail metadata respects the sponsors feature gate', async () => {
+  const docs = { ...SITE_DOCS, 'cmsOrganizations/beacon': {
+    name: 'Beacon community fund', description: 'Supports local reporting projects.', visible: true,
+  } };
+  const res = await getRoute(routeHandler({ features: { sponsors: false } }, docs), '/sponsors/beacon');
+  assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
+  assert.ok(!res.sent.includes('Beacon community fund'));
+});

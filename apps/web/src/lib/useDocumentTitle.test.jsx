@@ -126,8 +126,8 @@ describe('routeTitlePartFor', () => {
     // session's own title over it.
     expect(partFor('/schedule/some-session')).toBe('Schedule');
     expect(partFor('/speakers/rae-okonkwo')).toBe('Speakers');
-    // sponsors mounts no children, so nothing sits under it.
-    expect(partFor('/sponsors/anything')).toBeNull();
+    // Sponsor details use the sponsor page title as a fallback.
+    expect(partFor('/sponsors/anything')).toBe('Sponsors');
   });
 
   it('names nothing for a route whose feature is off, a hidden page, or an unknown address', () => {

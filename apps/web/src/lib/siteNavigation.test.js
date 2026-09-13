@@ -209,10 +209,10 @@ describe('buildNavItems', () => {
     expect(items.every((item) => item.end)).toBe(true);
   });
 
-  it('matches a system page with no child routes exactly too', () => {
+  it('keeps sponsors active on sponsor detail routes', () => {
     const sponsors = { id: 'sponsors', label: 'Sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true };
     const [item] = buildNavItems([sponsors], ALL_ON);
-    expect(item.end).toBe(true);
+    expect(item.end).toBe(false);
   });
 
   // The defect this replaced: SYSTEM_PAGE_FEATURES was keyed by path, so a

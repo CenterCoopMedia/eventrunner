@@ -27,9 +27,8 @@
 // which is the control an operator already has and already understands.
 //
 // A mark is contained, never cropped: a sponsor's logo is their property
-// and `object-fit: cover` would cut it. Every mark sits on the alternate
-// ground at the house radius, which is what lets a wall of wildly
-// different logo files read as one wall without any of them being boxed.
+// and `object-fit: cover` would cut it. Transparent marks sit directly on the page ground.
+import { Link, useLocation } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
 import AssetImage from './media/AssetImage.jsx';
@@ -126,7 +125,10 @@ export function groupByTier(organizations) {
  * meets a run of outbound links one after another, which is exactly where
  * a silent change of context is hardest to recover from.
  */
-function SponsorName({ org }) {
+function SponsorName({ org, search }) {
+  if (typeof org.bio === 'string' && org.bio.trim()) {
+    return <Link to={{ pathname: `/sponsors/${encodeURIComponent(org.id)}`, search }} className="hover:underline">{org.name}</Link>;
+  }
   return isSafeHref(org.url) ? (
     <ExternalLink href={org.url} className="hover:underline">
       {org.name}
@@ -150,6 +152,7 @@ export default function SponsorWall({
   level = 2,
   idPrefix = 'tier',
 }) {
+  const { search } = useLocation();
   const groups = groupByTier(organizations);
   if (groups.length === 0) return null;
   // A name sits under its tier in the outline, never beside it: the tier
@@ -196,8 +199,11 @@ export default function SponsorWall({
                 supporter this is, so the name does not have to shout it a
                 second time. */}
             <NameTag className="mt-2xs font-heading text-body font-semibold text-text-primary text-pretty">
-              <SponsorName org={org} />
+              <SponsorName org={org} search={search} />
             </NameTag>
+            <Link to={{ pathname: `/sponsors/${encodeURIComponent(org.id)}`, search }} className="mt-xs inline-block font-data text-caption text-accent hover:underline">
+              Read more<span className="sr-only"> about {org.name}</span>
+            </Link>
             {/* `arrangement` (brief §6.1) decides how much of a supporter
                 the wall says: `list` is the reading wall, with each
                 organization's description under its mark; `grid` is the

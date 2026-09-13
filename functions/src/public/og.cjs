@@ -476,6 +476,13 @@ async function resolveRouteSubject({ db, config, path }) {
     if (gate !== null && features[gate] !== true) return null;
   }
 
+  if (segments.length === 2 && first === 'sponsors') {
+    if (features.sponsors !== true || !ROUTE_KEY_RE.test(second)) return null;
+    const snap = await db.collection('cmsOrganizations').doc(second).get();
+    const data = snap.exists ? snap.data() : null;
+    return data && data.visible === true ? { kind: 'sponsor', doc: data } : null;
+  }
+
   // The two detail routes own their second segment outright: `schedule`
   // and `speakers` are reserved (shared/routing), so no page document can
   // sit under either prefix and there is nothing to fall through to.
@@ -807,6 +814,14 @@ function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
       title: titled(subject.doc.title),
       description: excerpt(subject.doc.description) || eventDescription,
       ogType: 'article',
+    };
+  }
+  if (subject.kind === 'sponsor') {
+    if (!isNonEmptyString(subject.doc.name)) return shell;
+    return {
+      ...described,
+      title: titled(subject.doc.name),
+      description: excerpt(subject.doc.description) || excerpt(subject.doc.bio) || eventDescription,
     };
   }
   if (subject.kind === 'speaker') {

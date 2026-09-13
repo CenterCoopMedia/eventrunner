@@ -77,13 +77,27 @@ and 100 content blocks. The generated snapshot renders on first paint in both
 build modes. Its expansion adds 23,264 minified bytes before the demo-only
 announcements. No SDK dependency was added.
 
-The initial limit is now 1,060,000 raw bytes and 286,000 gzip bytes. This allows
+The initial limit is now 1,080,000 raw bytes and 292,000 gzip bytes. This allows
 the requested event content and retains a small margin above both measured
 builds. Deferred chunk limits stay unchanged. The 20 portrait, logo, and scene
 images use 1.54 MB of WebP files outside the JavaScript graph.
 
+## 2026-09-13: session detail and rich updates
+
+Full session descriptions, six sponsor biographies, and six rich update examples
+add 24,829 raw bytes and 7,778 gzip bytes to the demo entry graph. Sponsor detail and update rendering remain in deferred route chunks. The
+Leaflet map library loads only when the map enters the viewport.
+
+| Build | Initial raw bytes | Initial gzip bytes | Initial chunks |
+| --- | ---: | ---: | ---: |
+| Normal | 1,058,761 | 285,182 | 1 |
+| Demo | 1,068,924 | 289,187 | 1 |
+
+The initial ceiling is 1,080,000 raw bytes and 292,000 gzip bytes to include this
+requested sample content with a small margin. Deferred limits remain unchanged.
+
 ## Enforced limits
 
-- The initial graph can use at most 1,060,000 raw bytes and 286,000 gzip bytes.
+- The initial graph can use at most 1,080,000 raw bytes and 292,000 gzip bytes.
 - Each deferred chunk can use at most 180,000 raw bytes and 50,000 gzip bytes.
 - CI checks the normal build and the committed demo build.
