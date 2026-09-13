@@ -22,6 +22,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import scheduleData from '@generated/scheduleData.js';
 
 const configSubscriptions = new Map();
 vi.mock('../../lib/configSource.js', () => ({
@@ -209,6 +210,7 @@ describe('the proof', () => {
   }, 10_000);
 
   it('states the page, the mode, the width, and the draft below the frame', async () => {
+    await import('../../pages/Schedule.jsx');
     await renderBranding();
     expect(screen.getByText('Home · light · 1440px · published theme')).toBeInTheDocument();
 
@@ -269,6 +271,7 @@ describe('the proof', () => {
   });
 
   it('previews the session page a shared link lands on', async () => {
+    await import('../../pages/SessionDetail.jsx');
     // PROOF_PAGES covers the four routes a visitor navigates to. Session
     // detail is the fifth, and it is the one page most visitors reach
     // first — the page where a theme meets one session's own type, room,
@@ -277,7 +280,7 @@ describe('the proof', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Session' }));
     await waitFor(() =>
       expect(
-        within(frame()).getByRole('heading', { level: 1, name: 'Welcome and orientation' }),
+        within(frame()).getByRole('heading', { level: 1, name: scheduleData.find((session) => session.visible !== false).title }),
       ).toBeInTheDocument(),
     );
     expect(screen.getAllByText(/Session · light · 1440px/).length).toBeGreaterThan(0);

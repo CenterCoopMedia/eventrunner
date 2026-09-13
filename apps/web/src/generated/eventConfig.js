@@ -52,14 +52,14 @@ export const eventConfig = {
     actionLabel: null,
   },
   venue: {
-    name: 'Harborlight Hall',
-    addressLine1: '1 Harborlight Way',
+    name: 'The Newark Museum of Art',
+    addressLine1: '49 Washington Street',
     addressLine2: null,
-    city: 'Millhaven',
-    region: 'MH',
-    postalCode: '58211',
+    city: 'Newark',
+    region: 'NJ',
+    postalCode: '07102',
     country: 'US',
-    mapUrl: null,
+    mapUrl: 'https://www.google.com/maps/search/?api=1&query=The+Newark+Museum+of+Art+49+Washington+Street+Newark+NJ',
     places: [
       {
         id: 'main-hall',
@@ -82,19 +82,19 @@ export const eventConfig = {
         from: 'main-hall',
         to: 'room-a',
         walkingMinutes: 4,
-        accessibleRoute: 'Lift beside the north stair to the first floor, then left along the gallery. Step-free the whole way.',
+        accessibleRoute: 'Illustrative route only. Follow the marked gallery and lift on the demo plan. This is not a surveyed museum route.',
       },
       {
         from: 'room-a',
         to: 'main-hall',
         walkingMinutes: 3,
-        accessibleRoute: 'The same lift back down, then straight ahead into the hall.',
+        accessibleRoute: 'Illustrative route only. Follow the marked gallery and lift on the demo plan. This is not a surveyed museum route.',
       },
       {
         from: 'main-hall',
         to: 'room-b',
         walkingMinutes: 5,
-        accessibleRoute: 'Lift beside the north stair to the first floor, then right to the end of the gallery.',
+        accessibleRoute: 'Illustrative route only. Follow the marked gallery and lift on the demo plan. This is not a surveyed museum route.',
       },
       {
         from: 'room-b',
@@ -105,7 +105,7 @@ export const eventConfig = {
         from: 'room-a',
         to: 'room-b',
         walkingMinutes: 1,
-        accessibleRoute: 'Along the first-floor gallery. No steps between the two rooms.',
+        accessibleRoute: 'Illustrative route only. Follow the marked gallery and lift on the demo plan. This is not a surveyed museum route.',
       },
       {
         from: 'room-b',
@@ -114,8 +114,8 @@ export const eventConfig = {
       },
     ],
     map: {
-      image: 'branding/venue-plan-placeholder.svg',
-      alt: 'Placeholder floor plan: an outline with a corridor across it and rooms off both sides, standing in for a plan of the building.',
+      image: 'branding/demo-venue-plan.svg',
+      alt: 'Illustrative summit floor plan with the main hall, rooms A and B, registration, and a quiet room. This is not the museum floor plan.',
       markers: [
         {
           placeId: 'main-hall',
@@ -125,11 +125,11 @@ export const eventConfig = {
         {
           placeId: 'room-a',
           x: 20,
-          y: 27,
+          y: 79,
         },
         {
           placeId: 'room-b',
-          x: 17,
+          x: 65,
           y: 79,
         },
       ],
@@ -144,7 +144,7 @@ export const eventConfig = {
   },
   legal: {
     operatorName: 'Harborlight Cooperative',
-    postalAddressHtml: '<p>Harborlight Cooperative<br>1 Harborlight Way<br>Millhaven, MH 58211</p>',
+    postalAddressHtml: '<p>Harborlight Cooperative<br>Fictional demo organization<br>Contact: support@example.org</p>',
     supportEmail: 'support@example.org',
     conductEmail: 'conduct@example.org',
     reviewRequired: true,
@@ -182,9 +182,9 @@ export const features = {
   liveUpdates: false,
   feedbackInbox: false,
   schedulePdf: false,
-  icsExport: false,
+  icsExport: true,
   calendarSync: false,
-  updates: false,
+  updates: true,
   autoApproveTicketHolders: false,
   publicAttendeeProfiles: false,
   webmcpPublic: false,

@@ -41,6 +41,7 @@
 import { storageObjectPath } from 'shared/venue';
 import { storageBucketName, storageDownloadOrigin } from '../firebase.js';
 import { IS_DEMO } from './demoMode.js';
+import { bundledDemoAssetUrl } from './bundledAssets.js';
 
 /** Mirrors storage.rules for `profile-photos/{uid}/**` — keep in step. */
 export const PROFILE_PHOTO_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/webp']);
@@ -179,6 +180,8 @@ export function storagePath(value) {
  * @returns {string|null} null when the value is not a usable object path
  */
 export function assetUrl(path) {
+  const bundled = bundledDemoAssetUrl(path);
+  if (bundled) return bundled;
   // The bundled defaults are not bucket objects: the prefix names an asset
   // that ships with the site, in every mode, with no Storage behind it.
   if (isDefaultAvatarPath(path)) return defaultAvatarUrl(path);
@@ -186,10 +189,8 @@ export function assetUrl(path) {
   if (!object) return null;
   // Static demo build: there is no Storage bucket behind the site, so a
   // built URL would be a request to firebasestorage.googleapis.com that can
-  // only fail. The only object paths the synthetic snapshot uses are the
-  // flat `branding/*` placeholders, and identical copies ship in the bundle
-  // under public/branding — resolve those bundle-relative (the same thing
-  // brandingSrc() does for them) and treat everything else as absent.
+  // only fail. Resolve flat branding paths from the bundle. Other stored
+  // objects are absent in demo mode.
   if (IS_DEMO) {
     return object.startsWith('branding/') && object.split('/').length === 2
       ? `${import.meta.env.BASE_URL}${object}`

@@ -36,6 +36,7 @@ import { validateCustomBadges } from 'shared/badges';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { subscribeDirectory } from '../lib/profileSource.js';
+import { IS_DEMO } from '../lib/demoMode.js';
 import { badgeLabel, visibleBadgeIds } from '../lib/badgeDisplay.js';
 import { collectOrganizations, directorySearchText, matchesDirectoryFilters } from '../lib/directoryView.js';
 import EmptyState from '../components/EmptyState.jsx';
@@ -115,7 +116,7 @@ export default function Attendees() {
   // query for — they get the sign-in state below, so skip the listener
   // rather than running a query whose result is known to be empty.
   const signedOutWithNothingToSee =
-    status === 'signed-out' && !features.publicAttendeeProfiles;
+    !IS_DEMO && status === 'signed-out' && !features.publicAttendeeProfiles;
 
   useEffect(() => {
     if (!directoryEnabled || signedOutWithNothingToSee) return undefined;
@@ -197,6 +198,11 @@ export default function Attendees() {
     <div className="grid gap-xl lg:grid-cols-[2fr_1fr]">
       <SystemPage pageId="attendees">
         <h1 className="font-heading text-h1 font-semibold text-text-primary">Attendees</h1>
+        {IS_DEMO ? (
+          <p className="mt-xs max-w-prose text-body text-text-secondary">
+            A sample of fictional attendees. These profiles show how the directory works.
+          </p>
+        ) : null}
         {status === 'ready' && !attendeeAccess ? (
           <p className="mt-xs max-w-prose text-body text-text-secondary">
             You can see attendees with public profiles. The full directory opens up once your

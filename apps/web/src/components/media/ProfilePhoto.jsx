@@ -7,10 +7,8 @@
 // The value comes from `users_public/{uid}.photoPath` — a projection of an
 // unvalidated client-written field. Two guards, both deliberate:
 //
-//   • only a `profile-photos/` path renders. The rules type-check photoPath
-//     as a string but say nothing about WHICH object it names, so a profile
-//     could point at any path in the bucket; anything else is treated as no
-//     photo rather than fetched.
+//   • uploaded photos must use `profile-photos/`. Bundled default avatars
+//     and fictional demo portraits do not read from the bucket.
 //   • a load failure falls back to the initial. A deleted object, an offline
 //     bucket, and a path that was never uploaded all end the same way — a
 //     directory card that still reads correctly.
@@ -20,6 +18,7 @@
 // photo, and a photo carries an empty alt for the same reason.
 import { useEffect, useState } from 'react';
 import { assetUrl, isDefaultAvatarPath, storagePath } from '../../lib/mediaSource.js';
+import { bundledDemoAssetUrl } from '../../lib/bundledAssets.js';
 
 /** The first letter of a display name, for the stand-in. */
 export function initialOf(displayName) {
@@ -28,13 +27,14 @@ export function initialOf(displayName) {
 }
 
 /**
- * A displayable URL for the stored photoPath, or null. Two namespaces
- * render: the owner's own `profile-photos/` objects, and the bundled
- * `default-avatars/` a person may choose instead of uploading anything
- * (issue #175). Anything else is treated as no photo rather than fetched —
- * the same guard as before, one namespace wider.
+ * Uploaded photos use the owner-bound namespace. Default avatars and
+ * fictional demo speaker portraits resolve only to bundled static assets.
+ * Other paths are treated as missing photos.
  */
 export function profilePhotoUrl(photoPath) {
+  if (typeof photoPath === 'string' && photoPath.startsWith('demo/speakers/')) {
+    return bundledDemoAssetUrl(photoPath);
+  }
   if (isDefaultAvatarPath(photoPath)) return assetUrl(photoPath);
   const path = storagePath(photoPath);
   if (!path || !path.startsWith('profile-photos/')) return null;

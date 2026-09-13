@@ -130,6 +130,8 @@ describe('app shell', () => {
   });
 
   it('renders the schedule from the snapshot with sessions grouped by day', async () => {
+    // Load the lazy module before measuring the rendered route.
+    await import('./pages/Schedule.jsx');
     renderAt('/schedule');
     expect(await screen.findByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument();
     // The page carries two views of the day — the screen one and the

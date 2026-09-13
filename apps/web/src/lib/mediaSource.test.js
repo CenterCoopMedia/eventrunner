@@ -32,6 +32,12 @@ const {
 const BUCKET = 'demo-run-of-show.appspot.com';
 
 describe('assetUrl', () => {
+  it('serves furnished demo images without a Storage URL in normal mode', () => {
+    expect(assetUrl('demo/speakers/marisol-reyes.webp')).toBe('/demo/speakers/marisol-reyes.webp');
+    expect(assetUrl('demo/sponsors/beacon-community-fund.webp')).toBe('/demo/sponsors/beacon-community-fund.webp');
+    expect(assetUrl('branding/demo-venue-plan.svg')).toBe('/branding/demo-venue-plan.svg');
+  });
+
   it('builds the token-free media URL for an object path', () => {
     expect(assetUrl('cms-images/asset-1/hero.png')).toBe(
       `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(BUCKET)}/o/` +
