@@ -5,7 +5,7 @@
 // type-check photoPath but never constrain WHICH object it names — and any
 // other value, or a failed load, falls back to the lettered stand-in rather
 // than a broken image.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import ProfilePhoto, { initialOf, profilePhotoUrl } from './ProfilePhoto.jsx';
@@ -21,6 +21,9 @@ describe('profilePhotoUrl', () => {
     for (const value of [
       'session-materials/s1/slides.pdf',
       'cms-images/a/b.png',
+      'demo/sponsors/beacon-community-fund.webp',
+      'demo/speakers/../private.webp',
+      'demo/speakers/%2e%2e/private.webp',
       '../profile-photos/u1/photo.png',
       'https://evil.example/x.png',
       { path: 'profile-photos/u1/photo.png' },
@@ -41,6 +44,19 @@ describe('initialOf', () => {
 });
 
 describe('ProfilePhoto', () => {
+  it('renders a bundled demo speaker portrait under the deployment base', () => {
+    vi.stubEnv('BASE_URL', '/eventrunner/');
+    try {
+      const { container } = render(
+        <ProfilePhoto photoPath="demo/speakers/marisol-reyes.webp" displayName="Marisol Reyes" />,
+      );
+      expect(container.querySelector('img')).toHaveAttribute('src', '/eventrunner/demo/speakers/marisol-reyes.webp');
+      expect(container.querySelector('img')).toHaveAttribute('alt', '');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('renders the photo with an empty alt — the name is already text beside it', () => {
     const { container } = render(
       <ProfilePhoto photoPath="profile-photos/u1/photo.png" displayName="Rae Okonkwo" />,

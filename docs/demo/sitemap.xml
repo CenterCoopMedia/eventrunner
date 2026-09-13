@@ -28,13 +28,85 @@
     <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule</loc>
   </url>
   <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-arrival-1</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-arrival-2</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-arrival-3</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-audio</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-break-1</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-break-2</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-break-3</loc>
+  </url>
+  <url>
     <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-closing</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-day-one-exchange</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-day-two-exchange</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-listening</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-lunch-1</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-lunch-2</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-lunch-3</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-mapping</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-membership</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-newsletter</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-ninety-days</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-opening</loc>
   </url>
   <url>
     <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-panel</loc>
   </url>
   <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-product</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-sponsor-policy</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-staffing</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-story-plan</loc>
+  </url>
+  <url>
     <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-unconference</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-unconference-notes</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-verification</loc>
   </url>
   <url>
     <loc>https://centercoopmedia.github.io/eventrunner/demo/schedule/session-welcome</loc>
@@ -55,13 +127,40 @@
     <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers</loc>
   </url>
   <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-amara-okafor</loc>
+  </url>
+  <url>
     <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-devon-achebe</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-elena-santos</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-june-park</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-lucia-bennett</loc>
   </url>
   <url>
     <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-marisol-reyes</loc>
   </url>
   <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-mateo-rivera</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-nora-chen</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-omar-farouk</loc>
+  </url>
+  <url>
     <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-priya-natarajan</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-samir-das</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/speakers/demo-theo-brooks</loc>
   </url>
   <url>
     <loc>https://centercoopmedia.github.io/eventrunner/demo/sponsors</loc>
@@ -71,5 +170,8 @@
   </url>
   <url>
     <loc>https://centercoopmedia.github.io/eventrunner/demo/travel</loc>
+  </url>
+  <url>
+    <loc>https://centercoopmedia.github.io/eventrunner/demo/updates</loc>
   </url>
 </urlset>

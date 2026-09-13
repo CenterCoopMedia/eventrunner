@@ -8,12 +8,13 @@
 // checks); the same href allowlist keeps data:/attacker-controlled schemes
 // out even though javascript: is inert on <img src> in modern browsers.
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
+import { bundledDemoAssetUrl } from '../../lib/bundledAssets.js';
 
 export default function ImageBlock({ block }) {
   if (!block?.url || !isSafeHref(block.url)) return null;
   const image = (
     <img
-      src={block.url}
+      src={bundledDemoAssetUrl(block.url) ?? block.url}
       alt={block.alt ?? ''}
       loading="lazy"
       className="h-auto max-w-full rounded-brand outline outline-1 -outline-offset-1 outline-text-primary/[0.08]"

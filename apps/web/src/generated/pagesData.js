@@ -762,6 +762,7 @@ export const pagesData = [
         allowedBlocks: [
           'link_group',
           'richtext',
+          'image',
         ],
         maxBlocks: 20,
         reorderable: true,

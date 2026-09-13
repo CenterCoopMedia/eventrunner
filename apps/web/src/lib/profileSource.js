@@ -31,6 +31,8 @@ import {
 import { SELF_EDITABLE_PROFILE_FIELDS } from 'shared/profile';
 import { db } from '../firebase.js';
 import { subscribeWithRetry } from './retrySubscription.js';
+import { IS_DEMO } from './demoMode.js';
+import { demoAttendees } from './demoCommunity.js';
 
 const USERS = 'users';
 const USERS_PUBLIC = 'users_public';
@@ -102,6 +104,10 @@ export function saveOwnProfile(uid, fields) {
  * @returns {() => void} unsubscribe
  */
 export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
+  if (IS_DEMO) {
+    onNext(demoAttendees);
+    return () => {};
+  }
   const target = includeAttendeesOnly
     ? query(
         collection(db, USERS_PUBLIC),
@@ -133,6 +139,7 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
  * @returns {Promise<object | null>}
  */
 export async function fetchPublicProfile(uid) {
+  if (IS_DEMO) return demoAttendees.find((profile) => profile.id === uid) ?? null;
   try {
     const snapshot = await getDoc(doc(db, USERS_PUBLIC, uid));
     return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;

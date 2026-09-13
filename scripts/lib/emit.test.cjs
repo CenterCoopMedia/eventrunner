@@ -129,9 +129,21 @@ test('every demo page is a valid page doc, and the demo names stay fictional', (
     'Marisol Reyes',
     'Devon Achebe',
     'Priya Natarajan',
+    'Lucia Bennett',
+    'Omar Farouk',
+    'June Park',
+    'Elena Santos',
+    'Theo Brooks',
+    'Amara Okafor',
+    'Samir Das',
+    'Nora Chen',
+    'Mateo Rivera',
     'Beacon Community Fund',
     'Lighthouse Press Trust',
     'Tidewater Media Collective',
+    'Openfield Tools',
+    'Civic Thread Studio',
+    'Common Ground Coffee',
     'Harborlight Media Summit',
     'Harborlight Cooperative',
   ]);
@@ -185,4 +197,32 @@ test('jsValue escapes quotes and backslashes rather than emitting broken JS', ()
   // Evaluating the emitted literal is the assertion: it must parse back
   // to the value it was built from.
   assert.deepEqual(eval(`(${literal})`), { value: "it's a \\ backslash" });
+});
+
+
+test('the furnished demo schedule keeps its count and references consistent', () => {
+  const demo = demoEvent();
+  const sessions = new Map(demo.sessions.map((session) => [session.id, session]));
+  const speakers = new Set(demo.speakers.map((speaker) => speaker.id));
+  const places = new Set(demo.config.event.venue.places.map((place) => place.id));
+  const count = demo.sessions.filter((session) => session.type !== 'break' && !session.parentId).length;
+  assert.equal(Number(demo.content.find((doc) => doc.id === 'stats__sessions').value), count);
+  for (const session of demo.sessions) {
+    const day = demo.config.event.days.find((entry) => entry.id === session.dayId);
+    assert.ok(day, session.id);
+    assert.ok(session.startTime >= day.startTime && session.endTime <= day.endTime, session.id);
+    assert.ok(session.startTime < session.endTime, session.id);
+    for (const speakerId of session.speakerIds) assert.ok(speakers.has(speakerId), session.id);
+    if (session.placeId) assert.ok(places.has(session.placeId), session.id);
+    if (session.parentId) {
+      const parent = sessions.get(session.parentId);
+      assert.ok(parent, session.id);
+      assert.equal(session.dayId, parent.dayId);
+      assert.ok(session.startTime >= parent.startTime && session.endTime <= parent.endTime);
+    }
+  }
+  for (const speaker of demo.speakers) {
+    assert.ok(demo.sessions.some((session) => session.speakerIds.includes(speaker.id)), speaker.id);
+  }
+  assert.match(demo.config.event.venue.map.alt, /not the museum floor plan/);
 });

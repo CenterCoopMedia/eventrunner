@@ -4,7 +4,7 @@
 // rejects reserved keys), so each renderer must refuse to render an unsafe
 // scheme itself, the same way sanitizeHtml.js already does for richtext
 // links.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import CtaBlock from './CtaBlock.jsx';
@@ -109,6 +109,16 @@ describe('LinkGroupBlock', () => {
 });
 
 describe('ImageBlock', () => {
+  it('resolves bundled demo images under a nested deployment base', () => {
+    vi.stubEnv('BASE_URL', '/eventrunner/');
+    try {
+      const { getByRole } = render(<ImageBlock block={{ url: 'demo/summit-gathering.webp', alt: 'Summit' }} />);
+      expect(getByRole('img')).toHaveAttribute('src', '/eventrunner/demo/summit-gathering.webp');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('renders nothing for an unsafe url', () => {
     for (const url of UNSAFE_URLS) {
       const { container, unmount } = render(<ImageBlock block={{ url, alt: 'x' }} />);

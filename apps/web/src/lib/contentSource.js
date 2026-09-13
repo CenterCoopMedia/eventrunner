@@ -15,8 +15,9 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 import { IS_DEMO } from './demoMode.js';
+import { demoUpdates } from './demoCommunity.js';
 
-// Static demo build: subscribe to nothing and never report.
+// Static demo build: report local updates and keep other snapshots in charge.
 //
 // The overlay semantics ContentProvider documents are "any successful live
 // result, INCLUDING an empty array, replaces the snapshot wholesale". In the
@@ -24,8 +25,8 @@ import { IS_DEMO } from './demoMode.js';
 // (firebase.js), so every query here would be answered from an empty local
 // cache — a successful, empty result that would blank the schedule, the
 // speaker directory, and every CMS block the demo exists to show. Not
-// attaching at all leaves each overlay slot null, which is precisely the
-// "no runtime result yet" state that keeps the committed snapshot in charge.
+// attaching leaves the snapshot-backed slots null. Updates use local demo
+// data because that collection has no generated snapshot.
 const NO_OVERLAY = () => {};
 
 /**
@@ -76,7 +77,10 @@ export function subscribeSpeakersPublic(onNext) {
 }
 
 export function subscribeContentCollection(name, readSource, onNext) {
-  if (IS_DEMO) return NO_OVERLAY;
+  if (IS_DEMO) {
+    if (name === 'cmsUpdates') onNext(demoUpdates);
+    return NO_OVERLAY;
+  }
   const target =
     readSource === 'draft'
       ? collection(db, `${name}_drafts`)

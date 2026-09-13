@@ -12,7 +12,7 @@ const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
 const { BLOCK_TYPES } = require('../../functions/src/cms/blockTypes.cjs');
 const { RESERVED_PATH_SEGMENTS } = require('shared/routing');
 const {
-  DEMO_ANSWERS, DEMO_ORGANIZATIONS, DEMO_SPEAKERS, DEMO_PAGE_EXTRA_CONTENT,
+  demoEvent, DEMO_ANSWERS, DEMO_ORGANIZATIONS, DEMO_SPEAKERS, DEMO_PAGE_EXTRA_CONTENT,
 } = require('./demo-event.cjs');
 
 const TIER_A = { publicUrl: 'https://example.org', ticketingProvider: 'none', emailProvider: 'console' };
@@ -26,7 +26,9 @@ const TIER_A = { publicUrl: 'https://example.org', ticketingProvider: 'none', em
  * list below to the fixture's actual invented names, not their generic
  * descriptor words.
  */
-const GENERIC_INSTITUTIONAL_WORDS = new Set(['demo', 'hall', 'media']);
+const GENERIC_INSTITUTIONAL_WORDS = new Set([
+  'demo', 'hall', 'media', 'the', 'common', 'block', 'reporting',
+]);
 
 /**
  * The demo fixture's own invented proper nouns — event, venue, city,
@@ -378,7 +380,7 @@ test('no demo fixture copy leaks into the shared seed', () => {
 
 test('every DEMO_PAGE_EXTRA_CONTENT entry targets a real section, an allowed block type, and stays within maxBlocks', () => {
   const sectionsById = new Map();
-  for (const page of defaultPages()) {
+  for (const page of demoEvent().pages) {
     for (const section of page.sections) {
       sectionsById.set(section.id, section);
     }
@@ -386,7 +388,7 @@ test('every DEMO_PAGE_EXTRA_CONTENT entry targets a real section, an allowed blo
   const countBySection = new Map();
   for (const doc of DEMO_PAGE_EXTRA_CONTENT) {
     const section = sectionsById.get(doc.section);
-    assert.ok(section, `${doc.id}: section "${doc.section}" does not exist in defaultPages()`);
+    assert.ok(section, `${doc.id}: section "${doc.section}" does not exist in demoEvent().pages`);
     assert.ok(
       section.allowedBlocks.includes(doc.blockType),
       `${doc.id}: blockType "${doc.blockType}" is not allowed on section "${doc.section}" (allows ${section.allowedBlocks.join(', ')})`,
