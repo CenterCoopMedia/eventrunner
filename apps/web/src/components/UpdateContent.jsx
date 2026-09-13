@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { validUpdateBlock, validUpdateImage } from 'shared/update';
 import ImageBlock from './blocks/ImageBlock.jsx';
 import RichTextBlock from './blocks/RichTextBlock.jsx';
@@ -36,6 +36,14 @@ function PracticePoll({ block }) {
   );
 }
 
+function InternalUpdateLink({ block }) {
+  const { search } = useLocation();
+  const [pathname, query = ''] = block.href.split('?');
+  const params = new URLSearchParams(query);
+  for (const [key, value] of new URLSearchParams(search)) params.set(key, value);
+  return <Link className={primaryActionClass} to={{ pathname, search: params.toString() }}>{block.label}</Link>;
+}
+
 function UpdateBlock({ block }) {
   if (!validUpdateBlock(block)) return null;
   switch (block.type) {
@@ -51,7 +59,7 @@ function UpdateBlock({ block }) {
       </div>
     );
     case 'button': return block.href.startsWith('/')
-      ? <Link className={primaryActionClass} to={block.href}>{block.label}</Link>
+      ? <InternalUpdateLink block={block} />
       : <a className={primaryActionClass} href={block.href} rel="noopener noreferrer">{block.label}</a>;
     default: return null;
   }

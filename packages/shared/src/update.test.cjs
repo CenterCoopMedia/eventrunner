@@ -18,3 +18,9 @@ test('reject unsafe and unbounded update content', () => {
   assert.equal(validUpdateContent([{ type: 'practicePoll', question: 'Vote', options: ['A', 'A'] }]), false);
   assert.equal(validUpdateImage({ url: 'demo/../secret.webp', alt: 'Invalid' }), false);
 });
+test('poll option labels must differ after display whitespace is normalized', () => {
+  for (const options of [['A', ' A '], ['Local news', 'Local  news'], ['Local news', 'Local\nnews']]) {
+    assert.equal(validUpdateContent([{ type: 'practicePoll', question: 'Choose', options }]), false);
+  }
+  assert.equal(validUpdateContent([{ type: 'practicePoll', question: 'Choose', options: ['Local news', 'Revenue'] }]), true);
+});

@@ -3,8 +3,10 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 let organizationsData;
 let enabled = true;
-vi.mock('../contexts/ContentContext.jsx', () => ({ useContent: () => ({ organizationsData }) }));
-vi.mock('../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ features: { sponsors: enabled } }) }));
+let scheduleEnabled;
+let scheduleData;
+vi.mock('../contexts/ContentContext.jsx', () => ({ useContent: () => ({ organizationsData, scheduleData }) }));
+vi.mock('../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ features: { sponsors: enabled, schedule: scheduleEnabled } }) }));
 vi.mock('../components/media/AssetImage.jsx', () => ({ default: () => null }));
 import SponsorDetail from './SponsorDetail.jsx';
 function show(search = '') {
@@ -12,6 +14,8 @@ function show(search = '') {
 }
 beforeEach(() => {
   enabled = true;
+  scheduleEnabled = true;
+  scheduleData = [{ id: 'session-closing', visible: true }];
   organizationsData = [{ id: 'demo-beacon', name: 'Beacon', visible: true, description: 'Travel support.', bio: 'First paragraph.\n\nSecond paragraph.', supportDescription: 'Covers the peer clinic.', readMorePath: '/schedule/session-closing', url: 'https://example.org' }];
 });
 describe('Sponsor detail', () => {
@@ -41,4 +45,17 @@ describe('Sponsor detail', () => {
     expect(screen.queryByRole('link', { name: /Visit Beacon/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Explore the program' })).toHaveAttribute('href', '/schedule');
   });
+});
+
+
+it('hides program actions when the schedule feature is disabled', () => {
+  scheduleEnabled = false;
+  show();
+  expect(screen.queryByRole('link', { name: /supported session|Explore the program/ })).toBeNull();
+});
+it.each(['missing', 'hidden'])('does not link to a %s supported session', (state) => {
+  scheduleData = state === 'missing' ? [] : [{ id: 'session-closing', visible: false }];
+  show();
+  expect(screen.queryByRole('link', { name: /supported session/ })).toBeNull();
+  expect(screen.getByRole('link', { name: 'Explore the program' })).toHaveAttribute('href', '/schedule');
 });

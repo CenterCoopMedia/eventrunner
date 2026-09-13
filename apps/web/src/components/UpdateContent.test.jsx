@@ -14,6 +14,15 @@ describe('UpdateContent', () => {
     expect(screen.getByRole('heading', { name: 'Before' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'See schedule' })).toHaveAttribute('href', '/schedule');
   });
+  it('preserves preview parameters while retaining button query parameters', () => {
+    render(<MemoryRouter initialEntries={['/updates/example?preview=1&theme=zine']}>
+      <UpdateContent content={[{ type: 'button', label: 'Choose a day', href: '/schedule?day=day-2' }]} />
+    </MemoryRouter>);
+    expect(screen.getByRole('link', { name: 'Choose a day' })).toHaveAttribute(
+      'href', '/schedule?day=day-2&preview=1&theme=zine',
+    );
+  });
+
   it('keeps poll choices local and reports no totals', () => {
     render(<UpdateContent content={[poll]} />);
     expect(screen.getByRole('button')).toBeDisabled();

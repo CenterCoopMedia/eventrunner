@@ -1242,3 +1242,15 @@ test('routeMeta: sponsor detail metadata respects the sponsors feature gate', as
   assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
   assert.ok(!res.sent.includes('Beacon community fund'));
 });
+
+
+test('routeMeta: sponsor IDs follow the CMS writer contract and keep encoded canonical URLs', async () => {
+  for (const id of ['acme.co', 'Local fund & partners', '基金'.repeat(140)]) {
+    const docs = { ...SITE_DOCS, [`cmsOrganizations/${id}`]: { name: 'Published sponsor', visible: true } };
+    const route = `/sponsors/${encodeURIComponent(id)}`;
+    const res = await getRoute(routeHandler({}, docs), route);
+    assert.ok(res.sent.includes('<title>Published sponsor · [Fixture] Harborlight Media Summit</title>'));
+    assert.ok(res.sent.includes(`content="https://example.org${route}"`));
+    assert.ok(!res.sent.includes('<meta name="robots" content="noindex">'));
+  }
+});

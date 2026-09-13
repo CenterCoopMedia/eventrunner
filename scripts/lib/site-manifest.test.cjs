@@ -8,6 +8,8 @@ const {
   classifyPages,
   buildSessionRoutes,
   buildSpeakerRoutes,
+  buildSponsorRoutes,
+  collectPublicRoutes,
   buildUpdateRoutes,
   buildSitemapXml,
   buildRobotsTxt,
@@ -566,4 +568,20 @@ test('buildSiteArtifacts produces all three files from one read', () => {
   assert.match(sitemapXml, /<urlset/);
   assert.match(robotsTxt, /User-agent: \*/);
   assert.equal(manifest.name, 'Harborlight Summit');
+});
+
+
+test('sponsor profile routes require a visible record and a public parent', () => {
+  const organizations = [{ id: 'beacon', visible: true }, { id: 'draft', visible: false }, { id: 'unset' }, { visible: true }];
+  assert.deepEqual(buildSponsorRoutes({ organizations, parentPublic: true }), [{ id: 'beacon', path: '/sponsors/beacon' }]);
+  for (const page of [
+    { id: 'sponsors', path: '/sponsors', visible: false, systemPage: true },
+  ]) {
+    const routes = collectPublicRoutes({ pages: [page], features: { sponsors: true }, organizations });
+    assert.equal(routes.some((route) => route.path === '/sponsors/beacon'), false);
+  }
+  assert.deepEqual(buildSponsorRoutes({ organizations, parentPublic: false }), []);
+  const page = { id: 'sponsors', path: '/sponsors', visible: true, systemPage: true };
+  assert.ok(collectPublicRoutes({ pages: [page], features: { sponsors: true }, organizations }).some((route) => route.path === '/sponsors/beacon'));
+  assert.equal(collectPublicRoutes({ pages: [page], features: { sponsors: false }, organizations }).length, 0);
 });

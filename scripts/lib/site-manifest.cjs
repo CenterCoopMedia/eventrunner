@@ -51,10 +51,10 @@ const SYSTEM_PAGE_FEATURE_GATES = Object.freeze(
 /**
  * System page ids whose own React route tree owns further paths under it
  * (apps/web/src/App.jsx): `/schedule/:sessionId` and `/schedule/mine`,
- * `/speakers/:slug`, `/attendees/:uid`, `/updates/:id`. When one of these
+ * `/speakers/:slug`, `/sponsors/:id`, `/attendees/:uid`, `/updates/:id`. When one of these
  * pages is excluded, robots.txt has to disallow the whole subtree — an
  * exact-path rule for `/schedule` alone would leave every session detail
- * page reachable. `sponsors` and `home` carry no such subtree today.
+ * page reachable. The home page carries no such subtree.
  *
  * Read off the same shared map, for the same reason as the gates above.
  */
@@ -276,6 +276,14 @@ function buildSpeakerRoutes({ speakers = [], parentPublic }) {
     .map((s) => ({ id: s.slug, path: `/speakers/${s.slug}` }));
 }
 
+/** Visible sponsor profiles, gated by their public parent page. */
+function buildSponsorRoutes({ organizations = [], parentPublic }) {
+  if (!parentPublic) return [];
+  return organizations
+    .filter((organization) => organization?.visible === true && typeof organization.id === 'string' && organization.id)
+    .map((organization) => ({ id: organization.id, path: `/sponsors/${organization.id}` }));
+}
+
 /**
  * Published update routes (`/updates/:id`,
  * apps/web/src/pages/UpdateDetail.jsx). Gated on the `updates` cmsPages
@@ -295,20 +303,21 @@ function buildUpdateRoutes({ updates = [], parentPublic }) {
 
 /**
  * Every route the sitemap may list: the public `cmsPages` routes plus the
- * three detail-record kinds, each gated on its own parent page's
+ * four detail-record kinds, each gated on its own parent page's
  * classification (see `buildSessionRoutes`).
  *
  * @param {{ pages: object[], features: object, sessions: object[],
- *           speakers: object[], updates: object[] }} args
+ *           speakers: object[], organizations: object[], updates: object[] }} args
  * @returns {Array<{ id: string, path: string }>}
  */
-function collectPublicRoutes({ pages, features, sessions, speakers, updates }) {
+function collectPublicRoutes({ pages, features, sessions, speakers, organizations, updates }) {
   const { public: pageRoutes } = classifyPages({ pages, features });
   const publicPageIds = new Set(pageRoutes.map((r) => r.id));
   return [
     ...pageRoutes,
     ...buildSessionRoutes({ sessions, parentPublic: publicPageIds.has('schedule') }),
     ...buildSpeakerRoutes({ speakers, parentPublic: publicPageIds.has('speakers') }),
+    ...buildSponsorRoutes({ organizations, parentPublic: publicPageIds.has('sponsors') }),
     ...buildUpdateRoutes({ updates, parentPublic: publicPageIds.has('updates') }),
   ];
 }
@@ -378,15 +387,15 @@ function escapeXml(value) {
 
 /**
  * @param {{ publicUrl: string, pages: object[], features: object,
- *           sessions?: object[], speakers?: object[], updates?: object[] }} args
+ *           sessions?: object[], speakers?: object[], organizations?: object[], updates?: object[] }} args
  * @returns {string} sitemap.xml content
  */
 function buildSitemapXml({
-  publicUrl, pages, features, sessions = [], speakers = [], updates = [],
+  publicUrl, pages, features, sessions = [], speakers = [], organizations = [], updates = [],
 }) {
   const base = normalizedBaseUrl(publicUrl);
   const publicRoutes = collectPublicRoutes({
-    pages, features, sessions, speakers, updates,
+    pages, features, sessions, speakers, organizations, updates,
   });
   const sorted = [...publicRoutes].sort((a, b) => a.path.localeCompare(b.path));
   const urls = sorted.map((route) => {
@@ -501,16 +510,16 @@ function buildWebManifest({ event = {}, theme = {} }) {
  * and published detail records.
  *
  * @param {{ event: object, features: object, theme: object,
- *           pages: object[], sessions?: object[], speakers?: object[],
+ *           pages: object[], sessions?: object[], speakers?: object[], organizations?: object[],
  *           updates?: object[], publicUrl: string }} args
  * @returns {{ sitemapXml: string, robotsTxt: string, manifest: object }}
  */
 function buildSiteArtifacts({
-  event, features, theme, pages, sessions = [], speakers = [], updates = [], publicUrl,
+  event, features, theme, pages, sessions = [], speakers = [], organizations = [], updates = [], publicUrl,
 }) {
   return {
     sitemapXml: buildSitemapXml({
-      publicUrl, pages, features, sessions, speakers, updates,
+      publicUrl, pages, features, sessions, speakers, organizations, updates,
     }),
     robotsTxt: buildRobotsTxt({ publicUrl, pages, features }),
     manifest: buildWebManifest({ event, theme }),
@@ -526,6 +535,7 @@ module.exports = {
   classifyPages,
   buildSessionRoutes,
   buildSpeakerRoutes,
+  buildSponsorRoutes,
   buildUpdateRoutes,
   collectPublicRoutes,
   buildSitemapXml,

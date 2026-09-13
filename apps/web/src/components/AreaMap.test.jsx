@@ -7,9 +7,13 @@ const leaflet = vi.hoisted(() => {
   map.setView.mockReturnValue(map);
   const marker = { addTo: vi.fn(), bindTooltip: vi.fn() };
   marker.addTo.mockReturnValue(marker);
+  const tiles = { addTo: vi.fn(), on: vi.fn(), off: vi.fn() };
+  tiles.on.mockReturnValue(tiles);
+  tiles.addTo.mockReturnValue(tiles);
   return {
+    tiles,
     map: vi.fn(() => map), instance: map,
-    tileLayer: vi.fn(() => ({ addTo: vi.fn() })),
+    tileLayer: vi.fn(() => tiles),
     circleMarker: vi.fn(() => marker),
   };
 });
@@ -28,7 +32,7 @@ beforeEach(() => {
     disconnect() { disconnect(); }
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('OpenStreetMap area map', () => {
   it('loads raster tiles only when visible and removes the map on unmount', async () => {
@@ -79,4 +83,30 @@ describe('OpenStreetMap area map', () => {
     expect(container).toBeEmptyDOMElement();
     expect(leaflet.map).not.toHaveBeenCalled();
   });
+});
+
+
+it('reports asynchronous tile errors and clears the status after a successful batch', async () => {
+  const { unmount } = render(<AreaMap url={url} />);
+  act(() => enterViewport());
+  await waitFor(() => expect(leaflet.tiles.on).toHaveBeenCalled());
+  const events = leaflet.tiles.on.mock.calls[0][0];
+  act(() => { events.loading(); events.tileerror(); events.load(); });
+  expect(screen.getByRole('status')).toHaveTextContent('could not fully load');
+  act(() => { events.loading(); events.load(); });
+  expect(screen.queryByRole('status')).toBeNull();
+  unmount();
+  expect(leaflet.tiles.off).toHaveBeenCalledWith(events);
+});
+it('reports stalled tile requests and cancels their timeout on unmount', async () => {
+  const { unmount } = render(<AreaMap url={url} />);
+  act(() => enterViewport());
+  await waitFor(() => expect(leaflet.tiles.on).toHaveBeenCalled());
+  const events = leaflet.tiles.on.mock.calls[0][0];
+  vi.useFakeTimers();
+  act(() => { events.loading(); vi.advanceTimersByTime(15000); });
+  expect(screen.getByRole('status')).toHaveTextContent('could not fully load');
+  act(() => events.loading());
+  unmount();
+  expect(vi.getTimerCount()).toBe(0);
 });

@@ -29,6 +29,24 @@ export default function AreaMap({ url }) {
     let cancelled = false;
     let map;
     let started = false;
+    let tiles;
+    let tileTimer;
+    let tileErrors = false;
+    const tileEvents = {
+      loading() {
+        tileErrors = false;
+        clearTimeout(tileTimer);
+        tileTimer = setTimeout(() => { if (!cancelled) setFailed(true); }, 15000);
+      },
+      tileerror() {
+        tileErrors = true;
+        if (!cancelled) setFailed(true);
+      },
+      load() {
+        clearTimeout(tileTimer);
+        if (!cancelled) setFailed(tileErrors);
+      },
+    };
     setFailed(false);
 
     async function loadMap() {
@@ -41,18 +59,21 @@ export default function AreaMap({ url }) {
         ]);
         if (cancelled) return;
         map = leaflet.map(container.current, { scrollWheelZoom: false }).setView([lat, lon], 16);
-        leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        tiles = leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           updateWhenIdle: true,
           keepBuffer: 0,
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
-        }).addTo(map);
+        });
+        tiles.on(tileEvents).addTo(map);
         leaflet.circleMarker([lat, lon], {
           radius: 8,
           color: 'currentColor',
           fillOpacity: 0.85,
         }).addTo(map).bindTooltip('Venue map reference', { permanent: true, direction: 'top' });
       } catch {
+        clearTimeout(tileTimer);
+        tiles?.off(tileEvents);
         map?.remove();
         map = null;
         if (!cancelled) setFailed(true);
@@ -73,6 +94,8 @@ export default function AreaMap({ url }) {
     return () => {
       cancelled = true;
       observer?.disconnect();
+      clearTimeout(tileTimer);
+      tiles?.off(tileEvents);
       map?.remove();
     };
   }, [lat, lon]);
@@ -86,7 +109,7 @@ export default function AreaMap({ url }) {
         aria-label="OpenStreetMap of the area around the venue"
         className="relative z-0 h-96 w-full text-text-primary"
       />
-      {failed ? <p role="status" className="mt-xs text-body text-text-secondary">The map could not load. Use the OpenStreetMap link below.</p> : null}
+      {failed ? <p role="status" className="mt-xs text-body text-text-secondary">The map could not fully load. Use the OpenStreetMap link below.</p> : null}
       <figcaption className="mt-xs flex flex-wrap justify-between gap-xs font-data text-caption text-text-secondary">
         <ExternalLink href={url}>Explore the area on OpenStreetMap</ExternalLink>
         <ExternalLink href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</ExternalLink>

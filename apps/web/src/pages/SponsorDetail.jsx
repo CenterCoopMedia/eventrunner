@@ -17,7 +17,7 @@ export default function SponsorDetail() {
   const { id } = useParams();
   const { search } = useLocation();
   const { features } = useEventConfig();
-  const { organizationsData } = useContent();
+  const { organizationsData, scheduleData = [] } = useContent();
   const org = features.sponsors && visibleOrganizations(organizationsData).find((item) => item.id === id);
   useDocumentTitle(org?.name);
   if (!org) return (
@@ -26,8 +26,11 @@ export default function SponsorDetail() {
   );
   const bio = paragraphs(org.bio || org.description);
   const support = paragraphs(org.supportDescription);
-  const sessionPath = typeof org.readMorePath === 'string' && /^\/schedule\/[a-z0-9-]+$/.test(org.readMorePath)
+  const requestedSessionPath = typeof org.readMorePath === 'string' && /^\/schedule\/[a-z0-9-]+$/.test(org.readMorePath)
     ? org.readMorePath : null;
+  const sessionPath = requestedSessionPath && scheduleData.some((session) =>
+    `/schedule/${session.id}` === requestedSessionPath && session.visible === true)
+    ? requestedSessionPath : null;
   return (
     <article>
       <Link to={{ pathname: "/sponsors", search }} className="font-data text-caption text-text-secondary hover:underline">← Back to sponsors</Link>
@@ -47,7 +50,7 @@ export default function SponsorDetail() {
       </section> : null}
       <div className="mt-xl flex flex-wrap gap-md">
         {isSafeHref(org.url) ? <ExternalLink href={org.url} className={primaryActionClass}>Visit {org.name}</ExternalLink> : null}
-        <Link to={{ pathname: sessionPath || '/schedule', search }} className={primaryActionClass}>{sessionPath ? 'Read about the supported session' : 'Explore the program'}</Link>
+        {features.schedule ? <Link to={{ pathname: sessionPath || '/schedule', search }} className={primaryActionClass}>{sessionPath ? 'Read about the supported session' : 'Explore the program'}</Link> : null}
       </div>
     </article>
   );

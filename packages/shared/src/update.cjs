@@ -21,7 +21,7 @@ function validUpdateBlock(block) {
         && keys(column, ['heading', 'body']) && text(column.heading) && text(column.body));
     case 'practicePoll': return keys(block, ['type', 'question', 'options']) && text(block.question)
       && Array.isArray(block.options) && block.options.length >= 2 && block.options.length <= 6
-      && block.options.every(text) && new Set(block.options).size === block.options.length;
+      && block.options.every(text) && new Set(block.options.map((option) => option.trim().replace(/\s+/g, ' '))).size === block.options.length;
     default: return false;
   }
 }
