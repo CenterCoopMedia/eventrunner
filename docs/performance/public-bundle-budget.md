@@ -21,7 +21,7 @@ node scripts/ci/bundle-budget.cjs --dist docs/demo
 
 The committed limits are:
 
-- 1,020,000 raw bytes and 275,000 gzip bytes for the initial graph.
+- 1,060,000 raw bytes and 286,000 gzip bytes for the initial graph.
 - 180,000 raw bytes and 50,000 gzip bytes for each deferred chunk.
 
 See [the current bundle report](public-bundle-report.md) for measured results.
