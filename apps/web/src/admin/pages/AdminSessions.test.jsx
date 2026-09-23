@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const adminSubscriptions = new Map();
@@ -10,7 +10,24 @@ vi.mock('../adminSource.js', () => ({
     return () => adminSubscriptions.delete(name);
   },
 }));
-vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
+const configSubscriptions = new Map();
+vi.mock('../../lib/configSource.js', () => ({
+  subscribeConfigDoc: (docId, onNext) => {
+    configSubscriptions.set(docId, onNext);
+    return () => configSubscriptions.delete(docId);
+  },
+}));
+// The public bookmark counts (issue #182). Mocked for every test: the
+// firebase/firestore mock below has no onSnapshot, and the Sessions list
+// mounts the Most saved panel whenever it has sessions.
+const bookmarkCounts = { onNext: null, onError: null };
+vi.mock('../../lib/bookmarkCountsSource.js', () => ({
+  subscribeBookmarkCounts: (onNext, onError) => {
+    bookmarkCounts.onNext = onNext;
+    bookmarkCounts.onError = onError;
+    return () => {};
+  },
+}));
 vi.mock('../../lib/contentSource.js', () => ({
   subscribeContentCollection: () => () => {},
   subscribeSpeakersPublic: () => () => {},
@@ -68,6 +85,9 @@ function bodyOf(index) {
 
 beforeEach(() => {
   adminSubscriptions.clear();
+  configSubscriptions.clear();
+  bookmarkCounts.onNext = null;
+  bookmarkCounts.onError = null;
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -269,5 +289,118 @@ describe('admin Sessions workspace', () => {
     const preview = screen.getByRole('link', { name: /Preview draft/ });
     expect(preview).toHaveAttribute('target', '_blank');
     expect(preview).toHaveAccessibleName(`Preview draft (${NEW_TAB_NOTE})`);
+  });
+
+  // SESSION POPULARITY (issue #182): the Most saved panel above the day
+  // groups, from the public sessionBookmarks counts.
+  describe('the Most saved panel', () => {
+    const LIVE = [
+      { id: 'keynote', dayId: 'day-1', startTime: '09:00', title: 'Keynote', visible: true },
+      { id: 'audience', dayId: 'day-1', startTime: '10:00', title: 'Audience research', visible: true },
+      { id: 'lunch', dayId: 'day-1', startTime: '12:00', title: 'Lunch', visible: true },
+      { id: 'data', dayId: 'day-2', startTime: '09:00', title: 'Data desk', visible: true },
+      { id: 'lost', dayId: 'day-9', startTime: '09:00', title: 'Lost day', visible: true },
+    ];
+    const DRAFTS = [
+      { id: 'fresh', dayId: 'day-1', startTime: '15:00', title: 'Fresh draft', status: 'dirty' },
+    ];
+
+    async function openSessions(features = { sessionBookmarks: true }) {
+      await renderAt('/admin/sessions');
+      await screen.findByRole('heading', { name: 'Sessions' });
+      if (features) {
+        await waitFor(() => expect(configSubscriptions.has('features')).toBe(true));
+        act(() => configSubscriptions.get('features')(features));
+      }
+      pushSessions(LIVE, DRAFTS);
+      return (await screen.findByRole('heading', { name: 'Most saved' })).closest('section');
+    }
+
+    it('orders the sessions by saves, most first, with the day each is on', async () => {
+      const panel = await openSessions();
+      act(() => bookmarkCounts.onNext(new Map([['keynote', 3], ['data', 12], ['lost', 7], ['gone', 40]])));
+
+      const table = within(panel).getByRole('table', { name: 'Sessions by saves, most first.' });
+      const rows = within(table).getAllByRole('row').slice(1)
+        .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent));
+      // Neither title order nor schedule order: count order. A count for a
+      // session that no longer exists is left out.
+      expect(rows).toEqual([
+        ['Data desk', 'Day two', '12'],
+        ['Lost day', 'Not on a configured day', '7'],
+        ['Keynote', 'Day one', '3'],
+      ]);
+      expect(within(table).getByRole('columnheader', { name: 'Saved' })).toHaveAttribute('aria-sort', 'descending');
+      expect(within(table).getByRole('link', { name: 'Data desk' })).toHaveAttribute('href', '/admin/sessions/data');
+      // The region scrolls on its own, and a keyboard can reach it.
+      const region = within(panel).getByRole('region', { name: 'Sessions by saves, most first.' });
+      expect(region).toHaveAttribute('tabindex', '0');
+      expect(region.className).toMatch(/max-h-\[20rem\]/);
+      // Audience research and Lunch are on the site with no saves; the draft
+      // cannot have been saved, so it is not counted.
+      expect(panel.textContent).toContain('2 sessions on the site have no saves yet.');
+      expect(panel.textContent).not.toContain('Saving sessions is off');
+    });
+
+    it('states when no session has been saved', async () => {
+      const panel = await openSessions();
+      act(() => bookmarkCounts.onNext(new Map()));
+      expect(within(panel).getByText('No session has been saved yet.')).toBeInTheDocument();
+      expect(within(panel).queryByRole('table')).toBeNull();
+      expect(panel.textContent).toContain('5 sessions on the site have no saves yet.');
+    });
+
+    it('says the counts cannot change while saving sessions is off', async () => {
+      const panel = await openSessions({ sessionBookmarks: false });
+      act(() => bookmarkCounts.onNext(new Map([['keynote', 1]])));
+      expect(panel.textContent).toContain('Saving sessions is off for this event, so these counts do not change.');
+      expect(within(panel).getByRole('table')).toBeInTheDocument();
+    });
+
+    it('says it is loading until the first counts arrive, and keeps the last counts when the listener fails', async () => {
+      const panel = await openSessions();
+      expect(within(panel).getByRole('status', { name: 'Loading saves…' })).toBeInTheDocument();
+
+      act(() => bookmarkCounts.onNext(new Map([['audience', 2]])));
+      expect(within(panel).queryByRole('status', { name: 'Loading saves…' })).toBeNull();
+      act(() => bookmarkCounts.onError(new Error('unavailable')));
+      expect(within(panel).getByText(/We lost the connection to the saves/)).toBeInTheDocument();
+      expect(within(panel).getByRole('link', { name: 'Audience research' })).toBeInTheDocument();
+
+      act(() => bookmarkCounts.onNext(new Map([['audience', 3]])));
+      expect(within(panel).queryByText(/We lost the connection to the saves/)).toBeNull();
+      expect(within(panel).getAllByRole('cell').map((cell) => cell.textContent)).toContain('3');
+    });
+
+    it('says so when the counts fail before any arrive', async () => {
+      const panel = await openSessions();
+      act(() => bookmarkCounts.onError(new Error('unavailable')));
+      expect(within(panel).getByText('We could not load the saves. We keep trying.')).toBeInTheDocument();
+      expect(within(panel).queryByRole('status', { name: 'Loading saves…' })).toBeNull();
+    });
+
+    it('puts the panel between the title band and the day groups in the keyboard path', async () => {
+      const panel = await openSessions();
+      act(() => bookmarkCounts.onNext(new Map([['keynote', 3]])));
+      const main = document.getElementById('admin-content');
+      const stops = [...main.querySelectorAll('a[href], button, [tabindex="0"]')];
+      const names = stops.map((el) => el.getAttribute('aria-label') ?? el.textContent);
+      const create = names.indexOf('Create a session');
+      const region = names.indexOf('Sessions by saves, most first.');
+      expect(create).toBeGreaterThanOrEqual(0);
+      expect(region).toBe(create + 1);
+      expect(names[region + 1]).toBe('Keynote');
+      // Then the day groups, whose first row link is Keynote again.
+      expect(names.slice(region + 2)).toContain('Keynote');
+      expect(panel.compareDocumentPosition(screen.getByRole('heading', { name: 'Day one' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('draws no panel while there are no sessions', async () => {
+      await renderAt('/admin/sessions');
+      await screen.findByRole('heading', { name: 'Sessions' });
+      pushSessions([], []);
+      expect(await screen.findByRole('heading', { name: 'No sessions yet' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Most saved' })).toBeNull();
+    });
   });
 });

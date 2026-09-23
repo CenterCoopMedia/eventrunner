@@ -57,6 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server. The readiness table lists, for pages, content blocks, sessions, organizations, the
   timeline, and updates, the records on the site and the records with unpublished changes. Both
   state zero in words: "No one has signed up yet." and "Nothing is on the site yet."
+- A **Most saved** panel on the admin Sessions page (#182). It ranks sessions by the public
+  bookmark counts, most saved first, in a scrolling ruled table with the session (a link to its
+  editor), its day heading, and the count. It says how many sessions on the site have no saves,
+  says "No session has been saved yet." when none has, says so when saving sessions is switched
+  off, and keeps the last counts under a notice if the listener fails. `useBookmarkCounts` now
+  also answers `ready` and `error`.
 
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.
