@@ -13,15 +13,18 @@ const PLACE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EMPTY_REFERENCES = Object.freeze([]);
 const EMPTY_MAP = Object.freeze({ image: '', alt: '', markers: EMPTY_REFERENCES });
 
-// `persisted` and `idTouched` are the form's own flags, never stored:
-// venueReferencesPayload sends id, name, and floor only. A new place's id
-// follows its name until `idTouched` says somebody typed in the id field.
+// `persisted`, `idTouched`, and `refId` are the form's own flags, never
+// stored: venueReferencesPayload sends id, name, and floor only. A new
+// place's id follows its name until `idTouched` says somebody typed in the id
+// field. `refId` is the last nonempty id the place had: the id its movements
+// and markers point at while the id field is empty for a moment.
 export const blankPlace = () => ({
   id: '',
   name: '',
   floor: '',
   persisted: false,
   idTouched: false,
+  refId: '',
 });
 export const blankMovement = () => ({
   from: '',
@@ -274,34 +277,38 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
    * marker that already picked it moves too, in the same change: the id is
    * the only thing they store, so left alone they would point at nothing.
    * A saved place's id is left to the rule the server enforces instead.
-   * Nothing is rewritten from or to an empty id, or from an id another row
-   * also carries, because then there is no one place the references mean.
+   *
+   * The references follow the place's last nonempty id (`refId`), not the
+   * id as it stands. Clearing a name or an id before typing its replacement
+   * empties the id for a moment; the references wait on the old id and move
+   * when the next one arrives. Nothing moves from an id another row also
+   * carries, because then there is no one place the references mean.
    */
   const changePlace = (index, patch) => {
     const place = places[index];
-    const change = {
-      places: places.map((entry, placeIndex) =>
-        placeIndex === index ? { ...entry, ...patch } : entry,
-      ),
-    };
-    const oldId = place.id;
     const nextId = patch.id;
-    const idMoves = !place.persisted
-      && typeof nextId === 'string'
-      && oldId
+    const idChanges = !place.persisted && typeof nextId === 'string' && nextId !== place.id;
+    const refId = place.refId || place.id;
+    const next = { ...place, ...patch };
+    if (idChanges) next.refId = nextId || refId;
+    const change = {
+      places: places.map((entry, placeIndex) => (placeIndex === index ? next : entry)),
+    };
+    const idMoves = idChanges
+      && refId
       && nextId
-      && nextId !== oldId
-      && !places.some((other, otherIndex) => otherIndex !== index && other.id === oldId);
+      && nextId !== refId
+      && !places.some((other, otherIndex) => otherIndex !== index && other.id === refId);
     if (idMoves) {
-      const follow = (id) => (id === oldId ? nextId : id);
-      if (movements.some((movement) => movement.from === oldId || movement.to === oldId)) {
+      const follow = (id) => (id === refId ? nextId : id);
+      if (movements.some((movement) => movement.from === refId || movement.to === refId)) {
         change.movements = movements.map((movement) => ({
           ...movement,
           from: follow(movement.from),
           to: follow(movement.to),
         }));
       }
-      if (markers.some((marker) => marker.placeId === oldId)) {
+      if (markers.some((marker) => marker.placeId === refId)) {
         change.map = {
           ...map,
           markers: markers.map((marker) => ({ ...marker, placeId: follow(marker.placeId) })),
