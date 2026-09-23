@@ -1,7 +1,7 @@
 'use strict';
 
 const { configuredThemeColor } = require('shared/theme');
-const { safeUrlHref } = require('shared/urlSafety');
+const { listSocialAccounts } = require('shared/config');
 
 /**
  * Template renderer (spec §6.1–6.2).
@@ -70,27 +70,16 @@ function stripHtmlToText(html) {
 }
 
 /**
- * The event's social accounts the mail footer lists.
- *
- * The shared schema refuses a malformed account at save, but a document
- * written before that rule is still read here. So an entry with no service
- * name, or a link that is not an absolute http(s) URL, is dropped, and the
- * href is the canonical form shared/urlSafety approved: the same set the
- * site footer lists (apps/web Layout).
+ * The event's social accounts the mail footer lists: shared/config
+ * listSocialAccounts, the same list the site footer reads (apps/web Layout),
+ * so a document written before the schema refused a malformed, overlong, or
+ * repeated account is cut and filtered the same way in both places.
  *
  * @param {object|null|undefined} social config/event.social
  * @returns {Array<{ platform: string, href: string }>}
  */
 function socialAccounts(social) {
-  const handles = Array.isArray(social?.handles) ? social.handles : [];
-  const accounts = [];
-  for (const h of handles) {
-    if (!h || typeof h.platform !== 'string' || !h.platform.trim()) continue;
-    const href = safeUrlHref(h.url);
-    if (!href) continue;
-    accounts.push({ platform: h.platform.trim(), href });
-  }
-  return accounts;
+  return listSocialAccounts(social).map(({ platform, url }) => ({ platform, href: url }));
 }
 
 /** The accounts as links, for the html footer. @param {object|null|undefined} social */

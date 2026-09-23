@@ -318,6 +318,36 @@ test('every shipped template carries the social accounts in html and text', () =
   }
 });
 
+// A config/event written before the schema refused long or repeated
+// accounts is still read by the mail path. It must list what the site footer
+// lists: each name cut to the shared cap, and one account listed once.
+test('a stored account list the schema would refuse is capped and de-duplicated in both footers', () => {
+  const long = 'L'.repeat(60);
+  const config = {
+    ...CONFIG,
+    event: {
+      ...CONFIG.event,
+      social: {
+        handles: [
+          { platform: 'Mastodon', url: 'https://example.org/@eventname' },
+          { platform: ' Mastodon ', url: 'https://EXAMPLE.org/@eventname' },
+          { platform: long, url: 'https://example.org/long' },
+        ],
+      },
+    },
+  };
+  const out = render({
+    template: getDefaultTemplate('account.welcome'),
+    tokenValues: { first_name: 'Ada', profile_url: 'https://summit.example.org/profile' },
+    config,
+  });
+  assert.equal(out.text.match(/Mastodon: /g).length, 1, out.text);
+  assert.equal(out.html.match(/>Mastodon</g).length, 1);
+  assert.ok(out.text.includes(`${'L'.repeat(40)}: https://example.org/long`), out.text);
+  assert.ok(!out.text.includes('L'.repeat(41)));
+  assert.ok(!out.html.includes('L'.repeat(41)));
+});
+
 test('an event with no usable social account adds nothing to either footer', () => {
   const template = getDefaultTemplate('account.welcome');
   const tokenValues = { first_name: 'Ada', profile_url: 'https://summit.example.org/profile' };

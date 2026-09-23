@@ -13,6 +13,7 @@ export {
   isHttpsUrl,
   httpsUrlHref,
 } from './schema.cjs';
+export { listSocialAccounts } from './socialAccounts.cjs';
 export {
   validateDeployEnv,
   REQUIRED_ALWAYS,
