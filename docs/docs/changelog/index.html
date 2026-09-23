@@ -220,6 +220,10 @@
           place is, how a session names one, how a one-way movement is entered and where the site shows
           it, how the map lists and marks places, and every rule the save checks. It also covers the new
           Social accounts panel (#226).</li>
+          <li>The profile and speaker photo fields, and the shared avatar and missing-asset components, now
+          read the same tier 2 role tokens (<code>--color-*</code>, <code>--rule-*</code>) every other public component reads,
+          instead of the retired brand-* utility names. Rendered colour is pixel-identical in every site
+          style and mode (#247).</li>
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
           <ul>
@@ -364,6 +368,13 @@
           <h3 id="fixed-1">Fixed<a class="heading-anchor" href="#fixed-1" aria-label="Link to this section">#</a></h3>
           <ul>
           <li>Firebase deployment validation no longer requires <code>VITE_FIREBASE_MEASUREMENT_ID</code> when Google Analytics is disabled (#101).</li>
+          <li>The admin sessions list showed a day&#39;s raw document id (&quot;day-2&quot;) as its heading whenever the day
+          had no label, or whenever a session pointed at a day no longer in the event&#39;s configured list. A
+          heading now falls back to the day&#39;s own date, then to its position (&quot;Day 2&quot;) when it has no date,
+          and to a plain &quot;Not on a configured day&quot; line when the day itself is missing — never to the id
+          (#248).</li>
+          <li>The venue editor&#39;s payload helper sent a blank walking-minutes field as <code>0</code>, a real distance an
+          operator can mean, instead of failing to save. It now sends <code>null</code> (#227).</li>
           </ul>
           <p>The feature set itself is specified in <a href="/eventrunner/docs/decisions/0001-event-platform-v1/">docs/adr/0001-event-platform-v1.md</a>. Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.</p>
         </article>
