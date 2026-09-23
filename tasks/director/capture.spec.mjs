@@ -1,3 +1,4 @@
+/* global document -- read inside page.evaluate callbacks, which run in the browser */
 // Reusable PR-evidence screenshot spec (see capture.sh in this same
 // directory for how it gets run).
 //
