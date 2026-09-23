@@ -106,6 +106,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   package, read by the header navigation, the sitemap and robots builders, and the server-rendered
   route metadata. The contract is the strict `visible === true` the sitemap and the server already
   applied; the navigation now reads the field the same way. No generated output changed.
+- The admin guide now covers the Places, Movements, and Venue map panels in event settings: What a
+  place is, how a session names one, how a one-way movement is entered and where the site shows
+  it, how the map lists and marks places, and every rule the save checks. It also covers the new
+  Social accounts panel (#226).
 
 ### Fixed
 
