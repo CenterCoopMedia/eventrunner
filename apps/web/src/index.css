@@ -1939,13 +1939,21 @@
   }
   .long-read-opening .rich-text:first-child > p:first-child::first-letter {
     float: var(--drop-cap-float);
-    font-family: var(--drop-cap-font);
     font-size: var(--drop-cap-size);
-    line-height: var(--drop-cap-leading);
-    font-weight: var(--drop-cap-weight);
-    color: var(--drop-cap-ink);
     padding-inline-end: var(--drop-cap-pad-inline-end);
-    margin-block-start: var(--drop-cap-margin-block-start);
+  }
+  /* The cap's face, leading, weight, ink and lift apply only while the
+     letter floats: a first letter that is not a cap keeps its paragraph's
+     own. A browser that cannot read a style query draws the floated letter
+     at its size in the paragraph's face, which is still a cap. */
+  @container style(--drop-cap-float: left) {
+    .long-read-opening .rich-text:first-child > p:first-child::first-letter {
+      font-family: var(--drop-cap-font);
+      line-height: var(--drop-cap-leading);
+      font-weight: var(--drop-cap-weight);
+      color: var(--drop-cap-ink);
+      margin-block-start: var(--drop-cap-margin-block-start);
+    }
   }
 }
 

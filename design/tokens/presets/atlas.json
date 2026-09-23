@@ -105,7 +105,6 @@
     "--legend-font": "var(--font-mono)",
     "--state-marker-font": "var(--font-mono)",
     "--standfirst-font": "var(--font-heading)",
-    "--standfirst-weight": "var(--weight-regular)",
     "--byline-font": "var(--font-mono)"
   },
 
@@ -224,13 +223,7 @@
           "tokens": {
             "--drop-cap-float": "left",
             "--drop-cap-size": "3.1em",
-            "--drop-cap-leading": "0.8",
-            "--drop-cap-font": "var(--font-heading)",
-            "--drop-cap-weight": "var(--weight-semibold)",
-            "--drop-cap-pad-inline-end": "var(--space-xs)",
-            "--drop-cap-margin-block-start": "0.08em",
-            "--long-read-opening-size": "var(--text-body)",
-            "--long-read-opening-leading": "var(--text-body-leading)"
+            "--drop-cap-pad-inline-end": "var(--space-xs)"
           }
         },
         {
@@ -238,13 +231,6 @@
           "label": "Standfirst",
           "why": "Sets the first paragraph at the lead size, as a summary of the page.",
           "tokens": {
-            "--drop-cap-float": "none",
-            "--drop-cap-size": "1em",
-            "--drop-cap-leading": "inherit",
-            "--drop-cap-font": "inherit",
-            "--drop-cap-weight": "inherit",
-            "--drop-cap-pad-inline-end": "0",
-            "--drop-cap-margin-block-start": "0",
             "--long-read-opening-size": "var(--text-lead)",
             "--long-read-opening-leading": "var(--text-lead-leading)"
           }
@@ -254,15 +240,7 @@
           "label": "Plain",
           "why": "Keeps the first paragraph at body size with no drop cap.",
           "tokens": {
-            "--drop-cap-float": "none",
-            "--drop-cap-size": "1em",
-            "--drop-cap-leading": "inherit",
-            "--drop-cap-font": "inherit",
-            "--drop-cap-weight": "inherit",
-            "--drop-cap-pad-inline-end": "0",
-            "--drop-cap-margin-block-start": "0",
-            "--long-read-opening-size": "var(--text-body)",
-            "--long-read-opening-leading": "var(--text-body-leading)"
+            "--drop-cap-float": "none"
           }
         }
       ]
@@ -277,11 +255,7 @@
           "label": "Route line",
           "why": "Sets the quote beside one strong rule, like a route on the map, with the attribution in the monospaced font.",
           "tokens": {
-            "--pull-quote-rule-block-width": "0",
-            "--pull-quote-rule-inline-width": "var(--rule-strong-width)",
-            "--pull-quote-pad-inline": "var(--space-md)",
-            "--pull-quote-mark-display": "none",
-            "--pull-quote-align": "start"
+            "--pull-quote-rule-block-width": "0"
           }
         },
         {
@@ -289,11 +263,7 @@
           "label": "Boxed sign",
           "why": "Sets the quote between strong rules above and below with the strong rule at its start, like a sign.",
           "tokens": {
-            "--pull-quote-rule-block-width": "var(--rule-strong-width)",
-            "--pull-quote-rule-inline-width": "var(--rule-strong-width)",
-            "--pull-quote-pad-inline": "var(--space-md)",
-            "--pull-quote-mark-display": "none",
-            "--pull-quote-align": "start"
+            "--pull-quote-rule-block-width": "var(--rule-strong-width)"
           }
         }
       ]
@@ -308,10 +278,6 @@
           "label": "Gazetteer",
           "why": "Sets square portraits with tight index rows, like a place index.",
           "tokens": {
-            "--directory-portrait-aspect": "1 / 1",
-            "--directory-portrait-radius": "var(--radius-base)",
-            "--directory-portrait-ground": "rgb(var(--color-surface-alt-rgb))",
-            "--directory-rule-width": "var(--rule-hairline-width)",
             "--directory-entry-pad-block": "var(--space-3xs)"
           }
         },
@@ -321,8 +287,6 @@
           "why": "Sets tall portraits and rules each entry at the strong width, like a departure board.",
           "tokens": {
             "--directory-portrait-aspect": "4 / 5",
-            "--directory-portrait-radius": "var(--radius-base)",
-            "--directory-portrait-ground": "rgb(var(--color-surface-alt-rgb))",
             "--directory-rule-width": "var(--rule-strong-width)",
             "--directory-entry-pad-block": "var(--space-xs)"
           }
@@ -339,8 +303,7 @@
           "label": "Rule and folio",
           "why": "Draws the section rule with the folio at the far end of the heading line.",
           "tokens": {
-            "--section-folio-display": "inline",
-            "--section-folio-placement": "end"
+            "--section-folio-display": "inline"
           }
         },
         {
@@ -348,8 +311,7 @@
           "label": "Rule only",
           "why": "Draws the section rule and hides the folio beside the heading.",
           "tokens": {
-            "--section-folio-display": "none",
-            "--section-folio-placement": "end"
+            "--section-folio-display": "none"
           }
         }
       ]
@@ -364,8 +326,7 @@
           "label": "Hairline rows",
           "why": "Rules the rows and the head at the hairline and draws no column rules.",
           "tokens": {
-            "--table-head-rule-width": "var(--rule-hairline-width)",
-            "--table-column-rule-width": "0"
+            "--table-head-rule-width": "var(--rule-hairline-width)"
           }
         },
         {
@@ -373,8 +334,7 @@
           "label": "Ruled head",
           "why": "Closes the head with a strong rule and rules the rows at the hairline, with no column rules.",
           "tokens": {
-            "--table-head-rule-width": "var(--rule-strong-width)",
-            "--table-column-rule-width": "0"
+            "--table-head-rule-width": "var(--rule-strong-width)"
           }
         },
         {
@@ -382,7 +342,6 @@
           "label": "Full grid",
           "why": "Rules the rows and the columns at the hairline, with the head closed at the width the style sets.",
           "tokens": {
-            "--table-head-rule-width": "var(--rule-strong-width)",
             "--table-column-rule-width": "var(--rule-hairline-width)"
           }
         }

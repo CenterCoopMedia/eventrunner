@@ -231,13 +231,7 @@
           "tokens": {
             "--drop-cap-float": "left",
             "--drop-cap-size": "3.1em",
-            "--drop-cap-leading": "0.8",
-            "--drop-cap-font": "var(--font-heading)",
-            "--drop-cap-weight": "var(--weight-semibold)",
-            "--drop-cap-pad-inline-end": "var(--space-xs)",
-            "--drop-cap-margin-block-start": "0.08em",
-            "--long-read-opening-size": "var(--text-body)",
-            "--long-read-opening-leading": "var(--text-body-leading)"
+            "--drop-cap-pad-inline-end": "var(--space-xs)"
           }
         },
         {
@@ -245,13 +239,6 @@
           "label": "Standfirst",
           "why": "Sets the first paragraph at the lead size, as a summary of the page.",
           "tokens": {
-            "--drop-cap-float": "none",
-            "--drop-cap-size": "1em",
-            "--drop-cap-leading": "inherit",
-            "--drop-cap-font": "inherit",
-            "--drop-cap-weight": "inherit",
-            "--drop-cap-pad-inline-end": "0",
-            "--drop-cap-margin-block-start": "0",
             "--long-read-opening-size": "var(--text-lead)",
             "--long-read-opening-leading": "var(--text-lead-leading)"
           }
@@ -261,15 +248,7 @@
           "label": "Plain",
           "why": "Keeps the first paragraph at body size with no drop cap.",
           "tokens": {
-            "--drop-cap-float": "none",
-            "--drop-cap-size": "1em",
-            "--drop-cap-leading": "inherit",
-            "--drop-cap-font": "inherit",
-            "--drop-cap-weight": "inherit",
-            "--drop-cap-pad-inline-end": "0",
-            "--drop-cap-margin-block-start": "0",
-            "--long-read-opening-size": "var(--text-body)",
-            "--long-read-opening-leading": "var(--text-body-leading)"
+            "--drop-cap-float": "none"
           }
         }
       ]
@@ -284,12 +263,7 @@
           "label": "Handwritten",
           "why": "Sets the quote in the script typeface at a small angle between strong rules.",
           "tokens": {
-            "--callout-angle": "-2.5deg",
-            "--pull-quote-rule-block-width": "var(--rule-strong-width)",
-            "--pull-quote-rule-inline-width": "0",
-            "--pull-quote-pad-inline": "0",
-            "--pull-quote-pad-block": "var(--space-lg)",
-            "--pull-quote-mark-display": "none"
+            "--pull-quote-rule-block-width": "var(--rule-strong-width)"
           }
         },
         {
@@ -301,11 +275,7 @@
           },
           "tokens": {
             "--callout-angle": "0deg",
-            "--pull-quote-rule-block-width": "var(--rule-strong-width)",
-            "--pull-quote-rule-inline-width": "0",
-            "--pull-quote-pad-inline": "0",
-            "--pull-quote-pad-block": "var(--space-md)",
-            "--pull-quote-mark-display": "none"
+            "--pull-quote-pad-block": "var(--space-md)"
           }
         },
         {
@@ -313,12 +283,10 @@
           "label": "Cut-out",
           "why": "Sets the quote in the script typeface beside one strong rule, with no rules above or below.",
           "tokens": {
-            "--callout-angle": "-2.5deg",
             "--pull-quote-rule-block-width": "0",
             "--pull-quote-rule-inline-width": "var(--rule-strong-width)",
             "--pull-quote-pad-inline": "var(--space-md)",
-            "--pull-quote-pad-block": "var(--space-sm)",
-            "--pull-quote-mark-display": "none"
+            "--pull-quote-pad-block": "var(--space-sm)"
           }
         }
       ]
@@ -333,11 +301,8 @@
           "label": "Contact sheet",
           "why": "Sets square portraits with square corners between strong rules.",
           "tokens": {
-            "--directory-portrait-aspect": "1 / 1",
             "--directory-portrait-radius": "0",
-            "--directory-portrait-ground": "rgb(var(--color-surface-alt-rgb))",
-            "--directory-rule-width": "var(--rule-strong-width)",
-            "--directory-entry-pad-block": "var(--space-2xs)"
+            "--directory-rule-width": "var(--rule-strong-width)"
           }
         },
         {
@@ -347,9 +312,7 @@
           "tokens": {
             "--directory-portrait-aspect": "4 / 5",
             "--directory-portrait-radius": "0",
-            "--directory-portrait-ground": "rgb(var(--color-surface-rgb))",
-            "--directory-rule-width": "var(--rule-hairline-width)",
-            "--directory-entry-pad-block": "var(--space-2xs)"
+            "--directory-portrait-ground": "rgb(var(--color-surface-rgb))"
           }
         }
       ]
@@ -364,8 +327,7 @@
           "label": "Rule and folio",
           "why": "Draws the section rule with the folio at the far end of the heading line.",
           "tokens": {
-            "--section-folio-display": "inline",
-            "--section-folio-placement": "end"
+            "--section-folio-display": "inline"
           }
         },
         {
@@ -373,8 +335,7 @@
           "label": "Rule only",
           "why": "Draws the section rule and hides the folio beside the heading.",
           "tokens": {
-            "--section-folio-display": "none",
-            "--section-folio-placement": "end"
+            "--section-folio-display": "none"
           }
         }
       ]
@@ -389,8 +350,7 @@
           "label": "Hairline rows",
           "why": "Rules the rows and the head at the hairline and draws no column rules.",
           "tokens": {
-            "--table-head-rule-width": "var(--rule-hairline-width)",
-            "--table-column-rule-width": "0"
+            "--table-head-rule-width": "var(--rule-hairline-width)"
           }
         },
         {
@@ -398,8 +358,7 @@
           "label": "Ruled head",
           "why": "Closes the head with a strong rule and rules the rows at the hairline, with no column rules.",
           "tokens": {
-            "--table-head-rule-width": "var(--rule-strong-width)",
-            "--table-column-rule-width": "0"
+            "--table-head-rule-width": "var(--rule-strong-width)"
           }
         },
         {
@@ -407,7 +366,6 @@
           "label": "Full grid",
           "why": "Rules the rows and the columns at the hairline, with the head closed at the width the style sets.",
           "tokens": {
-            "--table-head-rule-width": "var(--rule-strong-width)",
             "--table-column-rule-width": "var(--rule-hairline-width)"
           }
         }

@@ -188,13 +188,7 @@
           "tokens": {
             "--drop-cap-float": "left",
             "--drop-cap-size": "3.1em",
-            "--drop-cap-leading": "0.8",
-            "--drop-cap-font": "var(--font-heading)",
-            "--drop-cap-weight": "var(--weight-semibold)",
-            "--drop-cap-pad-inline-end": "var(--space-xs)",
-            "--drop-cap-margin-block-start": "0.08em",
-            "--long-read-opening-size": "var(--text-body)",
-            "--long-read-opening-leading": "var(--text-body-leading)"
+            "--drop-cap-pad-inline-end": "var(--space-xs)"
           }
         },
         {
@@ -202,13 +196,6 @@
           "label": "Standfirst",
           "why": "Sets the first paragraph at the lead size, as a summary of the page.",
           "tokens": {
-            "--drop-cap-float": "none",
-            "--drop-cap-size": "1em",
-            "--drop-cap-leading": "inherit",
-            "--drop-cap-font": "inherit",
-            "--drop-cap-weight": "inherit",
-            "--drop-cap-pad-inline-end": "0",
-            "--drop-cap-margin-block-start": "0",
             "--long-read-opening-size": "var(--text-lead)",
             "--long-read-opening-leading": "var(--text-lead-leading)"
           }
@@ -218,15 +205,7 @@
           "label": "Plain",
           "why": "Keeps the first paragraph at body size with no drop cap.",
           "tokens": {
-            "--drop-cap-float": "none",
-            "--drop-cap-size": "1em",
-            "--drop-cap-leading": "inherit",
-            "--drop-cap-font": "inherit",
-            "--drop-cap-weight": "inherit",
-            "--drop-cap-pad-inline-end": "0",
-            "--drop-cap-margin-block-start": "0",
-            "--long-read-opening-size": "var(--text-body)",
-            "--long-read-opening-leading": "var(--text-body-leading)"
+            "--drop-cap-float": "none"
           }
         }
       ]
@@ -241,13 +220,7 @@
           "label": "Centred with an opening mark",
           "why": "Centres the quote between hairlines with a large opening mark and a small-capitals attribution.",
           "tokens": {
-            "--pull-quote-rule-rgb": "var(--rule-hairline-rgb)",
-            "--pull-quote-rule-block-width": "var(--rule-hairline-width)",
-            "--pull-quote-rule-inline-width": "0",
-            "--pull-quote-pad-inline": "0",
-            "--pull-quote-mark-display": "block",
-            "--pull-quote-align": "center",
-            "--pull-quote-attribution-transform": "uppercase"
+            "--pull-quote-rule-block-width": "var(--rule-hairline-width)"
           }
         },
         {
@@ -255,13 +228,11 @@
           "label": "Column rule",
           "why": "Sets the quote beside one hairline, like a boxed paragraph in a column, with no mark.",
           "tokens": {
-            "--pull-quote-rule-rgb": "var(--rule-hairline-rgb)",
             "--pull-quote-rule-block-width": "0",
             "--pull-quote-rule-inline-width": "var(--rule-hairline-width)",
             "--pull-quote-pad-inline": "var(--space-md)",
             "--pull-quote-mark-display": "none",
-            "--pull-quote-align": "start",
-            "--pull-quote-attribution-transform": "uppercase"
+            "--pull-quote-align": "start"
           }
         }
       ]
@@ -276,10 +247,7 @@
           "label": "Agate directory",
           "why": "Sets square portraits and tight index rows, like a newspaper directory.",
           "tokens": {
-            "--directory-portrait-aspect": "1 / 1",
             "--directory-portrait-radius": "0",
-            "--directory-portrait-ground": "rgb(var(--color-surface-alt-rgb))",
-            "--directory-rule-width": "var(--rule-hairline-width)",
             "--directory-entry-pad-block": "var(--space-3xs)"
           }
         },
@@ -290,9 +258,7 @@
           "tokens": {
             "--directory-portrait-aspect": "4 / 5",
             "--directory-portrait-radius": "0",
-            "--directory-portrait-ground": "rgb(var(--color-surface-alt-rgb))",
-            "--directory-rule-width": "var(--rule-strong-width)",
-            "--directory-entry-pad-block": "var(--space-2xs)"
+            "--directory-rule-width": "var(--rule-strong-width)"
           }
         }
       ]
@@ -307,8 +273,7 @@
           "label": "Rule and folio",
           "why": "Draws the section rule with the folio at the far end of the heading line.",
           "tokens": {
-            "--section-folio-display": "inline",
-            "--section-folio-placement": "end"
+            "--section-folio-display": "inline"
           }
         },
         {
@@ -316,8 +281,7 @@
           "label": "Rule only",
           "why": "Draws the section rule and hides the folio beside the heading.",
           "tokens": {
-            "--section-folio-display": "none",
-            "--section-folio-placement": "end"
+            "--section-folio-display": "none"
           }
         },
         {
@@ -325,7 +289,6 @@
           "label": "Folio in the margin",
           "why": "Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.",
           "tokens": {
-            "--section-folio-display": "inline",
             "--section-folio-placement": "margin"
           }
         }
@@ -341,8 +304,7 @@
           "label": "Hairline rows",
           "why": "Rules the rows and the head at the hairline and draws no column rules.",
           "tokens": {
-            "--table-head-rule-width": "var(--rule-hairline-width)",
-            "--table-column-rule-width": "0"
+            "--table-head-rule-width": "var(--rule-hairline-width)"
           }
         },
         {
@@ -350,8 +312,7 @@
           "label": "Ruled head",
           "why": "Closes the head with a strong rule and rules the rows at the hairline, with no column rules.",
           "tokens": {
-            "--table-head-rule-width": "var(--rule-strong-width)",
-            "--table-column-rule-width": "0"
+            "--table-head-rule-width": "var(--rule-strong-width)"
           }
         },
         {

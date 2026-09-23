@@ -320,16 +320,16 @@
     "--directory-portrait-radius": "var(--radius-base)",
     "--directory-entry-pad-block": "var(--space-2xs)"
   },
-  "$long-read-note": "The opening of a long read (record §3.1, brief §2.1): a drop cap, a standfirst, or plain. The Long read opening option in each preset picks one by remapping these tokens; the contract defaults are the plain opening, so a style that names nothing draws no cap. One drop cap per page at most, on the first paragraph of the first block of a page on the Long read template, never on a short intro and never on a card. Broadsheet and Field Guide default to the cap, Newsroom to the standfirst, Civic, Zine and Atlas to plain.",
+  "$long-read-note": "The opening of a long read (record §3.1, brief §2.1): a drop cap, a standfirst, or plain. The Long read opening option in each preset picks one by remapping these tokens; the contract defaults are the plain opening, so a style that names nothing draws no cap. The cap's face, leading, weight, ink and lift apply only while the first letter floats (a style query in index.css), so a choice moves three tokens to turn the cap on and two to size the opening line. One drop cap per page at most, on the first paragraph of the first block of a page on the Long read template, never on a short intro and never on a card. Broadsheet and Field Guide default to the cap, Newsroom to the standfirst, Civic, Zine and Atlas to plain.",
   "long-read": {
     "--drop-cap-float": "none",
     "--drop-cap-size": "1em",
-    "--drop-cap-leading": "inherit",
-    "--drop-cap-font": "inherit",
-    "--drop-cap-weight": "inherit",
-    "--drop-cap-ink": "currentColor",
     "--drop-cap-pad-inline-end": "0",
-    "--drop-cap-margin-block-start": "0",
+    "--drop-cap-font": "var(--font-heading)",
+    "--drop-cap-leading": "0.8",
+    "--drop-cap-weight": "var(--weight-semibold)",
+    "--drop-cap-ink": "currentColor",
+    "--drop-cap-margin-block-start": "0.08em",
     "--long-read-opening-size": "var(--text-body)",
     "--long-read-opening-leading": "var(--text-body-leading)"
   }
