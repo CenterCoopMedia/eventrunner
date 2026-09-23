@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The email log, under Operations, for staff and operators: every message the site sent, newest
+  first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
+  word. Search looks in the recipient and the subject across the 500 most recent messages at a
+  time; the source and status filters stay in the page address, and the search text never does.
+  A preview opens the stored body in an empty sandboxed frame under a content policy that blocks
+  script, remote images, and every other fetch, so opening a message sends nothing to any other
+  site. Sign-in codes and speaker invitations still store no body. Two staff-tier endpoints,
+  `listSentEmails` and `getSentEmail`, are the only readers of `sent_emails`, whose rules stay
+  closed to every browser; each preview read is recorded in the admin log by account and record
+  only (#183).
 - `docs/adr/0003-optional-google-calendar-sync.md`, the proposed decision record for the optional
   Google Calendar sync of saved sessions (#177). It supersedes the one row of ADR 0001 §9 that
   removed the feature, names the client's own Google Cloud project as the owner of the consent

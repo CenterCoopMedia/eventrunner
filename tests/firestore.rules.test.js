@@ -512,6 +512,31 @@ describe("server-only collections stay deny-all", () => {
     });
   }
 
+  // The email log (issue #183) reads sent_emails through listSentEmails and
+  // getSentEmail on the server. The rules stay closed: no tier lists the
+  // collection or reads a row from the browser, because a stored body can
+  // hold personal data and a list would carry every recipient.
+  it("denies a list query on sent_emails to admin, staff and non-admin, and a get to staff and non-admin", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sent_emails/logged-1"), {
+        to: "reader@example.com",
+        subject: "Welcome",
+        source: "feedback",
+        status: "sent",
+        bodyStored: true,
+        html: "<p>Hello.</p>",
+        sentAt: new Date(1000),
+      });
+    });
+    for (const db of [admin(), staff(), nonAdmin()]) {
+      await assertFails(getDocs(collection(db, "sent_emails")));
+      await assertFails(getDocs(query(collection(db, "sent_emails"), where("source", "==", "feedback"))));
+    }
+    for (const db of [staff(), nonAdmin()]) {
+      await assertFails(getDoc(doc(db, "sent_emails/logged-1")));
+    }
+  });
+
   it("denies unmatched collections (catch-all)", async () => {
     await assertFails(getDoc(doc(anon(), "activity_logs/a1")));
     await assertFails(setDoc(doc(nonAdmin(), "activity_logs/a1"), { x: 1 }));
