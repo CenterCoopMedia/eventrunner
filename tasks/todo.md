@@ -47,7 +47,7 @@ and the pull request says "Refs #177", not "Closes".
 | b4 | Opus | #188 | queued |
 | b5 | Opus | #189 | queued |
 | b6 | Opus | #218 | dispatched from the #262 tip |
-| b7 | Fable | #177 decision record only | dispatched from the #262 tip |
+| b7 | Fable | #177 decision record only | opened as #264 |
 | c1 | Opus | #190, #191 | queued (M10) |
 | c2 | Opus | #192, #193 | queued |
 | c3 | Opus | #194 | queued |
@@ -70,7 +70,8 @@ and the pull request says "Refs #177", not "Closes".
 | Pull request | Branch | Issues |
 |---|---|---|
 | #262 (merged 2026-09-23) | `joe/confident-gates-gy99ip` | #231, #226 |
-| next | `joe/confident-gates-gy99ip`, restarted from main | #248, #227, #230, #247 |
+| #263 | `joe/confident-gates-gy99ip`, restarted from main | #248, #227, #230, #247 |
+| #264 | `joe/confident-gates-gy99ip-3-calendar-record` | refs #177 (record only) |
 
 ### After every integration
 
