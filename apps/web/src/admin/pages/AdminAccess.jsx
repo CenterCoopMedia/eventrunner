@@ -7,7 +7,9 @@
 // listener here: a plain fetch on mount and after every accepted change, the
 // same shape AdminSystemErrors takes for its server-only rows. A first load
 // that fails is an error state with one retry, never an empty list: an
-// empty list would say "nobody has access", which is not what happened.
+// empty list would say "nobody has access", which is not what happened. The
+// retry control stays mounted and busy while it runs, so the keyboard stays
+// on it; when the list it asked for lands, focus moves to the table.
 //
 // THE GALLEY, AS A TABLE. One ruled table of accounts: the address in the
 // data face, the tier as a word in a badge, and the row's quiet actions as
@@ -26,13 +28,14 @@
 // destructive. A grant to an address that already holds that tier is said
 // in place and opens nothing.
 //
-// FOCUS FOLLOWS THE SURFACE. Onto it when it opens. When it closes — after
-// a confirmed change or a cancel — back to the control that opened it, or,
-// if that control's row is gone, to the grant field. After a refusal, onto
-// the refusal itself. Every move happens in an effect AFTER the render that
-// mounts or unmounts the element, because a focus call made in the async
-// continuation lands on a node React is about to remove and drops to the
-// body.
+// FOCUS FOLLOWS THE SURFACE. Onto it when it opens — and only then: a list
+// that lands while it is open changes nothing about where the keyboard is.
+// When it closes — after a confirmed change or a cancel — back to the
+// control that opened it, or, if that control's row is gone, to the grant
+// field. After a refusal, onto the refusal itself. Every move happens in an
+// effect AFTER the render that mounts or unmounts the element, because a
+// focus call made in the async continuation lands on a node React is about
+// to remove and drops to the body.
 //
 // The server's refusal is shown verbatim and in place — "At least one
 // operator must keep access." names the rule an operator just met — and it
@@ -101,8 +104,8 @@ export function describeChange({ email, tier, previousTier }) {
     return {
       title: `Set ${word} access for ${email}`,
       consequence: tier === 'operator'
-        ? `${email} will have operator access to the admin panel at once: every section, including ${TIER_SCOPE.operatorOnly}.`
-        : `${email} will have staff access to the admin panel at once: ${TIER_SCOPE.staff}.`,
+        ? `${email} will have operator access to the admin panel at once and can open every section, including ${TIER_SCOPE.operatorOnly}.`
+        : `${email} will have staff access to the admin panel at once and can run ${TIER_SCOPE.staff}.`,
       confirmLabel: `Set ${word} access`,
       destructive: false,
     };
@@ -227,11 +230,16 @@ export default function AdminAccess() {
   // async continuation that closes the surface.
   const triggerRef = useRef(null);
   const returnFocusRef = useRef(false);
+  // Whether the next list to land should take focus: "Try again" asks for
+  // it, because that control leaves the page the moment the list arrives.
+  const focusListRef = useRef(false);
+  const listRef = useRef(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ focusList = false } = {}) => {
     setLoading(true);
     try {
       const response = await call('listAdminAccess', {});
+      focusListRef.current = focusList;
       setAccounts(Array.isArray(response?.accounts) ? response.accounts : []);
       setCallerEmail(typeof response?.callerEmail === 'string' ? response.callerEmail : null);
       setLoadError(null);
@@ -247,7 +255,9 @@ export default function AdminAccess() {
   }, [load]);
 
   // Focus follows the surface (see the file comment). Runs after the render
-  // that mounted or unmounted it, so the node it lands on exists.
+  // that mounted or unmounted it, so the node it lands on exists — and only
+  // when the pending change itself moves (opens, closes, or is replaced by
+  // another), never because the list behind it reloaded.
   useEffect(() => {
     if (pending) {
       surfaceRef.current?.focus();
@@ -259,7 +269,15 @@ export default function AdminAccess() {
     triggerRef.current = null;
     if (trigger && trigger.isConnected) trigger.focus();
     else formRef.current?.querySelector('input')?.focus();
-  }, [pending, accounts]);
+  }, [pending]);
+
+  // The list "Try again" asked for has landed: the keyboard was on that
+  // control, which is gone now, so it goes to what was asked for.
+  useEffect(() => {
+    if (accounts === null || !focusListRef.current) return;
+    focusListRef.current = false;
+    listRef.current?.focus();
+  }, [accounts]);
 
   // A refusal is read where it lands, not from wherever the disabled confirm
   // button dropped the keyboard.
@@ -392,7 +410,7 @@ export default function AdminAccess() {
 
       {result ? <Notice tone={result.tone} message={result.message} /> : null}
 
-      {accounts === null && loading ? (
+      {accounts === null && loading && !loadError ? (
         <AdminLoadingState label="Loading access…" />
       ) : accounts === null ? (
         <div className="flex flex-col gap-xs">
@@ -401,8 +419,17 @@ export default function AdminAccess() {
             message={`The access list could not be loaded${loadError?.message ? `: ${loadError.message}` : '.'}`}
           />
           <div>
-            <button type="button" className={secondaryButtonClass} onClick={load}>
-              Try again
+            {/* The same control through the retry: busy, not gone, so the
+                keyboard stays on it whether the retry lands or fails. */}
+            <button
+              type="button"
+              className={secondaryButtonClass}
+              aria-busy={loading || undefined}
+              onClick={() => {
+                if (!loading) load({ focusList: true });
+              }}
+            >
+              {loading ? 'Loading…' : 'Try again'}
             </button>
           </div>
         </div>
@@ -421,7 +448,7 @@ export default function AdminAccess() {
             />
           ) : (
             <Panel flush>
-              <table className="w-full border-collapse text-admin-sm">
+              <table ref={listRef} tabIndex={-1} className="w-full border-collapse text-admin-sm">
                 <caption className="sr-only">Admin accounts and their tier</caption>
                 <thead>
                   <tr>

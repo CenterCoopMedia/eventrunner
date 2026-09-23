@@ -8,7 +8,7 @@
 // announcements; each has a test here that reads document.activeElement or
 // the exact words.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const callMock = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
@@ -213,14 +213,18 @@ describe('AdminAccess', () => {
     await renderPage({ set: serverError(409, 'last-operator', message) });
     fireEvent.click(rowFor('ops@example.org').querySelectorAll('button')[1]);
     const surface = screen.getByRole('region', { name: 'Remove access for ops@example.org' });
-    fireEvent.click(within(surface).getByRole('button', { name: 'Remove access' }));
+    const confirm = within(surface).getByRole('button', { name: 'Remove access' });
+    confirm.focus();
+    expect(document.activeElement).toBe(confirm);
+    fireEvent.click(confirm);
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe(message);
     expect(screen.getByRole('region', { name: 'Remove access for ops@example.org' })).toBeInTheDocument();
-    // The refusal is where the keyboard is, not the body the disabled
-    // confirm button dropped it to.
-    await waitFor(() => expect(document.activeElement).toContainElement(alert));
+    // The refusal is where the keyboard is — exactly its container, not the
+    // body the disabled confirm button dropped it to.
+    await waitFor(() => expect(document.activeElement).toBe(alert.parentElement));
+    expect(alert.parentElement.tagName).toBe('DIV');
     expect(showToastMock).toHaveBeenCalledWith(message, { tone: 'error', announce: false });
   });
 
@@ -254,11 +258,12 @@ describe('AdminAccess', () => {
     expect(screen.queryByRole('table')).toBeNull();
 
     // A grant is still possible; its confirmation claims nothing about a
-    // standing the page does not know.
+    // standing the page does not know, and its sentence is a sentence.
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'new@example.org' } });
     fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
     const surface = screen.getByRole('region', { name: 'Set staff access for new@example.org' });
     expect(surface.textContent).not.toMatch(/loses|gains/);
+    expect(surface.textContent).toContain(`new@example.org will have staff access to the admin panel at once and can run ${TIER_SCOPE.staff}.`);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     // One retry action, and it loads the list.
@@ -266,6 +271,64 @@ describe('AdminAccess', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('table', { name: 'Admin accounts and their tier' })).toBeInTheDocument();
     expect(screen.getByText('3 accounts, 2 operators')).toBeInTheDocument();
+  });
+
+  it('keeps “Try again” mounted and focused while a retry is in flight and after a second failure', async () => {
+    // The first load fails at once; the retry is held open until the test
+    // has looked at the page mid-flight, then fails too.
+    let failures = 0;
+    let failRetry;
+    callMock.mockImplementation((name) => {
+      if (name !== 'listAdminAccess') return Promise.resolve({});
+      failures += 1;
+      if (failures === 1) return Promise.reject(serverError(500, 'internal', 'down 1'));
+      return new Promise((_, reject) => {
+        failRetry = reject;
+      });
+    });
+    render(<AdminAccess />);
+    const retry = await screen.findByRole('button', { name: 'Try again' });
+    retry.focus();
+    fireEvent.click(retry);
+    // In flight: the SAME control, busy, still where the keyboard is.
+    const busy = await screen.findByRole('button', { name: 'Loading…' });
+    expect(busy).toBe(retry);
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    expect(document.activeElement).toBe(retry);
+    expect(screen.getByRole('alert').textContent).toContain('down 1');
+    // Second failure: the block stays, the button is back, focus never left.
+    await act(async () => {
+      failRetry(serverError(500, 'internal', 'down 2'));
+    });
+    expect(screen.getByRole('button', { name: 'Try again' })).toBe(retry);
+    expect(retry).not.toHaveAttribute('aria-busy');
+    expect(screen.getByRole('alert').textContent).toContain('down 2');
+    expect(document.activeElement).toBe(retry);
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('a list load that lands while a confirmation is open does not pull focus back onto the surface', async () => {
+    callMock.mockImplementation((name) => (name === 'listAdminAccess'
+      ? Promise.reject(serverError(500, 'internal', 'down'))
+      : Promise.resolve({})));
+    render(<AdminAccess />);
+    await screen.findByRole('button', { name: 'Try again' });
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'new@example.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    const surface = screen.getByRole('region', { name: 'Set staff access for new@example.org' });
+    expect(document.activeElement).toBe(surface);
+    const cancel = within(surface).getByRole('button', { name: 'Cancel' });
+    cancel.focus();
+
+    serve();
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    fireEvent.click(retry);
+    const table = await screen.findByRole('table', { name: 'Admin accounts and their tier' });
+    // The surface is still open; the keyboard went to what was asked for.
+    expect(screen.getByRole('region', { name: 'Set staff access for new@example.org' })).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).not.toBe(surface));
+    expect(document.activeElement).toBe(table.closest('[tabindex]') ?? table);
   });
 
   it('a failed LATER reload keeps the list and says so', async () => {
@@ -290,6 +353,12 @@ describe('AdminAccess', () => {
       confirmLabel: 'Set staff access',
       destructive: false,
     });
+    // No colon runs into a lowercase sentence (docs/COPY_STYLE.md).
+    for (const tier of ['staff', 'operator']) {
+      const words = describeChange({ email: 'a@example.org', tier, previousTier: undefined });
+      expect(words.consequence).not.toMatch(/at once: [a-z]/);
+      expect(words.consequence).toMatch(/at once and can (run|open)/);
+    }
     expect(describeChange({ email: 'a@example.org', tier: 'none', previousTier: 'staff' })).toMatchObject({
       confirmLabel: 'Remove access',
       destructive: true,
