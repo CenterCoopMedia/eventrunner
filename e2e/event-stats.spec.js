@@ -10,9 +10,10 @@
 // The overview is then driven in a real browser: the seeded operator signs
 // in, opens /admin, lands on the overview, and every figure sentence on the
 // page is compared with the endpoint's own answer. Milestones (issue #180)
-// are saved through updateEventConfig, the endpoint the event settings page
-// calls, and the overview is watched for them; config/event is put back
-// afterwards.
+// are saved and then emptied through the event settings form, and the
+// overview is read after each save; config/event is put back afterwards.
+// The Sessions page's Most saved panel (issue #182) is read against counts
+// written for the purpose.
 //
 // The spec adds one ticket record per status (the seed writes none) under its
 // own ids and deletes them when it is done, so no later spec meets them.
@@ -198,44 +199,103 @@ test.describe.serial('the event statistics endpoint', () => {
     await expect(page.getByRole('status').filter({ hasText: /^Figures read at / })).toBeVisible();
   });
 
-  test('a saved milestone appears on the overview, and an empty set renders nothing', async ({ page }) => {
-    test.setTimeout(90_000);
-    const token = await adminIdToken();
+  test('a milestone saved on the Event page appears on the overview, and an empty set renders nothing', async ({ page }) => {
+    test.setTimeout(150_000);
     const eventRef = adminDb().doc('config/event');
     const stored = (await eventRef.get()).data();
-    const save = (event) => callFunction('updateEventConfig', { event }, token);
+    const nav = page.getByRole('navigation', { name: 'Admin sections' });
+    const milestones = page.locator('section', { has: page.getByRole('heading', { name: 'Milestones', exact: true }) });
+    const openEventPage = async () => {
+      await nav.getByRole('link', { name: 'Event', exact: true }).click();
+      // The form adopts the live config/event before it is edited.
+      await expect(page.getByLabel('Event name', { exact: true })).toHaveValue(stored.name);
+    };
+    const saveEventPage = async () => {
+      await page.getByRole('button', { name: 'Save event settings' }).click();
+      await expect(page.getByText('Saved. The site picks the change up live.')).toBeVisible();
+    };
     try {
-      const cleared = await save({ milestones: [], registration: { goal: null } });
-      expect(cleared.status, JSON.stringify(cleared.body)).toBe(200);
-
+      await eventRef.update({ milestones: [], 'registration.goal': null });
       await signIn(page, ADMIN_EMAIL);
       await page.goto('/admin/overview');
       await expect(page.getByRole('heading', { name: 'Event figures' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Milestones' })).toHaveCount(0);
-      await expect(page.getByRole('progressbar')).toHaveCount(0);
+      // No milestones and no goal: no panel at all.
+      await expect(page.getByRole('heading', { name: 'Milestones', exact: true })).toHaveCount(0);
 
-      const saved = await save({
-        milestones: [
-          { label: 'E2E programme announced', date: dateInZone(stored.timezone, 12) },
-          { label: 'E2E proposals close', date: dateInZone(stored.timezone, -3) },
-        ],
-        registration: { goal: 500 },
-      });
-      expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+      // Saved through the event settings form, the way an organizer saves them.
+      await openEventPage();
+      await page.getByRole('button', { name: 'Add milestone' }).click();
+      await expect(page.getByLabel('Milestone 1 name', { exact: true })).toBeFocused();
+      await page.getByLabel('Milestone 1 name', { exact: true }).fill('E2E programme announced');
+      await page.getByLabel('Milestone 1 date', { exact: true }).fill(dateInZone(stored.timezone, 12));
+      await page.getByRole('button', { name: 'Add milestone' }).click();
+      await page.getByLabel('Milestone 2 name', { exact: true }).fill('E2E proposals close');
+      await page.getByLabel('Milestone 2 date', { exact: true }).fill(dateInZone(stored.timezone, -3));
+      await page.getByLabel('Registration goal', { exact: true }).fill('500');
+      await saveEventPage();
+      await expect.poll(async () => (await eventRef.get()).data().milestones?.length, { timeout: 15_000 }).toBe(2);
+      expect((await eventRef.get()).data().registration.goal).toBe(500);
 
-      // The overview's live config listener delivers the save; no reload.
-      const panel = page.locator('section', { has: page.getByRole('heading', { name: 'Milestones' }) });
-      await expect(panel).toBeVisible();
-      const items = panel.getByRole('listitem');
+      await nav.getByRole('link', { name: 'Overview', exact: true }).click();
+      await expect(milestones).toBeVisible();
+      const items = milestones.getByRole('listitem');
       await expect(items).toHaveCount(2);
       await expect(items.nth(0)).toContainText('E2E proposals close');
       await expect(items.nth(0)).toContainText('3 days ago');
       await expect(items.nth(1)).toContainText('E2E programme announced');
       await expect(items.nth(1)).toContainText('In 12 days');
-      await expect(panel).toContainText(/\d+ of 500 approved toward the registration goal\./);
-      await expect(panel.getByRole('progressbar')).toHaveAttribute('max', '500');
+      await expect(milestones).toContainText(/\d+ of 500 approved toward the registration goal\./);
+      await expect(milestones.getByRole('progressbar')).toHaveAttribute('max', '500');
+
+      // Emptied through the same form: the overview draws nothing.
+      await openEventPage();
+      await page.getByRole('button', { name: 'Remove milestone 1' }).click();
+      await page.getByRole('button', { name: 'Remove milestone 1' }).click();
+      await expect(page.getByText('No milestones yet.')).toBeVisible();
+      await page.getByLabel('Registration goal', { exact: true }).fill('');
+      await saveEventPage();
+      await expect.poll(async () => (await eventRef.get()).data().milestones, { timeout: 15_000 }).toEqual([]);
+      await nav.getByRole('link', { name: 'Overview', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Event figures' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Milestones', exact: true })).toHaveCount(0);
     } finally {
       await eventRef.set(stored);
+    }
+  });
+
+  // Session popularity (issue #182), on the admin Sessions page, from the
+  // public sessionBookmarks counts the bookmarkSession function keeps. The
+  // counts are written here through the Admin SDK so the order is known;
+  // whatever the collection held before is put back afterwards.
+  test('the Sessions page ranks sessions by saves, and says when none has been saved', async ({ page }) => {
+    test.setTimeout(90_000);
+    const counts = adminDb().collection('sessionBookmarks');
+    const before = (await counts.get()).docs.map((doc) => [doc.id, doc.data()]);
+    for (const [id] of before) await counts.doc(id).delete();
+    const [first, second] = (await adminDb().collection('cmsSchedule').where('visible', '==', true).get()).docs;
+    try {
+      await signIn(page, ADMIN_EMAIL);
+      await page.goto('/admin/sessions');
+      const panel = page.locator('section', { has: page.getByRole('heading', { name: 'Most saved' }) });
+      await expect(panel).toContainText('No session has been saved yet.');
+
+      await counts.doc(first.id).set({ count: 3, updatedAt: new Date() });
+      await counts.doc(second.id).set({ count: 7, updatedAt: new Date() });
+      // The listener delivers the counts; the most saved comes first.
+      const table = panel.getByRole('table', { name: 'Sessions by saves, most first.' });
+      const rows = table.getByRole('row');
+      await expect(rows).toHaveCount(3);
+      await expect(rows.nth(1)).toContainText(second.data().title);
+      await expect(rows.nth(1).getByRole('cell').last()).toHaveText('7');
+      await expect(rows.nth(2)).toContainText(first.data().title);
+      await expect(rows.nth(2).getByRole('cell').last()).toHaveText('3');
+      await expect(table.getByRole('columnheader', { name: 'Saved' })).toHaveAttribute('aria-sort', 'descending');
+      await expect(panel).not.toContainText('No session has been saved yet.');
+      await expect(panel).toContainText(/\d+ sessions? on the site ha(s|ve) no saves yet\./);
+    } finally {
+      await counts.doc(first.id).delete();
+      await counts.doc(second.id).delete();
+      for (const [id, data] of before) await counts.doc(id).set(data);
     }
   });
 });
