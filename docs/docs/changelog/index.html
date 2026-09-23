@@ -130,6 +130,17 @@
           interaction states — it draws the states it has and says which ones it does not have, and why.
           A state that is missing looks the same as a state somebody decided against, and only one of
           those is a defect.</li>
+          <li>Event settings has a Social accounts panel. An operator adds, edits, and removes the event&#39;s own
+          accounts there: A service name, an optional handle, and a link. The site footer lists them, and
+          so does the footer of every built-in email: A link per service in the formatted copy, and one
+          &quot;Service: address&quot; line per account in the plain-text copy. An event with no account gets no
+          row and no blank line. The form and the server both refuse a link that is not an absolute
+          <code>http://</code> or <code>https://</code> address, and each names the field; the event settings form no longer
+          lets the browser&#39;s own check stop a save before the form can mark the field. <code>init-event</code> asks
+          for the accounts as <code>service=link</code> pairs and asks again for a pair the schema would refuse. The
+          shared event schema now validates the <code>legal</code> and <code>social</code> blocks and refuses an unknown field
+          in either by name. The email footer drops a stored link that fails the same check, as the site
+          footer already did (#231).</li>
           </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
@@ -205,6 +216,10 @@
           package, read by the header navigation, the sitemap and robots builders, and the server-rendered
           route metadata. The contract is the strict <code>visible === true</code> the sitemap and the server already
           applied; the navigation now reads the field the same way. No generated output changed.</li>
+          <li>The admin guide now covers the Places, Movements, and Venue map panels in event settings: What a
+          place is, how a session names one, how a one-way movement is entered and where the site shows
+          it, how the map lists and marks places, and every rule the save checks. It also covers the new
+          Social accounts panel (#226).</li>
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
           <ul>
@@ -220,6 +235,10 @@
           verification (#177).</li>
           <li>Pull requests now have a connector completion check for the current commit and unresolved
           review threads. The main branch requires this check and CI, including for administrators.</li>
+          <li>In event settings, a new place&#39;s id kept only the first letter of the name typed into it, and a
+          change to a place, movement, or map marker field moved keyboard focus out of the row. The id now
+          follows the whole name until you type in the id field, and focus stays in the field. Until the
+          save, a movement or map marker that already picked a new place follows its id when it changes.</li>
           </ul>
           <ul>
           <li>Pressing Save in an admin editor with an invalid field did nothing and said nothing, because the
