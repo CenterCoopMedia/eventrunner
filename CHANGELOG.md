@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   access, and every change asks for a confirmation first, is written by the server with the
   address lowercased, and is recorded in the admin log. The server refuses a change that would
   leave the deployment with no operator, including an operator removing their own last grant.
+- `getEventStats`, a staff-tier endpoint for the admin overview (#178). It answers the event's
+  figures as server aggregates: accounts by registration status and completed profiles, ticket
+  records by status, speakers by pipeline status, records on the site and records with unpublished
+  changes for each content collection, and unresolved errors. Every figure is a Firestore
+  `count()`, so no document leaves the database. A caller who is not an admin is refused.
 
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.
