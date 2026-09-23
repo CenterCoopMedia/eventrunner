@@ -47,6 +47,8 @@
     "validateSpeakerInvite",
     "acceptSpeakerInvite",
     "emailDeliveryWebhook",
+    "listSentEmails",
+    "getSentEmail",
     "bookmarkSession",
     "buildSchedulePdf",
     "buildMySchedulePdf",

@@ -11,7 +11,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, and Event settings | The people who run the event day to day |
+| Staff | Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. One field in there stays with the operator: The outbound sender address, because it is the email identity the deployment was verified against. A staff save that changes it is refused and the field is named.
 
@@ -178,6 +178,19 @@ Compose, edit, and delete entries in the live-updates feed shown on the public s
 ## Feedback
 
 Every submission from the public feedback modal, newest first, with a mark-reviewed / archived action. Admins can read the feedback collection directly; only the status change goes through an admin endpoint, because every client write to that collection is denied outright.
+
+## Email log
+
+Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, operator alerts, and ticket prompts. Staff and operators can open it. Nobody can edit or delete a row here.
+
+- **Search** looks for your text in the recipient address and in the subject. Case does not matter. One search reads the 500 most recent messages. If nothing in those 500 matches, the page says so and offers **Search older messages**, which reads the next 500.
+- **Source** picks one kind of message. **Status** picks **Sent** or **Failed**, which is what the mail provider answered when the site sent the message. A later delivery report shows as a word in the Status column: Delivered, Bounced, Complained, or Suppressed.
+- **The filters stay in the page address**, so a reload or a shared link keeps them. The search text does not: An address you search for never enters the page address, the browser history, or an error report.
+- **Preview** opens the stored message under its row, with the plain text version under it. The preview runs no script, loads no remote image, and opens no link, so opening a message sends nothing to any other site. A stored body stops at 100 KB, and the preview says so when a body was cut.
+- **Sign-in codes and speaker invitations never store their body or their subject**, because each one holds a code or a link that signs a person in. Their rows show "Not stored", and their preview says why.
+- **Every preview you open is recorded** in the admin log with your account and the message's record. The record never holds the address or the subject.
+
+Sent messages are closed to every browser, admins included. The page reads them through two admin-gated endpoints.
 
 ## Materials
 

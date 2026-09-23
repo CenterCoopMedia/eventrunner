@@ -158,7 +158,7 @@ An organizer can see how the event is going and act on it without leaving the ad
 - [ ] Add milestones and goals to the event settings (#180)
 - [ ] Add the registration funnel and content readiness panels (#181)
 - [ ] Add session popularity to the admin (#182)
-- [ ] Add the outbound email log (#183)
+- [x] Add the outbound email log (#183)
 - [ ] Add attendee export (#184)
 - [ ] Extend attendee administration (#185)
 - [x] Add operator and staff admin tiers (#186)

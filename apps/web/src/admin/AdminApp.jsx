@@ -49,6 +49,9 @@ const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
 // one link, exactly like the session editor above, so it is loaded when
 // somebody asks for it.
 const AdminEventSettings = lazy(() => import('./pages/AdminEventSettings.jsx'));
+// The email log carries the preview frame and its document builder; it is
+// one screen behind one link, so it waits for somebody to ask for it.
+const AdminEmailLog = lazy(() => import('./pages/AdminEmailLog.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -159,6 +162,10 @@ export default function AdminApp() {
           <Route path="ticketing" element={<AdminTicketing />} />
           <Route path="live-updates" element={<AdminLiveUpdates />} />
           <Route path="feedback" element={<AdminFeedback />} />
+          <Route
+            path="email-log"
+            element={<DeferredAdminPage label="the email log"><AdminEmailLog /></DeferredAdminPage>}
+          />
           <Route path="system-errors" element={<AdminSystemErrors />} />
           <Route path="access" element={<AdminAccess />} />
           <Route

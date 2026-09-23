@@ -12,7 +12,7 @@
 // keyboard path per control, `aria-current` on the active section.
 //
 // THE RAIL. The navigation stands on its own dark ground down the leading
-// edge, so the tool's frame and the work surface are never confused. Sixteen
+// edge, so the tool's frame and the work surface are never confused. Seventeen
 // named sections read as a standing list grouped by what the operator came
 // to do: content, people, operations, system. Group heads are folios. Every
 // item is a word — no icon rail, no collapse to glyphs, no counts in
@@ -98,6 +98,7 @@ export const DOCKET = Object.freeze([
       { to: 'live-updates', label: 'Live updates', tier: 'staff' },
       { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
       { to: 'feedback', label: 'Feedback', tier: 'staff' },
+      { to: 'email-log', label: 'Email log', tier: 'staff' },
     ],
   },
   {

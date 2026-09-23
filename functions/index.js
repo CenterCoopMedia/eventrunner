@@ -5,6 +5,7 @@
 // export is re-exported here by name.
 
 const email = require('./src/email/send.cjs');
+const emailLog = require('./src/email/log.cjs');
 const auth = require('./src/auth/otp.cjs');
 const cmsContent = require('./src/cms/content.cjs');
 const cmsPages = require('./src/cms/pages.cjs');
@@ -51,6 +52,7 @@ const maintenanceCleanup = require('./src/maintenance/cleanup.cjs');
 
 module.exports = {
   ...email.handlers,
+  ...emailLog.handlers,
   ...auth.handlers,
   ...cmsContent.handlers,
   ...cmsPages.handlers,

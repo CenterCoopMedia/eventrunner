@@ -143,6 +143,7 @@ describe('admin route gating', () => {
       'Branding',
       'Live updates',
       'Feedback',
+      'Email log',
       'System errors',
     ]) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
@@ -203,7 +204,7 @@ describe('admin route gating', () => {
 
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Pages' })).toBeInTheDocument();
-    for (const tab of ['Pages', 'Sessions', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Event']) {
+    for (const tab of ['Pages', 'Sessions', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Email log', 'Event']) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     for (const tab of ['Features', 'Branding', 'Access', 'System errors']) {
@@ -211,6 +212,26 @@ describe('admin route gating', () => {
     }
     // The tier is said in a word beside the address, never left to inference.
     expect(screen.getByText('Staff')).toBeInTheDocument();
+  });
+
+  it('opens the email log for a staff admin: the log is staff visible', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    // functionsOrigin() names the missing project id on console.error.
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ rows: [], nextCursor: null, scanned: 0 }),
+    }));
+    globalThis.fetch = fetchMock;
+    await renderAt('/admin/email-log');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Email log' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Email log' })).toHaveAttribute('aria-current', 'page');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/listSentEmails$/);
   });
 
   it('refuses a staff admin an operator route rather than only hiding its link', async () => {
@@ -276,7 +297,7 @@ describe('admin route gating', () => {
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin/features');
     const refusal = screen.getByRole('heading', { name: 'This section needs operator access' }).parentElement;
-    expect(refusal.textContent).toContain('Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback and Event');
+    expect(refusal.textContent).toContain('Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log and Event');
     expect(refusal.textContent).not.toMatch(/deployment settings/);
   });
 });

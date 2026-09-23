@@ -130,8 +130,8 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Sixteen sections, every one a word. No icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(16);
+    // Seventeen sections, every one a word. No icon rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(17);
     expect(nav.querySelector('svg')).toBeNull();
     for (const link of nav.querySelectorAll('a')) {
       expect(link.textContent.trim().length).toBeGreaterThan(0);
@@ -196,7 +196,7 @@ describe('the admin shell', () => {
     expect(byTier('staff')).toEqual([
       'pages', 'sessions', 'content', 'media', 'materials',
       'speakers', 'attendees', 'badges',
-      'live-updates', 'ticketing', 'feedback',
+      'live-updates', 'ticketing', 'feedback', 'email-log',
       'settings',
     ]);
   });
@@ -204,6 +204,8 @@ describe('the admin shell', () => {
   it('reads a route’s tier from its docket entry, owning every path under the section', () => {
     expect(sectionTier('/admin/branding')).toBe('operator');
     expect(sectionTier('/admin/pages')).toBe('staff');
+    // The email log is staff visible (issue #183).
+    expect(sectionTier('/admin/email-log')).toBe('staff');
     expect(sectionTier('/admin/pages/new')).toBe('staff');
     expect(sectionTier('/admin/sessions/abc')).toBe('staff');
     expect(sectionTier('/admin')).toBeNull();
