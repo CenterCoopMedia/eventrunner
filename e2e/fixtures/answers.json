@@ -5,7 +5,9 @@
     "shortName": "E2E Summit",
     "timezone": "America/New_York",
     "days": [
-      { "id": "day-1", "label": "Day one", "date": "2027-05-13", "startTime": "09:00", "endTime": "17:00" }
+      { "id": "day-1", "label": "Day one", "date": "2027-05-13", "startTime": "09:00", "endTime": "17:00" },
+      { "id": "day-2", "label": "Day two", "date": "2027-05-14", "startTime": "09:00", "endTime": "17:00" },
+      { "id": "day-3", "label": "Day three", "date": "2027-05-15", "startTime": "09:00", "endTime": "16:00" }
     ],
     "venue": { "name": "Example Hall", "city": "Example City" },
     "sender": { "email": "hello@example.test", "name": "E2E Test Summit" },

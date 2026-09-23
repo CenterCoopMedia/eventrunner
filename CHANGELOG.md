@@ -253,5 +253,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Firebase deployment validation no longer requires `VITE_FIREBASE_MEASUREMENT_ID` when Google Analytics is disabled (#101).
+- The admin sessions list showed a day's raw document id ("day-2") as its heading whenever the day
+  had no label, or whenever a session pointed at a day no longer in the event's configured list. A
+  heading now falls back to the day's own date, then to its position ("Day 2") when it has no date,
+  and to a plain "Not on a configured day" line when the day itself is missing — never to the id
+  (#248).
 
 The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.

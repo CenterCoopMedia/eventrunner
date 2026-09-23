@@ -236,6 +236,23 @@ describe('admin Sessions workspace', () => {
     expect(bodyOf(1).docIds).toEqual(['parent', 'child']);
   });
 
+  it('names a saved day that no longer exists, rather than showing "no day chosen" (issue 248)', async () => {
+    // A <select> whose value matches none of its <option>s falls back to
+    // showing the first option — "Select a day" — even though the stored
+    // value is still 'day-9'. That reads as an empty field to an operator
+    // who never touched it, so the actual stored value needs its own
+    // option, named plainly, never the bare id standing in as if it were a
+    // real day's name.
+    await renderAt('/admin/sessions/orphan');
+    await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
+    pushSessions([], [
+      { id: 'orphan', dayId: 'day-9', title: 'Orphan', description: 'On a removed day.', status: 'dirty' },
+    ]);
+    const select = await screen.findByLabelText('Event day');
+    expect(select).toHaveValue('day-9');
+    expect(screen.getByRole('option', { name: 'day-9 (not on a configured day)' })).toBeInTheDocument();
+  });
+
   it('says that the preview opens a new tab, inside the link name (issue 236)', async () => {
     // A new tab is a change of context. A reader who can see the page reads
     // it off the tab strip; a reader using a screen reader gets no signal

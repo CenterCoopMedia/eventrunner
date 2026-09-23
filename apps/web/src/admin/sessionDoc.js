@@ -1,11 +1,39 @@
 import { recordStateOf } from './recordState.js';
+import { formatDayDate } from '../lib/eventTime.js';
 
 const byTimeAndTitle = (a, b) =>
   String(a.current.startTime ?? '').localeCompare(String(b.current.startTime ?? ''))
   || String(a.current.title ?? '').localeCompare(String(b.current.title ?? ''))
   || a.id.localeCompare(b.id);
 
-export function mergeSessionRevisions(liveDocs, draftDocs, days = []) {
+// A session can carry a dayId that names no entry in config/event.days at
+// all — an operator deleted the day, or (the exact case behind #248's
+// screenshot) an environment's config/event was bootstrapped with fewer
+// days than its seeded sessions cover, because a seed step that already
+// found config/event skips writing it. There is no day record to read a
+// label or a date from here, so this is a different case from "the day
+// has no label": a plain, shared heading, never the raw dayId.
+export const UNKNOWN_DAY_LABEL = 'Not on a configured day';
+
+/**
+ * A day's heading: its own label, or its date, or its position — never its
+ * document id (#248). An id is an internal key, not a word an operator
+ * chose, so it never reaches an admin list as the thing a day is called.
+ *
+ * @param {{ label?: string, date?: string }} day
+ * @param {number} index position in the configured day order (0-based)
+ * @param {string} [timeZone] the event's IANA timezone
+ * @returns {string}
+ */
+export function resolveDayLabel(day, index, timeZone) {
+  const label = typeof day?.label === 'string' ? day.label.trim() : '';
+  if (label) return label;
+  const date = formatDayDate(day, timeZone);
+  if (date) return date;
+  return `Day ${index + 1}`;
+}
+
+export function mergeSessionRevisions(liveDocs, draftDocs, days = [], timeZone) {
   const liveById = new Map((liveDocs ?? []).map((doc) => [doc.id, doc]));
   const draftById = new Map((draftDocs ?? []).map((doc) => [doc.id, doc]));
   const rows = [...new Set([...liveById.keys(), ...draftById.keys()])].map((id) => {
@@ -15,7 +43,9 @@ export function mergeSessionRevisions(liveDocs, draftDocs, days = []) {
   });
   const rowsById = new Map(rows.map((row) => [row.id, row]));
   const dayOrder = new Map(days.map((day, index) => [day.id, index]));
-  const dayLabel = new Map(days.map((day) => [day.id, day.label || day.id]));
+  const dayLabel = new Map(
+    days.map((day, index) => [day.id, resolveDayLabel(day, index, timeZone)]),
+  );
   const grouped = new Map();
   for (const row of rows) {
     const id = row.current.dayId || 'unscheduled';
@@ -52,7 +82,12 @@ export function mergeSessionRevisions(liveDocs, draftDocs, days = []) {
       }
       return {
         dayId,
-        label: dayId === 'unscheduled' ? 'Unscheduled' : dayLabel.get(dayId) ?? dayId,
+        label:
+          dayId === 'unscheduled'
+            ? 'Unscheduled'
+            : dayLabel.has(dayId)
+              ? dayLabel.get(dayId)
+              : UNKNOWN_DAY_LABEL,
         rows: flattened,
       };
     });
