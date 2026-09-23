@@ -16,6 +16,10 @@ and the pull request says "Refs #177", not "Closes".
 
 ### How the stack works
 
+- Specs: every builder group gets a spec in `/home/user/specs/<id>.md`, written
+  from the code and then attacked by an adversarial reviewer before dispatch.
+- Every builder branch gets an adversarial review (five lenses, each finding
+  checked by a skeptic) before it joins the stack.
 - Builders work in parallel, each in its own worktree at `/home/user/wt-<id>` on
   branch `joe/confident-gates-gy99ip-b-<id>`, cut from the stack tip at dispatch.
   The brief is `tasks/builder-brief.md`. Each builder commits its report to
@@ -33,17 +37,17 @@ and the pull request says "Refs #177", not "Closes".
 
 | Id | Model | Issues | State |
 |---|---|---|---|
-| a1 | Sonnet | #248, #227, #230, #247 | dispatched |
-| a2 | Opus | #231, #226 | dispatched |
-| a3 | Fable | design wave 2 of #249, #234 | dispatched |
-| a4 | Fable | #186, #187 | dispatched |
+| a1 | Sonnet | #248, #227, #230, #247 | reviewed, fixed, integrated |
+| a2 | Opus | #231, #226 | merged as #262 |
+| a3 | Fable | design wave 2 of #249, #234 | reviewing the catalog split |
+| a4 | Fable | #186, #187 | fixing review findings |
 | b1 | Opus | #178, #179, #180, #181, #182 | queued |
 | b2 | Opus | #183 | queued, after a4 |
 | b3 | Opus | #184, #185 | queued |
 | b4 | Opus | #188 | queued |
 | b5 | Opus | #189 | queued |
-| b6 | Sonnet | #218 | queued |
-| b7 | Opus | #177 decision record only | queued |
+| b6 | Opus | #218 | dispatched from the #262 tip |
+| b7 | Fable | #177 decision record only | dispatched from the #262 tip |
 | c1 | Opus | #190, #191 | queued (M10) |
 | c2 | Opus | #192, #193 | queued |
 | c3 | Opus | #194 | queued |
@@ -65,6 +69,8 @@ and the pull request says "Refs #177", not "Closes".
 
 | Pull request | Branch | Issues |
 |---|---|---|
+| #262 (merged 2026-09-23) | `joe/confident-gates-gy99ip` | #231, #226 |
+| next | `joe/confident-gates-gy99ip`, restarted from main | #248, #227, #230, #247 |
 
 ### After every integration
 
