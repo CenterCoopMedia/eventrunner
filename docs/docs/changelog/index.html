@@ -149,6 +149,17 @@
           shared event schema now validates the <code>legal</code> and <code>social</code> blocks and refuses an unknown field
           in either by name. The email footer drops a stored link that fails the same check, as the site
           footer already did (#231).</li>
+          <li>The web manifest lists two raster app icons, 192 and 512 pixels square, so Chrome and Android can
+          install the site. When the square icon slot holds an uploaded square PNG of 512 to 4096 pixels,
+          the site publisher and the deploy build resample it to both sizes. Any other slot value ships
+          neutral placeholder icons drawn from the default mark, and the job log names the reason. The
+          placeholders are listed as <code>any maskable</code>; an uploaded icon is listed as <code>any</code>, because its safe
+          zone is unknown. The manifest no longer lists the SVG mark or favicon. The deploy build reads the
+          upload over its public download URL (<code>--storage-bucket</code>), so it needs no credentials. A PNG
+          decoder and resampler in <code>scripts/lib/png.cjs</code> use only <code>node:zlib</code>, so no new dependency ships.
+          The Branding page hint for the square icon states the rule: a square PNG from 512 to 4096 pixels
+          on a side also becomes the app icon. An end-to-end test asks Chromium whether the default site is
+          installable (#218).</li>
           </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
