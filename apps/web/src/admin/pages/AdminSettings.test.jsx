@@ -936,3 +936,183 @@ describe('badges', () => {
     expect(screen.getByLabelText('Category 2 id')).toHaveAttribute('aria-invalid', 'true');
   });
 });
+
+// THE MILESTONES AND THE REGISTRATION GOAL (issue #180): stored on
+// config/event, listed on the overview.
+describe('milestones and the registration goal', () => {
+  const SAVED = [
+    { label: 'Proposals close', date: '2026-08-01' },
+    { label: 'Programme announced', date: '2026-09-01' },
+  ];
+
+  it('adds, edits, and removes milestones, moving focus to a field that still exists', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, milestones: SAVED });
+    expect(screen.getByLabelText('Milestone 1 name')).toHaveValue('Proposals close');
+    expect(screen.getByLabelText('Milestone 2 date')).toHaveValue('2026-09-01');
+    expect(screen.getByText(/Anyone can read these dates and names/)).toBeInTheDocument();
+
+    // Add moves focus into the new row's name field.
+    fireEvent.click(screen.getByRole('button', { name: 'Add milestone' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Milestone 3 name')));
+    fireEvent.change(screen.getByLabelText('Milestone 3 name'), { target: { value: '  Doors open ' } });
+    fireEvent.change(screen.getByLabelText('Milestone 3 date'), { target: { value: '2026-10-15' } });
+
+    // Remove moves focus to the row that takes its place…
+    fireEvent.click(screen.getByRole('button', { name: 'Remove milestone 1' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Milestone 1 name')));
+    expect(screen.getByLabelText('Milestone 1 name')).toHaveValue('Programme announced');
+    // …to the row above when the last row goes…
+    fireEvent.click(screen.getByRole('button', { name: 'Remove milestone 2' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Milestone 1 name')));
+    expect(screen.queryByLabelText('Milestone 2 name')).toBeNull();
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.milestones).toEqual([{ label: 'Programme announced', date: '2026-09-01' }]);
+
+    // …and to "Add milestone" when none is left. An empty list is sent, and clears.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove milestone 1' }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Add milestone' })));
+    expect(screen.getByText('No milestones yet.')).toBeInTheDocument();
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).event.milestones).toEqual([]);
+  }, 20000);
+
+  it('sends a new milestone trimmed, beside the rest of the event', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    expect(screen.getByText('No milestones yet.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add milestone' }));
+    fireEvent.change(screen.getByLabelText('Milestone 1 name'), { target: { value: '  Doors open ' } });
+    fireEvent.change(screen.getByLabelText('Milestone 1 date'), { target: { value: '2026-10-15' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const payload = bodyOf(0).event;
+    expect(payload.milestones).toEqual([{ label: 'Doors open', date: '2026-10-15' }]);
+    expect(payload.name).toBe(LIVE_EVENT.name);
+  });
+
+  it('stops adding at twenty milestones and says why, without ever disabling the control', async () => {
+    await renderAt('/admin/settings');
+    const twenty = Array.from({ length: 20 }, (_, i) => ({
+      label: `Milestone ${i + 1}`,
+      date: `2026-09-${String(i + 1).padStart(2, '0')}`,
+    }));
+    await pushConfig('event', { ...LIVE_EVENT, milestones: twenty });
+
+    const add = screen.getByRole('button', { name: 'Add milestone' });
+    expect(add).toHaveAttribute('aria-disabled', 'true');
+    expect(add).not.toBeDisabled();
+    expect(add).toHaveAccessibleDescription('An event can list 20 milestones. Remove one to add another.');
+    add.focus();
+    fireEvent.click(add);
+    expect(screen.queryByLabelText('Milestone 21 name')).toBeNull();
+    expect(document.activeElement).toBe(add);
+
+    // One fewer, and the control works again.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove milestone 20' }));
+    expect(add).not.toHaveAttribute('aria-disabled');
+    fireEvent.click(add);
+    expect(screen.getByLabelText('Milestone 20 name')).toHaveValue('');
+  }, 20000);
+
+  it('refuses a milestone with no date at submit, marks the field, and puts the keyboard on it', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    fireEvent.click(screen.getByRole('button', { name: 'Add milestone' }));
+    // A just-added row says nothing until a save is attempted.
+    expect(screen.getByLabelText('Milestone 1 date')).not.toHaveAttribute('aria-invalid');
+    fireEvent.change(screen.getByLabelText('Milestone 1 name'), { target: { value: 'Doors open' } });
+    const save = screen.getByRole('button', { name: 'Save event settings' });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+
+    const date = screen.getByLabelText('Milestone 1 date');
+    await waitFor(() => expect(document.activeElement).toBe(date));
+    expect(date).toHaveAttribute('aria-invalid', 'true');
+    expect(date).toHaveAccessibleDescription('Enter the date of this milestone.');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('marks the milestone field the server refused, by its path', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, milestones: SAVED });
+    fetch.mockResolvedValueOnce(
+      errorResponse(
+        400,
+        'bad-request',
+        'milestones[0].date: must match YYYY-MM-DD and name a real calendar date; '
+          + 'milestones[1].label: must be at most 80 characters',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    // The rejection takes focus, as every server rejection on this page does,
+    // and names the field; the field itself is marked.
+    const alert = await screen.findByRole('alert');
+    await waitFor(() => expect(document.activeElement).toBe(alert));
+    expect(alert).toHaveTextContent('milestones[0].date: must match YYYY-MM-DD');
+    expect(screen.getByLabelText('Milestone 1 date')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Milestone 1 date')).toHaveAccessibleDescription(/milestones\[0\]\.date: must match/);
+    expect(screen.getByLabelText('Milestone 2 name')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Milestone 1 name')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('sends the goal as a number, blank as null, and anything else as typed for the server to name', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, registration: { goal: 500 } });
+    const goal = screen.getByLabelText('Registration goal');
+    expect(goal).toHaveValue('500');
+    expect(goal).toHaveAttribute('inputmode', 'numeric');
+
+    fireEvent.change(goal, { target: { value: ' 750 ' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.registration.goal).toBe(750);
+
+    fireEvent.change(goal, { target: { value: '' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).event.registration.goal).toBeNull();
+
+    // Not a number: sent as typed, never as NaN (which JSON would turn into
+    // null and so clear the goal), and the server's refusal marks the field.
+    fireEvent.change(goal, { target: { value: 'many' } });
+    fetch.mockResolvedValueOnce(
+      errorResponse(400, 'bad-request', 'registration.goal: must be null or a whole number from 1 to 1000000, got "many"'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    expect(fetch.mock.calls[2][1].body).toContain('"goal":"many"');
+    await screen.findByRole('alert');
+    expect(goal).toHaveAttribute('aria-invalid', 'true');
+    expect(goal).toHaveValue('many');
+  }, 20000);
+
+  it('lets a staff admin save milestones and the goal, with the sender left out', async () => {
+    operatorProbeShouldSucceed = false;
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    fireEvent.click(screen.getByRole('button', { name: 'Add milestone' }));
+    fireEvent.change(screen.getByLabelText('Milestone 1 name'), { target: { value: 'Doors open' } });
+    fireEvent.change(screen.getByLabelText('Milestone 1 date'), { target: { value: '2026-10-15' } });
+    fireEvent.change(screen.getByLabelText('Registration goal'), { target: { value: '300' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const payload = bodyOf(0).event;
+    expect(payload.milestones).toEqual([{ label: 'Doors open', date: '2026-10-15' }]);
+    expect(payload.registration.goal).toBe(300);
+    expect(payload).not.toHaveProperty('sender');
+    expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
+  }, 20000);
+});

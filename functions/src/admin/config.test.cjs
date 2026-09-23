@@ -1017,3 +1017,104 @@ test('domainVerifiedBy and domainVerifiedDomain are read-only for BOTH tiers, li
     }
   }
 });
+
+// THE MILESTONES AND THE REGISTRATION GOAL (issue #180), stored on
+// config/event rather than in a settings collection of their own.
+const MILESTONES = [
+  { label: 'Call for proposals closes', date: '2027-03-01' },
+  { label: 'Programme announced', date: '2027-04-15' },
+];
+
+test('milestones are editable on config/event and merge over the stored doc', async () => {
+  const deps = makeDeps({ 'config/event': { ...validEvent(), ...STORED_EXTRAS } });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { milestones: MILESTONES } }), res);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const written = deps.db.docs.get('config/event');
+  assert.deepEqual(written.milestones, MILESTONES);
+  // The rest of the stored doc survives a milestones-only save.
+  assert.equal(written.venue.name, STORED_EXTRAS.venue.name);
+  assert.equal(written.tagline, STORED_EXTRAS.tagline);
+  assert.equal(internals.EVENT_EDITABLE_KEYS.includes('milestones'), true);
+});
+
+test('an empty milestone list clears the stored one', async () => {
+  const deps = makeDeps({ 'config/event': { ...validEvent(), milestones: MILESTONES } });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { milestones: [] } }), res);
+  assert.equal(res.statusCode, 200);
+  // Arrays replace on merge, so the stored list does not come back.
+  assert.deepEqual(deps.db.docs.get('config/event').milestones, []);
+});
+
+test('a milestone with an impossible date or a stray field is refused by name, and nothing is written', async () => {
+  const deps = makeDeps({ 'config/event': { ...validEvent(), milestones: MILESTONES } });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({
+      event: {
+        milestones: [
+          { label: 'Early rate ends', date: '2027-02-30' },
+          { label: 'Doors open', date: '2027-05-13', note: 'private' },
+        ],
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /milestones\[0\]\.date: must match YYYY-MM-DD and name a real calendar date/);
+  assert.match(res.body.error.message, /milestones\[1\]\.note: unknown milestone field/);
+  assert.equal(deps.db.writes.length, 0);
+  assert.deepEqual(deps.db.docs.get('config/event').milestones, MILESTONES);
+});
+
+test('the registration goal round-trips inside registration, and a bad one is refused by name', async () => {
+  const deps = makeDeps({ 'config/event': validEvent() });
+  const ok = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { registration: { goal: 500 } } }), ok);
+  assert.equal(ok.statusCode, 200);
+  const stored = deps.db.docs.get('config/event').registration;
+  assert.equal(stored.goal, 500);
+  // A nested partial merges: the stored registration dates survive.
+  assert.equal(stored.opensAt, validEvent().registration.opensAt);
+
+  for (const goal of [0, 1.5, '500']) {
+    const bad = makeRes();
+    await createUpdateEventConfigHandler(deps)(makeReq({ event: { registration: { goal } } }), bad);
+    assert.equal(bad.statusCode, 400, String(goal));
+    assert.match(bad.body.error.message, /registration\.goal: must be null or a whole number from 1 to 1000000/);
+  }
+  assert.equal(deps.db.docs.get('config/event').registration.goal, 500);
+
+  const cleared = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { registration: { goal: null } } }), cleared);
+  assert.equal(cleared.statusCode, 200);
+  assert.equal(deps.db.docs.get('config/event').registration.goal, null);
+});
+
+test('a staff caller saves milestones and the goal: alone, and in the whole form without the sender', async () => {
+  const stored = validEvent();
+  const deps = tieredDeps({ 'config/event': stored });
+  const alone = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { milestones: MILESTONES } }, { token: 'staff-token' }),
+    alone,
+  );
+  assert.equal(alone.statusCode, 200, JSON.stringify(alone.body));
+  assert.deepEqual(deps.db.docs.get('config/event').milestones, MILESTONES);
+
+  // What the Event form sends for staff: every editable field but the
+  // sender block (AdminEventSettings leaves it out of a staff payload).
+  const { sender: _sender, ...withoutSender } = fullStaffPayload(stored, {
+    milestones: [MILESTONES[1]],
+    registration: { opensAt: null, closesAt: null, externalUrl: null, actionLabel: null, goal: 250 },
+  });
+  const whole = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: withoutSender }, { token: 'staff-token' }), whole);
+  assert.equal(whole.statusCode, 200, JSON.stringify(whole.body));
+  const written = deps.db.docs.get('config/event');
+  assert.deepEqual(written.milestones, [MILESTONES[1]]);
+  assert.equal(written.registration.goal, 250);
+  assert.equal(written.sender.email, stored.sender.email);
+  assert.equal(written.updatedBy, STAFF_EMAIL);
+});
