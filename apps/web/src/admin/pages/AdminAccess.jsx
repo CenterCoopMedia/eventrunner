@@ -5,7 +5,9 @@
 //
 // `config/bootstrap` is server-only in both directions, so there is no live
 // listener here: a plain fetch on mount and after every accepted change, the
-// same shape AdminSystemErrors takes for its server-only rows.
+// same shape AdminSystemErrors takes for its server-only rows. A first load
+// that fails is an error state with one retry, never an empty list: an
+// empty list would say "nobody has access", which is not what happened.
 //
 // THE GALLEY, AS A TABLE. One ruled table of accounts: the address in the
 // data face, the tier as a word in a badge, and the row's quiet actions as
@@ -15,22 +17,35 @@
 // their own.
 //
 // EVERY CHANGE ASKS FIRST. A grant, a tier change, and a removal each open
-// the same still surface under the table (the DestructiveConfirm device,
-// drawn here so the row's trigger can stay a quiet word and so focus can be
-// managed): a sentence naming what changes for whom, a confirm button that
-// repeats the consequence, and Cancel. Focus moves to the surface when it
-// opens and back to the control that opened it when it closes, so a
-// keyboard reader is never left on an element that has gone. A removal sits
-// on the alarm ground; a grant or a tier change on the proof ground, because
-// widening or narrowing access is deliberate but not destructive.
+// the same still surface under the grant form, above the table (the
+// DestructiveConfirm device, drawn here so the row's trigger can stay a
+// quiet word and so focus can be managed): a sentence naming what changes
+// for whom, a confirm button that repeats the consequence, and Cancel. A
+// removal sits on the alarm ground; a grant or a tier change on the proof
+// ground, because widening or narrowing access is deliberate but not
+// destructive. A grant to an address that already holds that tier is said
+// in place and opens nothing.
+//
+// FOCUS FOLLOWS THE SURFACE. Onto it when it opens. When it closes — after
+// a confirmed change or a cancel — back to the control that opened it, or,
+// if that control's row is gone, to the grant field. After a refusal, onto
+// the refusal itself. Every move happens in an effect AFTER the render that
+// mounts or unmounts the element, because a focus call made in the async
+// continuation lands on a node React is about to remove and drops to the
+// body.
 //
 // The server's refusal is shown verbatim and in place — "At least one
 // operator must keep access." names the rule an operator just met — and it
 // stays until the next attempt. Addresses are lowercased on write by the
 // server; the form lowercases as it goes so the list and the field agree.
+// Each tier's sections are named in TIER_SCOPE, in the rail's own words,
+// so the description, the confirmation sentences and the shell's refusal
+// cannot drift apart.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
+import { focusFirstError } from '../../lib/focusFirstError.js';
 import { useAdminApi } from '../adminApi.js';
+import { TIER_SCOPE } from '../AdminLayout.jsx';
 import {
   Notice,
   Panel,
@@ -58,14 +73,19 @@ const GRANT_TIERS = [
   { value: 'operator', label: 'Operator' },
 ];
 
-/** What each tier may do, said once and reused by every consequence sentence. */
-const OPERATOR_SECTIONS = 'Features, Branding, Access and System errors';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * The words a pending change is stated in: the heading, the sentence
  * naming the consequence, and the confirm label that repeats it.
  *
- * @param {{ email: string, tier: 'operator'|'staff'|'none', previousTier: 'operator'|'staff'|null }} change
+ * `previousTier` is the account's standing now: 'operator' or 'staff', null
+ * for an address not yet listed, or undefined when the list did not load
+ * and the standing is unknown — then the sentence says only what will be
+ * true afterwards, and claims nothing about what is lost.
+ *
+ * @param {{ email: string, tier: 'operator'|'staff'|'none',
+ *           previousTier: 'operator'|'staff'|null|undefined }} change
  */
 export function describeChange({ email, tier, previousTier }) {
   if (tier === 'none') {
@@ -76,17 +96,28 @@ export function describeChange({ email, tier, previousTier }) {
       destructive: true,
     };
   }
+  const word = TIER_WORDS[tier].label.toLowerCase();
+  if (previousTier === undefined) {
+    return {
+      title: `Set ${word} access for ${email}`,
+      consequence: tier === 'operator'
+        ? `${email} will have operator access to the admin panel at once: every section, including ${TIER_SCOPE.operatorOnly}.`
+        : `${email} will have staff access to the admin panel at once: ${TIER_SCOPE.staff}.`,
+      confirmLabel: `Set ${word} access`,
+      destructive: false,
+    };
+  }
   if (previousTier === null) {
     return tier === 'operator'
       ? {
         title: `Grant operator access to ${email}`,
-        consequence: `${email} can sign in to the admin panel at once and open every section, including ${OPERATOR_SECTIONS}. An operator can change who has access, including yours.`,
+        consequence: `${email} can sign in to the admin panel at once and open every section, including ${TIER_SCOPE.operatorOnly}. An operator can change who has access, including yours.`,
         confirmLabel: 'Grant operator access',
         destructive: false,
       }
       : {
         title: `Grant staff access to ${email}`,
-        consequence: `${email} can sign in to the admin panel at once and run the content, people and operations sections. Staff cannot open ${OPERATOR_SECTIONS}.`,
+        consequence: `${email} can sign in to the admin panel at once and run ${TIER_SCOPE.staff}. Staff cannot open ${TIER_SCOPE.operatorOnly}.`,
         confirmLabel: 'Grant staff access',
         destructive: false,
       };
@@ -94,13 +125,13 @@ export function describeChange({ email, tier, previousTier }) {
   return tier === 'operator'
     ? {
       title: `Change ${email} to operator`,
-      consequence: `${email} gains ${OPERATOR_SECTIONS}. An operator can change who has access, including yours.`,
+      consequence: `${email} gains ${TIER_SCOPE.operatorOnly}. An operator can change who has access, including yours.`,
       confirmLabel: 'Change to operator',
       destructive: false,
     }
     : {
       title: `Change ${email} to staff`,
-      consequence: `${email} loses ${OPERATOR_SECTIONS} and keeps the content, people and operations sections.`,
+      consequence: `${email} loses ${TIER_SCOPE.operatorOnly} and keeps ${TIER_SCOPE.staff}.`,
       confirmLabel: 'Change to staff',
       destructive: false,
     };
@@ -114,10 +145,10 @@ export function describeResult({ email, tier, previousTier }) {
 }
 
 /**
- * The still surface a pending change is confirmed on. `open` and `onClose`
- * belong to the page, which also owns the focus hand-back to the trigger.
+ * The still surface a pending change is confirmed on. The page owns the
+ * focus moves; this only exposes the two elements they land on.
  */
-function ChangeConfirm({ change, busy, error, onConfirm, onCancel, surfaceRef }) {
+function ChangeConfirm({ change, busy, error, onConfirm, onCancel, surfaceRef, errorRef }) {
   const headingId = useId();
   const words = describeChange(change);
   const ground = words.destructive
@@ -135,12 +166,17 @@ function ChangeConfirm({ change, busy, error, onConfirm, onCancel, surfaceRef })
         {words.title}
       </h2>
       <p className="max-w-[65ch] text-admin-sm text-admin-ink">{words.consequence}</p>
-      {error ? <Notice tone="error" message={error} /> : null}
+      {error ? (
+        <div ref={errorRef} tabIndex={-1}>
+          <Notice tone="error" message={error} />
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-xs">
         <button
           type="button"
           className={words.destructive ? dangerButtonClass : primaryButtonClass}
           disabled={busy}
+          aria-busy={busy || undefined}
           onClick={onConfirm}
         >
           {busy ? 'Saving…' : words.confirmLabel}
@@ -170,31 +206,39 @@ export default function AdminAccess() {
   const call = useAdminApi();
   const { showToast } = useToast();
 
+  // null until the first load answers; then the list, even when a LATER
+  // reload fails (those keep the last values and say so).
   const [accounts, setAccounts] = useState(null);
   const [callerEmail, setCallerEmail] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [form, setForm] = useState({ email: '', tier: 'staff' });
   const [formError, setFormError] = useState(null);
-  // The one change awaiting confirmation, or null. `trigger` is the control
-  // that opened it, so focus can go back there when the surface closes.
+  // The one change awaiting confirmation, or null.
   const [pending, setPending] = useState(null);
   const [busy, setBusy] = useState(false);
   const [changeError, setChangeError] = useState(null);
   const [result, setResult] = useState(null);
   const surfaceRef = useRef(null);
+  const errorRef = useRef(null);
   const formRef = useRef(null);
+  // The control that opened the surface, and whether the next close should
+  // hand focus back to it. Both are read by the focus effect, never by the
+  // async continuation that closes the surface.
+  const triggerRef = useRef(null);
+  const returnFocusRef = useRef(false);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await call('listAdminAccess', {});
       setAccounts(Array.isArray(response?.accounts) ? response.accounts : []);
       setCallerEmail(typeof response?.callerEmail === 'string' ? response.callerEmail : null);
       setLoadError(null);
     } catch (err) {
-      // Fail soft: keep the rows already shown; a failed FIRST load settles
-      // the loading state on an empty list rather than loading forever.
       setLoadError(err);
-      setAccounts((current) => current ?? []);
+    } finally {
+      setLoading(false);
     }
   }, [call]);
 
@@ -202,39 +246,63 @@ export default function AdminAccess() {
     load();
   }, [load]);
 
-  // Focus follows the surface: onto it when it opens, back to its trigger
-  // when it closes. Done after render so the element exists.
+  // Focus follows the surface (see the file comment). Runs after the render
+  // that mounted or unmounted it, so the node it lands on exists.
   useEffect(() => {
-    if (pending) surfaceRef.current?.focus();
-  }, [pending]);
+    if (pending) {
+      surfaceRef.current?.focus();
+      return;
+    }
+    if (!returnFocusRef.current) return;
+    returnFocusRef.current = false;
+    const trigger = triggerRef.current;
+    triggerRef.current = null;
+    if (trigger && trigger.isConnected) trigger.focus();
+    else formRef.current?.querySelector('input')?.focus();
+  }, [pending, accounts]);
+
+  // A refusal is read where it lands, not from wherever the disabled confirm
+  // button dropped the keyboard.
+  useEffect(() => {
+    if (changeError) errorRef.current?.focus();
+  }, [changeError]);
 
   function open(change, trigger) {
     setResult(null);
     setChangeError(null);
-    setPending({ ...change, trigger });
+    triggerRef.current = trigger ?? null;
+    setPending(change);
   }
 
   function close() {
-    const trigger = pending?.trigger;
-    setPending(null);
+    returnFocusRef.current = true;
     setChangeError(null);
-    // The trigger can be gone (a removed row): fall back to the grant form's
-    // field, which is always there and draws its own ring, rather than to
-    // the body.
-    if (trigger && trigger.isConnected) trigger.focus();
-    else formRef.current?.querySelector('input')?.focus();
+    setPending(null);
   }
 
   function submitGrant(event) {
     event.preventDefault();
     const email = form.email.trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!EMAIL_RE.test(email)) {
       setFormError('Enter an email address.');
+      // After the render that marks the field, not before it.
+      window.setTimeout(() => focusFirstError(formRef.current), 0);
       return;
     }
     setFormError(null);
-    const existing = (accounts ?? []).find((account) => account.email === email);
-    open({ email, tier: form.tier, previousTier: existing?.tier ?? null }, event.currentTarget.querySelector('button[type="submit"]'));
+    const existing = accounts ? accounts.find((account) => account.email === email) : undefined;
+    if (existing && existing.tier === form.tier) {
+      // Nothing would change, so nothing is asked.
+      setResult({
+        tone: 'info',
+        message: `${email} already has ${TIER_WORDS[form.tier].label.toLowerCase()} access.`,
+      });
+      return;
+    }
+    open(
+      { email, tier: form.tier, previousTier: accounts ? existing?.tier ?? null : undefined },
+      event.currentTarget.querySelector('button[type="submit"]'),
+    );
   }
 
   async function confirm() {
@@ -244,18 +312,22 @@ export default function AdminAccess() {
     const { email, tier, previousTier } = pending;
     try {
       const response = await call('setAdminAccess', { email, tier });
+      const nextTier = response?.tier ?? (tier === 'none' ? null : tier);
+      const standing = previousTier === undefined ? response?.previousTier ?? null : previousTier;
       const sentence = response?.changed === false
         ? `${email} already had this access.`
-        : describeResult({ email, tier: response?.tier ?? (tier === 'none' ? null : tier), previousTier });
+        : describeResult({ email, tier: nextTier, previousTier: standing });
+      // The line on the page is the record and it announces; the bar
+      // repeats it silently.
       setResult({ tone: 'ok', message: sentence });
-      showToast(sentence);
-      if (previousTier === null && tier !== 'none') setForm({ email: '', tier: 'staff' });
+      showToast(sentence, { announce: false });
+      if (standing === null && tier !== 'none') setForm({ email: '', tier: 'staff' });
       await load();
       close();
     } catch (err) {
       // Verbatim and in place: the server's sentence names the rule.
       setChangeError(err.message);
-      showToast(err.message, { tone: 'error' });
+      showToast(err.message, { tone: 'error', announce: false });
     } finally {
       setBusy(false);
     }
@@ -267,8 +339,12 @@ export default function AdminAccess() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Access"
-        identifiers={accounts ? `${accounts.length} account${accounts.length === 1 ? '' : 's'}, ${operatorCount} operator${operatorCount === 1 ? '' : 's'}` : undefined}
-        description="Who can sign in to the admin panel, and at which tier. Operators run branding, features, access and the deployment settings. Staff run content, the schedule, speakers, attendees and materials. Every change here asks you to confirm it first and is recorded in the admin log."
+        identifiers={
+          accounts
+            ? `${accounts.length} account${accounts.length === 1 ? '' : 's'}, ${operatorCount} operator${operatorCount === 1 ? '' : 's'}`
+            : undefined
+        }
+        description={`Who can sign in to the admin panel, and at which tier. Operators open every section, including ${TIER_SCOPE.operatorOnly}. Staff run ${TIER_SCOPE.staff}. Every change here asks you to confirm it first and is recorded in the admin log.`}
       />
 
       <Panel
@@ -310,87 +386,105 @@ export default function AdminAccess() {
           onConfirm={confirm}
           onCancel={close}
           surfaceRef={surfaceRef}
+          errorRef={errorRef}
         />
       ) : null}
 
       {result ? <Notice tone={result.tone} message={result.message} /> : null}
 
-      {loadError ? (
-        <Notice
-          tone="caution"
-          message="We could not load the access list; showing the last values we received."
-        />
-      ) : null}
-
-      {accounts === null ? (
+      {accounts === null && loading ? (
         <AdminLoadingState label="Loading access…" />
-      ) : accounts.length === 0 ? (
-        <AdminEmptyState
-          title="No admin accounts"
-          description="Nobody is listed. Grant access above."
-        />
+      ) : accounts === null ? (
+        <div className="flex flex-col gap-xs">
+          <Notice
+            tone="error"
+            message={`The access list could not be loaded${loadError?.message ? `: ${loadError.message}` : '.'}`}
+          />
+          <div>
+            <button type="button" className={secondaryButtonClass} onClick={load}>
+              Try again
+            </button>
+          </div>
+        </div>
       ) : (
-        <Panel flush>
-          <table className="w-full border-collapse text-admin-sm">
-            <caption className="sr-only">Admin accounts and their tier</caption>
-            <thead>
-              <tr>
-                <GalleyHead>Account</GalleyHead>
-                <GalleyHead>Tier</GalleyHead>
-                <GalleyHead align="end">Actions</GalleyHead>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map((account) => {
-                const isSelf = account.email === callerEmail;
-                const word = TIER_WORDS[account.tier] ?? { label: account.tier, tone: 'neutral' };
-                const otherTier = account.tier === 'operator' ? 'staff' : 'operator';
-                return (
-                  <tr
-                    key={account.email}
-                    className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0"
-                  >
-                    <td className="px-md py-sm align-top">
-                      <span className="break-all font-admin-data text-admin-base text-admin-ink">{account.email}</span>
-                      {isSelf ? (
-                        <span className="ms-xs text-admin-xs text-admin-ink-secondary">(you)</span>
-                      ) : null}
-                    </td>
-                    <td className="px-md py-sm align-top">
-                      <StatusBadge tone={word.tone}>{word.label}</StatusBadge>
-                    </td>
-                    <td className="px-md py-sm text-end align-top">
-                      <div className="flex flex-wrap items-center justify-end gap-xs">
-                        <button
-                          type="button"
-                          className={linkButtonClass}
-                          disabled={busy}
-                          onClick={(event) => open(
-                            { email: account.email, tier: otherTier, previousTier: account.tier },
-                            event.currentTarget,
-                          )}
-                        >
-                          Change to {TIER_WORDS[otherTier].label.toLowerCase()}
-                        </button>
-                        <button
-                          type="button"
-                          className={`${linkButtonClass} text-admin-state-error`}
-                          disabled={busy}
-                          onClick={(event) => open(
-                            { email: account.email, tier: 'none', previousTier: account.tier },
-                            event.currentTarget,
-                          )}
-                        >
-                          Remove access
-                        </button>
-                      </div>
-                    </td>
+        <>
+          {loadError ? (
+            <Notice
+              tone="caution"
+              message="We could not refresh the access list; showing the last values we received."
+            />
+          ) : null}
+          {accounts.length === 0 ? (
+            <AdminEmptyState
+              title="No admin accounts"
+              description="Nobody is listed. Grant access above."
+            />
+          ) : (
+            <Panel flush>
+              <table className="w-full border-collapse text-admin-sm">
+                <caption className="sr-only">Admin accounts and their tier</caption>
+                <thead>
+                  <tr>
+                    <GalleyHead>Account</GalleyHead>
+                    <GalleyHead>Tier</GalleyHead>
+                    <GalleyHead align="end">Actions</GalleyHead>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Panel>
+                </thead>
+                <tbody>
+                  {accounts.map((account) => {
+                    const isSelf = account.email === callerEmail;
+                    const word = TIER_WORDS[account.tier] ?? { label: account.tier, tone: 'neutral' };
+                    const otherTier = account.tier === 'operator' ? 'staff' : 'operator';
+                    return (
+                      <tr
+                        key={account.email}
+                        className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0"
+                      >
+                        <td className="px-md py-sm align-top">
+                          <span className="break-all font-admin-data text-admin-base text-admin-ink">
+                            {account.email}
+                          </span>
+                          {isSelf ? (
+                            <span className="ms-xs text-admin-xs text-admin-ink-secondary">(you)</span>
+                          ) : null}
+                        </td>
+                        <td className="px-md py-sm align-top">
+                          <StatusBadge tone={word.tone}>{word.label}</StatusBadge>
+                        </td>
+                        <td className="px-md py-sm text-end align-top">
+                          <div className="flex flex-wrap items-center justify-end gap-xs">
+                            <button
+                              type="button"
+                              className={linkButtonClass}
+                              disabled={busy}
+                              onClick={(event) => open(
+                                { email: account.email, tier: otherTier, previousTier: account.tier },
+                                event.currentTarget,
+                              )}
+                            >
+                              Change to {TIER_WORDS[otherTier].label.toLowerCase()}
+                            </button>
+                            <button
+                              type="button"
+                              className={`${linkButtonClass} text-admin-state-error`}
+                              disabled={busy}
+                              onClick={(event) => open(
+                                { email: account.email, tier: 'none', previousTier: account.tier },
+                                event.currentTarget,
+                              )}
+                            >
+                              Remove access
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Panel>
+          )}
+        </>
       )}
     </div>
   );

@@ -210,7 +210,7 @@ test('setAdminAccess: refuses to remove or demote the last operator — the call
   }
 });
 
-test('setAdminAccess: refuses removing the only other operator too — the rule is the last operator overall', async () => {
+test('setAdminAccess: refuses demoting or removing the last operator until a second operator exists', async () => {
   const { db, deps } = world({ adminEmails: [OPS], staffEmails: [] });
   // Grant a second operator, then the first may leave; before that, nobody may.
   let res = makeRes();
@@ -245,17 +245,24 @@ test('setAdminAccess: a stored mis-normalized list is rewritten lowercase on the
   assert.deepEqual(bootstrapOf(db).staffEmails, [STAFF]);
 });
 
-test('setAdminAccess: a missing bootstrap document is treated as empty lists', async () => {
+test('setAdminAccess: a missing bootstrap document admits nobody, even a caller the cached copy lists', async () => {
+  // The gate reads the document live and fails closed; a stale cached copy
+  // is not a way back in once the document is gone.
   const db = makeFakeDb({});
   const deps = {
     db, auth, log: QUIET, now: () => T0.getTime(),
-    // The gate still has to admit the caller: a cached config from before
-    // the document vanished is the only way that happens.
     getConfig: async () => ({ bootstrap: { adminEmails: [OPS] } }),
   };
   const res = makeRes();
   await createSetAdminAccessHandler(deps)(req('ops', { email: SECOND_OPS, tier: 'operator' }), res);
-  assert.equal(res.statusCode, 200);
+  assert.equal(res.statusCode, 403);
+  assert.equal(db.writes.length, 0);
+});
+
+test('applyAccessChange: an absent bootstrap document is written as fresh lists (the seed path, not the gate)', async () => {
+  const db = makeFakeDb({});
+  const result = await applyAccessChange({ db, email: SECOND_OPS, tier: 'operator' });
+  assert.deepEqual(result, { ok: true, changed: true, previousTier: null });
   assert.deepEqual(db.read('config', 'bootstrap'), { adminEmails: [SECOND_OPS], staffEmails: [] });
 });
 
