@@ -83,6 +83,10 @@ The admin opens here, for staff and operators alike. The page states how the eve
 
 **Read at.** The time under the title says when the server counted the figures, on the event's clock. The figures do not change by themselves. Select **Refresh figures** to count again. If a refresh fails, the page keeps the figures it has and says when they were read.
 
+**Registration funnel.** Three stages, each stated as a number of all accounts beside a bar: **Accounts**, then **Ticketed or approved**, then **Approved**. The middle stage counts approved accounts too, because an admin can approve an account that never held a ticket. Revoked accounts count as accounts and in no later stage, and the panel says how many there are. With no accounts, the panel says "No one has signed up yet." and draws no bar.
+
+**Content readiness.** A table with one row per collection: Pages, Content blocks, Sessions, Organizations, Timeline, and Updates. **On the site** counts the records attendees can see. **Unpublished changes** counts the records with a draft that is not published yet, including new records that were never published. A zero is printed as 0, and when nothing at all is on the site the panel says so.
+
 **Milestones.** When the event settings list milestones or a registration goal, a **Milestones** panel sets the approved count against the goal and lists each milestone with its date and the days left. You set both under Settings → Event settings, in **Milestones and the registration goal**. With neither set, the panel is not shown.
 
 ## Pages

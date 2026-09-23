@@ -52,6 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them in a **Milestones** panel and a **Registration goal** field, and says that anyone can read
   them. The overview lists the milestones in date order with the days left, sets the approved
   count against the goal as a sentence and a bar, and shows nothing when neither is set.
+- The registration funnel and content readiness panels on the overview (#181). The funnel states
+  accounts, then ticketed or approved, then approved, each as a number of all accounts beside a
+  native progress bar, with revoked accounts named beside it; `getEventStats` sums the stages on the
+  server. The readiness table lists, for pages, content blocks, sessions, organizations, the
+  timeline, and updates, the records on the site and the records with unpublished changes. Both
+  state zero in words: "No one has signed up yet." and "Nothing is on the site yet."
 
 - A `fact` block for a fact that is not a number (#234): The term, the fact itself, and one
   optional line under it. It renders through the new definition list device, a real `<dl>` ruled

@@ -191,14 +191,38 @@ test('getEventStats returns the counts for the seeded demo event', async () => {
       cmsPages: { published: 15, drafts: 0 },
     },
     errors: { unresolved: 2 },
+    funnel: [
+      { id: 'accounts', count: 10 },
+      { id: 'ticketed-or-approved', count: 5 },
+      { id: 'approved', count: 3 },
+    ],
   });
+});
+
+test('the funnel nests: an account approved straight from pending counts in both later stages', async () => {
+  const db = makeFakeDb(BOOTSTRAP);
+  // Pending, then approved by an admin with no ticket (a press or volunteer
+  // grant): its stored status is simply 'approved'.
+  await db.collection('users').doc('press').set({ registrationStatus: 'approved' });
+  await db.collection('users').doc('buyer').set({ registrationStatus: 'ticketed' });
+  await db.collection('users').doc('new').set({ registrationStatus: 'pending' });
+  await db.collection('users').doc('gone').set({ registrationStatus: 'revoked' });
+  const res = await call(db);
+  assert.deepEqual(res.body.funnel, [
+    { id: 'accounts', count: 4 },
+    { id: 'ticketed-or-approved', count: 2 },
+    { id: 'approved', count: 1 },
+  ]);
+  const [accounts, later, approved] = res.body.funnel.map((stage) => stage.count);
+  assert.ok(accounts >= later && later >= approved);
 });
 
 test('getEventStats answers zero for every figure on an empty deployment', async () => {
   const res = await call(makeFakeDb(BOOTSTRAP));
   assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.funnel.map((stage) => stage.count), [0, 0, 0]);
   for (const path of leafPaths(res.body)) {
-    if (path === 'readAt') continue;
+    if (path === 'readAt' || path === 'funnel') continue;
     const value = path.split('.').reduce((node, key) => node[key], res.body);
     assert.equal(value, 0, path);
   }
@@ -206,6 +230,11 @@ test('getEventStats answers zero for every figure on an empty deployment', async
 
 test('getEventStats answers exactly these key paths, integers and a timestamp only', async () => {
   const res = await call(makeFakeDb(BOOTSTRAP));
+  // The funnel is the one list: three stages, each an id and an integer.
+  assert.deepEqual(res.body.funnel.map((stage) => Object.keys(stage).sort()), [
+    ['count', 'id'], ['count', 'id'], ['count', 'id'],
+  ]);
+  assert.deepEqual(res.body.funnel.map((stage) => stage.id), ['accounts', 'ticketed-or-approved', 'approved']);
   assert.deepEqual(leafPaths(res.body), [
     'content.cmsContent.drafts', 'content.cmsContent.published',
     'content.cmsOrganizations.drafts', 'content.cmsOrganizations.published',
@@ -214,6 +243,7 @@ test('getEventStats answers exactly these key paths, integers and a timestamp on
     'content.cmsTimeline.drafts', 'content.cmsTimeline.published',
     'content.cmsUpdates.drafts', 'content.cmsUpdates.published',
     'errors.unresolved',
+    'funnel',
     'readAt',
     'registrations.byStatus.approved', 'registrations.byStatus.pending',
     'registrations.byStatus.revoked', 'registrations.byStatus.ticketed',
