@@ -113,6 +113,7 @@
           <nav class="contents" aria-labelledby="contents-title">
             <p class="contents-title" id="contents-title">On this page</p>
             <ul>
+              <li><a href="#who-can-do-what-operator-and-staff">Who can do what: Operator and staff</a></li>
               <li><a href="#set-the-site-up-six-steps">Set the site up: Six steps</a></li>
               <li><a href="#settings-branding">Settings → Branding</a></li>
               <li><a href="#pages">Pages</a></li>
@@ -129,11 +130,27 @@
               <li><a href="#settings-event-settings">Settings → Event settings</a></li>
               <li><a href="#settings-features">Settings → Features</a></li>
               <li><a href="#settings-badges">Settings → Badges</a></li>
+              <li><a href="#settings-access">Settings → Access</a></li>
               <li><a href="#legal-pages">Legal pages</a></li>
             </ul>
           </nav>
           <p>How to run a client&#39;s site from the admin panel, in the order the work happens. For the narrative &quot;why does this work this way&quot; version, hand a new staff member <a href="/eventrunner/docs/handbook/for-event-staff/"><code>docs/handbook/for-event-staff.md</code></a> first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see <a href="/eventrunner/docs/design-reference/"><code>design-reference.md</code></a>. You do not need it to run a site.</p>
           <p><strong>Draft and live are separate almost everywhere below.</strong> Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.</p>
+          <h2 id="who-can-do-what-operator-and-staff">Who can do what: Operator and staff<a class="heading-anchor" href="#who-can-do-what-operator-and-staff" aria-label="Link to this section">#</a></h2>
+          <p>An admin account holds one of two tiers. The rail shows the tier under your address, and it shows only the sections your tier can open. A link you type or follow to a section outside your tier meets a refusal, not the page. The server and the database rules refuse the same requests, so the tier is not only a matter of what the rail shows.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Tier</th><th>Sections</th><th>For</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, and System errors</td><td>The person who set the site up and answers for the deployment</td></tr>
+          <tr><td>Staff</td><td>Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, and Event settings</td><td>The people who run the event day to day</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. One field in there stays with the operator: The outbound sender address, because it is the email identity the deployment was verified against. A staff save that changes it is refused and the field is named.</p>
+          <p>An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.</p>
           <h2 id="set-the-site-up-six-steps">Set the site up: Six steps<a class="heading-anchor" href="#set-the-site-up-six-steps" aria-label="Link to this section">#</a></h2>
           <p>This is the whole visual setup, start to finish. It takes about twenty minutes and you do it once.</p>
           <ol>
@@ -213,6 +230,7 @@
           <li><strong><code>speaker-photos/</code></strong> — set from the speaker editor, not uploaded loose here.</li>
           </ul>
           <p>Upload, edit alt text, and delete from the library. A delete warns you first if anything currently on the site references the asset — do not dismiss that warning without checking what it names.</p>
+          <p><strong>Branding needs an operator.</strong> An upload into <code>branding/</code>, and a delete or an alt-text edit of a branding asset or of any asset a Branding slot uses, is refused for a staff account, with or without the delete warning dismissed. Everything else in the library is staff work.</p>
           <h2 id="speakers">Speakers<a class="heading-anchor" href="#speakers" aria-label="Link to this section">#</a></h2>
           <p>The canonical speaker list, with each record&#39;s pipeline status and the entry points to create, edit, invite, and review pending edits. This list reads the real speaker records, not the public-facing projection, on purpose: An admin needs to see speakers who are not published yet — drafts, outstanding invites, soft-deleted records.</p>
           <p><strong>Pipeline states</strong>, top to bottom of what a record moves through:</p>
@@ -239,6 +257,37 @@
           <li><strong>Revoked</strong> → Approve. That is the only way out of revoked.</li>
           </ul>
           <p>Approve and revoke always go through the server endpoints. Every registration field involved is server-owned and not editable directly, even for the account&#39;s own owner.</p>
+          <p><strong>Export the list.</strong> The button in the title band reads <strong>Export 42 attendees</strong>, where the number is the rows on screen after your search and status filter. It saves a CSV file with one row per account, in the order the page lists them. The file has nine columns, and nothing else leaves the site:</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Column</th><th>What it holds</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Name</td><td>The display name</td></tr>
+          <tr><td>Email</td><td>The sign-in address</td></tr>
+          <tr><td>Organization</td><td>The organization on the profile</td></tr>
+          <tr><td>Role</td><td>The role on the profile (the job title, not an access level)</td></tr>
+          <tr><td>Registration status</td><td>The stored value: <code>pending</code>, <code>ticketed</code>, <code>approved</code>, or <code>revoked</code></td></tr>
+          <tr><td>Badges</td><td>The configured badge labels, then the custom badges while that feature is on</td></tr>
+          <tr><td>Past attendance</td><td>The editions an organizer recorded on the account</td></tr>
+          <tr><td>Social handles</td><td><code>label: handle</code> pairs, sorted by label</td></tr>
+          <tr><td>Profile visibility</td><td>The stored value: <code>public</code>, <code>attendees_only</code>, or <code>private</code></td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>A cell with more than one entry joins them with a semicolon. The file carries no account id, pronouns, bio, photo, or dates. The status and visibility columns keep the stored words, so a spreadsheet filter on them stays stable.</p>
+          <p><strong>Formulas stay text.</strong> A spreadsheet runs a cell that starts with <code>=</code>, <code>+</code>, <code>-</code>, or <code>@</code> as a formula. In the file, such a cell starts with an apostrophe, and so does a cell that starts with a tab or a carriage return, or with spaces and then one of those four characters. The spreadsheet shows the value as text.</p>
+          <p><strong>Every export is recorded.</strong> The server writes an admin log entry with your address, the number of rows, the status filter, and whether a search narrowed the list. It never records the search text, because that text can name a person. If the entry cannot be written, the server refuses the export and makes no file. The server keeps no copy of the file. One export holds at most 10,000 attendees.</p>
+          <p><strong>Past attendance.</strong> Select <strong>Edit record</strong> on a row to open that account&#39;s record. <strong>Past attendance</strong> takes one edition per line, such as a year: at most 20 editions of up to 40 characters each, with no repeats. Select <strong>Save record</strong> to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.</p>
+          <p><strong>Delete an account.</strong> In the record, select <strong>Delete account</strong>, read what the delete removes, and select <strong>Delete this account</strong>. The delete removes the account, its directory profile, and its shared schedule in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session&#39;s saved count), the private notes, the profile photo, and the ticket claim. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.</p>
+          <p>The server refuses a delete in three cases, and says why:</p>
+          <ul>
+          <li>Your own account.</li>
+          <li>An account with operator or staff access. An operator removes that access on the Access page first.</li>
+          <li>An account linked to a speaker. Delete the speaker record first, in Speakers.</li>
+          </ul>
+          <p><strong>If a delete stops part way.</strong> When the account has left the directory but some of its data did not clear, the page keeps a notice with <strong>Try the delete again</strong>. Select it until the page says the account is deleted. Each retry clears only what is left, and records itself in the admin log.</p>
           <h2 id="ticketing">Ticketing<a class="heading-anchor" href="#ticketing" aria-label="Link to this section">#</a></h2>
           <p>Provider status, CSV import, and a searchable ticket list. What is here depends on the client&#39;s provider choice (<a href="/eventrunner/docs/client-onboarding/"><code>CLIENT_ONBOARDING.md</code></a> §3 item 5):</p>
           <ul>
@@ -337,6 +386,13 @@
           <p>The badge catalog: Categories, each with a max-picks cap and its list of badges, which attendees self-select from on their profile. Also a whole-document replace: editing one badge sends the complete set of categories back and preserves the configured custom-badge block list.</p>
           <p><strong>Custom badges.</strong> The separate feature is off by default. When enabled, attendees can enter up to three badges of 24 characters each. Reserved role words are always blocked; <code>config/badges.customBadgeBlockList</code> adds event-specific words. The owner form and public projection use the same validator. The category editor preserves this list; an operator changes it through the badge configuration API.</p>
           <p><strong>Remove a custom badge.</strong> In Attendees, select the removal action beside the badge and confirm. The result stays on the page and an <code>admin_logs</code> entry records the action. Turning the feature off removes custom badges from the public projection; attendees can still edit their other profile fields.</p>
+          <h2 id="settings-access">Settings → Access<a class="heading-anchor" href="#settings-access" aria-label="Link to this section">#</a></h2>
+          <p>Operators only. One ruled table of every admin account with its tier word, and a form to grant access to a new address.</p>
+          <p><strong>Grant access.</strong> Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. The person signs in with that address the way every admin does, by Google or by the emailed code; there is no invitation to send.</p>
+          <p><strong>Change a tier or remove access.</strong> Each row carries two quiet actions: <strong>Change to staff</strong> or <strong>Change to operator</strong>, and <strong>Remove access</strong>. Each one opens a confirmation under the grant form, above the table, that names the account and the consequence. Removal sits on the alarm ground; a tier change does not, because it narrows or widens access without deleting anything. Cancel returns you to the control you pressed.</p>
+          <p><strong>At least one operator stays.</strong> The server refuses a change that would leave the deployment with no operator: Demoting or removing the last operator, your own grant included. Grant a second operator first. The refusal is stated in place, in the server&#39;s words.</p>
+          <p><strong>What is recorded.</strong> Every grant, change, and removal writes a row to the admin log with your address, the account, and the tier it moved from and to. A change that changes nothing writes no row.</p>
+          <p><strong>When it takes effect.</strong> At once. The database rules, the server, and the admin rail all read the access lists live: A granted account is admitted on its next request, a removed account is refused on its next request, and the rail shows the right sections the next time the person signs in or reloads.</p>
           <h2 id="legal-pages">Legal pages<a class="heading-anchor" href="#legal-pages" aria-label="Link to this section">#</a></h2>
           <p>Privacy policy and terms of service ship as CMS content pages seeded from provider-aware templates, each clause needing review flagged <code>[Client legal review required]</code>. They stay flagged — a persistent banner in the admin panel and a visible notice on the public page — until an admin clears the review flag after the client&#39;s counsel has actually reviewed the seeded copy. See <a href="/eventrunner/docs/client-onboarding/"><code>CLIENT_ONBOARDING.md</code></a>&#39;s legal review section for the full context. Do not publish another organization&#39;s terms verbatim; the seeded text is a starting point, not a finished policy.</p>
         </article>

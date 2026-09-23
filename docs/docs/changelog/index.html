@@ -123,6 +123,41 @@
           how the <code>calendarSync</code> flag behaves when a client has not finished the Google setup: the <code>.ics</code>
           download stays and nothing is written. The record is proposed, not accepted, and the flag stays
           off. The documentation site lists it under Decisions.</li>
+          <li>Two admin tiers. An admin account is an operator or a staff member. Operators keep branding,
+          feature flags, access, and the deployment settings; staff run content, the schedule, speakers,
+          attendees, media, materials, and the operations pages. <code>config/bootstrap.adminEmails</code> keeps
+          its meaning as the operator list, so every existing deployment keeps full access with no
+          migration, and <code>config/bootstrap.staffEmails</code> is the new staff list. The database rules, the
+          server&#39;s admin gate (<code>requireAdmin</code> takes a <code>tier</code> option and defaults to operator), and the
+          admin rail all read the same two lists: the rail shows only the sections the signed-in tier can
+          open and refuses the route of any other. Event settings admit staff; the sender block is shown
+          read-only to staff, and a staff save that would change it is refused by name. Branding is the
+          operator&#39;s in the media library too: an upload into <code>branding/</code>, and a delete or relabel of a
+          branding asset or of any asset a theme slot uses, is refused for staff. <code>init-event.cjs</code> takes
+          <code>--staff</code> beside <code>--admin</code>; a re-run never removes a grant made in the admin and never puts back
+          an address removed there, because only <code>--admin</code> and <code>--staff</code> add on a re-run.</li>
+          <li>The Access page, under System, for operators: a ruled table of every admin account with its tier
+          word. An operator grants staff or operator access to a new address, changes a tier, or removes
+          access, and every change asks for a confirmation first, is written by the server with the
+          address lowercased, and is recorded in the admin log. The server refuses a change that would
+          leave the deployment with no operator, including an operator removing their own last grant.</li>
+          <li>Attendee export (#184). The Attendees page saves the rows on screen as a CSV file through the
+          staff-tier <code>exportAttendees</code> endpoint. The file carries exactly the approved field set: name,
+          email, organization, role, registration status, badges, past attendance, social handles, and
+          profile visibility. A cell that a spreadsheet would run as a formula starts with an apostrophe.
+          Every export writes an <code>admin_logs</code> row with the actor, the row count, the status filter, and
+          whether a search was used, never the search text; the server refuses the file when that row
+          cannot be written, and keeps no copy of it.</li>
+          <li>Attendee records and a guarded account delete (#185). <strong>Edit record</strong> on an Attendees row opens
+          the organizer-owned past attendance list, saved through the staff-tier <code>updateAttendee</code>
+          endpoint; the rules deny the field to every client, its owner included. The same panel deletes
+          an account through <code>deleteAttendee</code>: one transaction checks that the account is not the
+          caller&#39;s, not an admin&#39;s, and not linked to a speaker, then removes the account, its directory
+          profile, and its schedule share, releases its ticket claims, and writes the audit row. The
+          sign-in, saved sessions, notes, and profile photos are cleared after it, and a part-way delete
+          keeps a &quot;Try the delete again&quot; action that resumes it. Approve and revoke are unchanged.</li>
+          </ul>
+          <ul>
           <li>A specimen book at <code>/specimen</code>: every device the system has, drawn in the site style and display
           mode the page is set to, with the component file and the tier 3 contract beside each one.
           Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,
