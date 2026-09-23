@@ -61,6 +61,11 @@ const STATS = {
     cmsPages: { published: 15, drafts: 16 },
   },
   errors: { unresolved: 21 },
+  funnel: [
+    { id: 'accounts', count: 412 },
+    { id: 'ticketed-or-approved', count: 280 },
+    { id: 'approved', count: 250 },
+  ],
 };
 
 /** Every figure at zero: the endpoint's answer for an empty deployment. */
@@ -74,6 +79,11 @@ const ZERO = {
       .map((name) => [name, { published: 0, drafts: 0 }]),
   ),
   errors: { unresolved: 0 },
+  funnel: [
+    { id: 'accounts', count: 0 },
+    { id: 'ticketed-or-approved', count: 0 },
+    { id: 'approved', count: 0 },
+  ],
 };
 
 function okResponse(body) {
@@ -333,7 +343,8 @@ describe('the admin overview', () => {
 
       await pushEvent({ milestones: [], registration: { goal: null } });
       expect(screen.queryByRole('heading', { name: 'Milestones' })).toBeNull();
-      expect(screen.queryByRole('progressbar')).toBeNull();
+      expect(screen.queryByRole('progressbar', { name: /registration goal/ })).toBeNull();
+      expect(screen.queryByText(/registration goal/i)).toBeNull();
 
       // A goal alone is enough to draw the panel; clearing it removes it again.
       await pushEvent({ milestones: [], registration: { goal: 400 } });
@@ -356,6 +367,93 @@ describe('the admin overview', () => {
         held.release(okResponse(STATS));
       });
       expect(await within(panel).findByRole('progressbar')).toBeInTheDocument();
+    });
+  });
+
+  // THE FUNNEL AND READINESS PANELS (issue #181), read from the same answer.
+  describe('the funnel and content readiness', () => {
+    it('states each funnel stage as a fraction of all accounts beside a bar it labels', async () => {
+      fetch.mockResolvedValueOnce(okResponse(STATS));
+      await renderAt('/admin/overview');
+      const panel = (await screen.findByRole('heading', { name: 'Registration funnel' })).closest('section');
+
+      const stages = within(panel).getAllByRole('listitem');
+      expect(stages.map((li) => li.querySelector('p').textContent.replace(/\s+/g, ' ').trim())).toEqual([
+        'Accounts: 412 of 412',
+        'Ticketed or approved: 280 of 412',
+        'Approved: 250 of 412',
+      ]);
+      const bars = within(panel).getAllByRole('progressbar');
+      expect(bars.map((bar) => bar.tagName)).toEqual(['PROGRESS', 'PROGRESS', 'PROGRESS']);
+      expect(bars.map((bar) => [bar.getAttribute('value'), bar.getAttribute('max')])).toEqual([
+        ['412', '412'], ['280', '412'], ['250', '412'],
+      ]);
+      expect(bars[1]).toHaveAccessibleName('Ticketed or approved: 280 of 412');
+      expect(panel.textContent).toContain('12 revoked. They count as accounts but not in the later stages.');
+    });
+
+    it('lists what is on the site and what has unpublished changes, per collection', async () => {
+      fetch.mockResolvedValueOnce(okResponse(STATS));
+      await renderAt('/admin/overview');
+      await screen.findByRole('heading', { name: 'Content readiness' });
+
+      const table = screen.getByRole('table', { name: 'Records on the site and records with unpublished changes, by collection.' });
+      expect(within(table).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+        'Collection', 'On the site', 'Unpublished changes',
+      ]);
+      const rows = within(table).getAllByRole('row').slice(1)
+        .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent));
+      expect(rows).toEqual([
+        ['Pages', '15', '16'],
+        ['Content blocks', '90', '8'],
+        ['Sessions', '48', '9'],
+        ['Organizations', '11', '0'],
+        ['Timeline', '0', '0'],
+        ['Updates', '17', '14'],
+      ]);
+      // Figures end-aligned in the data face.
+      const cell = within(table).getAllByRole('cell')[1];
+      expect(cell.className).toMatch(/text-end/);
+      expect(cell.className).toMatch(/tabular-nums/);
+      expect(screen.queryByText('Nothing is on the site yet.')).toBeNull();
+      // "saved" is the attendee's word for a bookmark; it never labels a draft.
+      expect(table.textContent).not.toMatch(/saved/i);
+    });
+
+    it('states zero clearly in both panels for an empty deployment', async () => {
+      fetch.mockResolvedValueOnce(okResponse(ZERO));
+      await renderAt('/admin/overview');
+
+      const funnel = (await screen.findByRole('heading', { name: 'Registration funnel' })).closest('section');
+      expect(funnel.textContent).toContain('No one has signed up yet.');
+      expect(within(funnel).queryByRole('progressbar')).toBeNull();
+      expect(funnel.textContent).not.toContain('revoked');
+
+      const readiness = screen.getByRole('heading', { name: 'Content readiness' }).closest('section');
+      expect(readiness.textContent).toContain('Nothing is on the site yet.');
+      const cells = within(readiness).getAllByRole('cell').map((cell) => cell.textContent);
+      expect(cells.filter((text) => /^\d+$/.test(text))).toEqual(Array(12).fill('0'));
+    });
+
+    it('keeps the keyboard path short: Refresh figures, then the readiness table', async () => {
+      fetch.mockResolvedValueOnce(okResponse({
+        ...STATS,
+        registrations: { ...STATS.registrations, byStatus: { ...STATS.registrations.byStatus, revoked: 1 } },
+      }));
+      await renderAt('/admin/overview');
+      await screen.findByRole('heading', { name: 'Content readiness' });
+
+      const main = document.getElementById('admin-content');
+      const stops = [...main.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')]
+        .filter((el) => el.getAttribute('tabindex') !== '-1');
+      expect(stops.map((el) => el.getAttribute('aria-label') ?? el.textContent)).toEqual([
+        'Refresh figures',
+        'Records on the site and records with unpublished changes, by collection.',
+      ]);
+      const region = screen.getByRole('region', { name: 'Records on the site and records with unpublished changes, by collection.' });
+      expect(region).toHaveAttribute('tabindex', '0');
+      const funnel = screen.getByRole('heading', { name: 'Registration funnel' }).closest('section');
+      expect(funnel.textContent).toContain('1 revoked. It counts as an account but not in the later stages.');
     });
   });
 });

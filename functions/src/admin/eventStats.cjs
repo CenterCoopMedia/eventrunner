@@ -4,7 +4,7 @@
  * The event's figures for the admin overview (issue #178). One staff-tier
  * POST endpoint:
  *
- *   getEventStats {} → { readAt, registrations, tickets, speakers, content, errors }
+ *   getEventStats {} → { readAt, registrations, tickets, speakers, content, errors, funnel }
  *
  * EVERY FIGURE IS A SERVER AGGREGATE (parity plan, M9). The handler asks
  * Firestore for `count()` aggregates and for nothing else, so no document
@@ -29,6 +29,12 @@
  * counted here with no second list to keep in step. A total is the whole
  * collection, so a record whose status is missing or unknown still counts in
  * it: the parts need not add up to the total, and the page never says they do.
+ *
+ * THE FUNNEL (issue #181) is summed here from those counts, so the page
+ * prints it and adds nothing: accounts (every account, revoked included),
+ * then ticketed or approved, then approved. The stages nest because an
+ * admin can approve a pending account directly (shared/registration
+ * TRANSITIONS), so "ticketed" alone would not contain "approved".
  *
  * ALL OR NOTHING. A failed aggregate is logged and the call answers 500 with
  * no figures. A page that showed 29 figures beside a zero nobody measured
@@ -122,7 +128,23 @@ async function readEventStats({ db, now = Date.now }) {
   const snapshots = await Promise.all(plan.map(({ query }) => query.count().get()));
   const stats = { readAt: new Date(now()).toISOString() };
   plan.forEach(({ path }, index) => setPath(stats, path, countOf(snapshots[index])));
+  stats.funnel = funnelOf(stats.registrations);
   return stats;
+}
+
+/**
+ * The registration funnel, three nested stages from the account counts.
+ *
+ * @param {{ total: number, byStatus: Record<string, number> }} registrations
+ * @returns {Array<{ id: string, count: number }>}
+ */
+function funnelOf(registrations) {
+  const { ticketed, approved } = registrations.byStatus;
+  return [
+    { id: 'accounts', count: registrations.total },
+    { id: 'ticketed-or-approved', count: ticketed + approved },
+    { id: 'approved', count: approved },
+  ];
 }
 
 /**
@@ -181,5 +203,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { aggregatePlan, readEventStats, countOf, STATS_UNAVAILABLE },
+  internals: { aggregatePlan, readEventStats, countOf, funnelOf, STATS_UNAVAILABLE },
 };

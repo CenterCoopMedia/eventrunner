@@ -145,6 +145,12 @@ test.describe.serial('the event statistics endpoint', () => {
       expect(stats.errors).toEqual({
         unresolved: await countDocs('system_errors', (data) => data.resolved === false),
       });
+      // The funnel nests, summed by the server from the same counts.
+      expect(stats.funnel).toEqual([
+        { id: 'accounts', count: users.total },
+        { id: 'ticketed-or-approved', count: users.byStatus.ticketed + users.byStatus.approved },
+        { id: 'approved', count: users.byStatus.approved },
+      ]);
       expect(Date.parse(stats.readAt)).not.toBeNaN();
     }).toPass({ timeout: 20_000 });
   });
@@ -168,6 +174,23 @@ test.describe.serial('the event statistics endpoint', () => {
       const response = await callFunction('getEventStats', {}, token);
       expect(response.status).toBe(200);
       expect(printed).toEqual(figureSentences(response.body));
+
+      // The funnel and the readiness table read the same answer (issue #181).
+      const funnel = page.locator('section', { has: page.getByRole('heading', { name: 'Registration funnel' }) });
+      const [accounts, later, approved] = response.body.funnel.map((stage) => stage.count);
+      if (accounts === 0) {
+        await expect(funnel).toContainText('No one has signed up yet.');
+      } else {
+        await expect(funnel.getByRole('progressbar')).toHaveCount(3);
+        await expect(funnel.getByRole('listitem').nth(1)).toHaveText(`Ticketed or approved: ${later} of ${accounts}`);
+        await expect(funnel.getByRole('listitem').nth(2)).toHaveText(`Approved: ${approved} of ${accounts}`);
+      }
+      const table = page.getByRole('table', { name: /by collection/ });
+      const { content } = response.body;
+      for (const [label, id] of [['Pages', 'cmsPages'], ['Sessions', 'cmsSchedule'], ['Timeline', 'cmsTimeline']]) {
+        await expect(table.getByRole('row', { name: new RegExp(`^${label} `) }).getByRole('cell'))
+          .toHaveText([label, String(content[id].published), String(content[id].drafts)]);
+      }
     }).toPass({ timeout: 45_000 });
 
     // Refresh reads the figures again and says when.

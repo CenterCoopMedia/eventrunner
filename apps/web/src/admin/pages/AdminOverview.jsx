@@ -24,6 +24,10 @@
 // failure with nothing to show is an error notice with the server's words
 // and no figures; a failure after figures arrived keeps them on the page
 // under a caution notice that says when they were read.
+//
+// Under the figures: the milestones and the goal from config/event (issue
+// #180), then the registration funnel and the content readiness table
+// (issue #181), both read from the same response.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { zoneLabel } from '../../lib/eventTime.js';
@@ -32,6 +36,8 @@ import { Notice, Panel, SaveStatus, secondaryButtonClass } from '../components/f
 import AdminPageHeader, { AdminLoadingState } from '../components/adminChrome.jsx';
 import { Figure, plural } from '../overview/figures.jsx';
 import MilestonesPanel from '../overview/MilestonesPanel.jsx';
+import FunnelPanel from '../overview/FunnelPanel.jsx';
+import ReadinessPanel from '../overview/ReadinessPanel.jsx';
 
 /**
  * The time the figures were read, on the event's clock: "9:14 AM EDT". An
@@ -198,6 +204,13 @@ export default function AdminOverview() {
         approved={stats?.registrations?.byStatus?.approved}
         timezone={eventConfig.timezone}
       />
+
+      {stats ? (
+        <>
+          <FunnelPanel funnel={stats.funnel} revoked={stats.registrations?.byStatus?.revoked} />
+          <ReadinessPanel content={stats.content} />
+        </>
+      ) : null}
     </div>
   );
 }
