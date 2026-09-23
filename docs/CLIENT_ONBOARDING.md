@@ -63,7 +63,10 @@ node scripts/init-event.cjs --answers client-answers.json --admin <first-admin@c
 ```
 
 Repeat `--admin` for a second address if you already know it — item 5 below still applies if you
-don't yet.
+don't yet. `--admin` seeds the **operator** tier (branding, features, access, deployment settings).
+Pass `--staff <email>` for anyone who should run content, schedule, speakers, and attendees without
+the deployment settings; staff can also be granted later from admin Settings → Access
+(`docs/ADMIN_GUIDE.md`, "Who can do what").
 
 This seeds `config/*`, the fifteen default pages, placeholder CMS content, the two legal page
 templates (flagged `reviewRequired`, see item 4 below), the client-visible email template
@@ -164,12 +167,14 @@ Without it, the functions deploy fails its pre-flight check with a 403 that read
 permissions error, not a billing one — check this **before** the first real deploy dispatch, not
 after debugging a cryptic failure.
 
-### 7. First admin, then a second
+### 7. First operator, then a second
 
-The first admin (from `--admin` above, or `config/bootstrap.adminEmails`) signs in and confirms the
-admin panel loads. Then, **through the admin UI**, grant a second admin — do not leave
-`config/bootstrap` as a single point of failure for a client who could lose access to one inbox.
-`--check` (§6) requires at least two admin accounts for exactly this reason.
+The first operator (from `--admin` above, or `config/bootstrap.adminEmails`) signs in and confirms
+the admin panel loads. Then, from **admin Settings → Access**, grant a second operator — do not
+leave `config/bootstrap` as a single point of failure for a client who could lose access to one
+inbox. `--check` (§6) requires at least two operator accounts for exactly this reason; staff
+accounts do not count, because a staff account cannot restore anyone's access. Grant the client's
+day-to-day editors as staff from the same page.
 
 ### Legal review sign-off
 

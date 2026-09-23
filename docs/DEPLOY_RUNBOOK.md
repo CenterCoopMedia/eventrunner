@@ -327,7 +327,10 @@ node scripts/init-event.cjs --check
 
 `init-event.cjs` runs from an operator's machine (or a follow-up dispatch of a future
 provisioning workflow), not from `deploy-client.yml` — it is the one-time content bootstrap, not a
-repeatable deploy step. See `scripts/README.md`.
+repeatable deploy step. See `scripts/README.md`. `--admin` seeds the operator tier; `--staff`
+(repeatable) seeds staff, who run content, schedule, speakers, and attendees but not branding,
+features, access, or deployment settings. Both can be granted later from admin Settings → Access,
+and a re-run of init never removes a grant made there.
 
 **Step 3 — normal dispatch**, now that `config/event` exists:
 

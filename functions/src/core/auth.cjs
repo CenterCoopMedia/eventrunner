@@ -4,11 +4,28 @@
  * Token verification and the admin gate for onRequest handlers
  * (spec §1.3 core/, §8.4).
  *
- * Admin identity is the server-only `config/bootstrap.adminEmails` list —
- * never a client-writable doc and never a custom claim, so revoking an
- * admin is a config edit, not a token round-trip. `requireAdmin` returns a
- * verdict object instead of writing to `res`, so handlers own their error
- * shape via core/errors and tests never need an Express fake.
+ * Admin identity is the server-only `config/bootstrap` document — never a
+ * client-writable doc and never a custom claim, so revoking an admin is a
+ * config edit, not a token round-trip. `requireAdmin` returns a verdict
+ * object instead of writing to `res`, so handlers own their error shape
+ * via core/errors and tests never need an Express fake.
+ *
+ * TWO TIERS (issue #186). `config/bootstrap` carries two lists:
+ *
+ *   adminEmails  — operators. Branding, feature flags, access control,
+ *                  deployment settings, system errors. The name predates
+ *                  the split and is kept so every existing deployment keeps
+ *                  full access with no migration: an address on this list
+ *                  has always meant "can do everything", and still does.
+ *   staffEmails  — staff. Content, schedule, speakers, attendees, media,
+ *                  materials, feedback, live updates, ticketing operations.
+ *
+ * An address on either list is an admin; an address on `adminEmails` is
+ * an operator. `resolveAdminTier` is the ONE predicate, and it is shared
+ * with every place that used to scan `adminEmails` by hand (speakers/
+ * profile.cjs, media/upload.cjs, `requireAttendeeAccess` below) so the two
+ * lists cannot be read two ways. firestore.rules carries the same split
+ * as isOperator() / isStaff() / isAdmin().
  *
  * Neither function throws on a bad token: an unverifiable token is the
  * same as no token. Only infrastructure failures (Firestore down inside
@@ -19,6 +36,51 @@ const { hasAttendeeAccess } = require('shared/registration');
 
 const BEARER_RE = /^Bearer\s+(\S+)$/i;
 const APP_CHECK_HEADER = 'X-Firebase-AppCheck';
+
+/**
+ * The two admin tiers, strictest first. `requireAdmin` defaults to the
+ * strictest, so an endpoint that forgets to state its tier is closed to
+ * staff rather than open to them.
+ */
+const ADMIN_TIERS = Object.freeze(['operator', 'staff']);
+
+/** @param {unknown} list @param {string} email lowercased @returns {boolean} */
+function listHasEmail(list, email) {
+  return Array.isArray(list)
+    && list.some((entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email);
+}
+
+/**
+ * The tier an address holds on `config/bootstrap`, or null for no admin
+ * access at all. Case-insensitive on both sides. An address on both lists
+ * is an operator: the wider grant wins, the same way the rules'
+ * `isOperator() || isStaff()` reads it. A missing document, a missing
+ * list, or a malformed list is "not an admin", never a throw.
+ *
+ * @param {{ adminEmails?: unknown, staffEmails?: unknown }|null|undefined} bootstrap
+ * @param {string|null|undefined} email
+ * @returns {'operator'|'staff'|null}
+ */
+function resolveAdminTier(bootstrap, email) {
+  const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  if (!normalized) return null;
+  if (listHasEmail(bootstrap?.adminEmails, normalized)) return 'operator';
+  if (listHasEmail(bootstrap?.staffEmails, normalized)) return 'staff';
+  return null;
+}
+
+/**
+ * Whether `held` satisfies `required`. Operator satisfies everything;
+ * staff satisfies staff only.
+ *
+ * @param {'operator'|'staff'|null} held
+ * @param {'operator'|'staff'} required
+ * @returns {boolean}
+ */
+function tierSatisfies(held, required) {
+  if (held === 'operator') return true;
+  return held === 'staff' && required === 'staff';
+}
 
 /**
  * Pull the raw ID token out of `Authorization: Bearer <idToken>`.
@@ -62,21 +124,33 @@ async function verifyAuthToken({ auth }, req) {
  *
  * Checks, in order: a verifiable ID token (else 401); a verified email on
  * the token (else 403 — an unverified address must never confer admin,
- * §1.3); membership in `config/bootstrap.adminEmails`, compared
- * case-insensitively (else 403). The 403 message never reveals whether
- * the bootstrap doc exists or which addresses are on the list.
+ * §1.3); membership in `config/bootstrap`, compared case-insensitively
+ * (else 403); and that the tier held satisfies the tier the endpoint
+ * asks for (else 403). The 403 message never reveals whether the
+ * bootstrap doc exists or which addresses are on either list.
+ *
+ * `options.tier` is the endpoint's own classification and the ONE place
+ * it states it: `'staff'` admits both tiers, `'operator'` admits operators
+ * only. It defaults to `'operator'`, so an endpoint that does not say
+ * refuses staff rather than admitting them. The verdict carries the tier
+ * the caller holds, for a handler that gates one field more tightly than
+ * the rest (admin/config.cjs's sender block).
  *
  * `db` is accepted for signature compatibility but unused: the injected
  * `getConfig` (core/config.cjs getEventConfig) already loads bootstrap.
  *
  * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
- *           getConfig: () => Promise<{ bootstrap: { adminEmails?: string[] } | null }>,
+ *           getConfig: () => Promise<{ bootstrap: { adminEmails?: string[], staffEmails?: string[] } | null }>,
  *           db?: object }} deps
  * @param {object} req
- * @returns {Promise<{ ok: true, uid: string, email: string } |
+ * @param {{ tier?: 'operator'|'staff' }} [options]
+ * @returns {Promise<{ ok: true, uid: string, email: string, tier: 'operator'|'staff' } |
  *                    { ok: false, status: 401|403, code: string, message: string }>}
  */
-async function requireAdmin({ auth, getConfig }, req) {
+async function requireAdmin({ auth, getConfig }, req, { tier = 'operator' } = {}) {
+  if (!ADMIN_TIERS.includes(tier)) {
+    throw new TypeError(`requireAdmin: unknown tier "${tier}" (expected ${ADMIN_TIERS.join(' or ')})`);
+  }
   const decoded = await verifyAuthToken({ auth }, req);
   if (!decoded) {
     return { ok: false, status: 401, code: 'unauthorized', message: 'Authentication required.' };
@@ -86,16 +160,14 @@ async function requireAdmin({ auth, getConfig }, req) {
     return { ok: false, status: 403, code: 'forbidden', message: 'Admin access required.' };
   }
   const config = await getConfig();
-  const adminEmails = Array.isArray(config?.bootstrap?.adminEmails)
-    ? config.bootstrap.adminEmails
-    : [];
-  const isAdmin = adminEmails.some(
-    (entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email,
-  );
-  if (!isAdmin) {
+  const held = resolveAdminTier(config?.bootstrap, email);
+  if (held === null) {
     return { ok: false, status: 403, code: 'forbidden', message: 'Admin access required.' };
   }
-  return { ok: true, uid: decoded.uid, email };
+  if (!tierSatisfies(held, tier)) {
+    return { ok: false, status: 403, code: 'forbidden', message: 'Operator access required.' };
+  }
+  return { ok: true, uid: decoded.uid, email, tier: held };
 }
 
 /**
@@ -121,7 +193,7 @@ async function requireAdmin({ auth, getConfig }, req) {
  * direct client reads of `users_public` — one vocabulary, two enforcement
  * points that cannot drift apart.
  *
- * Bootstrap admins (`config/bootstrap.adminEmails`) get the SAME
+ * Bootstrap admins (either tier on `config/bootstrap`) get the SAME
  * `role: 'attendee'` default from the auth trigger as anyone else — the
  * trigger has no way to know an email is on the bootstrap list. The
  * client-side counterpart (ProfileContext.jsx) papers over this by
@@ -129,14 +201,15 @@ async function requireAdmin({ auth, getConfig }, req) {
  * so the UI shows a working bookmark pill for an admin who isn't also an
  * approved attendee — but this server gate, reading only the stored
  * document, would 403 that same admin's click. Resolving bootstrap-admin
- * identity the same way `requireAdmin` does (verified email against
- * `config/bootstrap.adminEmails`) keeps the UI's promise and the server's
- * enforcement in agreement, the same "one predicate, two checkpoints"
- * discipline the module doc above describes.
+ * identity the same way `requireAdmin` does (verified email through
+ * `resolveAdminTier`) keeps the UI's promise and the server's enforcement
+ * in agreement, the same "one predicate, two checkpoints" discipline the
+ * module doc above describes. Staff count here too: attendee access is
+ * the floor under every admin, not an operator privilege.
  *
  * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
  *           db: FirebaseFirestore.Firestore,
- *           getConfig: () => Promise<{ bootstrap: { adminEmails?: string[] } | null }> }} deps
+ *           getConfig: () => Promise<{ bootstrap: { adminEmails?: string[], staffEmails?: string[] } | null }> }} deps
  * @param {object} req
  * @returns {Promise<{ ok: true, uid: string, email: string|null } |
  *                    { ok: false, status: 401|403, code: string, message: string }>}
@@ -151,12 +224,7 @@ async function requireAttendeeAccess({ auth, db, getConfig }, req) {
   const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
   if (email && decoded.email_verified === true && typeof getConfig === 'function') {
     const config = await getConfig();
-    const adminEmails = Array.isArray(config?.bootstrap?.adminEmails)
-      ? config.bootstrap.adminEmails
-      : [];
-    isBootstrapAdmin = adminEmails.some(
-      (entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email,
-    );
+    isBootstrapAdmin = resolveAdminTier(config?.bootstrap, email) !== null;
   }
 
   const snap = await db.collection('users').doc(decoded.uid).get();
@@ -236,9 +304,11 @@ async function requireAppCheck({ appCheck, enforced = false }, req) {
 }
 
 module.exports = {
+  ADMIN_TIERS,
+  resolveAdminTier,
   verifyAuthToken,
   requireAdmin,
   requireAttendeeAccess,
   requireAppCheck,
-  internals: { extractBearerToken, extractAppCheckToken, APP_CHECK_HEADER },
+  internals: { extractBearerToken, extractAppCheckToken, tierSatisfies, APP_CHECK_HEADER },
 };

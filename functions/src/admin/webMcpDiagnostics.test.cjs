@@ -194,3 +194,64 @@ test('the server gate rejects signed-out callers and sanitizes an authorized res
   assert.equal(authorized.statusCode, 200);
   assert.doesNotMatch(JSON.stringify(authorized.body), /private@example\.org|private-token/);
 });
+
+// ------------------------------------------------------- the two tiers (#186)
+
+const {
+  createCheckEventReadinessHandler,
+  createInspectSystemErrorsHandler,
+} = require('./webMcpDiagnostics.cjs');
+
+function tieredAuth() {
+  return {
+    verifyIdToken: async (token) => {
+      if (token === 'staff') return { uid: 'staff-uid', email: 'staff@example.org', email_verified: true };
+      if (token === 'ops') return { uid: 'ops-uid', email: 'admin@example.org', email_verified: true };
+      throw new Error('bad token');
+    },
+  };
+}
+
+function tieredConfig() {
+  return async () => ({
+    ...config(),
+    bootstrap: { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] },
+  });
+}
+
+const asToken = (token) => ({ method: 'POST', headers: { authorization: `Bearer ${token}` }, body: {} });
+
+test('every diagnostic states a tier, and only the system-error inspection is operator-only', () => {
+  const { DIAGNOSTIC_TIERS } = internals;
+  assert.deepEqual(DIAGNOSTIC_TIERS, {
+    webMcpCheckEventReadiness: 'staff',
+    webMcpValidateCurrentPageDraft: 'staff',
+    webMcpInspectPublishQueue: 'staff',
+    webMcpInspectSystemErrors: 'operator',
+    webMcpCheckMediaUsage: 'staff',
+    webMcpCheckTicketingHealth: 'staff',
+  });
+});
+
+test('a staff caller reads the readiness and publish-queue diagnostics', async () => {
+  const db = makeFakeDb(seed());
+  const deps = { db, getConfig: tieredConfig(), auth: tieredAuth(), log: console };
+  for (const create of [createCheckEventReadinessHandler, createInspectPublishQueueHandler]) {
+    const res = response();
+    await create(deps)(asToken('staff'), res);
+    assert.equal(res.statusCode, 200);
+  }
+});
+
+test('a staff caller is refused the system-error diagnostic; an operator is not', async () => {
+  const db = makeFakeDb(seed());
+  const deps = { db, getConfig: tieredConfig(), auth: tieredAuth(), log: console };
+  const refused = response();
+  await createInspectSystemErrorsHandler(deps)(asToken('staff'), refused);
+  assert.equal(refused.statusCode, 403);
+  assert.equal(refused.body.error.message, 'Operator access required.');
+
+  const admitted = response();
+  await createInspectSystemErrorsHandler(deps)(asToken('ops'), admitted);
+  assert.equal(admitted.statusCode, 200);
+});

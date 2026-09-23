@@ -11,11 +11,12 @@
  * `requireAttendeeAccess`.
  *
  * Resolves admin status via `requireAdmin`'s verified-email-against-
- * `config/bootstrap.adminEmails` check (NOT `requireAttendeeAccess`'s
- * bootstrap-admin fallback, which needs a `users/{uid}` doc to already
- * exist) so an admin who happens not to be a registered attendee can still
- * manage materials. `speakerId` is read directly off `users/{uid}` —
- * `requireAttendeeAccess` deliberately does not expose it.
+ * `config/bootstrap` check at the staff tier — materials are staff work,
+ * so either tier counts (NOT `requireAttendeeAccess`'s bootstrap-admin
+ * fallback, which needs a `users/{uid}` doc to already exist) so an admin
+ * who happens not to be a registered attendee can still manage materials.
+ * `speakerId` is read directly off `users/{uid}` — `requireAttendeeAccess`
+ * deliberately does not expose it.
  */
 
 const { verifyAuthToken, requireAdmin } = require('../core/auth.cjs');
@@ -56,7 +57,7 @@ async function resolveActorOptional({ auth, db, getConfig }, req) {
 }
 
 async function loadActorForUid({ auth, db, getConfig }, req, uid) {
-  const adminVerdict = await requireAdmin({ auth, getConfig }, req);
+  const adminVerdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
   const isAdmin = adminVerdict.ok === true;
 
   const snap = await db.collection('users').doc(uid).get();

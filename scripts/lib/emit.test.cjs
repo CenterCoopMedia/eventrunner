@@ -87,6 +87,7 @@ test('config/bootstrap is never emitted into the bundle', () => {
   const files = emitAll(demoSnapshot());
   const all = Object.values(files).join('\n');
   assert.doesNotMatch(all, /adminEmails/);
+  assert.doesNotMatch(all, /staffEmails/);
   assert.doesNotMatch(all, /demo-admin@example\.org/);
 });
 

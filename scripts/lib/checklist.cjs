@@ -73,9 +73,9 @@ function manualChecklist(ctx = {}) {
       title: 'First admin signs in and confirms the admin panel loads',
       detail:
         (admins.length > 0
-          ? `Seeded admins: ${admins.join(', ')}. `
-          : 'No admin addresses were seeded — re-run with --admin. ') +
-        'Then grant a second admin through the UI so config/bootstrap is not a single point of failure.',
+          ? `Seeded operators: ${admins.join(', ')}. `
+          : 'No operator addresses were seeded — re-run with --admin. ') +
+        'Then grant a second operator through Settings → Access so config/bootstrap is not a single point of failure.',
     },
     {
       title: 'Record the Auth steps once done',

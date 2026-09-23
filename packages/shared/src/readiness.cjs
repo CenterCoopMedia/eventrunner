@@ -56,13 +56,15 @@ function evaluateReadiness({
     'Upload the client logo, mark, favicon, and OG image from admin Settings → Branding.',
   );
 
+  // Operators only (issue #186): a staff account cannot restore anyone's
+  // access, so it does not count against the single-point-of-failure row.
   const admins = Array.isArray(bootstrap?.adminEmails) ? bootstrap.adminEmails : [];
   row(
     'admins',
     'First admin',
     admins.length >= MIN_ADMINS,
-    `${admins.length} admin account${admins.length === 1 ? '' : 's'} configured`,
-    `Grant a second admin so config/bootstrap is not a single point of failure (at least ${MIN_ADMINS}).`,
+    `${admins.length} operator account${admins.length === 1 ? '' : 's'} configured`,
+    `Grant a second operator (admin Settings → Access) so config/bootstrap is not a single point of failure (at least ${MIN_ADMINS}).`,
   );
 
   const ticketing = providers?.ticketing || {};

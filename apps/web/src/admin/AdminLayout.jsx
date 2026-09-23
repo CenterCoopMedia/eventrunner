@@ -12,7 +12,7 @@
 // keyboard path per control, `aria-current` on the active section.
 //
 // THE RAIL. The navigation stands on its own dark ground down the leading
-// edge, so the tool's frame and the work surface are never confused. Fifteen
+// edge, so the tool's frame and the work surface are never confused. Sixteen
 // named sections read as a standing list grouped by what the operator came
 // to do: content, people, operations, system. Group heads are folios. Every
 // item is a word — no icon rail, no collapse to glyphs, no counts in
@@ -31,11 +31,20 @@
 // thing on the rail and it belongs to the client. With the accent in
 // AdminPageHeader's mark, it is one of exactly two client-owned elements on
 // this surface.
+//
+// THE TIERS (issue #186). Every docket item names the tier it needs, and
+// that one declaration does two things: the rail draws only the sections the
+// signed-in tier may reach, and the shell refuses the route of one it may
+// not, so a bookmarked or typed URL to an out-of-tier section meets a
+// refusal rather than the page. A page a builder adds declares its tier by
+// its docket entry and nowhere else. The tier comes from AuthContext's
+// probes; the server's requireAdmin and the rules are the enforcement.
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
+import { AdminEmptyState } from './components/adminChrome.jsx';
 
 /** Every docket item is an ABSOLUTE path. A relative `to` resolves against
  * the current LOCATION inside this nested `<Routes>`, so on /admin/branding
@@ -44,50 +53,106 @@ import { brandingSrc } from '../lib/mediaSource.js';
 const ROOT = '/admin';
 
 /**
+ * The two admin tiers, as the server names them (functions/src/core/auth.cjs
+ * ADMIN_TIERS). A docket item's `tier` is the LEAST it needs: 'staff' admits
+ * both tiers, 'operator' admits operators only.
+ */
+export const ADMIN_TIERS = Object.freeze(['operator', 'staff']);
+
+/**
  * The docket. Four groups, in the order an operator works: what the event
  * says, who is in it, how it runs, and how the deployment is set up.
+ *
+ * Content, people and operations are staff work. Under System, the event
+ * settings admit staff (dates, venue, places and social handles are content
+ * an organizer runs; the server holds the sender address back for an
+ * operator); features, branding, access and system errors are the
+ * operator's, because each one changes what the deployment is rather than
+ * what the event says.
  */
 export const DOCKET = Object.freeze([
   {
     id: 'content',
     label: 'Content',
     items: [
-      { to: 'pages', label: 'Pages' },
-      { to: 'sessions', label: 'Sessions' },
-      { to: 'content', label: 'Content' },
-      { to: 'media', label: 'Media' },
-      { to: 'materials', label: 'Materials' },
+      { to: 'pages', label: 'Pages', tier: 'staff' },
+      { to: 'sessions', label: 'Sessions', tier: 'staff' },
+      { to: 'content', label: 'Content', tier: 'staff' },
+      { to: 'media', label: 'Media', tier: 'staff' },
+      { to: 'materials', label: 'Materials', tier: 'staff' },
     ],
   },
   {
     id: 'people',
     label: 'People',
     items: [
-      { to: 'speakers', label: 'Speakers' },
-      { to: 'attendees', label: 'Attendees' },
-      { to: 'badges', label: 'Badges' },
+      { to: 'speakers', label: 'Speakers', tier: 'staff' },
+      { to: 'attendees', label: 'Attendees', tier: 'staff' },
+      { to: 'badges', label: 'Badges', tier: 'staff' },
     ],
   },
   {
     id: 'operations',
     label: 'Operations',
     items: [
-      { to: 'live-updates', label: 'Live updates' },
-      { to: 'ticketing', label: 'Ticketing' },
-      { to: 'feedback', label: 'Feedback' },
+      { to: 'live-updates', label: 'Live updates', tier: 'staff' },
+      { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
+      { to: 'feedback', label: 'Feedback', tier: 'staff' },
     ],
   },
   {
     id: 'system',
     label: 'System',
     items: [
-      { to: 'settings', label: 'Event' },
-      { to: 'features', label: 'Features' },
-      { to: 'branding', label: 'Branding' },
-      { to: 'system-errors', label: 'System errors' },
+      { to: 'settings', label: 'Event', tier: 'staff' },
+      { to: 'features', label: 'Features', tier: 'operator' },
+      { to: 'branding', label: 'Branding', tier: 'operator' },
+      { to: 'access', label: 'Access', tier: 'operator' },
+      { to: 'system-errors', label: 'System errors', tier: 'operator' },
     ],
   },
 ]);
+
+/**
+ * Whether a tier the caller holds reaches a tier a section asks for. An
+ * item with no tier declared falls to the strictest, the same default the
+ * server's requireAdmin takes, so a forgotten declaration closes a section
+ * to staff rather than opening it.
+ *
+ * @param {'operator'|'staff'|null} held
+ * @param {'operator'|'staff'|undefined} required
+ * @returns {boolean}
+ */
+export function tierReaches(held, required = 'operator') {
+  if (held === 'operator') return true;
+  return held === 'staff' && required === 'staff';
+}
+
+/**
+ * The tier the section at `pathname` asks for, from its docket entry, or
+ * null for a path no docket item owns (the index redirect, the not-found
+ * page). A section owns every path under it, so /admin/pages/new is Pages.
+ *
+ * @param {string} pathname
+ * @returns {'operator'|'staff'|null}
+ */
+export function sectionTier(pathname) {
+  const segment = pathname.replace(/^\/admin\/?/, '').split('/')[0];
+  if (!segment) return null;
+  for (const group of DOCKET) {
+    const item = group.items.find((entry) => entry.to === segment);
+    if (item) return item.tier ?? 'operator';
+  }
+  return null;
+}
+
+/** The docket with the sections `held` cannot reach left out. */
+export function docketForTier(held) {
+  return DOCKET.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => tierReaches(held, item.tier)),
+  })).filter((group) => group.items.length > 0);
+}
 
 /**
  * A docket item. The marker is a short rule in the rail's own ink at the
@@ -110,14 +175,35 @@ const railButtonClass =
   'border-admin-rail-rule px-sm py-2xs text-admin-sm font-semibold text-admin-rail-ink ' +
   'hover:bg-admin-rail-ground-hover';
 
+/**
+ * The refusal an out-of-tier route meets. It is a page, not a redirect: the
+ * reader typed or followed a link here, and the honest answer is what this
+ * section is and who may open it, with the rail still beside it so the next
+ * move is one click away.
+ */
+function TierRefusal() {
+  return (
+    <div className="px-md py-lg">
+      <AdminEmptyState
+        title="This section needs operator access"
+        description="Your account has staff access. Staff run the content, people and operations sections. Ask an operator to change your access if you need this one."
+      />
+    </div>
+  );
+}
+
 export default function AdminLayout() {
   const { eventConfig, theme } = useEventConfig();
-  const { user, signOut } = useAuth();
+  const { user, adminTier, signOut } = useAuth();
+  const { pathname } = useLocation();
   // A branding slot can point at an object that has since been deleted from
   // the bucket, so the job mark degrades to the event's short name rather
   // than to a broken image.
   const [markFailed, setMarkFailed] = useState(false);
   const markSrc = brandingSrc(theme?.logos?.mark ?? theme?.logos?.primary);
+  const docket = docketForTier(adminTier);
+  const required = sectionTier(pathname);
+  const refused = required !== null && !tierReaches(adminTier, required);
 
   return (
     <div className="admin-room flex min-h-screen flex-col bg-admin-ground font-admin-ui text-admin-base text-admin-ink lg:flex-row">
@@ -142,7 +228,7 @@ export default function AdminLayout() {
         </div>
 
         <nav aria-label="Admin sections" className="flex-1 px-md py-xs lg:px-xs lg:py-sm">
-          {DOCKET.map((group) => (
+          {docket.map((group) => (
             <div
               key={group.id}
               className="flex flex-wrap items-center gap-x-xs gap-y-3xs py-3xs lg:mt-sm lg:block lg:py-0 lg:first:mt-0"
@@ -166,10 +252,18 @@ export default function AdminLayout() {
         <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-t-admin-hairline px-md py-sm lg:flex-col lg:items-stretch">
           {/* An operator has to be able to tell which account the server
               will see, so the address is set in the data face: it is an
-              identifier, and identifiers are the machine's. */}
-          <p className="min-w-0 break-all font-admin-data text-admin-xs text-admin-rail-ink-muted">
-            {user?.email}
-          </p>
+              identifier, and identifiers are the machine's. The tier word
+              beside it says what that account may do here. */}
+          <div className="min-w-0">
+            <p className="break-all font-admin-data text-admin-xs text-admin-rail-ink-muted">
+              {user?.email}
+            </p>
+            {adminTier ? (
+              <p className="text-admin-xs font-semibold text-admin-rail-ink" data-admin-tier={adminTier}>
+                {adminTier === 'operator' ? 'Operator' : 'Staff'}
+              </p>
+            ) : null}
+          </div>
           <div className="flex flex-wrap items-center gap-xs">
             <NavLink to="/" className={railButtonClass}>
               View site
@@ -183,7 +277,7 @@ export default function AdminLayout() {
 
       <main id="admin-content" className="min-w-0 flex-1">
         <div className="admin-stone mx-auto w-full max-w-admin-canvas">
-          <Outlet />
+          {refused ? <TierRefusal /> : <Outlet />}
         </div>
       </main>
     </div>

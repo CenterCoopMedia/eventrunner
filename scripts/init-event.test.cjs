@@ -164,7 +164,7 @@ test('init prints the manual checklist including the Firebase Auth steps (§5.6)
   assert.match(output, /Authentication → Sign-in method → enable Google/);
   assert.match(output, /Authorized domains/);
   assert.match(output, /ops@example\.org/);
-  assert.match(output, /second admin/);
+  assert.match(output, /second operator/);
 });
 
 test('an unprovisioned Storage bucket is a warning, not a failed init', async () => {
@@ -647,4 +647,36 @@ test('a fresh init has no legacy document to remove and says nothing about one',
     runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
   assert.equal(value, 0);
   assert.doesNotMatch(output, /hero__register_cta/);
+});
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('--staff seeds the staff tier, lowercased, beside the operators', async () => {
+  const db = makeFakeDb();
+  const { value } = await quietly(() => runInit({
+    db, store, bucket: noBucket,
+    args: initArgs({ staff: ['Desk@Example.org', 'ops@example.org'] }),
+    tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  assert.equal(value, 0);
+  const bootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(bootstrap.adminEmails, ['ops@example.org']);
+  // An address on both lists is an operator and is stored once.
+  assert.deepEqual(bootstrap.staffEmails, ['desk@example.org']);
+});
+
+test('a re-run keeps the staff an operator granted through the Access page', async () => {
+  const db = makeFakeDb();
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  const bootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(bootstrap.staffEmails, []);
+  await db.collection('config').doc('bootstrap').set({ ...bootstrap, staffEmails: ['granted@example.org'] });
+
+  await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true, admin: ['second@example.org'] }),
+    tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  const after = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(after.adminEmails, ['ops@example.org', 'second@example.org']);
+  assert.deepEqual(after.staffEmails, ['granted@example.org']);
 });

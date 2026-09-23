@@ -240,3 +240,22 @@ test('a refused transition writes no audit row and no state', async () => {
   await revoke(db)(req('admin'), makeRes());
   assert.deepEqual(adminLogs(db), []);
 });
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('a staff admin may approve and revoke — attendees are staff work', async () => {
+  const STAFF = 'staff@example.com';
+  const staffAuth = {
+    async verifyIdToken(token) {
+      if (token === 'staff') return { uid: 'staff-1', email: STAFF, email_verified: true };
+      throw new Error('invalid token');
+    },
+  };
+  const tiered = async () => ({ bootstrap: { adminEmails: [ADMIN], staffEmails: [STAFF] }, features: {} });
+  const db = seeded();
+  const res = makeRes();
+  await createApproveUserHandler({ db, auth: staffAuth, getConfig: tiered, now: () => T0, log: QUIET })(req('staff'), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('users', 'uid-ada').registrationStatus, 'approved');
+  assert.equal(adminLogs(db)[0].email, STAFF);
+});

@@ -961,3 +961,29 @@ test('getOwnSpeakerProfile handler surfaces pendingEdits to the owner', async ()
   assert.deepEqual(res.body.speaker.pendingEdits, { bio: 'queued bio' });
   assert.equal(res.body.speaker.bio, 'old bio');
 });
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('createSpeaker admits a staff admin — speakers are staff work', async () => {
+  const db = makeSpeakersDb();
+  const staffDeps = {
+    ...adminDeps(db),
+    auth: { verifyIdToken: async () => ({ uid: 'staff-1', email: 'staff@example.org', email_verified: true }) },
+    getConfig: async () => ({ bootstrap: { adminEmails: [ACTOR.email], staffEmails: ['staff@example.org'] } }),
+  };
+  const res = fakeRes();
+  await createCreateSpeakerHandler(staffDeps)(adminReq({ speaker: { firstName: 'Rae', lastName: 'Okonkwo' } }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('getOwnSpeakerProfile treats a staff admin as an admin and reads any record', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const staff = {
+    ...speakerDeps(db, { uid: 'staff-1', email: 'staff@example.org' }),
+    getConfig: async () => ({ bootstrap: { adminEmails: [], staffEmails: ['staff@example.org'] } }),
+  };
+  const res = fakeRes();
+  await createGetOwnSpeakerProfileHandler(staff)(speakerReq({ speakerId: 'rae' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.speaker.speakerId, 'rae');
+});

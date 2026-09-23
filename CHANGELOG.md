@@ -16,6 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   how the `calendarSync` flag behaves when a client has not finished the Google setup: the `.ics`
   download stays and nothing is written. The record is proposed, not accepted, and the flag stays
   off. The documentation site lists it under Decisions.
+- Two admin tiers. An admin account is an operator or a staff member. Operators keep branding,
+  feature flags, access, and the deployment settings; staff run content, the schedule, speakers,
+  attendees, media, materials, and the operations pages. `config/bootstrap.adminEmails` keeps
+  its meaning as the operator list, so every existing deployment keeps full access with no
+  migration, and `config/bootstrap.staffEmails` is the new staff list. The database rules, the
+  server's admin gate (`requireAdmin` takes a `tier` option and defaults to operator), and the
+  admin rail all read the same two lists: the rail shows only the sections the signed-in tier can
+  open and refuses the route of any other. Event settings admit staff; a staff save that changes
+  the outbound sender address is refused by name. `init-event.cjs` takes `--staff` beside
+  `--admin`, and a re-run never removes a grant made in the admin.
+
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.
   Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,
