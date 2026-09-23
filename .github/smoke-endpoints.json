@@ -79,6 +79,8 @@
     "ticketingListTickets",
     "approveUser",
     "revokeUser",
-    "exportAttendees"
+    "exportAttendees",
+    "updateAttendee",
+    "deleteAttendee"
   ]
 }
