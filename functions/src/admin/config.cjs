@@ -12,10 +12,13 @@
  *      staff, because dates, venue, places, tracks, the register link,
  *      social handles, and the badge catalogue are the content an
  *      organizer runs day to day. One field of config/event is held back:
- *      `sender` (the outbound address and display name) needs an
- *      operator, because it is the email identity verify-sender-domain.cjs
- *      attests — a staff member changing it could point the deployment's
- *      mail at an address nobody verified.
+ *      a CHANGE to `sender` (the outbound address, display name, reply-to)
+ *      needs an operator, because it is the email identity
+ *      verify-sender-domain.cjs attests — a staff member changing it could
+ *      point the deployment's mail at an address nobody verified. The
+ *      comparison happens inside the write transaction against the stored
+ *      values, so a staff save that carries the sender unchanged (the
+ *      form sends the whole editable slice) goes through.
  *   2. Targets only {event, features, theme, badges}. `config/bootstrap`
  *      (the admin-list seed) and `config/providers` (a read-only mirror of
  *      Tier A deploy env) are NEVER writable from the panel, and the
@@ -112,10 +115,60 @@ const EVENT_EDITABLE_KEYS = Object.freeze([
 const SENDER_VERIFICATION_FIELDS = Object.freeze(['domainVerified', 'domainVerifiedAt']);
 
 /**
- * Top-level config/event keys only an operator may write (issue #186).
+ * Top-level config/event keys only an operator may CHANGE (issue #186).
  * Everything else on EVENT_EDITABLE_KEYS is staff content.
  */
 const EVENT_OPERATOR_KEYS = Object.freeze(['sender']);
+
+/** The editable sender fields, the only ones the comparison looks at. */
+const SENDER_EDITABLE_FIELDS = Object.freeze(['email', 'name', 'replyTo']);
+
+/**
+ * One sender field, normalized the way the save stores it: trimmed, an
+ * empty string and a missing value both read as null (the form sends
+ * `orNull`), and an address compared without regard to case.
+ */
+function normalizeSenderField(field, value) {
+  if (typeof value !== 'string') return value == null ? null : value;
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  return field === 'replyTo' || field === 'email' ? trimmed.toLowerCase() : trimmed;
+}
+
+/**
+ * Whether a payload's sender differs from the stored one on any editable
+ * field. The verification pair is not compared: it is refused by name
+ * before this runs, whoever the caller is. Pure.
+ *
+ * @param {object|undefined} payloadSender
+ * @param {object|undefined} storedSender
+ * @returns {boolean}
+ */
+function senderChanged(payloadSender, storedSender) {
+  if (!isPlainObject(payloadSender)) return false;
+  const stored = isPlainObject(storedSender) ? storedSender : {};
+  return SENDER_EDITABLE_FIELDS.some((field) => field in payloadSender
+    && normalizeSenderField(field, payloadSender[field]) !== normalizeSenderField(field, stored[field]));
+}
+
+/**
+ * Operator-only keys a staff payload would CHANGE, each named. Runs inside
+ * the event transaction, against the stored document. Pure.
+ *
+ * @param {string} docId
+ * @param {object} payload
+ * @param {object} stored the stored document (stamps stripped)
+ * @param {'operator'|'staff'} tier the caller's tier
+ * @returns {string[]}
+ */
+function findOperatorKeyChanges(docId, payload, stored, tier) {
+  if (tier === 'operator' || docId !== 'event') return [];
+  const violations = [];
+  if ('sender' in payload && senderChanged(payload.sender, stored?.sender)) {
+    violations.push('sender: operator access required');
+  }
+  return violations;
+}
 
 /**
  * The tier each panel-writable doc asks of its caller (issue #186). The
@@ -129,20 +182,6 @@ const CONFIG_DOC_TIERS = Object.freeze({
   badges: 'staff',
 });
 
-/**
- * Operator-only keys a staff payload touches, each named. Pure.
- *
- * @param {string} docId
- * @param {object} payload
- * @param {'operator'|'staff'} tier the caller's tier
- * @returns {string[]}
- */
-function findTierViolations(docId, payload, tier) {
-  if (tier === 'operator' || docId !== 'event') return [];
-  return EVENT_OPERATOR_KEYS
-    .filter((key) => key in payload)
-    .map((key) => `${key}: operator access required`);
-}
 
 /** Server-stamped bookkeeping — silently stripped from payloads. */
 const STAMP_FIELDS = Object.freeze(['updatedAt', 'updatedBy']);
@@ -247,6 +286,16 @@ function deepMerge(base, patch) {
   return out;
 }
 
+/** Thrown inside the event transaction when a staff caller changes an
+ * operator-only key; applyConfigWrite maps it to a 403. */
+class OperatorKeyRefusedError extends Error {
+  constructor(errors) {
+    super(errors.join('; '));
+    this.name = 'OperatorKeyRefusedError';
+    this.errors = errors;
+  }
+}
+
 /** Thrown inside the event transaction when the MERGED doc fails the
  * shared validator; applyConfigWrite maps it to a 400. */
 class MergedConfigInvalidError extends Error {
@@ -293,12 +342,18 @@ async function removedPlaceReferences({ db, tx, stored, written }) {
  * touching `res`, so the four handlers share it and tests can drive the
  * allowlist directly (e.g. prove `bootstrap` is rejected).
  *
+ * `actor.tier` is the caller's admin tier; when it is 'staff' a change to
+ * an operator-only key of config/event is refused inside the transaction,
+ * against the stored values (see findOperatorKeyChanges). A missing tier
+ * reads as staff, the strict side.
+ *
  * @param {{ db: FirebaseFirestore.Firestore, docId: string, payload: object,
- *           actor: { uid: string, email: string }, now?: () => number }} args
+ *           actor: { uid: string, email: string, tier?: 'operator'|'staff' }, now?: () => number }} args
  * @returns {Promise<{ ok: true, docPath: string } |
  *                    { ok: false, status: 400|403, code: string, message: string }>}
  */
 async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
+  const tier = actor?.tier === 'operator' ? 'operator' : 'staff';
   const validate = WRITABLE_CONFIG_DOCS[docId];
   if (!validate) {
     // Covers bootstrap, providers, and any unknown id in one refusal that
@@ -364,6 +419,10 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
       if (docId === 'event') {
         const snap = await tx.get(ref);
         const stored = snap.exists ? stripStamps(snap.data()) : {};
+        // A staff save may carry the sender unchanged (the form sends the
+        // whole editable slice); only a CHANGE to it is the operator's.
+        const operatorKeyChanges = findOperatorKeyChanges(docId, fields, stored, tier);
+        if (operatorKeyChanges.length > 0) throw new OperatorKeyRefusedError(operatorKeyChanges);
         // MERGE the payload over the stored doc, then validate the RESULT:
         // the validator accepts a partial shape, so validating (or writing)
         // the payload alone would let a partial save erase venue/legal/etc.
@@ -405,6 +464,9 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
     if (err instanceof MergedConfigInvalidError) {
       return { ok: false, status: 400, code: 'bad-request', message: err.message };
     }
+    if (err instanceof OperatorKeyRefusedError) {
+      return { ok: false, status: 403, code: 'forbidden', message: err.message };
+    }
     throw err;
   }
   return { ok: true, docPath: `config/${docId}` };
@@ -432,15 +494,9 @@ function createConfigWriteHandler({ docId, action }, { db, auth, getConfig, now 
     const payload = req.body?.[docId];
     if (!isPlainObject(payload)) return badRequest(res, `${docId}: must be an object`);
 
-    // A staff save that carries an operator-only key is refused whole, by
-    // name, before anything is validated or written — the same shape every
-    // other read-only refusal takes, so the form can mark the field.
-    const tierViolations = findTierViolations(docId, payload, gate.tier);
-    if (tierViolations.length > 0) {
-      return sendError(res, 403, 'forbidden', tierViolations.join('; '));
-    }
-
-    const actor = { uid: gate.uid, email: gate.email };
+    // The tier rides on the actor: a staff CHANGE to an operator-only key is
+    // refused inside the transaction, by name, against the stored values.
+    const actor = { uid: gate.uid, email: gate.email, tier: gate.tier };
     let result;
     try {
       result = await applyConfigWrite({ db, docId, payload, actor, now });
@@ -524,10 +580,12 @@ module.exports = {
     deepMerge,
     stripStamps,
     createConfigWriteHandler,
-    findTierViolations,
+    findOperatorKeyChanges,
+    senderChanged,
     WRITABLE_CONFIG_DOCS,
     CONFIG_DOC_TIERS,
     EVENT_OPERATOR_KEYS,
+    SENDER_EDITABLE_FIELDS,
     TIER_A_FIELDS,
     EVENT_EDITABLE_KEYS,
     SENDER_VERIFICATION_FIELDS,

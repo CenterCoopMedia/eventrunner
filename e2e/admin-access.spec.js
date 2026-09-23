@@ -103,10 +103,29 @@ test.describe.serial('admin tiers and the Access page', () => {
       expect(refused.status, `${name} refuses staff`).toBe(403);
       expect(refused.body.error.message).toBe('Operator access required.');
     }
-    // Event settings are content — but the sender block is the operator's.
+    // Event settings are content — but a CHANGE to the sender block is the
+    // operator's. A save that carries the stored sender unchanged, which is
+    // what the Event form sends, goes through for staff.
+    const stored = (await adminDb().doc('config/event').get()).data();
+    const unchanged = await callFunction('updateEventConfig', {
+      event: { tagline: `Set by staff ${Date.now()}`, sender: { email: stored.sender.email, name: stored.sender.name ?? null, replyTo: stored.sender.replyTo ?? null } },
+    }, staffToken);
+    expect(unchanged.status, JSON.stringify(unchanged.body)).toBe(200);
     const sender = await callFunction('updateEventConfig', { event: { sender: { email: 'x@example.test' } } }, staffToken);
     expect(sender.status).toBe(403);
     expect(sender.body.error.message).toBe('sender: operator access required');
+
+    // Branding through the media library is the operator's too.
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    const branding = await callFunction('mediaUpload', {
+      folder: 'branding', contentType: 'image/png', filename: 'logo.png', data: png.toString('base64'),
+    }, staffToken);
+    expect(branding.status).toBe(403);
+    expect(branding.body.error.message).toBe('branding: operator access required');
+    const content = await callFunction('mediaUpload', {
+      folder: 'cms-images', contentType: 'image/png', filename: 'hero.png', data: png.toString('base64'),
+    }, staffToken);
+    expect(content.status, JSON.stringify(content.body)).toBe(200);
   });
 
   test('the staff account signs in and sees the staff rail; an operator route is refused, not rendered', async ({ page }) => {

@@ -329,8 +329,9 @@ node scripts/init-event.cjs --check
 provisioning workflow), not from `deploy-client.yml` — it is the one-time content bootstrap, not a
 repeatable deploy step. See `scripts/README.md`. `--admin` seeds the operator tier; `--staff`
 (repeatable) seeds staff, who run content, schedule, speakers, and attendees but not branding,
-features, access, or deployment settings. Both can be granted later from admin Settings → Access,
-and a re-run of init never removes a grant made there.
+features, access, or deployment settings. Both can be granted later from admin Settings → Access.
+A re-run of init never removes a grant made there, and it never puts back an address removed there:
+on a re-run the answers file's lists are not re-applied, and only `--admin` and `--staff` add.
 
 **Step 3 — normal dispatch**, now that `config/event` exists:
 

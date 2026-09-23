@@ -53,7 +53,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../App.jsx';
-import { ADMIN_TIERS, DOCKET, docketForTier, sectionTier, tierReaches } from './AdminLayout.jsx';
+import { ADMIN_TIERS, DOCKET, TIER_SCOPE, docketForTier, sectionTier, tierReaches } from './AdminLayout.jsx';
 
 async function renderAdmin(path = '/admin/pages') {
   const result = render(
@@ -208,7 +208,32 @@ describe('the admin shell', () => {
     expect(sectionTier('/admin/sessions/abc')).toBe('staff');
     expect(sectionTier('/admin')).toBeNull();
     expect(sectionTier('/admin/')).toBeNull();
-    expect(sectionTier('/admin/nope')).toBeNull();
+  });
+
+  it('normalises the segment the way the router matches it, and fails closed on a path no staff section owns', () => {
+    // React Router matches routes case-insensitively, so /admin/Branding
+    // renders the Branding page; the tier lookup must see the same section.
+    expect(sectionTier('/admin/Branding')).toBe('operator');
+    expect(sectionTier('/admin/ACCESS')).toBe('operator');
+    expect(sectionTier('/admin/%41ccess')).toBe('operator');
+    expect(sectionTier('/admin/Pages/new')).toBe('staff');
+    // An /admin path no staff-tier section owns is the operator's — the
+    // same default an undeclared docket item takes.
+    expect(sectionTier('/admin/nope')).toBe('operator');
+    expect(sectionTier('/admin/%E0%A4%A')).toBe('operator');
+  });
+
+  it('names each tier’s sections once, in the rail’s own words, Event included for staff', () => {
+    const labels = (predicate) =>
+      DOCKET.flatMap((group) => group.items).filter(predicate).map((item) => item.label);
+    const staffLabels = labels((item) => item.tier === 'staff');
+    const operatorLabels = labels((item) => item.tier === 'operator');
+    expect(TIER_SCOPE.staff).toBe(
+      `${staffLabels.slice(0, -1).join(', ')} and ${staffLabels.at(-1)}`,
+    );
+    expect(TIER_SCOPE.staff).toContain('Event');
+    expect(TIER_SCOPE.operatorOnly).toBe('Features, Branding, Access and System errors');
+    expect(operatorLabels).toEqual(['Features', 'Branding', 'Access', 'System errors']);
   });
 
   it('lets an operator reach everything, staff reach staff only, and an undeclared tier reach nothing but operators', () => {

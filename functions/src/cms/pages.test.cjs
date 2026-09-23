@@ -44,7 +44,9 @@ function validPage(overrides = {}) {
 
 /** In-memory Firestore fake (get/set/where/batch) seeded as 'collection/id'. */
 function fakeDb(seed = {}) {
-  return makeFakeDb(seed);
+  // requireAdmin reads config/bootstrap live from this db (fails closed on
+  // an absent document), so every fake carries the admin the tests use.
+  return makeFakeDb({ 'config/bootstrap': { adminEmails: ['admin@example.org'] }, ...seed });
 }
 
 function fakeStore() {

@@ -4,7 +4,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createGetVersionHistoryHandler, internals } = require('./versions.cjs');
-const { makeFakeDb } = require('./firestoreFake.cjs');
+const { makeFakeDb: makeBareFakeDb } = require('./firestoreFake.cjs');
+
+// requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
+// #186 review: it fails closed on an absent document), so every fake this
+// file builds carries the document the file's getConfig describes.
+const BOOTSTRAP_DOC = { adminEmails: ['admin@example.org'] };
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
 
 const ADMIN = { uid: 'admin1', email: 'admin@example.org', email_verified: true };
 const USER = { uid: 'user1', email: 'user@example.org', email_verified: true };

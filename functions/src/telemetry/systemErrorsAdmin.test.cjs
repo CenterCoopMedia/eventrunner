@@ -23,7 +23,7 @@ const {
  * FieldPath.documentId()): orderBy/startAfter treat it as the doc's id
  * rather than a stored data field.
  */
-function makeFakeDb(seed = {}) {
+function makeBareFakeDb(seed = {}) {
   const store = new Map(); // "collection/id" -> data
   for (const [path, data] of Object.entries(seed)) {
     store.set(path, { ...data });
@@ -142,6 +142,14 @@ function makeFakeDb(seed = {}) {
     },
   };
 }
+
+// requireAdmin reads config/bootstrap live from the db it is handed (fails
+// closed on an absent document), so every fake carries the admin and the
+// staff address the tests use.
+const makeFakeDb = (seed = {}) => makeBareFakeDb({
+  'config/bootstrap': { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] },
+  ...seed,
+});
 
 const ADMIN = { uid: 'admin1', email: 'admin@example.org', email_verified: true };
 const USER = { uid: 'user1', email: 'user@example.org', email_verified: true };

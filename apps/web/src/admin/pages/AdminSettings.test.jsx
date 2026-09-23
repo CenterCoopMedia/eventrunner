@@ -3,7 +3,7 @@
 // contexts, posts to its own endpoint, surfaces per-field server validation
 // errors, and reflects the saved state when the config listener reports it
 // back — no reload, nothing optimistic.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -39,12 +39,20 @@ vi.mock('firebase/auth', () => ({
   signInWithPopup: vi.fn(),
   signOut: vi.fn(),
 }));
+// The tier probe (issue #186): the admin_logs read succeeds for an operator
+// and is refused for staff; the drafts probe succeeds for both.
+let operatorProbeShouldSucceed = true;
 vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(() => ({})),
-  query: vi.fn(() => ({})),
+  collection: vi.fn((_db, name) => ({ name })),
+  query: vi.fn((ref) => ref),
   limit: vi.fn(() => ({})),
-  getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+  getDocs: vi.fn((ref) => (ref?.name === 'admin_logs' && !operatorProbeShouldSucceed
+    ? Promise.reject(new Error('permission denied'))
+    : Promise.resolve({ docs: [] }))),
 }));
+afterEach(() => {
+  operatorProbeShouldSucceed = true;
+});
 
 import App from '../../App.jsx';
 
@@ -166,6 +174,46 @@ describe('event settings', () => {
     // here, and this one asserts against all of it. It runs close to the
     // 5s default on a loaded machine, so it states its own budget rather
     // than failing as a flake somebody has to re-run to understand.
+  }, 20000);
+
+  it('lets a staff admin save the content and leaves the sender out, shown read-only (issue 186)', async () => {
+    operatorProbeShouldSucceed = false;
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+
+    // The sender is the operator's: readable, not editable, and said so.
+    for (const label of ['Sender email', 'Sender name', 'Reply-to']) {
+      expect(screen.getByLabelText(label)).toHaveAttribute('readonly');
+    }
+    expect(screen.getByLabelText('Sender email')).toHaveValue('summit@example.org');
+    expect(screen.getByText(/An operator changes the sender/)).toBeInTheDocument();
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.change(screen.getByLabelText('Event name'), {
+      target: { value: 'Community Media Summit 2027' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const payload = bodyOf(0).event;
+    expect(payload.name).toBe('Community Media Summit 2027');
+    // The whole editable slice minus the one block staff cannot change.
+    expect(payload).not.toHaveProperty('sender');
+    expect(payload).toHaveProperty('venue');
+    expect(payload).toHaveProperty('registration');
+    expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
+  }, 20000);
+
+  it('lets an operator edit the sender, and sends it', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    expect(screen.getByLabelText('Sender email')).not.toHaveAttribute('readonly');
+    expect(screen.queryByText(/An operator changes the sender/)).toBeNull();
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.change(screen.getByLabelText('Sender name'), { target: { value: 'The Summit desk' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.sender).toEqual({ email: 'summit@example.org', name: 'The Summit desk', replyTo: null });
   }, 20000);
 
   // The event's concurrent tracks (design brief §4.6): a letter and a name,

@@ -24,7 +24,9 @@
  * fixture and the web app cannot drift from the server.
  */
 
-const { loadBootstrap, requireAdmin, resolveAdminTier, verifyAuthToken } = require('../core/auth.cjs');
+const {
+  BOOTSTRAP_UNAVAILABLE, BootstrapUnavailableError, loadBootstrap, requireAdmin, resolveAdminTier, verifyAuthToken,
+} = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
 const { validateSpeaker, SELF_EDITABLE_SPEAKER_FIELDS } = require('shared/speaker');
@@ -394,7 +396,7 @@ function buildOwnSpeakerView(speaker, speakerId) {
  * @param {{ auth: object, db?: object, getConfig: () => Promise<object> }} deps
  * @param {object} req
  * @returns {Promise<{ ok: true, uid: string, email: string, isAdmin: boolean } |
- *                    { ok: false, status: 401, code: string, message: string }>}
+ *                    { ok: false, status: 401|500, code: string, message: string }>}
  */
 async function gateSpeakerSelfOrAdmin({ auth, db, getConfig }, req) {
   const decoded = await verifyAuthToken({ auth }, req);
@@ -406,7 +408,15 @@ async function gateSpeakerSelfOrAdmin({ auth, db, getConfig }, req) {
   let isAdmin = false;
   const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
   if (email && decoded.email_verified === true) {
-    isAdmin = resolveAdminTier(await loadBootstrap({ db, getConfig }), email) !== null;
+    try {
+      isAdmin = resolveAdminTier(await loadBootstrap({ db, getConfig }), email) !== null;
+    } catch (err) {
+      // Fail closed as a 500, not as "not an admin": a speaker editing
+      // their own record would still pass, and an admin would be told the
+      // check failed rather than that they are not an admin.
+      if (err instanceof BootstrapUnavailableError) return { ...BOOTSTRAP_UNAVAILABLE };
+      throw err;
+    }
   }
   return {
     ok: true,
