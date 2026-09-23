@@ -95,3 +95,21 @@ and the pull request says "Refs #177", not "Closes".
   is a weak rule; the segmented control and the tabs take no disabled prop;
   hover, focus and press are drawn once on the five shared shapes; an empty
   feedback message marks the field and moves focus, with no form-level alert.
+
+## Paused 2026-09-23 23:50 UTC (usage limit)
+
+Resume in this order:
+
+1. Re-run the stopped reviews with `resumeFromRunId` (cached agents replay):
+   a3 round 2 `wf_ed110ad7-e40`, b2 `wf_54fd8612-e0b`, b3 `wf_66f76a40-f88`,
+   b1 `wf_1c382032-f25`; M10 specs `wf_c0486301-fd0` (writes `/home/user/specs/c*.md`).
+2. a4 round 3 (worktree `/home/user/wt-a4`) fixes the second review's escalation
+   paths: seo.defaultOgImagePath, speaker headshotPath, sender byte and sub-key
+   compare, staff Media page. Then put a4 on `joe/confident-gates-gy99ip-5-admin-tiers`,
+   stacked on #266 (the local branch `joe/confident-gates-gy99ip-4-admin-tiers`
+   holds the round 2 state on top of main's 3ccd388).
+3. Stack order after a4: a3 (wave 2), then b1, b2, b3 (all built on the a4 tip).
+   Watch the admin entry chunk budget (50,000 gzip) when b1, b2, b3 combine.
+4. Then dispatch b4 (#188) and b5 (#189) from the new tip, and M10 from its specs.
+
+Open: #266 (#218), green, waits on review. Filed follow-ups: #267, #268.
