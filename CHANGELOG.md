@@ -121,6 +121,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verification (#177).
 - Pull requests now have a connector completion check for the current commit and unresolved
   review threads. The main branch requires this check and CI, including for administrators.
+- In event settings, a new place's id kept only the first letter of the name typed into it, and a
+  change to a place, movement, or map marker field moved keyboard focus out of the row. The id now
+  follows the whole name until you type an id of your own, and focus stays in the field.
 
 - Pressing Save in an admin editor with an invalid field did nothing and said nothing, because the
   control was disabled. Save now stays enabled until the request starts, sends nothing while a

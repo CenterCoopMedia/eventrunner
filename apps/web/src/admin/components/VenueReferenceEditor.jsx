@@ -360,8 +360,11 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
             {places.map((place, index) => {
               const uses = placeUsage.get(place.id) ?? [];
               return (
+                // Keyed by position, never by the id being edited: a key
+                // that changes with the value rebuilds the row on every
+                // change and takes the focused field with it.
                 <li
-                  key={`${place.id}-${index}`}
+                  key={index}
                   className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
                 >
                   <div className="grid gap-sm sm:grid-cols-3">
@@ -370,7 +373,12 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                       value={place.name}
                       onChange={(value) => {
                         const patch = { name: value };
-                        if (!place.persisted && !place.id) patch.id = placeIdFromName(value);
+                        // A new place's id follows its name, key by key,
+                        // until somebody types an id of their own. A saved
+                        // place's id never moves: sessions point at it.
+                        const following =
+                          !place.id || place.id === placeIdFromName(place.name);
+                        if (!place.persisted && following) patch.id = placeIdFromName(value);
                         changePlace(index, patch);
                       }}
                       error={errorFor(`venue.places[${index}].name`)}
@@ -432,7 +440,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
           <ol className="flex flex-col">
             {movements.map((movement, index) => (
               <li
-                key={`${movement.from}-${movement.to}-${index}`}
+                key={index}
                 className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
               >
                 <div className="grid gap-sm sm:grid-cols-2">
@@ -543,7 +551,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
               <ol className="flex flex-col">
                 {markers.map((marker, index) => (
                   <li
-                    key={`${marker.placeId}-${index}`}
+                    key={index}
                     className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
                   >
                     <div className="grid gap-sm sm:grid-cols-3">

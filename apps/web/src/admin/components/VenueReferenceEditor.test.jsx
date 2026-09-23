@@ -201,6 +201,81 @@ function EditorHarness({ venue: initial }) {
   );
 }
 
+describe('VenueReferenceEditor places panel', () => {
+  const empty = { places: [], movements: [], map: { image: '', alt: '', markers: [] } };
+
+  /** A person types one key at a time, so the name changes once per key. */
+  function typeInto(field, text) {
+    let typed = '';
+    for (const key of text) {
+      typed += key;
+      fireEvent.change(field, { target: { value: typed } });
+    }
+  }
+
+  it('fills a new place’s id from its whole name as it is typed', () => {
+    render(<EditorHarness venue={empty} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add place' }));
+    typeInto(screen.getByLabelText('Place 1 name'), 'Main hall');
+    // Not "m": the id follows every key of the name, not only the first.
+    expect(screen.getByLabelText('Place 1 id')).toHaveValue('main-hall');
+  });
+
+  it('stops following the name once the id is typed by hand', () => {
+    render(<EditorHarness venue={empty} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add place' }));
+    typeInto(screen.getByLabelText('Place 1 name'), 'Main');
+    fireEvent.change(screen.getByLabelText('Place 1 id'), { target: { value: 'hall-a' } });
+    typeInto(screen.getByLabelText('Place 1 name'), 'Main hall');
+    expect(screen.getByLabelText('Place 1 id')).toHaveValue('hall-a');
+  });
+
+  // A row is keyed by its position, not by the value being edited. Keyed by
+  // the value, the row was rebuilt on every change and the field the person
+  // was in went with it, so focus fell to the page.
+  it('keeps the keyboard in a place, movement, or marker field while it changes', () => {
+    render(
+      <EditorHarness
+        venue={{
+          places: [
+            { id: 'main-hall', name: 'Main hall', floor: '', persisted: true },
+            { id: 'studio', name: 'Studio', floor: '', persisted: true },
+          ],
+          movements: [{ from: '', to: '', walkingMinutes: '0', accessibleRoute: '' }],
+          map: {
+            image: 'cms-images/a/plan.png',
+            alt: 'A floor plan.',
+            markers: [{ placeId: '', x: '50', y: '50' }],
+          },
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add place' }));
+    const name = screen.getByLabelText('Place 3 name');
+    name.focus();
+    fireEvent.change(name, { target: { value: 'L' } });
+    expect(name).toHaveFocus();
+
+    for (const label of ['Movement 1 from', 'Marker 1 room']) {
+      const select = screen.getByLabelText(label);
+      select.focus();
+      fireEvent.change(select, { target: { value: 'studio' } });
+      expect(select).toHaveFocus();
+      expect(select).toHaveValue('studio');
+    }
+  });
+
+  it('never changes a saved place’s id when it is renamed', () => {
+    render(
+      <EditorHarness
+        venue={{ ...empty, places: [{ id: 'main-hall', name: 'Main hall', floor: '', persisted: true }] }}
+      />,
+    );
+    typeInto(screen.getByLabelText('Place 1 name'), 'Great hall');
+    expect(screen.getByLabelText('Place 1 id')).toHaveValue('main-hall');
+  });
+});
+
 describe('VenueReferenceEditor map panel', () => {
   const venue = {
     places: [
