@@ -1,7 +1,7 @@
 // The overview (issue #179): /admin opens here, and every figure on it is
 // the number getEventStats answered, printed inside the sentence that says
 // what it counts.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -116,10 +116,20 @@ function sentence(panelTitle, text) {
   return item?.textContent.replace(/\s+/g, ' ').trim();
 }
 
+/** Push a config/event doc through the live listener, the way a save echoes back. */
+async function pushEvent(data) {
+  await waitFor(() => expect(configSubscriptions.has('event')).toBe(true));
+  act(() => configSubscriptions.get('event')(data));
+}
+
 beforeEach(() => {
   configSubscriptions.clear();
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('the admin overview', () => {
@@ -275,5 +285,77 @@ describe('the admin overview', () => {
     ).toBeInTheDocument();
     expect(sentence('Event figures', 'accounts:')).toMatch(/^412 accounts:/);
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  // MILESTONES AND THE GOAL (issue #180): read from config/event, which the
+  // event settings page saves and the live listener delivers here.
+  describe('milestones', () => {
+    it('lists a saved milestone with the days left, and the goal against the approved count', async () => {
+      // Noon on Wednesday 14 October in the event's zone (America/New_York).
+      vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+      vi.setSystemTime(new Date('2026-10-14T16:00:00Z'));
+      fetch.mockResolvedValueOnce(okResponse(STATS));
+      await renderAt('/admin/overview');
+      await screen.findByRole('heading', { name: 'Event figures' });
+      await pushEvent({
+        milestones: [
+          { label: 'Programme announced', date: '2026-10-26' },
+          { label: 'Proposals close', date: '2026-10-11' },
+          { label: 'Doors open', date: '2026-10-14' },
+        ],
+        registration: { goal: 500 },
+      });
+
+      const panel = (await screen.findByRole('heading', { name: 'Milestones' })).closest('section');
+      const goal = within(panel).getByText(/toward the registration goal/);
+      expect(goal.textContent).toBe('250 of 500 approved toward the registration goal.');
+      const bar = within(panel).getByRole('progressbar');
+      expect(bar.tagName).toBe('PROGRESS');
+      expect(bar).toHaveAttribute('value', '250');
+      expect(bar).toHaveAttribute('max', '500');
+      expect(bar).toHaveAccessibleName('250 of 500 approved toward the registration goal.');
+      expect(bar.className).toMatch(/accent-admin-action/);
+
+      // Date order, each with its date in the data face and its distance in words.
+      const items = within(panel).getAllByRole('listitem').map((li) => li.textContent);
+      expect(items).toEqual([
+        'Proposals close, Sunday, October 11, 3 days ago',
+        'Doors open, Wednesday, October 14, Today',
+        'Programme announced, Monday, October 26, In 12 days',
+      ]);
+      expect(within(panel).getByText('Monday, October 26').className).toMatch(/font-admin-data/);
+    });
+
+    it('renders nothing for an empty set and no goal', async () => {
+      fetch.mockResolvedValueOnce(okResponse(STATS));
+      await renderAt('/admin/overview');
+      await screen.findByRole('heading', { name: 'Event figures' });
+
+      await pushEvent({ milestones: [], registration: { goal: null } });
+      expect(screen.queryByRole('heading', { name: 'Milestones' })).toBeNull();
+      expect(screen.queryByRole('progressbar')).toBeNull();
+
+      // A goal alone is enough to draw the panel; clearing it removes it again.
+      await pushEvent({ milestones: [], registration: { goal: 400 } });
+      expect(await screen.findByRole('heading', { name: 'Milestones' })).toBeInTheDocument();
+      await pushEvent({ milestones: null, registration: {} });
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Milestones' })).toBeNull());
+    });
+
+    it('states the goal on its own until the approved count arrives', async () => {
+      const held = heldResponse();
+      fetch.mockReturnValueOnce(held.promise);
+      await renderAt('/admin/overview');
+      await pushEvent({ registration: { goal: 500 } });
+
+      const panel = (await screen.findByRole('heading', { name: 'Milestones' })).closest('section');
+      expect(panel.textContent).toContain('Registration goal: 500 approved.');
+      expect(within(panel).queryByRole('progressbar')).toBeNull();
+
+      await act(async () => {
+        held.release(okResponse(STATS));
+      });
+      expect(await within(panel).findByRole('progressbar')).toBeInTheDocument();
+    });
   });
 });

@@ -30,11 +30,8 @@ import { zoneLabel } from '../../lib/eventTime.js';
 import { useAdminApi } from '../adminApi.js';
 import { Notice, Panel, SaveStatus, secondaryButtonClass } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminLoadingState } from '../components/adminChrome.jsx';
-
-/** One word or the other, by count. */
-function plural(count, one, many) {
-  return count === 1 ? one : many;
-}
+import { Figure, plural } from '../overview/figures.jsx';
+import MilestonesPanel from '../overview/MilestonesPanel.jsx';
 
 /**
  * The time the figures were read, on the event's clock: "9:14 AM EDT". An
@@ -54,11 +51,6 @@ export function formatReadAt(iso, timeZone) {
   } catch {
     return instant.toISOString();
   }
-}
-
-/** A number from the response, in the data face. Missing reads as 0. */
-export function Figure({ value }) {
-  return <span className="font-admin-data font-bold tabular-nums">{String(value ?? 0)}</span>;
 }
 
 /** "120 pending, 30 ticketed, …": each part a figure and its word. */
@@ -199,6 +191,13 @@ export default function AdminOverview() {
       {stats && !error ? <SaveStatus message={`Figures read at ${readAt}.`} /> : null}
 
       {stats ? <EventFigures stats={stats} /> : null}
+
+      <MilestonesPanel
+        milestones={eventConfig.milestones}
+        goal={eventConfig.registration?.goal}
+        approved={stats?.registrations?.byStatus?.approved}
+        timezone={eventConfig.timezone}
+      />
     </div>
   );
 }

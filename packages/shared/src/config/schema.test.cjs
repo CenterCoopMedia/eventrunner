@@ -8,6 +8,9 @@ const {
   validateBadgesConfig,
   validateFeatures,
   MAX_SOCIAL_LABEL_LENGTH,
+  MAX_MILESTONES,
+  MAX_MILESTONE_LABEL_LENGTH,
+  MAX_REGISTRATION_GOAL,
 } = require('./schema.cjs');
 const { MAX_TOTAL_BADGES } = require('../badges.cjs');
 const { internals: speakerInternals } = require('../speaker.cjs');
@@ -715,6 +718,67 @@ test('validateEventConfig refuses a malformed social block and hashtag by name',
   for (const social of ['x', [], 3]) {
     const bad = validateEventConfig({ ...VALID_EVENT, social });
     assert.ok(bad.errors.includes('social: must be an object or null'), JSON.stringify(social));
+  }
+});
+
+// THE MILESTONES AND THE GOAL (issue #180).
+test('validateEventConfig accepts dated milestones, none, and a cleared list', () => {
+  const milestones = [
+    { label: 'Call for proposals closes', date: '2027-03-01' },
+    { label: 'Programme announced', date: '2027-04-15' },
+  ];
+  for (const value of [milestones, [], null, undefined]) {
+    const result = validateEventConfig({ ...VALID_EVENT, milestones: value });
+    assert.deepEqual(result, { ok: true, errors: [] }, JSON.stringify(value));
+  }
+  const full = Array.from({ length: MAX_MILESTONES }, (_, i) => ({
+    label: `Milestone ${i + 1}`,
+    date: '2027-01-01',
+  }));
+  assert.equal(validateEventConfig({ ...VALID_EVENT, milestones: full }).ok, true);
+  assert.equal(MAX_MILESTONES, 20);
+  assert.equal(MAX_MILESTONE_LABEL_LENGTH, 80);
+});
+
+test('validateEventConfig names every problem with the milestones, each by field', () => {
+  const refused = (milestones) => validateEventConfig({ ...VALID_EVENT, milestones }).errors;
+
+  assert.deepEqual(refused('2027-03-01'), ['milestones: must be an array or null']);
+  assert.deepEqual(refused({ label: 'x', date: '2027-03-01' }), ['milestones: must be an array or null']);
+  const tooMany = Array.from({ length: MAX_MILESTONES + 1 }, () => ({ label: 'Due', date: '2027-01-01' }));
+  assert.deepEqual(refused(tooMany), ['milestones: must list at most 20 milestones, got 21']);
+  assert.deepEqual(refused([{ label: 'Due', date: '2027-01-01', note: 'private' }]), [
+    'milestones[0].note: unknown milestone field',
+  ]);
+  assert.deepEqual(refused([{ label: '   ', date: '2027-01-01' }]), ['milestones[0].label: must be a nonempty string']);
+  assert.deepEqual(refused([{ date: '2027-01-01' }]), ['milestones[0].label: must be a nonempty string']);
+  assert.deepEqual(refused([{ label: 'x'.repeat(81), date: '2027-01-01' }]), [
+    'milestones[0].label: must be at most 80 characters',
+  ]);
+  // Eighty characters is the limit, not past it; surrounding space does not count.
+  assert.deepEqual(refused([{ label: ` ${'x'.repeat(80)} `, date: '2027-01-01' }]), []);
+  assert.deepEqual(refused([{ label: 'Due', date: '2026-02-30' }]), [
+    'milestones[0].date: must match YYYY-MM-DD and name a real calendar date',
+  ]);
+  assert.deepEqual(refused([{ label: 'Due', date: '' }, 'soon']), [
+    'milestones[0].date: must match YYYY-MM-DD and name a real calendar date',
+    'milestones[1]: must be an object',
+  ]);
+});
+
+test('validateEventConfig accepts a whole-number registration goal or none, and names anything else', () => {
+  const withGoal = (goal) => validateEventConfig({
+    ...VALID_EVENT,
+    registration: { ...VALID_EVENT.registration, goal },
+  });
+  for (const goal of [1, 500, MAX_REGISTRATION_GOAL, null, undefined]) {
+    assert.deepEqual(withGoal(goal), { ok: true, errors: [] }, String(goal));
+  }
+  for (const goal of [0, -3, 1.5, '500', MAX_REGISTRATION_GOAL + 1, Number.NaN, true]) {
+    const result = withGoal(goal);
+    assert.equal(result.ok, false, String(goal));
+    assert.equal(result.errors.length, 1);
+    assert.match(result.errors[0], /^registration\.goal: must be null or a whole number from 1 to 1000000/);
   }
 });
 

@@ -10,8 +10,8 @@
  *      features and theme are operator-only, because a feature flag or the
  *      site's identity is a deployment decision; event and badges admit
  *      staff, because dates, venue, places, tracks, the register link,
- *      social handles, and the badge catalogue are the content an
- *      organizer runs day to day. One field of config/event is held back:
+ *      social handles, milestones, the registration goal, and the badge
+ *      catalogue are the content an organizer runs day to day. One field of config/event is held back:
  *      a CHANGE to `sender` (the outbound address, display name, reply-to)
  *      needs an operator, because it is the email identity
  *      verify-sender-domain.cjs attests — a staff member changing it could
@@ -39,10 +39,11 @@
  *      days/sender, so a plain replace would let a partial save silently
  *      erase venue/legal/social/seo. Unknown top-level event keys are
  *      rejected by name (the shared validator does not); an unknown key
- *      in a track, a venue place, movement, or map, the legal block, or
- *      the social block, and a social account whose link is not a safe
- *      absolute URL, are refused by the shared validator on the merged
- *      result. To clear an optional nested value, send it explicitly null.
+ *      in a track, a venue place, movement, or map, the legal block, the
+ *      social block, or a milestone, and a social account whose link is
+ *      not a safe absolute URL, are refused by the shared validator on
+ *      the merged result. Arrays replace on merge, so `milestones: []`
+ *      clears the list. To clear an optional nested value, send it explicitly null.
  *      features/theme/badges stay whole-doc replaces (their validators
  *      cover the full shape, and omitted feature flags defaulting off is
  *      the §2.2 contract). Every write stamps { updatedAt, updatedBy: email }. On
@@ -109,6 +110,9 @@ const EVENT_EDITABLE_KEYS = Object.freeze([
   'sender',
   'legal',
   'social',
+  // The overview's dated markers (issue #180). The registration goal sits
+  // inside `registration`, which is already editable.
+  'milestones',
   'announcedAt',
   'archivedAt',
   'seo',

@@ -79,6 +79,8 @@ The admin opens here, for staff and operators alike. The page states how the eve
 
 **Read at.** The time under the title says when the server counted the figures, on the event's clock. The figures do not change by themselves. Select **Refresh figures** to count again. If a refresh fails, the page keeps the figures it has and says when they were read.
 
+**Milestones.** When the event settings list milestones or a registration goal, a **Milestones** panel sets the approved count against the goal and lists each milestone with its date and the days left. You set both under Settings → Event settings, in **Milestones and the registration goal**. With neither set, the panel is not shown.
+
 ## Pages
 
 Every page document (About, Travel, Conduct, and anything else seeded or added) shows its state in the list, in the same three words every editor uses: **Draft** (never published), **Live** (published, with nothing pending), or **Live with unpublished changes** (published, with newer edits saved but not published yet). Create, edit, and publish from here.
@@ -204,7 +206,7 @@ Unresolved system-error rows — the operational surface for things like an inva
 
 ## Settings → Event settings
 
-The event's own identity fields: Name, dates, timezone, venue, sender address, social accounts, and the rest. The venue's places, movements, and map are set here too, in the panels described below. This is a merge-then-validate write — the form only sends the keys it is actually changing, and fields it does not touch (the legal postal address, the SEO metadata) are left alone.
+The event's own identity fields: Name, dates, timezone, venue, sender address, social accounts, milestones, and the rest. The venue's places, movements, and map are set here too, in the panels described below. This is a merge-then-validate write — the form only sends the keys it is actually changing, and fields it does not touch (the legal postal address, the SEO metadata) are left alone.
 
 **Tracks** live here too: The lines your event runs when sessions happen at the same time in different rooms. Each track has a letter (A to Z) and a name, and the schedule shows both — a reader tells two lines apart by the letter and the name, never by colour alone. Sessions point at a track by its letter, so renaming a track is one edit here rather than a change to every session. Leave the list empty if everything happens in one room.
 
@@ -306,6 +308,18 @@ Select **Add account**. Focus moves to the new row's **Service** field. Each acc
 **What the save checks.** The accounts are checked when you select **Save event settings**. A save is refused, and focus moves to the first field that needs a fix, when a service name is empty, a link is not a full `https://` or `http://` address, or the same service and link are listed twice. A link with no scheme, such as `example.org/@eventname`, is refused, and so is a `javascript:` link. The server checks the same rules and names the field it refused.
 
 **Social hashtag.** One word with no spaces, such as #EventName. The event settings store it, but the site and its email do not show it.
+
+### Milestones and the registration goal
+
+The **Milestones** panel lists the dates the Overview counts down to, such as the day proposals close or the day the programme is announced. The Overview shows them in date order, each with its date and the days left: **In 12 days**, **Today**, or **3 days ago** once it has passed.
+
+**Anyone can read the milestones.** They are stored with the event settings, which the public site reads, so every name and date is public. Keep private notes out of them.
+
+Select **Add milestone**. Focus moves to the new row's name field. Each milestone has a name, at most 80 characters, and a date. An event can list 20 milestones; at 20, **Add milestone** does nothing and says so until you remove one. **Remove milestone** moves focus to the milestone that takes its place, or to the one before it when you removed the last, or to **Add milestone** when none is left. A milestone goes when you save. A milestone with no name or no date is refused when you save, and focus moves to the field that needs it.
+
+**Registration goal** is in the **Registration** panel: The number of approved attendees you are aiming for. The Overview sets the approved count against it, as a sentence and a bar. Leave it empty for no goal. It must be a whole number from 1 to 1,000,000; the server refuses anything else and names the field.
+
+With no milestones and no goal, the Overview shows no milestone panel at all.
 
 ## Settings → Features
 

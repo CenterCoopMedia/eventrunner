@@ -189,6 +189,60 @@ function isValidTimezone(tz) {
   }
 }
 
+/** Keys one `config/event.milestones[]` entry may carry (issue #180). */
+const MILESTONE_KEYS = Object.freeze(['label', 'date']);
+/** The most milestones an event may list, and the longest name one may have. */
+const MAX_MILESTONES = 20;
+const MAX_MILESTONE_LABEL_LENGTH = 80;
+/** The largest registration goal: past this a figure is a typo, not a plan. */
+const MAX_REGISTRATION_GOAL = 1_000_000;
+
+/**
+ * THE MILESTONES (issue #180): the event's own dated markers, which the
+ * admin overview lists with the days left until each one. Optional, and
+ * null clears them. An array of at most MAX_MILESTONES `{ label, date }`:
+ * the label a nonempty name of at most MAX_MILESTONE_LABEL_LENGTH
+ * characters once trimmed, the date a real YYYY-MM-DD calendar date.
+ * Readers sort them, so the stored order carries no meaning.
+ *
+ * UNKNOWN FIELDS ARE REFUSED BY NAME, for the reason the legal block's
+ * are: config/event is merge-then-validate, so a field nothing reads would
+ * be carried forward by every later save. config/event is also public
+ * (firestore.rules) and ships in the generated bundle, so a milestone is
+ * public text; the editor says so.
+ *
+ * @param {unknown} milestones
+ * @param {string[]} errors appended to
+ */
+function validateMilestones(milestones, errors) {
+  if (milestones == null) return;
+  if (!Array.isArray(milestones)) {
+    errors.push('milestones: must be an array or null');
+    return;
+  }
+  if (milestones.length > MAX_MILESTONES) {
+    errors.push(`milestones: must list at most ${MAX_MILESTONES} milestones, got ${milestones.length}`);
+  }
+  milestones.forEach((milestone, i) => {
+    const at = `milestones[${i}]`;
+    if (!milestone || typeof milestone !== 'object' || Array.isArray(milestone)) {
+      errors.push(`${at}: must be an object`);
+      return;
+    }
+    for (const key of Object.keys(milestone)) {
+      if (!MILESTONE_KEYS.includes(key)) errors.push(`${at}.${key}: unknown milestone field`);
+    }
+    if (!isNonEmptyString(milestone.label)) {
+      errors.push(`${at}.label: must be a nonempty string`);
+    } else if (milestone.label.trim().length > MAX_MILESTONE_LABEL_LENGTH) {
+      errors.push(`${at}.label: must be at most ${MAX_MILESTONE_LABEL_LENGTH} characters`);
+    }
+    if (!isValidCalendarDate(milestone.date)) {
+      errors.push(`${at}.date: must match YYYY-MM-DD and name a real calendar date`);
+    }
+  });
+}
+
 /**
  * Validate a config/event document (spec §2.2).
  *
@@ -531,6 +585,8 @@ function validateEventConfig(event) {
     }
   }
 
+  validateMilestones(event.milestones, errors);
+
   const reg = event.registration;
   if (reg != null) {
     if (typeof reg !== 'object') {
@@ -574,6 +630,16 @@ function validateEventConfig(event) {
       }
       if (reg.actionLabel != null && !isNonEmptyString(reg.actionLabel)) {
         errors.push('registration.actionLabel: must be null or a nonempty string');
+      }
+      // THE REGISTRATION GOAL (issue #180): how many approved accounts the
+      // organizer is aiming for, which the overview sets against the
+      // approved count. A whole number, or null for no goal.
+      if (reg.goal != null
+        && (!Number.isInteger(reg.goal) || reg.goal < 1 || reg.goal > MAX_REGISTRATION_GOAL)) {
+        errors.push(
+          `registration.goal: must be null or a whole number from 1 to ${MAX_REGISTRATION_GOAL}, ` +
+          `got ${JSON.stringify(reg.goal)}`,
+        );
       }
     }
   }
@@ -1033,6 +1099,10 @@ module.exports = {
   SOCIAL_KEYS,
   SOCIAL_HANDLE_KEYS,
   MAX_SOCIAL_LABEL_LENGTH,
+  MILESTONE_KEYS,
+  MAX_MILESTONES,
+  MAX_MILESTONE_LABEL_LENGTH,
+  MAX_REGISTRATION_GOAL,
   isHttpsUrl,
   httpsUrlHref,
 };

@@ -9,7 +9,10 @@
 //
 // The overview is then driven in a real browser: the seeded operator signs
 // in, opens /admin, lands on the overview, and every figure sentence on the
-// page is compared with the endpoint's own answer.
+// page is compared with the endpoint's own answer. Milestones (issue #180)
+// are saved through updateEventConfig, the endpoint the event settings page
+// calls, and the overview is watched for them; config/event is put back
+// afterwards.
 //
 // The spec adds one ticket record per status (the seed writes none) under its
 // own ids and deletes them when it is done, so no later spec meets them.
@@ -61,6 +64,15 @@ function figureSentences(stats) {
       + `${sessions.drafts} with unpublished changes.`,
     `${stats.errors.unresolved} unresolved ${one(stats.errors.unresolved, 'error', 'errors')}.`,
   ];
+}
+
+/** `YYYY-MM-DD` for today plus `days`, on the calendar of `timeZone`. */
+function dateInZone(timeZone, days) {
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+  const [year, month, day] = today.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
 /** `{ total, byStatus }` for a collection, counted from its documents. */
@@ -161,5 +173,46 @@ test.describe.serial('the event statistics endpoint', () => {
     // Refresh reads the figures again and says when.
     await page.getByRole('button', { name: 'Refresh figures' }).click();
     await expect(page.getByRole('status').filter({ hasText: /^Figures read at / })).toBeVisible();
+  });
+
+  test('a saved milestone appears on the overview, and an empty set renders nothing', async ({ page }) => {
+    test.setTimeout(90_000);
+    const token = await adminIdToken();
+    const eventRef = adminDb().doc('config/event');
+    const stored = (await eventRef.get()).data();
+    const save = (event) => callFunction('updateEventConfig', { event }, token);
+    try {
+      const cleared = await save({ milestones: [], registration: { goal: null } });
+      expect(cleared.status, JSON.stringify(cleared.body)).toBe(200);
+
+      await signIn(page, ADMIN_EMAIL);
+      await page.goto('/admin/overview');
+      await expect(page.getByRole('heading', { name: 'Event figures' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Milestones' })).toHaveCount(0);
+      await expect(page.getByRole('progressbar')).toHaveCount(0);
+
+      const saved = await save({
+        milestones: [
+          { label: 'E2E programme announced', date: dateInZone(stored.timezone, 12) },
+          { label: 'E2E proposals close', date: dateInZone(stored.timezone, -3) },
+        ],
+        registration: { goal: 500 },
+      });
+      expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+
+      // The overview's live config listener delivers the save; no reload.
+      const panel = page.locator('section', { has: page.getByRole('heading', { name: 'Milestones' }) });
+      await expect(panel).toBeVisible();
+      const items = panel.getByRole('listitem');
+      await expect(items).toHaveCount(2);
+      await expect(items.nth(0)).toContainText('E2E proposals close');
+      await expect(items.nth(0)).toContainText('3 days ago');
+      await expect(items.nth(1)).toContainText('E2E programme announced');
+      await expect(items.nth(1)).toContainText('In 12 days');
+      await expect(panel).toContainText(/\d+ of 500 approved toward the registration goal\./);
+      await expect(panel.getByRole('progressbar')).toHaveAttribute('max', '500');
+    } finally {
+      await eventRef.set(stored);
+    }
   });
 });

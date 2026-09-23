@@ -45,6 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   event's clock. **Refresh figures** counts again; while it runs it says so and ignores another
   press. A failed first read shows the server's words and no figures; a failed refresh keeps the
   figures and says when they were read. Staff and operators both open it.
+- Milestones and a registration goal in the event settings (#180). `config/event.milestones` holds
+  up to 20 named dates and `config/event.registration.goal` a whole number of approved attendees;
+  the shared schema refuses anything else by field, and staff can save both. The Event page edits
+  them in a **Milestones** panel and a **Registration goal** field, and says that anyone can read
+  them. The overview lists the milestones in date order with the days left, sets the approved
+  count against the goal as a sentence and a bar, and shows nothing when neither is set.
 
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.
