@@ -814,17 +814,20 @@
   .update-feed__entry {
     position: relative;
     padding-block: var(--page-row-pad-block);
-    padding-inline-start: var(--space-md);
-    border-inline-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    padding-inline-start: var(--timeline-pad-inline);
+    /* The spine is the timeline contract (2026-09-10 vocabulary expansion,
+       §3.1): the feed and a list of past editions draw one thread of time,
+       so a style that thickens one thickens both. */
+    border-inline-start: var(--timeline-spine-width) solid rgb(var(--timeline-spine-rgb));
   }
   .update-feed__entry::before {
     content: '';
     position: absolute;
     inset-block-start: calc(var(--page-row-pad-block) + 0.6em);
     inset-inline-start: 0;
-    inline-size: var(--space-sm);
-    block-size: var(--rule-hairline-width);
-    background-color: rgb(var(--rule-hairline-rgb));
+    inline-size: var(--timeline-tick-length);
+    block-size: var(--timeline-spine-width);
+    background-color: rgb(var(--timeline-spine-rgb));
   }
 
   /* The `density` layout variant (brief §6.1): tight, comfortable, loose.
@@ -1603,6 +1606,156 @@
   .pull-quote__attribution {
     font-family: var(--pull-quote-attribution-font);
     text-transform: var(--pull-quote-attribution-transform);
+  }
+
+  /* THE TIMELINE (record §3.1): dated entries in order, on a spine. A
+     hairline runs down the leading edge of the whole run and each entry
+     hangs a short tick off it, which is the same device the updates feed
+     draws — .update-feed__entry above reads the same tokens — so a list of
+     past editions and a list of announcements are one thread of time. The
+     stop is Atlas's station on the line: zero size everywhere else, which
+     paints nothing at all. */
+  .timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .timeline__entry {
+    position: relative;
+    padding-block: var(--page-row-pad-block);
+    padding-inline-start: var(--timeline-pad-inline);
+    border-inline-start: var(--timeline-spine-width) solid rgb(var(--timeline-spine-rgb));
+  }
+  .timeline__entry::before {
+    content: '';
+    position: absolute;
+    inset-block-start: calc(var(--page-row-pad-block) + 0.6em);
+    inset-inline-start: 0;
+    inline-size: var(--timeline-tick-length);
+    block-size: var(--timeline-spine-width);
+    background-color: rgb(var(--timeline-spine-rgb));
+  }
+  .timeline__entry::after {
+    content: '';
+    position: absolute;
+    inset-block-start: calc(var(--page-row-pad-block) + 0.6em - var(--timeline-stop-size) / 2);
+    inset-inline-start: calc(-1 * var(--timeline-stop-size) / 2 - var(--timeline-spine-width) / 2);
+    inline-size: var(--timeline-stop-size);
+    block-size: var(--timeline-stop-size);
+    border-radius: 50%;
+    background-color: var(--timeline-stop-ink);
+  }
+  .timeline__date {
+    font-family: var(--timeline-date-font);
+    text-transform: var(--timeline-date-transform);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* PROGRESS (record §3.2): a native <progress> with the fraction stated
+     beside it. The native paint is turned off and the bar is drawn from the
+     tokens: a track inside a hairline on the alternate ground, and a flat
+     fill in the accent. Never a ring, and nothing moves. */
+  .progress-bar {
+    appearance: none;
+    -webkit-appearance: none;
+    display: block;
+    inline-size: 100%;
+    block-size: var(--progress-block-size);
+    overflow: hidden;
+    border: var(--progress-rule-width) solid rgb(var(--progress-rule-rgb));
+    border-radius: var(--progress-radius);
+    background-color: var(--progress-track);
+    color: var(--progress-fill);
+  }
+  .progress-bar::-webkit-progress-bar {
+    background-color: var(--progress-track);
+  }
+  .progress-bar::-webkit-progress-value {
+    background-color: var(--progress-fill);
+  }
+  .progress-bar::-moz-progress-bar {
+    background-color: var(--progress-fill);
+  }
+  .progress-label {
+    font-family: var(--progress-label-font);
+  }
+
+  /* THE NOTICE BAR (record §3.2): a site-wide message with a level, as a
+     ruled band under the header. The level is a word and a rule weight:
+     information takes the hairline, urgent takes the strong rule. Nothing
+     here is a colour on its own. */
+  .notice-bar {
+    padding-block: var(--notice-bar-pad-block);
+    background-color: var(--notice-bar-ground);
+    border-block-start: var(--notice-bar-rule-width) solid rgb(var(--notice-bar-rule-rgb));
+    border-block-end: var(--notice-bar-rule-width) solid rgb(var(--notice-bar-rule-rgb));
+    font-family: var(--notice-bar-font);
+  }
+  .notice-bar--urgent {
+    border-block-start-width: var(--notice-bar-urgent-rule-width);
+    border-block-end-width: var(--notice-bar-urgent-rule-width);
+  }
+  .notice-bar__word {
+    font-family: var(--notice-bar-word-font);
+    text-transform: var(--notice-bar-word-transform);
+  }
+
+  /* THE RULED TABLE (record §3.1): a real <table>, ruled between rows, with
+     a head that stays in view while the body scrolls under it. The three
+     widths are what the Table rules option moves: hairline rows, a ruled
+     head, or the full grid. Figures sit in tabular numerals so a column
+     of them lines up. */
+  .ruled-table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+  .ruled-table caption {
+    text-align: start;
+    caption-side: top;
+  }
+  .ruled-table th,
+  .ruled-table td {
+    padding-block: var(--table-cell-pad-block);
+    padding-inline: var(--table-cell-pad-inline);
+    text-align: start;
+    vertical-align: top;
+    border-block-start: var(--table-rule-width) solid rgb(var(--table-rule-rgb));
+    border-inline-start: var(--table-column-rule-width) solid rgb(var(--table-rule-rgb));
+  }
+  .ruled-table th:first-child,
+  .ruled-table td:first-child {
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
+  .ruled-table thead th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    border-block-start: 0;
+    border-block-end: var(--table-head-rule-width) solid rgb(var(--table-head-rule-rgb));
+    background-color: var(--table-head-ground);
+    font-family: var(--table-head-font);
+    text-transform: var(--table-head-transform);
+    letter-spacing: var(--table-head-tracking);
+  }
+  .ruled-table tbody tr:first-child > * {
+    border-block-start: 0;
+  }
+  .ruled-table [data-numeric] {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+  /* The sort control is the head's own word, so it takes no box of its
+     own: the whole word is the target, at the row's height. */
+  .ruled-table__sort {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2xs);
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    text-align: inherit;
   }
 }
 

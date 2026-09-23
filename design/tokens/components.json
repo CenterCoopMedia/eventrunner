@@ -184,5 +184,51 @@
     "--pull-quote-pad-block": "var(--space-md)",
     "--pull-quote-attribution-font": "var(--font-data)",
     "--pull-quote-attribution-transform": "none"
+  },
+  "$timeline-note": "Dated entries in order (record §3.1): past editions, key dates, milestones. An ordered list with a spine down the leading edge and a tick per entry. It is the same spine the updates feed draws: .update-feed__entry reads these tokens too, so the two cannot drift apart. The numbers are years and dates, never sequence ornaments: the list renders no counter and nothing zero-padded. Zine and Broadsheet thicken the spine, Atlas draws a station stop on it, and Field Guide lengthens the tick.",
+  "timeline": {
+    "--timeline-spine-rgb": "--rule-hairline-rgb",
+    "--timeline-spine-width": "var(--rule-hairline-width)",
+    "--timeline-tick-length": "var(--space-sm)",
+    "--timeline-stop-size": "0",
+    "--timeline-stop-ink": "rgb(var(--color-accent-rgb))",
+    "--timeline-pad-inline": "var(--space-md)",
+    "--timeline-date-font": "var(--font-mono)",
+    "--timeline-date-transform": "none"
+  },
+  "$progress-note": "How much of a set of tasks is done (record §3.2): a native <progress> with the fraction stated beside it, \"3 of 5 done\". <meter> is not used: it measures a quantity in a range, not completion. Never a ring. The track sits inside a hairline on the alternate ground and the fill is the accent. Zine fills in toner and squares the ends, Broadsheet keeps the bar to a hairline's height, and Atlas draws the fill as a route.",
+  "progress": {
+    "--progress-track": "rgb(var(--color-surface-alt-rgb))",
+    "--progress-fill": "rgb(var(--color-accent-rgb))",
+    "--progress-rule-rgb": "--rule-hairline-rgb",
+    "--progress-rule-width": "var(--rule-hairline-width)",
+    "--progress-block-size": "var(--space-xs)",
+    "--progress-radius": "var(--radius-base)",
+    "--progress-label-font": "var(--font-data)"
+  },
+  "$notice-bar-note": "A site-wide message with a level (record §3.2): a ruled band under the header. role=status for information, role=alert for urgent. A dismiss control, remembered per browser. The level is a word and a rule weight, never a colour alone: information takes the hairline and the word \"Notice\", urgent takes the strong rule and the word \"Urgent\". The band sits on the alternate ground in most styles; Zine sets it on the page ground between strong rules and Atlas sets its word in the mono face.",
+  "notice-bar": {
+    "--notice-bar-ground": "rgb(var(--color-surface-alt-rgb))",
+    "--notice-bar-rule-rgb": "--rule-strong-rgb",
+    "--notice-bar-rule-width": "var(--rule-hairline-width)",
+    "--notice-bar-urgent-rule-width": "var(--rule-strong-width)",
+    "--notice-bar-font": "var(--font-body)",
+    "--notice-bar-word-font": "var(--font-data)",
+    "--notice-bar-word-transform": "uppercase",
+    "--notice-bar-pad-block": "var(--space-sm)"
+  },
+  "$table-note": "Rows and columns a reader compares (record §3.1): a real <table> with row rules, tabular figures, a sticky head, and a horizontal scroll region at narrow widths. A sortable head holds a <button> that sorts, and the <th> carries aria-sort. The Table rules option group in each preset picks hairline rows, a ruled head, or the full grid by remapping the three widths here; the head's face and case are the style's own.",
+  "table": {
+    "--table-rule-rgb": "--rule-hairline-rgb",
+    "--table-rule-width": "var(--rule-hairline-width)",
+    "--table-head-rule-rgb": "--rule-strong-rgb",
+    "--table-head-rule-width": "var(--rule-strong-width)",
+    "--table-column-rule-width": "0",
+    "--table-head-font": "var(--font-data)",
+    "--table-head-transform": "none",
+    "--table-head-tracking": "0em",
+    "--table-head-ground": "rgb(var(--color-surface-rgb))",
+    "--table-cell-pad-block": "var(--space-xs)",
+    "--table-cell-pad-inline": "var(--space-sm)"
   }
 }

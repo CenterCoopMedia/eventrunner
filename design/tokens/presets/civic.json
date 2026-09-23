@@ -55,7 +55,7 @@
   "shape": { "radius": "small", "texture": "flat", "density": "comfortable" },
   "motifSet": "none",
 
-  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule uses comfortable vertical padding and the data font for folio text. The definition list widens its term column for the long labels a public notice carries. The pull quote keeps the plain ruled form with a rule at its inline start, like a quoted minute.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule uses comfortable vertical padding and the data font for folio text. The definition list widens its term column for the long labels a public notice carries. The pull quote keeps the plain ruled form with a rule at its inline start, like a quoted minute. A table takes the full hairline grid, like a posted schedule. The timeline, the progress bar and the notice bar keep the contract defaults.",
   "tokens": {
     "--session-card-pad-block": "var(--space-md)",
     "--folio-font": "var(--font-data)",
@@ -64,6 +64,7 @@
     "--pull-quote-rule-rgb": "var(--rule-hairline-rgb)",
     "--pull-quote-rule-inline-width": "var(--rule-strong-width)",
     "--pull-quote-pad-inline": "var(--space-md)",
+    "--table-column-rule-width": "var(--rule-hairline-width)",
     "--hero-art-width": "58%",
     "--hero-art-position": "80% 50%",
     "--hero-title-size": "clamp(2.5rem, 5vw, 5rem)",

@@ -52,7 +52,7 @@ Use this style for universities, public agencies, and organizations with formal 
 
 **font-note.** Uses Merriweather for headings, Public Sans for body text and labels, and IBM Plex Mono for times, room codes, and identifiers.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule uses comfortable vertical padding and the data font for folio text. The definition list widens its term column for the long labels a public notice carries. The pull quote keeps the plain ruled form with a rule at its inline start, like a quoted minute.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule uses comfortable vertical padding and the data font for folio text. The definition list widens its term column for the long labels a public notice carries. The pull quote keeps the plain ruled form with a rule at its inline start, like a quoted minute. A table takes the full hairline grid, like a posted schedule. The timeline, the progress bar and the notice bar keep the contract defaults.
 
 ### Heading face: `headingFace`
 
@@ -110,7 +110,7 @@ Use this style for publications, media conferences, and newsroom events.
 
 **font-note.** Uses Fraunces for headings, Newsreader for body text, Plex Sans for labels and data, and Plex Mono for figures and identifiers.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses the data font for folio text and a strong rule below each section heading. The definition list keeps the data face for its terms in a wide column. The pull quote sits between a strong rule above and a hairline below, with a large opening mark.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses the data font for folio text and a strong rule below each section heading. The definition list keeps the data face for its terms in a wide column. The pull quote sits between strong rules with a large opening mark. An urgent notice takes the nameplate rule, and table heads are set in small capitals over a strong rule.
 
 ### Heading face: `headingFace`
 
@@ -168,7 +168,7 @@ Use this style for formal programmes, anniversary editions, and events that need
 
 **font-note.** Uses serif type for headings, body text, programme data, and figures. The data roles use compact editorial type instead of a typewriter face.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule uses tight vertical padding and the data font for folio text. The definition list sets its terms in italic. The pull quote is centred between hairlines with a large opening mark and a small-capitals attribution.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule uses tight vertical padding and the data font for folio text. The definition list sets its terms in italic. The pull quote is centred between hairlines with a large opening mark and a small-capitals attribution. The timeline spine is a column rule at the strong width, the progress bar is a hairline-thin ink bar, the notice bar sits on the page ground, and tables take the full hairline grid with small-capitals heads.
 
 ### Heading face: `headingFace`
 
@@ -228,7 +228,7 @@ Use this style for multi-venue events, city festivals, and events where visitors
 
 **font-note.** Uses Overpass for headings, Libre Franklin for body text, and Overpass Mono for schedule data, coordinates, and identifiers.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule trace connects entries vertically. The grid remains below hairline contrast. Other styles set the trace width to zero. The definition list sets its terms as a map key: the monospaced font in capitals in a narrow column. The pull quote takes a strong rule at its inline start, like a route line, and no rules above or below.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule trace connects entries vertically. The grid remains below hairline contrast. Other styles set the trace width to zero. The definition list sets its terms as a map key: the monospaced font in capitals in a narrow column. The pull quote takes a strong rule at its inline start, like a route line, and no rules above or below. The timeline draws a station stop on its spine, the progress bar is a thin route line, the notice word and table heads are set in the monospaced font in capitals, and tables take the departure board grid.
 
 ### Heading face: `headingFace`
 
@@ -295,7 +295,7 @@ Use this style for environmental events, science programs, and regional gatherin
 
 **motif-note.** Botanical line drawings are enabled by default. The site can show them in the masthead mark, masthead divider, and public empty state. A client logo replaces the masthead mark. Clients can select no illustrations or the fauna set.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses a hairline plate frame, visible specimen-label rules, visible field names, the data font for folio text, and no marginalia by default. The definition list sets its terms as label keys in the monospaced font. The pull quote takes a hairline at its inline start, like a field note, and no rules above or below.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses a hairline plate frame, visible specimen-label rules, visible field names, the data font for folio text, and no marginalia by default. The definition list sets its terms as label keys in the monospaced font. The pull quote takes a hairline at its inline start, like a field note, and no rules above or below. The timeline tick is longer, the progress fill is clay, the notice word and table heads are label keys in the monospaced font, and a table head is ruled at the hairline.
 
 ### Heading face: `headingFace`
 
@@ -366,7 +366,7 @@ Use this style for unconferences, community events, and student programs.
 
 **shape-note.** Paper grain is enabled by default and appears only when data-texture is paper. A client can select Flat in the advanced settings. The optional stamped schedule remains off by default.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses strong rules, the monospaced font for folio text, a small callout angle, and no marginalia by default. The definition list sets its terms in the monospaced font in capitals between strong rules. The pull quote is the handwritten callout between strong rules.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses strong rules, the monospaced font for folio text, a small callout angle, and no marginalia by default. The definition list sets its terms in the monospaced font in capitals between strong rules. The pull quote is the handwritten callout between strong rules. The timeline spine is a strong rule, the progress fill is toner black with square ends, the notice bar sits on the page ground between strong rules, and table heads are set in the monospaced font in capitals.
 
 ### Heading face: `headingFace`
 

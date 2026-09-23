@@ -7,6 +7,8 @@ import Callout from '../../../components/editorial/Callout.jsx';
 import DefinitionList from '../../../components/editorial/DefinitionList.jsx';
 import Folio from '../../../components/editorial/Folio.jsx';
 import PullQuote from '../../../components/editorial/PullQuote.jsx';
+import RuledTable from '../../../components/editorial/RuledTable.jsx';
+import Timeline from '../../../components/editorial/Timeline.jsx';
 import Marginalia from '../../../components/editorial/Marginalia.jsx';
 import Nameplate, { buildNameplate } from '../../../components/editorial/Nameplate.jsx';
 import Plate, { PlateNumber } from '../../../components/editorial/Plate.jsx';
@@ -22,7 +24,9 @@ import StatBlock from '../../../components/blocks/StatBlock.jsx';
 import FactBlock from '../../../components/blocks/FactBlock.jsx';
 import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
-import { EXAMPLE_SESSIONS, specimenTracks } from '../exampleContent.js';
+import { useState } from 'react';
+import { formatDayDate } from '../../../lib/eventTime.js';
+import { EXAMPLE_SESSIONS, specimenDays, specimenSchedule, specimenTracks } from '../exampleContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import { scheduleData } from '@generated/scheduleData.js';
 
@@ -77,6 +81,55 @@ const FACT_BLOCK = Object.freeze({
   value: 'Reporters, editors, and publishers from local newsrooms',
   note: 'Workshop places go to registered participants first.',
 });
+
+// The event's days as dated entries: the timeline draws real dates, never
+// a sequence ornament, and the days are the dates this configuration has.
+const DAY_ENTRIES = specimenDays(eventConfig).map((day) => ({
+  id: day.id,
+  title: day.label,
+  date: day.date,
+  dateLabel: formatDayDate(day, eventConfig.timezone) ?? day.date,
+  body: day.startTime && day.endTime ? `Doors ${day.startTime}, close ${day.endTime}.` : undefined,
+}));
+
+// The sessions of one day, as rows a reader compares. The book sorts them
+// live, because a still of a sortable head says nothing about sorting.
+const { day: TABLE_DAY, sessions: TABLE_SESSIONS } = specimenSchedule(eventConfig, scheduleData);
+const TABLE_COLUMNS = Object.freeze([
+  Object.freeze({ id: 'title', label: 'Session', sortable: true }),
+  Object.freeze({ id: 'location', label: 'Room' }),
+  Object.freeze({ id: 'startTime', label: 'Starts', numeric: true, sortable: true }),
+]);
+
+function SessionTable() {
+  const [sort, setSort] = useState({ column: 'startTime', direction: 'ascending' });
+  const rows = [...TABLE_SESSIONS]
+    .filter((session) => !session.parentId)
+    .sort((left, right) => {
+      const order = String(left[sort.column] ?? '').localeCompare(String(right[sort.column] ?? ''));
+      return sort.direction === 'ascending' ? order : -order;
+    })
+    .slice(0, 5)
+    .map((session) => ({
+      id: session.id,
+      cells: { title: session.title, location: session.location, startTime: session.startTime },
+    }));
+  return (
+    <RuledTable
+      caption={`Sessions on ${TABLE_DAY.label}`}
+      columns={TABLE_COLUMNS}
+      rows={rows}
+      sort={sort}
+      onSort={(column) =>
+        setSort((current) => ({
+          column,
+          direction:
+            current.column === column && current.direction === 'ascending' ? 'descending' : 'ascending',
+        }))
+      }
+    />
+  );
+}
 
 // The one quoted sentence a page may carry.
 const QUOTE = Object.freeze({
@@ -254,6 +307,26 @@ export default function EditorialSection({ folio }) {
         <div className="max-w-prose">
           <DefinitionList items={FACTS} />
         </div>
+      </Figure>
+
+      <Figure
+        name="Timeline"
+        file="components/editorial/Timeline.jsx"
+        contract="timeline"
+        note="Dated entries in order on a spine, the same spine the updates feed draws. The date sits beside the title in the mono face and is the entry's only number: nothing counts the entries and nothing is zero-padded."
+      >
+        <div className="max-w-prose">
+          <Timeline entries={DAY_ENTRIES} level={4} />
+        </div>
+      </Figure>
+
+      <Figure
+        name="Ruled table"
+        file="components/editorial/RuledTable.jsx"
+        contract="table"
+        note="A real table with row rules, tabular figures and a head that stays in view. Press a sortable head to sort: the head is a button and the column carries aria-sort. At narrow widths the table scrolls inside its own region and the page does not."
+      >
+        <SessionTable />
       </Figure>
 
       <Figure

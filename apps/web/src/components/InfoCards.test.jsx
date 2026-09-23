@@ -66,7 +66,7 @@ describe('groupIntoCards', () => {
     ]);
   });
 
-  it('opens a card on a fact block too, with no evidence fields asked for (#234)', () => {
+  it('opens a card on a fact block too, with no evidence fields asked for (issue 234)', () => {
     const cards = groupIntoCards(THREE_FACTS);
     expect(cards.map((card) => [card.lead.field, card.lines.map((l) => l.field)])).toEqual([
       ['when', []],

@@ -120,6 +120,25 @@ const DEVICE_CLASSES = [
   '.no-print',
   '.nameplate__coordinate--start',
   '.nameplate__coordinate--end',
+  // Wave 2 of the vocabulary expansion (record §3): the text, feedback and
+  // input devices. Each one is a contract class the component names as a
+  // literal string, and a purged rule here would leave the device as an
+  // unruled list, an unlabelled bar, or a native progress element painted
+  // by the operating system.
+  '.definition-list__pair',
+  '.definition-list__term',
+  '.pull-quote',
+  '.pull-quote__mark',
+  '.pull-quote__attribution',
+  '.timeline__entry',
+  '.timeline__date',
+  '.progress-bar',
+  '.progress-label',
+  '.notice-bar',
+  '.notice-bar--urgent',
+  '.notice-bar__word',
+  '.ruled-table',
+  '.ruled-table__sort',
 ];
 
 describe('the built stylesheet', () => {
