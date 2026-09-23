@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { chooseAndApplyCrop, installPhotoCropStubs, uninstallPhotoCropStubs } from '../../test/photoCropStubs.js';
+import { BRAND_UTILITY_PREFIX } from '../../test/retiredUtilityNames.js';
 
 const uploadBytes = vi.fn(async () => ({}));
 const deleteObject = vi.fn(async () => {});
@@ -63,6 +64,35 @@ describe('ProfilePhotoField', () => {
     const image = screen.getByAltText('Your current profile photo');
     expect(image).toHaveClass('rounded-brand');
     expect(image).not.toHaveClass('rounded-full');
+  });
+
+  it('reads the tier 2 role tokens, not the old compatibility names (issue 247)', () => {
+    render(
+      <ProfilePhotoField
+        uid="attendee-1"
+        value="profile-photos/attendee-1/photo.png"
+        onChange={vi.fn()}
+      />,
+    );
+    const image = screen.getByAltText('Your current profile photo');
+    expect(image).toHaveClass('bg-surface-alt');
+    expect(image.className).not.toMatch(BRAND_UTILITY_PREFIX);
+    const upload = screen.getByText('Replace photo');
+    expect(upload).toHaveClass('bg-surface');
+    expect(upload).toHaveClass('text-text-primary');
+    expect(upload).toHaveClass('border-text-primary/20');
+    expect(upload.className).not.toMatch(BRAND_UTILITY_PREFIX);
+  });
+
+  it('draws a visible ring on the label when the hidden file input has keyboard focus', () => {
+    // The real <input type="file"> stays keyboard-operable but is visually
+    // hidden (sr-only); the label immediately after it in the markup is
+    // what carries the ring — index.css's
+    // `.file-input-label:has(+ input:focus-visible)` rule reads this class.
+    render(<ProfilePhotoField uid="attendee-1" value="" onChange={vi.fn()} />);
+    const label = screen.getByText('Upload a photo');
+    expect(label.tagName).toBe('LABEL');
+    expect(label).toHaveClass('file-input-label');
   });
 
   it('uploads to the signed-in user’s own prefix and reports the path, after the crop', async () => {

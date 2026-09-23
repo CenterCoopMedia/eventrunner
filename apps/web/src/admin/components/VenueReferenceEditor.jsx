@@ -108,6 +108,22 @@ function coordinate(value) {
 }
 
 /**
+ * A typed walking-minutes value as a number, or `null` for one nobody typed.
+ *
+ * Same reasoning as `coordinate` above (#227): `Number('')` is `0`, and `0`
+ * minutes is a real, recorded answer — "across the corridor" — so a blank
+ * field must never resolve to it. The local validator already refuses to
+ * save while this field is blank; this is what keeps the payload itself
+ * honest even so, rather than trusting every caller to check first.
+ */
+function wholeMinutes(value) {
+  const raw = String(value ?? '').trim();
+  if (raw === '') return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
  * The map, or null.
  *
  * No image is no map, and null is the server's "clear this" — so an operator
@@ -139,7 +155,7 @@ export function venueReferencesPayload(venue) {
     movements: (venue?.movements ?? []).map((movement) => ({
       from: movement.from,
       to: movement.to,
-      walkingMinutes: Number(movement.walkingMinutes),
+      walkingMinutes: wholeMinutes(movement.walkingMinutes),
       accessibleRoute: optional(movement.accessibleRoute),
     })),
   };

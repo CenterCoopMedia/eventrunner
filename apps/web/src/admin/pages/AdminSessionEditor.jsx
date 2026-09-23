@@ -7,6 +7,7 @@ import { useAdminApi } from '../adminApi.js';
 import { summarizePublish } from '../publishResult.js';
 import {
   publishSetForSession,
+  resolveDayLabel,
   sessionFields,
   sessionIdFromTitle,
 } from '../sessionDoc.js';
@@ -128,9 +129,24 @@ export default function AdminSessionEditor({ mode }) {
   const errorFor = (field) => localErrors.get(field) ?? serverErrors.get(field);
   const set = (patch) => setForm((current) => ({ ...current, ...patch }));
 
+  const configuredDays = eventConfig.days ?? [];
   const dayOptions = [
     { value: '', label: 'Select a day' },
-    ...(eventConfig.days ?? []).map((day) => ({ value: day.id, label: day.label || day.id })),
+    ...configuredDays.map((day, index) => ({
+      value: day.id,
+      label: resolveDayLabel(day, index, eventConfig.timezone),
+    })),
+    // A saved session can point at a day the event no longer configures (an
+    // operator removed it, or an environment's demo sessions outran its own
+    // config/event — #248 review follow-up). A <select> whose value matches
+    // none of its <option>s silently shows the first option instead, which
+    // reads as "no day chosen" even though the stored value is something
+    // else. Naming the actual stored value here — never a bare id standing
+    // alone as if it were a real day's name — keeps the control honest and
+    // gives the operator the one thing they need to fix it.
+    ...(form.dayId && !configuredDays.some((day) => day.id === form.dayId)
+      ? [{ value: form.dayId, label: `${form.dayId} (not on a configured day)` }]
+      : []),
   ];
   const trackOptions = [
     { value: '', label: 'No track' },

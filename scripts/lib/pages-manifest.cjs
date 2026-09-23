@@ -178,6 +178,12 @@ const SECTIONS = Object.freeze([
         summary: 'The v1 architecture decision record. This is the contract.',
       },
       {
+        source: 'docs/adr/0003-optional-google-calendar-sync.md',
+        route: 'decisions/0003-optional-google-calendar-sync/',
+        title: 'ADR 0003: Optional Google Calendar sync',
+        summary: 'The proposed record that brings calendar sync back as an opt-in, and what a client sets up first.',
+      },
+      {
         source: 'docs/ROADMAP.md',
         route: 'roadmap/',
         title: 'Roadmap',

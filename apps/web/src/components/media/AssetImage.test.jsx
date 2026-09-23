@@ -9,6 +9,7 @@
 // while still holding its space in the layout.
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
+import { BRAND_UTILITY_PREFIX } from '../../test/retiredUtilityNames.js';
 
 vi.mock('../../lib/mediaSource.js', () => ({
   assetUrl: (path) => (typeof path === 'string' && path ? `https://cdn.example.org/${path}` : null),
@@ -27,6 +28,14 @@ describe('AssetImage', () => {
   it('tells an operator when the object cannot be resolved', () => {
     const { container } = render(<AssetImage path={null} alt="A mark" />);
     expect(container.textContent).toContain('This file is missing from storage.');
+  });
+
+  it('reads the tier 2 role tokens, not the old compatibility names (issue 247)', () => {
+    const { container } = render(<AssetImage path={null} alt="A mark" />);
+    const missing = container.firstChild;
+    expect(missing).toHaveClass('bg-surface-alt');
+    expect(missing).toHaveClass('text-text-secondary');
+    expect(missing.className).not.toMatch(BRAND_UTILITY_PREFIX);
   });
 
   it('tells an operator when the object is gone from the bucket', () => {

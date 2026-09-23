@@ -4,8 +4,20 @@
 // errors, and reflects the saved state when the config listener reports it
 // back — no reload, nothing optimistic.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, configure, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+
+// This file mounts the full settings surfaces — the admin chunk pulls in
+// the whole public app for the branding preview, and the config, session,
+// and speaker editors each render their own real forms on top of it. On an
+// idle machine that first render clears the stock 5s budgets comfortably;
+// under a loaded parallel run (#230) it can outrun both vitest's per-test
+// timeout and Testing Library's default wait timeout before the gate even
+// finishes checking access, failing the file's first test for load, not for
+// a defect. Both budgets are widened for this file only — no editor
+// behavior changes; a fast run still finishes in well under the new budget.
+vi.setConfig({ testTimeout: 20_000, hookTimeout: 20_000 });
+configure({ asyncUtilTimeout: 20_000 });
 
 // EventConfigProvider's one seam to Firestore: capture each config doc's
 // callback so a test can push a live doc the way onSnapshot would.
@@ -85,6 +97,11 @@ async function renderAt(path) {
   // form itself arrives after the area around it. Waiting only for the
   // chunk lets an assertion run while the gate is still checking, which is
   // a flake under load, not a bug.
+  //
+  // This explicit timeout OVERRIDES the file's configured asyncUtilTimeout
+  // (#230) — an explicit `waitFor` timeout always wins over the configured
+  // default in Testing Library — so it has to carry the same widened
+  // budget itself rather than lean on the file-level config.
   await waitFor(
     () => {
       expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
@@ -94,7 +111,7 @@ async function renderAt(path) {
     // The admin chunk now pulls the whole public app in with it (the theme
     // editor's frame renders real pages), so the first mount in a file can
     // outrun the default budget on a loaded machine.
-    { timeout: 5000 },
+    { timeout: 20_000 },
   );
   return result;
 }

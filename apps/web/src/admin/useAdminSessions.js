@@ -26,8 +26,8 @@ export function useAdminSessions() {
   }, []);
 
   const groups = useMemo(
-    () => mergeSessionRevisions(live, drafts, eventConfig.days ?? []),
-    [live, drafts, eventConfig.days],
+    () => mergeSessionRevisions(live, drafts, eventConfig.days ?? [], eventConfig.timezone),
+    [live, drafts, eventConfig.days, eventConfig.timezone],
   );
   const rows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
 

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs/adr/0003-optional-google-calendar-sync.md`, the proposed decision record for the optional
+  Google Calendar sync of saved sessions (#177). It supersedes the one row of ADR 0001 §9 that
+  removed the feature, names the client's own Google Cloud project as the owner of the consent
+  screen and the OAuth client, picks the `calendar.app.created` scope, adds no secret, and says
+  how the `calendarSync` flag behaves when a client has not finished the Google setup: the `.ics`
+  download stays and nothing is written. The record is proposed, not accepted, and the flag stays
+  off. The documentation site lists it under Decisions.
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.
   Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,
@@ -114,6 +121,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   place is, how a session names one, how a one-way movement is entered and where the site shows
   it, how the map lists and marks places, and every rule the save checks. It also covers the new
   Social accounts panel (#226).
+- The profile and speaker photo fields, and the shared avatar and missing-asset components, now
+  read the same tier 2 role tokens (`--color-*`, `--rule-*`) every other public component reads,
+  instead of the retired brand-* utility names. Rendered colour is pixel-identical in every site
+  style and mode (#247).
 
 ### Fixed
 
@@ -253,5 +264,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Firebase deployment validation no longer requires `VITE_FIREBASE_MEASUREMENT_ID` when Google Analytics is disabled (#101).
+- The admin sessions list showed a day's raw document id ("day-2") as its heading whenever the day
+  had no label, or whenever a session pointed at a day no longer in the event's configured list. A
+  heading now falls back to the day's own date, then to its position ("Day 2") when it has no date,
+  and to a plain "Not on a configured day" line when the day itself is missing — never to the id
+  (#248).
+- The venue editor's payload helper sent a blank walking-minutes field as `0`, a real distance an
+  operator can mean, instead of failing to save. It now sends `null` (#227).
 
 The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.

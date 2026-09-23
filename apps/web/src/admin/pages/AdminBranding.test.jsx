@@ -20,9 +20,20 @@
 //   • A contrast failure is stated inline with the pair, the mode, and the
 //     ratio, and the frame keeps rendering.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import scheduleData from '@generated/scheduleData.js';
+
+// This file mounts the full branding editor, whose preview frame renders
+// the whole public app on top of the admin chunk. On an idle machine that
+// first render clears the stock 5s budgets comfortably; under a loaded
+// parallel run (#230) it can outrun both vitest's per-test timeout and
+// Testing Library's default wait timeout before the gate even finishes
+// checking access, failing the file's first test for load, not for a
+// defect. Both budgets are widened for this file only — no editor behavior
+// changes; a fast run still finishes in well under the new budget.
+vi.setConfig({ testTimeout: 20_000, hookTimeout: 20_000 });
+configure({ asyncUtilTimeout: 20_000 });
 
 const configSubscriptions = new Map();
 vi.mock('../../lib/configSource.js', () => ({
@@ -133,6 +144,11 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
   // gate holds on (AdminGate renders "Checking your access…" until it
   // answers). Waiting only for the chunk lets an assertion run while the
   // gate is still checking, which is a flake under load, not a bug.
+  //
+  // This explicit timeout OVERRIDES the file's configured asyncUtilTimeout
+  // (#230) — an explicit `waitFor` timeout always wins over the configured
+  // default in Testing Library — so it has to carry the same widened
+  // budget itself rather than lean on the file-level config.
   await waitFor(
     () => {
       expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
@@ -140,7 +156,7 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
     },
     // The frame renders the whole public app, so the first mount in this
     // file is slower than the default budget allows for.
-    { timeout: 5000 },
+    { timeout: 20_000 },
   );
   await waitFor(() => expect(configSubscriptions.has('theme')).toBe(true));
   act(() => configSubscriptions.get('theme')(themeDoc));
@@ -190,7 +206,7 @@ describe('the proof', () => {
     // The public shell, rendered by the app's own routes and components.
     expect(within(frame()).getByRole('banner')).toBeInTheDocument();
     expect(within(frame()).getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
-  }, 10_000);
+  });
 
   it('applies the candidate to the FRAME, and the room never adopts it', async () => {
     await renderBranding();
@@ -207,7 +223,7 @@ describe('the proof', () => {
     fireEvent.change(screen.getByLabelText('Site style'), { target: { value: 'zine' } });
     await waitFor(() => expect(frame().dataset.theme).toBe('zine'));
     expect({ ...document.documentElement.dataset }).toEqual(room);
-  }, 10_000);
+  });
 
   it('states the page, the mode, the width, and the draft below the frame', async () => {
     await import('../../pages/Schedule.jsx');

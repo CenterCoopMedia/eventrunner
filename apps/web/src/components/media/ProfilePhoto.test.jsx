@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import ProfilePhoto, { initialOf, profilePhotoUrl } from './ProfilePhoto.jsx';
+import { BRAND_UTILITY_PREFIX } from '../../test/retiredUtilityNames.js';
 
 describe('profilePhotoUrl', () => {
   it('resolves a photo under the owner-bound namespace', () => {
@@ -80,6 +81,25 @@ describe('ProfilePhoto', () => {
     const stub = screen.getByText('R');
     expect(stub).toHaveClass('rounded-brand');
     expect(stub).not.toHaveClass('rounded-full');
+  });
+
+  it('reads the tier 2 role tokens, not the old compatibility names (issue 247)', () => {
+    const { container } = render(
+      <ProfilePhoto photoPath="profile-photos/u1/photo.png" displayName="Rae Okonkwo" />,
+    );
+    const image = container.querySelector('img');
+    expect(image).toHaveClass('bg-surface');
+    expect(image).toHaveClass('outline-text-primary/[0.08]');
+    expect(image.className).not.toMatch(BRAND_UTILITY_PREFIX);
+  });
+
+  it('reads the tier 2 role tokens on the initial stand-in too', () => {
+    render(<ProfilePhoto photoPath={null} displayName="Rae Okonkwo" />);
+    const stub = screen.getByText('R');
+    expect(stub).toHaveClass('bg-surface');
+    expect(stub).toHaveClass('text-text-secondary');
+    expect(stub).toHaveClass('outline-text-primary/[0.12]');
+    expect(stub.className).not.toMatch(BRAND_UTILITY_PREFIX);
   });
 
   it('falls back to the initial when there is no photo', () => {

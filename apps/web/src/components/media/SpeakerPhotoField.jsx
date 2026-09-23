@@ -73,25 +73,25 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="block font-semibold text-brand-ink">Photo</span>
+      <span className="block font-semibold text-text-primary">Photo</span>
       {/* Square portrait, brand radius (design brief §2.4) — not a circle. */}
       <div className="flex items-center gap-4">
         {value && !defaultUrl ? (
           <AssetImage
             path={value}
             alt="Your current speaker photo"
-            className="h-20 w-20 rounded-brand bg-brand-surface-alt object-cover"
+            className="h-20 w-20 rounded-brand bg-surface-alt object-cover"
           />
         ) : defaultUrl ? (
           <img
             src={defaultUrl}
             alt="Your chosen default avatar"
-            className="h-20 w-20 rounded-brand bg-brand-surface-alt object-cover"
+            className="h-20 w-20 rounded-brand bg-surface-alt object-cover"
           />
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-20 w-20 items-center justify-center rounded-brand border border-dashed border-brand-ink/20 text-xs text-brand-ink-muted"
+            className="flex h-20 w-20 items-center justify-center rounded-brand border border-dashed border-text-primary/20 text-xs text-text-secondary"
           >
             None
           </span>
@@ -99,7 +99,7 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
         <div className="flex flex-col gap-2">
           <label
             htmlFor="speaker-photo"
-            className="touch-target inline-flex w-fit cursor-pointer items-center justify-center rounded-brand border border-brand-ink/20 bg-brand-surface px-4 py-2 font-semibold text-brand-ink hover:bg-brand-surface-alt"
+            className="file-input-label touch-target inline-flex w-fit cursor-pointer items-center justify-center rounded-brand border border-text-primary/20 bg-surface px-4 py-2 font-semibold text-text-primary hover:bg-surface-alt"
           >
             {busy ? 'Uploading…' : value ? 'Replace photo' : 'Upload a photo'}
           </label>
@@ -116,7 +116,7 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
           {value ? (
             <button
               type="button"
-              className="touch-target inline-flex w-fit items-center rounded-brand px-3 py-2 text-brand-ink-muted underline hover:bg-brand-surface-alt"
+              className="touch-target inline-flex w-fit items-center rounded-brand px-3 py-2 text-text-secondary underline hover:bg-surface-alt"
               onClick={remove}
               disabled={busy}
             >
@@ -134,7 +134,7 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
         />
       ) : null}
       <DefaultAvatarPicker value={value} onChange={onChange} namePrefix="speaker" />
-      <p id="speaker-photo-hint" className="text-sm text-brand-ink-muted">
+      <p id="speaker-photo-hint" className="text-sm text-text-secondary">
         {SPEAKER_PHOTO_TYPES.map(typeLabel).join(', ')} · up to{' '}
         {formatBytes(SPEAKER_PHOTO_MAX_BYTES)}. Save to publish the change; an organizer reviews it
         before it appears on the public programme.

@@ -11,10 +11,11 @@
 //
 // Everything below EXTENDS the Tailwind defaults rather than replacing them.
 // This branch restyles the public pages, the block renderers, the editorial
-// devices, and the toast onto the tier 2 role utilities, and moves the admin
-// onto its own admin-* identity. What is still on the brand-* names and the
-// default Tailwind sizes is the shared media widgets. Leaving the defaults in
-// place is what keeps those compiling and rendering until they move too.
+// devices, the toast, and the shared media widgets (#247) onto the tier 2
+// role utilities, and moves the admin onto its own admin-* identity. The
+// media widgets still size themselves with the default Tailwind scale
+// (h-20, px-4, text-xs, and the like) rather than the named spacing and
+// text steps — a separate move, tracked apart from the colour one.
 const fontStep = (step) => [
   `var(--text-${step})`,
   { lineHeight: `var(--text-${step}-leading)`, letterSpacing: `var(--text-${step}-tracking)` },
@@ -62,8 +63,11 @@ export default {
         danger: 'rgb(var(--semantic-danger-rgb) / <alpha-value>)',
         highlight: 'rgb(var(--semantic-highlight-rgb) / <alpha-value>)',
         keynote: 'rgb(var(--semantic-keynote-rgb) / <alpha-value>)',
-        // Tier 2 role names (brief §3.1). Every public surface reads these;
-        // the brand-* names above stay for the surfaces still to move.
+        // Tier 2 role names (brief §3.1). Every public surface reads these
+        // now (#247). The brand-* names above stay defined — every one of
+        // these is a direct alias of a brand-* custom property in every
+        // site style and mode — but nothing in the app reads them as a
+        // Tailwind utility class any more.
         surface: 'rgb(var(--color-surface-rgb) / <alpha-value>)',
         'surface-alt': 'rgb(var(--color-surface-alt-rgb) / <alpha-value>)',
         'text-primary': 'rgb(var(--color-text-primary-rgb) / <alpha-value>)',
