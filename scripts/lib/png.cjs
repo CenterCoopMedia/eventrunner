@@ -20,7 +20,8 @@
  *   unsupported  a PNG this reader does not read (16-bit, interlaced, gray
  *                below 8 bits, an unknown critical chunk, a palette image
  *                with no PLTE)
- *   too-large    a side is above `maxSide`
+ *   too-large    a side is above `maxSide`; the error also carries the
+ *                `width` and `height` IHDR names
  *
  * Every ancillary chunk (sRGB, gAMA, iCCP, pHYs, tEXt, eXIf, acTL, ...) is
  * skipped, so an APNG gives its default image and colour profiles are
@@ -48,11 +49,14 @@ class PngError extends Error {
   /**
    * @param {'not-png'|'damaged'|'unsupported'|'too-large'} reason
    * @param {string} message
+   * @param {{ width?: number, height?: number }} [size] the IHDR size, when known
    */
-  constructor(reason, message) {
+  constructor(reason, message, size = {}) {
     super(message);
     this.name = 'PngError';
     this.reason = reason;
+    this.width = size.width ?? null;
+    this.height = size.height ?? null;
   }
 }
 
@@ -108,7 +112,7 @@ function readHeader(data, maxSide) {
   if (width === 0 || height === 0) throw damaged('the image has a side of 0');
   if (compression !== 0 || filterMethod !== 0) throw damaged('unknown compression or filter method');
   if (width > maxSide || height > maxSide) {
-    throw new PngError('too-large', `${width} by ${height} is above ${maxSide} pixels on a side`);
+    throw new PngError('too-large', `${width} by ${height} is above ${maxSide} pixels on a side`, { width, height });
   }
   if (!READABLE_DEPTHS[colorType]?.includes(bitDepth)) {
     throw unsupported(`colour type ${colorType} at ${bitDepth} bits`);

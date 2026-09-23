@@ -6,8 +6,13 @@
 // Drawn in code from the default mark's numbers (scripts/lib/app-icons.cjs
 // PLACEHOLDER_MARK) for the same reason as og-default.png: nothing in this
 // repo's dependencies rasterizes SVG. The output is committed, and the
-// publish and deploy scripts copy those bytes as they are. Re-run this when
-// mark.svg or the drawing changes; a unit test fails until you do.
+// publish and deploy scripts copy those bytes as they are.
+//
+// After a change to mark.svg, a unit test fails until you do these steps in
+// order: update PLACEHOLDER_MARK in scripts/lib/app-icons.cjs to match the
+// new mark.svg (and renderPlaceholderIcon, if the shapes change), run this
+// script, and commit both PNGs. Running this script alone does not clear
+// the test that compares PLACEHOLDER_MARK with mark.svg.
 //
 //   node scripts/dev/build-app-icons.mjs
 //   node scripts/dev/build-app-icons.mjs --check   # compare pixels, write nothing

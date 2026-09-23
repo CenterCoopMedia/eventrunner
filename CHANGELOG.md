@@ -50,8 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   zone is unknown. The manifest no longer lists the SVG mark or favicon. The deploy build reads the
   upload over its public download URL (`--storage-bucket`), so it needs no credentials. A PNG
   decoder and resampler in `scripts/lib/png.cjs` use only `node:zlib`, so no new dependency ships.
-  The Branding page hint for the square icon states the rule, and an end-to-end test asks Chromium
-  whether the default site is installable (#218).
+  The Branding page hint for the square icon states the rule: a square PNG from 512 to 4096 pixels
+  on a side also becomes the app icon. An end-to-end test asks Chromium whether the default site is
+  installable (#218).
 
 ### Changed
 

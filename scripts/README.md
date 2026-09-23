@@ -370,8 +370,13 @@ node scripts/dev/build-app-icons.mjs --check   # compare pixels, write nothing
 ```
 
 `scripts/lib/app-icons.test.cjs` fails when a committed icon no longer matches a fresh render, or
-when `mark.svg` no longer holds the numbers the drawing uses. Re-run the script and commit both
-files.
+when `mark.svg` no longer holds the numbers the drawing uses. Running the script alone does not
+clear the second failure. After a change to `mark.svg`, do these steps in order:
+
+1. Update `PLACEHOLDER_MARK` in `scripts/lib/app-icons.cjs` to match the new `mark.svg`. If the
+   shapes change, update `renderPlaceholderIcon` too.
+2. Run `node scripts/dev/build-app-icons.mjs`.
+3. Commit both PNGs with the change.
 
 ## Planned
 

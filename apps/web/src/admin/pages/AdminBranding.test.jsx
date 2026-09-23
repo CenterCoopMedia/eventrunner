@@ -654,7 +654,7 @@ describe('publishing the theme', () => {
   it('describes the square icon field with the app icon rule', async () => {
     await renderBranding();
     expect(screen.getByLabelText('Square icon')).toHaveAccessibleDescription(
-      'A square version for tight spaces. A square PNG of 512 pixels or more also becomes the app icon.',
+      'A square version for tight spaces. A square PNG from 512 to 4096 pixels on a side also becomes the app icon.',
     );
   }, 20_000);
 });

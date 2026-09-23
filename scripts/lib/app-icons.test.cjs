@@ -86,7 +86,8 @@ for (const size of APP_ICON_SIZES) {
 }
 
 test('the committed placeholder icons match a fresh render, pixel for pixel', () => {
-  // Stale? Run `node scripts/dev/build-app-icons.mjs` and commit both files.
+  // Stale after a drawing change? Run `node scripts/dev/build-app-icons.mjs`
+  // and commit both files.
   for (const file of committed()) {
     const size = Number(/app-icon-(\d+)\.png$/.exec(file.path)[1]);
     const decoded = decodePng(file.bytes);
@@ -97,6 +98,9 @@ test('the committed placeholder icons match a fresh render, pixel for pixel', ()
 });
 
 test('the default mark still holds the numbers the placeholder is drawn from', () => {
+  // Failing after a change to mark.svg? Update PLACEHOLDER_MARK in
+  // app-icons.cjs to match it, run `node scripts/dev/build-app-icons.mjs`,
+  // and commit both PNGs. The script alone does not clear this test.
   const svg = fs.readFileSync(path.join(PLACEHOLDER_DIR, 'mark.svg'), 'utf8');
   const { grid, ground, ink, ring, dot } = PLACEHOLDER_MARK;
   const rgb = (color) => `rgb(${color.join(' ')})`;
@@ -302,14 +306,26 @@ test('an image under 512 pixels gives the placeholder and names its width', asyn
   );
 });
 
-test('an image over 4096 pixels gives the placeholder before it is inflated', async () => {
+/** A real PNG whose IHDR is rewritten to a size over the limit, CRC fixed. */
+function oversized(width, height) {
   const bytes = Buffer.from(twoColourMark(512));
-  bytes.writeUInt32BE(5000, 16);
-  bytes.writeUInt32BE(5000, 20);
+  bytes.writeUInt32BE(width, 16);
+  bytes.writeUInt32BE(height, 20);
   bytes.writeUInt32BE(zlib.crc32(bytes.subarray(12, 29)) >>> 0, 29);
+  return bytes;
+}
+
+test('an image over 4096 pixels gives the placeholder before it is inflated, and names both sides', async () => {
   assert.equal(
-    await placeholderFor(() => new Response(bytes, { status: 200 })),
-    'the square icon is wider than 4096 pixels',
+    await placeholderFor(() => new Response(oversized(5000, 5000), { status: 200 })),
+    'the square icon is 5000 by 5000 pixels; each side must be 4096 or less',
+  );
+});
+
+test('a tall image over the limit is named by both sides, not called wide', async () => {
+  assert.equal(
+    await placeholderFor(() => new Response(oversized(100, 5000), { status: 200 })),
+    'the square icon is 100 by 5000 pixels; each side must be 4096 or less',
   );
 });
 

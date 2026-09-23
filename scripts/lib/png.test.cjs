@@ -324,6 +324,20 @@ test('a side over the limit is refused before any image data is inflated', () =>
   assert.equal(decodePng(PLAIN_PNG, { maxSide: 7 }).width, 7);
 });
 
+test('a too-large refusal carries the size IHDR names, so either side can be reported', () => {
+  const tall = Buffer.concat([
+    SIGNATURE,
+    chunk('IHDR', header({ width: 100, height: 5000, colorType: 6 })),
+    chunk('IDAT', Buffer.from('not deflate data')),
+    chunk('IEND'),
+  ]);
+  assert.throws(() => decodePng(tall), (err) => (
+    err instanceof PngError && err.reason === 'too-large' && err.width === 100 && err.height === 5000
+  ));
+  // Other refusals carry no size.
+  assert.throws(() => decodePng(Buffer.from('not a PNG')), (err) => err.width === null && err.height === null);
+});
+
 test('16-bit and gray below 8 bits are unsupported', () => {
   refuses(buildPng({ width: 1, height: 1, colorType: 6, bitDepth: 16, raw: Buffer.alloc(9) }), 'unsupported');
   refuses(buildPng({ width: 2, height: 1, colorType: 0, bitDepth: 4, raw: Buffer.alloc(2) }), 'unsupported');

@@ -210,9 +210,15 @@ Two raster placeholders sit beside them: `app-icon-192.png` and
 `app-icon-512.png`, the app icons `public/manifest.webmanifest` lists. They
 are drawn from the default mark's numbers, not converted from the SVG. The
 publish and deploy scripts replace them with an uploaded square PNG icon
-when there is one (`scripts/lib/app-icons.cjs`). Regenerate them after a
-change to `mark.svg` with `node scripts/dev/build-app-icons.mjs`; a unit test
-fails until you do.
+when there is one (`scripts/lib/app-icons.cjs`).
+
+After a change to `mark.svg`, a unit test fails until you do these steps in
+order:
+
+1. Update `PLACEHOLDER_MARK` in `scripts/lib/app-icons.cjs` to match the new
+   `mark.svg`. If the shapes change, update `renderPlaceholderIcon` too.
+2. Run `node scripts/dev/build-app-icons.mjs`.
+3. Commit both PNGs with the change.
 
 ## Testing
 

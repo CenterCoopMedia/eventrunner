@@ -71,7 +71,6 @@ const REASONS = Object.freeze({
   noBucket: 'no storage bucket was given',
   tooManyBytes: 'the square icon is larger than 5 MB',
   'not-png': 'the square icon is not a PNG file',
-  'too-large': `the square icon is wider than ${MAX_MARK_SIDE} pixels`,
   unsupported: 'the square icon uses a PNG format this build cannot read',
   damaged: 'the square icon file is damaged',
 });
@@ -171,7 +170,11 @@ function iconsFromMark(bytes) {
   try {
     image = decodePng(bytes, { maxSide: MAX_MARK_SIDE });
   } catch (err) {
-    throw err instanceof PngError ? new AppIconError(REASONS[err.reason]) : err;
+    if (!(err instanceof PngError)) throw err;
+    // The size limit applies to each side, so the reason names both.
+    throw new AppIconError(err.reason === 'too-large'
+      ? `the square icon is ${err.width} by ${err.height} pixels; each side must be ${MAX_MARK_SIDE} or less`
+      : REASONS[err.reason]);
   }
   if (image.width !== image.height) {
     throw new AppIconError(`the square icon is ${image.width} by ${image.height} pixels; it must be square`);
