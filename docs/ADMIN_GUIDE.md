@@ -302,6 +302,20 @@ The badge catalog: Categories, each with a max-picks cap and its list of badges,
 
 **Remove a custom badge.** In Attendees, select the removal action beside the badge and confirm. The result stays on the page and an `admin_logs` entry records the action. Turning the feature off removes custom badges from the public projection; attendees can still edit their other profile fields.
 
+## Settings → Access
+
+Operators only. One ruled table of every admin account with its tier word, and a form to grant access to a new address.
+
+**Grant access.** Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. The person signs in with that address the way every admin does, by Google or by the emailed code; there is no invitation to send.
+
+**Change a tier or remove access.** Each row carries two quiet actions: **Change to staff** or **Change to operator**, and **Remove access**. Each one opens a confirmation under the table that names the account and the consequence. Removal sits on the alarm ground; a tier change does not, because it narrows or widens access without deleting anything. Cancel returns you to the control you pressed.
+
+**At least one operator stays.** The server refuses a change that would leave the deployment with no operator. That covers removing your own last grant and removing the only other operator's. Grant a second operator first. The refusal is stated in place, in the server's words.
+
+**What is recorded.** Every grant, change, and removal writes a row to the admin log with your address, the account, and the tier it moved from and to. A change that changes nothing writes no row.
+
+**When it takes effect.** At once. The database rules, the server, and the admin rail all read the access lists live: a granted account is admitted on its next request, a removed account is refused on its next request, and the rail shows the right sections the next time the person signs in or reloads.
+
 ## Legal pages
 
 Privacy policy and terms of service ship as CMS content pages seeded from provider-aware templates, each clause needing review flagged `[Client legal review required]`. They stay flagged — a persistent banner in the admin panel and a visible notice on the public page — until an admin clears the review flag after the client's counsel has actually reviewed the seeded copy. See [`CLIENT_ONBOARDING.md`](CLIENT_ONBOARDING.md)'s legal review section for the full context. Do not publish another organization's terms verbatim; the seeded text is a starting point, not a finished policy.

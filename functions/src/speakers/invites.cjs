@@ -133,12 +133,12 @@ const EXPIRED_INVITE = Object.freeze({
 });
 
 /** Shared admin-POST preamble. Sends the response itself on failure. */
-async function gateAdminPost({ auth, getConfig }, req, res) {
+async function gateAdminPost({ auth, db, getConfig }, req, res) {
   if (req.method !== 'POST') {
     methodNotAllowed(res, ['POST']);
     return null;
   }
-  const verdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+  const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
   if (!verdict.ok) {
     sendError(res, verdict.status, verdict.code, verdict.message);
     return null;
@@ -737,7 +737,7 @@ async function listInvites({ db, speakerId = null, limit = MAX_LISTED_INVITES })
 /** @param {{ db, auth, getConfig, sendEmail, now?, log? }} deps */
 function createSendSpeakerInviteHandler({ db, auth, getConfig, sendEmail, now = Date.now, log = console }) {
   return async function sendSpeakerInvite(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     await runInviteSend({
       db, getConfig, sendEmail, now, log, req, res, actor, mode: 'send',
@@ -748,7 +748,7 @@ function createSendSpeakerInviteHandler({ db, auth, getConfig, sendEmail, now = 
 /** @param {{ db, auth, getConfig, sendEmail, now?, log? }} deps */
 function createResendSpeakerInviteHandler({ db, auth, getConfig, sendEmail, now = Date.now, log = console }) {
   return async function resendSpeakerInvite(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     await runInviteSend({
       db, getConfig, sendEmail, now, log, req, res, actor, mode: 'resend',
@@ -858,7 +858,7 @@ async function runInviteSend({ db, getConfig, sendEmail, now, log, req, res, act
 /** @param {{ db, auth, getConfig, now?, log? }} deps */
 function createCancelSpeakerInviteHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function cancelSpeakerInvite(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     let result;
     try {
@@ -887,7 +887,7 @@ function createCancelSpeakerInviteHandler({ db, auth, getConfig, now = Date.now,
 /** @param {{ db, auth, getConfig, log? }} deps */
 function createListSpeakerInvitesHandler({ db, auth, getConfig, log = console }) {
   return async function listSpeakerInvites(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     const speakerId = req.body?.speakerId;
     if (speakerId !== undefined && speakerId !== null && !isValidDocId(speakerId)) {

@@ -390,7 +390,7 @@ async function writeSpeakerLink({ db, speakerId, uid, now }) {
 function createDeleteSpeakerHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function deleteSpeaker(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
     const actor = { uid: gate.uid, email: gate.email };
 

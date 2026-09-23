@@ -106,7 +106,7 @@ function toRow(doc) {
 function createListSystemErrorsHandler({ db, auth, getConfig, log = console }) {
   return async function listSystemErrors(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'operator' });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'operator' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const { includeResolved, limit, cursor } = req.body || {};
@@ -182,7 +182,7 @@ async function resolveOne({ db, id, expectedLastSeenAt, actor, now }) {
 function createResolveSystemErrorsHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function resolveSystemErrors(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'operator' });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'operator' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const { id, kind, expectedLastSeenAt, cursor } = req.body || {};

@@ -9,7 +9,7 @@ Landed so far (M2 backend foundation):
 - `src/auth/` — emailed-code sign-in: challenge store, rate bucket, attempt lockout, send-boundary code gate, custom-token issuance
 - `src/notify/` — operator notifier with webhook/email/none sinks
 - `src/cms/` — the two-revision publish model (spec §8.4): block-type registry, draft-only content/page/update editors, version history reads, and the chunked resumable publish pipeline over the six publishable collections and their `_drafts` siblings
-- `src/admin/` — validated `config/*` writers (`updateEventConfig`, `updateFeatures`, `updateTheme`, `updateBadges`), the only path that writes config documents; rejects deploy-mirrored read-only fields and everything outside the `{event, features, theme, badges}` allowlist (spec §1.3)
+- `src/admin/` — validated `config/*` writers (`updateEventConfig`, `updateFeatures`, `updateTheme`, `updateBadges`), the only path that writes config documents; rejects deploy-mirrored read-only fields and everything outside the `{event, features, theme, badges}` allowlist (spec §1.3). `access.cjs` holds the operator-only `listAdminAccess` and `setAdminAccess`, the only path that reads or changes `config/bootstrap` from the browser; it lowercases on write, refuses the change that would leave no operator, and records every change in `admin_logs` with the address and the tiers it moved between.
 
 ## Admin tiers
 
@@ -25,12 +25,12 @@ An address on either list is an admin. An address on both is an operator. Both l
 **One gate, one option.** Every admin endpoint calls `requireAdmin(deps, req, { tier })` from `src/core/auth.cjs` and states its tier at that call, nowhere else:
 
 ```js
-const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
 if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 // gate.tier is 'operator' or 'staff', for a handler that holds one field back.
 ```
 
-`tier: 'staff'` admits both tiers. `tier: 'operator'` admits operators only. The option defaults to `'operator'`, so an endpoint that does not say refuses staff rather than admitting them. A handler that needs the predicate without the HTTP verdict (an owner-or-admin check) calls `resolveAdminTier(bootstrap, email)`, which answers `'operator'`, `'staff'` or `null`; do not scan `adminEmails` by hand.
+`tier: 'staff'` admits both tiers. `tier: 'operator'` admits operators only. The option defaults to `'operator'`, so an endpoint that does not say refuses staff rather than admitting them. Pass `db` in the deps: with it the gate reads `config/bootstrap` live (`loadBootstrap`), so a grant or a revocation made on the Access page takes effect on the next request on every server; without it the gate falls back to the five-minute config cache. A handler that needs the predicate without the HTTP verdict (an owner-or-admin check) calls `resolveAdminTier(await loadBootstrap({ db, getConfig }), email)`, which answers `'operator'`, `'staff'` or `null`; do not scan `adminEmails` by hand.
 
 `firestore.rules` carries the same split as `isOperator()`, `isStaff()` and `isAdmin()`. Every admin-readable collection reads on `isAdmin()` except `admin_logs`, which is the operator's audit trail and the read the browser probes to learn its tier (`apps/web/src/contexts/AuthContext.jsx`).
 

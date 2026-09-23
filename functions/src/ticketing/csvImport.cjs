@@ -241,12 +241,12 @@ async function buildImportPreview({ db, mapping, rows }) {
 }
 
 /** Shared admin-POST preamble, mirroring speakers/invites.cjs's gateAdminPost. */
-async function gateAdminPost({ auth, getConfig }, req, res) {
+async function gateAdminPost({ auth, db, getConfig }, req, res) {
   if (req.method !== 'POST') {
     methodNotAllowed(res, ['POST']);
     return null;
   }
-  const verdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+  const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
   if (!verdict.ok) {
     sendError(res, verdict.status, verdict.code, verdict.message);
     return null;
@@ -257,7 +257,7 @@ async function gateAdminPost({ auth, getConfig }, req, res) {
 /** @param {{ db, auth, getConfig, now?, log? }} deps */
 function createTicketingImportCsvHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function ticketingImportCsv(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
 
     const validated = validateImportRequest(req.body);
@@ -328,7 +328,7 @@ const MAX_LIST_LIMIT = 100;
  */
 function createTicketingListTicketsHandler({ db, auth, getConfig, log = console }) {
   return async function ticketingListTickets(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
 
     const body = isPlainObject(req.body) ? req.body : {};
