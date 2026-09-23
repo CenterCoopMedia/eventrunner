@@ -63,7 +63,7 @@ Every page document (About, Travel, Conduct, and anything else seeded or added) 
 
 **One item is not a page.** The navigation ends with the account control, which the site adds itself. It reads **Sign in** for a reader who is not signed in and **Your profile** for one who is. You cannot remove it or reorder it, and it needs no page document.
 
-**The footer lists the same pages.** The footer repeats the page list under the same rules, so a page you hide leaves both places at once and a page you rename is renamed in both. Below it the footer names the organization that operates the event and links its support address, both from the event configuration, and lists the event's social accounts if the configuration records any. Each account link is labelled with the service and the handle together, such as Mastodon @summit, so two accounts on one service can be told apart; an account recorded with no handle is labelled with the service name alone. An event with no social accounts gets no social block, not an empty one. Social account links are set when the site is created and have no editor here yet.
+**The footer lists the same pages.** The footer repeats the page list under the same rules, so a page you hide leaves both places at once and a page you rename is renamed in both. Below it the footer names the organization that operates the event and links its support address, both from the event configuration, and lists the event's social accounts if the configuration records any. Each account link is labelled with the service and the handle together, such as Mastodon @eventname, so two accounts on one service can be told apart; an account recorded with no handle is labelled with the service name alone. An event with no social accounts gets no social block, not an empty one. You add and edit the accounts under Settings → Event settings, in the **Social accounts** panel.
 
 **Pick what kind of page this is.** Six named tasks, and picking one shapes the page:
 
@@ -174,7 +174,7 @@ Unresolved system-error rows — the operational surface for things like an inva
 
 ## Settings → Event settings
 
-The event's own identity fields: Name, dates, timezone, venue, sender address, and the rest. This is a merge-then-validate write — the form only sends the keys it is actually changing, and fields it does not touch (the legal postal address, the SEO metadata) are left alone.
+The event's own identity fields: Name, dates, timezone, venue, sender address, social accounts, and the rest. The venue's places, movements, and map are set here too, in the panels described below. This is a merge-then-validate write — the form only sends the keys it is actually changing, and fields it does not touch (the legal postal address, the SEO metadata) are left alone.
 
 **Tracks** live here too: The lines your event runs when sessions happen at the same time in different rooms. Each track has a letter (A to Z) and a name, and the schedule shows both — a reader tells two lines apart by the letter and the name, never by colour alone. Sessions point at a track by its letter, so renaming a track is one edit here rather than a change to every session. Leave the list empty if everything happens in one room.
 
@@ -192,11 +192,90 @@ The event's own identity fields: Name, dates, timezone, venue, sender address, a
 
 **Printing.** Print any schedule page and you get the handout: Every day of the event, every session and every stop under it, tracks named by letter and name, no buttons. You do not have to prepare anything for it, and you get the light edition even if you print from a dark screen.
 
-**Venue map.** Upload a map of the building and the travel page prints it, with the venue's rooms listed beside it. Under **Venue map** you choose or upload the image the same way you pick any other picture, and then write the **alt text**: One sentence saying what the map shows. The alt text is required — a map with none does not publish, because an image nobody described tells a reader using a screen reader nothing at all. The picture has to come from the media library, so a link to a map on somebody else's site is refused; upload the file instead.
+### Places
+
+A place is one named room or hall at the venue. Sessions, movements, and the venue map all point at places, so each room's name is stored once. Rename a room in its place, and the transfer lines, the room list beside the venue map, and the admin sessions list all follow.
+
+Select **Add place** in the **Places** panel. Each place has three fields:
+
+- **Name**: The name readers see, such as Main hall. Required.
+- **Id**: The stable key that sessions, movements, and map markers store. Use lowercase letters, digits, and single hyphens, such as `main-hall`. For a new place, the id fills in from the name as you type. Type in the id field and the id stops following the name. Until you save, a movement or map marker that already picked the new place follows its id when the id changes.
+- **Floor**: Optional, such as Level 2. The room list beside the venue map and the transfer line both show it.
+
+**Keep a saved id the same.** Change a place's name as often as you need to; the id stays. A saved place's id does not follow its name. If you change a saved id anyway, every movement and marker that named the old id is refused until you point it at the new one. The server also refuses the save while a live or draft session still uses the old id.
+
+**Removing a place.** Select the **Remove** control on the place's row. The place's movements and its map marker go with it, and a line above the **Places** panel says what will go. Nothing is removed until you save. You cannot remove a place that a live or draft session uses. Its remove control is off, and the row names the sessions that use it. Move those sessions to another place first. The server makes the same check when you save.
+
+### How a session uses a place
+
+In the session editor, **Recorded place** picks one of your places, or **No recorded place**. It is a separate field from **Public location text**. The location text is the wording attendees read, and it does not change the recorded place. The site never matches the location text against place names. The sessions list in the admin shows the recorded place's name, or the location text when a session has no recorded place.
+
+A session can only name a place that exists. The server refuses any other id, and refuses every id while the venue has no places at all. Add the place in Event settings first, then pick it on the session.
+
+### Movements
+
+A movement is one recorded walk from one place to another. The site shows a walk only where a movement records that exact pair of places. It never guesses a walking time.
+
+Select **Add movement** in the **Movements** panel and fill in:
+
+- **From** and **To**: Two different places from your list.
+- **Walking minutes**: A whole number from 0 to 120. Use 0 for rooms across the corridor; the site then says "under a minute’s walk".
+- **Accessible route**: Optional. The step-free way between the same two places, in your own words. Leave it empty if nobody has checked one. The site then says nothing about a step-free route, rather than saying there is none.
+
+**A movement is one way.** A walk from the main hall to the studio says nothing about the walk back, so record the reverse as its own movement, even when it takes the same time. The site does not join movements either: A walk from A to B and a walk from B to C do not make a walk from A to C.
+
+**Where a walk shows.** A transfer line appears in two places only:
+
+- On **My schedule**, between two sessions a reader bookmarked, one after the other on the same day, when a movement records the walk from the first session's place to the second session's place.
+- In a session's calling points, when a child session sits in a different place from its parent and a movement records that walk.
+
+The line names both places, the destination's floor, and the walk. When you recorded an accessible route, a second line gives it after "Step-free route:". The full schedule shows no transfer lines, because a reader scanning the programme is not walking it in order.
+
+**Removing a movement.** Select **Remove movement** on its row. It goes when you save.
+
+### Venue map
+
+Upload a map of the building and the travel page prints it, with the venue's rooms listed beside it. Under **Venue map** you choose or upload the image the same way you pick any other picture, and then write the **alt text**: One sentence saying what the map shows. The alt text is required — a map with none does not publish, because an image nobody described tells a reader using a screen reader nothing at all. The picture has to come from the media library, so a link to a map on somebody else's site is refused; upload the file instead.
+
+**The map lists your places.** The room list beside the map is your **Places** list, in the same order, with each room's floor. Every place is listed, marked or not, so a reader who cannot see the picture still gets every room name. Add your places before you mark them: A marker can only name a place that already exists. The **Map URL** field in the **Venue** panel is a different thing. It links to an outside street map, and it does not use places.
 
 **Where the map appears.** The travel page carries a section called **Venue map** (its id is `travel_map`), and the map draws wherever that section sits, so you move the map by moving the section in Pages. If your travel page does not have that section — every site set up before this feature shipped is in that position — the map draws at the end of the page instead, so uploading one always publishes something.
 
-**Marking rooms on the map.** A marker puts a numbered dot on the image where one of your places is. Add one with **Add marker**, pick the room, and type how far **across** and **down** it sits as percentages of the picture: 0 across is the left edge, 100 the right; 0 down is the top, 100 the bottom. Every place is listed beside the map whether or not you mark it, and the number on the dot is the number in the list, so a reader can match the two. Numbers run down the list in the order your places are listed, not the order you added the markers. One marker per room. **Remove marker** takes one off, and removing a place takes its marker with it — the panel says so before you save.
+**Marking rooms on the map.** A marker puts a numbered dot on the image where one of your places is. Add one with **Add marker**, pick the room, and type how far **across** and **down** it sits as percentages of the picture: 0 across is the left edge, 100 the right; 0 down is the top, 100 the bottom. The number on the dot is the number in the list, so a reader can match the two. Numbers run down the list in the order your places are listed, not the order you added the markers. One marker per room. **Remove marker** takes one off, and removing a place takes its marker with it — the panel says so before you save.
+
+**Taking the map down.** Clear the map image. The alt text and the markers are cleared with it, and the travel page shows no map after you save.
+
+### Rules for places, movements, and the map
+
+The places and movements fields are checked as you type, and a field that breaks a rule is marked at once. The map fields are checked when you select **Save event settings**. Either way, **Save event settings** stays available. A save with a marked field sends nothing and moves focus to the first field that needs a fix. The server checks the same rules again and names the field it refused.
+
+| Field | Rule |
+|---|---|
+| Place name | Required. |
+| Place id | Lowercase letters, digits, and single hyphens. No two places share an id. |
+| Removing a place | Refused while a live or draft session uses it. |
+| Movement **From** and **To** | Two different places from your list. One movement per direction for each pair. |
+| Walking minutes | A whole number from 0 to 120. |
+| Map image | Chosen from the media library, so its path starts with `cms-images/` or `branding/`. |
+| Map alt text | Required once an image is chosen. |
+| Marker room | One of your places. One marker per place. |
+| Marker across and down | A number from 0 to 100. |
+
+### Social accounts
+
+The **Social accounts** panel holds the event's own accounts. The site footer and the footer of every built-in email list them, in the order the panel shows. In an email, the formatted copy links each service name, and the plain-text copy gives one line per account: The service, then the address. An email template override that replaces a body keeps the footer that body has. Leave the list empty and neither footer shows social links.
+
+Select **Add account**. Focus moves to the new row's **Service** field. Each account has three fields:
+
+- **Service**: The name readers see, such as Mastodon. Required, at most 40 characters.
+- **Handle**: Optional, such as @eventname, at most 40 characters. The site footer prints it beside the service, so two accounts on one service can be told apart. The email footer leaves it out.
+- **Link**: The full address of the account. It must start with `https://` or `http://`.
+
+**Removing an account.** Select **Remove account** on its row. Focus moves to the remove control of the account that takes its place, or of the one before it when you removed the last, or to **Add account** when none is left. The account goes when you save.
+
+**What the save checks.** The accounts are checked when you select **Save event settings**. A save is refused, and focus moves to the first field that needs a fix, when a service name is empty, a link is not a full `https://` or `http://` address, or the same service and link are listed twice. A link with no scheme, such as `example.org/@eventname`, is refused, and so is a `javascript:` link. The server checks the same rules and names the field it refused.
+
+**Social hashtag.** One word with no spaces, such as #EventName. The event settings store it, but the site and its email do not show it.
 
 ## Settings → Features
 

@@ -74,6 +74,17 @@ describe('venue reference helpers', () => {
     expect(errors.get('venue.movements[0].walkingMinutes')).toMatch(/whole number/);
   });
 
+  it('sends only the stored place fields, never the form’s own flags', () => {
+    expect(
+      venueReferencesPayload({
+        places: [
+          { id: 'hall-a', name: 'Hall A', floor: '', persisted: false, idTouched: true },
+        ],
+        movements: [],
+      }).places,
+    ).toEqual([{ id: 'hall-a', name: 'Hall A', floor: null }]);
+  });
+
   it('sends zero walking minutes and null optional strings', () => {
     expect(
       venueReferencesPayload({
@@ -200,6 +211,181 @@ function EditorHarness({ venue: initial }) {
     />
   );
 }
+
+describe('VenueReferenceEditor places panel', () => {
+  const empty = { places: [], movements: [], map: { image: '', alt: '', markers: [] } };
+
+  /** A person types one key at a time, so the name changes once per key. */
+  function typeInto(field, text) {
+    let typed = '';
+    for (const key of text) {
+      typed += key;
+      fireEvent.change(field, { target: { value: typed } });
+    }
+  }
+
+  it('fills a new place’s id from its whole name as it is typed', () => {
+    render(<EditorHarness venue={empty} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add place' }));
+    typeInto(screen.getByLabelText('Place 1 name'), 'Main hall');
+    // Not "m": the id follows every key of the name, not only the first.
+    expect(screen.getByLabelText('Place 1 id')).toHaveValue('main-hall');
+  });
+
+  it('stops following the name once the id is typed by hand', () => {
+    render(<EditorHarness venue={empty} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add place' }));
+    typeInto(screen.getByLabelText('Place 1 name'), 'Main');
+    fireEvent.change(screen.getByLabelText('Place 1 id'), { target: { value: 'hall-a' } });
+    typeInto(screen.getByLabelText('Place 1 name'), 'Main hall');
+    expect(screen.getByLabelText('Place 1 id')).toHaveValue('hall-a');
+  });
+
+  // A row is keyed by its position, not by the value being edited. Keyed by
+  // the value, the row was rebuilt on every change and the field the person
+  // was in went with it, so focus fell to the page.
+  it('keeps the keyboard in a place, movement, or marker field while it changes', () => {
+    render(
+      <EditorHarness
+        venue={{
+          places: [
+            { id: 'main-hall', name: 'Main hall', floor: '', persisted: true },
+            { id: 'studio', name: 'Studio', floor: '', persisted: true },
+          ],
+          movements: [{ from: '', to: '', walkingMinutes: '0', accessibleRoute: '' }],
+          map: {
+            image: 'cms-images/a/plan.png',
+            alt: 'A floor plan.',
+            markers: [{ placeId: '', x: '50', y: '50' }],
+          },
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add place' }));
+    const name = screen.getByLabelText('Place 3 name');
+    name.focus();
+    fireEvent.change(name, { target: { value: 'L' } });
+    expect(name).toHaveFocus();
+
+    for (const label of ['Movement 1 from', 'Marker 1 room']) {
+      const select = screen.getByLabelText(label);
+      select.focus();
+      fireEvent.change(select, { target: { value: 'studio' } });
+      expect(select).toHaveFocus();
+      expect(select).toHaveValue('studio');
+    }
+  });
+
+  // Whether the id still follows the name is a fact the form records when
+  // somebody types in the id field, not a guess from what the name slugs to.
+  it('keeps an id typed by hand even when the name later slugs to it', () => {
+    render(<EditorHarness venue={empty} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add place' }));
+    typeInto(screen.getByLabelText('Place 1 id'), 'hall-a');
+    typeInto(screen.getByLabelText('Place 1 name'), 'Hall A');
+    expect(screen.getByLabelText('Place 1 id')).toHaveValue('hall-a');
+    // The name now slugs to exactly the typed id. Editing it must not take
+    // the id back.
+    typeInto(screen.getByLabelText('Place 1 name'), 'Hall A east');
+    expect(screen.getByLabelText('Place 1 id')).toHaveValue('hall-a');
+  });
+
+  // A movement or a marker that already picked a new place must still point
+  // at it when the place's id moves with its name.
+  it('moves every movement and marker reference with a new place’s id', () => {
+    render(
+      <EditorHarness
+        venue={{
+          places: [{ id: 'main-hall', name: 'Main hall', floor: '', persisted: true }],
+          movements: [],
+          map: { image: 'cms-images/a/plan.png', alt: 'A floor plan.', markers: [] },
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add place' }));
+    typeInto(screen.getByLabelText('Place 2 name'), 'Stage');
+    expect(screen.getByLabelText('Place 2 id')).toHaveValue('stage');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add movement' }));
+    fireEvent.change(screen.getByLabelText('Movement 1 from'), { target: { value: 'main-hall' } });
+    fireEvent.change(screen.getByLabelText('Movement 1 to'), { target: { value: 'stage' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add movement' }));
+    fireEvent.change(screen.getByLabelText('Movement 2 from'), { target: { value: 'stage' } });
+    fireEvent.change(screen.getByLabelText('Movement 2 to'), { target: { value: 'main-hall' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add marker' }));
+    fireEvent.change(screen.getByLabelText('Marker 1 room'), { target: { value: 'stage' } });
+
+    typeInto(screen.getByLabelText('Place 2 name'), 'Stage two');
+    expect(screen.getByLabelText('Place 2 id')).toHaveValue('stage-two');
+    expect(screen.getByLabelText('Movement 1 from')).toHaveValue('main-hall');
+    expect(screen.getByLabelText('Movement 1 to')).toHaveValue('stage-two');
+    expect(screen.getByLabelText('Movement 2 from')).toHaveValue('stage-two');
+    expect(screen.getByLabelText('Movement 2 to')).toHaveValue('main-hall');
+    expect(screen.getByLabelText('Marker 1 room')).toHaveValue('stage-two');
+  });
+
+  // Clearing a name before typing its replacement empties the id for a
+  // moment. The references must still find the place when the new name
+  // arrives, rather than stay on an id that no place carries.
+  it('keeps references on a new place whose name is cleared and typed again', () => {
+    render(
+      <EditorHarness
+        venue={{
+          places: [{ id: 'main-hall', name: 'Main hall', floor: '', persisted: true }],
+          movements: [],
+          map: { image: 'cms-images/a/plan.png', alt: 'A floor plan.', markers: [] },
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add place' }));
+    typeInto(screen.getByLabelText('Place 2 name'), 'Stage');
+    fireEvent.click(screen.getByRole('button', { name: 'Add movement' }));
+    fireEvent.change(screen.getByLabelText('Movement 1 from'), { target: { value: 'main-hall' } });
+    fireEvent.change(screen.getByLabelText('Movement 1 to'), { target: { value: 'stage' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add marker' }));
+    fireEvent.change(screen.getByLabelText('Marker 1 room'), { target: { value: 'stage' } });
+
+    fireEvent.change(screen.getByLabelText('Place 2 name'), { target: { value: '' } });
+    expect(screen.getByLabelText('Place 2 id')).toHaveValue('');
+    typeInto(screen.getByLabelText('Place 2 name'), 'Studio');
+
+    expect(screen.getByLabelText('Place 2 id')).toHaveValue('studio');
+    expect(screen.getByLabelText('Movement 1 to')).toHaveValue('studio');
+    expect(screen.getByLabelText('Marker 1 room')).toHaveValue('studio');
+  });
+
+  it('keeps references on a new place whose typed id is cleared and typed again', () => {
+    render(
+      <EditorHarness
+        venue={{
+          places: [{ id: 'main-hall', name: 'Main hall', floor: '', persisted: true }],
+          movements: [],
+          map: { image: 'cms-images/a/plan.png', alt: 'A floor plan.', markers: [] },
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add place' }));
+    typeInto(screen.getByLabelText('Place 2 id'), 'stage');
+    fireEvent.click(screen.getByRole('button', { name: 'Add movement' }));
+    fireEvent.change(screen.getByLabelText('Movement 1 from'), { target: { value: 'stage' } });
+    fireEvent.change(screen.getByLabelText('Movement 1 to'), { target: { value: 'main-hall' } });
+
+    fireEvent.change(screen.getByLabelText('Place 2 id'), { target: { value: '' } });
+    typeInto(screen.getByLabelText('Place 2 id'), 'loft');
+
+    expect(screen.getByLabelText('Movement 1 from')).toHaveValue('loft');
+  });
+
+  it('never changes a saved place’s id when it is renamed', () => {
+    render(
+      <EditorHarness
+        venue={{ ...empty, places: [{ id: 'main-hall', name: 'Main hall', floor: '', persisted: true }] }}
+      />,
+    );
+    typeInto(screen.getByLabelText('Place 1 name'), 'Great hall');
+    expect(screen.getByLabelText('Place 1 id')).toHaveValue('main-hall');
+  });
+});
 
 describe('VenueReferenceEditor map panel', () => {
   const venue = {

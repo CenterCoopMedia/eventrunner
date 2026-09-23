@@ -26,7 +26,7 @@
  * the venue fields below are only name/address/map, from config.
  */
 
-const { wrap } = require('./layout.cjs');
+const { wrap, TEXT_FOOTER } = require('./layout.cjs');
 const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
 
 const html = wrap(
@@ -69,8 +69,7 @@ const text = [
   '{{/if}}',
   'Venue: {{venue_name}}, {{venue_address}}. Travel and venue details: {{site_url}}/travel',
   '',
-  '--',
-  '{{postal_address_html}}',
+  TEXT_FOOTER,
 ].join('\n');
 
 module.exports = {

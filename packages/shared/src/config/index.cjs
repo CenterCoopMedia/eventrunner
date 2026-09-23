@@ -8,5 +8,6 @@
 module.exports = {
   ...require('./lifecycle.cjs'),
   ...require('./schema.cjs'),
+  ...require('./socialAccounts.cjs'),
   ...require('./deploy.cjs'),
 };

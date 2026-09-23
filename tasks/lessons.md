@@ -24,3 +24,12 @@ Rules written after user corrections. Read at session start.
 - Write in ASD-STE100 Simplified Technical English in every message to Joe: short sentences, one fact per sentence, active voice, one word for one thing, no idioms. Joe reminded me twice on 2026-09-10.
 - A session's context can be lost between usage windows. Builder reports that live only in the director's context are lost with it. Every builder must write its report to a file in its worktree (`tasks/reports/<id>.md`) and commit it, so an integrator can read it from the branch. The director must record the wave plan and the agent roster in `tasks/todo.md` before dispatching, so a fresh context can rebuild the state from the repository alone.
 - Full-page specimen captures at a device scale of 0.5 are not legible to a human reviewer and cost about 1 MB each. Evidence a person reads is a section capture at full scale; the full-page set is what the committed script regenerates on demand.
+
+## 2026-09-23
+
+- Builders twice reported "Done when met in full" for a clause they had not
+  checked: an email footer proven by a unit test of an internal helper while no
+  shipped template used the token, and a day heading fixed for a nearby case
+  but not the one in the issue's screenshot. An adversarial review of every
+  builder branch, before it joins the stack, caught both. The brief now asks
+  for each clause quoted with the test that proves it, on the real surface.

@@ -24,6 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interaction states — it draws the states it has and says which ones it does not have, and why.
   A state that is missing looks the same as a state somebody decided against, and only one of
   those is a defect.
+- Event settings has a Social accounts panel. An operator adds, edits, and removes the event's own
+  accounts there: A service name, an optional handle, and a link. The site footer lists them, and
+  so does the footer of every built-in email: A link per service in the formatted copy, and one
+  "Service: address" line per account in the plain-text copy. An event with no account gets no
+  row and no blank line. The form and the server both refuse a link that is not an absolute
+  `http://` or `https://` address, and each names the field; the event settings form no longer
+  lets the browser's own check stop a save before the form can mark the field. `init-event` asks
+  for the accounts as `service=link` pairs and asks again for a pair the schema would refuse. The
+  shared event schema now validates the `legal` and `social` blocks and refuses an unknown field
+  in either by name. The email footer drops a stored link that fails the same check, as the site
+  footer already did (#231).
 
 ### Changed
 
@@ -99,6 +110,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   package, read by the header navigation, the sitemap and robots builders, and the server-rendered
   route metadata. The contract is the strict `visible === true` the sitemap and the server already
   applied; the navigation now reads the field the same way. No generated output changed.
+- The admin guide now covers the Places, Movements, and Venue map panels in event settings: What a
+  place is, how a session names one, how a one-way movement is entered and where the site shows
+  it, how the map lists and marks places, and every rule the save checks. It also covers the new
+  Social accounts panel (#226).
 
 ### Fixed
 
@@ -114,6 +129,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verification (#177).
 - Pull requests now have a connector completion check for the current commit and unresolved
   review threads. The main branch requires this check and CI, including for administrators.
+- In event settings, a new place's id kept only the first letter of the name typed into it, and a
+  change to a place, movement, or map marker field moved keyboard focus out of the row. The id now
+  follows the whole name until you type in the id field, and focus stays in the field. Until the
+  save, a movement or map marker that already picked a new place follows its id when it changes.
 
 - Pressing Save in an admin editor with an invalid field did nothing and said nothing, because the
   control was disabled. Save now stays enabled until the request starts, sends nothing while a

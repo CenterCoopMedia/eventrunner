@@ -34,6 +34,11 @@ import VenueReferenceEditor, {
   validateVenueReferences,
   venueReferencesPayload,
 } from '../components/VenueReferenceEditor.jsx';
+import SocialHandlesEditor, {
+  normalizeSocialHandles,
+  socialHandlesPayload,
+  validateSocialHandles,
+} from '../components/SocialHandlesEditor.jsx';
 
 /** Shared empty result, so a render with no errors is not a new Map. */
 const NO_ERRORS = new Map();
@@ -99,7 +104,7 @@ function toForm(eventConfig) {
       organizerName: seo.organizerName ?? '',
       organizerUrl: seo.organizerUrl ?? '',
     },
-    social: { hashtag: social.hashtag ?? '' },
+    social: { hashtag: social.hashtag ?? '', handles: normalizeSocialHandles(social) },
   };
 }
 
@@ -161,7 +166,10 @@ function toPayload(form) {
       organizerName: orNull(form.seo.organizerName),
       organizerUrl: orNull(form.seo.organizerUrl),
     },
-    social: { hashtag: orNull(form.social.hashtag) },
+    social: {
+      hashtag: orNull(form.social.hashtag),
+      handles: socialHandlesPayload(form.social.handles),
+    },
   };
 }
 
@@ -231,8 +239,20 @@ export default function AdminEventSettings() {
     () => (mapChecked ? validateVenueMap(form.venue) : NO_ERRORS),
     [mapChecked, form.venue],
   );
+  // The social accounts are checked at submit too, for the same reason: a
+  // blank row just added has nothing to be wrong about until a save is
+  // attempted. After a save lands the check is off again, so the next new
+  // row starts quiet.
+  const [socialChecked, setSocialChecked] = useState(false);
+  const socialErrors = useMemo(
+    () => (socialChecked ? validateSocialHandles(form.social.handles) : NO_ERRORS),
+    [socialChecked, form.social.handles],
+  );
   const errorFor = (field) =>
-    localVenueErrors.get(field) ?? mapErrors.get(field) ?? fieldErrors.get(field);
+    localVenueErrors.get(field)
+    ?? mapErrors.get(field)
+    ?? socialErrors.get(field)
+    ?? fieldErrors.get(field);
   const placeUsage = useMemo(() => {
     const usage = new Map();
     for (const session of [...liveSessions, ...draftSessions]) {
@@ -271,7 +291,12 @@ export default function AdminEventSettings() {
     // server a round trip later. The map is checked only from here, because
     // its fields say nothing until a save is attempted.
     setMapChecked(true);
-    if (localVenueErrors.size > 0 || validateVenueMap(form.venue).size > 0) {
+    setSocialChecked(true);
+    if (
+      localVenueErrors.size > 0
+      || validateVenueMap(form.venue).size > 0
+      || validateSocialHandles(form.social.handles).size > 0
+    ) {
       setStatus('');
       // A rejection from the SERVER, if one is still standing, goes now.
       // Nothing is being sent, so its summary is stating a problem that may
@@ -295,6 +320,7 @@ export default function AdminEventSettings() {
           places: current.venue.places.map((place) => ({ ...place, persisted: true })),
         },
       }));
+      setSocialChecked(false);
       setStatus('Saved. The site picks the change up live.');
       // The line above is the record and it announces; the bar repeats it.
       showToast('Event settings saved.', { announce: false });
@@ -308,10 +334,14 @@ export default function AdminEventSettings() {
   const verified = eventConfig?.sender?.domainVerified === true;
 
   return (
-    <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit}>
+    // noValidate: the form answers for its own fields (issue #219). Left to
+    // the browser, a url or email field it calls invalid stops the submit
+    // with a bubble, so this form's check never runs and nothing is marked.
+    // The fields keep their types for the keyboard each one brings up.
+    <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit} noValidate>
       <AdminPageHeader
         title="Event"
-        description="Name, dates, venue, and the addresses the site and its email use."
+        description="Name, dates, venue, social accounts, and the addresses the site and its email use."
         actions={
           <button
             type="submit"
@@ -627,23 +657,21 @@ export default function AdminEventSettings() {
             label="Operator name"
             value={form.legal.operatorName}
             onChange={(value) => setGroup('legal', { operatorName: value })}
+            error={errorFor('legal.operatorName')}
           />
           <TextField
             label="Support email"
             type="email"
             value={form.legal.supportEmail}
             onChange={(value) => setGroup('legal', { supportEmail: value })}
+            error={errorFor('legal.supportEmail')}
           />
           <TextField
             label="Conduct email"
             type="email"
             value={form.legal.conductEmail}
             onChange={(value) => setGroup('legal', { conductEmail: value })}
-          />
-          <TextField
-            label="Social hashtag"
-            value={form.social.hashtag}
-            onChange={(value) => setGroup('social', { hashtag: value })}
+            error={errorFor('legal.conductEmail')}
           />
           <div className="sm:col-span-2">
             <TextField
@@ -664,6 +692,12 @@ export default function AdminEventSettings() {
           />
         </div>
       </Panel>
+
+      <SocialHandlesEditor
+        social={form.social}
+        onChange={(patch) => setGroup('social', patch)}
+        errorFor={errorFor}
+      />
     </form>
   );
 }

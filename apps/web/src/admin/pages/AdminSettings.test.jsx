@@ -593,6 +593,159 @@ describe('event settings', () => {
     await screen.findByRole('alert');
     expect(screen.getByLabelText('Event name')).toHaveValue('   ');
   });
+
+  // THE SOCIAL ACCOUNTS (#231). The site footer and the email footer both
+  // list config/event.social.handles, and this panel is the one place an
+  // operator edits it.
+  it('adds, edits, and removes social accounts, and sends them with the event', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      social: {
+        hashtag: '#EventName',
+        handles: [{ platform: 'Mastodon', url: 'https://example.org/@eventname' }],
+      },
+    });
+    expect(screen.getByLabelText('Social hashtag')).toHaveValue('#EventName');
+    expect(screen.getByLabelText('Account 1 service')).toHaveValue('Mastodon');
+    expect(screen.getByLabelText('Account 1 link')).toHaveValue('https://example.org/@eventname');
+
+    fireEvent.change(screen.getByLabelText('Account 1 handle'), { target: { value: '@eventname' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
+    fireEvent.change(screen.getByLabelText('Account 2 service'), { target: { value: 'Video' } });
+    fireEvent.change(screen.getByLabelText('Account 2 link'), {
+      target: { value: 'https://example.org/channel' },
+    });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.social).toEqual({
+      hashtag: '#EventName',
+      handles: [
+        { platform: 'Mastodon', handle: '@eventname', url: 'https://example.org/@eventname' },
+        { platform: 'Video', url: 'https://example.org/channel' },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove account 1' }));
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).event.social.handles).toEqual([
+      { platform: 'Video', url: 'https://example.org/channel' },
+    ]);
+  }, 20000);
+
+  it('refuses a malformed social account at submit and puts the keyboard on it', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
+    // A just-added row says nothing until a save is attempted.
+    expect(screen.getByLabelText('Account 1 service')).not.toHaveAttribute('aria-invalid');
+    fireEvent.change(screen.getByLabelText('Account 1 link'), {
+      target: { value: 'javascript:alert(1)' },
+    });
+    const save = screen.getByRole('button', { name: 'Save event settings' });
+    expect(save).toBeEnabled();
+    save.focus();
+    fireEvent.click(save);
+
+    // Document order: the service field comes first, so it takes the focus.
+    const service = screen.getByLabelText('Account 1 service');
+    await waitFor(() => expect(document.activeElement).toBe(service));
+    expect(service).toHaveAttribute('aria-invalid', 'true');
+    const link = screen.getByLabelText('Account 1 link');
+    expect(link).toHaveAttribute('aria-invalid', 'true');
+    expect(link).toHaveAccessibleDescription(/Enter the full link, starting with https:\/\//);
+    expect(fetch).not.toHaveBeenCalled();
+
+    // The service is fixed; the link still refuses, and now takes the focus.
+    fireEvent.change(service, { target: { value: 'Mastodon' } });
+    expect(service).not.toHaveAttribute('aria-invalid');
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(document.activeElement).toBe(link));
+    expect(fetch).not.toHaveBeenCalled();
+
+    // Fixed, and the same control saves.
+    fireEvent.change(link, { target: { value: 'https://example.org/@eventname' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.social.handles).toEqual([
+      { platform: 'Mastodon', url: 'https://example.org/@eventname' },
+    ]);
+  }, 20000);
+
+  // A link with no scheme is one the BROWSER calls invalid for a url field.
+  // Without noValidate the browser answered it with its own bubble and fired
+  // no submit, so the form's own check never ran and nothing was marked —
+  // including other fields that were wrong beside it.
+  it('marks a link with no scheme itself, because the browser does not answer first', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    const form = screen.getByRole('button', { name: 'Save event settings' }).closest('form');
+    expect(form).toHaveAttribute('novalidate');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
+    fireEvent.change(screen.getByLabelText('Account 1 service'), { target: { value: 'Mastodon' } });
+    const link = screen.getByLabelText('Account 1 link');
+    fireEvent.change(link, { target: { value: 'example.org/@eventname' } });
+    // The field keeps its url type for the keyboard it brings up.
+    expect(link).toHaveAttribute('type', 'url');
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await waitFor(() => expect(document.activeElement).toBe(link));
+    expect(link).toHaveAttribute('aria-invalid', 'true');
+    expect(link).toHaveAccessibleDescription(/Enter the full link/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('sends a malformed email address to the server, and marks the field it refuses', async () => {
+    // The email fields have no check of their own in the form. With the
+    // browser's check off, the server's refusal is the one that names them.
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, legal: { supportEmail: 'help@example.org' } });
+    fireEvent.change(screen.getByLabelText('Support email'), { target: { value: 'not an address' } });
+    fetch.mockResolvedValueOnce(
+      errorResponse(
+        400,
+        'bad-request',
+        'legal.supportEmail: must be null or an email address, got "not an address"',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await screen.findByRole('alert');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(bodyOf(0).event.legal.supportEmail).toBe('not an address');
+    expect(screen.getByLabelText('Support email')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('marks the social and legal fields the server refused, each against its own control', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      legal: { operatorName: 'Example Trust', supportEmail: 'help@example.org' },
+      social: { handles: [{ platform: 'Mastodon', url: 'https://example.org/@eventname' }] },
+    });
+    fetch.mockResolvedValueOnce(
+      errorResponse(
+        400,
+        'bad-request',
+        'social.handles[0].url: this Mastodon account is already listed; '
+          + 'social.hashtag: must be null or one word with no spaces, got "a b"; '
+          + 'legal.supportEmail: must be null or an email address, got "x"',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Account 1 link')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Social hashtag')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Support email')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Account 1 service')).not.toHaveAttribute('aria-invalid');
+  });
 });
 
 // Every one of these forms seeds itself once and then saves its document

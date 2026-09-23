@@ -9,7 +9,7 @@
  * storeRendered: false — a rendered OTP must never persist.
  */
 
-const { wrap } = require('./layout.cjs');
+const { wrap, TEXT_FOOTER } = require('./layout.cjs');
 const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
 
 const html = wrap(
@@ -32,8 +32,7 @@ const text = [
   '',
   'If you did not request this code, you can ignore this email — or let us know at {{support_email}}.',
   '',
-  '--',
-  '{{postal_address_html}}',
+  TEXT_FOOTER,
 ].join('\n');
 
 module.exports = {

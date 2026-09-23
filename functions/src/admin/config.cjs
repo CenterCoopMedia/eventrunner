@@ -26,11 +26,14 @@
  *      on the RESULT — the validator only requires name/shortName/timezone/
  *      days/sender, so a plain replace would let a partial save silently
  *      erase venue/legal/social/seo. Unknown top-level event keys are
- *      rejected by name (the shared validator does not). To clear an
- *      optional nested value, send it explicitly null. features/theme/
- *      badges stay whole-doc replaces (their validators cover the full
- *      shape, and omitted feature flags defaulting off is the §2.2
- *      contract). Every write stamps { updatedAt, updatedBy: email }. On
+ *      rejected by name (the shared validator does not); an unknown key
+ *      in a track, a venue place, movement, or map, the legal block, or
+ *      the social block, and a social account whose link is not a safe
+ *      absolute URL, are refused by the shared validator on the merged
+ *      result. To clear an optional nested value, send it explicitly null.
+ *      features/theme/badges stay whole-doc replaces (their validators
+ *      cover the full shape, and omitted feature flags defaulting off is
+ *      the §2.2 contract). Every write stamps { updatedAt, updatedBy: email }. On
  *      config/event the verification pair is carried forward from the
  *      stored doc so a save cannot drop it — and the read is part of the
  *      write transaction, so a verify-sender-domain.cjs write landing

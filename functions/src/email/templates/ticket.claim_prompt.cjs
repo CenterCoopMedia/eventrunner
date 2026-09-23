@@ -19,7 +19,7 @@
  * the sentence reads fine without naming a ticket tier.
  */
 
-const { wrap } = require('./layout.cjs');
+const { wrap, TEXT_FOOTER } = require('./layout.cjs');
 const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
 
 const html = wrap(
@@ -57,8 +57,7 @@ const text = [
   '{{cta_url}}',
   '',
   '{{/if}}',
-  '--',
-  '{{postal_address_html}}',
+  TEXT_FOOTER,
 ].join('\n');
 
 module.exports = {

@@ -18,9 +18,27 @@ const LAYOUT_TOKENS = [
   'brand_primary',
   'event_name',
   'postal_address_html',
+  'social_links_html',
+  'social_links_text',
   'support_email',
   'current_year',
 ];
+
+/**
+ * The plain-text footer every template's text body ends with: the postal
+ * block, then the event's social accounts, one "Service: link" line each
+ * (config/event.social.handles, #231).
+ *
+ * The accounts sit inside `{{#if social_links_text}}`, blank line and all,
+ * so an event that lists none gets exactly the footer it had before: no
+ * separator and no trailing blank line.
+ */
+const TEXT_FOOTER = [
+  '--',
+  '{{postal_address_html}}{{#if social_links_text}}',
+  '',
+  '{{social_links_text}}{{/if}}',
+].join('\n');
 
 /**
  * Wrap inner body HTML in the shared header/footer chrome.
@@ -44,6 +62,10 @@ function wrap(innerHtml) {
     '</td></tr>',
     '<tr><td style="padding:20px 32px;border-top:1px solid #e0e0e0;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#777777;">',
     '<p style="margin:0 0 8px 0;">{{postal_address_html}}</p>',
+    // The event's social accounts (#231). Guarded on the TEXT token because
+    // `{{#if}}` reads plain values only; both are empty together, so an
+    // event with no account gets no row at all rather than an empty one.
+    '{{#if social_links_text}}<p style="margin:0 0 8px 0;">{{social_links_html}}</p>{{/if}}',
     '<p style="margin:0;">Questions? Write to <a href="mailto:{{support_email}}" style="color:#777777;">{{support_email}}</a>.</p>',
     '<p style="margin:8px 0 0 0;">&copy; {{current_year}} {{event_name}}</p>',
     '</td></tr>',
@@ -55,4 +77,4 @@ function wrap(innerHtml) {
   ].join('\n');
 }
 
-module.exports = { wrap, LAYOUT_TOKENS };
+module.exports = { wrap, LAYOUT_TOKENS, TEXT_FOOTER };

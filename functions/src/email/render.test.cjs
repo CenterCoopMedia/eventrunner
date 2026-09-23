@@ -299,3 +299,26 @@ test('stripHtmlToText converts breaks and strips tags', () => {
     'a\nb\nc',
   );
 });
+
+// The mail footer lists the same accounts the site footer does (#231): the
+// shared schema refuses a malformed one at save, and a document written
+// before that rule is filtered here with the same shared URL check.
+test('the social links footer lists safe accounts and drops the rest', () => {
+  const html = internals.buildSocialLinksHtml({
+    handles: [
+      { platform: 'Mastodon', handle: '@ex', url: 'https://EXAMPLE.org/@ex' },
+      { platform: 'Script', url: 'javascript:alert(1)' },
+      { platform: 'Relative', url: 'https:example.org/@ex' },
+      { platform: '  ', url: 'https://example.org/blank' },
+      { platform: 'Video <live>', url: 'http://example.org/channel' },
+      null,
+    ],
+  });
+  assert.equal(
+    html,
+    '<a href="https://example.org/@ex">Mastodon</a> &middot; '
+      + '<a href="http://example.org/channel">Video &lt;live&gt;</a>',
+  );
+  assert.equal(internals.buildSocialLinksHtml(undefined), '');
+  assert.equal(internals.buildSocialLinksHtml({ handles: 'nope' }), '');
+});
