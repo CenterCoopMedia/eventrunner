@@ -32,7 +32,13 @@ test('config docs are left alone on re-run unless --force is passed', () => {
 test('a --force refresh never takes back what another writer owns', () => {
   const existing = {
     name: 'Client edited',
-    sender: { email: 'a@example.org', domainVerified: true, domainVerifiedAt: '2027-01-01' },
+    sender: {
+      email: 'a@example.org',
+      domainVerified: true,
+      domainVerifiedAt: '2027-01-01',
+      domainVerifiedBy: 'dns',
+      domainVerifiedDomain: 'example.org',
+    },
     legal: { reviewRequired: false },
     announcedAt: '2027-02-01T00:00:00',
     archivedAt: null,
@@ -40,7 +46,7 @@ test('a --force refresh never takes back what another writer owns', () => {
   };
   const next = {
     name: 'Seeded',
-    sender: { email: 'a@example.org', domainVerified: false, domainVerifiedAt: null },
+    sender: { email: 'a@example.org', domainVerified: false, domainVerifiedAt: null, domainVerifiedBy: null, domainVerifiedDomain: null },
     legal: { reviewRequired: true },
     announcedAt: null,
     archivedAt: null,
@@ -49,6 +55,9 @@ test('a --force refresh never takes back what another writer owns', () => {
   const { value } = decideConfigWrite({ docId: 'event', existing, next, force: true });
   assert.equal(value.name, 'Seeded', 'seeded fields do refresh');
   assert.equal(value.sender.domainVerified, true, 'verify-sender-domain.cjs owns this');
+  assert.equal(value.sender.domainVerifiedAt, '2027-01-01');
+  assert.equal(value.sender.domainVerifiedBy, 'dns', 'the whole verification record is one writer’s');
+  assert.equal(value.sender.domainVerifiedDomain, 'example.org');
   assert.equal(value.legal.reviewRequired, false, 'admin Settings owns this');
   assert.equal(value.announcedAt, '2027-02-01T00:00:00', 'the lifecycle stamp is editorial');
   assert.equal(value.auth.googleProviderEnabled, true, 'the operator attestation stands');

@@ -186,7 +186,7 @@ describe('event settings', () => {
       expect(screen.getByLabelText(label)).toHaveAttribute('readonly');
     }
     expect(screen.getByLabelText('Sender email')).toHaveValue('summit@example.org');
-    expect(screen.getByText(/An operator changes the sender/)).toBeInTheDocument();
+    expect(screen.getByText('The From address every transactional email uses. You can read it here. An operator changes it.')).toBeInTheDocument();
 
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.change(screen.getByLabelText('Event name'), {
@@ -208,7 +208,7 @@ describe('event settings', () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);
     expect(screen.getByLabelText('Sender email')).not.toHaveAttribute('readonly');
-    expect(screen.queryByText(/An operator changes the sender/)).toBeNull();
+    expect(screen.queryByText(/You can read it here/)).toBeNull();
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.change(screen.getByLabelText('Sender name'), { target: { value: 'The Summit desk' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));

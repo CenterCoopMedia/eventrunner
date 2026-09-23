@@ -29,8 +29,7 @@ function fakeRes() {
   };
 }
 
-function seeded() {
-  return makeFakeDb({
+const seedRows = () => ({
     [`media_assets/${ASSET_ID}`]: {
       path: `cms-images/${ASSET_ID}/hero.png`,
       contentType: 'image/png',
@@ -41,7 +40,7 @@ function seeded() {
       createdAt: new Date(NOW),
     },
   });
-}
+const seeded = () => makeFakeDb(seedRows());
 
 const deps = (db, overrides = {}) => ({
   db,
@@ -159,4 +158,44 @@ test('mediaUpdateMetadata on a cms-images asset stays staff work', async () => {
     post({ assetId: ASSET_ID, alt: 'A hero' }), res,
   );
   assert.equal(res.statusCode, 200);
+});
+
+test('mediaUpdateMetadata on an asset a theme slot or the social card uses is refused for staff, allowed for an operator', async () => {
+  for (const config of [
+    { 'config/theme': { logos: { primary: `cms-images/${ASSET_ID}/hero.png` } } },
+    { 'config/event': { seo: { defaultOgImagePath: `cms-images/${ASSET_ID}/hero.png` } } },
+  ]) {
+    const db = makeFakeDb({ ...seedRows(), ...config });
+    const refused = fakeRes();
+    await createMediaUpdateMetadataHandler(deps(db, { auth: staffAuth, getConfig: tiered }))(post({ assetId: ASSET_ID, alt: 'x' }), refused);
+    assert.equal(refused.statusCode, 403, JSON.stringify(config));
+    assert.equal(refused.body.error.message, 'branding: operator access required');
+    assert.equal(db.read('media_assets', ASSET_ID).alt, '');
+
+    const allowed = fakeRes();
+    await createMediaUpdateMetadataHandler(deps(db, { getConfig: tiered }))(post({ assetId: ASSET_ID, alt: 'x' }), allowed);
+    assert.equal(allowed.statusCode, 200);
+  }
+});
+
+test('mediaUpdateMetadata refuses staff when the usage scan fails, and lets an operator through', async () => {
+  const broken = () => {
+    const db = makeFakeDb(seedRows());
+    const realCollection = db.collection.bind(db);
+    db.collection = (name) => {
+      if (name === 'cmsContent') return { async get() { throw new Error('transport failed'); } };
+      return realCollection(name);
+    };
+    return db;
+  };
+  const refused = fakeRes();
+  const staffDb = broken();
+  await createMediaUpdateMetadataHandler(deps(staffDb, { auth: staffAuth, getConfig: tiered }))(post({ assetId: ASSET_ID, alt: 'x' }), refused);
+  assert.equal(refused.statusCode, 500);
+  assert.equal(refused.body.error.message, 'The asset could not be checked for usage.');
+  assert.equal(staffDb.read('media_assets', ASSET_ID).alt, '');
+
+  const allowed = fakeRes();
+  await createMediaUpdateMetadataHandler(deps(broken(), { getConfig: tiered }))(post({ assetId: ASSET_ID, alt: 'x' }), allowed);
+  assert.equal(allowed.statusCode, 200);
 });

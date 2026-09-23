@@ -114,6 +114,11 @@ test.describe.serial('admin tiers and the Access page', () => {
     const sender = await callFunction('updateEventConfig', { event: { sender: { email: 'x@example.test' } } }, staffToken);
     expect(sender.status).toBe(403);
     expect(sender.body.error.message).toBe('sender: operator access required');
+    // The social sharing card is branding: pointing it elsewhere is refused
+    // the same way, and the stored value stands.
+    const card = await callFunction('updateEventConfig', { event: { seo: { defaultOgImagePath: 'cms-images/x/card.png' } } }, staffToken);
+    expect(card.status).toBe(403);
+    expect(card.body.error.message).toBe('seo.defaultOgImagePath: operator access required');
 
     // Branding through the media library is the operator's too.
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');

@@ -13,7 +13,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
 | Staff | Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, and Event settings | The people who run the event day to day |
 
-Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. One field in there stays with the operator: The outbound sender address, because it is the email identity the deployment was verified against. A staff save that changes it is refused and the field is named.
+Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
 An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.
 
@@ -131,7 +131,7 @@ A browsable library, split by namespace because each answers a different questio
 
 Upload, edit alt text, and delete from the library. A delete warns you first if anything currently on the site references the asset — do not dismiss that warning without checking what it names.
 
-**Branding needs an operator.** An upload into `branding/`, and a delete or an alt-text edit of a branding asset or of any asset a Branding slot uses, is refused for a staff account, with or without the delete warning dismissed. Everything else in the library is staff work.
+**Branding needs an operator.** An upload into `branding/`, and a delete or an alt-text edit of a branding asset or of any asset a Branding slot or the social sharing image uses, is refused for a staff account, with or without the delete warning dismissed. A staff account sees the Branding drawer read-only, with a note that an operator manages branding files. Everything else in the library is staff work.
 
 ## Speakers
 

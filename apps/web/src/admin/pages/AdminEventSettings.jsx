@@ -609,7 +609,7 @@ export default function AdminEventSettings() {
         description={
           canEditSender
             ? 'The From address every transactional email uses.'
-            : 'The From address every transactional email uses. An operator changes the sender; staff can read it here.'
+            : 'The From address every transactional email uses. You can read it here. An operator changes it.'
         }
       >
         <div className="grid gap-sm sm:grid-cols-2">

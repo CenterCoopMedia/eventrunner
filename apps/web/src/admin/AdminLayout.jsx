@@ -131,27 +131,38 @@ export function tierReaches(held, required = 'operator') {
 /**
  * The tier the section at `pathname` asks for, from its docket entry. A
  * section owns every path under it, so /admin/pages/new is Pages. The
- * segment is read the way the router matches it — percent-decoded and
- * without regard to case, because `<Route>` matches case-insensitively and
- * /admin/Branding renders the Branding page — so the lookup cannot be
- * stepped around by spelling. A path no docket item owns is the
- * operator's, the same default an undeclared item takes: fail closed. Only
- * the bare index (the redirect to Pages) asks for nothing.
+ * WHOLE pathname is read the way the router matches it — every segment
+ * percent-decoded and lowercased, the /admin prefix included, because
+ * `<Route>` matches case-insensitively and /Admin/Branding renders the
+ * Branding page — so the lookup cannot be stepped around by spelling
+ * either half. A path no docket item owns is the operator's, the same
+ * default an undeclared item takes: fail closed. So is a segment that
+ * decodes to a slash, or an empty segment with more path after it —
+ * nothing the docket names. Only the bare index (the redirect to Pages)
+ * asks for nothing.
  *
  * @param {string} pathname
  * @returns {'operator'|'staff'|null}
  */
 export function sectionTier(pathname) {
-  const raw = pathname.replace(/^\/admin\/?/, '').split('/')[0];
-  if (!raw) return null;
-  let segment;
-  try {
-    segment = decodeURIComponent(raw).toLowerCase();
-  } catch {
-    return 'operator';
+  const segments = [];
+  for (const raw of String(pathname ?? '').split('/').slice(1)) {
+    let segment;
+    try {
+      segment = decodeURIComponent(raw).toLowerCase();
+    } catch {
+      return 'operator';
+    }
+    if (segment.includes('/')) return 'operator';
+    segments.push(segment);
   }
+  // A trailing slash is not a section.
+  if (segments.length > 1 && segments[segments.length - 1] === '') segments.pop();
+  if (segments[0] !== 'admin') return 'operator';
+  const section = segments[1];
+  if (section === undefined) return null;
   for (const group of DOCKET) {
-    const item = group.items.find((entry) => entry.to === segment);
+    const item = group.items.find((entry) => entry.to === section);
     if (item) return item.tier ?? 'operator';
   }
   return 'operator';
