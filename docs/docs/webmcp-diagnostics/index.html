@@ -133,10 +133,11 @@
           <li><code>check_ticketing_health</code></li>
           </ul>
           <p>Each tool calls one fixed server endpoint. The current-page validator uses only the page id from the open admin editor route. It is unavailable on other admin routes.</p>
+          <p>The admin set follows the admin tiers. An operator holds all six tools. A staff account holds five: <code>inspect_system_errors</code> is registered for operators only, and the server refuses it to staff regardless of what is registered.</p>
           <p>Results do not contain attendee records, ticket details, payments, invitations, email content, provider credentials, storage administration, secrets, tokens, or unrestricted internal logs. Publish and system-error lists report their total and truncated count. Media checks report the total, checked, and truncated asset counts without object paths.</p>
           <h2 id="limits">Limits<a class="heading-anchor" href="#limits" aria-label="Link to this section">#</a></h2>
           <p>The tools cannot save, publish, deploy, delete, send email, export data, change provider setup, or run an arbitrary function. Use the visible admin controls for all changes.</p>
-          <p>Before either experimental setting is enabled outside the demo, invoke every tool in a real supported top-level browser and compare the result with the related screen. Confirm that public routes list no admin tool name. Sign out and confirm that the six admin names disappear. Record any mismatch as an issue.</p>
+          <p>Before either experimental setting is enabled outside the demo, invoke every tool in a real supported top-level browser and compare the result with the related screen. Confirm that public routes list no admin tool name. Sign out and confirm that the admin names disappear. Record any mismatch as an issue.</p>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/webmcp-diagnostics.md"><code>docs/operator/webmcp-diagnostics.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">

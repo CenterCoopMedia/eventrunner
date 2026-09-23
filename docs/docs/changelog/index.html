@@ -116,6 +116,16 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The email log, under Operations, for staff and operators: every message the site sent, newest
+          first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
+          word. Search looks in the recipient and the subject across the 500 most recent messages at a
+          time; the source and status filters stay in the page address, and the search text never does.
+          A preview opens the stored body in an empty sandboxed frame under a content policy that blocks
+          script, remote images, and every other fetch, so opening a message sends nothing to any other
+          site. Sign-in codes and speaker invitations still store no body. Two staff-tier endpoints,
+          <code>listSentEmails</code> and <code>getSentEmail</code>, are the only readers of <code>sent_emails</code>, whose rules stay
+          closed to every browser; each preview read is recorded in the admin log by account and record
+          only (#183).</li>
           <li><code>docs/adr/0003-optional-google-calendar-sync.md</code>, the proposed decision record for the optional
           Google Calendar sync of saved sessions (#177). It supersedes the one row of ADR 0001 §9 that
           removed the feature, names the client&#39;s own Google Cloud project as the owner of the consent
@@ -123,6 +133,26 @@
           how the <code>calendarSync</code> flag behaves when a client has not finished the Google setup: the <code>.ics</code>
           download stays and nothing is written. The record is proposed, not accepted, and the flag stays
           off. The documentation site lists it under Decisions.</li>
+          <li>Two admin tiers. An admin account is an operator or a staff member. Operators keep branding,
+          feature flags, access, and the deployment settings; staff run content, the schedule, speakers,
+          attendees, media, materials, and the operations pages. <code>config/bootstrap.adminEmails</code> keeps
+          its meaning as the operator list, so every existing deployment keeps full access with no
+          migration, and <code>config/bootstrap.staffEmails</code> is the new staff list. The database rules, the
+          server&#39;s admin gate (<code>requireAdmin</code> takes a <code>tier</code> option and defaults to operator), and the
+          admin rail all read the same two lists: the rail shows only the sections the signed-in tier can
+          open and refuses the route of any other. Event settings admit staff; the sender block is shown
+          read-only to staff, and a staff save that would change it is refused by name. Branding is the
+          operator&#39;s in the media library too: an upload into <code>branding/</code>, and a delete or relabel of a
+          branding asset or of any asset a theme slot uses, is refused for staff. <code>init-event.cjs</code> takes
+          <code>--staff</code> beside <code>--admin</code>; a re-run never removes a grant made in the admin and never puts back
+          an address removed there, because only <code>--admin</code> and <code>--staff</code> add on a re-run.</li>
+          <li>The Access page, under System, for operators: a ruled table of every admin account with its tier
+          word. An operator grants staff or operator access to a new address, changes a tier, or removes
+          access, and every change asks for a confirmation first, is written by the server with the
+          address lowercased, and is recorded in the admin log. The server refuses a change that would
+          leave the deployment with no operator, including an operator removing their own last grant.</li>
+          </ul>
+          <ul>
           <li>A specimen book at <code>/specimen</code>: every device the system has, drawn in the site style and display
           mode the page is set to, with the component file and the tier 3 contract beside each one.
           Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,
