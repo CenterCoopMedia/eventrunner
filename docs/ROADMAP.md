@@ -154,7 +154,7 @@ An attendee can find a session, build a personal schedule, and take it with them
 An organizer can see how the event is going and act on it without leaving the admin.
 
 - [x] Add a server side event statistics endpoint (#178)
-- [ ] Add the admin overview page (#179)
+- [x] Add the admin overview page (#179)
 - [ ] Add milestones and goals to the event settings (#180)
 - [ ] Add the registration funnel and content readiness panels (#181)
 - [ ] Add session popularity to the admin (#182)

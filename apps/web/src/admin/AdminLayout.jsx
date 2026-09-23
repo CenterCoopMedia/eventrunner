@@ -12,10 +12,12 @@
 // keyboard path per control, `aria-current` on the active section.
 //
 // THE RAIL. The navigation stands on its own dark ground down the leading
-// edge, so the tool's frame and the work surface are never confused. Sixteen
-// named sections read as a standing list grouped by what the operator came
-// to do: content, people, operations, system. Group heads are folios. Every
-// item is a word — no icon rail, no collapse to glyphs, no counts in
+// edge, so the tool's frame and the work surface are never confused. The
+// Overview stands first and alone, with no folio over it, because it is
+// where the admin opens rather than a kind of work (issue #179). The named
+// sections under it read as a standing list grouped by what the operator
+// came to do: content, people, operations, system. Group heads are folios.
+// Every item is a word — no icon rail, no collapse to glyphs, no counts in
 // bubbles. The current item is a filled block in the action blue and carries
 // four signals, never colour alone: the marker at its leading edge, the bold
 // weight, the ground shift, and `aria-current="page"`.
@@ -60,8 +62,14 @@ const ROOT = '/admin';
 export const ADMIN_TIERS = Object.freeze(['operator', 'staff']);
 
 /**
- * The docket. Four groups, in the order an operator works: what the event
- * says, who is in it, how it runs, and how the deployment is set up.
+ * The docket. A lead group with no label holds the Overview, the page the
+ * admin opens on (issue #179): it reports on every group below it, so it
+ * belongs to none of them, and the rail draws no folio over it. Then four
+ * groups, in the order an operator works: what the event says, who is in
+ * it, how it runs, and how the deployment is set up.
+ *
+ * The Overview is staff work: it shows counts only, and the rows behind the
+ * unresolved error count stay on the operator-only System errors page.
  *
  * Content, people and operations are staff work. Under System, the event
  * settings admit staff (dates, venue, places and social handles are content
@@ -71,6 +79,11 @@ export const ADMIN_TIERS = Object.freeze(['operator', 'staff']);
  * what the event says.
  */
 export const DOCKET = Object.freeze([
+  {
+    id: 'lead',
+    label: null,
+    items: [{ to: 'overview', label: 'Overview', tier: 'staff' }],
+  },
   {
     id: 'content',
     label: 'Content',
@@ -136,7 +149,7 @@ export function tierReaches(held, required = 'operator') {
  * /admin/Branding renders the Branding page — so the lookup cannot be
  * stepped around by spelling. A path no docket item owns is the
  * operator's, the same default an undeclared item takes: fail closed. Only
- * the bare index (the redirect to Pages) asks for nothing.
+ * the bare index (the redirect to the Overview) asks for nothing.
  *
  * @param {string} pathname
  * @returns {'operator'|'staff'|null}
@@ -264,9 +277,11 @@ export default function AdminLayout() {
               key={group.id}
               className="flex flex-wrap items-center gap-x-xs gap-y-3xs py-3xs lg:mt-sm lg:block lg:py-0 lg:first:mt-0"
             >
-              <p className="admin-folio me-2xs lg:me-0 lg:px-sm lg:pb-3xs lg:pt-2xs">
-                {group.label}
-              </p>
+              {group.label ? (
+                <p className="admin-folio me-2xs lg:me-0 lg:px-sm lg:pb-3xs lg:pt-2xs">
+                  {group.label}
+                </p>
+              ) : null}
               <ul className="flex flex-wrap gap-2xs lg:flex-col lg:gap-3xs">
                 {group.items.map((item) => (
                   <li key={item.to}>

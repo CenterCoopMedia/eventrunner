@@ -79,6 +79,16 @@ vi.mock('firebase/firestore', () => ({
 
 import App from '../App.jsx';
 
+// The overview asks getEventStats for its figures on mount (issue #179).
+const STATS = {
+  readAt: '2026-10-14T13:14:00.000Z',
+  registrations: { total: 9, byStatus: { pending: 1, ticketed: 2, approved: 3, revoked: 3 }, profileComplete: 4 },
+  tickets: { total: 0, byStatus: { valid: 0, refunded: 0, cancelled: 0, pending_info: 0 } },
+  speakers: { total: 0, byStatus: { draft: 0, invited: 0, accepted: 0, approved: 0, removed: 0 } },
+  content: {},
+  errors: { unresolved: 0 },
+};
+
 async function renderAt(path) {
   const result = render(
     <MemoryRouter
@@ -106,6 +116,7 @@ beforeEach(() => {
   pendingProbe = null;
   pendingOperatorProbe = null;
   currentUser = { uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' };
+  globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => STATS }));
 });
 
 describe('admin route gating', () => {
@@ -127,13 +138,19 @@ describe('admin route gating', () => {
     expect(screen.queryByRole('navigation', { name: 'Admin sections' })).toBeNull();
   });
 
-  it('renders the admin shell for an admin, defaulting to the pages list', async () => {
+  it('renders the admin shell for an admin, opening on the overview', async () => {
     await renderAt('/admin');
 
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Pages' })).toBeInTheDocument();
+    // /admin opens on the overview (issue #179), which reads its figures
+    // from the server.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(String(fetch.mock.calls[0][0])).toMatch(/\/getEventStats$/);
     // Every settings surface is reachable from the shell.
     for (const tab of [
+      'Overview',
       'Pages',
       'Sessions',
       'Content',
@@ -202,8 +219,11 @@ describe('admin route gating', () => {
     await renderAt('/admin');
 
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Pages' })).toBeInTheDocument();
-    for (const tab of ['Pages', 'Sessions', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Event']) {
+    // Staff open on the overview too: it is a staff section, so the first
+    // page they meet is one they may open.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    for (const tab of ['Overview', 'Pages', 'Sessions', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Event']) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     for (const tab of ['Features', 'Branding', 'Access', 'System errors']) {
@@ -276,7 +296,7 @@ describe('admin route gating', () => {
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin/features');
     const refusal = screen.getByRole('heading', { name: 'This section needs operator access' }).parentElement;
-    expect(refusal.textContent).toContain('Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback and Event');
+    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback and Event');
     expect(refusal.textContent).not.toMatch(/deployment settings/);
   });
 });

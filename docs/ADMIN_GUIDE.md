@@ -11,7 +11,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, and Event settings | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. One field in there stays with the operator: The outbound sender address, because it is the email identity the deployment was verified against. A staff save that changes it is refused and the field is named.
 
@@ -63,6 +63,21 @@ Work down the controls in this order.
 **A contrast failure stops a publish, not a save.** A draft may hold two colours too close together to read. Publishing that draft is refused, and the message names the pair, the mode, and the ratio it measured. Fix the pair, then publish again.
 
 Fonts come from the bundled open-licence sets, so no page asks an external font service for anything.
+
+## Overview
+
+The admin opens here, for staff and operators alike. The page states how the event is going in short sentences. The server counts every number in them when you open the page or refresh it, so a figure is never a guess made in your browser.
+
+| Sentence | What it counts |
+|---|---|
+| Accounts | Every account, then the accounts at each registration status: pending, ticketed, approved, and revoked. |
+| Profiles complete | The accounts with a complete profile, out of all accounts. |
+| Tickets | Every ticket record, then valid, refunded, cancelled, and waiting for details. A ticket is one ticket record, not one seat. |
+| Speakers | Every speaker record, by stage: draft, invited, accepted, approved, and removed. |
+| Sessions | The sessions on the site, and the sessions with unpublished changes. A new session that was never published counts as one with unpublished changes. |
+| Unresolved errors | The count only. Operators read the errors themselves on the System errors page. |
+
+**Read at.** The time under the title says when the server counted the figures, on the event's clock. The figures do not change by themselves. Select **Refresh figures** to count again. If a refresh fails, the page keeps the figures it has and says when they were read.
 
 ## Pages
 

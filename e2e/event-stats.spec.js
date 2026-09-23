@@ -1,4 +1,5 @@
-// The event statistics endpoint (issue #178) against the seeded emulator.
+// The event statistics endpoint (issue #178) and the overview that prints
+// it (issue #179), against the seeded emulator.
 //
 // This is the one place the real Admin SDK `count()` runs: the unit tests
 // drive functions/src/admin/eventStats.cjs over the in-memory fake. So the
@@ -6,10 +7,16 @@
 // counted in this file, never from an aggregate — an answer that agrees with
 // them was counted by Firestore itself.
 //
+// The overview is then driven in a real browser: the seeded operator signs
+// in, opens /admin, lands on the overview, and every figure sentence on the
+// page is compared with the endpoint's own answer.
+//
 // The spec adds one ticket record per status (the seed writes none) under its
 // own ids and deletes them when it is done, so no later spec meets them.
 import { test, expect } from '@playwright/test';
-import { adminDb, adminIdToken, callFunction, ensureUser, idTokenFor } from './helpers.mjs';
+import {
+  ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, mailFileSize, waitForOtpCode,
+} from './helpers.mjs';
 
 const STRANGER_EMAIL = 'e2e-stats-stranger@example.test';
 const TICKET_STATUSES = ['valid', 'refunded', 'cancelled', 'pending_info'];
@@ -21,6 +28,39 @@ const PUBLISHABLE_COLLECTIONS = ['cmsContent', 'cmsSchedule', 'cmsOrganizations'
 async function countDocs(collection, predicate = () => true) {
   const snap = await adminDb().collection(collection).get();
   return snap.docs.filter((doc) => predicate(doc.data())).length;
+}
+
+async function signIn(page, email) {
+  const since = mailFileSize();
+  await page.goto('/signin');
+  await page.locator('#signin-email').fill(email);
+  await page.getByRole('button', { name: /email me a code/i }).click();
+  await expect(page.locator('#signin-code')).toBeVisible();
+  await page.locator('#signin-code').fill(await waitForOtpCode(since, email, 30_000));
+  await page.getByRole('button', { name: /^sign in$/i }).click();
+  await page.waitForURL((url) => url.pathname !== '/signin');
+}
+
+const one = (count, singular, pluralWord) => (count === 1 ? singular : pluralWord);
+
+/** The six figure sentences the overview should print for an answer. */
+function figureSentences(stats) {
+  const r = stats.registrations;
+  const t = stats.tickets;
+  const s = stats.speakers;
+  const sessions = stats.content.cmsSchedule;
+  return [
+    `${r.total} ${one(r.total, 'account', 'accounts')}: ${r.byStatus.pending} pending, ${r.byStatus.ticketed} ticketed, `
+      + `${r.byStatus.approved} approved, ${r.byStatus.revoked} revoked.`,
+    `${r.profileComplete} of ${r.total} ${one(r.total, 'profile', 'profiles')} complete.`,
+    `${t.total} ${one(t.total, 'ticket', 'tickets')}: ${t.byStatus.valid} valid, ${t.byStatus.refunded} refunded, `
+      + `${t.byStatus.cancelled} cancelled, ${t.byStatus.pending_info} waiting for details.`,
+    `${s.total} ${one(s.total, 'speaker', 'speakers')}: ${s.byStatus.draft} draft, ${s.byStatus.invited} invited, `
+      + `${s.byStatus.accepted} accepted, ${s.byStatus.approved} approved, ${s.byStatus.removed} removed.`,
+    `${sessions.published} ${one(sessions.published, 'session', 'sessions')} on the site. `
+      + `${sessions.drafts} with unpublished changes.`,
+    `${stats.errors.unresolved} unresolved ${one(stats.errors.unresolved, 'error', 'errors')}.`,
+  ];
 }
 
 /** `{ total, byStatus }` for a collection, counted from its documents. */
@@ -95,5 +135,31 @@ test.describe.serial('the event statistics endpoint', () => {
       });
       expect(Date.parse(stats.readAt)).not.toBeNaN();
     }).toPass({ timeout: 20_000 });
+  });
+
+  test('/admin opens on the overview, and every figure on it matches the endpoint', async ({ page }) => {
+    test.setTimeout(90_000);
+    const token = await adminIdToken();
+    await signIn(page, ADMIN_EMAIL);
+    await expect(async () => {
+      await page.goto('/admin');
+      await expect(page).toHaveURL(/\/admin\/overview$/);
+      await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
+      const nav = page.getByRole('navigation', { name: 'Admin sections' });
+      await expect(nav.getByRole('link').first()).toHaveText('Overview');
+      await expect(nav.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('aria-current', 'page');
+
+      const figures = page.locator('section', { has: page.getByRole('heading', { name: 'Event figures' }) });
+      await expect(figures.getByRole('listitem')).toHaveCount(6);
+      const printed = (await figures.getByRole('listitem').allTextContents())
+        .map((text) => text.replace(/\s+/g, ' ').trim());
+      const response = await callFunction('getEventStats', {}, token);
+      expect(response.status).toBe(200);
+      expect(printed).toEqual(figureSentences(response.body));
+    }).toPass({ timeout: 45_000 });
+
+    // Refresh reads the figures again and says when.
+    await page.getByRole('button', { name: 'Refresh figures' }).click();
+    await expect(page.getByRole('status').filter({ hasText: /^Figures read at / })).toBeVisible();
   });
 });
