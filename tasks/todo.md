@@ -96,20 +96,70 @@ and the pull request says "Refs #177", not "Closes".
   hover, focus and press are drawn once on the five shared shapes; an empty
   feedback message marks the field and moves focus, with no form-level alert.
 
-## Paused 2026-09-23 23:50 UTC (usage limit)
+## Handoff, 2026-09-24 00:00 UTC (usage limit; no fan-outs until it resets)
 
-Resume in this order:
+### Merged and open
 
-1. Re-run the stopped reviews with `resumeFromRunId` (cached agents replay):
-   a3 round 2 `wf_ed110ad7-e40`, b2 `wf_54fd8612-e0b`, b3 `wf_66f76a40-f88`,
-   b1 `wf_1c382032-f25`; M10 specs `wf_c0486301-fd0` (writes `/home/user/specs/c*.md`).
-2. a4 round 3 (worktree `/home/user/wt-a4`) fixes the second review's escalation
-   paths: seo.defaultOgImagePath, speaker headshotPath, sender byte and sub-key
-   compare, staff Media page. Then put a4 on `joe/confident-gates-gy99ip-5-admin-tiers`,
-   stacked on #266 (the local branch `joe/confident-gates-gy99ip-4-admin-tiers`
-   holds the round 2 state on top of main's 3ccd388).
-3. Stack order after a4: a3 (wave 2), then b1, b2, b3 (all built on the a4 tip).
-   Watch the admin entry chunk budget (50,000 gzip) when b1, b2, b3 combine.
-4. Then dispatch b4 (#188) and b5 (#189) from the new tip, and M10 from its specs.
+- Merged: #262 (#231, #226), #263 (#248, #227, #230, #247), #264 (#177
+  decision record, status still Proposed; #177 stays open until the owner
+  accepts it).
+- Open: #266 on `joe/confident-gates-gy99ip` (#218), green, no threads, waits
+  on the owner.
+- Filed follow-ups: #267 (redact `%40` addresses), #268 (`sent_emails`
+  retention).
 
-Open: #266 (#218), green, waits on review. Filed follow-ups: #267, #268.
+### Built, not yet on the stack
+
+Worktrees live only in this container. Every branch below is local; push the
+builder branches first if the container may be reclaimed.
+
+| Id | Worktree / branch | Head | State |
+|---|---|---|---|
+| a4 | `/home/user/wt-a4`, `…-b-a4` | round 3 running | #186, #187. Round 2 review found escalation paths (seo.defaultOgImagePath, speaker headshotPath, sender byte and sub-key compare, staff Media page); the builder is fixing them. Review the round 3 diff before it joins. |
+| a3 | `/home/user/wt-a3`, `…-b-a3` | `cc66c0a` | Wave 2 of #249, #234, and the catalog split. Round 1 fixed; round 2 review stopped: resume `wf_ed110ad7-e40`. The design record §3.1 still says "sticky head"; the table dropped it, so correct the record when a3 lands. |
+| b1 | `/home/user/wt-b1`, `…-b-b1` | `bd2ac01` | #178 to #182. Review stopped: resume `wf_1c382032-f25`. |
+| b2 | `/home/user/wt-b2`, `…-b-b2` | `63c1862` | #183. Review stopped: resume `wf_54fd8612-e0b`. |
+| b3 | `/home/user/wt-b3`, `…-b-b3` | `46935c1` | #184, #185. Review stopped: resume `wf_66f76a40-f88`. |
+
+`joe/confident-gates-gy99ip-4-admin-tiers` (local) holds a4 round 2 on
+`3ccd388`, fully checked. Rebuild it from a4's round 3 commits instead.
+
+### Resume order
+
+1. Resume the four stopped reviews (the review script is
+   `workflows/scripts/review-builder-branch-*.js` in the session directory;
+   the brief for a new one is in this file's "How the stack works").
+2. When a4 round 3 lands, review its diff, then stack it as
+   `joe/confident-gates-gy99ip-5-admin-tiers` on #266.
+3. Stack a3, then b1, b2, b3 on top, one pull request each. b1, b2 and b3 were
+   cut from the a4 round 1 tip `426f430`; cherry-pick their commits without
+   their regenerate commit. They all edit AdminApp.jsx, AdminLayout.jsx,
+   functions/index.js, .github/smoke-endpoints.json, CHANGELOG and ADMIN_GUIDE,
+   and the docket count. Watch the admin entry chunk budget (50,000 gzip): b1
+   left it at 49,145; b3 made the attendees route lazy.
+4. Dispatch b4 (#188) and b5 (#189) from the new tip with
+   `tasks/specs/b4.md`, `b5.md`. b3's `PER_ACCOUNT_STORES` must gain b4's two
+   stores.
+5. M10: specs `tasks/specs/c1.md` to `c7.md` were written; their reviews may
+   not all have finished (resume `wf_c0486301-fd0` to finish them). Then M11
+   and M12 specs, builders, reviews, and the stack, as above.
+
+### Director tools (copied into `tasks/director/`)
+
+- `regen.sh <worktree>`: regenerate every generated output and commit it.
+- `checks.sh <worktree>`: every CI tier locally, heavy steps under
+  `flock /tmp/eventrunner-heavy.lock`.
+- `union.py <file>`: join CHANGELOG/ROADMAP conflict blocks, ours then theirs.
+- `capture.sh <worktree> <plan.json> [out]` with `capture.spec.mjs`: PR
+  screenshots through the E2E harness. The server strips image embeds from
+  PR bodies, so link the committed PNGs instead.
+
+### Decisions waiting on the owner
+
+- Accept or amend ADR 0003 (#177), with its six open questions.
+- a4: absent `config/bootstrap` means no admins (fail closed); `/admin/<unknown>`
+  shows the operator refusal to staff; event settings are staff with sender
+  operator-only.
+- a3: sticky table head dropped; one pull quote per page enforced at render;
+  a `[Replace]` placeholder is never created on a launched home page.
+- b2 decision 10: no sort control, no bulk row, search text kept out of the URL.
