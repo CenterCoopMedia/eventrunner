@@ -435,3 +435,47 @@ test('removeObsoleteSeeds under --dry-run reports without deleting', async () =>
   assert.deepEqual(result.removed, ['hero__register_cta']);
   assert.equal((await db.collection('cmsContent').doc('hero__register_cta').get()).exists, true);
 });
+
+// ------------------------------------------------------- the two tiers (#187 review)
+
+test('a re-run does not re-apply the answers file\u2019s lists: an address removed in the admin stays removed', async () => {
+  const db = makeFakeDb();
+  const config = docs();
+  await writeConfigDocs({ db, docs: config, now });
+  // An operator removed the seeded address on the Access page and granted another.
+  await db.collection('config').doc('bootstrap').set({ adminEmails: ['kept@example.org'], staffEmails: ['desk@example.org'] });
+
+  const { results } = await writeConfigDocs({
+    db, docs: config, now, bootstrapAdditions: { adminEmails: [], staffEmails: [] },
+  });
+  const row = results.find((r) => r.docId === 'bootstrap');
+  assert.equal(row.action, 'skip');
+  assert.deepEqual(row.added, { adminEmails: [], staffEmails: [] });
+  const loaded = await readConfig({ db });
+  assert.deepEqual(loaded.bootstrap.adminEmails, ['kept@example.org']);
+  assert.deepEqual(loaded.bootstrap.staffEmails, ['desk@example.org']);
+});
+
+test('on a re-run only the explicit flags add, and the result names what was added', async () => {
+  const db = makeFakeDb();
+  const config = docs();
+  await writeConfigDocs({ db, docs: config, now });
+  const { results } = await writeConfigDocs({
+    db, docs: config, now,
+    bootstrapAdditions: { adminEmails: ['Second@Example.org'], staffEmails: ['desk@example.org', 'ops@example.org'] },
+  });
+  const row = results.find((r) => r.docId === 'bootstrap');
+  assert.equal(row.action, 'overwrite');
+  // ops@ is already an operator, so it is not "added" as staff either.
+  assert.deepEqual(row.added, { adminEmails: ['second@example.org'], staffEmails: ['desk@example.org'] });
+  const loaded = await readConfig({ db });
+  assert.deepEqual(loaded.bootstrap.adminEmails, ['ops@example.org', 'second@example.org']);
+  assert.deepEqual(loaded.bootstrap.staffEmails, ['desk@example.org']);
+});
+
+test('a fresh deployment still seeds bootstrap from the answers file, additions or not', async () => {
+  const db = makeFakeDb();
+  await writeConfigDocs({ db, docs: docs(), now, bootstrapAdditions: { adminEmails: [], staffEmails: [] } });
+  const loaded = await readConfig({ db });
+  assert.deepEqual(loaded.bootstrap.adminEmails, ['ops@example.org']);
+});

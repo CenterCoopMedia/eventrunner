@@ -131,6 +131,8 @@ A browsable library, split by namespace because each answers a different questio
 
 Upload, edit alt text, and delete from the library. A delete warns you first if anything currently on the site references the asset — do not dismiss that warning without checking what it names.
 
+**Branding needs an operator.** An upload into `branding/`, and a delete or an alt-text edit of a branding asset or of any asset a Branding slot uses, is refused for a staff account, with or without the delete warning dismissed. Everything else in the library is staff work.
+
 ## Speakers
 
 The canonical speaker list, with each record's pipeline status and the entry points to create, edit, invite, and review pending edits. This list reads the real speaker records, not the public-facing projection, on purpose: An admin needs to see speakers who are not published yet — drafts, outstanding invites, soft-deleted records.
@@ -308,13 +310,13 @@ Operators only. One ruled table of every admin account with its tier word, and a
 
 **Grant access.** Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. The person signs in with that address the way every admin does, by Google or by the emailed code; there is no invitation to send.
 
-**Change a tier or remove access.** Each row carries two quiet actions: **Change to staff** or **Change to operator**, and **Remove access**. Each one opens a confirmation under the table that names the account and the consequence. Removal sits on the alarm ground; a tier change does not, because it narrows or widens access without deleting anything. Cancel returns you to the control you pressed.
+**Change a tier or remove access.** Each row carries two quiet actions: **Change to staff** or **Change to operator**, and **Remove access**. Each one opens a confirmation under the grant form, above the table, that names the account and the consequence. Removal sits on the alarm ground; a tier change does not, because it narrows or widens access without deleting anything. Cancel returns you to the control you pressed.
 
-**At least one operator stays.** The server refuses a change that would leave the deployment with no operator. That covers removing your own last grant and removing the only other operator's. Grant a second operator first. The refusal is stated in place, in the server's words.
+**At least one operator stays.** The server refuses a change that would leave the deployment with no operator: Demoting or removing the last operator, your own grant included. Grant a second operator first. The refusal is stated in place, in the server's words.
 
 **What is recorded.** Every grant, change, and removal writes a row to the admin log with your address, the account, and the tier it moved from and to. A change that changes nothing writes no row.
 
-**When it takes effect.** At once. The database rules, the server, and the admin rail all read the access lists live: a granted account is admitted on its next request, a removed account is refused on its next request, and the rail shows the right sections the next time the person signs in or reloads.
+**When it takes effect.** At once. The database rules, the server, and the admin rail all read the access lists live: A granted account is admitted on its next request, a removed account is refused on its next request, and the rail shows the right sections the next time the person signs in or reloads.
 
 ## Legal pages
 

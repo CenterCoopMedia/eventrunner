@@ -18,7 +18,15 @@ const {
   internals,
 } = require('./invites.cjs');
 const { SPEAKER_INVITES, hashInviteToken, INVITE_TTL_MS } = require('./inviteTokens.cjs');
-const { makeSpeakersDb } = require('./speakersFake.cjs');
+const { makeSpeakersDb: makeBareSpeakersDb } = require('./speakersFake.cjs');
+
+// requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
+// #186 review: it fails closed on an absent document), so every fake this
+// file builds carries the admin and the staff address the tests use.
+const makeSpeakersDb = (seed = {}) => makeBareSpeakersDb({
+  'config/bootstrap': { adminEmails: [ACTOR.email], staffEmails: ['staff@example.org'] },
+  ...seed,
+});
 const { resetTemplateCacheForTest } = require('../email/templates.cjs');
 
 const ACTOR = { uid: 'admin-1', email: 'admin@example.org' };
@@ -77,9 +85,11 @@ function deps(db, { admin = true, sendResult = { status: 'sent', providerMessage
     deps: {
       db,
       auth: {
-        verifyIdToken: async () => ({ uid: ACTOR.uid, email: ACTOR.email, email_verified: true }),
+        // The gate reads the admin list live off the db, so "not an admin"
+        // is a token whose address is not on it.
+        verifyIdToken: async () => ({ uid: ACTOR.uid, email: admin ? ACTOR.email : 'stranger@example.org', email_verified: true }),
       },
-      getConfig: async () => ({ ...CONFIG, bootstrap: { adminEmails: admin ? [ACTOR.email] : [] } }),
+      getConfig: async () => ({ ...CONFIG, bootstrap: { adminEmails: [ACTOR.email] } }),
       sendEmail: async (message) => {
         sent.push(message);
         return typeof sendResult === 'function' ? sendResult(message) : sendResult;

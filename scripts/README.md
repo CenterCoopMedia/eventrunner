@@ -79,9 +79,12 @@ the same rule in Storage: init stamps `metadata.seeded=true` on what it uploads 
 an object without that stamp. `config/*`
 documents are skipped on re-run unless `--force`, and even then the fields another writer owns
 (sender verification, the legal review flag, `announcedAt`/`archivedAt`, the auth attestation,
-ticketing webhook stamps) are preserved. `config/bootstrap` is always additive on both lists, so a
-re-run never removes an account an operator granted from admin Settings → Access; an address on
-both lists is stored as an operator only.
+ticketing webhook stamps) are preserved. `config/bootstrap` is never reduced by a re-run: an
+account an operator granted from admin Settings → Access stays granted. Nor is it quietly refilled:
+on a re-run against an existing `config/bootstrap` the answers file's `adminEmails` and
+`staffEmails` are not re-applied, so an address an operator removed or demoted on the Access page
+stays where the operator put it. Only explicit `--admin` and `--staff` flags add on a re-run, and
+the output names what was added. An address on both lists is stored as an operator only.
 
 **A re-run also removes a block this release no longer seeds.** Seeding writes and refreshes; it
 never deletes, so a block dropped from the defaults keeps drawing on every site an earlier release

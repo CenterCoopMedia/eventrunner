@@ -333,8 +333,26 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
 
   console.log(`\ninit-event: ${dryRun ? 'DRY RUN — ' : ''}seeding ${tierA.projectId}\n`);
 
-  const { results: configResults, effective } = await writeConfigDocs({ db, docs, force, dryRun, now });
-  for (const r of configResults) console.log(`  config/${r.docId.padEnd(9)} ${r.action} (${r.reason})`);
+  // On a re-run, only the explicit flags may add to config/bootstrap: the
+  // answers file's lists seeded the first run and are not re-applied, so
+  // an address an operator removed or demoted on the Access page stays
+  // where the operator put it (write.cjs writeConfigDocs).
+  const bootstrapAdditions = { adminEmails: adminFlags, staffEmails: staffFlags };
+  const { results: configResults, effective } = await writeConfigDocs({
+    db, docs, force, dryRun, now, bootstrapAdditions,
+  });
+  for (const r of configResults) {
+    let note = r.reason;
+    if (r.docId === 'bootstrap' && r.added) {
+      const parts = [];
+      if (r.added.adminEmails.length > 0) parts.push(`added operators: ${r.added.adminEmails.join(', ')}`);
+      if (r.added.staffEmails.length > 0) parts.push(`added staff: ${r.added.staffEmails.join(', ')}`);
+      note = parts.length > 0
+        ? parts.join('; ')
+        : 'no accounts added; a re-run adds only --admin and --staff, never the answers file';
+    }
+    console.log(`  config/${r.docId.padEnd(9)} ${r.action} (${note})`);
+  }
 
   // Path-collision preflight (Codex review, seed a recap page and a
   // guidelines page: P1): seedCollection decides purely by doc id, so it

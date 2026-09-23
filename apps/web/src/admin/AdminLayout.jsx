@@ -129,22 +129,53 @@ export function tierReaches(held, required = 'operator') {
 }
 
 /**
- * The tier the section at `pathname` asks for, from its docket entry, or
- * null for a path no docket item owns (the index redirect, the not-found
- * page). A section owns every path under it, so /admin/pages/new is Pages.
+ * The tier the section at `pathname` asks for, from its docket entry. A
+ * section owns every path under it, so /admin/pages/new is Pages. The
+ * segment is read the way the router matches it — percent-decoded and
+ * without regard to case, because `<Route>` matches case-insensitively and
+ * /admin/Branding renders the Branding page — so the lookup cannot be
+ * stepped around by spelling. A path no docket item owns is the
+ * operator's, the same default an undeclared item takes: fail closed. Only
+ * the bare index (the redirect to Pages) asks for nothing.
  *
  * @param {string} pathname
  * @returns {'operator'|'staff'|null}
  */
 export function sectionTier(pathname) {
-  const segment = pathname.replace(/^\/admin\/?/, '').split('/')[0];
-  if (!segment) return null;
+  const raw = pathname.replace(/^\/admin\/?/, '').split('/')[0];
+  if (!raw) return null;
+  let segment;
+  try {
+    segment = decodeURIComponent(raw).toLowerCase();
+  } catch {
+    return 'operator';
+  }
   for (const group of DOCKET) {
     const item = group.items.find((entry) => entry.to === segment);
     if (item) return item.tier ?? 'operator';
   }
-  return null;
+  return 'operator';
 }
+
+/** "A, B and C" from a list of labels; one label stands alone. */
+function listWords(labels) {
+  if (labels.length <= 1) return labels.join('');
+  return `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`;
+}
+
+const labelsForTier = (tier) =>
+  DOCKET.flatMap((group) => group.items).filter((item) => item.tier === tier).map((item) => item.label);
+
+/**
+ * Each tier's sections, named once in the rail's own words, for every
+ * sentence that describes a tier: the refusal below, the Access page's
+ * description and its confirmation sentences. Derived from the docket so a
+ * section added there is named everywhere at once.
+ */
+export const TIER_SCOPE = Object.freeze({
+  staff: listWords(labelsForTier('staff')),
+  operatorOnly: listWords(labelsForTier('operator')),
+});
 
 /** The docket with the sections `held` cannot reach left out. */
 export function docketForTier(held) {
@@ -186,7 +217,7 @@ function TierRefusal() {
     <div className="px-md py-lg">
       <AdminEmptyState
         title="This section needs operator access"
-        description="Your account has staff access. Staff run the content, people and operations sections. Ask an operator to change your access if you need this one."
+        description={`Your account has staff access. Staff run ${TIER_SCOPE.staff}. Ask an operator to change your access if you need this section.`}
       />
     </div>
   );

@@ -3,7 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { makeFakeDb } = require('../cms/firestoreFake.cjs');
+const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
+
+// requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
+// #186 review: it fails closed on an absent document), so every fake this
+// file builds carries the document the file's getConfig describes.
+const BOOTSTRAP_DOC = { adminEmails: ['admin@example.org'] };
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
 const {
   createScanMediaUsageHandler,
   scanUsage,
@@ -150,7 +156,7 @@ test('scanMediaUsage requires admin', async () => {
   const res = fakeRes();
   const handler = createScanMediaUsageHandler({
     ...adminDeps(db),
-    getConfig: async () => ({ bootstrap: { adminEmails: ['someone-else@example.org'] } }),
+    auth: { verifyIdToken: async () => ({ uid: 'x-1', email: 'someone-else@example.org', email_verified: true }) },
   });
   await handler(post({ paths: [HERO] }), res);
   assert.equal(res.statusCode, 403);

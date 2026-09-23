@@ -25,6 +25,12 @@ function fakeDb(seed = {}) {
           const key = `${name}/${id === undefined ? `auto${(autoId += 1)}` : id}`;
           return {
             async get() {
+              // requireAdmin reads config/bootstrap live from this db (fails
+              // closed on an absent document); served outside `docs` so the
+              // "writes nothing" assertions keep counting only handler writes.
+              if (key === 'config/bootstrap') {
+                return { exists: true, data: () => ({ adminEmails: ['admin@example.org'] }) };
+              }
               const data = docs.get(key);
               return { exists: data !== undefined, data: () => data };
             },

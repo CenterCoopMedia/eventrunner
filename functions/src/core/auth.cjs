@@ -82,6 +82,22 @@ function tierSatisfies(held, required) {
   return held === 'staff' && required === 'staff';
 }
 
+/** The live read of config/bootstrap failed. requireAdmin answers 500. */
+class BootstrapUnavailableError extends Error {
+  constructor(cause) {
+    super('config/bootstrap could not be read');
+    this.name = 'BootstrapUnavailableError';
+    this.cause = cause;
+  }
+}
+
+const BOOTSTRAP_UNAVAILABLE = Object.freeze({
+  ok: false,
+  status: 500,
+  code: 'internal',
+  message: 'Admin access could not be checked. Try again.',
+});
+
 /**
  * The bootstrap document as it is NOW, for an admin decision.
  *
@@ -93,23 +109,27 @@ function tierSatisfies(held, required) {
  * the document live instead — one small document read per admin request,
  * and admin requests are people clicking.
  *
- * The cached copy is the fallback, never the first choice: when no `db`
- * was handed in, when the live read fails, or when the document is
- * absent (the cached copy is then either null, or what the container had
- * before the document went — exactly what today's readers see). The
- * fallback never widens beyond that.
+ * With a `db` the answer is the document and nothing else, and it FAILS
+ * CLOSED: a read that throws is a BootstrapUnavailableError (the caller
+ * answers 500 and admits nobody), and an absent document is "no admins".
+ * The cached copy is never consulted on that path — it can still list an
+ * address revoked a moment ago, which is exactly the caller a revocation
+ * is meant to stop. Only a caller that passes no `db` reads the cached
+ * copy (requireAttendeeAccess, on purpose — see its doc).
  *
  * @param {{ db?: { collection: Function }, getConfig?: () => Promise<{ bootstrap?: object|null }> }} deps
  * @returns {Promise<object|null>}
+ * @throws {BootstrapUnavailableError} when the live read fails
  */
 async function loadBootstrap({ db, getConfig }) {
   if (db && typeof db.collection === 'function') {
+    let snap;
     try {
-      const snap = await db.collection('config').doc('bootstrap').get();
-      if (snap?.exists) return snap.data() ?? null;
-    } catch {
-      // Fall through to the cached copy.
+      snap = await db.collection('config').doc('bootstrap').get();
+    } catch (err) {
+      throw new BootstrapUnavailableError(err);
     }
+    return snap?.exists ? (snap.data() ?? null) : null;
   }
   if (typeof getConfig !== 'function') return null;
   const config = await getConfig();
@@ -180,7 +200,7 @@ async function verifyAuthToken({ auth }, req) {
  * @param {object} req
  * @param {{ tier?: 'operator'|'staff' }} [options]
  * @returns {Promise<{ ok: true, uid: string, email: string, tier: 'operator'|'staff' } |
- *                    { ok: false, status: 401|403, code: string, message: string }>}
+ *                    { ok: false, status: 401|403|500, code: string, message: string }>}
  */
 async function requireAdmin({ auth, db, getConfig }, req, { tier = 'operator' } = {}) {
   if (!ADMIN_TIERS.includes(tier)) {
@@ -194,7 +214,14 @@ async function requireAdmin({ auth, db, getConfig }, req, { tier = 'operator' } 
   if (!email || decoded.email_verified !== true) {
     return { ok: false, status: 403, code: 'forbidden', message: 'Admin access required.' };
   }
-  const held = resolveAdminTier(await loadBootstrap({ db, getConfig }), email);
+  let bootstrap;
+  try {
+    bootstrap = await loadBootstrap({ db, getConfig });
+  } catch (err) {
+    if (err instanceof BootstrapUnavailableError) return { ...BOOTSTRAP_UNAVAILABLE };
+    throw err;
+  }
+  const held = resolveAdminTier(bootstrap, email);
   if (held === null) {
     return { ok: false, status: 403, code: 'forbidden', message: 'Admin access required.' };
   }
@@ -344,6 +371,8 @@ async function requireAppCheck({ appCheck, enforced = false }, req) {
 
 module.exports = {
   ADMIN_TIERS,
+  BOOTSTRAP_UNAVAILABLE,
+  BootstrapUnavailableError,
   resolveAdminTier,
   loadBootstrap,
   verifyAuthToken,

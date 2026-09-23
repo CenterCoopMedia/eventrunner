@@ -68,9 +68,12 @@ read that succeeds means admin, and an `admin_logs` read that succeeds
 means operator rather than staff. The admin shell reads the tier in one
 place: every entry in `DOCKET` (`src/admin/AdminLayout.jsx`) declares the
 tier it needs, the rail draws only the sections the signed-in tier may
-reach, and the layout refuses the route of any other. A new admin page
-declares its tier by its docket entry and nowhere else; the server's
-`requireAdmin` tier option and the rules are the enforcement.
+reach, and the layout refuses the route of any other (the segment is
+percent-decoded and lowercased first, the way the router matches it, and a
+path no staff section owns is the operator's). A new admin page declares
+its tier by its docket entry and nowhere else, and `TIER_SCOPE` names each
+tier's sections from the docket for every sentence that describes a tier;
+the server's `requireAdmin` tier option and the rules are the enforcement.
 
 ## Dev loop
 

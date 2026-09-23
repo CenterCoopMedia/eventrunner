@@ -31,7 +31,9 @@
  * leaves the replacement alone.
  */
 
-const { loadBootstrap, requireAdmin, resolveAdminTier, verifyAuthToken } = require('../core/auth.cjs');
+const {
+  BOOTSTRAP_UNAVAILABLE, BootstrapUnavailableError, loadBootstrap, requireAdmin, resolveAdminTier, verifyAuthToken,
+} = require('../core/auth.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
 const { scanUsage } = require('./usage.cjs');
@@ -75,6 +77,30 @@ const MAX_ALT_LENGTH = 500;
 const MAX_TITLE_LENGTH = 200;
 
 const CACHE_CONTROL = 'public, max-age=3600';
+
+/**
+ * Branding is the operator's (issue #186 review): the logo slots on
+ * config/theme point into `branding/`, so a staff member who could upload
+ * there, delete from there, or delete an object a theme slot references
+ * would be changing the site's identity without the Branding page. Every
+ * media write that touches branding therefore gates at staff and then
+ * asks for the operator tier, the same way admin/config.cjs holds the
+ * sender block back.
+ */
+const BRANDING_FOLDER = 'branding';
+const BRANDING_REFUSAL = 'branding: operator access required';
+
+/** @param {object} stored a media_assets row @returns {boolean} */
+function isBrandingAsset(stored) {
+  return stored?.folder === BRANDING_FOLDER
+    || (typeof stored?.path === 'string' && stored.path.startsWith(`${BRANDING_FOLDER}/`));
+}
+
+/** @param {Array<{ docPath: string }>} references @returns {boolean} */
+function referencedByTheme(references) {
+  return references.some((reference) => typeof reference?.docPath === 'string'
+    && reference.docPath.startsWith('config/theme'));
+}
 
 /**
  * Speaker headshots (spec §8.5, §9 "Speaker profile wizard", issue #22).
@@ -302,6 +328,9 @@ function createMediaUploadHandler({
 
     const verdict = validateUpload(req.body, newId);
     if (!verdict.ok) return badRequest(res, verdict.message);
+    if (verdict.asset.folder === BRANDING_FOLDER && gate.tier !== 'operator') {
+      return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
+    }
 
     const actor = { uid: gate.uid, email: gate.email };
     let asset;
@@ -362,6 +391,8 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
     if (!snap.exists) return notFound(res, 'That asset is not in the media library.');
     const stored = snap.data() || {};
     const path = typeof stored.path === 'string' ? stored.path : '';
+    const operator = gate.tier === 'operator';
+    if (isBrandingAsset(stored) && !operator) return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
 
     let references = [];
     if (path) {
@@ -371,10 +402,16 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
       } catch (err) {
         // A scan that cannot run is not permission to delete blindly: the
         // whole point of the warning is that the admin sees the references
-        // first. Only --force gets past it.
+        // first. Only --force gets past it, and only for an operator — a
+        // staff member cannot prove the asset is not a theme slot's.
         log.error('mediaDelete usage scan failed', err);
-        if (!force) return internal(res, 'The file could not be checked for usage.');
+        if (!force || !operator) return internal(res, 'The file could not be checked for usage.');
       }
+    }
+    // A theme slot's asset is branding whatever folder it sits in, and
+    // force does not change whose it is.
+    if (!operator && referencedByTheme(references)) {
+      return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
     }
     if (references.length > 0 && !force) {
       return res.status(409).json({
@@ -496,7 +533,14 @@ function createSpeakerPhotoUploadHandler({
     let isAdmin = false;
     const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
     if (email && decoded.email_verified === true) {
-      isAdmin = resolveAdminTier(await loadBootstrap({ db, getConfig }), email) !== null;
+      try {
+        isAdmin = resolveAdminTier(await loadBootstrap({ db, getConfig }), email) !== null;
+      } catch (err) {
+        if (err instanceof BootstrapUnavailableError) {
+          return sendError(res, BOOTSTRAP_UNAVAILABLE.status, BOOTSTRAP_UNAVAILABLE.code, BOOTSTRAP_UNAVAILABLE.message);
+        }
+        throw err;
+      }
     }
 
     if (!isAdmin) {
@@ -575,7 +619,14 @@ function createSpeakerPhotoDeleteHandler({ db, bucket, auth, getConfig, log = co
     let isAdmin = false;
     const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
     if (email && decoded.email_verified === true) {
-      isAdmin = resolveAdminTier(await loadBootstrap({ db, getConfig }), email) !== null;
+      try {
+        isAdmin = resolveAdminTier(await loadBootstrap({ db, getConfig }), email) !== null;
+      } catch (err) {
+        if (err instanceof BootstrapUnavailableError) {
+          return sendError(res, BOOTSTRAP_UNAVAILABLE.status, BOOTSTRAP_UNAVAILABLE.code, BOOTSTRAP_UNAVAILABLE.message);
+        }
+        throw err;
+      }
     }
     if (!isAdmin) {
       const snap = await db.collection('speakers').doc(speakerId).get();
@@ -623,6 +674,10 @@ module.exports = {
     return buildHandlers();
   },
   internals: {
+    isBrandingAsset,
+    referencedByTheme,
+    BRANDING_FOLDER,
+    BRANDING_REFUSAL,
     validateUpload,
     decodeUpload,
     safeObjectName,

@@ -10,7 +10,15 @@ const {
   createDeleteSpeakerHandler,
   internals,
 } = require('./lifecycle.cjs');
-const { makeSpeakersDb } = require('./speakersFake.cjs');
+const { makeSpeakersDb: makeBareSpeakersDb } = require('./speakersFake.cjs');
+
+// requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
+// #186 review: it fails closed on an absent document), so every fake this
+// file builds carries the admin and the staff address the tests use.
+const makeSpeakersDb = (seed = {}) => makeBareSpeakersDb({
+  'config/bootstrap': { adminEmails: [ACTOR.email], staffEmails: ['staff@example.org'] },
+  ...seed,
+});
 
 const ACTOR = { uid: 'admin-1', email: 'admin@example.org' };
 const NOW = () => Date.parse('2026-08-21T12:00:00Z');
@@ -280,8 +288,10 @@ function fakeRes() {
 function adminDeps(db, { admin = true } = {}) {
   return {
     db,
-    auth: { verifyIdToken: async () => ({ uid: ACTOR.uid, email: ACTOR.email, email_verified: true }) },
-    getConfig: async () => ({ bootstrap: { adminEmails: admin ? [ACTOR.email] : [] } }),
+    // The gate reads the admin list live off the db, so "not an admin" is
+    // a token whose address is not on it.
+    auth: { verifyIdToken: async () => ({ uid: ACTOR.uid, email: admin ? ACTOR.email : 'stranger@example.org', email_verified: true }) },
+    getConfig: async () => ({ bootstrap: { adminEmails: [ACTOR.email] } }),
     now: NOW,
     log: { error() {}, warn() {} },
   };

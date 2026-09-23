@@ -23,7 +23,9 @@ function validUpdate(overrides = {}) {
 }
 
 function fakeDb(seed = {}) {
-  const docs = new Map(Object.entries(seed));
+  // requireAdmin reads config/bootstrap live from this db (fails closed on
+  // an absent document), so every fake carries the admin the tests use.
+  const docs = new Map(Object.entries({ 'config/bootstrap': { adminEmails: ['admin@example.org'] }, ...seed }));
   const added = [];
   return {
     docs,
@@ -281,7 +283,9 @@ test('cmsSaveUpdate preserves validated rich media and rejects unsafe blocks', a
 test('rich updates survive draft, publish, and version history', async () => {
   const { makeFakeDb } = require('./firestoreFake.cjs');
   const store = require('./store.cjs');
-  const db = makeFakeDb();
+  // The real fake, so publishDocs runs; requireAdmin reads config/bootstrap
+  // live from it, so the admin the handler expects is seeded.
+  const db = makeFakeDb({ 'config/bootstrap': { adminEmails: ['admin@example.org'] } });
   const actor = { uid: 'admin1', email: 'admin@example.org' };
   const featuredImage = { url: 'demo/summit-gathering.webp', alt: 'Summit scene' };
   const content = [{ type: 'columns', columns: [
