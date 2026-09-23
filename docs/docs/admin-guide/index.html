@@ -113,6 +113,7 @@
           <nav class="contents" aria-labelledby="contents-title">
             <p class="contents-title" id="contents-title">On this page</p>
             <ul>
+              <li><a href="#who-can-do-what-operator-and-staff">Who can do what: Operator and staff</a></li>
               <li><a href="#set-the-site-up-six-steps">Set the site up: Six steps</a></li>
               <li><a href="#settings-branding">Settings → Branding</a></li>
               <li><a href="#pages">Pages</a></li>
@@ -129,11 +130,27 @@
               <li><a href="#settings-event-settings">Settings → Event settings</a></li>
               <li><a href="#settings-features">Settings → Features</a></li>
               <li><a href="#settings-badges">Settings → Badges</a></li>
+              <li><a href="#settings-access">Settings → Access</a></li>
               <li><a href="#legal-pages">Legal pages</a></li>
             </ul>
           </nav>
           <p>How to run a client&#39;s site from the admin panel, in the order the work happens. For the narrative &quot;why does this work this way&quot; version, hand a new staff member <a href="/eventrunner/docs/handbook/for-event-staff/"><code>docs/handbook/for-event-staff.md</code></a> first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see <a href="/eventrunner/docs/design-reference/"><code>design-reference.md</code></a>. You do not need it to run a site.</p>
           <p><strong>Draft and live are separate almost everywhere below.</strong> Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.</p>
+          <h2 id="who-can-do-what-operator-and-staff">Who can do what: Operator and staff<a class="heading-anchor" href="#who-can-do-what-operator-and-staff" aria-label="Link to this section">#</a></h2>
+          <p>An admin account holds one of two tiers. The rail shows the tier under your address, and it shows only the sections your tier can open. A link you type or follow to a section outside your tier meets a refusal, not the page. The server and the database rules refuse the same requests, so the tier is not only a matter of what the rail shows.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Tier</th><th>Sections</th><th>For</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, and System errors</td><td>The person who set the site up and answers for the deployment</td></tr>
+          <tr><td>Staff</td><td>Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, and Event settings</td><td>The people who run the event day to day</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. One field in there stays with the operator: The outbound sender address, because it is the email identity the deployment was verified against. A staff save that changes it is refused and the field is named.</p>
+          <p>An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.</p>
           <h2 id="set-the-site-up-six-steps">Set the site up: Six steps<a class="heading-anchor" href="#set-the-site-up-six-steps" aria-label="Link to this section">#</a></h2>
           <p>This is the whole visual setup, start to finish. It takes about twenty minutes and you do it once.</p>
           <ol>
@@ -213,6 +230,7 @@
           <li><strong><code>speaker-photos/</code></strong> — set from the speaker editor, not uploaded loose here.</li>
           </ul>
           <p>Upload, edit alt text, and delete from the library. A delete warns you first if anything currently on the site references the asset — do not dismiss that warning without checking what it names.</p>
+          <p><strong>Branding needs an operator.</strong> An upload into <code>branding/</code>, and a delete or an alt-text edit of a branding asset or of any asset a Branding slot uses, is refused for a staff account, with or without the delete warning dismissed. Everything else in the library is staff work.</p>
           <h2 id="speakers">Speakers<a class="heading-anchor" href="#speakers" aria-label="Link to this section">#</a></h2>
           <p>The canonical speaker list, with each record&#39;s pipeline status and the entry points to create, edit, invite, and review pending edits. This list reads the real speaker records, not the public-facing projection, on purpose: An admin needs to see speakers who are not published yet — drafts, outstanding invites, soft-deleted records.</p>
           <p><strong>Pipeline states</strong>, top to bottom of what a record moves through:</p>
@@ -337,6 +355,13 @@
           <p>The badge catalog: Categories, each with a max-picks cap and its list of badges, which attendees self-select from on their profile. Also a whole-document replace: editing one badge sends the complete set of categories back and preserves the configured custom-badge block list.</p>
           <p><strong>Custom badges.</strong> The separate feature is off by default. When enabled, attendees can enter up to three badges of 24 characters each. Reserved role words are always blocked; <code>config/badges.customBadgeBlockList</code> adds event-specific words. The owner form and public projection use the same validator. The category editor preserves this list; an operator changes it through the badge configuration API.</p>
           <p><strong>Remove a custom badge.</strong> In Attendees, select the removal action beside the badge and confirm. The result stays on the page and an <code>admin_logs</code> entry records the action. Turning the feature off removes custom badges from the public projection; attendees can still edit their other profile fields.</p>
+          <h2 id="settings-access">Settings → Access<a class="heading-anchor" href="#settings-access" aria-label="Link to this section">#</a></h2>
+          <p>Operators only. One ruled table of every admin account with its tier word, and a form to grant access to a new address.</p>
+          <p><strong>Grant access.</strong> Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. The person signs in with that address the way every admin does, by Google or by the emailed code; there is no invitation to send.</p>
+          <p><strong>Change a tier or remove access.</strong> Each row carries two quiet actions: <strong>Change to staff</strong> or <strong>Change to operator</strong>, and <strong>Remove access</strong>. Each one opens a confirmation under the grant form, above the table, that names the account and the consequence. Removal sits on the alarm ground; a tier change does not, because it narrows or widens access without deleting anything. Cancel returns you to the control you pressed.</p>
+          <p><strong>At least one operator stays.</strong> The server refuses a change that would leave the deployment with no operator: Demoting or removing the last operator, your own grant included. Grant a second operator first. The refusal is stated in place, in the server&#39;s words.</p>
+          <p><strong>What is recorded.</strong> Every grant, change, and removal writes a row to the admin log with your address, the account, and the tier it moved from and to. A change that changes nothing writes no row.</p>
+          <p><strong>When it takes effect.</strong> At once. The database rules, the server, and the admin rail all read the access lists live: A granted account is admitted on its next request, a removed account is refused on its next request, and the rail shows the right sections the next time the person signs in or reloads.</p>
           <h2 id="legal-pages">Legal pages<a class="heading-anchor" href="#legal-pages" aria-label="Link to this section">#</a></h2>
           <p>Privacy policy and terms of service ship as CMS content pages seeded from provider-aware templates, each clause needing review flagged <code>[Client legal review required]</code>. They stay flagged — a persistent banner in the admin panel and a visible notice on the public page — until an admin clears the review flag after the client&#39;s counsel has actually reviewed the seeded copy. See <a href="/eventrunner/docs/client-onboarding/"><code>CLIENT_ONBOARDING.md</code></a>&#39;s legal review section for the full context. Do not publish another organization&#39;s terms verbatim; the seeded text is a starting point, not a finished policy.</p>
         </article>
