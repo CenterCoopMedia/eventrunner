@@ -21,6 +21,7 @@
     "updateBadges",
     "listAdminAccess",
     "setAdminAccess",
+    "getEventStats",
     "webMcpCheckEventReadiness",
     "webMcpValidateCurrentPageDraft",
     "webMcpInspectPublishQueue",

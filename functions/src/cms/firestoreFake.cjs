@@ -8,7 +8,8 @@
  *
  * Supports exactly what the cms modules use — doc get/set/update/delete,
  * create (fails ALREADY_EXISTS like the Admin SDK), `==` queries with
- * orderBy/limit/startAfter, getAll, batches with per-update
+ * orderBy/limit/startAfter, `count()` aggregates on a query or a whole
+ * collection (admin/eventStats.cjs), getAll, batches with per-update
  * { lastUpdateTime } preconditions (snapshots expose a monotonically
  * bumped `updateTime`; a stale precondition fails the whole batch with
  * FAILED_PRECONDITION, applying nothing, like real Firestore) — plus
@@ -193,6 +194,16 @@ function makeFakeDb(seed = {}) {
         const docs = rows.map(({ id }) => snapshot(col, id));
         return { docs, size: docs.length, empty: docs.length === 0 };
       },
+      // The Admin SDK's aggregate: `query.count().get()` answers a snapshot
+      // whose data() is `{ count }`, and no document body is read.
+      count() {
+        return {
+          async get() {
+            const { size } = await query(col, filters, order, limitN, startAfterValue).get();
+            return { data: () => ({ count: size }) };
+          },
+        };
+      },
     };
   }
 
@@ -221,6 +232,9 @@ function makeFakeDb(seed = {}) {
         // seam and by media/usage.cjs, which walks the content corpus.
         get() {
           return query(name, [], null, undefined, undefined).get();
+        },
+        count() {
+          return query(name, [], null, undefined, undefined).count();
         },
       };
     },
