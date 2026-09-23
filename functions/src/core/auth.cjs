@@ -83,6 +83,40 @@ function tierSatisfies(held, required) {
 }
 
 /**
+ * The bootstrap document as it is NOW, for an admin decision.
+ *
+ * core/config.cjs caches config per container for five minutes, and every
+ * function runs in its own container, so a grant or a revocation made
+ * through setAdminAccess would otherwise reach the other endpoints only
+ * when their copies expired: a newly granted staff member refused for
+ * minutes, a revoked account admitted for minutes. An admin decision reads
+ * the document live instead — one small document read per admin request,
+ * and admin requests are people clicking.
+ *
+ * The cached copy is the fallback, never the first choice: when no `db`
+ * was handed in, when the live read fails, or when the document is
+ * absent (the cached copy is then either null, or what the container had
+ * before the document went — exactly what today's readers see). The
+ * fallback never widens beyond that.
+ *
+ * @param {{ db?: { collection: Function }, getConfig?: () => Promise<{ bootstrap?: object|null }> }} deps
+ * @returns {Promise<object|null>}
+ */
+async function loadBootstrap({ db, getConfig }) {
+  if (db && typeof db.collection === 'function') {
+    try {
+      const snap = await db.collection('config').doc('bootstrap').get();
+      if (snap?.exists) return snap.data() ?? null;
+    } catch {
+      // Fall through to the cached copy.
+    }
+  }
+  if (typeof getConfig !== 'function') return null;
+  const config = await getConfig();
+  return config?.bootstrap ?? null;
+}
+
+/**
  * Pull the raw ID token out of `Authorization: Bearer <idToken>`.
  * Tolerates both Express (`req.get`) and bare `{ headers }` fakes.
  *
@@ -136,8 +170,9 @@ async function verifyAuthToken({ auth }, req) {
  * the caller holds, for a handler that gates one field more tightly than
  * the rest (admin/config.cjs's sender block).
  *
- * `db` is accepted for signature compatibility but unused: the injected
- * `getConfig` (core/config.cjs getEventConfig) already loads bootstrap.
+ * `db` makes the decision current: with it, `config/bootstrap` is read
+ * live (see loadBootstrap); without it, the injected `getConfig`
+ * (core/config.cjs getEventConfig) supplies the cached copy.
  *
  * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
  *           getConfig: () => Promise<{ bootstrap: { adminEmails?: string[], staffEmails?: string[] } | null }>,
@@ -147,7 +182,7 @@ async function verifyAuthToken({ auth }, req) {
  * @returns {Promise<{ ok: true, uid: string, email: string, tier: 'operator'|'staff' } |
  *                    { ok: false, status: 401|403, code: string, message: string }>}
  */
-async function requireAdmin({ auth, getConfig }, req, { tier = 'operator' } = {}) {
+async function requireAdmin({ auth, db, getConfig }, req, { tier = 'operator' } = {}) {
   if (!ADMIN_TIERS.includes(tier)) {
     throw new TypeError(`requireAdmin: unknown tier "${tier}" (expected ${ADMIN_TIERS.join(' or ')})`);
   }
@@ -159,8 +194,7 @@ async function requireAdmin({ auth, getConfig }, req, { tier = 'operator' } = {}
   if (!email || decoded.email_verified !== true) {
     return { ok: false, status: 403, code: 'forbidden', message: 'Admin access required.' };
   }
-  const config = await getConfig();
-  const held = resolveAdminTier(config?.bootstrap, email);
+  const held = resolveAdminTier(await loadBootstrap({ db, getConfig }), email);
   if (held === null) {
     return { ok: false, status: 403, code: 'forbidden', message: 'Admin access required.' };
   }
@@ -206,6 +240,11 @@ async function requireAdmin({ auth, getConfig }, req, { tier = 'operator' } = {}
  * in agreement, the same "one predicate, two checkpoints" discipline the
  * module doc above describes. Staff count here too: attendee access is
  * the floor under every admin, not an operator privilege.
+ *
+ * This gate reads the CACHED bootstrap, not the live document: it runs on
+ * every bookmark and reaction at attendee volume, the admin branch only
+ * widens what an approved attendee already has, and a five-minute lag on
+ * an admin's bookmark pill costs nobody anything.
  *
  * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
  *           db: FirebaseFirestore.Firestore,
@@ -306,6 +345,7 @@ async function requireAppCheck({ appCheck, enforced = false }, req) {
 module.exports = {
   ADMIN_TIERS,
   resolveAdminTier,
+  loadBootstrap,
   verifyAuthToken,
   requireAdmin,
   requireAttendeeAccess,

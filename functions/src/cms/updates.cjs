@@ -86,7 +86,7 @@ function validateUpdateDoc(doc) {
 function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, log = console }) {
   return async function cmsSaveUpdate(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const update = req.body?.update;
@@ -149,7 +149,7 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
 function createDeleteUpdateHandler({ db, auth, getConfig, store, now = Date.now, log = console }) {
   return async function cmsDeleteUpdate(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const id = req.body?.id;

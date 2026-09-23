@@ -438,11 +438,17 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
  * writes an admin_logs entry, and a failed audit write NEVER fails the
  * mutation it describes.
  *
+ * `details` is optional and only for what the row would otherwise not
+ * say — the access page records which address moved to which tier
+ * (admin/access.cjs). A row with no details keeps the fixed five-field
+ * shape every earlier writer produces.
+ *
  * @param {{ db: FirebaseFirestore.Firestore, action: string, docPath: string,
  *           actor: { uid: string, email: string }, now?: () => number,
+ *           details?: Record<string, unknown>,
  *           log?: Pick<Console, 'warn'> }} args
  */
-async function logAdminAction({ db, action, docPath, actor, now = Date.now, log = console }) {
+async function logAdminAction({ db, action, docPath, actor, now = Date.now, details, log = console }) {
   try {
     await db.collection('admin_logs').doc().set({
       action,
@@ -450,6 +456,7 @@ async function logAdminAction({ db, action, docPath, actor, now = Date.now, log 
       uid: actor.uid,
       email: actor.email,
       at: new Date(now()),
+      ...(details && typeof details === 'object' ? { details } : {}),
     });
   } catch (err) {
     log.warn('admin_logs write failed', err);

@@ -82,7 +82,7 @@ function validateLiveUpdateDoc(doc) {
 function createSaveLiveUpdateHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function saveLiveUpdate(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const update = req.body?.update;
@@ -136,7 +136,7 @@ function createSaveLiveUpdateHandler({ db, auth, getConfig, now = Date.now, log 
 function createDeleteLiveUpdateHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function deleteLiveUpdate(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const id = req.body?.id;

@@ -429,7 +429,7 @@ function createConfigWriteHandler({ docId, action }, { db, auth, getConfig, now 
   const tier = CONFIG_DOC_TIERS[docId] ?? 'operator';
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const payload = req.body?.[docId];

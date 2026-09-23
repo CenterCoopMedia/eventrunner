@@ -256,12 +256,12 @@ class RequestError extends Error {
 }
 
 /** Shared admin-POST preamble. Sends the response itself on failure. */
-async function gateAdminPost({ auth, getConfig }, req, res) {
+async function gateAdminPost({ auth, db, getConfig }, req, res) {
   if (req.method !== 'POST') {
     methodNotAllowed(res, ['POST']);
     return null;
   }
-  const verdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+  const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
   if (!verdict.ok) {
     sendError(res, verdict.status, verdict.code, verdict.message);
     return null;
@@ -274,7 +274,7 @@ async function gateAdminPost({ auth, getConfig }, req, res) {
  */
 function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function cmsCreateContent(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     const target = resolveTarget(req.body);
     if (!target.ok) return badRequest(res, target.message);
@@ -355,7 +355,7 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
  */
 function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function cmsUpdateContent(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     const target = resolveTarget(req.body);
     if (!target.ok) return badRequest(res, target.message);
@@ -440,7 +440,7 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
  */
 function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function cmsDeleteContent(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     const target = resolveTarget(req.body);
     if (!target.ok) return badRequest(res, target.message);
