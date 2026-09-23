@@ -35,6 +35,7 @@ import SchedulePrint from '../components/SchedulePrint.jsx';
 import HorizontalScrollRegion from '../components/HorizontalScrollRegion.jsx';
 import { resolveTracks } from '../lib/scheduleGrid.js';
 import { sessionStateOf } from '../lib/scheduleState.js';
+import Legend from '../components/editorial/Legend.jsx';
 import {
   buildSearchIndex,
   collectFormats,
@@ -328,9 +329,10 @@ export default function Schedule() {
               schedule header because the figure is meaningless without it:
               a number is not self-describing. */}
           {features.sessionBookmarks ? (
-            <p className="mt-2xs font-data text-caption text-text-secondary">
-              “Saved” is how many attendees bookmarked a session.
-            </p>
+            <Legend
+              className="mt-2xs"
+              items={[{ term: 'Saved', meaning: 'how many attendees bookmarked a session' }]}
+            />
           ) : null}
         </div>
         {/* Controls do not print: a button on paper is a lie (index.css,

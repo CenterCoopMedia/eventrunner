@@ -52,6 +52,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   native `<progress>` with "3 of 5 tasks done" stated beside it, never a ring), and a notice bar (a
   ruled band with a level as a word and a rule weight, `status` or `alert`, with a dismiss control
   remembered per browser).
+- The rest of the second wave's devices: a dropzone (a ruled region around a real file input, with a
+  stated progress line and a sent list with a state word per file), a repeater (rows a person adds
+  and removes, each field labelled, focus following the change), an avatar (square on the brand
+  radius, the initial in the heading face; the attendee photo now draws through it), a count and a
+  figure sentence (figures in tabular numerals with their label, in place of a badge or a tile), a
+  legend (one line at the head of a list), a session state marker (a word with an ink change and a
+  rule; a finished session takes the back-issue ink), a standfirst, a byline and a dateline, and the
+  long read opening (a drop cap, a standfirst, or plain, on the first paragraph of a Long read page).
+  Each has a tier 3 contract, a rule set, a specimen, and a remap in the styles whose story differs.
+- Five option groups on every site style, under Advanced: Long read opening, Quote device,
+  Directory style, Section boundary and Table rules. A group remaps tokens the style already
+  declares, and a choice may now move a component face too, which is how Zine's toner-block quote
+  drops the script face. The updates feed's spine and the speaker shelf's rule read the new
+  `timeline` and `directory` contracts, so the option reaches them.
+- The tabs and the segmented control take an unavailable state. An unavailable tab or segment stays
+  in its row with `aria-disabled`, so the arrow keys can land on it and a reader hears why; it opens
+  nothing and is never chosen, and the tests prove it.
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.
   Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,

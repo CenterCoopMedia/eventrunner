@@ -753,7 +753,15 @@ describe('bookmark counts on the schedule', () => {
   it('a bookmarked session shows the count as a labelled figure, with the legend on the header', () => {
     renderWithCounts(new Map([['fx-early', 7]]));
 
-    expect(screen.getByText('“Saved” is how many attendees bookmarked a session.')).toBeInTheDocument();
+    // The legend is one line whose term is its own span, so the sentence
+    // is matched across the elements (components/editorial/Legend.jsx).
+    expect(
+      screen.getByText(
+        (content, element) =>
+          element.tagName === 'P'
+          && element.textContent === '“Saved” is how many attendees bookmarked a session.',
+      ),
+    ).toBeInTheDocument();
     // The figure is a number in the mono face and the word beside it, so
     // the sentence is matched across the two.
     const savedFigure = (count) =>

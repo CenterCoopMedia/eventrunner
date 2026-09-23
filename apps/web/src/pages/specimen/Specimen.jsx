@@ -15,6 +15,7 @@
 // needs a label, a hint and a refusal that the snapshot has no field for.
 // Nothing on the page is placeholder copy either way.
 import SectionIndexNav from '../../components/SectionIndexNav.jsx';
+import Standfirst from '../../components/editorial/Standfirst.jsx';
 import { SPECIMEN_SECTIONS, sectionFolio } from './sections/index.js';
 import { SPECIMEN_TITLE } from './specimenRoute.js';
 import useNoIndex from './useNoIndex.js';
@@ -30,10 +31,10 @@ export default function Specimen() {
       <h1 className="font-heading text-h1 font-semibold text-text-primary">{SPECIMEN_TITLE}</h1>
       {/* The one sentence that says what the page is, under the heading and
           never above it. */}
-      <p className="mt-sm max-w-prose text-lead text-text-secondary">
+      <Standfirst className="mt-sm">
         Every device in the system, drawn with content from {eventConfig.name}, in the site style
         and display mode this page is set to.
-      </p>
+      </Standfirst>
 
       {/* The contents. SectionIndexNav brings its own landmark and marks
           the section the reader is in. */}

@@ -852,6 +852,14 @@ function resolveComponentFonts(theme) {
   for (const [name, setId] of Object.entries(preset?.componentFonts || {})) {
     if (THEME_FONT_SET_IDS.includes(setId)) fonts[name] = setId;
   }
+  // A picked option may move a component face too (2026-09-10 record, §4):
+  // Zine's Quote device option drops the script face for a toner block by
+  // pointing --callout-font at the heading set. The same allowlist applies.
+  for (const choice of pickedChoices(theme)) {
+    for (const [name, setId] of Object.entries(choice.componentFonts || {})) {
+      if (THEME_FONT_SET_IDS.includes(setId)) fonts[name] = setId;
+    }
+  }
   return fonts;
 }
 

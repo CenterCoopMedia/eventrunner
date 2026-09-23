@@ -44,17 +44,33 @@ export function Tabs({ value, onChange, tabs, children }) {
   );
 }
 
+/**
+ * The index of the tab that holds focus, or of the selected tab when none
+ * does. An unavailable tab can hold focus without being selected, so the
+ * arrow keys have to move from where the reader IS rather than from what is
+ * open.
+ */
+function focusedIndex(listRef, tabs, value) {
+  const nodes = [...(listRef.current?.querySelectorAll('[role="tab"]') ?? [])];
+  const active = nodes.indexOf(globalThis.document?.activeElement);
+  return active >= 0 ? active : Math.max(0, tabs.indexOf(value));
+}
+
 /** The row of words. */
 export function TabList({ label, children }) {
   const { value, onChange, tabs, listRef } = useTabs('TabList');
-  const current = Math.max(0, tabs.indexOf(value));
 
   function onKeyDown(event) {
-    const index = nextRovingIndex(event.key, current, tabs.length);
+    const index = nextRovingIndex(event.key, focusedIndex(listRef, tabs, value), tabs.length);
     if (index === null) return;
     event.preventDefault();
+    const target = listRef.current?.querySelectorAll('[role="tab"]')[index];
+    target?.focus();
+    // Selection follows focus — except onto a tab that states it is
+    // unavailable. The reader lands on it and hears why; the open panel
+    // stays where it was.
+    if (target?.getAttribute('aria-disabled') === 'true') return;
     onChange(tabs[index]);
-    listRef.current?.querySelectorAll('[role="tab"]')[index]?.focus();
   }
 
   return (
@@ -74,8 +90,26 @@ const tabClass =
   `${controlStateClass} tab touch-target inline-flex items-center px-md py-xs font-data ` +
   'text-caption font-medium text-text-secondary aria-selected:text-text-primary';
 
-/** One word in the row. */
-export function Tab({ id, children }) {
+/**
+ * One word in the row.
+ *
+ * AN UNAVAILABLE TAB STAYS IN THE ROW AND EXPLAINS ITSELF (expansion record
+ * §2.1). It carries `aria-disabled="true"` rather than `disabled`, so the
+ * arrow keys can still land on it and a screen reader hears that it is
+ * unavailable and why — `hint` is read as part of the tab's name — and its
+ * handler refuses every activation path: a click, Enter and Space all
+ * arrive here and go nowhere, and the arrow keys never select it. A tab
+ * with nothing behind it at all is not rendered; this is for a panel that
+ * exists and cannot be opened yet.
+ *
+ * @param {{
+ *   id: string,
+ *   children: import('react').ReactNode,
+ *   disabled?: boolean,
+ *   hint?: string,     // why it is unavailable, for a screen reader
+ * }} props
+ */
+export function Tab({ id, children, disabled = false, hint }) {
   const { baseId, value, onChange } = useTabs('Tab');
   const selected = value === id;
   return (
@@ -85,11 +119,15 @@ export function Tab({ id, children }) {
       id={`${baseId}-tab-${id}`}
       aria-controls={`${baseId}-panel-${id}`}
       aria-selected={selected}
+      aria-disabled={disabled || undefined}
       tabIndex={selected ? 0 : -1}
-      onClick={() => onChange(id)}
+      onClick={() => {
+        if (!disabled) onChange(id);
+      }}
       className={tabClass}
     >
       {children}
+      {disabled && hint ? <span className="sr-only">{` (${hint})`}</span> : null}
     </button>
   );
 }
