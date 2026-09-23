@@ -82,7 +82,7 @@ function buildHandlers() {
       const db = getDb();
       const getConfig = () => getEventConfig({ db });
 
-      const gate = await requireAdmin({ auth: getAuth(), getConfig }, req, { tier: 'staff' });
+      const gate = await requireAdmin({ auth: getAuth(), db, getConfig }, req, { tier: 'staff' });
       if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
       const { materialId, reviewStatus } = req.body || {};

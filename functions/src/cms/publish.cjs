@@ -42,12 +42,12 @@ const QUEUE_LIST_MAX = 50;
 const SETTABLE_STATUSES = Object.freeze(['failed', 'done']);
 
 /** Shared admin-POST preamble; sends the response itself on failure. */
-async function gateAdminPost({ auth, getConfig }, req, res) {
+async function gateAdminPost({ auth, db, getConfig }, req, res) {
   if (req.method !== 'POST') {
     methodNotAllowed(res, ['POST']);
     return null;
   }
-  const verdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+  const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
   if (!verdict.ok) {
     sendError(res, verdict.status, verdict.code, verdict.message);
     return null;
@@ -120,7 +120,7 @@ function createCmsPublishHandler({
   log = console,
 }) {
   return async function cmsPublish(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
 
     let queueRef;
@@ -228,7 +228,7 @@ function createCmsPublishHandler({
  */
 function createGetPublishQueueHandler({ db, auth, getConfig }) {
   return async function cmsGetPublishQueue(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
 
     const { queueId, limit } = req.body || {};
@@ -257,7 +257,7 @@ function createGetPublishQueueHandler({ db, auth, getConfig }) {
  */
 function createUpdatePublishStatusHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function cmsUpdatePublishStatus(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
 
     const { queueId, status, note } = req.body || {};

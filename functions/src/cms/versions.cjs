@@ -42,7 +42,7 @@ function isValidDocPath(docPath) {
 function createGetVersionHistoryHandler({ db, auth, getConfig, log = console }) {
   return async function cmsGetVersionHistory(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const verdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+    const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!verdict.ok) return sendError(res, verdict.status, verdict.code, verdict.message);
 
     const { docPath, limit, cursor } = req.body || {};

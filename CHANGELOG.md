@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   open and refuses the route of any other. Event settings admit staff; a staff save that changes
   the outbound sender address is refused by name. `init-event.cjs` takes `--staff` beside
   `--admin`, and a re-run never removes a grant made in the admin.
+- The Access page, under System, for operators: a ruled table of every admin account with its tier
+  word. An operator grants staff or operator access to a new address, changes a tier, or removes
+  access, and every change asks for a confirmation first, is written by the server with the
+  address lowercased, and is recorded in the admin log. The server refuses a change that would
+  leave the deployment with no operator, including an operator removing their own last grant.
 
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.
