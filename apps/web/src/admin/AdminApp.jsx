@@ -36,6 +36,7 @@ import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
 import AdminTicketing from './pages/AdminTicketing.jsx';
+import AdminAccess from './pages/AdminAccess.jsx';
 import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
@@ -159,6 +160,7 @@ export default function AdminApp() {
           <Route path="live-updates" element={<AdminLiveUpdates />} />
           <Route path="feedback" element={<AdminFeedback />} />
           <Route path="system-errors" element={<AdminSystemErrors />} />
+          <Route path="access" element={<AdminAccess />} />
           <Route
             path="*"
             element={

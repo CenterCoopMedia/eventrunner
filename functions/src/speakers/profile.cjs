@@ -24,7 +24,7 @@
  * fixture and the web app cannot drift from the server.
  */
 
-const { requireAdmin, resolveAdminTier, verifyAuthToken } = require('../core/auth.cjs');
+const { loadBootstrap, requireAdmin, resolveAdminTier, verifyAuthToken } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
 const { validateSpeaker, SELF_EDITABLE_SPEAKER_FIELDS } = require('shared/speaker');
@@ -91,12 +91,12 @@ function newSpeakerDefaults() {
 }
 
 /** Shared admin-POST preamble. Sends the response itself on failure. */
-async function gateAdminPost({ auth, getConfig }, req, res) {
+async function gateAdminPost({ auth, db, getConfig }, req, res) {
   if (req.method !== 'POST') {
     methodNotAllowed(res, ['POST']);
     return null;
   }
-  const verdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+  const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
   if (!verdict.ok) {
     sendError(res, verdict.status, verdict.code, verdict.message);
     return null;
@@ -391,12 +391,12 @@ function buildOwnSpeakerView(speaker, speakerId) {
  * path, a plain get for the read path), so this only answers "who is this
  * and are they an admin" once per request.
  *
- * @param {{ auth: object, getConfig: () => Promise<object> }} deps
+ * @param {{ auth: object, db?: object, getConfig: () => Promise<object> }} deps
  * @param {object} req
  * @returns {Promise<{ ok: true, uid: string, email: string, isAdmin: boolean } |
  *                    { ok: false, status: 401, code: string, message: string }>}
  */
-async function gateSpeakerSelfOrAdmin({ auth, getConfig }, req) {
+async function gateSpeakerSelfOrAdmin({ auth, db, getConfig }, req) {
   const decoded = await verifyAuthToken({ auth }, req);
   if (!decoded?.uid) {
     return { ok: false, status: 401, code: 'unauthorized', message: 'Authentication required.' };
@@ -406,8 +406,7 @@ async function gateSpeakerSelfOrAdmin({ auth, getConfig }, req) {
   let isAdmin = false;
   const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
   if (email && decoded.email_verified === true) {
-    const config = await getConfig();
-    isAdmin = resolveAdminTier(config?.bootstrap, email) !== null;
+    isAdmin = resolveAdminTier(await loadBootstrap({ db, getConfig }), email) !== null;
   }
   return {
     ok: true,
@@ -679,7 +678,7 @@ async function applyDiscardSpeakerPendingEdits({ db, speakerId }) {
 function createGetOwnSpeakerProfileHandler({ db, auth, getConfig, log = console }) {
   return async function getOwnSpeakerProfile(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await gateSpeakerSelfOrAdmin({ auth, getConfig }, req);
+    const gate = await gateSpeakerSelfOrAdmin({ auth, db, getConfig }, req);
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     let result;
@@ -704,7 +703,7 @@ function createUpdateOwnSpeakerProfileHandler({ db, auth, getConfig, now = Date.
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const speakerId = req.body?.speakerId;
     if (!isValidDocId(speakerId)) return badRequest(res, 'speakerId: required');
-    const gate = await gateSpeakerSelfOrAdmin({ auth, getConfig }, req);
+    const gate = await gateSpeakerSelfOrAdmin({ auth, db, getConfig }, req);
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     let result;
@@ -744,7 +743,7 @@ function createUpdateOwnSpeakerProfileHandler({ db, auth, getConfig, now = Date.
  */
 function createApplySpeakerPendingEditsHandler({ db, bucket, auth, getConfig, now = Date.now, log = console }) {
   return async function applySpeakerPendingEdits(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     let result;
     try {
@@ -774,7 +773,7 @@ function createApplySpeakerPendingEditsHandler({ db, bucket, auth, getConfig, no
  */
 function createDiscardSpeakerPendingEditsHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function discardSpeakerPendingEdits(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     let result;
     try {
@@ -798,7 +797,7 @@ function createDiscardSpeakerPendingEditsHandler({ db, auth, getConfig, now = Da
  */
 function createCreateSpeakerHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function createSpeaker(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     let result;
     try {
@@ -824,7 +823,7 @@ function createCreateSpeakerHandler({ db, auth, getConfig, now = Date.now, log =
  */
 function createUpdateSpeakerHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function updateSpeaker(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     let result;
     try {

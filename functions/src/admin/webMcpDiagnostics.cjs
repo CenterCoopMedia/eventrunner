@@ -109,11 +109,11 @@ const DIAGNOSTIC_TIERS = Object.freeze({
   webMcpCheckTicketingHealth: 'staff',
 });
 
-function createDiagnosticHandler({ auth, getConfig, log = console }, name, read) {
+function createDiagnosticHandler({ db, auth, getConfig, log = console }, name, read) {
   const tier = DIAGNOSTIC_TIERS[name] ?? 'operator';
   return async function diagnostic(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
     try {
       const result = await read(req.body || {});

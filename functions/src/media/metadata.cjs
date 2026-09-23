@@ -62,7 +62,7 @@ function validateMetadata(body) {
 function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const assetId = typeof req.body?.assetId === 'string' ? req.body.assetId.trim() : '';

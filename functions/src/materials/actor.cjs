@@ -57,7 +57,7 @@ async function resolveActorOptional({ auth, db, getConfig }, req) {
 }
 
 async function loadActorForUid({ auth, db, getConfig }, req, uid) {
-  const adminVerdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+  const adminVerdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
   const isAdmin = adminVerdict.ok === true;
 
   const snap = await db.collection('users').doc(uid).get();

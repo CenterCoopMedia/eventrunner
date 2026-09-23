@@ -31,7 +31,7 @@
  * leaves the replacement alone.
  */
 
-const { requireAdmin, resolveAdminTier, verifyAuthToken } = require('../core/auth.cjs');
+const { loadBootstrap, requireAdmin, resolveAdminTier, verifyAuthToken } = require('../core/auth.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
 const { scanUsage } = require('./usage.cjs');
@@ -297,7 +297,7 @@ function createMediaUploadHandler({
 }) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const verdict = validateUpload(req.body, newId);
@@ -344,7 +344,7 @@ function createMediaUploadHandler({
 function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now, log = console }) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const assetId = typeof req.body?.assetId === 'string' ? req.body.assetId.trim() : '';
@@ -496,8 +496,7 @@ function createSpeakerPhotoUploadHandler({
     let isAdmin = false;
     const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
     if (email && decoded.email_verified === true) {
-      const config = await getConfig();
-      isAdmin = resolveAdminTier(config?.bootstrap, email) !== null;
+      isAdmin = resolveAdminTier(await loadBootstrap({ db, getConfig }), email) !== null;
     }
 
     if (!isAdmin) {
@@ -576,8 +575,7 @@ function createSpeakerPhotoDeleteHandler({ db, bucket, auth, getConfig, log = co
     let isAdmin = false;
     const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
     if (email && decoded.email_verified === true) {
-      const config = await getConfig();
-      isAdmin = resolveAdminTier(config?.bootstrap, email) !== null;
+      isAdmin = resolveAdminTier(await loadBootstrap({ db, getConfig }), email) !== null;
     }
     if (!isAdmin) {
       const snap = await db.collection('speakers').doc(speakerId).get();

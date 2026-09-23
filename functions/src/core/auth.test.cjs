@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   ADMIN_TIERS,
   resolveAdminTier,
+  loadBootstrap,
   verifyAuthToken,
   requireAdmin,
   requireAttendeeAccess,
@@ -205,6 +206,70 @@ test('requireAdmin: an unknown tier is a programming error and throws', async ()
     ),
     /unknown tier "owner"/,
   );
+});
+
+// --- the live bootstrap read (issue #187) ----------------------------------
+
+/** A db whose config/bootstrap answers as given, or throws. */
+function bootstrapDb(answer) {
+  return {
+    collection(name) {
+      assert.equal(name, 'config');
+      return {
+        doc(id) {
+          assert.equal(id, 'bootstrap');
+          return {
+            async get() {
+              if (answer instanceof Error) throw answer;
+              return { exists: answer !== null, data: () => answer ?? undefined };
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+test('loadBootstrap: the live document wins over the cached copy', async () => {
+  const live = { adminEmails: ['ops@example.org'], staffEmails: ['fresh@example.org'] };
+  const cached = async () => ({ bootstrap: { adminEmails: ['ops@example.org'] } });
+  assert.deepEqual(await loadBootstrap({ db: bootstrapDb(live), getConfig: cached }), live);
+});
+
+test('loadBootstrap: falls back to the cached copy without a db, when the read fails, and when the document is absent', async () => {
+  const cached = async () => ({ bootstrap: { adminEmails: ['cached@example.org'] } });
+  assert.deepEqual(await loadBootstrap({ getConfig: cached }), { adminEmails: ['cached@example.org'] });
+  assert.deepEqual(
+    await loadBootstrap({ db: bootstrapDb(new Error('firestore down')), getConfig: cached }),
+    { adminEmails: ['cached@example.org'] },
+  );
+  assert.deepEqual(await loadBootstrap({ db: bootstrapDb(null), getConfig: cached }), { adminEmails: ['cached@example.org'] });
+  assert.equal(await loadBootstrap({ db: bootstrapDb(null) }), null);
+});
+
+test('requireAdmin: with a db, a grant made a moment ago is honoured although the cached copy predates it', async () => {
+  // The cached copy knows nothing of the staff address; the document does.
+  const stale = fakeGetConfig(['admin@example.org']);
+  const live = bootstrapDb({ adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] });
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: STAFF_TOKEN }), db: live, getConfig: stale },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.equal(verdict.ok, true);
+  assert.equal(verdict.tier, 'staff');
+});
+
+test('requireAdmin: with a db, a revocation made a moment ago is honoured although the cached copy still lists the address', async () => {
+  const stale = fakeGetConfig(['admin@example.org'], ['staff@example.org']);
+  const live = bootstrapDb({ adminEmails: ['admin@example.org'], staffEmails: [] });
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: STAFF_TOKEN }), db: live, getConfig: stale },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
 });
 
 test('tierSatisfies: operator satisfies both, staff satisfies staff only, null satisfies nothing', () => {

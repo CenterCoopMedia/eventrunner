@@ -271,7 +271,7 @@ function createCreateUserFromTicketHandler({ db, auth, getConfig, now = () => ne
       res.status(405).json({ error: { code: 'method-not-allowed', message: 'Use POST.' } });
       return;
     }
-    const verdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
+    const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!verdict.ok) {
       res.status(verdict.status).json({ error: { code: verdict.code, message: verdict.message } });
       return;
