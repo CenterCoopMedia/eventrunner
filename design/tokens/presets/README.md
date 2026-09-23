@@ -6,9 +6,10 @@
      scripts/build-preset-catalog.test.cjs fails when this is stale. -->
 
 This catalog lists each site style, its default configuration, and the options
-staff can select. Runtime values are in `packages/shared/src/presetCatalog.cjs`.
+staff can select. Runtime values are in `packages/shared/src/presetCatalog.cjs`
+and `packages/shared/src/presetRemaps.cjs`.
 Admin labels and explanations are in `apps/web/src/admin/presetCopy.js`.
-All three outputs are generated from the same JSON source files.
+All four outputs are generated from the same JSON source files.
 
 The picker uses the order shown below. A new deployment starts with Institutional.
 Each style includes one default configuration. Options marked *default* are selected

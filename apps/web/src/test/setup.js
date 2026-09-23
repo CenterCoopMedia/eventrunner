@@ -1,6 +1,16 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
+import { PRESET_REMAPS } from 'shared/presetRemaps';
+import { presetRemapsLoaded, registerPresetRemaps } from 'shared/theme';
+
+// The preset remaps are a lazy chunk in the app (lib/presetRemaps.js) and a
+// resolver that is asked for a style's tokens or picks before they arrive
+// throws. A test is not a first paint: every test runs with the remaps
+// registered, the way a Node caller requires them once, so a component under
+// test resolves every style and the app's own loader is exercised where a
+// test asks for it.
+if (!presetRemapsLoaded()) registerPresetRemaps(PRESET_REMAPS);
 
 // Tests run credential-free (spec §8.1): no VITE_FIREBASE_* env, no network.
 // The firebase entry module and the SDK functions the providers call are

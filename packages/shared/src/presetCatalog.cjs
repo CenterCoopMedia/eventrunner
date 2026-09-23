@@ -3,14 +3,16 @@
 /**
  * GENERATED FILE — do not edit by hand.
  *
- * RENDERING VALUES ONLY. Palettes, type maps, shape, the motif default,
- * token remaps, and the option ids and defaults — everything the one
- * resolver and the config validator read, and nothing a human reads.
- * The style names and the reasons behind each curated choice are copy:
- * they live in `apps/web/src/admin/presetCopy.js`, which rides the admin
- * chunk, and the design prose lives in
- * `design/tokens/presets/README.md`. This file is the only one of the
- * three that ships to Cloud Functions, where prose could never be read.
+ * WHAT EVERY PATH READS. Palettes, type maps, shape, the motif default,
+ * and the option ids and defaults — what the config validator, the
+ * contrast check and the palette resolver read on every path, and
+ * nothing a human reads. What a style MOVES — its token and
+ * component-font remaps, what each choice moves, the component defaults
+ * a style change resets — is `presetRemaps.cjs`, which only a path that
+ * resolves a style at runtime loads. The style names and the reasons
+ * behind each curated choice are copy: they live in
+ * `apps/web/src/admin/presetCopy.js`, which rides the admin chunk, and
+ * the design prose lives in `design/tokens/presets/README.md`.
  *
  * The design source of truth is `design/tokens/presets/*.json`,
  * `design/tokens/admin.json`, and `design/tokens/motifs.json`. This file
@@ -69,41 +71,18 @@ const PRESETS = Object.freeze({
       density: 'comfortable',
     },
     motifSet: 'none',
-    tokens: {
-      '--session-card-pad-block': 'var(--space-md)',
-      '--folio-font': 'var(--font-data)',
-      '--definition-list-term-width': '11rem',
-      '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
-      '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
-      '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
-      '--pull-quote-pad-inline': 'var(--space-md)',
-      '--hero-art-width': '58%',
-      '--hero-art-position': '80% 50%',
-      '--hero-title-size': 'clamp(2.5rem, 5vw, 5rem)',
-      '--hero-title-tracking': '-.035em',
-      '--standfirst-size': 'var(--text-lead)',
-    },
     options: {
       headingFace: {
         default: 'merriweather',
         choices: [
           {
             id: 'merriweather',
-            fonts: {
-              heading: 'merriweather',
-            },
           },
           {
             id: 'source-serif-4',
-            fonts: {
-              heading: 'serif-editorial',
-            },
           },
           {
             id: 'public-sans-bold',
-            fonts: {
-              heading: 'public-sans',
-            },
           },
         ],
       },
@@ -112,27 +91,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'institutional-letterhead',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-meta-placement': 'block',
-              '--nameplate-rule-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'two-part-lockup',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-meta-placement': 'inline',
-              '--nameplate-frame-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'compact-standing-head',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-size': 'var(--text-h1)',
-              '--nameplate-meta-placement': 'inline',
-            },
           },
         ],
       },
@@ -141,17 +105,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'posted-agenda',
-            tokens: {
-              '--schedule-number-display': 'none',
-              '--schedule-row-leading': 'var(--text-body-leading)',
-            },
           },
           {
             id: 'numbered-agenda',
-            tokens: {
-              '--schedule-number-display': 'inline',
-              '--schedule-row-leading': 'var(--text-body-leading)',
-            },
           },
         ],
       },
@@ -160,24 +116,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'drop-cap',
-            tokens: {
-              '--drop-cap-float': 'left',
-              '--drop-cap-size': '3.1em',
-              '--drop-cap-pad-inline-end': 'var(--space-xs)',
-            },
           },
           {
             id: 'standfirst',
-            tokens: {
-              '--long-read-opening-size': 'var(--text-lead)',
-              '--long-read-opening-leading': 'var(--text-lead-leading)',
-            },
           },
           {
             id: 'plain',
-            tokens: {
-              '--drop-cap-float': 'none',
-            },
           },
         ],
       },
@@ -186,16 +130,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'ruled-minute',
-            tokens: {
-              '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'plain-rules',
-            tokens: {
-              '--pull-quote-rule-inline-width': '0',
-              '--pull-quote-pad-inline': '0',
-            },
           },
         ],
       },
@@ -204,16 +141,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'ruled-entries',
-            tokens: {
-              '--directory-portrait-aspect': '1 / 1',
-            },
           },
           {
             id: 'portrait-plates',
-            tokens: {
-              '--directory-portrait-aspect': '4 / 5',
-              '--directory-entry-pad-block': 'var(--space-xs)',
-            },
           },
         ],
       },
@@ -222,21 +152,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'rule-and-folio',
-            tokens: {
-              '--section-folio-display': 'inline',
-            },
           },
           {
             id: 'rule-only',
-            tokens: {
-              '--section-folio-display': 'none',
-            },
           },
           {
             id: 'folio-in-margin',
-            tokens: {
-              '--section-folio-placement': 'margin',
-            },
           },
         ],
       },
@@ -245,21 +166,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'hairline-rows',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'ruled-head',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-strong-width)',
-            },
           },
           {
             id: 'full-grid',
-            tokens: {
-              '--table-column-rule-width': 'var(--rule-hairline-width)',
-            },
           },
         ],
       },
@@ -311,43 +223,18 @@ const PRESETS = Object.freeze({
       density: 'comfortable',
     },
     motifSet: 'none',
-    tokens: {
-      '--folio-font': 'var(--font-data)',
-      '--section-rule-width': 'var(--rule-strong-width)',
-      '--definition-list-term-width': '10rem',
-      '--pull-quote-mark-display': 'block',
-      '--pull-quote-pad-block': 'var(--space-lg)',
-      '--notice-bar-urgent-rule-width': 'var(--rule-nameplate-width)',
-      '--table-head-transform': 'uppercase',
-      '--table-head-tracking': '0.04em',
-      '--hero-art-width': '56%',
-      '--hero-copy-pad-inline-start': 'var(--space-md)',
-      '--hero-copy-border-inline-start': '.35rem solid rgb(var(--color-accent-rgb))',
-      '--hero-veil-background': 'linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%)',
-      '--standfirst-font': 'var(--font-heading)',
-      '--standfirst-weight': 'var(--weight-regular)',
-    },
     options: {
       headingFace: {
         default: 'fraunces',
         choices: [
           {
             id: 'fraunces',
-            fonts: {
-              heading: 'fraunces',
-            },
           },
           {
             id: 'newsreader-display',
-            fonts: {
-              heading: 'newsreader',
-            },
           },
           {
             id: 'archivo-condensed',
-            fonts: {
-              heading: 'archivo-condensed',
-            },
           },
         ],
       },
@@ -356,29 +243,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'rule-bounded-bar',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-rule-width': 'var(--rule-strong-width)',
-              '--nameplate-meta-placement': 'inline',
-            },
           },
           {
             id: 'stacked-with-deck',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-rule-width': 'var(--rule-hairline-width)',
-              '--nameplate-meta-placement': 'block',
-              '--nameplate-gap': 'var(--space-xs)',
-            },
           },
           {
             id: 'section-aware-bar',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-size': 'var(--text-h1)',
-              '--nameplate-rule-width': 'var(--rule-strong-width)',
-              '--nameplate-meta-placement': 'inline',
-            },
           },
         ],
       },
@@ -387,17 +257,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'hairline-row',
-            tokens: {
-              '--session-card-lead-scale': '1',
-              '--session-card-rule-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'lead-and-rest',
-            tokens: {
-              '--session-card-lead-scale': '1.35',
-              '--session-card-rule-width': 'var(--rule-hairline-width)',
-            },
           },
         ],
       },
@@ -406,24 +268,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'drop-cap',
-            tokens: {
-              '--drop-cap-float': 'left',
-              '--drop-cap-size': '3.1em',
-              '--drop-cap-pad-inline-end': 'var(--space-xs)',
-            },
           },
           {
             id: 'standfirst',
-            tokens: {
-              '--long-read-opening-size': 'var(--text-lead)',
-              '--long-read-opening-leading': 'var(--text-lead-leading)',
-            },
           },
           {
             id: 'plain',
-            tokens: {
-              '--drop-cap-float': 'none',
-            },
           },
         ],
       },
@@ -432,24 +282,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'ruled-with-mark',
-            tokens: {
-              '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
-            },
           },
           {
             id: 'side-rule',
-            tokens: {
-              '--pull-quote-rule-block-width': '0',
-              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
-              '--pull-quote-pad-inline': 'var(--space-md)',
-              '--pull-quote-mark-display': 'none',
-            },
           },
           {
             id: 'mark-only',
-            tokens: {
-              '--pull-quote-rule-block-width': '0',
-            },
           },
         ],
       },
@@ -458,15 +296,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'portrait-shelf',
-            tokens: {
-              '--directory-portrait-aspect': '1 / 1',
-            },
           },
           {
             id: 'tall-portraits',
-            tokens: {
-              '--directory-portrait-aspect': '3 / 4',
-            },
           },
         ],
       },
@@ -475,21 +307,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'rule-and-folio',
-            tokens: {
-              '--section-folio-display': 'inline',
-            },
           },
           {
             id: 'rule-only',
-            tokens: {
-              '--section-folio-display': 'none',
-            },
           },
           {
             id: 'folio-in-margin',
-            tokens: {
-              '--section-folio-placement': 'margin',
-            },
           },
         ],
       },
@@ -498,21 +321,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'hairline-rows',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'ruled-head',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-strong-width)',
-            },
           },
           {
             id: 'full-grid',
-            tokens: {
-              '--table-column-rule-width': 'var(--rule-hairline-width)',
-            },
           },
         ],
       },
@@ -564,57 +378,18 @@ const PRESETS = Object.freeze({
       density: 'tight',
     },
     motifSet: 'none',
-    tokens: {
-      '--session-card-pad-block': 'var(--space-sm)',
-      '--folio-font': 'var(--font-data)',
-      '--definition-list-term-style': 'italic',
-      '--definition-list-term-width': '8rem',
-      '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
-      '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
-      '--pull-quote-mark-display': 'block',
-      '--pull-quote-align': 'center',
-      '--pull-quote-attribution-transform': 'uppercase',
-      '--timeline-spine-width': 'var(--rule-strong-width)',
-      '--progress-fill': 'rgb(var(--color-text-primary-rgb))',
-      '--progress-block-size': 'var(--space-3xs)',
-      '--progress-radius': '0',
-      '--notice-bar-ground': 'rgb(var(--color-surface-rgb))',
-      '--table-head-transform': 'uppercase',
-      '--table-head-tracking': '0.06em',
-      '--hero-rule-block-start': 'var(--rule-strong-width) double rgb(var(--rule-strong-rgb))',
-      '--hero-art-width': '75%',
-      '--hero-art-position': '85% 50%',
-      '--hero-title-style': 'normal',
-      '--hero-title-tracking': '-.055em',
-      '--avatar-ink': 'rgb(var(--color-text-primary-rgb))',
-      '--avatar-radius': '0',
-      '--legend-transform': 'uppercase',
-      '--legend-tracking': 'var(--text-folio-tracking)',
-      '--standfirst-style': 'italic',
-      '--byline-transform': 'uppercase',
-      '--byline-tracking': 'var(--text-folio-tracking)',
-    },
     options: {
       headingFace: {
         default: 'libre-caslon-display',
         choices: [
           {
             id: 'libre-caslon-display',
-            fonts: {
-              heading: 'caslon-display',
-            },
           },
           {
             id: 'libre-baskerville',
-            fonts: {
-              heading: 'baskerville',
-            },
           },
           {
             id: 'spectral',
-            fonts: {
-              heading: 'spectral',
-            },
           },
         ],
       },
@@ -623,28 +398,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'full-measure',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-rule-top-width': '0',
-              '--nameplate-meta-placement': 'block',
-            },
           },
           {
             id: 'centred-double-rule',
-            tokens: {
-              '--nameplate-align': 'center',
-              '--nameplate-rule-top-width': 'var(--rule-hairline-width)',
-              '--nameplate-meta-placement': 'inline',
-            },
           },
           {
             id: 'compact-standing-edition',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-size': 'var(--text-h1)',
-              '--nameplate-rule-width': 'var(--rule-hairline-width)',
-              '--nameplate-meta-placement': 'inline',
-            },
           },
         ],
       },
@@ -653,18 +412,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'ruled-programme',
-            tokens: {
-              '--schedule-row-leading': 'var(--text-body-leading)',
-              '--schedule-data-size': 'var(--text-caption)',
-            },
           },
           {
             id: 'agate-block',
-            tokens: {
-              '--schedule-row-leading': '1.3',
-              '--schedule-data-size': 'var(--text-folio)',
-              '--session-card-pad-block': 'var(--space-xs)',
-            },
           },
         ],
       },
@@ -673,24 +423,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'drop-cap',
-            tokens: {
-              '--drop-cap-float': 'left',
-              '--drop-cap-size': '3.1em',
-              '--drop-cap-pad-inline-end': 'var(--space-xs)',
-            },
           },
           {
             id: 'standfirst',
-            tokens: {
-              '--long-read-opening-size': 'var(--text-lead)',
-              '--long-read-opening-leading': 'var(--text-lead-leading)',
-            },
           },
           {
             id: 'plain',
-            tokens: {
-              '--drop-cap-float': 'none',
-            },
           },
         ],
       },
@@ -699,19 +437,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'centred-mark',
-            tokens: {
-              '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'column-rule',
-            tokens: {
-              '--pull-quote-rule-block-width': '0',
-              '--pull-quote-rule-inline-width': 'var(--rule-hairline-width)',
-              '--pull-quote-pad-inline': 'var(--space-md)',
-              '--pull-quote-mark-display': 'none',
-              '--pull-quote-align': 'start',
-            },
           },
         ],
       },
@@ -720,18 +448,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'agate-directory',
-            tokens: {
-              '--directory-portrait-radius': '0',
-              '--directory-entry-pad-block': 'var(--space-3xs)',
-            },
           },
           {
             id: 'plate-portraits',
-            tokens: {
-              '--directory-portrait-aspect': '4 / 5',
-              '--directory-portrait-radius': '0',
-              '--directory-rule-width': 'var(--rule-strong-width)',
-            },
           },
         ],
       },
@@ -740,21 +459,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'rule-and-folio',
-            tokens: {
-              '--section-folio-display': 'inline',
-            },
           },
           {
             id: 'rule-only',
-            tokens: {
-              '--section-folio-display': 'none',
-            },
           },
           {
             id: 'folio-in-margin',
-            tokens: {
-              '--section-folio-placement': 'margin',
-            },
           },
         ],
       },
@@ -763,22 +473,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'hairline-rows',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'ruled-head',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-strong-width)',
-            },
           },
           {
             id: 'full-grid',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-hairline-width)',
-              '--table-column-rule-width': 'var(--rule-hairline-width)',
-            },
           },
         ],
       },
@@ -830,78 +530,18 @@ const PRESETS = Object.freeze({
       density: 'tight',
     },
     motifSet: 'cartographic',
-    tokens: {
-      '--definition-list-term-font': 'var(--font-mono)',
-      '--definition-list-term-transform': 'uppercase',
-      '--definition-list-term-tracking': '0.05em',
-      '--definition-list-term-width': '7rem',
-      '--pull-quote-rule-block-width': '0',
-      '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
-      '--pull-quote-pad-inline': 'var(--space-md)',
-      '--pull-quote-attribution-font': 'var(--font-mono)',
-      '--timeline-stop-size': 'var(--space-xs)',
-      '--progress-block-size': 'var(--space-2xs)',
-      '--progress-radius': '0',
-      '--notice-bar-word-font': 'var(--font-mono)',
-      '--table-head-font': 'var(--font-mono)',
-      '--table-head-transform': 'uppercase',
-      '--table-head-tracking': '0.05em',
-      '--map-grid-size': 'var(--space-xl)',
-      '--schedule-trace-width': 'var(--rule-strong-width)',
-      '--route-mark-radius': 'var(--radius-base)',
-      '--session-card-pad-block': 'var(--space-xs)',
-      '--folio-font': 'var(--font-data)',
-      '--section-rule-width': 'var(--rule-strong-width)',
-      '--hero-art-width': '100%',
-      '--hero-art-position': 'center',
-      '--hero-veil-background': 'linear-gradient(90deg, rgb(var(--color-surface-rgb) / .98), rgb(var(--color-surface-rgb) / .88) 38%, rgb(var(--color-surface-rgb) / 0) 72%)',
-      '--hero-copy-pad-block-end': '6.5rem',
-      '--hero-route-display': 'block',
-      '--hero-route-color': 'rgb(255 212 59)',
-      '--hero-sign-display': 'flex',
-      '--schedule-days-gap': 'var(--space-xs)',
-      '--schedule-days-border-block-end': '0',
-      '--schedule-day-min-inline-size': '7rem',
-      '--schedule-day-pad-inline': 'var(--space-md)',
-      '--schedule-day-border': 'var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb))',
-      '--schedule-day-border-block-end': 'var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb))',
-      '--schedule-day-radius': 'var(--space-xs) var(--space-xs) 0 0',
-      '--schedule-day-background': 'rgb(var(--color-surface-alt-rgb))',
-      '--schedule-day-active-color': 'rgb(var(--color-surface-rgb))',
-      '--schedule-day-active-background': 'rgb(var(--color-text-primary-rgb))',
-      '--schedule-day-active-border-color': 'rgb(var(--color-text-primary-rgb))',
-      '--schedule-route-pad-inline-start': 'var(--space-lg)',
-      '--schedule-route-line-width': '2px',
-      '--schedule-route-stop-size': '12px',
-      '--schedule-route-stop-border-width': '3px',
-      '--avatar-frame-width': 'var(--rule-strong-width)',
-      '--dropzone-rule-style': 'solid',
-      '--legend-font': 'var(--font-mono)',
-      '--state-marker-font': 'var(--font-mono)',
-      '--standfirst-font': 'var(--font-heading)',
-      '--byline-font': 'var(--font-mono)',
-    },
     options: {
       headingFace: {
         default: 'overpass',
         choices: [
           {
             id: 'overpass',
-            fonts: {
-              heading: 'overpass',
-            },
           },
           {
             id: 'libre-franklin-extrabold',
-            fonts: {
-              heading: 'libre-franklin',
-            },
           },
           {
             id: 'archivo-condensed',
-            fonts: {
-              heading: 'archivo-condensed',
-            },
           },
         ],
       },
@@ -910,30 +550,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'corner-title-block',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-frame-width': 'var(--rule-hairline-width)',
-              '--nameplate-corner-mark-width': 'var(--rule-hairline-width)',
-              '--nameplate-meta-placement': 'block',
-            },
           },
           {
             id: 'sheet-header-scale-line',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-frame-width': '0',
-              '--nameplate-meta-placement': 'inline',
-              '--nameplate-rule-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'departure-board-header',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-frame-width': '0',
-              '--nameplate-rule-width': 'var(--rule-strong-width)',
-              '--nameplate-meta-placement': 'block',
-            },
           },
         ],
       },
@@ -942,26 +564,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'departure-board',
-            tokens: {
-              '--map-grid-size': 'var(--space-xl)',
-              '--schedule-data-size': 'var(--text-caption)',
-            },
           },
           {
             id: 'line-diagram',
-            tokens: {
-              '--map-grid-size': '0',
-              '--schedule-data-size': 'var(--text-caption)',
-              '--schedule-row-leading': '1.5',
-            },
           },
           {
             id: 'gazetteer-list',
-            tokens: {
-              '--map-grid-size': '0',
-              '--schedule-data-size': 'var(--text-folio)',
-              '--schedule-row-leading': 'var(--text-body-leading)',
-            },
           },
         ],
       },
@@ -970,24 +578,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'drop-cap',
-            tokens: {
-              '--drop-cap-float': 'left',
-              '--drop-cap-size': '3.1em',
-              '--drop-cap-pad-inline-end': 'var(--space-xs)',
-            },
           },
           {
             id: 'standfirst',
-            tokens: {
-              '--long-read-opening-size': 'var(--text-lead)',
-              '--long-read-opening-leading': 'var(--text-lead-leading)',
-            },
           },
           {
             id: 'plain',
-            tokens: {
-              '--drop-cap-float': 'none',
-            },
           },
         ],
       },
@@ -996,15 +592,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'route-line',
-            tokens: {
-              '--pull-quote-rule-block-width': '0',
-            },
           },
           {
             id: 'boxed-sign',
-            tokens: {
-              '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
-            },
           },
         ],
       },
@@ -1013,17 +603,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'gazetteer',
-            tokens: {
-              '--directory-entry-pad-block': 'var(--space-3xs)',
-            },
           },
           {
             id: 'station-index',
-            tokens: {
-              '--directory-portrait-aspect': '4 / 5',
-              '--directory-rule-width': 'var(--rule-strong-width)',
-              '--directory-entry-pad-block': 'var(--space-xs)',
-            },
           },
         ],
       },
@@ -1032,15 +614,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'rule-and-folio',
-            tokens: {
-              '--section-folio-display': 'inline',
-            },
           },
           {
             id: 'rule-only',
-            tokens: {
-              '--section-folio-display': 'none',
-            },
           },
         ],
       },
@@ -1049,21 +625,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'hairline-rows',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'ruled-head',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-strong-width)',
-            },
           },
           {
             id: 'full-grid',
-            tokens: {
-              '--table-column-rule-width': 'var(--rule-hairline-width)',
-            },
           },
         ],
       },
@@ -1115,60 +682,18 @@ const PRESETS = Object.freeze({
       density: 'comfortable',
     },
     motifSet: 'botanical',
-    tokens: {
-      '--definition-list-term-font': 'var(--font-mono)',
-      '--definition-list-term-transform': 'uppercase',
-      '--definition-list-term-tracking': '0.06em',
-      '--definition-list-term-size': 'var(--text-folio)',
-      '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
-      '--pull-quote-rule-block-width': '0',
-      '--pull-quote-rule-inline-width': 'var(--rule-hairline-width)',
-      '--pull-quote-pad-inline': 'var(--space-md)',
-      '--timeline-tick-length': 'var(--space-md)',
-      '--progress-fill': 'rgb(var(--color-accent-secondary-rgb))',
-      '--progress-radius': '0',
-      '--notice-bar-word-font': 'var(--font-mono)',
-      '--table-head-font': 'var(--font-mono)',
-      '--table-head-transform': 'uppercase',
-      '--table-head-tracking': '0.06em',
-      '--plate-frame-width': 'var(--rule-hairline-width)',
-      '--plate-pad': 'var(--space-md)',
-      '--plate-number-display': 'inline',
-      '--specimen-label-rule-width': 'var(--rule-hairline-width)',
-      '--specimen-label-pad': 'var(--space-2xs)',
-      '--specimen-label-key-display': 'inline',
-      '--folio-font': 'var(--font-data)',
-      '--marginalia-display': 'none',
-      '--hero-art-width': '67%',
-      '--hero-art-position': '75% 45%',
-      '--hero-title-style': 'italic',
-      '--hero-title-weight': 'var(--weight-semibold)',
-      '--avatar-radius': '0',
-      '--legend-font': 'var(--font-mono)',
-      '--standfirst-style': 'italic',
-      '--byline-font': 'var(--font-mono)',
-    },
     options: {
       headingFace: {
         default: 'besley',
         choices: [
           {
             id: 'besley',
-            fonts: {
-              heading: 'besley',
-            },
           },
           {
             id: 'vollkorn-display',
-            fonts: {
-              heading: 'vollkorn',
-            },
           },
           {
             id: 'spectral',
-            fonts: {
-              heading: 'spectral',
-            },
           },
         ],
       },
@@ -1177,29 +702,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'framed-title-page',
-            tokens: {
-              '--nameplate-align': 'center',
-              '--nameplate-frame-width': 'var(--rule-hairline-width)',
-              '--nameplate-meta-placement': 'block',
-            },
           },
           {
             id: 'ruled-title-no-frame',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-frame-width': '0',
-              '--nameplate-rule-top-width': 'var(--rule-hairline-width)',
-              '--nameplate-meta-placement': 'block',
-            },
           },
           {
             id: 'plate-and-label',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-frame-width': '0',
-              '--nameplate-meta-placement': 'inline',
-              '--plate-frame-width': 'var(--rule-strong-width)',
-            },
           },
         ],
       },
@@ -1208,18 +716,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'specimen-label',
-            tokens: {
-              '--session-card-rule-width': 'var(--rule-hairline-width)',
-              '--session-card-pad-block': 'var(--space-sm)',
-            },
           },
           {
             id: 'field-notes-column',
-            tokens: {
-              '--session-card-rule-width': 'var(--rule-hairline-width)',
-              '--session-card-pad-block': 'var(--space-xs)',
-              '--schedule-row-leading': '1.4',
-            },
           },
         ],
       },
@@ -1228,15 +727,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'off',
-            tokens: {
-              '--marginalia-display': 'none',
-            },
           },
           {
             id: 'on',
-            tokens: {
-              '--marginalia-display': 'inline',
-            },
           },
         ],
       },
@@ -1245,24 +738,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'drop-cap',
-            tokens: {
-              '--drop-cap-float': 'left',
-              '--drop-cap-size': '3.1em',
-              '--drop-cap-pad-inline-end': 'var(--space-xs)',
-            },
           },
           {
             id: 'standfirst',
-            tokens: {
-              '--long-read-opening-size': 'var(--text-lead)',
-              '--long-read-opening-leading': 'var(--text-lead-leading)',
-            },
           },
           {
             id: 'plain',
-            tokens: {
-              '--drop-cap-float': 'none',
-            },
           },
         ],
       },
@@ -1271,19 +752,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'field-note',
-            tokens: {
-              '--pull-quote-rule-block-width': '0',
-            },
           },
           {
             id: 'pressed-page',
-            tokens: {
-              '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
-              '--pull-quote-rule-inline-width': '0',
-              '--pull-quote-pad-inline': '0',
-              '--pull-quote-mark-display': 'block',
-              '--pull-quote-align': 'center',
-            },
           },
         ],
       },
@@ -1292,17 +763,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'specimen-plates',
-            tokens: {
-              '--directory-portrait-aspect': '4 / 5',
-              '--directory-portrait-radius': '0',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-rgb))',
-            },
           },
           {
             id: 'field-list',
-            tokens: {
-              '--directory-portrait-radius': '0',
-            },
           },
         ],
       },
@@ -1311,21 +774,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'rule-and-folio',
-            tokens: {
-              '--section-folio-display': 'inline',
-            },
           },
           {
             id: 'rule-only',
-            tokens: {
-              '--section-folio-display': 'none',
-            },
           },
           {
             id: 'folio-in-margin',
-            tokens: {
-              '--section-folio-placement': 'margin',
-            },
           },
         ],
       },
@@ -1334,22 +788,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'hairline-rows',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'ruled-head',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-strong-width)',
-            },
           },
           {
             id: 'full-grid',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-hairline-width)',
-              '--table-column-rule-width': 'var(--rule-hairline-width)',
-            },
           },
         ],
       },
@@ -1395,76 +839,24 @@ const PRESETS = Object.freeze({
       data: 'fragment-mono',
       mono: 'fragment-mono',
     },
-    componentFonts: {
-      '--callout-font': 'script-casual',
-    },
     shape: {
       radius: 'sharp',
       texture: 'paper',
       density: 'loose',
     },
     motifSet: 'none',
-    tokens: {
-      '--session-card-rule-width': 'var(--rule-strong-width)',
-      '--folio-rule-width': 'var(--rule-strong-width)',
-      '--folio-font': 'var(--font-mono)',
-      '--callout-angle': '-2.5deg',
-      '--marginalia-display': 'none',
-      '--definition-list-rule-width': 'var(--rule-strong-width)',
-      '--definition-list-term-font': 'var(--font-mono)',
-      '--definition-list-term-transform': 'uppercase',
-      '--definition-list-term-tracking': '0.04em',
-      '--pull-quote-pad-block': 'var(--space-lg)',
-      '--timeline-spine-width': 'var(--rule-strong-width)',
-      '--progress-fill': 'rgb(var(--color-text-primary-rgb))',
-      '--progress-radius': '0',
-      '--notice-bar-ground': 'rgb(var(--color-surface-rgb))',
-      '--notice-bar-rule-width': 'var(--rule-strong-width)',
-      '--notice-bar-word-font': 'var(--font-mono)',
-      '--table-head-font': 'var(--font-mono)',
-      '--table-head-transform': 'uppercase',
-      '--table-head-tracking': '0.04em',
-      '--hero-art-width': '64%',
-      '--hero-title-size': 'clamp(2.8rem, 6vw, 6rem)',
-      '--hero-title-tracking': '-.06em',
-      '--hero-title-transform': 'uppercase',
-      '--hero-press-display': 'block',
-      '--avatar-frame-width': 'var(--rule-strong-width)',
-      '--avatar-radius': '0',
-      '--dropzone-rule-style': 'solid',
-      '--dropzone-rule-width': 'var(--rule-strong-width)',
-      '--repeater-rule-width': 'var(--rule-strong-width)',
-      '--count-figure-weight': 'var(--weight-bold)',
-      '--legend-font': 'var(--font-mono)',
-      '--legend-rule-width': 'var(--rule-strong-width)',
-      '--legend-pad-block': 'var(--space-2xs)',
-      '--state-marker-font': 'var(--font-mono)',
-      '--standfirst-ink': 'rgb(var(--color-text-primary-rgb))',
-      '--standfirst-rule-width': 'var(--rule-strong-width)',
-      '--standfirst-pad-block-end': 'var(--space-sm)',
-      '--byline-font': 'var(--font-mono)',
-    },
     options: {
       headingFace: {
         default: 'karrik',
         choices: [
           {
             id: 'karrik',
-            fonts: {
-              heading: 'karrik',
-            },
           },
           {
             id: 'bagnard',
-            fonts: {
-              heading: 'bagnard',
-            },
           },
           {
             id: 'avara',
-            fonts: {
-              heading: 'avara',
-            },
           },
         ],
       },
@@ -1473,27 +865,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'full-sheet',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-rule-width': 'var(--rule-nameplate-width)',
-              '--nameplate-frame-width': '0',
-            },
           },
           {
             id: 'stacked-block',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-leading': '0.86',
-              '--nameplate-frame-width': '0',
-            },
           },
           {
             id: 'boxed-bill',
-            tokens: {
-              '--nameplate-align': 'start',
-              '--nameplate-frame-width': 'var(--rule-strong-width)',
-              '--nameplate-meta-placement': 'block',
-            },
           },
         ],
       },
@@ -1502,26 +879,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'flat-block',
-            tokens: {
-              '--session-card-stamp-offset': '0',
-              '--folio-rule-top-width': '0',
-            },
           },
           {
             id: 'stamped-block',
-            tokens: {
-              '--session-card-stamp-offset': '4px',
-              '--session-card-stamp-alpha': '0.55',
-              '--folio-rule-top-width': '0',
-            },
           },
           {
             id: 'struck-folio',
-            tokens: {
-              '--session-card-stamp-offset': '0',
-              '--folio-rule-top-width': 'var(--rule-strong-width)',
-              '--folio-font': 'var(--font-mono)',
-            },
           },
         ],
       },
@@ -1530,15 +893,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'off',
-            tokens: {
-              '--marginalia-display': 'none',
-            },
           },
           {
             id: 'on',
-            tokens: {
-              '--marginalia-display': 'inline',
-            },
           },
         ],
       },
@@ -1547,24 +904,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'drop-cap',
-            tokens: {
-              '--drop-cap-float': 'left',
-              '--drop-cap-size': '3.1em',
-              '--drop-cap-pad-inline-end': 'var(--space-xs)',
-            },
           },
           {
             id: 'standfirst',
-            tokens: {
-              '--long-read-opening-size': 'var(--text-lead)',
-              '--long-read-opening-leading': 'var(--text-lead-leading)',
-            },
           },
           {
             id: 'plain',
-            tokens: {
-              '--drop-cap-float': 'none',
-            },
           },
         ],
       },
@@ -1573,28 +918,12 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'handwritten',
-            tokens: {
-              '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
-            },
           },
           {
             id: 'toner-block',
-            componentFonts: {
-              '--callout-font': 'karrik',
-            },
-            tokens: {
-              '--callout-angle': '0deg',
-              '--pull-quote-pad-block': 'var(--space-md)',
-            },
           },
           {
             id: 'cut-out',
-            tokens: {
-              '--pull-quote-rule-block-width': '0',
-              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
-              '--pull-quote-pad-inline': 'var(--space-md)',
-              '--pull-quote-pad-block': 'var(--space-sm)',
-            },
           },
         ],
       },
@@ -1603,18 +932,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'contact-sheet',
-            tokens: {
-              '--directory-portrait-radius': '0',
-              '--directory-rule-width': 'var(--rule-strong-width)',
-            },
           },
           {
             id: 'cut-outs',
-            tokens: {
-              '--directory-portrait-aspect': '4 / 5',
-              '--directory-portrait-radius': '0',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-rgb))',
-            },
           },
         ],
       },
@@ -1623,15 +943,9 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'rule-and-folio',
-            tokens: {
-              '--section-folio-display': 'inline',
-            },
           },
           {
             id: 'rule-only',
-            tokens: {
-              '--section-folio-display': 'none',
-            },
           },
         ],
       },
@@ -1640,158 +954,17 @@ const PRESETS = Object.freeze({
         choices: [
           {
             id: 'hairline-rows',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-hairline-width)',
-            },
           },
           {
             id: 'ruled-head',
-            tokens: {
-              '--table-head-rule-width': 'var(--rule-strong-width)',
-            },
           },
           {
             id: 'full-grid',
-            tokens: {
-              '--table-column-rule-width': 'var(--rule-hairline-width)',
-            },
           },
         ],
       },
     },
   },
-});
-
-const COMPONENT_TOKEN_DEFAULTS = Object.freeze({
-  '--session-card-rule-width': 'var(--rule-hairline-width)',
-  '--session-card-stamp-offset': '0',
-  '--session-card-stamp-alpha': '1',
-  '--session-card-lead-scale': '1',
-  '--session-card-pad-block': 'var(--space-md)',
-  '--nameplate-rule-width': 'var(--rule-nameplate-width)',
-  '--nameplate-rule-top-width': '0',
-  '--nameplate-frame-width': '0',
-  '--nameplate-corner-mark-width': '0',
-  '--nameplate-align': 'start',
-  '--nameplate-meta-placement': 'block',
-  '--nameplate-size': 'var(--text-nameplate)',
-  '--nameplate-leading': 'var(--text-nameplate-leading)',
-  '--nameplate-gap': 'var(--space-sm)',
-  '--hero-rule-block-start': 'var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb))',
-  '--hero-art-width': '70%',
-  '--hero-art-position': '70% 50%',
-  '--hero-veil-background': 'linear-gradient(90deg, rgb(var(--color-surface-rgb)) 0%, rgb(var(--color-surface-rgb)) 35%, rgb(var(--color-surface-rgb) / .92) 43%, rgb(var(--color-surface-rgb) / 0) 73%)',
-  '--hero-copy-pad-inline-start': '0',
-  '--hero-copy-border-inline-start': '0 solid transparent',
-  '--hero-copy-pad-block-end': 'var(--space-2xl)',
-  '--hero-title-size': 'clamp(2.7rem, 5.8vw, 5.75rem)',
-  '--hero-title-style': 'normal',
-  '--hero-title-weight': 'var(--weight-bold)',
-  '--hero-title-tracking': '-.045em',
-  '--hero-title-transform': 'none',
-  '--hero-route-display': 'none',
-  '--hero-route-color': 'rgb(var(--color-accent-rgb))',
-  '--hero-sign-display': 'none',
-  '--hero-press-display': 'none',
-  '--section-rule-width': 'var(--rule-strong-width)',
-  '--section-folio-display': 'inline',
-  '--section-folio-placement': 'end',
-  '--folio-rule-width': 'var(--rule-hairline-width)',
-  '--folio-rule-top-width': '0',
-  '--folio-font': 'var(--font-data)',
-  '--schedule-row-leading': 'var(--text-body-leading)',
-  '--schedule-data-size': 'var(--text-caption)',
-  '--schedule-number-display': 'none',
-  '--schedule-trace-width': '0',
-  '--schedule-days-gap': '0 var(--space-md)',
-  '--schedule-days-border-block-end': 'var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb))',
-  '--schedule-day-min-inline-size': '2.75rem',
-  '--schedule-day-pad-inline': 'var(--space-2xs)',
-  '--schedule-day-border': '0 solid transparent',
-  '--schedule-day-border-block-end': 'var(--rule-strong-width) solid transparent',
-  '--schedule-day-radius': '0',
-  '--schedule-day-background': 'transparent',
-  '--schedule-day-active-color': 'rgb(var(--color-text-primary-rgb))',
-  '--schedule-day-active-background': 'transparent',
-  '--schedule-day-active-border-color': 'rgb(var(--rule-strong-rgb))',
-  '--schedule-route-pad-inline-start': '0',
-  '--schedule-route-line-width': '0',
-  '--schedule-route-stop-size': '0',
-  '--schedule-route-stop-border-width': '0',
-  '--plate-frame-width': '0',
-  '--plate-pad': '0',
-  '--plate-number-display': 'none',
-  '--specimen-label-rule-width': '0',
-  '--specimen-label-pad': '0',
-  '--specimen-label-key-display': 'none',
-  '--map-grid-size': '0',
-  '--route-mark-radius': '0',
-  '--callout-font': 'var(--font-heading)',
-  '--callout-angle': '0deg',
-  '--marginalia-display': 'none',
-  '--definition-list-rule-width': 'var(--rule-hairline-width)',
-  '--definition-list-term-font': 'var(--font-data)',
-  '--definition-list-term-size': 'var(--text-caption)',
-  '--definition-list-term-style': 'normal',
-  '--definition-list-term-transform': 'none',
-  '--definition-list-term-tracking': '0em',
-  '--definition-list-term-width': '9rem',
-  '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
-  '--pull-quote-rule-inline-width': '0',
-  '--pull-quote-mark-display': 'none',
-  '--pull-quote-align': 'start',
-  '--pull-quote-pad-inline': '0',
-  '--pull-quote-pad-block': 'var(--space-md)',
-  '--pull-quote-attribution-font': 'var(--font-data)',
-  '--pull-quote-attribution-transform': 'none',
-  '--timeline-spine-width': 'var(--rule-hairline-width)',
-  '--timeline-tick-length': 'var(--space-sm)',
-  '--timeline-stop-size': '0',
-  '--progress-fill': 'rgb(var(--color-accent-rgb))',
-  '--progress-block-size': 'var(--space-xs)',
-  '--progress-radius': 'var(--radius-base)',
-  '--notice-bar-ground': 'rgb(var(--color-surface-alt-rgb))',
-  '--notice-bar-rule-width': 'var(--rule-hairline-width)',
-  '--notice-bar-urgent-rule-width': 'var(--rule-strong-width)',
-  '--notice-bar-word-font': 'var(--font-data)',
-  '--table-head-rule-width': 'var(--rule-strong-width)',
-  '--table-column-rule-width': '0',
-  '--table-head-font': 'var(--font-data)',
-  '--table-head-transform': 'none',
-  '--table-head-tracking': '0em',
-  '--avatar-ink': 'rgb(var(--color-text-secondary-rgb))',
-  '--avatar-frame-width': 'var(--rule-hairline-width)',
-  '--avatar-radius': 'var(--radius-base)',
-  '--dropzone-rule-width': 'var(--rule-hairline-width)',
-  '--dropzone-rule-style': 'dashed',
-  '--repeater-rule-width': 'var(--rule-hairline-width)',
-  '--count-figure-weight': 'var(--weight-semibold)',
-  '--legend-font': 'var(--font-data)',
-  '--legend-transform': 'none',
-  '--legend-tracking': '0em',
-  '--legend-rule-width': '0',
-  '--legend-pad-block': '0',
-  '--state-marker-font': 'var(--font-data)',
-  '--standfirst-font': 'var(--font-body)',
-  '--standfirst-size': 'var(--text-lead)',
-  '--standfirst-style': 'normal',
-  '--standfirst-weight': 'var(--weight-regular)',
-  '--standfirst-ink': 'rgb(var(--color-text-secondary-rgb))',
-  '--standfirst-rule-width': '0',
-  '--standfirst-pad-block-end': '0',
-  '--byline-font': 'var(--font-data)',
-  '--byline-transform': 'none',
-  '--byline-tracking': '0em',
-  '--directory-rule-width': 'var(--rule-hairline-width)',
-  '--directory-portrait-aspect': '1 / 1',
-  '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
-  '--directory-portrait-radius': 'var(--radius-base)',
-  '--directory-entry-pad-block': 'var(--space-2xs)',
-  '--drop-cap-float': 'none',
-  '--drop-cap-size': '1em',
-  '--drop-cap-pad-inline-end': '0',
-  '--long-read-opening-size': 'var(--text-body)',
-  '--long-read-opening-leading': 'var(--text-body-leading)',
 });
 
 const ADMIN_TOKENS = Object.freeze({
@@ -2028,4 +1201,4 @@ const MOTIF_SET_IDS = Object.freeze([
   'cartographic',
 ]);
 
-module.exports = { PRESETS, COMPONENT_TOKEN_DEFAULTS, ADMIN_TOKENS, MOTIF_SET_IDS };
+module.exports = { PRESETS, ADMIN_TOKENS, MOTIF_SET_IDS };

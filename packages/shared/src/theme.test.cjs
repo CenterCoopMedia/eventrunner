@@ -2,6 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+// The preset remaps register themselves with the resolver when required; a
+// style's tokens and picks cannot be resolved until they are (2026-09-10
+// vocabulary expansion).
+require('./presetRemaps.cjs');
 
 const {
   THEME_MODES,
@@ -30,6 +34,8 @@ const {
   resolveThemePalettes,
   findThemeContrastFailures,
   getPreset,
+  presetRemapsLoaded,
+  registerPresetRemaps,
   resolveComponentFonts,
   resolveFontRoles,
   resolveMotifSet,
@@ -703,4 +709,26 @@ test('each preset resets component values left by the generated baseline', () =>
   assert.equal(atlas['--hero-route-display'], 'block');
   assert.equal(civic['--hero-route-display'], 'none');
   assert.equal(civic['--hero-sign-display'], 'none');
+});
+
+test('the remaps register once required, and a style resolves its picks in full', () => {
+  // The catalog carries what every path reads; the remaps arrive with
+  // shared/presetRemaps (2026-09-10 vocabulary expansion). Requiring that
+  // module above registered them, so every resolver here answers in full:
+  // a picked choice moves its tokens and its component face, and the style
+  // change resets the defaults of every token a style can move.
+  assert.equal(presetRemapsLoaded(), true);
+  const toner = { preset: 'zine', optionPicks: { quote: 'toner-block' } };
+  assert.equal(resolveComponentFonts(toner)['--callout-font'], 'karrik');
+  assert.equal(resolveComponentFonts(recommendedConfiguration('zine'))['--callout-font'], 'script-casual');
+  const reset = resolvePresetTokens({ preset: 'civic' }, { resetComponents: true });
+  const own = resolvePresetTokens({ preset: 'civic' });
+  assert.ok(Object.keys(reset).length > Object.keys(own).length, 'the reset adds the component defaults');
+  // A document naming no style needs no remaps to say it moves nothing.
+  assert.deepEqual(resolvePresetTokens({}), {});
+  assert.deepEqual(resolveComponentFonts({}), {});
+  // The registry takes the generated shape and nothing else.
+  assert.throws(() => registerPresetRemaps({}), TypeError);
+  assert.throws(() => registerPresetRemaps({ presets: {} }), TypeError);
+  assert.equal(presetRemapsLoaded(), true);
 });

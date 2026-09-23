@@ -31,6 +31,8 @@ export {
   ADMIN_TOKEN_SET,
   ADMIN_ACCENT_MIN_CONTRAST,
   getPreset,
+  registerPresetRemaps,
+  presetRemapsLoaded,
   themePresetId,
   resolveOptionPicks,
   pickedChoices,

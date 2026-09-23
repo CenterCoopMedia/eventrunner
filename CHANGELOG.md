@@ -109,6 +109,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The preset catalog is split by who needs it. `shared/presetCatalog` carries the palettes, the
+  type maps and every option group's default and choice ids; `shared/presetRemaps` carries what a
+  style moves (its own token remaps, what each choice moves, and the component defaults a style
+  change resets), and only a path that resolves a style at runtime loads it: the web app fetches it
+  as a lazy chunk when a live theme overlay, the demo style switcher, the admin or the specimen book
+  asks, and a Node caller requires it once. The chunk every visitor downloads for first paint no
+  longer carries the remaps of every style, and the resolver refuses to resolve a style's tokens or
+  picks until the remaps are loaded rather than dropping a choice silently.
 - Every control on the public site now answers the same ten interaction states: rest, hover, focus,
   press, selected, disabled, busy, error, success and empty. The hover, press and selected tints
   come from a new `state` family in the design tokens, so a site style retunes every control at

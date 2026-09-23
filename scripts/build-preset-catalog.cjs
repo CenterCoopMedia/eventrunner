@@ -17,24 +17,36 @@
  *     `functions/vendor/shared.tgz`, and `npm pack` cannot reach a file
  *     outside the package directory.
  *
- * THREE OUTPUTS, ONE SOURCE (owner review, 2026-08-27). The catalog used to
- * be one file carrying both the values that render and the prose that
- * explains them, which meant every deploy shipped design rationale into
- * Cloud Functions, where nothing can read it.
+ * FOUR OUTPUTS, ONE SOURCE (owner review, 2026-08-27; split again for the
+ * 2026-09-10 vocabulary expansion). The catalog used to be one file carrying
+ * both the values that render and the prose that explains them, which meant
+ * every deploy shipped design rationale into Cloud Functions, where nothing
+ * can read it.
  *
- *   1. `packages/shared/src/presetCatalog.cjs` — RENDERING VALUES ONLY.
- *      Palettes, type maps, shape, motif default, token remaps, option ids
- *      and defaults. This is what the resolver and the validator need, and
- *      it is the only one of the three that ships to the server.
- *   2. `apps/web/src/admin/presetCopy.js` — THE WORDS STAFF READ. Style
+ *   1. `packages/shared/src/presetCatalog.cjs` — WHAT EVERY PATH READS.
+ *      Palettes, type maps, shape, motif default, and every option group's
+ *      default and choice IDS: what the validator, the contrast check and
+ *      the palette resolver need on every path, in Cloud Functions and in
+ *      the chunk every visitor downloads.
+ *   2. `packages/shared/src/presetRemaps.cjs` — WHAT A STYLE MOVES. Each
+ *      style's own token and component-font remaps, what every choice of
+ *      every option group moves, and the component defaults a style change
+ *      resets. The public site's first paint needs none of it: the
+ *      generated stylesheet already carries the chosen style with its picks
+ *      resolved. It is needed to RESOLVE a style at runtime — a live
+ *      config/theme overlay, the demo's style switcher, the admin's
+ *      branding editor, the specimen book — so those paths load it lazily,
+ *      and a Node caller requires it once. Loading it registers the remaps
+ *      with the resolver (shared/theme registerPresetRemaps).
+ *   3. `apps/web/src/admin/presetCopy.js` — THE WORDS STAFF READ. Style
  *      names, one-line summaries, who each style suits, and the label and
  *      reason for every curated choice. It rides the lazily-loaded admin
  *      chunk and reaches no public page and no function.
- *   3. `design/tokens/presets/README.md` — THE DOCUMENTATION CATALOG. Every
+ *   4. `design/tokens/presets/README.md` — THE DOCUMENTATION CATALOG. Every
  *      design note in the source JSON, rendered for a human deciding which
  *      style an event should wear.
  *
- * `scripts/build-preset-catalog.test.cjs` regenerates all three and fails
+ * `scripts/build-preset-catalog.test.cjs` regenerates all four and fails
  * when any committed file has drifted, exactly as the demo snapshot gate
  * works. Adding a seventh preset stays a data change: drop the JSON in, run
  * this, commit the outputs.
@@ -56,6 +68,7 @@ const ROOT = path.resolve(__dirname, '..');
 const TOKENS_DIR = path.join(ROOT, 'design', 'tokens');
 const PRESETS_DIR = path.join(TOKENS_DIR, 'presets');
 const TARGET = path.join(ROOT, 'packages', 'shared', 'src', 'presetCatalog.cjs');
+const REMAPS_TARGET = path.join(ROOT, 'packages', 'shared', 'src', 'presetRemaps.cjs');
 const COPY_TARGET = path.join(ROOT, 'apps', 'web', 'src', 'admin', 'presetCopy.js');
 const DOC_TARGET = path.join(ROOT, 'design', 'tokens', 'presets', 'README.md');
 
@@ -128,34 +141,61 @@ function jsValue(value, depth = 0) {
 }
 
 /**
- * The rendering values of one preset — everything the resolver, the token
- * generator, and the validator read, and nothing else.
+ * The values of one preset that every path reads: the palette the contrast
+ * check and the palette resolver need, the type map, the shape, the motif
+ * default, and each option group's default and choice ids the validator
+ * needs. Nothing else.
  *
- * An option keeps its id, its default, and the token or font remaps it
- * performs. Its label and the sentence explaining why it belongs to the
- * story are copy, and copy goes to the other two outputs.
+ * What the style MOVES — its own token and component-font remaps, and what
+ * each choice moves — goes to the remaps output (remapValues below), which
+ * only a path that resolves a style at runtime loads. A choice's label and
+ * the sentence explaining why it belongs to the story are copy, and copy
+ * goes to the copy and documentation outputs.
  *
  * @param {object} preset a preset with its `$` notes already stripped
  * @returns {object}
  */
 function renderingValues(preset) {
-  const values = { id: preset.id, palette: preset.palette, fonts: preset.fonts };
-  if (preset.componentFonts) values.componentFonts = preset.componentFonts;
-  values.shape = preset.shape;
-  values.motifSet = preset.motifSet;
-  if (preset.tokens) values.tokens = preset.tokens;
+  const values = {
+    id: preset.id,
+    palette: preset.palette,
+    fonts: preset.fonts,
+    shape: preset.shape,
+    motifSet: preset.motifSet,
+  };
   const options = {};
   for (const [group, spec] of Object.entries(preset.options || {})) {
     options[group] = {
       default: spec.default,
-      choices: (spec.choices || []).map((choice) => {
-        const kept = { id: choice.id };
-        if (choice.fonts) kept.fonts = choice.fonts;
-        if (choice.componentFonts) kept.componentFonts = choice.componentFonts;
-        if (choice.tokens) kept.tokens = choice.tokens;
-        return kept;
-      }),
+      choices: (spec.choices || []).map((choice) => ({ id: choice.id })),
     };
+  }
+  values.options = options;
+  return values;
+}
+
+/**
+ * What one preset moves: its own remaps, and every choice's, keyed
+ * group → choice id → { fonts?, componentFonts?, tokens? }.
+ *
+ * @param {object} preset a preset with its `$` notes already stripped
+ * @returns {{ componentFonts?: object, tokens?: object, options: object }}
+ */
+function remapValues(preset) {
+  const values = {};
+  if (preset.componentFonts) values.componentFonts = preset.componentFonts;
+  if (preset.tokens) values.tokens = preset.tokens;
+  const options = {};
+  for (const [group, spec] of Object.entries(preset.options || {})) {
+    const bodies = {};
+    for (const choice of spec.choices || []) {
+      const body = {};
+      if (choice.fonts) body.fonts = choice.fonts;
+      if (choice.componentFonts) body.componentFonts = choice.componentFonts;
+      if (choice.tokens) body.tokens = choice.tokens;
+      bodies[choice.id] = body;
+    }
+    options[group] = bodies;
   }
   values.options = options;
   return values;
@@ -208,9 +248,10 @@ function buildPresetDoc(sources) {
     '     scripts/build-preset-catalog.test.cjs fails when this is stale. -->',
     '',
     'This catalog lists each site style, its default configuration, and the options',
-    'staff can select. Runtime values are in `packages/shared/src/presetCatalog.cjs`.',
+    'staff can select. Runtime values are in `packages/shared/src/presetCatalog.cjs`',
+    'and `packages/shared/src/presetRemaps.cjs`.',
     'Admin labels and explanations are in `apps/web/src/admin/presetCopy.js`.',
-    'All three outputs are generated from the same JSON source files.',
+    'All four outputs are generated from the same JSON source files.',
     '',
     'The picker uses the order shown below. A new deployment starts with Institutional.',
     'Each style includes one default configuration. Options marked *default* are selected',
@@ -264,15 +305,16 @@ function buildPresetDoc(sources) {
 }
 
 /**
- * Build all three outputs from one read of the design tokens.
+ * Build all four outputs from one read of the design tokens.
  *
  * @param {{ tokensDir?: string }} [options]
- * @returns {{ runtime: string, copy: string, doc: string }}
+ * @returns {{ runtime: string, remaps: string, copy: string, doc: string }}
  */
 function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
   const presetsDir = path.join(tokensDir, 'presets');
   const sources = {};
   const presets = {};
+  const remaps = {};
   const copy = {};
   for (const id of PRESET_ORDER) {
     const file = path.join(presetsDir, `${id}.json`);
@@ -283,11 +325,14 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
     }
     sources[id] = source;
     presets[id] = renderingValues(preset);
+    remaps[id] = remapValues(preset);
     copy[id] = copyValues(preset);
   }
 
   // Only preset-remapped properties need explicit resets on a style change.
   // Untouched component defaults already remain in the generated stylesheet.
+  // A style's own remaps and every choice's are in the remaps, so one walk
+  // finds them all.
   const remappedNames = new Set();
   function collectRemaps(value) {
     if (!value || typeof value !== 'object') return;
@@ -296,7 +341,7 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
       collectRemaps(child);
     }
   }
-  collectRemaps(presets);
+  collectRemaps(remaps);
   const componentContracts = stripNotes(readJson(path.join(tokensDir, 'components.json')));
   const componentDefaults = Object.fromEntries(Object.values(componentContracts)
     .flatMap((contract) => Object.entries(contract))
@@ -321,14 +366,16 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
     '/**',
     ' * GENERATED FILE — do not edit by hand.',
     ' *',
-    ' * RENDERING VALUES ONLY. Palettes, type maps, shape, the motif default,',
-    ' * token remaps, and the option ids and defaults — everything the one',
-    ' * resolver and the config validator read, and nothing a human reads.',
-    ' * The style names and the reasons behind each curated choice are copy:',
-    ' * they live in `apps/web/src/admin/presetCopy.js`, which rides the admin',
-    ' * chunk, and the design prose lives in',
-    ' * `design/tokens/presets/README.md`. This file is the only one of the',
-    ' * three that ships to Cloud Functions, where prose could never be read.',
+    ' * WHAT EVERY PATH READS. Palettes, type maps, shape, the motif default,',
+    ' * and the option ids and defaults — what the config validator, the',
+    ' * contrast check and the palette resolver read on every path, and',
+    ' * nothing a human reads. What a style MOVES — its token and',
+    ' * component-font remaps, what each choice moves, the component defaults',
+    ' * a style change resets — is `presetRemaps.cjs`, which only a path that',
+    ' * resolves a style at runtime loads. The style names and the reasons',
+    ' * behind each curated choice are copy: they live in',
+    ' * `apps/web/src/admin/presetCopy.js`, which rides the admin chunk, and',
+    ' * the design prose lives in `design/tokens/presets/README.md`.',
     ' *',
     ' * The design source of truth is `design/tokens/presets/*.json`,',
     ' * `design/tokens/admin.json`, and `design/tokens/motifs.json`. This file',
@@ -342,13 +389,52 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
     '',
     `const PRESETS = Object.freeze(${jsValue(presets)});`,
     '',
-    `const COMPONENT_TOKEN_DEFAULTS = Object.freeze(${jsValue(componentDefaults)});`,
-    '',
     `const ADMIN_TOKENS = Object.freeze(${jsValue(admin)});`,
     '',
     `const MOTIF_SET_IDS = Object.freeze(${jsValue(motifSetIds)});`,
     '',
-    'module.exports = { PRESETS, COMPONENT_TOKEN_DEFAULTS, ADMIN_TOKENS, MOTIF_SET_IDS };',
+    'module.exports = { PRESETS, ADMIN_TOKENS, MOTIF_SET_IDS };',
+    '',
+  ].join('\n');
+
+  const remapsText = [
+    "'use strict';",
+    '',
+    '/**',
+    ' * GENERATED FILE — do not edit by hand.',
+    ' *',
+    ' * WHAT A STYLE MOVES. `presets` carries, per style, its own token and',
+    ' * component-font remaps and what every choice of every option group',
+    ' * moves (`options`, keyed group → choice id → { fonts?, componentFonts?,',
+    ' * tokens? }); `componentDefaults` carries the contract default of every',
+    ' * token some style or choice remaps, which a style change resets before',
+    ' * it applies the new style. `presetCatalog.cjs` carries the palettes,',
+    ' * type maps and choice IDS every path needs; this file carries what only',
+    ' * a path that RESOLVES a style at runtime needs — a live config/theme',
+    ' * overlay, the demo style switcher, the admin branding editor, the',
+    " * specimen book, the token generator. The public site's first paint",
+    ' * needs none of it, because the generated stylesheet already carries the',
+    ' * chosen style with its picks resolved, so the web app loads this module',
+    ' * lazily (apps/web/src/lib/presetRemaps.js) and a Node caller requires',
+    ' * it once.',
+    ' *',
+    ' * REQUIRING IT REGISTERS IT. The resolver (theme.cjs) keeps a registry',
+    ' * its token and pick resolvers read, and the last line here fills it, so',
+    " * a caller that has required 'shared/presetRemaps' resolves every style",
+    ' * in full and one that has not is told so rather than handed a',
+    ' * half-resolved style.',
+    ' *',
+    ' * Source of truth: design/tokens/presets/*.json and',
+    ' * design/tokens/components.json.',
+    ' * Regenerate with `node scripts/build-preset-catalog.cjs`.',
+    ' * `scripts/build-preset-catalog.test.cjs` fails when this file is stale.',
+    ' */',
+    '',
+    `const PRESET_REMAPS = Object.freeze(${jsValue({ componentDefaults, presets: remaps })});`,
+    '',
+    "require('./theme.cjs').registerPresetRemaps(PRESET_REMAPS);",
+    '',
+    'module.exports = { PRESET_REMAPS };',
     '',
   ].join('\n');
 
@@ -393,7 +479,7 @@ function buildPresetCatalog({ tokensDir = TOKENS_DIR } = {}) {
     '',
   ].join('\n');
 
-  return { runtime, copy: copyText, doc: buildPresetDoc(sources) };
+  return { runtime, remaps: remapsText, copy: copyText, doc: buildPresetDoc(sources) };
 }
 
 if (require.main === module) {
@@ -401,6 +487,7 @@ if (require.main === module) {
   const check = process.argv.includes('--check');
   const outputs = [
     [TARGET, built.runtime],
+    [REMAPS_TARGET, built.remaps],
     [COPY_TARGET, built.copy],
     [DOC_TARGET, built.doc],
   ];
@@ -429,6 +516,7 @@ module.exports = {
   buildPresetCatalog,
   PRESET_ORDER,
   TARGET,
+  REMAPS_TARGET,
   COPY_TARGET,
   DOC_TARGET,
   TOKENS_DIR,

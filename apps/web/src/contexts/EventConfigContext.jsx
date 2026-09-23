@@ -22,6 +22,7 @@ import {
 import { subscribeConfigDoc } from '../lib/configSource.js';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeRuntime.js';
+import { loadPresetRemaps, presetRemapsLoaded } from '../lib/presetRemaps.js';
 import { startModeSync } from '../lib/modeRuntime.js';
 import { getRouteTitlePart, subscribeRouteTitle } from '../lib/useDocumentTitle.js';
 import { resolveShape } from 'shared/theme';
@@ -160,11 +161,29 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   // ownership contract holds even before config/theme arrives; its content is
   // only the properties the runtime doc validly overrides — everything else
   // keeps the build-time value from generated/theme.css.
+  //
+  // THE OVERLAY WAITS FOR THE PRESET REMAPS. Resolving a style needs what it
+  // and its picked options move, and that data is a lazy chunk (lib/
+  // presetRemaps.js) rather than part of the bundle every visitor downloads
+  // for a first paint the generated stylesheet already covers. The overlay is
+  // written whole once the chunk is here, never half-resolved before it; a
+  // load that fails leaves the build-time look in place, which is what the
+  // page shows before config/theme arrives anyway.
   useEffect(() => {
     const styleEl = ensureRuntimeStyleElement();
-    styleEl.textContent = runtimeThemeDoc
-      ? buildRuntimeThemeCss(runtimeThemeDoc)
-      : '';
+    if (!runtimeThemeDoc) {
+      styleEl.textContent = '';
+      return undefined;
+    }
+    let cancelled = false;
+    const write = () => {
+      if (!cancelled) styleEl.textContent = buildRuntimeThemeCss(runtimeThemeDoc);
+    };
+    if (presetRemapsLoaded()) write();
+    else loadPresetRemaps().then(write, () => {});
+    return () => {
+      cancelled = true;
+    };
   }, [runtimeThemeDoc]);
 
   // Event-neutral shell title: snapshot name first, runtime name when it
