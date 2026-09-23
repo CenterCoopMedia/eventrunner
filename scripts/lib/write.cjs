@@ -34,20 +34,37 @@ const SEED_ACTOR = Object.freeze({ uid: 'init-event-script', email: 'init-event-
  * settings), so it must build from what is stored, not from what init
  * proposed and the merge rules then declined to apply.
  *
+ * `bootstrapAdditions` is what a RE-RUN may add to config/bootstrap: the
+ * addresses named by explicit `--admin` / `--staff` flags, and nothing
+ * else. On a fresh deployment the answers file's lists seed the document;
+ * on a re-run they are NOT re-applied, because an operator may have
+ * removed or demoted one of those addresses on the admin's Access page
+ * since, and a re-run must never quietly put it back (issue #187 review).
+ * The bootstrap result row carries `added` so the caller can say exactly
+ * what a re-run granted. Omit it to keep the older additive behaviour
+ * (the demo seed does).
+ *
  * @param {{ db: object, docs: object, force?: boolean, dryRun?: boolean,
- *           now?: () => number }} args
- * @returns {Promise<{ results: Array<{ docId: string, action: string, reason: string }>,
+ *           now?: () => number,
+ *           bootstrapAdditions?: { adminEmails?: string[], staffEmails?: string[] }|null }} args
+ * @returns {Promise<{ results: Array<{ docId: string, action: string, reason: string,
+ *                                       added?: { adminEmails: string[], staffEmails: string[] } }>,
  *                     effective: object }>}
  */
-async function writeConfigDocs({ db, docs, force = false, dryRun = false, now = Date.now }) {
+async function writeConfigDocs({ db, docs, force = false, dryRun = false, now = Date.now, bootstrapAdditions = null }) {
   const results = [];
   const effective = {};
-  for (const [docId, next] of Object.entries(docs)) {
+  for (const [docId, proposed] of Object.entries(docs)) {
     const ref = db.collection('config').doc(docId);
     const snap = await ref.get();
     const existing = snap.exists ? snap.data() : null;
+    const next = docId === 'bootstrap' && existing != null && bootstrapAdditions
+      ? { adminEmails: bootstrapAdditions.adminEmails ?? [], staffEmails: bootstrapAdditions.staffEmails ?? [] }
+      : proposed;
     const decision = decideConfigWrite({ docId, existing, next, force });
-    results.push({ docId, action: decision.action, reason: decision.reason });
+    const row = { docId, action: decision.action, reason: decision.reason };
+    if (docId === 'bootstrap' && existing != null) row.added = addedAccounts(existing, decision.value);
+    results.push(row);
     effective[docId] = decision.value;
     if (decision.action === 'skip' || dryRun) continue;
     await ref.set({
@@ -57,6 +74,20 @@ async function writeConfigDocs({ db, docs, force = false, dryRun = false, now = 
     });
   }
   return { results, effective };
+}
+
+/**
+ * The addresses a bootstrap merge added, per list, lowercased the way the
+ * merge stores them.
+ *
+ * @param {object} existing the stored document
+ * @param {{ adminEmails?: string[], staffEmails?: string[] }} merged the decided value
+ * @returns {{ adminEmails: string[], staffEmails: string[] }}
+ */
+function addedAccounts(existing, merged) {
+  const before = (list) => (Array.isArray(list) ? list : []).map((e) => String(e).trim().toLowerCase());
+  const added = (field) => (merged?.[field] ?? []).filter((email) => !before(existing?.[field]).includes(email));
+  return { adminEmails: added('adminEmails'), staffEmails: added('staffEmails') };
 }
 
 /**
@@ -395,5 +426,6 @@ module.exports = {
   seedEmailTemplateOverrides,
   countSeeded,
   readConfig,
+  addedAccounts,
   SEED_ACTOR,
 };

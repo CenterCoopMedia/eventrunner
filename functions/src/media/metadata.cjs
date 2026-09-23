@@ -19,7 +19,7 @@ const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
 const { internals: uploadInternals } = require('./upload.cjs');
 
-const { MAX_ALT_LENGTH, MAX_TITLE_LENGTH, trimmedText } = uploadInternals;
+const { MAX_ALT_LENGTH, MAX_TITLE_LENGTH, trimmedText, isBrandingAsset, BRANDING_REFUSAL } = uploadInternals;
 
 /** Fields a client may change on an existing row. */
 const EDITABLE_FIELDS = Object.freeze(['alt', 'title']);
@@ -77,6 +77,10 @@ function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now,
     try {
       const snap = await ref.get();
       if (!snap.exists) return notFound(res, 'That asset is not in the media library.');
+      // A branding asset's words are the operator's too (upload.cjs).
+      if (isBrandingAsset(snap.data()) && gate.tier !== 'operator') {
+        return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
+      }
       await ref.update({ ...verdict.patch, updatedAt: at, updatedBy: actor.email });
     } catch (err) {
       log.error('mediaUpdateMetadata failed', err);

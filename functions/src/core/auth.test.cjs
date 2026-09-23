@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   ADMIN_TIERS,
+  BootstrapUnavailableError,
   resolveAdminTier,
   loadBootstrap,
   verifyAuthToken,
@@ -236,15 +237,52 @@ test('loadBootstrap: the live document wins over the cached copy', async () => {
   assert.deepEqual(await loadBootstrap({ db: bootstrapDb(live), getConfig: cached }), live);
 });
 
-test('loadBootstrap: falls back to the cached copy without a db, when the read fails, and when the document is absent', async () => {
+test('loadBootstrap: without a db the cached copy is the source', async () => {
   const cached = async () => ({ bootstrap: { adminEmails: ['cached@example.org'] } });
   assert.deepEqual(await loadBootstrap({ getConfig: cached }), { adminEmails: ['cached@example.org'] });
-  assert.deepEqual(
-    await loadBootstrap({ db: bootstrapDb(new Error('firestore down')), getConfig: cached }),
-    { adminEmails: ['cached@example.org'] },
+  assert.equal(await loadBootstrap({}), null);
+});
+
+test('loadBootstrap: with a db, a failed live read is an error, never the cached copy', async () => {
+  // A cached copy can still list an address revoked a moment ago; falling
+  // back to it on a transport error would admit exactly the caller the
+  // revocation was meant to stop. Fail closed instead.
+  const cached = async () => ({ bootstrap: { adminEmails: ['cached@example.org'] } });
+  await assert.rejects(
+    () => loadBootstrap({ db: bootstrapDb(new Error('firestore down')), getConfig: cached }),
+    (err) => err instanceof BootstrapUnavailableError,
   );
-  assert.deepEqual(await loadBootstrap({ db: bootstrapDb(null), getConfig: cached }), { adminEmails: ['cached@example.org'] });
+});
+
+test('loadBootstrap: with a db, an absent document means no admins, even when the cached copy has some', async () => {
+  const cached = async () => ({ bootstrap: { adminEmails: ['cached@example.org'] } });
+  assert.equal(await loadBootstrap({ db: bootstrapDb(null), getConfig: cached }), null);
   assert.equal(await loadBootstrap({ db: bootstrapDb(null) }), null);
+});
+
+test('requireAdmin: a failed live read answers 500 and admits nobody', async () => {
+  const cached = fakeGetConfig(['admin@example.org']);
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: ADMIN_TOKEN }), db: bootstrapDb(new Error('firestore down')), getConfig: cached },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.deepEqual(
+    { ok: verdict.ok, status: verdict.status, code: verdict.code },
+    { ok: false, status: 500, code: 'internal' },
+  );
+  assert.doesNotMatch(verdict.message, /firestore/i);
+});
+
+test('requireAdmin: an absent bootstrap document admits nobody, even a caller the cached copy still lists', async () => {
+  const cached = fakeGetConfig(['admin@example.org']);
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: ADMIN_TOKEN }), db: bootstrapDb(null), getConfig: cached },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
 });
 
 test('requireAdmin: with a db, a grant made a moment ago is honoured although the cached copy predates it', async () => {

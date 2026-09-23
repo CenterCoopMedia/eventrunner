@@ -17,6 +17,7 @@ const {
 function fakeDb() {
   const store = new Map();
   const key = (c, id) => `${c}/${id}`;
+
   let autoId = 0;
   function docRef(c, id) {
     return {
@@ -24,6 +25,12 @@ function fakeDb() {
       __id: id,
       get id() { return id; },
       async get() {
+        // requireAdmin reads config/bootstrap live from this db (fails
+        // closed on an absent document); served outside `store` so the
+        // "writes nothing" assertions keep counting only what a handler wrote.
+        if (c === 'config' && id === 'bootstrap') {
+          return { exists: true, data: () => ({ adminEmails: ['admin@example.org'] }) };
+        }
         const data = store.get(key(c, id));
         return { exists: data !== undefined, data: () => data };
       },
