@@ -8,6 +8,7 @@
 // type still hits the UnknownBlock fallback.
 import BlockRenderer from './registry.jsx';
 import StatBlock from './StatBlock.jsx';
+import FactBlock from './FactBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
 import FaqItemBlock from './FaqItemBlock.jsx';
 import LinkGroupBlock from './LinkGroupBlock.jsx';
@@ -52,6 +53,16 @@ const RUN_RENDERERS = {
     <dl className="grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
       {run.map((block, i) => (
         <StatBlock key={blockKey(block, i)} block={block} />
+      ))}
+    </dl>
+  ),
+  // A run of facts is one definition list (expansion record §3.1): term and
+  // description pairs, ruled between pairs, at the measure. FactBlock
+  // renders one pair, so the <dl> is drawn here.
+  fact: (run) => (
+    <dl className="definition-list max-w-prose">
+      {run.map((block, i) => (
+        <FactBlock key={blockKey(block, i)} block={block} />
       ))}
     </dl>
   ),

@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   address lowercased, and is recorded in the admin log. The server refuses a change that would
   leave the deployment with no operator, including an operator removing their own last grant.
 
+- A `fact` block for a fact that is not a number (#234): The term, the fact itself, and one
+  optional line under it. It renders through the new definition list device, a real `<dl>` ruled
+  between pairs, and it asks for none of the evidence parts a statistic must carry. The home page's
+  key facts now seed as three facts (when, where, who) with the dates and the venue taken from the
+  event settings; the stat block's six-part contract is unchanged, and a statistic can still open a
+  card. A `quote` block renders a quoted sentence and its attribution through the new pull quote
+  device, whose sentence is Zine's handwritten callout in every style and whose frame each style
+  remaps. Both blocks are in the admin palette with a hint under each field.
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.
   Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,

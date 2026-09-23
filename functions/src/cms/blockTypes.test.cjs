@@ -6,15 +6,40 @@ const assert = require('node:assert/strict');
 const {
   BLOCK_TYPES,
   isKnownBlockType,
+  statContractErrors,
   PUBLISHABLE_COLLECTIONS,
   draftCollectionFor,
   internals,
 } = require('./blockTypes.cjs');
 
-const V1_TYPE_IDS = ['text', 'richtext', 'image', 'cta', 'stat', 'list_item', 'faq_item', 'link_group'];
+// The eight v1 types, plus the two the design vocabulary expansion added
+// (wave 2): `fact`, the non-numeric fact of #234, and `quote`, the pull
+// quote's block.
+const V1_TYPE_IDS = [
+  'text', 'richtext', 'image', 'cta', 'stat', 'fact', 'quote', 'list_item', 'faq_item', 'link_group',
+];
 
 test('registry ships exactly the v1 block types', () => {
   assert.deepEqual(Object.keys(BLOCK_TYPES).sort(), [...V1_TYPE_IDS].sort());
+});
+
+// #234: a fact is a term and a description, never a stat block. The whole
+// point of the type is that an operator can write a venue name without
+// inventing a source line, so the registry must ask for none.
+test('a fact block carries no evidence field, and the stat contract is unchanged', () => {
+  const factFields = BLOCK_TYPES.fact.fields.map((f) => f.id);
+  assert.deepEqual(factFields, ['label', 'value', 'note', 'order']);
+  for (const evidence of ['takeaway', 'description', 'source', 'alt']) {
+    assert.equal(factFields.includes(evidence), false, `fact carries no ${evidence}`);
+  }
+  assert.equal(BLOCK_TYPES.fact.fields.find((f) => f.id === 'note').required, false);
+  assert.deepEqual(
+    BLOCK_TYPES.stat.fields.filter((f) => f.required).map((f) => f.id),
+    ['value', 'label', 'takeaway', 'description', 'source', 'alt'],
+  );
+  // The write-time contract is a stat rule and a no-op for a fact.
+  assert.deepEqual(statContractErrors({ blockType: 'fact', label: 'Where', value: 'The hall' }), []);
+  assert.equal(statContractErrors({ blockType: 'stat', value: '3' }).length > 0, true);
 });
 
 test('every block type is a well-formed contract', () => {

@@ -54,10 +54,13 @@
   "shape": { "radius": "small", "texture": "flat", "density": "comfortable" },
   "motifSet": "none",
 
-  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses the data font for folio text and a strong rule below each section heading.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses the data font for folio text and a strong rule below each section heading. The definition list keeps the data face for its terms in a wide column. The pull quote sits between a strong rule above and a hairline below, with a large opening mark.",
   "tokens": {
     "--folio-font": "var(--font-data)",
     "--section-rule-width": "var(--rule-strong-width)",
+    "--definition-list-term-width": "10rem",
+    "--pull-quote-mark-display": "block",
+    "--pull-quote-pad-block": "var(--space-lg)",
     "--hero-art-width": "56%",
     "--hero-copy-pad-inline-start": "var(--space-md)",
     "--hero-copy-border-inline-start": ".35rem solid rgb(var(--color-accent-rgb))",

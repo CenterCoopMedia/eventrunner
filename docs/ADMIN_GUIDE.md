@@ -109,13 +109,17 @@ The schedule itself: Create, edit, publish, and delete a session. Saving writes 
 
 ## Content (Pages → Content editor)
 
-Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections, which block types each allows, its default blocks — is set in the page editor above; this tree of screens is for the block *content*. All eight block types are editable here.
+Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections, which block types each allows, its default blocks — is set in the page editor above; this tree of screens is for the block *content*. All ten block types are editable here.
 
-**The home page's Key facts section is a group of cards.** It answers the questions a first-time reader arrives with. Each **statistic** in that section opens a card. Each **list item** after a statistic is a line on that card, so a card is one figure and then whatever a reader also needs to know beside it. Move a line under a different statistic and it moves to that card. On a wide screen the cards sit in a row of three; on a phone they stack into one plain list, in the same order.
+**A fact is a term and a description.** The **fact** block carries three parts: The term ("Where", "Who", "Format"), the fact itself (the hall's name, the audience), and one optional line under it (the address, a way to get there). It asks for no source and no finding, because a venue counts nothing. A run of facts renders as one ruled list of term and description pairs. Use it for anything that is true and is not a number.
+
+**A quote is one sentence and who said it.** The **quote** block carries the sentence, without quotation marks, and an optional attribution. The site draws the marks and the rules, in the site style's own treatment. One quote per page at most.
+
+**The home page's Key facts section is a group of cards.** It answers the questions a first-time reader arrives with. Each **fact** or **statistic** in that section opens a card. Each **list item** after one is a line on that card, so a card is one fact and then whatever a reader also needs to know beside it. Move a line under a different fact and it moves to that card. On a wide screen the cards sit in a row of three; on a phone they stack into one plain list, in the same order.
 
 **You place it, like any other section.** Move it up or down the home page's section list and the group moves with it. Set it to appear before or after the main feature and it obeys that too. The seed puts it near the top, under the opening, which is where a reader looks first.
 
-**A fresh site seeds one card**: The dates as the figure, and three lines for the venue name, its address, and the nearest transit. Add a statistic to open a second card. A fact that is not a number — a venue, an audience — belongs in the lines, not in a statistic: A statistic has to name where its number came from, and there is no source to name for the name of a hall. Empty the section, or fill it only with block types this section does not draw, and no heading is printed at all.
+**A fresh site seeds three cards**: When, with the dates from your event settings; Where, with the venue's name and its address under it, and one line for the nearest transit; and Who, which you write. Add a statistic to open a card on a figure that is evidence: A statistic has to name where its number came from, and there is no source to name for the name of a hall, which is why a place or an audience is a fact and not a statistic. Empty the section, or fill it only with block types this section does not draw, and no heading is printed at all.
 
 **The home page's Sponsors section is the logo wall, not a list of blocks.** It holds one line of text, and under it the site draws the same tiered logo wall the Sponsors page draws, from the same published organizations in the same tier order. Add or reorder organizations in the Organizations list; nothing about them is edited here.
 

@@ -63,6 +63,31 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'order', type: 'number', required: false },
     ],
   },
+  fact: {
+    id: 'fact',
+    label: 'Fact',
+    description:
+      'A fact that is not a number: The term, its description, and one optional line ' +
+      'under it. Where, who, format, room. A fact names no source and counts nothing, ' +
+      'so it carries none of the evidence parts a statistic must.',
+    fields: [
+      { id: 'label', type: 'string', required: true },
+      { id: 'value', type: 'string', required: true },
+      { id: 'note', type: 'string', required: false },
+      { id: 'order', type: 'number', required: false },
+    ],
+  },
+  quote: {
+    id: 'quote',
+    label: 'Quote',
+    description:
+      'A quoted sentence from a speaker or a session, with who said it. One per page ' +
+      'at most.',
+    fields: [
+      { id: 'text', type: 'string', required: true },
+      { id: 'attribution', type: 'string', required: false },
+    ],
+  },
   list_item: {
     id: 'list_item',
     label: 'List item',
@@ -110,6 +135,23 @@ export const STAT_CONTRACT_HINTS = Object.freeze({
   description: 'Say what the number counts, and over what period.',
   source: 'Name where the number came from, and the date you read it.',
   alt: 'Describe the finding for a screen reader. Do not describe the shape of the chart.',
+});
+
+/**
+ * What to write in each part of a fact (#234) and a quote, shown under the
+ * field in the block editor. Neither type is enforced on write beyond its
+ * required fields; the hints exist because `label` and `value` are the
+ * registry's names and "the term" and "the description" are the operator's.
+ */
+export const FACT_HINTS = Object.freeze({
+  label: 'The term. “Where”, “Who”, “Format”.',
+  value: 'The fact itself. “Harborlight Hall”, “Local newsroom staff”.',
+  note: 'One line under the fact, if it needs one. An address, a way to get there.',
+});
+
+export const QUOTE_HINTS = Object.freeze({
+  text: 'The sentence as it was said, without quotation marks. The page draws those.',
+  attribution: 'Who said it, and in what role. “Marisol Reyes, opening talk”.',
 });
 
 /** Registry order — the palette's display order. */

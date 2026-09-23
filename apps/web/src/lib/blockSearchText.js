@@ -89,6 +89,11 @@ function typeSearchText(block) {
       // reader searches by as its label or takeaway — a query for the
       // number should find the stat that states it.
       return joined(block.value, block.takeaway, block.label, block.description, block.source, block.alt);
+    case 'fact':
+      // The term, the fact and its note are all plain CMS input (#234).
+      return joined(block.label, block.value, block.note);
+    case 'quote':
+      return joined(block.text, block.attribution);
     case 'list_item':
       return verbatim(block.text);
     case 'faq_item':

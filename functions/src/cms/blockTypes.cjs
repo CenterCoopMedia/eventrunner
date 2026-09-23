@@ -92,6 +92,31 @@ const BLOCK_TYPES = Object.freeze({
       field('order', 'number', false),
     ],
   }),
+  fact: blockType({
+    id: 'fact',
+    label: 'Fact',
+    description:
+      'A fact that is not a number: The term, its description, and one optional line ' +
+      'under it. Where, who, format, room. A fact names no source and counts nothing, ' +
+      'so it carries none of the evidence parts a statistic must.',
+    fields: [
+      field('label', 'string', true),
+      field('value', 'string', true),
+      field('note', 'string', false),
+      field('order', 'number', false),
+    ],
+  }),
+  quote: blockType({
+    id: 'quote',
+    label: 'Quote',
+    description:
+      'A quoted sentence from a speaker or a session, with who said it. One per page ' +
+      'at most.',
+    fields: [
+      field('text', 'string', true),
+      field('attribution', 'string', false),
+    ],
+  }),
   list_item: blockType({
     id: 'list_item',
     label: 'List item',

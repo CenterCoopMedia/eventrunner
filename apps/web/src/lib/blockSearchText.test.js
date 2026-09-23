@@ -87,6 +87,19 @@ describe('blockSearchText', () => {
     ).toBe('Attendance grew Registered attendees this year Registration system, read live');
   });
 
+  it('joins the term, the fact and its note on a fact block', () => {
+    expect(
+      blockSearchText({ blockType: 'fact', label: 'Where', value: 'The hall', note: '12 Quay Street' }),
+    ).toBe('Where The hall 12 Quay Street');
+    expect(blockMatchesQuery({ blockType: 'fact', label: 'Where', value: 'The hall' }, 'hall')).toBe(true);
+  });
+
+  it('joins the sentence and the attribution on a quote block', () => {
+    expect(
+      blockSearchText({ blockType: 'quote', text: 'Decide who checks sources.', attribution: 'A speaker' }),
+    ).toBe('Decide who checks sources. A speaker');
+  });
+
   it('reads alt and caption from an image block', () => {
     expect(
       blockSearchText({ blockType: 'image', alt: 'Venue entrance', caption: 'Main doors' }),

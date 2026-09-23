@@ -55,8 +55,16 @@
   "shape": { "radius": "sharp", "texture": "flat", "density": "tight" },
   "motifSet": "cartographic",
 
-  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule trace connects entries vertically. The grid remains below hairline contrast. Other styles set the trace width to zero.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule trace connects entries vertically. The grid remains below hairline contrast. Other styles set the trace width to zero. The definition list sets its terms as a map key: the monospaced font in capitals in a narrow column. The pull quote takes a strong rule at its inline start, like a route line, and no rules above or below.",
   "tokens": {
+    "--definition-list-term-font": "var(--font-mono)",
+    "--definition-list-term-transform": "uppercase",
+    "--definition-list-term-tracking": "0.05em",
+    "--definition-list-term-width": "7rem",
+    "--pull-quote-rule-block-width": "0",
+    "--pull-quote-rule-inline-width": "var(--rule-strong-width)",
+    "--pull-quote-pad-inline": "var(--space-md)",
+    "--pull-quote-attribution-font": "var(--font-mono)",
     "--map-grid-size": "var(--space-xl)",
     "--schedule-trace-width": "var(--rule-strong-width)",
     "--route-mark-radius": "var(--radius-base)",

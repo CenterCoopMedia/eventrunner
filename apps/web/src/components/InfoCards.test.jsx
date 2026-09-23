@@ -10,6 +10,10 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import InfoCards, { groupIntoCards } from './InfoCards.jsx';
 
+/** The <dt> that carries a term. A dt takes no accessible name from its text in jsdom. */
+const termNamed = (term) =>
+  [...document.querySelectorAll('dt')].find((node) => node.textContent === term) ?? null;
+
 /** A stat block in the six-part shape every stat is written in today. */
 const stat = (field, label, value) => ({
   section: 'info',
@@ -25,6 +29,16 @@ const stat = (field, label, value) => ({
 
 const line = (field, text) => ({ section: 'info', field, blockType: 'list_item', text });
 
+/** A fact block (#234): a term, a description, and one optional line. */
+const fact = (field, label, value, note) => ({
+  section: 'info',
+  field,
+  blockType: 'fact',
+  label,
+  value,
+  ...(note ? { note } : {}),
+});
+
 const WHEN_WHERE_WHO = [
   stat('when', 'When', '3 days'),
   line('when_note', 'Doors open at 09:00.'),
@@ -33,20 +47,48 @@ const WHEN_WHERE_WHO = [
   line('who_note', 'Workshop places go to registered participants first.'),
 ];
 
+// The shape the seed writes now: three facts, no evidence fields, and one
+// line under the second.
+const THREE_FACTS = [
+  fact('when', 'When', '14–16 October 2026', 'Doors open at 09:00.'),
+  fact('where', 'Where', 'Harborlight Hall', '12 Quay Street, Portsmouth'),
+  line('where_transit', 'Ten minutes on foot from the station.'),
+  fact('who', 'Who', 'Local newsroom staff and their partners'),
+];
+
 describe('groupIntoCards', () => {
   it('opens a card on each stat and hangs the lines after it on that card', () => {
     const cards = groupIntoCards(WHEN_WHERE_WHO);
-    expect(cards.map((card) => [card.stat.field, card.lines.map((l) => l.field)])).toEqual([
+    expect(cards.map((card) => [card.lead.field, card.lines.map((l) => l.field)])).toEqual([
       ['when', ['when_note']],
       ['where', []],
       ['who', ['who_note']],
     ]);
   });
 
+  it('opens a card on a fact block too, with no evidence fields asked for (#234)', () => {
+    const cards = groupIntoCards(THREE_FACTS);
+    expect(cards.map((card) => [card.lead.field, card.lines.map((l) => l.field)])).toEqual([
+      ['when', []],
+      ['where', ['where_transit']],
+      ['who', []],
+    ]);
+  });
+
+  it('drops a fact missing either half rather than counting it', () => {
+    const cards = groupIntoCards([
+      fact('where', 'Where', '  '),
+      line('where_transit', 'Ten minutes on foot from the station.'),
+    ]);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].lead).toBeNull();
+    expect(cards[0].lines.map((l) => l.field)).toEqual(['where_transit']);
+  });
+
   it('keeps lines written before any fact rather than dropping them', () => {
     const cards = groupIntoCards([line('note', 'A line on its own.'), stat('when', 'When', '3 days')]);
     expect(cards).toHaveLength(2);
-    expect(cards[0].stat).toBeNull();
+    expect(cards[0].lead).toBeNull();
     expect(cards[0].lines.map((l) => l.field)).toEqual(['note']);
   });
 
@@ -77,7 +119,7 @@ describe('groupIntoCards', () => {
       line('where_note', 'The hall is on the ground floor.'),
     ]);
     expect(cards).toHaveLength(2);
-    expect(cards[1].stat).toBeNull();
+    expect(cards[1].lead).toBeNull();
     expect(cards[1].lines.map((l) => l.field)).toEqual(['where_note']);
   });
 
@@ -90,6 +132,19 @@ describe('groupIntoCards', () => {
 });
 
 describe('InfoCards', () => {
+  it('renders a fact through the definition list device, as a term and a description', () => {
+    const { container } = render(<InfoCards cards={groupIntoCards(THREE_FACTS)} />);
+    const lists = [...container.querySelectorAll('dl.definition-list')];
+    expect(lists).toHaveLength(3);
+    expect(termNamed('Where')).toBeInTheDocument();
+    expect(screen.getByText('Harborlight Hall').tagName).toBe('DD');
+    expect(screen.getByText('12 Quay Street, Portsmouth').tagName).toBe('DD');
+    // The line under the fact is that card's own.
+    expect(within(lists[1].parentElement).getByText('Ten minutes on foot from the station.')).toBeInTheDocument();
+    // No evidence fields are drawn, because a fact carries none.
+    expect(container.querySelectorAll('[data-numeric]')).toHaveLength(0);
+  });
+
   it('renders three entries as one group, each fact with its own lines', () => {
     render(<InfoCards cards={groupIntoCards(WHEN_WHERE_WHO)} />);
     // One description list per card, so each fact keeps its own term and

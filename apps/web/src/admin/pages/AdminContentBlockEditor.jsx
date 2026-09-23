@@ -23,6 +23,8 @@ import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
 import {
   BLOCK_TYPE_IDS,
+  FACT_HINTS,
+  QUOTE_HINTS,
   STAT_CONTRACT_HINTS,
   blockTypeFor,
   blockTypeLabel,
@@ -57,13 +59,21 @@ import AdminPageHeader, {
 } from '../components/adminChrome.jsx';
 
 /**
- * What to write in this field, where the system has something to say. Only
- * the stat contract does today (design brief §2.1.1): its four parts are
- * required on write, so the editor states what each one is for rather than
- * leaving an operator to guess from the field name.
+ * What to write in this field, where the system has something to say. The
+ * stat contract (design brief §2.1.1) has four parts required on write, so
+ * the editor states what each one is for rather than leaving an operator to
+ * guess from the field name; a fact (#234) and a quote name their parts
+ * `label`, `value` and `text`, which are the registry's words and not the
+ * operator's, so those say what the part is too.
  */
+const FIELD_HINTS = Object.freeze({
+  stat: STAT_CONTRACT_HINTS,
+  fact: FACT_HINTS,
+  quote: QUOTE_HINTS,
+});
+
 function hintFor(blockTypeId, fieldId) {
-  return blockTypeId === 'stat' ? STAT_CONTRACT_HINTS[fieldId] : undefined;
+  return FIELD_HINTS[blockTypeId]?.[fieldId];
 }
 
 /** One control per registry field, chosen by the field's declared type. */

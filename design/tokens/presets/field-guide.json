@@ -57,8 +57,16 @@
   "$motif-note": "Botanical line drawings are enabled by default. The site can show them in the masthead mark, masthead divider, and public empty state. A client logo replaces the masthead mark. Clients can select no illustrations or the fauna set.",
   "motifSet": "botanical",
 
-  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses a hairline plate frame, visible specimen-label rules, visible field names, the data font for folio text, and no marginalia by default.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses a hairline plate frame, visible specimen-label rules, visible field names, the data font for folio text, and no marginalia by default. The definition list sets its terms as label keys in the monospaced font. The pull quote takes a hairline at its inline start, like a field note, and no rules above or below.",
   "tokens": {
+    "--definition-list-term-font": "var(--font-mono)",
+    "--definition-list-term-transform": "uppercase",
+    "--definition-list-term-tracking": "0.06em",
+    "--definition-list-term-size": "var(--text-folio)",
+    "--pull-quote-rule-rgb": "var(--rule-hairline-rgb)",
+    "--pull-quote-rule-block-width": "0",
+    "--pull-quote-rule-inline-width": "var(--rule-hairline-width)",
+    "--pull-quote-pad-inline": "var(--space-md)",
     "--plate-frame-width": "var(--rule-hairline-width)",
     "--plate-pad": "var(--space-md)",
     "--plate-number-display": "inline",
