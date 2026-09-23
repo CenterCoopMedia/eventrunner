@@ -75,6 +75,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   says "No session has been saved yet." when none has, says so when saving sessions is switched
   off, and keeps the last counts under a notice if the listener fails. `useBookmarkCounts` now
   also answers `ready` and `error`.
+- Attendee export (#184). The Attendees page saves the rows on screen as a CSV file through the
+  staff-tier `exportAttendees` endpoint. The file carries exactly the approved field set: name,
+  email, organization, role, registration status, badges, past attendance, social handles, and
+  profile visibility. A cell that a spreadsheet would run as a formula starts with an apostrophe.
+  Every export writes an `admin_logs` row with the actor, the row count, the status filter, and
+  whether a search was used, never the search text; the server refuses the file when that row
+  cannot be written, and keeps no copy of it.
 
 - A `fact` block for a fact that is not a number (#234): The term, the fact itself, and one
   optional line under it. It renders through the new definition list device, a real `<dl>` ruled

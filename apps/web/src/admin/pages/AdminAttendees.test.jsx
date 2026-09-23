@@ -17,6 +17,9 @@ vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
 const showToastMock = vi.fn();
 vi.mock('../../contexts/ToastContext.jsx', () => ({ useToast: () => ({ showToast: showToastMock }) }));
 
+const saveTextFileMock = vi.fn();
+vi.mock('../downloadFile.js', () => ({ saveTextFile: (...args) => saveTextFileMock(...args) }));
+
 import AdminAttendees from './AdminAttendees.jsx';
 
 function pushRows(rows) {
@@ -165,5 +168,116 @@ describe('AdminAttendees', () => {
     render(<AdminAttendees />);
     pushRows([]);
     expect(screen.getByText('No attendees')).toBeInTheDocument();
+  });
+});
+
+// Export (issue 184): the title band's one action, over the rows on screen.
+describe('AdminAttendees export', () => {
+  const three = () => [
+    row({ id: 'uid-cy', displayName: 'Cy Marsh', email: 'cy@example.com', registrationStatus: 'approved' }),
+    row(),
+    row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com', registrationStatus: 'approved' }),
+  ];
+  const exportButton = () => screen.getByRole('button', { name: /^Export \d+ attendees?$|^Exporting…$/ });
+
+  it('renders once the list has loaded, and counts the rows on screen', () => {
+    render(<AdminAttendees />);
+    expect(screen.queryByRole('button', { name: /^Export/ })).toBeNull();
+
+    pushRows(three());
+    expect(exportButton()).toHaveTextContent('Export 3 attendees');
+
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'approved' } });
+    expect(exportButton()).toHaveTextContent('Export 2 attendees');
+
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'bo@' } });
+    expect(exportButton()).toHaveTextContent('Export 1 attendee');
+  });
+
+  it('is natively disabled at zero rows and says so', () => {
+    render(<AdminAttendees />);
+    pushRows([]);
+    expect(exportButton()).toHaveTextContent('Export 0 attendees');
+    expect(exportButton()).toBeDisabled();
+  });
+
+  it('sends the shown uids in screen order with the filter, and never the search text', async () => {
+    callMock.mockClear();
+    callMock.mockResolvedValueOnce({ filename: 'attendees-2026-09-23.csv', csv: 'x', rowCount: 2, skipped: 0 });
+    render(<AdminAttendees />);
+    pushRows(three());
+
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'approved' } });
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: '  example  ' } });
+    fireEvent.click(exportButton());
+    await act(async () => { await Promise.resolve(); });
+
+    expect(callMock).toHaveBeenCalledTimes(1);
+    const [name, body] = callMock.mock.calls[0];
+    expect(name).toBe('exportAttendees');
+    // Sorted by name, as the page lists them.
+    expect(body).toEqual({ uids: ['uid-bo', 'uid-cy'], filter: { status: 'approved', searched: true } });
+    expect(JSON.stringify(body)).not.toContain('example');
+  });
+
+  it('reports a blank search as no search', async () => {
+    callMock.mockClear();
+    callMock.mockResolvedValueOnce({ filename: 'attendees-2026-09-23.csv', csv: 'x', rowCount: 3, skipped: 0 });
+    render(<AdminAttendees />);
+    pushRows(three());
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: '   ' } });
+    fireEvent.click(exportButton());
+    await act(async () => { await Promise.resolve(); });
+    expect(callMock.mock.calls[0][1].filter).toEqual({ status: 'all', searched: false });
+  });
+
+  it('is busy and disabled in flight, saves the file, and states the result in place', async () => {
+    callMock.mockClear();
+    saveTextFileMock.mockClear();
+    let finish;
+    callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    render(<AdminAttendees />);
+    pushRows(three());
+
+    fireEvent.click(exportButton());
+    const busy = screen.getByRole('button', { name: 'Exporting…' });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    // A second press while the first is in flight writes no second row.
+    fireEvent.click(busy);
+    expect(callMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      finish({ filename: 'attendees-2026-09-23.csv', csv: '\uFEFF"Name"\r\n', rowCount: 3, skipped: 0 });
+    });
+
+    expect(saveTextFileMock).toHaveBeenCalledWith('attendees-2026-09-23.csv', '\uFEFF"Name"\r\n');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Exported 3 attendees to attendees-2026-09-23.csv. The export is in the admin log.',
+    );
+    expect(exportButton()).toHaveTextContent('Export 3 attendees');
+    expect(exportButton()).toBeEnabled();
+    expect(exportButton()).not.toHaveAttribute('aria-busy');
+
+    // The result stays while the list moves under it.
+    pushRows(three().slice(0, 2));
+    expect(screen.getByRole('status')).toHaveTextContent('Exported 3 attendees');
+  });
+
+  it('shows a refusal in the server’s words and saves nothing', async () => {
+    callMock.mockClear();
+    saveTextFileMock.mockClear();
+    callMock.mockRejectedValueOnce(new Error('uids: at most 10,000 attendees per export. Narrow the filter.'));
+    render(<AdminAttendees />);
+    pushRows(three());
+
+    fireEvent.click(exportButton());
+    await act(async () => { await Promise.resolve(); });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'uids: at most 10,000 attendees per export. Narrow the filter.',
+    );
+    expect(saveTextFileMock).not.toHaveBeenCalled();
+    expect(exportButton()).toBeEnabled();
   });
 });

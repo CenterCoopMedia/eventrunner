@@ -27,6 +27,10 @@ Invite by email. They accept with a login code, the same way attendees sign in. 
 
 Custom badges are off by default. If enabled in Features, attendees can write up to three badges of 24 characters each. Reserved role words and the event block list are refused. In Attendees, select the removal action beside a custom badge and confirm it. The removal is recorded in the admin log. Turning the feature off hides these badges and keeps other profile fields editable.
 
+## Attendees
+
+Approve and revoke registrations in Attendees. Select **Export** to save the rows on screen as a spreadsheet file. The file holds names, email addresses, organizations, roles, registration status, badges, past attendance, social handles, and profile visibility. Treat it as personal data. Every export is recorded in the admin log with your address.
+
 ## Materials
 
 Upload or link files on the session. Embargo holds them until the session ends. Prefer a real label ("Slides") over a raw URL as the link text.
