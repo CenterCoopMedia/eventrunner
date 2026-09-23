@@ -138,8 +138,9 @@ test.describe.serial('admin tiers and the Access page', () => {
     await page.goto('/admin');
     const nav = page.getByRole('navigation', { name: 'Admin sections' });
     await expect(nav).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1, name: 'Pages' })).toBeVisible();
-    for (const label of ['Pages', 'Sessions', 'Speakers', 'Attendees', 'Materials', 'Event']) {
+    // /admin opens on the overview, a staff section (issue #179).
+    await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
+    for (const label of ['Overview', 'Pages', 'Sessions', 'Speakers', 'Attendees', 'Materials', 'Event']) {
       await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
     }
     for (const label of ['Features', 'Branding', 'Access', 'System errors']) {

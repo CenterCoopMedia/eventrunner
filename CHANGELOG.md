@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   records by status, speakers by pipeline status, records on the site and records with unpublished
   changes for each content collection, and unresolved errors. Every figure is a Firestore
   `count()`, so no document leaves the database. A caller who is not an admin is refused.
+- The admin overview (#179). `/admin` now opens on **Overview**, the first item on the rail, above
+  the four groups and with no folio. It prints the endpoint's figures as sentences, each number in
+  the data face beside the words that say what it counts, with the time they were read on the
+  event's clock. **Refresh figures** counts again; while it runs it says so and ignores another
+  press. A failed first read shows the server's words and no figures; a failed refresh keeps the
+  figures and says when they were read. Staff and operators both open it.
 
 - A `fact` block for a fact that is not a number (#234): The term, the fact itself, and one
   optional line under it. It renders through the new definition list device, a real `<dl>` ruled

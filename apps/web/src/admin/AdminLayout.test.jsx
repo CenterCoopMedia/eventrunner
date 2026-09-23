@@ -113,13 +113,19 @@ describe('the admin shell', () => {
     expect(html).toMatch(/font-admin-(ui|data)/);
   });
 
-  it('sets the docket as four named groups of words, not a tab row', async () => {
+  it('sets the docket as the Overview and four named groups of words, not a tab row', async () => {
     await renderAdmin();
     const nav = screen.getByRole('navigation', { name: 'Admin sections' });
 
     // Group heads are folios on a hairline, not headings above a heading.
+    // The lead group (the Overview, issue #179) has no label and no folio.
     const folios = [...nav.querySelectorAll('.admin-folio')].map((el) => el.textContent);
-    expect(folios).toEqual(DOCKET.map((group) => group.label));
+    expect(folios).toEqual(DOCKET.filter((group) => group.label).map((group) => group.label));
+    expect(folios).toEqual(['Content', 'People', 'Operations', 'System']);
+    expect(DOCKET[0]).toMatchObject({ id: 'lead', label: null });
+    // The Overview is the first link on the rail.
+    expect(nav.querySelector('a')).toHaveTextContent('Overview');
+    expect(nav.querySelector('a')).toHaveAttribute('href', '/admin/overview');
     for (const group of DOCKET) {
       for (const item of group.items) {
         // Absolute, so a section reached from another section is not a dead
@@ -130,8 +136,9 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Sixteen sections, every one a word. No icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(16);
+    // One link above the base's sixteen (the Overview, issue #179), every
+    // one a word. No icon rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(17);
     expect(nav.querySelector('svg')).toBeNull();
     for (const link of nav.querySelectorAll('a')) {
       expect(link.textContent.trim().length).toBeGreaterThan(0);
@@ -194,6 +201,7 @@ describe('the admin shell', () => {
       DOCKET.flatMap((group) => group.items).filter((item) => item.tier === tier).map((item) => item.to);
     expect(byTier('operator')).toEqual(['features', 'branding', 'access', 'system-errors']);
     expect(byTier('staff')).toEqual([
+      'overview',
       'pages', 'sessions', 'content', 'media', 'materials',
       'speakers', 'attendees', 'badges',
       'live-updates', 'ticketing', 'feedback',
@@ -203,6 +211,7 @@ describe('the admin shell', () => {
 
   it('reads a route’s tier from its docket entry, owning every path under the section', () => {
     expect(sectionTier('/admin/branding')).toBe('operator');
+    expect(sectionTier('/admin/overview')).toBe('staff');
     expect(sectionTier('/admin/pages')).toBe('staff');
     expect(sectionTier('/admin/pages/new')).toBe('staff');
     expect(sectionTier('/admin/sessions/abc')).toBe('staff');
@@ -261,7 +270,8 @@ describe('the admin shell', () => {
 
   it('draws the staff docket without the operator sections and drops an emptied group', () => {
     const staffDocket = docketForTier('staff');
-    expect(staffDocket.map((group) => group.id)).toEqual(['content', 'people', 'operations', 'system']);
+    expect(staffDocket.map((group) => group.id)).toEqual(['lead', 'content', 'people', 'operations', 'system']);
+    expect(staffDocket[0].items.map((item) => item.to)).toEqual(['overview']);
     expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings']);
     expect(docketForTier('operator')).toEqual(DOCKET);
     expect(docketForTier(null)).toEqual([]);
