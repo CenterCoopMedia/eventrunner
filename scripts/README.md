@@ -39,7 +39,8 @@ Packs `packages/shared` into `functions/vendor/shared.tgz` (spec §1.1); run by 
 ### `init-event.cjs`
 
 Bootstraps a fresh deployment (spec §5.1, issue #18). Writes the five `config/*` documents plus
-`config/bootstrap.adminEmails`, seeds the fifteen default pages (§5.3) and their placeholder content
+`config/bootstrap` (`adminEmails` for operators, `staffEmails` for staff; issue #186), seeds the
+fifteen default pages (§5.3) and their placeholder content
 (§5.4), seeds the provider-aware privacy and terms templates (§5.5), uploads the neutral branding
 placeholders, then prints the manual checklist (§5.6) and the launch-readiness table.
 
@@ -52,7 +53,8 @@ node scripts/init-event.cjs --attest-auth    # record the manual Firebase Auth s
 | Flag | Meaning |
 |---|---|
 | `--answers <file>` | client answers JSON; without it the script prompts interactively (needs a TTY) |
-| `--admin <email>` | first admin address, repeatable; wins over the answers file |
+| `--admin <email>` | first operator address, repeatable; wins over the answers file |
+| `--staff <email>` | staff address (content, schedule, speakers, attendees), repeatable; wins over the answers file |
 | `--force` | re-run against a project that already has `config/event` |
 | `--check` | read-only launch-readiness check (the seven §5.1.1 rows) |
 | `--attest-auth` | record that the manual Auth console steps are done, and refresh the still-seeded legal copy that describes sign-in |
@@ -77,7 +79,9 @@ the same rule in Storage: init stamps `metadata.seeded=true` on what it uploads 
 an object without that stamp. `config/*`
 documents are skipped on re-run unless `--force`, and even then the fields another writer owns
 (sender verification, the legal review flag, `announcedAt`/`archivedAt`, the auth attestation,
-ticketing webhook stamps) are preserved. `config/bootstrap.adminEmails` is always additive.
+ticketing webhook stamps) are preserved. `config/bootstrap` is always additive on both lists, so a
+re-run never removes an account an operator granted from admin Settings → Access; an address on
+both lists is stored as an operator only.
 
 **A re-run also removes a block this release no longer seeds.** Seeding writes and refreshes; it
 never deletes, so a block dropped from the defaults keeps drawing on every site an earlier release
@@ -91,6 +95,7 @@ The answers file is JSON:
 ```json
 {
   "adminEmails": ["ops@example.org"],
+  "staffEmails": ["desk@example.org"],
   "event": { "name": "…", "shortName": "…", "timezone": "America/New_York",
              "days": [{ "id": "day-1", "label": "Day one", "date": "2027-05-13",
                         "startTime": "09:00", "endTime": "17:00" }],

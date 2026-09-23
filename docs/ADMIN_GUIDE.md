@@ -4,6 +4,19 @@ How to run a client's site from the admin panel, in the order the work happens. 
 
 **Draft and live are separate almost everywhere below.** Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.
 
+## Who can do what: Operator and staff
+
+An admin account holds one of two tiers. The rail shows the tier under your address, and it shows only the sections your tier can open. A link you type or follow to a section outside your tier meets a refusal, not the page. The server and the database rules refuse the same requests, so the tier is not only a matter of what the rail shows.
+
+| Tier | Sections | For |
+|---|---|---|
+| Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
+| Staff | Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, and Event settings | The people who run the event day to day |
+
+Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. One field in there stays with the operator: The outbound sender address, because it is the email identity the deployment was verified against. A staff save that changes it is refused and the field is named.
+
+An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.
+
 ## Set the site up: Six steps
 
 This is the whole visual setup, start to finish. It takes about twenty minutes and you do it once.

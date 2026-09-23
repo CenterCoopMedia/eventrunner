@@ -162,8 +162,8 @@ An organizer can see how the event is going and act on it without leaving the ad
 - [ ] Add the outbound email log (#183)
 - [ ] Add attendee export (#184)
 - [ ] Extend attendee administration (#185)
-- [ ] Add operator and staff admin tiers (#186)
-- [ ] Add the admin access page (#187)
+- [x] Add operator and staff admin tiers (#186)
+- [x] Add the admin access page (#187)
 - [ ] Add the change request queue (#188)
 - [ ] Add bulk material download and coverage tracking to the materials page (#189)
 

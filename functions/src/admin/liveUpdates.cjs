@@ -22,7 +22,7 @@
  * a failed audit write never fails the mutation it describes).
  *
  * The public doc deliberately carries no actor identity: `live_updates` is
- * anonymously readable, and config/bootstrap.adminEmails is a server-only
+ * anonymously readable, and config/bootstrap is a server-only
  * allowlist (firestore.rules denies even an admin a direct read of it) —
  * stamping `updatedBy` here would let any visitor enumerate admin addresses
  * simply by reading the feed. Actor identity lives ONLY in admin_logs
@@ -82,7 +82,7 @@ function validateLiveUpdateDoc(doc) {
 function createSaveLiveUpdateHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function saveLiveUpdate(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const update = req.body?.update;
@@ -136,7 +136,7 @@ function createSaveLiveUpdateHandler({ db, auth, getConfig, now = Date.now, log 
 function createDeleteLiveUpdateHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function deleteLiveUpdate(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const id = req.body?.id;

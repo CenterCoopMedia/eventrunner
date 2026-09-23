@@ -93,10 +93,27 @@ function assertOnlyKeys(body, allowed) {
   }
 }
 
-function createDiagnosticHandler({ auth, getConfig, log = console }, read) {
+/**
+ * The tier each diagnostic asks of its caller (issue #186). Each one
+ * mirrors the admin page it diagnoses: system errors are an operator
+ * surface (telemetry/systemErrorsAdmin.cjs), everything else reads what a
+ * staff member already sees on the content, media, and ticketing pages.
+ * An unlisted diagnostic falls to the strictest tier.
+ */
+const DIAGNOSTIC_TIERS = Object.freeze({
+  webMcpCheckEventReadiness: 'staff',
+  webMcpValidateCurrentPageDraft: 'staff',
+  webMcpInspectPublishQueue: 'staff',
+  webMcpInspectSystemErrors: 'operator',
+  webMcpCheckMediaUsage: 'staff',
+  webMcpCheckTicketingHealth: 'staff',
+});
+
+function createDiagnosticHandler({ auth, getConfig, log = console }, name, read) {
+  const tier = DIAGNOSTIC_TIERS[name] ?? 'operator';
   return async function diagnostic(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, getConfig }, req, { tier });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
     try {
       const result = await read(req.body || {});
@@ -243,39 +260,39 @@ async function readTicketingHealth({ db, provider, getConfig, now }) {
 }
 
 function createCheckEventReadinessHandler(deps) {
-  return createDiagnosticHandler(deps, (body) => {
+  return createDiagnosticHandler(deps, 'webMcpCheckEventReadiness', (body) => {
     assertOnlyKeys(body, []);
     return readEventReadiness(deps);
   });
 }
 
 function createValidateCurrentPageDraftHandler(deps) {
-  return createDiagnosticHandler(deps, (body) => readCurrentPageDraft(deps, body));
+  return createDiagnosticHandler(deps, 'webMcpValidateCurrentPageDraft', (body) => readCurrentPageDraft(deps, body));
 }
 
 function createInspectPublishQueueHandler(deps) {
-  return createDiagnosticHandler(deps, (body) => {
+  return createDiagnosticHandler(deps, 'webMcpInspectPublishQueue', (body) => {
     assertOnlyKeys(body, []);
     return readPublishQueue(deps);
   });
 }
 
 function createInspectSystemErrorsHandler(deps) {
-  return createDiagnosticHandler(deps, (body) => {
+  return createDiagnosticHandler(deps, 'webMcpInspectSystemErrors', (body) => {
     assertOnlyKeys(body, []);
     return readSystemErrors(deps);
   });
 }
 
 function createCheckMediaUsageHandler(deps) {
-  return createDiagnosticHandler(deps, (body) => {
+  return createDiagnosticHandler(deps, 'webMcpCheckMediaUsage', (body) => {
     assertOnlyKeys(body, []);
     return readMediaUsage(deps);
   });
 }
 
 function createCheckTicketingHealthHandler(deps) {
-  return createDiagnosticHandler(deps, (body) => {
+  return createDiagnosticHandler(deps, 'webMcpCheckTicketingHealth', (body) => {
     assertOnlyKeys(body, []);
     return readTicketingHealth(deps);
   });
@@ -356,6 +373,7 @@ module.exports = {
     readTicketingHealth,
     PUBLISH_QUEUE_LIMIT,
     SYSTEM_ERROR_LIMIT,
+    DIAGNOSTIC_TIERS,
     MEDIA_ASSET_LIMIT,
   },
 };

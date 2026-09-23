@@ -62,6 +62,16 @@ profiles solely to a requester whose own `users` doc shows approved,
 speaker, or admin (spec §3.4), so a wrong guess costs a failed query, never
 a leaked profile.
 
+`AuthProvider` exposes `adminStatus` and `adminTier` (issue #186). Both come
+from rules probes, not from a readable allowlist: a `cmsContent_drafts`
+read that succeeds means admin, and an `admin_logs` read that succeeds
+means operator rather than staff. The admin shell reads the tier in one
+place: every entry in `DOCKET` (`src/admin/AdminLayout.jsx`) declares the
+tier it needs, the rail draws only the sections the signed-in tier may
+reach, and the layout refuses the route of any other. A new admin page
+declares its tier by its docket entry and nowhere else; the server's
+`requireAdmin` tier option and the rules are the enforcement.
+
 ## Dev loop
 
 ```bash

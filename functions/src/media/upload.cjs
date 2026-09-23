@@ -31,7 +31,7 @@
  * leaves the replacement alone.
  */
 
-const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
+const { requireAdmin, resolveAdminTier, verifyAuthToken } = require('../core/auth.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
 const { scanUsage } = require('./usage.cjs');
@@ -297,7 +297,7 @@ function createMediaUploadHandler({
 }) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const verdict = validateUpload(req.body, newId);
@@ -344,7 +344,7 @@ function createMediaUploadHandler({
 function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now, log = console }) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const assetId = typeof req.body?.assetId === 'string' ? req.body.assetId.trim() : '';
@@ -460,9 +460,10 @@ async function storeSpeakerPhoto({
 /**
  * `speakerPhotoUpload`: POST a base64 image for a speaker's headshot.
  *
- * Authorized two ways, checked in this order: an admin (same
- * `config/bootstrap.adminEmails` check `requireAdmin` runs, inlined here so
- * a non-admin does not pay for an admin-only rejection path), or the
+ * Authorized two ways, checked in this order: an admin of either tier
+ * (the same `config/bootstrap` check `requireAdmin` runs, through
+ * `resolveAdminTier`, inlined here so a non-admin does not pay for an
+ * admin-only rejection path), or the
  * speaker who OWNS the record — `speakers/{speakerId}.uid` equals the
  * caller's uid, the same pair `functions/src/speakers/profile.cjs`'s
  * `updateOwnSpeakerProfile` checks. Nobody else may reach the object path,
@@ -496,8 +497,7 @@ function createSpeakerPhotoUploadHandler({
     const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
     if (email && decoded.email_verified === true) {
       const config = await getConfig();
-      const adminEmails = Array.isArray(config?.bootstrap?.adminEmails) ? config.bootstrap.adminEmails : [];
-      isAdmin = adminEmails.some((entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email);
+      isAdmin = resolveAdminTier(config?.bootstrap, email) !== null;
     }
 
     if (!isAdmin) {
@@ -577,8 +577,7 @@ function createSpeakerPhotoDeleteHandler({ db, bucket, auth, getConfig, log = co
     const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
     if (email && decoded.email_verified === true) {
       const config = await getConfig();
-      const adminEmails = Array.isArray(config?.bootstrap?.adminEmails) ? config.bootstrap.adminEmails : [];
-      isAdmin = adminEmails.some((entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email);
+      isAdmin = resolveAdminTier(config?.bootstrap, email) !== null;
     }
     if (!isAdmin) {
       const snap = await db.collection('speakers').doc(speakerId).get();

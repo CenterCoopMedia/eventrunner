@@ -71,9 +71,10 @@ function decideSeedWrite(existing, opts = {}) {
 /**
  * What to do with one `config/*` document.
  *
- * `config/bootstrap` is the exception: admin emails are additive, because
- * re-running init with a new `--admin` must be able to add an operator
- * without dropping the admins a client granted through the UI.
+ * `config/bootstrap` is the exception: both admin lists are additive,
+ * because re-running init with a new `--admin` or `--staff` must be able
+ * to add an account without dropping the ones a client granted through
+ * the admin's Access page.
  *
  * @param {{ docId: string, existing: object|null, next: object, force?: boolean }} args
  * @returns {{ action: SeedAction, reason: string, value: object }}
@@ -87,10 +88,12 @@ function decideConfigWrite({ docId, existing, next, force = false }) {
     // normalized form, and skipping that write leaves an entry
     // firestore.rules can never match — `adminEmails.hasAny([email.lower()])`
     // — i.e. an admin who silently cannot authenticate.
-    const before = Array.isArray(existing.adminEmails) ? existing.adminEmails : [];
-    const changed =
-      before.length !== merged.adminEmails.length ||
-      before.some((email, i) => email !== merged.adminEmails[i]);
+    const listChanged = (field) => {
+      const before = Array.isArray(existing[field]) ? existing[field] : [];
+      return before.length !== merged[field].length
+        || before.some((email, i) => email !== merged[field][i]);
+    };
+    const changed = listChanged('adminEmails') || listChanged('staffEmails');
     return {
       action: changed ? 'overwrite' : 'skip',
       reason: changed ? 'admin list extended or renormalized' : 'admin list unchanged',
@@ -104,20 +107,25 @@ function decideConfigWrite({ docId, existing, next, force = false }) {
 }
 
 /**
- * Union of the existing and new admin lists, lowercased and de-duplicated.
- * Lowercase is load-bearing: firestore.rules compares the stored list
- * against `request.auth.token.email.lower()`, so a mixed-case entry is an
- * admin who can never authenticate.
+ * Union of the existing and new admin lists, per tier, lowercased and
+ * de-duplicated. Lowercase is load-bearing: firestore.rules compares the
+ * stored list against `request.auth.token.email.lower()`, so a mixed-case
+ * entry is an admin who can never authenticate. An address that ends up
+ * on both lists is an operator (issue #186): the wider grant wins, so it
+ * is dropped from `staffEmails` rather than stored twice.
  *
  * @param {object|null} existing
  * @param {object} next
- * @returns {{ adminEmails: string[] }}
+ * @returns {{ adminEmails: string[], staffEmails: string[] }}
  */
 function mergeAdminEmails(existing, next) {
   const normalize = (list) => (Array.isArray(list) ? list : [])
     .map((e) => String(e).trim().toLowerCase())
     .filter(Boolean);
-  return { adminEmails: [...new Set([...normalize(existing?.adminEmails), ...normalize(next?.adminEmails)])] };
+  const adminEmails = [...new Set([...normalize(existing?.adminEmails), ...normalize(next?.adminEmails)])];
+  const staffEmails = [...new Set([...normalize(existing?.staffEmails), ...normalize(next?.staffEmails)])]
+    .filter((email) => !adminEmails.includes(email));
+  return { adminEmails, staffEmails };
 }
 
 /**
