@@ -258,5 +258,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   heading now falls back to the day's own date, then to its position ("Day 2") when it has no date,
   and to a plain "Not on a configured day" line when the day itself is missing — never to the id
   (#248).
+- The venue editor's payload helper sent a blank walking-minutes field as `0`, a real distance an
+  operator can mean, instead of failing to save. It now sends `null` (#227).
 
 The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.

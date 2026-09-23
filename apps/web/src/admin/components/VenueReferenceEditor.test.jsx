@@ -85,6 +85,30 @@ describe('venue reference helpers', () => {
     ).toEqual([{ id: 'hall-a', name: 'Hall A', floor: null }]);
   });
 
+  it('sends a blank walking-minutes field as null rather than calling it zero', () => {
+    // #227: Number('') is 0, and 0 is a real answer an operator can mean
+    // ("across the corridor"). The local validator already refuses to save
+    // while the field is blank (see the test above) — this locks the
+    // payload itself to the same rule, so a blank never reaches the server
+    // disguised as a real zero.
+    expect(
+      venueReferencesPayload({
+        places: [{ id: 'main-hall', name: 'Main hall', floor: '' }],
+        movements: [
+          { from: 'main-hall', to: 'studio', walkingMinutes: '', accessibleRoute: '' },
+        ],
+      }).movements[0].walkingMinutes,
+    ).toBeNull();
+    expect(
+      venueReferencesPayload({
+        places: [{ id: 'main-hall', name: 'Main hall', floor: '' }],
+        movements: [
+          { from: 'main-hall', to: 'studio', walkingMinutes: '   ', accessibleRoute: '' },
+        ],
+      }).movements[0].walkingMinutes,
+    ).toBeNull();
+  });
+
   it('sends zero walking minutes and null optional strings', () => {
     expect(
       venueReferencesPayload({
