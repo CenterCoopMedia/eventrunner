@@ -221,6 +221,17 @@ describe('the admin shell', () => {
     // same default an undeclared docket item takes.
     expect(sectionTier('/admin/nope')).toBe('operator');
     expect(sectionTier('/admin/%E0%A4%A')).toBe('operator');
+    // The PREFIX matches case-insensitively and decoded too, so it is read
+    // the same way — the whole pathname is normalised, not one segment.
+    expect(sectionTier('/Admin/branding')).toBe('operator');
+    expect(sectionTier('/ADMIN/Branding')).toBe('operator');
+    expect(sectionTier('/%41dmin/%42randing')).toBe('operator');
+    expect(sectionTier('/Admin/pages')).toBe('staff');
+    expect(sectionTier('/Admin')).toBeNull();
+    // A segment that decodes to a slash, or an empty segment before more
+    // path, is nothing the docket owns: the operator's.
+    expect(sectionTier('/admin/%2Fbranding')).toBe('operator');
+    expect(sectionTier('/admin//branding')).toBe('operator');
   });
 
   it('names each tier’s sections once, in the rail’s own words, Event included for staff', () => {

@@ -131,14 +131,17 @@ function mergeAdminEmails(existing, next) {
 /**
  * Fields a `--force` config refresh must never take back from the
  * deployment, because something other than init owns them:
- * verify-sender-domain.cjs owns the sender verification pair (§1.3), the
- * admin Settings UI owns the legal review flag and the lifecycle stamps
- * (§2.5), the ticketing webhook script owns its registration stamps, and
- * the auth attestation is recorded by a separate operator action.
+ * verify-sender-domain.cjs owns the whole sender verification record
+ * (§1.3), the admin Settings UI owns the legal review flag and the
+ * lifecycle stamps (§2.5), the ticketing webhook script owns its
+ * registration stamps, and the auth attestation is recorded by a separate
+ * operator action.
  */
 const PRESERVED_PATHS = Object.freeze([
   'sender.domainVerified',
   'sender.domainVerifiedAt',
+  'sender.domainVerifiedBy',
+  'sender.domainVerifiedDomain',
   'legal.reviewRequired',
   'announcedAt',
   'archivedAt',

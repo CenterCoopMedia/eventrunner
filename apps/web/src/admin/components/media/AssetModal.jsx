@@ -10,6 +10,12 @@
 // button says what it will break. `mediaDelete` refuses an in-use asset with
 // a 409 regardless — the server decides, this only makes the decision
 // legible — and confirming re-sends with `force`.
+//
+// For staff (issue 186) a branding asset — one in the branding folder, or
+// one a theme slot or the social card names — is read-only here: the words
+// and the delete are the operator's, the server refuses both, and the modal
+// says so once instead of offering controls that fail. `operator` is the
+// caller's tier; it defaults closed.
 import { useEffect, useState } from 'react';
 import { formatBytes } from '../../../lib/mediaSource.js';
 import {
@@ -23,6 +29,12 @@ import {
   secondaryButtonClass,
 } from '../formControls.jsx';
 import AssetImage from '../../../components/media/AssetImage.jsx';
+import {
+  BRANDING_NOTE,
+  isBrandingAsset,
+  mediaErrorMessage,
+  referencedByBranding,
+} from './mediaErrors.js';
 import ModalShell from './ModalShell.jsx';
 
 function UsageList({ references }) {
@@ -55,7 +67,15 @@ function UsageList({ references }) {
   );
 }
 
-export default function AssetModal({ asset, onClose, onChanged, scanUsage, updateMetadata, remove }) {
+export default function AssetModal({
+  asset,
+  onClose,
+  onChanged,
+  scanUsage,
+  updateMetadata,
+  remove,
+  operator = false,
+}) {
   const [alt, setAlt] = useState(asset.alt ?? '');
   const [title, setTitle] = useState(asset.title ?? '');
   const [references, setReferences] = useState(null);
@@ -63,6 +83,7 @@ export default function AssetModal({ asset, onClose, onChanged, scanUsage, updat
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const locked = !operator && (isBrandingAsset(asset) || referencedByBranding(references));
 
   useEffect(() => {
     let active = true;
@@ -90,7 +111,7 @@ export default function AssetModal({ asset, onClose, onChanged, scanUsage, updat
       setStatus('Saved.');
       onChanged?.();
     } catch (err) {
-      setError(err.message);
+      setError(mediaErrorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -110,7 +131,7 @@ export default function AssetModal({ asset, onClose, onChanged, scanUsage, updat
         setReferences(err.usage ?? references ?? []);
         setConfirming(true);
       }
-      setError(err.message);
+      setError(mediaErrorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -137,14 +158,17 @@ export default function AssetModal({ asset, onClose, onChanged, scanUsage, updat
       </div>
 
       <form className="mt-md flex flex-col gap-sm" onSubmit={save}>
-        <TextAreaField label="Alt text" value={alt} onChange={setAlt} rows={2} />
-        <TextField label="Title" value={title} onChange={setTitle} />
+        <TextAreaField label="Alt text" value={alt} onChange={setAlt} rows={2} readOnly={locked} />
+        <TextField label="Title" value={title} onChange={setTitle} readOnly={locked} />
         {status ? <SaveStatus message={status} /> : null}
         {error ? <Notice tone="error" message={error} /> : null}
+        {locked ? <p className="text-admin-sm text-admin-ink-secondary">{BRANDING_NOTE}</p> : null}
         <div className="flex flex-wrap gap-xs">
-          <button type="submit" className={primaryButtonClass} disabled={busy}>
-            {busy ? 'Saving…' : 'Save description'}
-          </button>
+          {locked ? null : (
+            <button type="submit" className={primaryButtonClass} disabled={busy}>
+              {busy ? 'Saving…' : 'Save description'}
+            </button>
+          )}
           <button type="button" className={secondaryButtonClass} onClick={onClose} disabled={busy}>
             Done
           </button>
@@ -157,9 +181,11 @@ export default function AssetModal({ asset, onClose, onChanged, scanUsage, updat
           <UsageList references={references} />
         </div>
         {/* Moment 3: the delete states what it costs before it runs, and
-            the in-use case says how many live documents lose their file. */}
+            the in-use case says how many live documents lose their file.
+            A locked asset offers no delete at all: the note above says whose
+            it is. */}
         <div className="mt-sm flex flex-wrap gap-xs">
-          {confirming || (references?.length ?? 0) > 0 ? (
+          {locked ? null : confirming || (references?.length ?? 0) > 0 ? (
             <DestructiveConfirm
               trigger="Delete this file anyway"
               title="Delete a file that is in use"

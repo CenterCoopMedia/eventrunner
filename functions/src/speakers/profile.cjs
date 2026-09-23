@@ -166,6 +166,19 @@ async function applyCreateSpeaker({ db, speakerId, payload, actor, now = Date.no
   } else {
     docId = speakerId;
   }
+  // The same prefix rule the self-service path applies (isOwnHeadshotPath):
+  // an admin payload could otherwise point a speaker at a branding file or
+  // another speaker's photo, and applySpeakerPendingEdits would later treat
+  // that path as this speaker's own to delete. Checked against the id the
+  // record will actually carry — the slug when none was sent.
+  if (!isOwnHeadshotPath(docId, fields.headshotPath)) {
+    return {
+      ok: false,
+      status: 400,
+      code: 'bad-request',
+      message: `headshotPath: must be null or under speaker-photos/${docId}/`,
+    };
+  }
 
   const at = new Date(now());
   const ref = db.collection(SPEAKERS).doc(docId);
@@ -235,6 +248,15 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
   }
   if (Object.keys(verdict.fields).length === 0) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speaker: no editable fields in the payload' };
+  }
+  // Same prefix rule as create and the self-service path, for the same reason.
+  if ('headshotPath' in verdict.fields && !isOwnHeadshotPath(speakerId, verdict.fields.headshotPath)) {
+    return {
+      ok: false,
+      status: 400,
+      code: 'bad-request',
+      message: `headshotPath: must be null or under speaker-photos/${speakerId}/`,
+    };
   }
 
   const at = new Date(now());
@@ -628,7 +650,14 @@ async function applyApplySpeakerPendingEdits({ db, bucket, speakerId, actor, now
     throw err;
   }
 
-  if (bucket && newHeadshotPath !== undefined && newHeadshotPath !== oldHeadshotPath && oldHeadshotPath) {
+  // Only the speaker's OWN superseded photo is ever deleted. A stored path
+  // outside speaker-photos/{speakerId}/ — a branding file, another speaker's
+  // photo, a bundled avatar — is not this record's object whatever put it
+  // there: the admin paths refuse such a value now, and a row written
+  // before they did must not become a way to delete somebody else's file.
+  const ownOldPhoto = typeof oldHeadshotPath === 'string'
+    && oldHeadshotPath.startsWith(`speaker-photos/${speakerId}/`);
+  if (bucket && ownOldPhoto && newHeadshotPath !== undefined && newHeadshotPath !== oldHeadshotPath) {
     try {
       await bucket.file(oldHeadshotPath).delete({ ignoreNotFound: true });
     } catch (err) {

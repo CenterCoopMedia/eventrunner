@@ -260,7 +260,7 @@ describe('admin route gating', () => {
     // must refuse it the same way it refuses /admin/branding.
     operatorProbeShouldSucceed = false;
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
-    for (const path of ['/admin/Branding', '/admin/%41ccess']) {
+    for (const path of ['/admin/Branding', '/admin/%41ccess', '/Admin/branding', '/%41dmin/branding']) {
       const { unmount } = await renderAt(path);
       expect(
         screen.getByRole('heading', { name: 'This section needs operator access' }),

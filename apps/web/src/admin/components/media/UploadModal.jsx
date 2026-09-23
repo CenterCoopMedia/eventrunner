@@ -27,6 +27,7 @@ import {
   rowMetaClass,
   secondaryButtonClass,
 } from '../formControls.jsx';
+import { mediaErrorMessage } from './mediaErrors.js';
 import ModalShell from './ModalShell.jsx';
 
 export default function UploadModal({ folder, onClose, onUploaded, upload }) {
@@ -56,7 +57,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
       const asset = await upload({ file, folder, alt: alt.trim(), title: title.trim() });
       onUploaded(asset);
     } catch (err) {
-      setError(err.message);
+      setError(mediaErrorMessage(err));
     } finally {
       setBusy(false);
     }

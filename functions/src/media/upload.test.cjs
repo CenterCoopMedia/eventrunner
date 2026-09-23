@@ -17,7 +17,7 @@ const {
   createSpeakerPhotoDeleteHandler,
   internals: {
     validateUpload, decodeUpload, safeObjectName, MAX_UPLOAD_BYTES, SPEAKER_PHOTO_MAX_BYTES,
-    isBrandingAsset, referencedByTheme,
+    isBrandingAsset, referencedByBranding,
   },
 } = require('./upload.cjs');
 
@@ -699,12 +699,100 @@ test('mediaDelete of an unreferenced cms-images asset stays staff work', async (
   assert.equal(res.statusCode, 200);
 });
 
-test('isBrandingAsset and referencedByTheme read the row and the scan the way the handlers do', () => {
+test('isBrandingAsset and referencedByBranding read the row and the scan the way the handlers do', () => {
   assert.equal(isBrandingAsset({ folder: 'branding', path: 'x' }), true);
   assert.equal(isBrandingAsset({ path: 'branding/a/b.png' }), true);
   assert.equal(isBrandingAsset({ folder: 'cms-images', path: 'cms-images/a/b.png' }), false);
   assert.equal(isBrandingAsset(undefined), false);
-  assert.equal(referencedByTheme([{ docPath: 'config/theme', field: 'logos.mark' }]), true);
-  assert.equal(referencedByTheme([{ docPath: 'cmsPages/home', field: 'sections.0.image' }]), false);
-  assert.equal(referencedByTheme([]), false);
+  assert.equal(referencedByBranding([{ docPath: 'config/theme', field: 'logos.mark' }]), true);
+  assert.equal(referencedByBranding([{ docPath: 'config/event', field: 'seo.defaultOgImagePath' }]), true);
+  assert.equal(referencedByBranding([{ docPath: 'config/event', field: 'venue.mapPath' }]), false);
+  assert.equal(referencedByBranding([{ docPath: 'cmsPages/home', field: 'sections.0.image' }]), false);
+  assert.equal(referencedByBranding([]), false);
+});
+
+// ---------------------------------------------- round three: the social card, failed scans, failed gates
+
+test('mediaDelete of the asset config/event.seo.defaultOgImagePath names is refused for staff even with force, and allowed for an operator', async () => {
+  const path = `cms-images/${ASSET_ID}/hero.png`;
+  const seed = () => seededLibrary({ 'config/event': { seo: { defaultOgImagePath: path } } });
+  const refused = fakeRes();
+  const db = seed();
+  await createMediaDeleteHandler(staffDeps(db, fakeBucket()))(post({ assetId: ASSET_ID, force: true }), refused);
+  assert.equal(refused.statusCode, 403);
+  assert.equal(refused.body.error.message, 'branding: operator access required');
+  assert.deepEqual(db.ids('media_assets'), [ASSET_ID]);
+
+  const allowed = fakeRes();
+  await createMediaDeleteHandler(operatorDeps(seed(), fakeBucket()))(post({ assetId: ASSET_ID, force: true }), allowed);
+  assert.equal(allowed.statusCode, 200);
+  assert.deepEqual(allowed.body.usage, [{ docPath: 'config/event', field: 'seo.defaultOgImagePath' }]);
+});
+
+test('an asset config/event names anywhere else (a page image) is not branding', async () => {
+  const path = `cms-images/${ASSET_ID}/hero.png`;
+  const db = seededLibrary({ 'config/event': { venue: { mapPath: path }, seo: { defaultOgImagePath: 'branding/og.png' } } });
+  const res = fakeRes();
+  await createMediaDeleteHandler(staffDeps(db, fakeBucket()))(post({ assetId: ASSET_ID, force: true }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+/** A library whose usage scan cannot run: cmsContent throws on read. */
+function libraryWithBrokenScan() {
+  const db = seededLibrary();
+  const realCollection = db.collection.bind(db);
+  db.collection = (name) => {
+    if (name === 'cmsContent') return { async get() { throw new Error('transport failed'); } };
+    return realCollection(name);
+  };
+  return db;
+}
+
+test('mediaDelete with force while the usage scan fails: 500 and nothing deleted for staff, 200 for an operator', async () => {
+  const staffRes = fakeRes();
+  const staffDb = libraryWithBrokenScan();
+  await createMediaDeleteHandler(staffDeps(staffDb, fakeBucket()))(post({ assetId: ASSET_ID, force: true }), staffRes);
+  assert.equal(staffRes.statusCode, 500);
+  assert.equal(staffRes.body.error.message, 'The file could not be checked for usage.');
+  assert.deepEqual(staffDb.ids('media_assets'), [ASSET_ID]);
+
+  const opsRes = fakeRes();
+  const opsDb = libraryWithBrokenScan();
+  const bucket = fakeBucket();
+  await bucket.file(`cms-images/${ASSET_ID}/hero.png`).save(Buffer.from('x'), {});
+  await createMediaDeleteHandler(operatorDeps(opsDb, bucket))(post({ assetId: ASSET_ID, force: true }), opsRes);
+  assert.equal(opsRes.statusCode, 200);
+  assert.deepEqual(opsDb.ids('media_assets'), []);
+});
+
+/** A db whose config/bootstrap read throws, for the fail-closed gates. */
+function bootstrapDownDb(seed = {}) {
+  const db = makeBareFakeDb(seed);
+  const realCollection = db.collection.bind(db);
+  db.collection = (name) => {
+    if (name === 'config') return { doc: () => ({ async get() { throw new Error('firestore down'); } }) };
+    return realCollection(name);
+  };
+  return db;
+}
+
+test('speakerPhotoUpload and speakerPhotoDelete answer 500 and write nothing when config/bootstrap cannot be read', async () => {
+  const bucket = fakeBucket();
+  const db = bootstrapDownDb({ 'speakers/rae': { firstName: 'Rae', lastName: 'Okonkwo', uid: SPEAKER_UID, status: 'accepted' } });
+  const upload = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(db, bucket))(
+    post({ speakerId: 'rae', contentType: 'image/png', data: PNG }), upload,
+  );
+  assert.equal(upload.statusCode, 500);
+  assert.equal(upload.body.error.code, 'internal');
+  assert.equal(bucket.objects.size, 0);
+
+  await bucket.file('speaker-photos/rae/old/photo.png').save(Buffer.from('x'), {});
+  const del = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(db, bucket))(
+    post({ speakerId: 'rae', path: 'speaker-photos/rae/old/photo.png' }), del,
+  );
+  assert.equal(del.statusCode, 500);
+  assert.equal(del.body.error.code, 'internal');
+  assert.deepEqual(bucket.deleted, []);
 });

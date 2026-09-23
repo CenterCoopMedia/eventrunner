@@ -926,3 +926,94 @@ test('findOperatorKeyChanges names sender only when a staff payload changes it, 
   assert.deepEqual(findOperatorKeyChanges('event', { tagline: 'x' }, stored, 'staff'), []);
   assert.deepEqual(findOperatorKeyChanges('badges', { sender: {} }, stored, 'staff'), []);
 });
+
+// ---------------------------------------------- round three: the social card and sender bytes
+
+const OG_SEEDED = 'branding/og-default.svg';
+const storedWithSeo = () => ({ ...validEvent(), seo: { description: null, organizerName: null, organizerUrl: null, defaultOgImagePath: OG_SEEDED } });
+
+test('a staff save that changes seo.defaultOgImagePath is refused by name — the social card is branding', async () => {
+  const stored = storedWithSeo();
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: fullStaffPayload(stored, { seo: { description: 'x', organizerName: null, organizerUrl: null, defaultOgImagePath: 'cms-images/abc/evil.png' } }) }, { token: 'staff-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.message, 'seo.defaultOgImagePath: operator access required');
+  assert.equal(deps.db.docs.get('config/event').seo.defaultOgImagePath, OG_SEEDED);
+  assert.equal(deps.db.docs.get('config/event').tagline, undefined);
+});
+
+test('a staff save that carries seo.defaultOgImagePath unchanged, or leaves it out, goes through and keeps the stored value', async () => {
+  for (const seo of [
+    { description: 'A summit', organizerName: null, organizerUrl: null, defaultOgImagePath: OG_SEEDED },
+    { description: 'A summit', organizerName: null, organizerUrl: null },
+  ]) {
+    const stored = storedWithSeo();
+    const deps = tieredDeps({ 'config/event': stored });
+    const res = makeRes();
+    await createUpdateEventConfigHandler(deps)(makeReq({ event: fullStaffPayload(stored, { seo }) }, { token: 'staff-token' }), res);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    assert.equal(deps.db.docs.get('config/event').seo.defaultOgImagePath, OG_SEEDED);
+    assert.equal(deps.db.docs.get('config/event').seo.description, 'A summit');
+  }
+});
+
+test('an operator may change seo.defaultOgImagePath', async () => {
+  const stored = storedWithSeo();
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { seo: { defaultOgImagePath: 'branding/og-card.png' } } }, { token: 'admin-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(deps.db.docs.get('config/event').seo.defaultOgImagePath, 'branding/og-card.png');
+});
+
+test('a staff sender judged unchanged keeps the STORED bytes — the merge does not take the payload’s own spelling', async () => {
+  const stored = validEvent({ sender: { email: 'summit@example.org', name: 'Example Summit', replyTo: null } });
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: fullStaffPayload(stored, { sender: { email: 'SUMMIT@Example.org', name: ' Example Summit ', replyTo: null } }) }, { token: 'staff-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.deepEqual(deps.db.docs.get('config/event').sender, {
+    email: 'summit@example.org', name: 'Example Summit', replyTo: null, domainVerified: false, domainVerifiedAt: null,
+  });
+});
+
+test('a staff sender that carries any key outside email, name and replyTo is refused by name', async () => {
+  const stored = validEvent();
+  for (const extra of [{ extra: 'x' }, { domainVerified: false }]) {
+    const deps = tieredDeps({ 'config/event': stored });
+    const res = makeRes();
+    await createUpdateEventConfigHandler(deps)(
+      makeReq({ event: fullStaffPayload(stored, { sender: { email: stored.sender.email, name: stored.sender.name, replyTo: null, ...extra } }) }, { token: 'staff-token' }),
+      res,
+    );
+    assert.equal(res.ok === undefined ? res.statusCode : res.statusCode, Object.keys(extra)[0] === 'extra' ? 403 : 400, JSON.stringify(extra));
+    if (Object.keys(extra)[0] === 'extra') assert.equal(res.body.error.message, 'sender.extra: operator access required');
+    assert.equal(deps.db.docs.get('config/event').tagline, undefined);
+  }
+});
+
+test('domainVerifiedBy and domainVerifiedDomain are read-only for BOTH tiers, like the rest of the verification record', async () => {
+  const stored = validEvent();
+  for (const token of ['admin-token', 'staff-token']) {
+    for (const field of ['domainVerified', 'domainVerifiedAt', 'domainVerifiedBy', 'domainVerifiedDomain']) {
+      const deps = tieredDeps({ 'config/event': stored });
+      const res = makeRes();
+      await createUpdateEventConfigHandler(deps)(
+        makeReq({ event: { sender: { email: stored.sender.email, [field]: 'x' } } }, { token }),
+        res,
+      );
+      assert.equal(res.statusCode, 400, `${token} ${field}`);
+      assert.match(res.body.error.message, new RegExp(`sender\\.${field}: read-only`));
+    }
+  }
+});

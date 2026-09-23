@@ -23,10 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   migration, and `config/bootstrap.staffEmails` is the new staff list. The database rules, the
   server's admin gate (`requireAdmin` takes a `tier` option and defaults to operator), and the
   admin rail all read the same two lists: the rail shows only the sections the signed-in tier can
-  open and refuses the route of any other. Event settings admit staff; the sender block is shown
-  read-only to staff, and a staff save that would change it is refused by name. Branding is the
-  operator's in the media library too: an upload into `branding/`, and a delete or relabel of a
-  branding asset or of any asset a theme slot uses, is refused for staff. `init-event.cjs` takes
+  open and refuses the route of any other. Event settings admit staff; the sender block and the
+  social sharing image are shown read-only to staff, and a staff save that would change either is
+  refused by name. Branding is the operator's in the media library too: an upload into
+  `branding/`, and a delete or relabel of a branding asset or of any asset a theme slot or the
+  social sharing image uses, is refused for staff, and the Branding drawer is read-only for them. `init-event.cjs` takes
   `--staff` beside `--admin`; a re-run never removes a grant made in the admin and never puts back
   an address removed there, because only `--admin` and `--staff` add on a re-run.
 - The Access page, under System, for operators: a ruled table of every admin account with its tier

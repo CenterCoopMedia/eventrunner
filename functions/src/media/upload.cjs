@@ -96,10 +96,25 @@ function isBrandingAsset(stored) {
     || (typeof stored?.path === 'string' && stored.path.startsWith(`${BRANDING_FOLDER}/`));
 }
 
-/** @param {Array<{ docPath: string }>} references @returns {boolean} */
-function referencedByTheme(references) {
+/**
+ * The one config/event field that is a branding surface: the social
+ * sharing card (public/og.cjs reads it after theme.logos.ogDefault).
+ * admin/config.cjs holds the same key back from staff.
+ */
+const OG_IMAGE_FIELD = 'seo.defaultOgImagePath';
+
+/**
+ * Whether the usage scan shows an asset on a branding surface: any theme
+ * slot, or the social card. Such an asset is branding whatever folder it
+ * sits in.
+ *
+ * @param {Array<{ docPath: string, field?: string }>} references
+ * @returns {boolean}
+ */
+function referencedByBranding(references) {
   return references.some((reference) => typeof reference?.docPath === 'string'
-    && reference.docPath.startsWith('config/theme'));
+    && (reference.docPath.startsWith('config/theme')
+      || (reference.docPath === 'config/event' && reference.field === OG_IMAGE_FIELD)));
 }
 
 /**
@@ -410,7 +425,7 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
     }
     // A theme slot's asset is branding whatever folder it sits in, and
     // force does not change whose it is.
-    if (!operator && referencedByTheme(references)) {
+    if (!operator && referencedByBranding(references)) {
       return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
     }
     if (references.length > 0 && !force) {
@@ -675,7 +690,7 @@ module.exports = {
   },
   internals: {
     isBrandingAsset,
-    referencedByTheme,
+    referencedByBranding,
     BRANDING_FOLDER,
     BRANDING_REFUSAL,
     validateUpload,

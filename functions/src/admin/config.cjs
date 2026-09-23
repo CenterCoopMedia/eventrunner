@@ -114,8 +114,17 @@ const EVENT_EDITABLE_KEYS = Object.freeze([
   'seo',
 ]);
 
-/** Only verify-sender-domain.cjs may set these (spec §1.3 item 3). */
-const SENDER_VERIFICATION_FIELDS = Object.freeze(['domainVerified', 'domainVerifiedAt']);
+/**
+ * Only verify-sender-domain.cjs may set these (spec §1.3 item 3): the whole
+ * verification record it writes, not just the pair the readiness check
+ * reads. Read-only for both tiers.
+ */
+const SENDER_VERIFICATION_FIELDS = Object.freeze([
+  'domainVerified',
+  'domainVerifiedAt',
+  'domainVerifiedBy',
+  'domainVerifiedDomain',
+]);
 
 /**
  * Top-level config/event keys only an operator may CHANGE (issue #186).
@@ -140,23 +149,59 @@ function normalizeSenderField(field, value) {
 
 /**
  * Whether a payload's sender differs from the stored one on any editable
- * field. The verification pair is not compared: it is refused by name
- * before this runs, whoever the caller is. Pure.
+ * field. The verification record is not compared: it is refused by name
+ * before this runs, whoever the caller is. A sender that is not an object
+ * would replace the block wholesale, so it counts as a change. Pure.
  *
  * @param {object|undefined} payloadSender
  * @param {object|undefined} storedSender
  * @returns {boolean}
  */
 function senderChanged(payloadSender, storedSender) {
-  if (!isPlainObject(payloadSender)) return false;
+  if (payloadSender === undefined) return false;
+  if (!isPlainObject(payloadSender)) return true;
   const stored = isPlainObject(storedSender) ? storedSender : {};
   return SENDER_EDITABLE_FIELDS.some((field) => field in payloadSender
     && normalizeSenderField(field, payloadSender[field]) !== normalizeSenderField(field, stored[field]));
 }
 
 /**
- * Operator-only keys a staff payload would CHANGE, each named. Runs inside
- * the event transaction, against the stored document. Pure.
+ * The config/event.seo key that names the social sharing card. The card is
+ * a branding surface — public/og.cjs renders it right after
+ * theme.logos.ogDefault — so pointing it elsewhere is the operator's, the
+ * same as a theme slot.
+ */
+const OG_IMAGE_KEY = 'defaultOgImagePath';
+
+/** A storage path the way the save stores it: trimmed; '' and absent both null. */
+function normalizePath(value) {
+  if (typeof value !== 'string') return value == null ? null : value;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * Whether a payload's seo block moves the social card image. A seo value
+ * that is not an object would replace the block, so it is a change when
+ * a card image is stored. Pure.
+ *
+ * @param {object|undefined} payloadSeo
+ * @param {object|undefined} storedSeo
+ * @returns {boolean}
+ */
+function ogImageChanged(payloadSeo, storedSeo) {
+  if (payloadSeo === undefined) return false;
+  const stored = isPlainObject(storedSeo) ? storedSeo : {};
+  if (!isPlainObject(payloadSeo)) return normalizePath(stored[OG_IMAGE_KEY]) !== null;
+  if (!(OG_IMAGE_KEY in payloadSeo)) return false;
+  return normalizePath(payloadSeo[OG_IMAGE_KEY]) !== normalizePath(stored[OG_IMAGE_KEY]);
+}
+
+/**
+ * Operator-only values a staff payload would CHANGE, each named. Runs
+ * inside the event transaction, against the stored document. A sender key
+ * outside the editable three is a change whatever it holds — staff cannot
+ * add to the sender block, only carry it. Pure.
  *
  * @param {string} docId
  * @param {object} payload
@@ -167,10 +212,45 @@ function senderChanged(payloadSender, storedSender) {
 function findOperatorKeyChanges(docId, payload, stored, tier) {
   if (tier === 'operator' || docId !== 'event') return [];
   const violations = [];
-  if ('sender' in payload && senderChanged(payload.sender, stored?.sender)) {
-    violations.push('sender: operator access required');
+  if ('sender' in payload) {
+    if (senderChanged(payload.sender, stored?.sender)) {
+      violations.push('sender: operator access required');
+    }
+    if (isPlainObject(payload.sender)) {
+      for (const key of Object.keys(payload.sender)) {
+        if (!SENDER_EDITABLE_FIELDS.includes(key)) {
+          violations.push(`sender.${key}: operator access required`);
+        }
+      }
+    }
+  }
+  if ('seo' in payload && ogImageChanged(payload.seo, stored?.seo)) {
+    violations.push(`seo.${OG_IMAGE_KEY}: operator access required`);
   }
   return violations;
+}
+
+/**
+ * A staff payload with the operator-only values it was just proven not to
+ * change REMOVED, so the merge keeps the stored bytes for them: a sender
+ * spelt with other case or spacing is judged unchanged, and must not be
+ * re-spelt on the way through. An operator's payload is returned as is.
+ * Pure; findOperatorKeyChanges has already refused any change.
+ *
+ * @param {object} payload
+ * @param {'operator'|'staff'} tier
+ * @returns {object}
+ */
+function withoutUnchangedOperatorKeys(payload, tier) {
+  if (tier === 'operator') return payload;
+  const out = { ...payload };
+  delete out.sender;
+  if (isPlainObject(out.seo) && OG_IMAGE_KEY in out.seo) {
+    const seo = { ...out.seo };
+    delete seo[OG_IMAGE_KEY];
+    out.seo = seo;
+  }
+  return out;
 }
 
 /**
@@ -426,13 +506,17 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
         // whole editable slice); only a CHANGE to it is the operator's.
         const operatorKeyChanges = findOperatorKeyChanges(docId, fields, stored, tier);
         if (operatorKeyChanges.length > 0) throw new OperatorKeyRefusedError(operatorKeyChanges);
+        // Proven unchanged, the operator's values are then DROPPED from a
+        // staff payload, so the merge keeps the stored bytes for them.
+        const merged = withoutUnchangedOperatorKeys(fields, tier);
         // MERGE the payload over the stored doc, then validate the RESULT:
         // the validator accepts a partial shape, so validating (or writing)
         // the payload alone would let a partial save erase venue/legal/etc.
-        written = deepMerge(stored, fields);
-        // The merge already preserves a stored verification pair (the
-        // payload was proven not to carry either field), but normalize it
-        // explicitly so a first write can never omit it.
+        written = deepMerge(stored, merged);
+        // The merge already preserves a stored verification record (the
+        // payload was proven not to carry any of its fields), but normalize
+        // the pair the readiness check reads so a first write can never
+        // omit it.
         const storedSender = isPlainObject(stored.sender) ? stored.sender : {};
         written.sender = {
           ...(isPlainObject(written.sender) ? written.sender : {}),
