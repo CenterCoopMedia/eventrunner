@@ -27,14 +27,23 @@
 // record state. A revoked account is dead matter: it keeps its word and
 // drops to the standing-matter ink (moment 1's device reused for the one
 // axis this surface actually has).
-import { useEffect, useMemo, useState } from 'react';
+//
+// Export (issue #184): the title band's one action saves the rows on screen
+// as a CSV file. The page sends the uids it shows, in the order it shows
+// them, plus the status filter and whether a search narrowed the list —
+// never the search text, which can name a person and would outlive them in
+// the audit row. The server re-reads each account, writes the admin_logs
+// row, and only then returns the file (functions/src/users/export.cjs).
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
+import { saveTextFile } from '../downloadFile.js';
 import {
   DestructiveConfirm,
   Notice,
   Panel,
+  SaveStatus,
   SelectField,
   TextField,
   rowMetaClass,
@@ -84,6 +93,11 @@ function canRevoke(row) {
   return ['ticketed', 'approved'].includes(row.registrationStatus);
 }
 
+/** "1 attendee", "42 attendees". */
+function attendeeCount(count) {
+  return `${count} attendee${count === 1 ? '' : 's'}`;
+}
+
 function matchesSearch(row, needle) {
   if (!needle) return true;
   const haystack = [row.displayName, row.email, row.organization, row.id]
@@ -104,6 +118,11 @@ export default function AdminAttendees() {
   const [busyUid, setBusyUid] = useState(null);
   const [removingBadges, setRemovingBadges] = useState([]);
   const [badgeRemovalResult, setBadgeRemovalResult] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportResult, setExportResult] = useState(null);
+  // A second press in the same tick, before the disabled state renders,
+  // must not start a second export: each one writes an audit row.
+  const exportingRef = useRef(false);
 
   useEffect(() => {
     return subscribeAdminCollection(
@@ -138,6 +157,29 @@ export default function AdminAttendees() {
     }
   }
 
+  async function exportShown() {
+    if (exportingRef.current || shown.length === 0) return;
+    exportingRef.current = true;
+    setExporting(true);
+    setExportResult(null);
+    try {
+      const result = await call('exportAttendees', {
+        uids: shown.map((row) => row.id),
+        filter: { status: filter, searched: search.trim() !== '' },
+      });
+      saveTextFile(result.filename, result.csv);
+      setExportResult({
+        tone: 'ok',
+        message: `Exported ${attendeeCount(result.rowCount)} to ${result.filename}. The export is in the admin log.`,
+      });
+    } catch (err) {
+      setExportResult({ tone: 'error', message: err.message });
+    } finally {
+      exportingRef.current = false;
+      setExporting(false);
+    }
+  }
+
   async function removeCustomBadge(uid, badge) {
     const pendingKey = `${uid}:${badge}`;
     setRemovingBadges((current) => [...current, pendingKey]);
@@ -159,8 +201,24 @@ export default function AdminAttendees() {
       <AdminPageHeader
         title="Attendees"
         identifiers={rows ? `${shown.length} of ${rows.length} account${rows.length === 1 ? '' : 's'}` : undefined}
-        description="Registration status for every account. An approval you make here is recorded as an organizer decision and survives a ticket refund; a revocation is never undone by a later ticket sync."
+        description="Registration status for every account. An approval you make here is recorded as an organizer decision and survives a ticket refund; a revocation is never undone by a later ticket sync. An export holds names, email addresses, and profile details, and every export is recorded."
+        actions={
+          rows === null ? null : (
+            <button
+              type="button"
+              className={secondaryButtonClass}
+              onClick={exportShown}
+              disabled={exporting || shown.length === 0}
+              aria-busy={exporting ? 'true' : undefined}
+            >
+              {exporting ? 'Exporting…' : `Export ${attendeeCount(shown.length)}`}
+            </button>
+          )
+        }
       />
+
+      {exportResult?.tone === 'ok' ? <SaveStatus message={exportResult.message} /> : null}
+      {exportResult?.tone === 'error' ? <Notice tone="error" message={exportResult.message} /> : null}
 
       <div className="flex flex-wrap items-end gap-sm">
         <div className="min-w-0 flex-1">

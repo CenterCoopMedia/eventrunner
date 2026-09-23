@@ -161,6 +161,26 @@ The full attendee list with registration status and a search/filter. What action
 
 Approve and revoke always go through the server endpoints. Every registration field involved is server-owned and not editable directly, even for the account's own owner.
 
+**Export the list.** The button in the title band reads **Export 42 attendees**, where the number is the rows on screen after your search and status filter. It saves a CSV file with one row per account, in the order the page lists them. The file has nine columns, and nothing else leaves the site:
+
+| Column | What it holds |
+|---|---|
+| Name | The display name |
+| Email | The sign-in address |
+| Organization | The organization on the profile |
+| Role | The role on the profile (the job title, not an access level) |
+| Registration status | The stored value: `pending`, `ticketed`, `approved`, or `revoked` |
+| Badges | The configured badge labels, then the custom badges while that feature is on |
+| Past attendance | The editions an organizer recorded on the account |
+| Social handles | `label: handle` pairs, sorted by label |
+| Profile visibility | The stored value: `public`, `attendees_only`, or `private` |
+
+A cell with more than one entry joins them with a semicolon. The file carries no account id, pronouns, bio, photo, or dates. The status and visibility columns keep the stored words, so a spreadsheet filter on them stays stable.
+
+**Formulas stay text.** A spreadsheet runs a cell that starts with `=`, `+`, `-`, or `@` as a formula. In the file, such a cell starts with an apostrophe, and so does a cell that starts with a tab or a carriage return, or with spaces and then one of those four characters. The spreadsheet shows the value as text.
+
+**Every export is recorded.** The server writes an admin log entry with your address, the number of rows, the status filter, and whether a search narrowed the list. It never records the search text, because that text can name a person. If the entry cannot be written, the server refuses the export and makes no file. The server keeps no copy of the file. One export holds at most 10,000 attendees.
+
 ## Ticketing
 
 Provider status, CSV import, and a searchable ticket list. What is here depends on the client's provider choice ([`CLIENT_ONBOARDING.md`](CLIENT_ONBOARDING.md) §3 item 5):

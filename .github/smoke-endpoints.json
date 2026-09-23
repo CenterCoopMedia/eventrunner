@@ -78,6 +78,7 @@
     "ticketingImportCsv",
     "ticketingListTickets",
     "approveUser",
-    "revokeUser"
+    "revokeUser",
+    "exportAttendees"
   ]
 }

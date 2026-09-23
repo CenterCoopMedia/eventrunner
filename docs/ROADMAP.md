@@ -159,7 +159,7 @@ An organizer can see how the event is going and act on it without leaving the ad
 - [ ] Add the registration funnel and content readiness panels (#181)
 - [ ] Add session popularity to the admin (#182)
 - [ ] Add the outbound email log (#183)
-- [ ] Add attendee export (#184)
+- [x] Add attendee export (#184)
 - [ ] Extend attendee administration (#185)
 - [x] Add operator and staff admin tiers (#186)
 - [x] Add the admin access page (#187)

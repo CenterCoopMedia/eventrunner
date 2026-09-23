@@ -34,6 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   access, and every change asks for a confirmation first, is written by the server with the
   address lowercased, and is recorded in the admin log. The server refuses a change that would
   leave the deployment with no operator, including an operator removing their own last grant.
+- Attendee export (#184). The Attendees page saves the rows on screen as a CSV file through the
+  staff-tier `exportAttendees` endpoint. The file carries exactly the approved field set: name,
+  email, organization, role, registration status, badges, past attendance, social handles, and
+  profile visibility. A cell that a spreadsheet would run as a formula starts with an apostrophe.
+  Every export writes an `admin_logs` row with the actor, the row count, the status filter, and
+  whether a search was used, never the search text; the server refuses the file when that row
+  cannot be written, and keeps no copy of it.
 
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.

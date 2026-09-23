@@ -1480,3 +1480,55 @@ describe("custom badges", () => {
     await assertSucceeds(update("approved-1", { customBadges: null }));
   });
 });
+
+// Attendee export (issue 184). The file lives only in the response body, so
+// the rules' part is the two stores around it: the account documents it is
+// read from, and the audit row it writes. The rules file is unchanged; these
+// pin the two facts the export relies on.
+describe("attendee export: the source rows and the audit row (issue 184)", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "admin_logs/export-1"), {
+        action: "exportAttendees",
+        docPath: "users",
+        uid: "staff-1",
+        email: STAFF_EMAIL,
+        at: new Date(),
+        details: { rowCount: 3, filter: { status: "all", searched: false } },
+      });
+    });
+  });
+
+  it("a non-admin cannot list the account documents an export reads", async () => {
+    await assertFails(getDocs(collection(nonAdmin(), "users")));
+    await assertFails(getDocs(collection(attendee("approved-1"), "users")));
+    await assertFails(getDocs(collection(anon(), "users")));
+  });
+
+  it("both admin tiers can list them: an export carries nothing the page does not already show", async () => {
+    await assertSucceeds(getDocs(collection(staff(), "users")));
+    await assertSucceeds(getDocs(collection(admin(), "users")));
+  });
+
+  it("no client of either tier can forge, change, or remove an export's audit row", async () => {
+    for (const db of [admin(), staff(), nonAdmin()]) {
+      await assertFails(
+        setDoc(doc(db, "admin_logs/forged-export"), {
+          action: "exportAttendees",
+          docPath: "users",
+          details: { rowCount: 0 },
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(db, "admin_logs/export-1"), { details: { rowCount: 0 } }),
+      );
+      await assertFails(deleteDoc(doc(db, "admin_logs/export-1")));
+    }
+  });
+
+  it("the audit row is the operator's to read, not staff's", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "admin_logs/export-1")));
+    await assertFails(getDoc(doc(staff(), "admin_logs/export-1")));
+    await assertFails(getDoc(doc(nonAdmin(), "admin_logs/export-1")));
+  });
+});
