@@ -11,7 +11,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { getPreset, THEME_PRESET_IDS } from 'shared/theme';
+import { THEME_PRESET_IDS } from 'shared/theme';
+import { PRESET_REMAPS } from 'shared/presetRemaps';
+
+/** What one style moves on its own: its token and component-font remaps. */
+const remapsOf = (id) => PRESET_REMAPS.presets[id] || {};
+/** Every choice body of one style, group by group. */
+const choicesOf = (id) => Object.values(remapsOf(id).options || {}).flatMap((group) => Object.values(group));
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const indexCss = fs.readFileSync(path.resolve(here, '..', '..', 'index.css'), 'utf8');
@@ -75,9 +81,7 @@ describe('the Zine stamp', () => {
     // and a stamp prints on every row, so a full-strength layer would spend
     // the rare accent twenty times over and read as the coloured card edge
     // §2.4 rejects instead of the second print pass §2.4 allows.
-    const stamped = getPreset('zine').options.component.choices.find(
-      (choice) => choice.id === 'stamped-block',
-    );
+    const stamped = remapsOf('zine').options.component['stamped-block'];
     const tint = Number(stamped.tokens['--session-card-stamp-alpha']);
     expect(tint).toBeGreaterThan(0);
     expect(tint).toBeLessThan(1);
@@ -97,12 +101,10 @@ describe('the Zine stamp', () => {
 
   it('3. ships in Zine only, and no other preset can turn it on', () => {
     for (const id of THEME_PRESET_IDS) {
-      const preset = getPreset(id);
+      const preset = remapsOf(id);
       const offsets = [
         preset.tokens?.['--session-card-stamp-offset'],
-        ...Object.values(preset.options || {}).flatMap((group) =>
-          group.choices.map((choice) => choice.tokens?.['--session-card-stamp-offset']),
-        ),
+        ...choicesOf(id).map((choice) => choice.tokens?.['--session-card-stamp-offset']),
       ].filter((value) => value !== undefined);
       for (const offset of offsets) {
         if (id === 'zine') continue;
@@ -113,20 +115,16 @@ describe('the Zine stamp', () => {
       if (id !== 'zine') {
         const tints = [
           preset.tokens?.['--session-card-stamp-alpha'],
-          ...Object.values(preset.options || {}).flatMap((group) =>
-            group.choices.map((choice) => choice.tokens?.['--session-card-stamp-alpha']),
-          ),
+          ...choicesOf(id).map((choice) => choice.tokens?.['--session-card-stamp-alpha']),
         ].filter((value) => value !== undefined);
         expect(tints, `${id} never tints the stamp`).toEqual([]);
       }
     }
     // Zine's stamped-block variant is the only place a non-zero offset is
     // set, and its flat-block variant turns it back off with no exception.
-    const zine = getPreset('zine').options.component.choices;
-    expect(zine.find((c) => c.id === 'stamped-block').tokens['--session-card-stamp-offset']).toBe(
-      '4px',
-    );
-    expect(zine.find((c) => c.id === 'flat-block').tokens['--session-card-stamp-offset']).toBe('0');
+    const zine = remapsOf('zine').options.component;
+    expect(zine['stamped-block'].tokens['--session-card-stamp-offset']).toBe('4px');
+    expect(zine['flat-block'].tokens['--session-card-stamp-offset']).toBe('0');
     // Every other preset holds the contract default, which is zero.
     expect(themeCss).toContain('--session-card-stamp-offset: 0;');
   });
@@ -214,17 +212,17 @@ describe('the handwritten callout', () => {
   });
 
   it('tilts in Zine only, at one fixed angle', () => {
-    expect(getPreset('zine').tokens['--callout-angle']).toBe('-2.5deg');
+    expect(remapsOf('zine').tokens['--callout-angle']).toBe('-2.5deg');
     for (const id of THEME_PRESET_IDS) {
       if (id === 'zine') continue;
-      expect(getPreset(id).tokens?.['--callout-angle'] ?? '0deg').toBe('0deg');
+      expect(remapsOf(id).tokens?.['--callout-angle'] ?? '0deg').toBe('0deg');
     }
   });
 
   it('sets the script face where Zine asks for it, and nowhere else', () => {
     // The face is bundled and declared, so pointing the token at it renders
     // the script rather than a fallback.
-    expect(getPreset('zine').componentFonts?.['--callout-font']).toBe('script-casual');
+    expect(remapsOf('zine').componentFonts?.['--callout-font']).toBe('script-casual');
     expect(themeCss).toMatch(/font-family: 'Caveat';/);
   });
 });

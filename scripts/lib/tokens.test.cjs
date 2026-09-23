@@ -18,6 +18,7 @@ const {
   TOKEN_FILES,
 } = require('./tokens.cjs');
 const { defaultTheme, FONT_SETS } = require('./theme.cjs');
+const { PRESET_REMAPS } = require('shared/presetRemaps');
 const {
   DARK_GROUND_RGB,
   THEME_FONT_ROLES,
@@ -351,11 +352,11 @@ test('every option a preset offers remaps a token the contracts already declare'
     [...buildTokenCss(THEME).matchAll(/(--[\w-]+):/g)].map((m) => m[1]),
   );
   for (const id of THEME_PRESET_IDS) {
-    const preset = getPreset(id);
+    const preset = PRESET_REMAPS.presets[id] || {};
     const remaps = [
       ...Object.keys(preset.tokens || {}),
       ...Object.values(preset.options || {}).flatMap(
-        (group) => group.choices.flatMap((choice) => Object.keys(choice.tokens || {})),
+        (group) => Object.values(group).flatMap((choice) => Object.keys(choice.tokens || {})),
       ),
     ];
     for (const name of remaps) {
@@ -417,11 +418,15 @@ test('the bundled library is 23 families, every one of them recorded', () => {
 test('every face a preset or an option names is a bundled set with a real file', () => {
   for (const id of THEME_PRESET_IDS) {
     const preset = getPreset(id);
+    const moved = PRESET_REMAPS.presets[id] || {};
     const named = [
       ...Object.values(preset.fonts || {}),
-      ...Object.values(preset.componentFonts || {}),
-      ...Object.values(preset.options || {}).flatMap(
-        (group) => group.choices.flatMap((choice) => Object.values(choice.fonts || {})),
+      ...Object.values(moved.componentFonts || {}),
+      ...Object.values(moved.options || {}).flatMap(
+        (group) => Object.values(group).flatMap((choice) => [
+          ...Object.values(choice.fonts || {}),
+          ...Object.values(choice.componentFonts || {}),
+        ]),
       ),
     ];
     for (const setId of named) {

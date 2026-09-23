@@ -8,23 +8,66 @@ const {
   buildPresetCatalog,
   PRESET_ORDER,
   TARGET,
+  REMAPS_TARGET,
   COPY_TARGET,
   DOC_TARGET,
 } = require('./build-preset-catalog.cjs');
 const { PRESETS, ADMIN_TOKEN_SET, THEME_MOTIF_SET_IDS } = require('shared/theme');
+const { PRESET_REMAPS } = require('shared/presetRemaps');
 
-test('all three committed outputs match the design tokens they mirror', () => {
-  // The source of truth is design/tokens/. One read of it writes three
-  // files, split by who reads them: the rendering values that reach Cloud
-  // Functions, the words the theme editor puts on screen, and the design
+/** What one style moves on its own, from the remaps output. */
+const remapsOf = (presetId) => PRESET_REMAPS.presets[presetId] || {};
+/** What a choice moves, from the remaps output. */
+const bodyOf = (presetId, group, choiceId) => remapsOf(presetId).options?.[group]?.[choiceId];
+
+test('all four committed outputs match the design tokens they mirror', () => {
+  // The source of truth is design/tokens/. One read of it writes four
+  // files, split by who reads them: the values that reach Cloud Functions
+  // and every visitor, the remaps only a path that resolves a style at
+  // runtime loads, the words the theme editor puts on screen, and the design
   // prose a human reads. A stale mirror would let the browser and the
   // publish path resolve a style differently, or let the editor describe a
   // choice the catalog no longer offers.
   const built = buildPresetCatalog();
   const stale = (file) => `${file} is stale — run node scripts/build-preset-catalog.cjs`;
   assert.equal(fs.readFileSync(TARGET, 'utf8'), built.runtime, stale(TARGET));
+  assert.equal(fs.readFileSync(REMAPS_TARGET, 'utf8'), built.remaps, stale(REMAPS_TARGET));
   assert.equal(fs.readFileSync(COPY_TARGET, 'utf8'), built.copy, stale(COPY_TARGET));
   assert.equal(fs.readFileSync(DOC_TARGET, 'utf8'), built.doc, stale(DOC_TARGET));
+});
+
+test('the catalog carries every choice id and the remaps module carries every body', () => {
+  // The split (2026-09-10 vocabulary expansion): the ids and defaults every
+  // path needs sit in the catalog, and what a style and each of its choices
+  // moves sits in the module only a runtime resolver loads. Neither may
+  // name a style or a choice the other does not, or a pick would resolve to
+  // an id with nothing behind it.
+  assert.deepEqual(Object.keys(PRESET_REMAPS.presets), Object.keys(PRESETS));
+  for (const [id, preset] of Object.entries(PRESETS)) {
+    assert.deepEqual(Object.keys(remapsOf(id).options), Object.keys(preset.options), `${id} groups`);
+    for (const [group, spec] of Object.entries(preset.options)) {
+      const ids = spec.choices.map((choice) => choice.id).sort();
+      assert.deepEqual(Object.keys(remapsOf(id).options[group]).sort(), ids, `${id}.${group}`);
+      for (const choice of spec.choices) {
+        assert.deepEqual(Object.keys(choice), ['id'], `${id}.${group}/${choice.id} carries its id only`);
+      }
+    }
+  }
+  // The component defaults cover every token some style or choice remaps,
+  // and only those, so a style change resets exactly what a style can move.
+  const remapped = new Set();
+  const collect = (value) => {
+    if (!value || typeof value !== 'object') return;
+    for (const [name, child] of Object.entries(value)) {
+      if (name.startsWith('--')) remapped.add(name);
+      collect(child);
+    }
+  };
+  collect(PRESET_REMAPS.presets);
+  assert.deepEqual(
+    Object.keys(PRESET_REMAPS.componentDefaults).sort(),
+    [...remapped].filter((name) => !name.endsWith('-rgb')).sort(),
+  );
 });
 
 test('the runtime catalog carries rendering values and no prose', () => {
@@ -45,14 +88,15 @@ test('the runtime catalog carries rendering values and no prose', () => {
     }
   };
   walk(PRESETS, 'PRESETS');
+  walk(PRESET_REMAPS, 'PRESET_REMAPS');
   assert.deepEqual(found, []);
 
   // What it does carry is everything the resolver asks it for.
   for (const [id, preset] of Object.entries(PRESETS)) {
     assert.deepEqual(
-      Object.keys(preset).filter((key) => key !== 'componentFonts' && key !== 'tokens').sort(),
+      Object.keys(preset).sort(),
       ['fonts', 'id', 'motifSet', 'options', 'palette', 'shape'],
-      `${id} carries the rendering values and nothing else`,
+      `${id} carries what every path reads and nothing else`,
     );
   }
 
@@ -141,8 +185,9 @@ test('every preset states the whole contract the brief §4 requires', () => {
       assert.ok(ids.includes(spec.default), `${id} ${group}: the default is one of the choices`);
       for (const choice of spec.choices) {
         // A choice remaps tokens, or fonts, or both — never nothing.
+        const body = bodyOf(id, group, choice.id);
         assert.ok(
-          choice.tokens || choice.fonts,
+          body && (body.tokens || body.fonts),
           `${id} ${group}/${choice.id} remaps something`,
         );
       }
@@ -188,7 +233,7 @@ test('Zine reads long-form prose in a text face, and keeps the mono for values',
 test('the stamp is Zine only, and Zine ships the flat-block variant beside it', () => {
   // Brief §2.4 exception two: the offset layer ships in the Zine preset
   // only, and no client override may bring it to another preset.
-  const stamped = PRESETS.zine.options.component.choices;
+  const stamped = Object.entries(remapsOf('zine').options.component).map(([id, body]) => ({ id, ...body }));
   assert.ok(stamped.some((choice) => choice.tokens['--session-card-stamp-offset'] !== '0'));
   assert.ok(stamped.some((choice) => choice.tokens['--session-card-stamp-offset'] === '0'));
   // The choice that draws the layer tints it. Zine spends the accent at full
@@ -200,12 +245,12 @@ test('the stamp is Zine only, and Zine ships the flat-block variant beside it', 
     const alpha = Number(choice.tokens['--session-card-stamp-alpha']);
     assert.ok(alpha > 0 && alpha < 1, `${choice.id} tints the stamp rather than printing it at full ink`);
   }
-  for (const [id, preset] of Object.entries(PRESETS)) {
+  for (const id of Object.keys(PRESETS)) {
     if (id === 'zine') continue;
     const remaps = [
-      ...Object.keys(preset.tokens || {}),
-      ...Object.values(preset.options).flatMap(
-        (group) => group.choices.flatMap((choice) => Object.keys(choice.tokens || {})),
+      ...Object.keys(remapsOf(id).tokens || {}),
+      ...Object.values(remapsOf(id).options).flatMap(
+        (group) => Object.values(group).flatMap((choice) => Object.keys(choice.tokens || {})),
       ),
     ];
     assert.equal(

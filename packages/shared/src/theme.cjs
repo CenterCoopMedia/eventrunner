@@ -660,7 +660,7 @@ function resolveMode(policy, prefersDark) {
  * Presets (brief §4) and the one publish-time resolver (brief §5.2).
  * ---------------------------------------------------------------------- */
 
-const { PRESETS, COMPONENT_TOKEN_DEFAULTS, ADMIN_TOKENS, MOTIF_SET_IDS } = require('./presetCatalog.cjs');
+const { PRESETS, ADMIN_TOKENS, MOTIF_SET_IDS } = require('./presetCatalog.cjs');
 
 /** The six preset ids (brief §4). `data-theme` carries one of these. */
 const THEME_PRESET_IDS = Object.freeze(Object.keys(PRESETS));
@@ -793,15 +793,79 @@ function resolveOptionPicks(theme) {
   return picks;
 }
 
-/** The picked choice objects, in the preset's group order. */
+/**
+ * What a style moves, once `shared/presetRemaps` has been loaded
+ * (2026-09-10 vocabulary expansion).
+ *
+ * THE CATALOG CARRIES WHAT EVERY PATH READS; THE REMAPS ARRIVE SEPARATELY.
+ * The public site's first paint needs no remap — the generated stylesheet
+ * already carries the chosen style with its picks resolved — and the five
+ * option groups the expansion added, on top of every style's own remaps
+ * and the component defaults a style change resets, would otherwise sit in
+ * the chunk every visitor downloads. So they live in `presetRemaps.cjs`,
+ * which registers itself here when it is required. The web app loads it
+ * lazily on the paths that resolve a style at runtime (a live config/theme
+ * overlay, the demo style switcher, the admin, the specimen book); a Node
+ * caller requires it once. The catalog keeps the palettes, the type maps
+ * and the choice ids, so the validator and the contrast check answer with
+ * nothing more loaded.
+ *
+ * Shape: { componentDefaults: { token → default }, presets: { preset id →
+ * { componentFonts?, tokens?, options: { group → choice id → { fonts?,
+ * componentFonts?, tokens? } } } } }.
+ */
+let PRESET_REMAPS = null;
+
+/**
+ * @param {{ componentDefaults: object, presets: Record<string, object> }} remaps
+ */
+function registerPresetRemaps(remaps) {
+  if (!isPlainObject(remaps) || !isPlainObject(remaps.componentDefaults) || !isPlainObject(remaps.presets)) {
+    throw new TypeError('registerPresetRemaps takes the generated remaps: { componentDefaults, presets }');
+  }
+  PRESET_REMAPS = remaps;
+}
+
+/** Whether the remaps have been loaded, so a style resolves in full. */
+function presetRemapsLoaded() {
+  return PRESET_REMAPS !== null;
+}
+
+/**
+ * The registered remaps, or a thrown error naming the module to load.
+ *
+ * LOUD WHEN THE REMAPS ARE MISSING. A style resolved without them is a
+ * half-resolved style — the generated baseline with the style's own remaps
+ * and the operator's picks silently dropped — and that is a worse failure
+ * than a thrown error naming the module to load. The web's overlay waits
+ * for the module before it asks.
+ *
+ * @param {string} doing what the caller was about to do, for the message
+ */
+function loadedRemaps(doing) {
+  if (PRESET_REMAPS === null) {
+    throw new Error(
+      `The preset remaps are not loaded: require or import 'shared/presetRemaps' before ${doing}.`,
+    );
+  }
+  return PRESET_REMAPS;
+}
+
+/**
+ * The picked choice objects, in the preset's group order, each carrying
+ * what it moves. A document that names no preset has no picks and needs no
+ * remaps to say so.
+ */
 function pickedChoices(theme) {
   const preset = getPreset(themePresetId(theme));
   if (!preset) return [];
+  const bodies = loadedRemaps('resolving a picked choice').presets[preset.id]?.options ?? {};
   const picks = resolveOptionPicks(theme);
   const chosen = [];
   for (const [group, spec] of Object.entries(preset.options || {})) {
-    const choice = (spec.choices || []).find((c) => c.id === picks[group]);
-    if (choice) chosen.push(choice);
+    const id = picks[group];
+    if (!(spec.choices || []).some((choice) => choice.id === id)) continue;
+    chosen.push({ id, ...(bodies[group]?.[id] ?? {}) });
   }
   return chosen;
 }
@@ -849,7 +913,9 @@ function resolveFontRoles(theme) {
 function resolveComponentFonts(theme) {
   const preset = getPreset(themePresetId(theme));
   const fonts = {};
-  for (const [name, setId] of Object.entries(preset?.componentFonts || {})) {
+  if (!preset) return fonts;
+  const own = loadedRemaps("resolving a style's component faces").presets[preset.id] ?? {};
+  for (const [name, setId] of Object.entries(own.componentFonts || {})) {
     if (THEME_FONT_SET_IDS.includes(setId)) fonts[name] = setId;
   }
   // A picked option may move a component face too (2026-09-10 record, §4):
@@ -876,7 +942,11 @@ function resolvePresetTokens(theme, { resetComponents = false } = {}) {
   if (!preset) return {};
   // A complete preset must reset the generated baseline before its remaps.
   // Otherwise switching from Newsroom retains its hero border in Atlas.
-  const tokens = { ...(resetComponents ? COMPONENT_TOKEN_DEFAULTS : {}), ...(preset.tokens || {}) };
+  const remaps = loadedRemaps("resolving a style's token remaps");
+  const tokens = {
+    ...(resetComponents ? remaps.componentDefaults : {}),
+    ...(remaps.presets[preset.id]?.tokens || {}),
+  };
   for (const choice of pickedChoices(theme)) Object.assign(tokens, choice.tokens || {});
   return tokens;
 }
@@ -1359,6 +1429,8 @@ module.exports = {
   ADMIN_TOKEN_SET,
   ADMIN_ACCENT_MIN_CONTRAST,
   getPreset,
+  registerPresetRemaps,
+  presetRemapsLoaded,
   themePresetId,
   resolveOptionPicks,
   pickedChoices,
