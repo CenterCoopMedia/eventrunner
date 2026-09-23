@@ -96,6 +96,17 @@
     outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
     outline-offset: var(--focus-ring-offset);
   }
+
+  /* A file input styled as a button (ProfilePhotoField, SpeakerPhotoField):
+     the real <input type="file"> stays keyboard-operable but visually
+     hidden (sr-only), so the base :focus-visible rule above draws its ring
+     around a box nobody can see. The <label> is the thing a reader looks
+     at, so it takes the same ring — the same width, colour and offset —
+     the moment its sibling input reports :focus-visible. */
+  .file-input-label:has(+ input:focus-visible) {
+    outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
+    outline-offset: var(--focus-ring-offset);
+  }
 }
 
 @layer components {

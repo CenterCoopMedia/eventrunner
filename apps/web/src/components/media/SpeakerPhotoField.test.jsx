@@ -81,6 +81,17 @@ describe('SpeakerPhotoField', () => {
     expect(upload.className).not.toMatch(BRAND_UTILITY_PREFIX);
   });
 
+  it('draws a visible ring on the label when the hidden file input has keyboard focus', () => {
+    // The real <input type="file"> stays keyboard-operable but is visually
+    // hidden (sr-only); the label immediately after it in the markup is
+    // what carries the ring — index.css's
+    // `.file-input-label:has(+ input:focus-visible)` rule reads this class.
+    render(<SpeakerPhotoField user={user} speakerId="rae" value="" onChange={vi.fn()} />);
+    const label = screen.getByText('Upload a photo');
+    expect(label.tagName).toBe('LABEL');
+    expect(label).toHaveClass('file-input-label');
+  });
+
   it('uploads to the speaker’s own folder through speakerPhotoUpload, after the crop, and reports the path', async () => {
     const onChange = vi.fn();
     render(<SpeakerPhotoField user={user} speakerId="rae" value="" onChange={onChange} />);

@@ -84,6 +84,17 @@ describe('ProfilePhotoField', () => {
     expect(upload.className).not.toMatch(BRAND_UTILITY_PREFIX);
   });
 
+  it('draws a visible ring on the label when the hidden file input has keyboard focus', () => {
+    // The real <input type="file"> stays keyboard-operable but is visually
+    // hidden (sr-only); the label immediately after it in the markup is
+    // what carries the ring — index.css's
+    // `.file-input-label:has(+ input:focus-visible)` rule reads this class.
+    render(<ProfilePhotoField uid="attendee-1" value="" onChange={vi.fn()} />);
+    const label = screen.getByText('Upload a photo');
+    expect(label.tagName).toBe('LABEL');
+    expect(label).toHaveClass('file-input-label');
+  });
+
   it('uploads to the signed-in user’s own prefix and reports the path, after the crop', async () => {
     const onChange = vi.fn();
     render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);

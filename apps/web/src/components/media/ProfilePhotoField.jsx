@@ -119,7 +119,7 @@ export default function ProfilePhotoField({ uid, value, onChange }) {
         <div className="flex flex-col gap-2">
           <label
             htmlFor="profile-photo"
-            className="touch-target inline-flex w-fit cursor-pointer items-center justify-center rounded-brand border border-text-primary/20 bg-surface px-4 py-2 font-semibold text-text-primary hover:bg-surface-alt"
+            className="file-input-label touch-target inline-flex w-fit cursor-pointer items-center justify-center rounded-brand border border-text-primary/20 bg-surface px-4 py-2 font-semibold text-text-primary hover:bg-surface-alt"
           >
             {busy ? 'Uploading…' : value ? 'Replace photo' : 'Upload a photo'}
           </label>
