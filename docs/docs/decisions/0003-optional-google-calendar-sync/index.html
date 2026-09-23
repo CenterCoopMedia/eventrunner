@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADR 0003: Optional Google Calendar sync — Event Runner documentation</title>
+  <meta name="description" content="The proposed record that brings calendar sync back as an opt-in, and what a client sets up first.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="ADR 0003: Optional Google Calendar sync — Event Runner documentation">
+  <meta property="og:description" content="The proposed record that brings calendar sync back as an opt-in, and what a client sets up first.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ADR 0003: Optional Google Calendar sync — Event Runner documentation">
+  <meta name="twitter:description" content="The proposed record that brings calendar sync back as an opt-in, and what a client sets up first.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/tokens.css">
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2.5" y="2" width="3" height="20"/>
+          <rect x="5.5" y="2" width="16" height="3"/>
+          <rect x="5.5" y="11" width="9.5" height="2"/>
+          <rect x="5.5" y="19.5" width="13" height="2.5"/>
+        </svg>
+        <span class="brand-words">
+          <strong>Event Runner</strong>
+          <span class="brand-line">Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><a href="/eventrunner/docs/#build">Build</a></li>
+        <li><span aria-current="page">ADR 0003: Optional Google Calendar sync</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
+          <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
+          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/" aria-current="page" class="is-current">ADR 0003: Optional Google Calendar sync</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>ADR 0003: Optional Google Calendar sync of saved sessions</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#status">Status</a></li>
+              <li><a href="#what-this-record-supersedes">What this record supersedes</a></li>
+              <li><a href="#context">Context</a></li>
+              <li><a href="#decision">Decision</a></li>
+              <li><a href="#consequences">Consequences</a></li>
+              <li><a href="#non-goals">Non-goals</a></li>
+              <li><a href="#open-questions-for-the-owner">Open questions for the owner</a></li>
+            </ul>
+          </nav>
+          <h2 id="status">Status<a class="heading-anchor" href="#status" aria-label="Link to this section">#</a></h2>
+          <p>Proposed. The owner accepts or amends this record before any calendar code is reviewed as done (issue #177).</p>
+          <p>A disabled implementation and <code>docs/CLIENT_ONBOARDING.md</code> §6 reached <code>main</code> in the M8 wave before this record was reviewed. Both sit behind a flag that is off. The branch that follows acceptance reconciles both with this record. Where the code and this record differ, this record wins.</p>
+          <h2 id="what-this-record-supersedes">What this record supersedes<a class="heading-anchor" href="#what-this-record-supersedes" aria-label="Link to this section">#</a></h2>
+          <p>ADR 0001 <a href="/eventrunner/docs/decisions/0001-event-platform-v1/#9-porting-map">§9 Porting map</a>, row &quot;Google Calendar sync&quot;: removed, with the reason &quot;per-client OAuth consent-screen verification does not scale under deploy-per-client&quot;. The same table&#39;s &quot;Schedule page&quot; row carries the note &quot;Google Calendar sync removed&quot;. The <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">triage record</a> gives the same reason.</p>
+          <p>This record replaces that one decision. It does not touch the &quot;ICS export + calendar links&quot; row: the <code>.ics</code> download and the Google and Outlook links stay the baseline for every deployment, and they are the fallback here. Every other decision in ADR 0001 stands.</p>
+          <h2 id="context">Context<a class="heading-anchor" href="#context" aria-label="Link to this section">#</a></h2>
+          <h3 id="what-adr-0001-decided">What ADR 0001 decided<a class="heading-anchor" href="#what-adr-0001-decided" aria-label="Link to this section">#</a></h3>
+          <p>The reference implementation asked the browser for the <code>calendar.events</code> scope and wrote each saved session into the attendee&#39;s primary calendar. <code>calendar.events</code> is a sensitive scope. It reads and writes every calendar the attendee can see. Google reviews an app that asks for a sensitive scope before the public can grant it. Under deploy-per-client the consent screen belongs to the client&#39;s Google Cloud project, so that review would repeat for every client, with every client&#39;s brand, and the operator would carry it. ADR 0001 removed the feature and shipped the <code>.ics</code> download and calendar links instead.</p>
+          <h3 id="what-changed-since-adr-0001">What changed since ADR 0001<a class="heading-anchor" href="#what-changed-since-adr-0001" aria-label="Link to this section">#</a></h3>
+          <ol>
+          <li>Google added narrower Calendar scopes. <code>calendar.app.created</code> lets an app make its own secondary calendar and manage events on that calendar only. Google&#39;s scope table listed it as non-sensitive when this record was written. A non-sensitive scope has no scope review. That removes most of the per-client cost ADR 0001 objected to. The check the operator makes before relying on this is in decision 2.</li>
+          <li>The platform now has the parts the sync needs. <code>config/features</code> has an admin editor where every flag defaults to off. <code>config/event.timezone</code> and <code>config/event.days[]</code> feed one shared session-time helper. The <code>.ics</code> export and calendar links exist per session and per schedule. Bookmarks live at <code>users/{uid}/bookmarks/{sessionId}</code>, written only by <code>bookmarkSession</code>. The onboarding checklist already carries manual console steps and an attestation for Google sign-in.</li>
+          <li>The owner asked for the feature back as an opt-in. Not every client wants it. The clients that do take the setup work.</li>
+          </ol>
+          <h2 id="decision">Decision<a class="heading-anchor" href="#decision" aria-label="Link to this section">#</a></h2>
+          <h3 id="1-the-flag">1. The flag<a class="heading-anchor" href="#1-the-flag" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>The key is <code>calendarSync</code>, in <code>KNOWN_FEATURE_KEYS</code> in <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/packages/shared/src/config/schema.cjs"><code>packages/shared/src/config/schema.cjs</code></a>, stored as <code>config/features.calendarSync</code>. The key is already in the list.</li>
+          <li>It is off by default. Every <code>config/features</code> flag defaults to false in the web client, and the admin editor sends the whole document, so an omitted key is off.</li>
+          <li>It requires <code>icsExport</code>. The sync control renders only when both flags are true. The file export is the fallback, and the fallback must exist.</li>
+          <li>Flag off: no control, no Google script, no OAuth request, no local storage key. The page is what it is today.</li>
+          <li>Flag on before the client finishes the setup in decision 5: the control renders and offers the sync. While the client&#39;s app is in testing status, Google refuses the grant for anyone who is not a listed test user. The control then shows its &quot;not granted&quot; state with the <code>.ics</code> download beside it. There is no broken button, and nothing is written. The checklist says to turn the flag on last. If a client turns it on early, this is what an attendee sees.</li>
+          <li>Turning the flag off later hides the control at once through the live config snapshot. Calendars already written stay. They belong to the attendee.</li>
+          </ul>
+          <h3 id="2-who-verifies-the-consent-screen">2. Who verifies the consent screen<a class="heading-anchor" href="#2-who-verifies-the-consent-screen" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>The consent screen belongs to the client&#39;s Google Cloud project, the one that holds their Firebase project. Google shows that project&#39;s brand and writes to that project&#39;s owner. So the client verifies. The operator does the console work as a project editor under the client&#39;s authorization and prepares any submission. The operator never submits its own brand and never hosts the client&#39;s privacy policy.</li>
+          <li>The scope is <code>https://www.googleapis.com/auth/calendar.app.created</code>, and no other calendar scope. It is the narrowest scope that can write events. The app creates one secondary calendar and reads and writes events on calendars it created. It cannot see the primary calendar or any other. <code>calendar.events</code> and <code>calendar.events.owned</code> are sensitive scopes that reach the primary calendar. <code>calendar</code> is the whole account.</li>
+          <li>Google groups scopes as non-sensitive, sensitive, and restricted. Calendar scopes were not in the restricted group when this record was written, and <code>calendar.app.created</code> was listed as non-sensitive. Both can change. Before configuring, the operator opens Google&#39;s <a href="https://developers.google.com/workspace/calendar/api/auth">Calendar API scopes page</a> and the project&#39;s data access page in the Cloud console and confirms the current classification. If the console marks the scope sensitive, the client needs a sensitive-scope review before the flag goes on, and the timeline below does not hold.</li>
+          <li>What verification involves for a non-sensitive scope: no scope review. <a href="https://developers.google.com/identity/protocols/oauth2/production-readiness/brand-verification">Brand verification</a> is separate. It covers the app name, logo, homepage, privacy policy URL, and authorized domain, and it needs the domain verified in Google Search Console by the project owner. Google states a few business days for it. The consent screen works without it; what it shows for an unverified brand has changed before, so the operator checks it in the test pass.</li>
+          <li>What verification involves if the scope is sensitive: a <a href="https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification">sensitive-scope submission</a> with a justification per scope and a demonstration of the flow. Google may ask questions, and the client&#39;s contact answers them. Google states the expected time in the console when the app is submitted. Plan on weeks. Promise the client no date.</li>
+          <li>Before verification completes, and while the app is in testing status: only listed test users can grant, up to 100 of them. Everyone else is refused at Google&#39;s screen. An unverified app in production with a sensitive scope shows Google&#39;s &quot;unverified app&quot; warning and caps new grants at 100 users. In every one of these cases the control ends in its &quot;not granted&quot; state and the <code>.ics</code> download stays.</li>
+          </ul>
+          <h3 id="3-who-owns-the-oauth-client-and-its-credentials">3. Who owns the OAuth client and its credentials<a class="heading-anchor" href="#3-who-owns-the-oauth-client-and-its-credentials" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>The client&#39;s project owns the OAuth client. It is the web client Firebase created when Google sign-in was enabled (<a href="/eventrunner/docs/client-onboarding/#3-the-56-items">onboarding §3, items 1 and 2</a>). Firebase&#39;s sign-in handler, <code>https://&lt;auth domain&gt;/__/auth/handler</code>, is already its redirect URI. No operator project is involved. No credential crosses projects, the same rule the site publisher follows.</li>
+          <li>One operator-owned client was rejected. It would show the operator&#39;s name on every client&#39;s consent screen. Its secret would sit in every client&#39;s project, or the exchange would run in the operator&#39;s project. One Google action against the operator&#39;s app would stop every client&#39;s sync at once. Each of these breaks a rule ADR 0001 set.</li>
+          <li>Secrets: none. The browser asks Firebase Auth for the grant and receives a short-lived access token. No client secret is used. So there is no new GitHub Environment secret, no Secret Manager entry, no <code>defineSecret</code> list change, and no new line in <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/.env.example"><code>.env.example</code></a>. Tier A gains nothing. Tier B gains nothing beyond the existing flag. The secret surface stays at seven.</li>
+          <li>Rotation: Firebase&#39;s sign-in handler is the only consumer of the web client&#39;s secret, as today. If the client rotates it in the Cloud console, they paste the new value into Firebase → Authentication → Google provider, as they would for sign-in. The sync does not hold the secret and needs no redeploy.</li>
+          <li>Revocation by the attendee: from their Google account&#39;s third-party access page. The app sees a 401 on its next pass and shows &quot;not granted&quot;. Revocation by the client: turn the flag off. Deleting the OAuth client also stops Google sign-in for the whole deployment, so the client does not do that. Suspension by Google: the same 401 path and the same fallback. The operator hears from the client and turns the flag off.</li>
+          </ul>
+          <h3 id="4-the-sync-model">4. The sync model<a class="heading-anchor" href="#4-the-sync-model" aria-label="Link to this section">#</a></h3>
+          <p>What is written:</p>
+          <ul>
+          <li>One secondary calendar per attendee per deployment, created by the app on the first pass and named for the event from <code>config/event.name</code>. It is the only calendar the scope reaches. The attendee can hide, recolour, or delete it as one thing.</li>
+          <li>One event per bookmarked session: title, description, location, start, and end. Start and end come from <code>config/event.days[]</code> and <code>config/event.timezone</code> through the shared session-time helper, and the event body carries the event&#39;s IANA time zone. Google shows it in the attendee&#39;s own zone. A session with no valid times is counted and skipped, not written.</li>
+          <li>Each event carries the session id as a private extended property. That tag is the only key. An event without the tag is never read, changed, or deleted, so an event the attendee adds to the calendar by hand is safe.</li>
+          </ul>
+          <p>How updates and removals follow bookmarks:</p>
+          <ul>
+          <li>The unit of work is a pass. A pass lists the tagged events in the app&#39;s calendar, deletes the ones whose session is no longer bookmarked, updates the ones whose session still is, and creates the rest. A pass is idempotent.</li>
+          <li>A pass runs when the attendee selects the control. While the My schedule page stays open, another pass runs whenever the bookmark set or the session data changes. Passes are serialized. A change during a pass asks for one more pass, in memory, not in a store. Leaving the page cancels what has not been sent. A request Google has accepted stands.</li>
+          <li>Nothing runs with the browser closed. An admin edit made after the attendee leaves lands on the attendee&#39;s next visit. Open question 1 covers the alternative.</li>
+          </ul>
+          <p>Token storage:</p>
+          <ul>
+          <li>The access token lives in page memory only. It is never written to Firestore, local storage, a cookie, or a log. It is dropped when the page unloads or Google refuses it. There is no refresh token anywhere.</li>
+          <li>So there is nothing for the rules to guard. No collection holds a credential, and no rule or rules test is added for one. The rules that matter are the existing ones: <code>users/{uid}/bookmarks</code> is self-read and server-write.</li>
+          <li>The only stored value is the calendar id, in the browser&#39;s local storage, keyed by project, attendee uid, and Google account id. It is an identifier, not a secret. If it is lost, in another browser or after clearing storage, the next pass makes a second calendar, and the attendee deletes the old one in Google. Open question 3 covers where else it could live.</li>
+          </ul>
+          <p>No queue:</p>
+          <ul>
+          <li><a href="/eventrunner/docs/contributing/#there-is-exactly-one-queue"><code>CONTRIBUTING.md</code></a> allows one queue. This adds none. No collection records pending or failed writes. There is no scheduled function and no drain.</li>
+          <li>Retry is the next pass. A failed create, update, or delete is counted and reported in the control as &quot;n could not be written&quot;. The next pass reads Google&#39;s state again and repairs it. A 401 ends the pass and drops the token, and the attendee grants again.</li>
+          </ul>
+          <p>Privacy, what leaves the deployment:</p>
+          <ul>
+          <li>To Google Calendar, on the attendee&#39;s own grant: the event name as the calendar title, and for each bookmarked session its title, description, location, start, end, and opaque session id. Nothing about other attendees, no session notes, no profile fields.</li>
+          <li>Into the deployment: nothing new about the attendee&#39;s Google account beyond what Google sign-in already records. An attendee who signed in by email and chooses to sync links a Google account to their event account. The control says so before the popup opens. A Google account already linked to another event account is refused by Firebase, and the control names the <code>.ics</code> fallback.</li>
+          <li>The client&#39;s privacy page states this before the flag goes on. It is a checklist item in decision 5.</li>
+          </ul>
+          <p>Failure and fallback:</p>
+          <ul>
+          <li>Scope refused, because the attendee closed the popup, unticked the scope, or Google refused: the control shows &quot;not granted&quot; with the <code>.ics</code> download beside it. Nothing is written.</li>
+          <li>Token expired or revoked during a pass: the pass stops, the token is dropped, and the control shows &quot;could not update&quot; with the <code>.ics</code> download. The next selection asks for a new grant.</li>
+          <li>Calendar deleted by the attendee: the list call fails, the stored id is forgotten, and one new calendar is made. A second miss in the same pass is an error, not permission to make calendars in a loop.</li>
+          <li>Network or API failure: the control shows the counts and the <code>.ics</code> download. Every state names the <code>.ics</code> download. The control has a keyboard path and visible focus, and no state is shown by colour alone.</li>
+          </ul>
+          <h3 id="5-provisioning-steps-for-docsclient_onboardingmd">5. Provisioning steps for <code>docs/CLIENT_ONBOARDING.md</code><a class="heading-anchor" href="#5-provisioning-steps-for-docsclient_onboardingmd" aria-label="Link to this section">#</a></h3>
+          <p>These steps replace the current §6 after acceptance. Until then nothing in that file changes.</p>
+          <ul>
+          <li class="task-item"><input type="checkbox" disabled> Opt-in recorded. The client&#39;s project owner asks for the feature in writing and accepts that their event name and support address appear on Google&#39;s consent screen, and that Google contacts them about it.</li>
+          <li class="task-item"><input type="checkbox" disabled> Onboarding §3 items 1 and 2 are complete and attested with <code>init-event.cjs --attest-auth</code>: Google sign-in is enabled and the authorized domains are set.</li>
+          <li class="task-item"><input type="checkbox" disabled> Privacy page. The client&#39;s privacy policy states that, at the attendee&#39;s request, saved sessions are written to a Google calendar the attendee chooses, what is sent, and how to revoke. The legal review sign-off in §3 happens after this edit, not before.</li>
+          <li class="task-item"><input type="checkbox" disabled> Google Cloud console, client project: enable the Google Calendar API.</li>
+          <li class="task-item"><input type="checkbox" disabled> Consent screen branding: app name is the event&#39;s public name, support email is the client&#39;s, homepage is <code>EVENT_PUBLIC_URL</code>, privacy policy is the page above, and the authorized domain is the client&#39;s domain, verified in Search Console by the project owner. Console page names move; read the current ones.</li>
+          <li class="task-item"><input type="checkbox" disabled> Data access: add <code>https://www.googleapis.com/auth/calendar.app.created</code> and confirm the console lists it as non-sensitive. If it is listed as sensitive, stop here. The client submits for verification, and the flag stays off until Google approves.</li>
+          <li class="task-item"><input type="checkbox" disabled> Audience: user type External. While testing, add the synthetic test accounts. Before enabling, set the publishing status to In production.</li>
+          <li class="task-item"><input type="checkbox" disabled> OAuth clients: the Firebase web client lists <code>https://&lt;auth domain&gt;/__/auth/handler</code> as a redirect URI and the site&#39;s domains as JavaScript origins. Add a custom auth domain if the client uses one.</li>
+          <li class="task-item"><input type="checkbox" disabled> Brand verification: submit it if the client wants its logo shown or the console asks for it. Record the submission date. For a non-sensitive scope, do not wait on it to enable, unless the test pass shows a warning screen.</li>
+          <li class="task-item"><input type="checkbox" disabled> Test pass with synthetic attendees in the test audience, on the deployed site: Google sign-in and email sign-in; a refused grant; grant, revoke at Google, and select the control again; add and remove bookmarks, including the last one; change a session time in the admin and see the update; an event the tester added to the app&#39;s calendar by hand is untouched; the <code>.ics</code> download is present in every state; the whole path works from the keyboard.</li>
+          <li class="task-item"><input type="checkbox" disabled> Admin panel → <a href="/eventrunner/docs/admin-guide/#settings-features">Settings → Features</a>: confirm <code>icsExport</code> is on, then turn <code>calendarSync</code> on.</li>
+          <li class="task-item"><input type="checkbox" disabled> Record the date, the scope classification seen, the publishing status, and the client&#39;s project owner in the client&#39;s onboarding notes.</li>
+          <li class="task-item"><input type="checkbox" disabled> Handoff: tell the client&#39;s staff that turning the flag off hides the control and leaves calendars in place, and that attendees revoke access from their own Google account.</li>
+          </ul>
+          <h2 id="consequences">Consequences<a class="heading-anchor" href="#consequences" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>ADR 0001 §9 loses one row. Every other row holds. The <code>.ics</code> export and calendar links stay required for every deployment.</li>
+          <li>Per client, the work is about an hour of console steps for a non-sensitive scope, and weeks of waiting if Google classifies it sensitive. The client carries it. The operator&#39;s fixed cost is the checklist.</li>
+          <li>The implementation on <code>main</code> is reconciled in the branch that follows acceptance: it sends the event&#39;s time zone on each event, renders only when <code>icsExport</code> is also on, and matches the states in decision 4. Tests sit next to the change. No rule changes, so no rules test is added. The control stays brand neutral, with a keyboard path and visible focus.</li>
+          <li><code>docs/CLIENT_ONBOARDING.md</code> §6 is replaced by the checklist in decision 5. <code>docs/DEPLOY_RUNBOOK.md</code> does not change, because there is no new variable and no secret. <code>docs/ADMIN_GUIDE.md</code> gains one sentence under Settings → Features that points at the onboarding section. <code>CHANGELOG.md</code> records the change.</li>
+          <li><code>docs/ROADMAP.md</code> ticks #177 only when the code and the onboarding steps have landed, not when this record is accepted.</li>
+          </ul>
+          <h2 id="non-goals">Non-goals<a class="heading-anchor" href="#non-goals" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>No server-side writer, no stored refresh token, and no sync while the browser is closed.</li>
+          <li>No write to the primary calendar, and no read of any calendar the app did not make.</li>
+          <li>No other calendar provider. Outlook keeps its link.</li>
+          <li>No organizer or speaker calendar, no invitations, and no attendees on events.</li>
+          <li>No operator-owned OAuth client.</li>
+          <li>No new Tier A variable, secret, collection, rule, or queue.</li>
+          </ul>
+          <h2 id="open-questions-for-the-owner">Open questions for the owner<a class="heading-anchor" href="#open-questions-for-the-owner" aria-label="Link to this section">#</a></h2>
+          <p>Each question has a recommended answer. Acceptance of this record with no other note adopts the recommendations.</p>
+          <ol>
+          <li><strong>Browser-side only, or a server-side writer with a stored refresh token?</strong> Recommended: browser-side, as written. The server model adds an eighth secret, a server-only collection of per-attendee Google credentials with rules and rules tests, a trigger that fans out on every session edit, and a seven-day refresh-token expiry while the client&#39;s app is in testing status. That last state is the one a client who skips the setup sits in, so the feature would work for a week and stop. If sync while the browser is closed is wanted later, it needs its own record.</li>
+          <li><strong>If Google lists <code>calendar.app.created</code> as sensitive at setup time, does the feature stay available?</strong> Recommended: yes. The client takes the review, the flag stays off until Google approves, and the operator prepares the submission but does not carry the review.</li>
+          <li><strong>Where does the calendar id live?</strong> Recommended: browser local storage for this version. If duplicate calendars are reported, a later change stores the id on <code>users/{uid}</code> through a callable. It is an identifier, not a credential, but it is still a server write and a rules line, so not now.</li>
+          <li><strong>Should <code>init-event.cjs --check</code> gate the flag with an attestation, like <code>--attest-auth</code>?</strong> Recommended: no for this version. The checklist and the admin editor are the gate. Add an attestation only if a client turns the flag on early.</li>
+          <li><strong>Should the control appear beside each session on the schedule page, or only on the My schedule page?</strong> Recommended: My schedule only. One place to grant and one place to read the state.</li>
+          <li><strong>Who at the operator signs off the test pass before the flag goes on?</strong> Recommended: the operator who ran onboarding, recorded in the client&#39;s onboarding notes with the date.</li>
+          </ol>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0003-optional-google-calendar-sync.md"><code>docs/adr/0003-optional-google-calendar-sync.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/decisions/0001-event-platform-v1/"><span>Previous</span>ADR 0001: Event platform v1</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/roadmap/"><span>Next</span>Roadmap</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

@@ -97,6 +97,7 @@
           <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
           <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
           <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
           <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
           <li><a href="/eventrunner/docs/changelog/" aria-current="page" class="is-current">Changelog</a></li>
         </ul>
@@ -115,6 +116,13 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li><code>docs/adr/0003-optional-google-calendar-sync.md</code>, the proposed decision record for the optional
+          Google Calendar sync of saved sessions (#177). It supersedes the one row of ADR 0001 §9 that
+          removed the feature, names the client&#39;s own Google Cloud project as the owner of the consent
+          screen and the OAuth client, picks the <code>calendar.app.created</code> scope, adds no secret, and says
+          how the <code>calendarSync</code> flag behaves when a client has not finished the Google setup: the <code>.ics</code>
+          download stays and nothing is written. The record is proposed, not accepted, and the flag stays
+          off. The documentation site lists it under Decisions.</li>
           <li>A specimen book at <code>/specimen</code>: every device the system has, drawn in the site style and display
           mode the page is set to, with the component file and the tier 3 contract beside each one.
           Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,
