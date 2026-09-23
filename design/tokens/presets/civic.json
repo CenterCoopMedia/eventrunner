@@ -55,10 +55,15 @@
   "shape": { "radius": "small", "texture": "flat", "density": "comfortable" },
   "motifSet": "none",
 
-  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule uses comfortable vertical padding and the data font for folio text.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule uses comfortable vertical padding and the data font for folio text. The definition list widens its term column for the long labels a public notice carries. The pull quote keeps the plain ruled form with a rule at its inline start, like a quoted minute.",
   "tokens": {
     "--session-card-pad-block": "var(--space-md)",
     "--folio-font": "var(--font-data)",
+    "--definition-list-term-width": "11rem",
+    "--pull-quote-rule-block-width": "var(--rule-hairline-width)",
+    "--pull-quote-rule-rgb": "var(--rule-hairline-rgb)",
+    "--pull-quote-rule-inline-width": "var(--rule-strong-width)",
+    "--pull-quote-pad-inline": "var(--space-md)",
     "--hero-art-width": "58%",
     "--hero-art-position": "80% 50%",
     "--hero-title-size": "clamp(2.5rem, 5vw, 5rem)",

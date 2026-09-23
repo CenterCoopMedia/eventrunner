@@ -88,8 +88,9 @@ describe('Home', () => {
     // section a second time further down the page.
     const infoSection = home.sections.find((s) => s.id === 'info');
     expect(screen.getAllByRole('heading', { name: infoSection.label })).toHaveLength(1);
-    expect(screen.getByText(siteContent.info__when.takeaway)).toBeInTheDocument();
-    expect(screen.getByText(siteContent.info__where_venue.text)).toBeInTheDocument();
+    // The cards are facts (#234): a term and a description, no evidence.
+    expect(screen.getByText(siteContent.info__when.value)).toBeInTheDocument();
+    expect(screen.getByText(siteContent.info__where.value)).toBeInTheDocument();
     // The sponsor strip (M7 issue 10) draws the demo's own published
     // organizations on the home page, in the section's own place: it comes
     // after the History section, which is where the seed puts it.

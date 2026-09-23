@@ -1,33 +1,38 @@
 // The home page's key facts, as one group of cards (M7 issue 9): when the
 // event runs, where it happens, and who it is for.
 //
-// NO NEW BLOCK TYPE. The two types that already say these things say them
-// here: a `stat` carries one fact and its caption, a `list_item` carries a
-// plain line. What this file adds is the ARRANGEMENT — which blocks belong
-// to which card, and how the group sits on the page.
+// TWO BLOCKS OPEN A CARD, AND ONLY ONE OF THEM IS A NUMBER. A `fact` (#234)
+// carries a term and a description — "Where", the hall's name, and one line
+// under it — and renders through the definition list device; a `stat`
+// carries a figure and the four-part evidence contract a figure needs. A
+// `list_item` carries a plain line. What this file adds is the ARRANGEMENT:
+// which blocks belong to which card, and how the group sits on the page.
+// Before the fact block existed the only way to open a card was the stat,
+// so an operator wrote a source line for a venue. A venue is a fact.
 //
-// A STAT OPENS A CARD; THE LIST ITEMS AFTER IT ARE THAT CARD'S LINES. The
-// grouping is positional, which is the idiom the block renderer already
-// uses (SectionBlocks batches runs of one type, LinkGroups reads the
+// A FACT OR A STAT OPENS A CARD; THE LIST ITEMS AFTER IT ARE THAT CARD'S
+// LINES. The grouping is positional, which is the idiom the block renderer
+// already uses (SectionBlocks batches runs of one type, LinkGroups reads the
 // group's own name), and it is the one an editor can see: the blocks are in
 // the order they are listed in, so moving a line under a different fact is
 // a reorder rather than a field to fill in. List items written before any
-// stat are a card of their own, so a section holding nothing but lines
+// fact are a card of their own, so a section holding nothing but lines
 // still renders rather than dropping them.
 //
 // A BLOCK THAT DRAWS NOTHING IS NOT COUNTED. The grouping asks the same
-// question the block's own renderer asks — has this stat a figure and a
-// caption, has this line any text — because Home opens the section and
-// writes its heading on the number of cards here. Counting a block the
-// renderer then drops would leave an empty card under a heading.
+// question the block's own renderer asks — has this fact both halves, has
+// this stat a figure and a caption, has this line any text — because Home
+// opens the section and writes its heading on the number of cards here.
+// Counting a block the renderer then drops would leave an empty card under
+// a heading.
 //
-// THE BLOCKS RENDER THROUGH THEIR OWN RENDERERS. StatBlock draws the fact
-// and ListItemBlock draws the line, exactly as they do everywhere else, so
-// a change to how a stat reads reaches this group too and nothing here can
-// drift away from the rest of the site. StatBlock also already puts the
-// figure in the mono face with tabular figures for the six-part shape every
-// stat is written in today (interface guidelines, Typography), which is the
-// treatment this group asks for.
+// THE BLOCKS RENDER THROUGH THEIR OWN RENDERERS. FactBlock and StatBlock
+// draw the fact and ListItemBlock draws the line, exactly as they do
+// everywhere else, so a change to how a fact reads reaches this group too
+// and nothing here can drift away from the rest of the site. StatBlock also
+// already puts the figure in the mono face with tabular figures for the
+// six-part shape every stat is written in today (interface guidelines,
+// Typography), which is the treatment this group asks for.
 //
 // NOTHING COUNTS UP. The figures are printed once, as text. An animated
 // counter is ambient motion in the one place on the page a reader has come
@@ -42,7 +47,11 @@
 // expansion). One card takes the measure, two split it, and three or more
 // take the stage's columns. See `arrangementClass` below.
 import StatBlock from './blocks/StatBlock.jsx';
+import FactBlock, { factDraws } from './blocks/FactBlock.jsx';
 import ListItemBlock from './blocks/ListItemBlock.jsx';
+
+/** The two block types that open a card. */
+const LEAD_TYPES = new Set(['fact', 'stat']);
 
 const blockKey = (block, index) => block.id ?? `${block.section}__${block.field ?? index}`;
 
@@ -66,6 +75,7 @@ const filled = (value) => typeof value === 'string' && value.trim().length > 0;
  */
 function drawsSomething(block) {
   if (block?.blockType === 'list_item') return filled(block.text);
+  if (block?.blockType === 'fact') return factDraws(block);
   if (block?.blockType !== 'stat') return false;
   const full =
     filled(block.takeaway) || filled(block.description) || filled(block.source) || filled(block.alt);
@@ -80,19 +90,21 @@ function drawsSomething(block) {
  * only through the rendered output.
  *
  * @param {object[]} blocks one section's ordered blocks
- * @returns {Array<{ key: string, stat: object|null, lines: object[] }>}
+ * @returns {Array<{ key: string, lead: object|null, lines: object[] }>}
+ *   `lead` is the fact or the stat that opened the card, or null for a card
+ *   of lines alone.
  */
 export function groupIntoCards(blocks) {
   const cards = [];
   for (const [index, block] of (blocks ?? []).entries()) {
-    if (block?.blockType === 'stat') {
+    if (LEAD_TYPES.has(block?.blockType)) {
       // A fact that draws nothing still opens the card it was written to
       // open, holding no fact: the lines under it were written under it,
       // and folding them into the card above would say they belong to a
       // fact their editor never put them under.
       cards.push({
         key: blockKey(block, index),
-        stat: drawsSomething(block) ? block : null,
+        lead: drawsSomething(block) ? block : null,
         lines: [],
       });
       continue;
@@ -102,14 +114,14 @@ export function groupIntoCards(blocks) {
     // A line with no fact above it opens a card of its own rather than
     // being dropped: an editor who wrote only lines still has a section.
     if (cards.length === 0) {
-      cards.push({ key: blockKey(block, index), stat: null, lines: [] });
+      cards.push({ key: blockKey(block, index), lead: null, lines: [] });
     }
     cards[cards.length - 1].lines.push(block);
   }
   // A card with nothing left in it is not a card. It would draw an empty
   // box, and its count would tell Home to write the section's heading over
   // that box.
-  return cards.filter((card) => card.stat || card.lines.length);
+  return cards.filter((card) => card.lead || card.lines.length);
 }
 
 /**
@@ -156,22 +168,28 @@ export default function InfoCards({ cards, columns = 'auto' }) {
       {cards.map((card) => (
         <div key={card.key}>
           {/* One card, one fact, so the description list holds one entry.
-              StatBlock writes the <dt> and the <dd>, and both need a <dl>
-              around them wherever they are. */}
-          {card.stat ? (
+              FactBlock and StatBlock each write a <dt> and a <dd>, and both
+              need a <dl> around them wherever they are. A fact's list is
+              the definition list device, ruled and termed the way the style
+              sets it. */}
+          {card.lead?.blockType === 'fact' ? (
+            <dl className="definition-list">
+              <FactBlock block={card.lead} />
+            </dl>
+          ) : card.lead ? (
             <dl>
-              <StatBlock block={card.stat} />
+              <StatBlock block={card.lead} />
             </dl>
           ) : null}
           {card.lines.length ? (
             // No bullets: the card is already the group, and a disc in
             // front of two short lines inside it is a mark that separates
             // nothing. The rule at the top of a card with no fact above it
-            // is the one StatBlock would otherwise have drawn, so a card
+            // is the one the fact would otherwise have drawn, so a card
             // opens on a rule either way.
             <ul
               className={
-                card.stat
+                card.lead
                   ? 'mt-xs space-y-3xs'
                   : 'space-y-3xs border-t-hairline border-t-rule-hairline pt-sm'
               }

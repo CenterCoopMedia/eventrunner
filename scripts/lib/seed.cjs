@@ -125,41 +125,34 @@ function defaultPages() {
             block('title', 'text', 'Event name headline.'),
             block('subtitle', 'text', 'One warm supporting sentence.'),
           ]),
-        // The essentials, as a group of cards (M7 issue 9). A stat block
+        // The essentials, as a group of cards (M7 issue 9). A fact or a stat
         // opens a card and the list items after it are that card's own
-        // lines, so the dates can carry the facts that belong beside them
+        // lines, so a card can carry the lines that belong beside it
         // without a second section.
         //
-        // Seeded as placeholders, not from config/event, on purpose. The
-        // dates already render from configuration in the home page's own
-        // Dates list, and a second copy of them here would be two answers
-        // to one question that drift apart the moment an operator edits
-        // either. What belongs in these cards is the event's own summary of
-        // itself, which only the operator can write.
+        // THREE FACTS, NOT THREE STATS (#234). A fact is a term and a
+        // description — "Where", the hall's name, and one line under it —
+        // and it carries no evidence field, because a venue counts nothing
+        // and names no source. A stat carries the six-part contract (design
+        // brief §2.1.1) for a figure that IS evidence, and it stays in the
+        // allowed list so an operator can open a fourth card on one.
         //
-        // ONE STAT AND THREE LINES, NOT THREE STATS. A stat carries the
-        // six-part contract (design brief §2.1.1), so every seeded stat is
-        // six [Replace] instructions an operator has to answer before the
-        // block says anything — and three of them put fifteen of those
-        // lines under the hero of a site nobody has edited yet. One figure
-        // with its lines under it is a card an operator can finish in a
-        // sitting, and the section takes twelve blocks, so a second fact
-        // is one more stat away.
-        //
-        // Which facts: the dates are a figure and belong in the stat; where
-        // the event happens is a name, an address and a way to get there,
-        // which are lines. A venue is not a number, and dressing one as a
-        // stat would mean inventing a count and a source line to cite it
-        // to. Issue #234 tracks a block for a non-numeric fact.
-        section('info', 'Key facts', 'The event’s own short answers. A stat opens a card; the list items after it are that card’s lines.',
-          ['stat', 'list_item'], 12, [
-            block('when', 'stat', 'When the event runs.'),
-            block('where_venue', 'list_item', 'The venue’s name, labelled.'),
-            block('where_address', 'list_item', 'The venue’s street address, labelled.'),
+        // The dates and the venue are seeded from config/event, the way the
+        // travel page's venue name is, so both are correct the moment init
+        // runs; who the event is for is a sentence only the operator can
+        // write, so it arrives as the instruction to write it.
+        section('info', 'Key facts', 'The event’s own short answers. A fact or a stat opens a card; the list items after it are that card’s lines.',
+          ['fact', 'stat', 'list_item'], 12, [
+            block('when', 'fact', 'When the event runs.'),
+            block('where', 'fact', 'Where the event happens: The venue’s name, with its address under it.'),
             block('where_transit', 'list_item', 'The nearest transit to the venue, labelled.'),
+            block('who', 'fact', 'Who the event is for.'),
           ]),
-        section('details', 'Details', 'Body copy describing what happens at the event.',
-          ['richtext', 'image'], 6, [
+        // A quote block may sit among the body copy: one pull quote per page
+        // at most, which the six-block cap and the operator hold between
+        // them.
+        section('details', 'Details', 'Body copy describing what happens at the event. One quote at most.',
+          ['richtext', 'image', 'quote'], 6, [
             block('intro', 'richtext', 'What happens across the days.'),
           ]),
         section('highlights', 'Highlights', 'A short list of what attendees can expect.',
@@ -483,6 +476,37 @@ function defaultPages() {
 /** Page ids seeded from the §5.5 legal templates rather than placeholders. */
 const LEGAL_PAGE_IDS = Object.freeze(['privacy', 'terms']);
 
+/**
+ * The event's dates as one range, from `config/event.days`, or null where
+ * the event has published no day yet. "14–16 October 2026" inside one
+ * month, "30 September – 2 October 2026" across two, and both dates in full
+ * across a year boundary. The en dash is the range mark (interface
+ * guidelines, Typography), and the locale is fixed so a seed is the same
+ * text on every machine that runs it.
+ *
+ * @param {object} event config/event
+ * @returns {string|null}
+ */
+const FULL_DATE = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+});
+const DAY_MONTH = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+
+function eventDateRange(event = {}) {
+  const dates = (Array.isArray(event.days) ? event.days : [])
+    .map((day) => day?.date)
+    .filter((date) => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date))
+    .sort();
+  if (dates.length === 0) return null;
+  const first = new Date(`${dates[0]}T00:00:00Z`);
+  const last = new Date(`${dates[dates.length - 1]}T00:00:00Z`);
+  if (dates.length === 1 || dates[0] === dates[dates.length - 1]) return FULL_DATE.format(first);
+  const sameYear = first.getUTCFullYear() === last.getUTCFullYear();
+  const sameMonth = sameYear && first.getUTCMonth() === last.getUTCMonth();
+  if (sameMonth) return `${first.getUTCDate()}–${FULL_DATE.format(last)}`;
+  return `${(sameYear ? DAY_MONTH : FULL_DATE).format(first)} – ${FULL_DATE.format(last)}`;
+}
+
 /** Full street address from `config/event.venue`, blank parts dropped. */
 function venueAddress(venue = {}) {
   const line = [venue.addressLine1, venue.addressLine2].filter(Boolean).join(', ');
@@ -523,6 +547,23 @@ const CONFIG_SEEDS = Object.freeze({
   // will count or where it came from.
   'stats.attendees': () => ({ value: '0', label: 'attendees expected', ...statContract('attendance') }),
   'stats.sessions': () => ({ value: '0', label: 'sessions planned', ...statContract('the session count') }),
+  // The two key facts configuration can answer (#234). A fact is a term
+  // and a description, and neither of these needs a source line. A note
+  // is written only where the venue states an address, because a fact's
+  // note is optional and an empty one is a field an operator has to notice
+  // and delete.
+  'info.when': ({ event }) => ({
+    label: 'When',
+    value: eventDateRange(event) || '[Replace] The dates the event runs.',
+  }),
+  'info.where': ({ event }) => {
+    const address = venueAddress(event.venue);
+    return {
+      label: 'Where',
+      value: event.venue?.name || '[Replace] The venue’s name.',
+      ...(address ? { note: address } : {}),
+    };
+  },
   'travel_venue.venue_name': ({ event }) => ({
     value: event.venue?.name || '[Replace] Venue name.',
   }),
@@ -568,6 +609,13 @@ function placeholderBlock(blockType, description) {
       return { label: '[Replace] Button label', url: 'https://example.org', external: true };
     case 'stat':
       return { value: '0', label: text, ...statContract('this number') };
+    case 'fact':
+      // The term is the instruction's own first word where it has one
+      // ("Who the event is for." seeds the term "Who"), so a placeholder
+      // card already reads as a term and a description.
+      return { label: text.replace(/^\[Replace\] /u, '').split(/\s/u)[0], value: text };
+    case 'quote':
+      return { text, attribution: '[Replace] Who said it, and in what role.' };
     case 'list_item':
       return { text };
     case 'faq_item':
@@ -746,6 +794,12 @@ const OBSOLETE_CONTENT_IDS = Object.freeze([
   // configuration now (`config/event.registration`), read by the page and
   // by the ticket provider's email alike, and an unset one draws nothing.
   'hero__register_cta',
+  // #234: the venue's name and address were two labelled lines under the
+  // dates card. They are the `info__where` fact now, with the address as
+  // its note, so a site upgraded in place would otherwise state the venue
+  // twice.
+  'info__where_venue',
+  'info__where_address',
 ]);
 
 module.exports = {
@@ -757,5 +811,5 @@ module.exports = {
   LEGAL_PAGE_IDS,
   OBSOLETE_CONTENT_IDS,
   EMAIL_TEMPLATE_OVERRIDE_IDS,
-  internals: { venueAddress, CONFIG_SEEDS },
+  internals: { venueAddress, eventDateRange, CONFIG_SEEDS },
 };

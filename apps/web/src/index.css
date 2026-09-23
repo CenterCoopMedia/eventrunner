@@ -1523,6 +1523,79 @@
 }
 
 @layer components {
+  /* WAVE 2 OF THE VOCABULARY EXPANSION (record 2026-09-10, §3): the text,
+     feedback and input devices. Each class below is the rendered form of one
+     tier 3 contract in design/tokens/components.json, so a style retunes a
+     device by remapping its tokens and no component changes. Rules are
+     drawn with border-block-* and a width token, never a height, so a
+     hairline stays a hairline on a fractional-pixel display.
+     ------------------------------------------------------------------ */
+
+  /* THE DEFINITION LIST (record §3.1): term and description pairs, ruled
+     between pairs. A real <dl>. The term sits in a fixed column at wide
+     widths so a run of pairs reads as a table of facts, and stacks over its
+     description at narrow ones. The face, the case and the width of the
+     term are what a style moves. */
+  .definition-list__pair {
+    display: grid;
+    gap: var(--space-3xs) var(--space-md);
+    padding-block: var(--definition-list-pad-block);
+    border-block-start: var(--definition-list-rule-width) solid rgb(var(--definition-list-rule-rgb));
+  }
+  @media (min-width: 40rem) {
+    .definition-list__pair {
+      grid-template-columns: minmax(0, var(--definition-list-term-width)) minmax(0, 1fr);
+    }
+    .definition-list__pair > dd {
+      grid-column: 2;
+    }
+  }
+  .definition-list__term {
+    font-family: var(--definition-list-term-font);
+    font-size: var(--definition-list-term-size);
+    line-height: var(--text-caption-leading);
+    font-style: var(--definition-list-term-style);
+    letter-spacing: var(--definition-list-term-tracking);
+    text-transform: var(--definition-list-term-transform);
+  }
+
+  /* THE PULL QUOTE (record §3.1): a quoted sentence with its attribution,
+     one per page at most. The sentence is the callout device — see
+     .callout above, and components/editorial/PullQuote.jsx — so the frame
+     is all that is drawn here: a rule above and below at the weight the
+     style sets, an optional rule at the inline start, and an optional large
+     opening mark. Every rule reads the rule tokens and never the accent, so
+     the frame is a typographic rule and not the rejected coloured edge. */
+  .pull-quote {
+    padding-block: var(--pull-quote-pad-block);
+    padding-inline-start: var(--pull-quote-pad-inline);
+    border-block-start: var(--pull-quote-rule-block-width) solid rgb(var(--pull-quote-rule-rgb));
+    border-block-end: var(--pull-quote-rule-block-width) solid rgb(var(--pull-quote-rule-rgb));
+    border-inline-start: var(--pull-quote-rule-inline-width) solid rgb(var(--pull-quote-rule-rgb));
+    text-align: var(--pull-quote-align);
+  }
+  /* The opening mark is drawn, never typed into the copy, so a screen
+     reader reads the sentence and not a stray quotation mark. `none` keeps
+     it out of the document in every style that does not draw one. */
+  .pull-quote__mark {
+    display: var(--pull-quote-mark-display);
+    font-family: var(--pull-quote-mark-font);
+    font-size: var(--text-h1);
+    line-height: 0.6;
+    color: rgb(var(--callout-rgb));
+  }
+  /* A centred quote centres its sentence too. The callout is an inline
+     block with a measure of its own, so the block's text-align places it. */
+  .pull-quote .callout {
+    text-wrap: pretty;
+  }
+  .pull-quote__attribution {
+    font-family: var(--pull-quote-attribution-font);
+    text-transform: var(--pull-quote-attribution-transform);
+  }
+}
+
+@layer components {
   /* The desk (docs/plans/2026-09-10-admin-editorial-desk.md, which amends
      the composing room in docs/plans/2026-08-27-admin-identity-story.md).
      The admin is the seventh surface and it is not a preset: it reads the

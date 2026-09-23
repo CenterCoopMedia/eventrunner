@@ -458,48 +458,79 @@ test('the hero seeds no registration action of its own (M7 issue 8)', () => {
   assert.equal(content.some((doc) => doc.section === 'hero' && doc.blockType === 'cta'), false);
 });
 
-// M7 issue 9: the key facts group. The seed supplies the section and its
-// placeholder blocks, using the two block types that already exist — a
-// stat opens a card and the list items after it are that card's lines.
-//
-// ONE STAT, THREE LINES. A stat is six [Replace] instructions (the stat
-// contract), so three of them would put fifteen of them under the hero of a
-// site nobody has edited yet. One figure and three lines is one short card
-// an operator can finish, and the section takes twelve blocks.
-test('the home page seeds a key facts section built from stat and list_item blocks', () => {
+// M7 issue 9 and #234: the key facts group. A fact or a stat opens a card
+// and the list items after it are that card's lines. The seed opens three
+// cards on FACTS — a term and a description, no evidence fields — and keeps
+// the stat in the allowed list for a figure that is evidence.
+test('the home page seeds a key facts section built from fact blocks', () => {
   const home = defaultPages().find((page) => page.id === 'home');
   const info = home.sections.find((section) => section.id === 'info');
   assert.ok(info, 'the home page seeds an info section');
-  assert.deepEqual(info.allowedBlocks, ['stat', 'list_item'], 'no new block type');
+  assert.deepEqual(info.allowedBlocks, ['fact', 'stat', 'list_item']);
   assert.deepEqual(
     info.defaultBlocks.map((def) => [def.field, def.blockType]),
     [
-      ['when', 'stat'],
-      ['where_venue', 'list_item'],
-      ['where_address', 'list_item'],
+      ['when', 'fact'],
+      ['where', 'fact'],
       ['where_transit', 'list_item'],
+      ['who', 'fact'],
     ],
-    'one stat opens the card and its lines follow it',
+    'three facts open three cards, and the transit line follows the venue',
   );
   assert.equal(
     info.defaultBlocks.filter((def) => def.blockType === 'stat').length,
-    1,
-    'a fresh site opens one short card, not one per fact',
+    0,
+    'no seeded card asks an operator to invent evidence for a place or a date',
   );
   const content = new Map(
     buildSeedContent({ pages: defaultPages(), docs: configDocs(), tierA: TIER_A }).map((d) => [d.id, d]),
   );
-  // Seeded in the order the card reads in, so the positional grouping the
+  // Seeded in the order the cards read in, so the positional grouping the
   // renderer applies is the one an editor sees in the admin.
   assert.deepEqual(
     info.defaultBlocks.map((def) => content.get(`info__${def.field}`).order),
     [0, 1, 2, 3],
   );
-  // The seeded stat carries the six-part contract, so the section can be
-  // published without an editor first filling in four more fields.
-  for (const part of ['value', 'label', 'takeaway', 'description', 'source', 'alt']) {
-    assert.ok(content.get('info__when')[part], `info__when.${part} is seeded`);
+  // The dates and the venue come from configuration, correct the moment
+  // init runs; a fact carries no source, no takeaway, no alt text.
+  const when = content.get('info__when');
+  assert.equal(when.label, 'When');
+  const { eventDateRange } = require('./seed.cjs').internals;
+  assert.equal(
+    when.value,
+    eventDateRange(configDocs().event) || '[Replace] The dates the event runs.',
+    'the dates are seeded from config/event.days, or the instruction to state them',
+  );
+  const where = content.get('info__where');
+  assert.equal(where.label, 'Where');
+  assert.equal(where.value, configDocs().event.venue.name);
+  for (const doc of [when, where, content.get('info__who')]) {
+    for (const evidence of ['takeaway', 'description', 'source', 'alt']) {
+      assert.equal(evidence in doc, false, `${doc.id} carries no ${evidence}`);
+    }
   }
+  // The audience is the operator's own sentence, so it is an instruction.
+  const who = content.get('info__who');
+  assert.equal(who.label, 'Who');
+  assert.match(who.value, /\[Replace\]/);
+});
+
+test('the seeded date range reads as one range in the event’s own dates', () => {
+  const { eventDateRange } = require('./seed.cjs').internals;
+  assert.equal(eventDateRange({ days: [] }), null);
+  assert.equal(eventDateRange({ days: [{ date: '2026-10-14' }] }), '14 October 2026');
+  assert.equal(
+    eventDateRange({ days: [{ date: '2026-10-16' }, { date: '2026-10-14' }, { date: '2026-10-15' }] }),
+    '14–16 October 2026',
+  );
+  assert.equal(
+    eventDateRange({ days: [{ date: '2026-09-30' }, { date: '2026-10-02' }] }),
+    '30 September – 2 October 2026',
+  );
+  assert.equal(
+    eventDateRange({ days: [{ date: '2026-12-31' }, { date: '2027-01-02' }] }),
+    '31 December 2026 – 2 January 2027',
+  );
 });
 
 // M7 issue 10: the sponsor strip. The section is the operator's own switch
@@ -527,7 +558,7 @@ test('placeholder copy is a [Replace] instruction, never another event copy', ()
   const placeholderish = content.filter(
     // Config-derived blocks are correct as seeded, so they carry no
     // [Replace] marker by design (§5.4).
-    (d) => !['hero__title', 'stats__attendees', 'stats__sessions'].includes(d.id) &&
+    (d) => !['hero__title', 'stats__attendees', 'stats__sessions', 'info__when', 'info__where'].includes(d.id) &&
       !d.section.startsWith('privacy_') && !d.section.startsWith('terms_') &&
       !d.id.startsWith('travel_venue__venue_name') && !d.id.startsWith('travel_venue__venue_address') &&
       !d.id.startsWith('footer__') && !d.id.startsWith('contact_channels__'),

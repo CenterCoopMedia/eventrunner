@@ -158,5 +158,31 @@
   "marginalia": {
     "--marginalia-rgb": "--color-ink-motif-rgb",
     "--marginalia-display": "none"
+  },
+  "$wave-2-note": "The text, feedback and input devices of the vocabulary expansion (2026-09-10 record, §3), wave 2. Every contract below is read by one rule set in apps/web/src/index.css and drawn by one component, and a style remaps it in its preset file where its story differs. A contract note says why a device is the same everywhere when no style remaps it. An ink a style may move is a non-rgb token holding an rgb(var()) value, because a preset remap lands in the root block and a mode block would outrank it.",
+  "$definition-list-note": "Term and description pairs (record §3.1): venue, dates, format, room. A real <dl>, ruled between pairs. This is the answer to a non-numeric fact (issue 234): a fact is a term and a description, never a stat block. The term is set in the data face by default; Zine and Field Guide move it to the mono face, Broadsheet sets it in italic, and Atlas sets it in small caps.",
+  "definition-list": {
+    "--definition-list-rule-rgb": "--rule-hairline-rgb",
+    "--definition-list-rule-width": "var(--rule-hairline-width)",
+    "--definition-list-term-font": "var(--font-data)",
+    "--definition-list-term-size": "var(--text-caption)",
+    "--definition-list-term-style": "normal",
+    "--definition-list-term-transform": "none",
+    "--definition-list-term-tracking": "0em",
+    "--definition-list-term-width": "9rem",
+    "--definition-list-pad-block": "var(--space-xs)"
+  },
+  "$pull-quote-note": "A quoted sentence from a speaker or a session, with its attribution (record §3.1). One per page at most. The TEXT is the callout device: PullQuote renders its sentence through Callout.jsx, so the face, the size, the ink and the angle come from the callout contract and Zine's handwritten line is the same element as every other style's quote. What this contract holds is the frame around the sentence: the rules above and below, the rule at the inline start, the large opening mark, the alignment, and the attribution's face. The Quote device option group in each preset remaps both contracts.",
+  "pull-quote": {
+    "--pull-quote-rule-rgb": "--rule-strong-rgb",
+    "--pull-quote-rule-block-width": "var(--rule-strong-width)",
+    "--pull-quote-rule-inline-width": "0",
+    "--pull-quote-mark-display": "none",
+    "--pull-quote-mark-font": "var(--font-heading)",
+    "--pull-quote-align": "start",
+    "--pull-quote-pad-inline": "0",
+    "--pull-quote-pad-block": "var(--space-md)",
+    "--pull-quote-attribution-font": "var(--font-data)",
+    "--pull-quote-attribution-transform": "none"
   }
 }

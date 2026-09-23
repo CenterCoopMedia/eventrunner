@@ -4,7 +4,9 @@
 // a test reads the rendered book back to prove it. A device this page does
 // not draw is a device nobody reviews in five of the six site styles.
 import Callout from '../../../components/editorial/Callout.jsx';
+import DefinitionList from '../../../components/editorial/DefinitionList.jsx';
 import Folio from '../../../components/editorial/Folio.jsx';
+import PullQuote from '../../../components/editorial/PullQuote.jsx';
 import Marginalia from '../../../components/editorial/Marginalia.jsx';
 import Nameplate, { buildNameplate } from '../../../components/editorial/Nameplate.jsx';
 import Plate, { PlateNumber } from '../../../components/editorial/Plate.jsx';
@@ -17,6 +19,7 @@ import WayfindingIcon, { WAYFINDING_ICONS } from '../../../components/editorial/
 import LeadImage from '../../../components/LeadImage.jsx';
 import SessionCard from '../../../components/SessionCard.jsx';
 import StatBlock from '../../../components/blocks/StatBlock.jsx';
+import FactBlock from '../../../components/blocks/FactBlock.jsx';
 import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
 import { EXAMPLE_SESSIONS, specimenTracks } from '../exampleContent.js';
@@ -51,6 +54,35 @@ const FULL_STAT = Object.freeze({
 });
 
 const LEGACY_STAT = Object.freeze({ value: '3', label: 'days' });
+
+// The facts of the event, as term and description pairs (#234). The venue
+// and the days come from the snapshot where it states them; the format is
+// the book's own line, because no field in config/event holds one.
+const FACTS = Object.freeze([
+  Object.freeze({
+    term: 'Where',
+    description: eventConfig.venue?.name || firstSession.location,
+    note: [eventConfig.venue?.city, eventConfig.venue?.region].filter(Boolean).join(', ') || null,
+  }),
+  Object.freeze({
+    term: 'When',
+    description: `${eventConfig.days?.length || 1} ${eventConfig.days?.length === 1 ? 'day' : 'days'}`,
+  }),
+  Object.freeze({ term: 'Format', description: 'Workshops, panels, and peer clinics' }),
+]);
+
+const FACT_BLOCK = Object.freeze({
+  blockType: 'fact',
+  label: 'Who',
+  value: 'Reporters, editors, and publishers from local newsrooms',
+  note: 'Workshop places go to registered participants first.',
+});
+
+// The one quoted sentence a page may carry.
+const QUOTE = Object.freeze({
+  text: firstSession.description || eventConfig.tagline,
+  attribution: firstSession.title,
+});
 
 // THREE DEVICES ARE SWITCHED OFF BY MOST STYLES, AND THE BOOK STILL HAS TO
 // SHOW THEM. The plate number, the specimen label's term, and the pen mark
@@ -197,9 +229,42 @@ export default function EditorialSection({ folio }) {
         name="Callout"
         file="components/editorial/Callout.jsx"
         contract="callout"
-        note="One quoted line. Every style but Zine holds a zero angle and the heading face, so the device is a lead line there."
+        note="One quoted line. Every style but Zine holds a zero angle and the heading face, so the device is a lead line there. The pull quote below is its call site."
       >
         <Callout>{eventConfig.tagline}</Callout>
+      </Figure>
+
+      <Figure
+        name="Pull quote"
+        file="components/editorial/PullQuote.jsx"
+        contract="pull-quote"
+        note="A quoted sentence with its attribution under it, one per page at most. The sentence is the callout device, so Zine's handwritten line and every other style's ruled quote are one element; the frame around it — the rules, the opening mark, the alignment — is this contract, and the Quote device option in each style remaps both."
+      >
+        <div className="max-w-prose">
+          <PullQuote attribution={QUOTE.attribution}>{QUOTE.text}</PullQuote>
+        </div>
+      </Figure>
+
+      <Figure
+        name="Definition list"
+        file="components/editorial/DefinitionList.jsx"
+        contract="definition-list"
+        note="Term and description pairs in a real dl, ruled between pairs. This is the answer to a non-numeric fact: a venue is a term and a description, never a stat block. The term's face, case and column width are what a style moves."
+      >
+        <div className="max-w-prose">
+          <DefinitionList items={FACTS} />
+        </div>
+      </Figure>
+
+      <Figure
+        name="Fact block"
+        file="components/blocks/FactBlock.jsx"
+        contract="definition-list"
+        note="The fact block, as an operator writes it: the term, the fact, and one optional line under it. It renders one pair of the definition list above and asks for no evidence field."
+      >
+        <dl className="definition-list max-w-prose">
+          <FactBlock block={FACT_BLOCK} />
+        </dl>
       </Figure>
 
       <Figure

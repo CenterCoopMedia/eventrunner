@@ -54,10 +54,17 @@
   "shape": { "radius": "sharp", "texture": "flat", "density": "tight" },
   "motifSet": "none",
 
-  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule uses tight vertical padding and the data font for folio text.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule uses tight vertical padding and the data font for folio text. The definition list sets its terms in italic. The pull quote is centred between hairlines with a large opening mark and a small-capitals attribution.",
   "tokens": {
     "--session-card-pad-block": "var(--space-sm)",
     "--folio-font": "var(--font-data)",
+    "--definition-list-term-style": "italic",
+    "--definition-list-term-width": "8rem",
+    "--pull-quote-rule-rgb": "var(--rule-hairline-rgb)",
+    "--pull-quote-rule-block-width": "var(--rule-hairline-width)",
+    "--pull-quote-mark-display": "block",
+    "--pull-quote-align": "center",
+    "--pull-quote-attribution-transform": "uppercase",
     "--hero-rule-block-start": "var(--rule-strong-width) double rgb(var(--rule-strong-rgb))",
     "--hero-art-width": "75%",
     "--hero-art-position": "85% 50%",
