@@ -1,4 +1,4 @@
-# Specimen captures — wave 1
+# Specimen captures — waves 1 and 2
 
 Twenty-nine section captures of the specimen book, at full scale. They are
 the review evidence for wave 1 of the design vocabulary expansion
@@ -121,3 +121,63 @@ Read on the captures of 2026-09-10, and fixed in the same wave:
 - The back-to-top control mounts on scroll and was landing in the middle of
   the 390px captures. The capture script hides what the page fixes to the
   viewport before it shoots.
+
+## Wave 2 captures
+
+Six section captures at full scale, 1440px wide, from wave 2 of the expansion
+(the text, feedback and input devices of the record's §3 and the option groups
+of §4). Four are new and two replace the wave 1 feedback captures for
+Broadsheet and Zine. Each is `<style>--<mode>--1440--<section>.png`, taken
+from the committed demo build.
+
+| Files | What |
+|---|---|
+| 4 | the editorial section in Broadsheet and Zine, light and dark |
+| 2 | the feedback section in Broadsheet and Zine, light |
+
+**Why these.** The editorial section is where most of the wave landed: the
+pull quote (Zine's is the handwritten callout, Broadsheet's is centred with an
+opening mark), the definition list and the fact block, the standfirst, the
+byline and dateline, the long read opening (this style's own default, then the
+cap forced on), the timeline on the feed's spine, and the ruled table with its
+live sort. Broadsheet and Zine are the two styles whose remaps differ most, so
+the same section in both is the shortest proof that a device is one contract
+with six looks. The feedback section carries the notice bar at both levels,
+the count, the figure sentence, the legend, the state marker and the progress
+bar. The directories section gained the avatar in its three sizes and the
+controls section the dropzone and the repeater; neither section was captured
+again, because a section capture of either runs past half a megabyte and the
+whole set has to stay small enough to review. Both are on the committed demo
+at `#/specimen`.
+
+Regenerate with the committed script against the committed demo:
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/dev/capture-specimen.mjs \
+  --dist docs/demo --out docs/plans/evidence/specimen \
+  --scale 1 --widths 1440 --modes light,dark --styles broadsheet,zine --only specimen-editorial
+PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/dev/capture-specimen.mjs \
+  --dist docs/demo --out docs/plans/evidence/specimen \
+  --scale 1 --widths 1440 --modes light --styles broadsheet,zine --only specimen-feedback
+PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/dev/capture-specimen.mjs \
+  --dist docs/demo --out docs/plans/evidence/specimen \
+  --scale 1 --widths 1440 --modes light --styles atlas --only specimen-directories
+```
+
+### What to look at
+
+- **Editorial (section 6), Broadsheet against Zine.** The pull quote is one
+  element: italic serif between hairlines with a large opening mark in
+  Broadsheet, the handwritten line between strong rules in Zine. The
+  definition list's terms are italic in one and monospaced capitals in the
+  other. The long read opening's first copy is the style's own default, so
+  Broadsheet shows the cap and Zine shows none; the second copy forces the cap
+  in both. The timeline's spine is the strong width in both, which is the
+  remap the two share.
+- **Feedback (section 12).** The notice bar's two levels differ by a word and
+  a rule weight, and in Zine the band sits on the page ground between strong
+  rules. The state marker's finished word is in the back-issue ink on the
+  hairline; the running word is in the accent on the strong rule.
+- **Across styles and modes.** As in wave 1: a device that renders the same in
+  both styles is a finding, and a dark capture in which a rule or an ink has
+  disappeared is a finding.

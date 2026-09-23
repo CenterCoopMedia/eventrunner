@@ -163,25 +163,12 @@ const PRESETS = Object.freeze({
             tokens: {
               '--drop-cap-float': 'left',
               '--drop-cap-size': '3.1em',
-              '--drop-cap-leading': '0.8',
-              '--drop-cap-font': 'var(--font-heading)',
-              '--drop-cap-weight': 'var(--weight-semibold)',
               '--drop-cap-pad-inline-end': 'var(--space-xs)',
-              '--drop-cap-margin-block-start': '0.08em',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
           {
             id: 'standfirst',
             tokens: {
-              '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
               '--long-read-opening-size': 'var(--text-lead)',
               '--long-read-opening-leading': 'var(--text-lead-leading)',
             },
@@ -190,14 +177,6 @@ const PRESETS = Object.freeze({
             id: 'plain',
             tokens: {
               '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
         ],
@@ -209,22 +188,13 @@ const PRESETS = Object.freeze({
             id: 'ruled-minute',
             tokens: {
               '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
-              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
-              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
-              '--pull-quote-pad-inline': 'var(--space-md)',
-              '--pull-quote-mark-display': 'none',
-              '--pull-quote-align': 'start',
             },
           },
           {
             id: 'plain-rules',
             tokens: {
-              '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
-              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
               '--pull-quote-rule-inline-width': '0',
               '--pull-quote-pad-inline': '0',
-              '--pull-quote-mark-display': 'none',
-              '--pull-quote-align': 'start',
             },
           },
         ],
@@ -236,19 +206,12 @@ const PRESETS = Object.freeze({
             id: 'ruled-entries',
             tokens: {
               '--directory-portrait-aspect': '1 / 1',
-              '--directory-portrait-radius': 'var(--radius-base)',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
-              '--directory-rule-width': 'var(--rule-hairline-width)',
-              '--directory-entry-pad-block': 'var(--space-2xs)',
             },
           },
           {
             id: 'portrait-plates',
             tokens: {
               '--directory-portrait-aspect': '4 / 5',
-              '--directory-portrait-radius': 'var(--radius-base)',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
-              '--directory-rule-width': 'var(--rule-hairline-width)',
               '--directory-entry-pad-block': 'var(--space-xs)',
             },
           },
@@ -261,20 +224,17 @@ const PRESETS = Object.freeze({
             id: 'rule-and-folio',
             tokens: {
               '--section-folio-display': 'inline',
-              '--section-folio-placement': 'end',
             },
           },
           {
             id: 'rule-only',
             tokens: {
               '--section-folio-display': 'none',
-              '--section-folio-placement': 'end',
             },
           },
           {
             id: 'folio-in-margin',
             tokens: {
-              '--section-folio-display': 'inline',
               '--section-folio-placement': 'margin',
             },
           },
@@ -287,20 +247,17 @@ const PRESETS = Object.freeze({
             id: 'hairline-rows',
             tokens: {
               '--table-head-rule-width': 'var(--rule-hairline-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
             id: 'ruled-head',
             tokens: {
               '--table-head-rule-width': 'var(--rule-strong-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
             id: 'full-grid',
             tokens: {
-              '--table-head-rule-width': 'var(--rule-strong-width)',
               '--table-column-rule-width': 'var(--rule-hairline-width)',
             },
           },
@@ -452,25 +409,12 @@ const PRESETS = Object.freeze({
             tokens: {
               '--drop-cap-float': 'left',
               '--drop-cap-size': '3.1em',
-              '--drop-cap-leading': '0.8',
-              '--drop-cap-font': 'var(--font-heading)',
-              '--drop-cap-weight': 'var(--weight-semibold)',
               '--drop-cap-pad-inline-end': 'var(--space-xs)',
-              '--drop-cap-margin-block-start': '0.08em',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
           {
             id: 'standfirst',
             tokens: {
-              '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
               '--long-read-opening-size': 'var(--text-lead)',
               '--long-read-opening-leading': 'var(--text-lead-leading)',
             },
@@ -479,14 +423,6 @@ const PRESETS = Object.freeze({
             id: 'plain',
             tokens: {
               '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
         ],
@@ -498,10 +434,6 @@ const PRESETS = Object.freeze({
             id: 'ruled-with-mark',
             tokens: {
               '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
-              '--pull-quote-rule-inline-width': '0',
-              '--pull-quote-pad-inline': '0',
-              '--pull-quote-mark-display': 'block',
-              '--pull-quote-align': 'start',
             },
           },
           {
@@ -511,17 +443,12 @@ const PRESETS = Object.freeze({
               '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
               '--pull-quote-pad-inline': 'var(--space-md)',
               '--pull-quote-mark-display': 'none',
-              '--pull-quote-align': 'start',
             },
           },
           {
             id: 'mark-only',
             tokens: {
               '--pull-quote-rule-block-width': '0',
-              '--pull-quote-rule-inline-width': '0',
-              '--pull-quote-pad-inline': '0',
-              '--pull-quote-mark-display': 'block',
-              '--pull-quote-align': 'start',
             },
           },
         ],
@@ -533,20 +460,12 @@ const PRESETS = Object.freeze({
             id: 'portrait-shelf',
             tokens: {
               '--directory-portrait-aspect': '1 / 1',
-              '--directory-portrait-radius': 'var(--radius-base)',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
-              '--directory-rule-width': 'var(--rule-hairline-width)',
-              '--directory-entry-pad-block': 'var(--space-2xs)',
             },
           },
           {
             id: 'tall-portraits',
             tokens: {
               '--directory-portrait-aspect': '3 / 4',
-              '--directory-portrait-radius': 'var(--radius-base)',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
-              '--directory-rule-width': 'var(--rule-hairline-width)',
-              '--directory-entry-pad-block': 'var(--space-2xs)',
             },
           },
         ],
@@ -558,20 +477,17 @@ const PRESETS = Object.freeze({
             id: 'rule-and-folio',
             tokens: {
               '--section-folio-display': 'inline',
-              '--section-folio-placement': 'end',
             },
           },
           {
             id: 'rule-only',
             tokens: {
               '--section-folio-display': 'none',
-              '--section-folio-placement': 'end',
             },
           },
           {
             id: 'folio-in-margin',
             tokens: {
-              '--section-folio-display': 'inline',
               '--section-folio-placement': 'margin',
             },
           },
@@ -584,20 +500,17 @@ const PRESETS = Object.freeze({
             id: 'hairline-rows',
             tokens: {
               '--table-head-rule-width': 'var(--rule-hairline-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
             id: 'ruled-head',
             tokens: {
               '--table-head-rule-width': 'var(--rule-strong-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
             id: 'full-grid',
             tokens: {
-              '--table-head-rule-width': 'var(--rule-strong-width)',
               '--table-column-rule-width': 'var(--rule-hairline-width)',
             },
           },
@@ -763,25 +676,12 @@ const PRESETS = Object.freeze({
             tokens: {
               '--drop-cap-float': 'left',
               '--drop-cap-size': '3.1em',
-              '--drop-cap-leading': '0.8',
-              '--drop-cap-font': 'var(--font-heading)',
-              '--drop-cap-weight': 'var(--weight-semibold)',
               '--drop-cap-pad-inline-end': 'var(--space-xs)',
-              '--drop-cap-margin-block-start': '0.08em',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
           {
             id: 'standfirst',
             tokens: {
-              '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
               '--long-read-opening-size': 'var(--text-lead)',
               '--long-read-opening-leading': 'var(--text-lead-leading)',
             },
@@ -790,14 +690,6 @@ const PRESETS = Object.freeze({
             id: 'plain',
             tokens: {
               '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
         ],
@@ -808,25 +700,17 @@ const PRESETS = Object.freeze({
           {
             id: 'centred-mark',
             tokens: {
-              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
               '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
-              '--pull-quote-rule-inline-width': '0',
-              '--pull-quote-pad-inline': '0',
-              '--pull-quote-mark-display': 'block',
-              '--pull-quote-align': 'center',
-              '--pull-quote-attribution-transform': 'uppercase',
             },
           },
           {
             id: 'column-rule',
             tokens: {
-              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
               '--pull-quote-rule-block-width': '0',
               '--pull-quote-rule-inline-width': 'var(--rule-hairline-width)',
               '--pull-quote-pad-inline': 'var(--space-md)',
               '--pull-quote-mark-display': 'none',
               '--pull-quote-align': 'start',
-              '--pull-quote-attribution-transform': 'uppercase',
             },
           },
         ],
@@ -837,10 +721,7 @@ const PRESETS = Object.freeze({
           {
             id: 'agate-directory',
             tokens: {
-              '--directory-portrait-aspect': '1 / 1',
               '--directory-portrait-radius': '0',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
-              '--directory-rule-width': 'var(--rule-hairline-width)',
               '--directory-entry-pad-block': 'var(--space-3xs)',
             },
           },
@@ -849,9 +730,7 @@ const PRESETS = Object.freeze({
             tokens: {
               '--directory-portrait-aspect': '4 / 5',
               '--directory-portrait-radius': '0',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
               '--directory-rule-width': 'var(--rule-strong-width)',
-              '--directory-entry-pad-block': 'var(--space-2xs)',
             },
           },
         ],
@@ -863,20 +742,17 @@ const PRESETS = Object.freeze({
             id: 'rule-and-folio',
             tokens: {
               '--section-folio-display': 'inline',
-              '--section-folio-placement': 'end',
             },
           },
           {
             id: 'rule-only',
             tokens: {
               '--section-folio-display': 'none',
-              '--section-folio-placement': 'end',
             },
           },
           {
             id: 'folio-in-margin',
             tokens: {
-              '--section-folio-display': 'inline',
               '--section-folio-placement': 'margin',
             },
           },
@@ -889,14 +765,12 @@ const PRESETS = Object.freeze({
             id: 'hairline-rows',
             tokens: {
               '--table-head-rule-width': 'var(--rule-hairline-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
             id: 'ruled-head',
             tokens: {
               '--table-head-rule-width': 'var(--rule-strong-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
@@ -1005,7 +879,6 @@ const PRESETS = Object.freeze({
       '--legend-font': 'var(--font-mono)',
       '--state-marker-font': 'var(--font-mono)',
       '--standfirst-font': 'var(--font-heading)',
-      '--standfirst-weight': 'var(--weight-regular)',
       '--byline-font': 'var(--font-mono)',
     },
     options: {
@@ -1100,25 +973,12 @@ const PRESETS = Object.freeze({
             tokens: {
               '--drop-cap-float': 'left',
               '--drop-cap-size': '3.1em',
-              '--drop-cap-leading': '0.8',
-              '--drop-cap-font': 'var(--font-heading)',
-              '--drop-cap-weight': 'var(--weight-semibold)',
               '--drop-cap-pad-inline-end': 'var(--space-xs)',
-              '--drop-cap-margin-block-start': '0.08em',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
           {
             id: 'standfirst',
             tokens: {
-              '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
               '--long-read-opening-size': 'var(--text-lead)',
               '--long-read-opening-leading': 'var(--text-lead-leading)',
             },
@@ -1127,14 +987,6 @@ const PRESETS = Object.freeze({
             id: 'plain',
             tokens: {
               '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
         ],
@@ -1146,20 +998,12 @@ const PRESETS = Object.freeze({
             id: 'route-line',
             tokens: {
               '--pull-quote-rule-block-width': '0',
-              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
-              '--pull-quote-pad-inline': 'var(--space-md)',
-              '--pull-quote-mark-display': 'none',
-              '--pull-quote-align': 'start',
             },
           },
           {
             id: 'boxed-sign',
             tokens: {
               '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
-              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
-              '--pull-quote-pad-inline': 'var(--space-md)',
-              '--pull-quote-mark-display': 'none',
-              '--pull-quote-align': 'start',
             },
           },
         ],
@@ -1170,10 +1014,6 @@ const PRESETS = Object.freeze({
           {
             id: 'gazetteer',
             tokens: {
-              '--directory-portrait-aspect': '1 / 1',
-              '--directory-portrait-radius': 'var(--radius-base)',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
-              '--directory-rule-width': 'var(--rule-hairline-width)',
               '--directory-entry-pad-block': 'var(--space-3xs)',
             },
           },
@@ -1181,8 +1021,6 @@ const PRESETS = Object.freeze({
             id: 'station-index',
             tokens: {
               '--directory-portrait-aspect': '4 / 5',
-              '--directory-portrait-radius': 'var(--radius-base)',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
               '--directory-rule-width': 'var(--rule-strong-width)',
               '--directory-entry-pad-block': 'var(--space-xs)',
             },
@@ -1196,14 +1034,12 @@ const PRESETS = Object.freeze({
             id: 'rule-and-folio',
             tokens: {
               '--section-folio-display': 'inline',
-              '--section-folio-placement': 'end',
             },
           },
           {
             id: 'rule-only',
             tokens: {
               '--section-folio-display': 'none',
-              '--section-folio-placement': 'end',
             },
           },
         ],
@@ -1215,20 +1051,17 @@ const PRESETS = Object.freeze({
             id: 'hairline-rows',
             tokens: {
               '--table-head-rule-width': 'var(--rule-hairline-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
             id: 'ruled-head',
             tokens: {
               '--table-head-rule-width': 'var(--rule-strong-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
             id: 'full-grid',
             tokens: {
-              '--table-head-rule-width': 'var(--rule-strong-width)',
               '--table-column-rule-width': 'var(--rule-hairline-width)',
             },
           },
@@ -1415,25 +1248,12 @@ const PRESETS = Object.freeze({
             tokens: {
               '--drop-cap-float': 'left',
               '--drop-cap-size': '3.1em',
-              '--drop-cap-leading': '0.8',
-              '--drop-cap-font': 'var(--font-heading)',
-              '--drop-cap-weight': 'var(--weight-semibold)',
               '--drop-cap-pad-inline-end': 'var(--space-xs)',
-              '--drop-cap-margin-block-start': '0.08em',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
           {
             id: 'standfirst',
             tokens: {
-              '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
               '--long-read-opening-size': 'var(--text-lead)',
               '--long-read-opening-leading': 'var(--text-lead-leading)',
             },
@@ -1442,14 +1262,6 @@ const PRESETS = Object.freeze({
             id: 'plain',
             tokens: {
               '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
         ],
@@ -1460,18 +1272,12 @@ const PRESETS = Object.freeze({
           {
             id: 'field-note',
             tokens: {
-              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
               '--pull-quote-rule-block-width': '0',
-              '--pull-quote-rule-inline-width': 'var(--rule-hairline-width)',
-              '--pull-quote-pad-inline': 'var(--space-md)',
-              '--pull-quote-mark-display': 'none',
-              '--pull-quote-align': 'start',
             },
           },
           {
             id: 'pressed-page',
             tokens: {
-              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
               '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
               '--pull-quote-rule-inline-width': '0',
               '--pull-quote-pad-inline': '0',
@@ -1490,18 +1296,12 @@ const PRESETS = Object.freeze({
               '--directory-portrait-aspect': '4 / 5',
               '--directory-portrait-radius': '0',
               '--directory-portrait-ground': 'rgb(var(--color-surface-rgb))',
-              '--directory-rule-width': 'var(--rule-hairline-width)',
-              '--directory-entry-pad-block': 'var(--space-2xs)',
             },
           },
           {
             id: 'field-list',
             tokens: {
-              '--directory-portrait-aspect': '1 / 1',
               '--directory-portrait-radius': '0',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
-              '--directory-rule-width': 'var(--rule-hairline-width)',
-              '--directory-entry-pad-block': 'var(--space-2xs)',
             },
           },
         ],
@@ -1513,20 +1313,17 @@ const PRESETS = Object.freeze({
             id: 'rule-and-folio',
             tokens: {
               '--section-folio-display': 'inline',
-              '--section-folio-placement': 'end',
             },
           },
           {
             id: 'rule-only',
             tokens: {
               '--section-folio-display': 'none',
-              '--section-folio-placement': 'end',
             },
           },
           {
             id: 'folio-in-margin',
             tokens: {
-              '--section-folio-display': 'inline',
               '--section-folio-placement': 'margin',
             },
           },
@@ -1539,14 +1336,12 @@ const PRESETS = Object.freeze({
             id: 'hairline-rows',
             tokens: {
               '--table-head-rule-width': 'var(--rule-hairline-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
             id: 'ruled-head',
             tokens: {
               '--table-head-rule-width': 'var(--rule-strong-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
@@ -1755,25 +1550,12 @@ const PRESETS = Object.freeze({
             tokens: {
               '--drop-cap-float': 'left',
               '--drop-cap-size': '3.1em',
-              '--drop-cap-leading': '0.8',
-              '--drop-cap-font': 'var(--font-heading)',
-              '--drop-cap-weight': 'var(--weight-semibold)',
               '--drop-cap-pad-inline-end': 'var(--space-xs)',
-              '--drop-cap-margin-block-start': '0.08em',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
           {
             id: 'standfirst',
             tokens: {
-              '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
               '--long-read-opening-size': 'var(--text-lead)',
               '--long-read-opening-leading': 'var(--text-lead-leading)',
             },
@@ -1782,14 +1564,6 @@ const PRESETS = Object.freeze({
             id: 'plain',
             tokens: {
               '--drop-cap-float': 'none',
-              '--drop-cap-size': '1em',
-              '--drop-cap-leading': 'inherit',
-              '--drop-cap-font': 'inherit',
-              '--drop-cap-weight': 'inherit',
-              '--drop-cap-pad-inline-end': '0',
-              '--drop-cap-margin-block-start': '0',
-              '--long-read-opening-size': 'var(--text-body)',
-              '--long-read-opening-leading': 'var(--text-body-leading)',
             },
           },
         ],
@@ -1800,12 +1574,7 @@ const PRESETS = Object.freeze({
           {
             id: 'handwritten',
             tokens: {
-              '--callout-angle': '-2.5deg',
               '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
-              '--pull-quote-rule-inline-width': '0',
-              '--pull-quote-pad-inline': '0',
-              '--pull-quote-pad-block': 'var(--space-lg)',
-              '--pull-quote-mark-display': 'none',
             },
           },
           {
@@ -1815,22 +1584,16 @@ const PRESETS = Object.freeze({
             },
             tokens: {
               '--callout-angle': '0deg',
-              '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
-              '--pull-quote-rule-inline-width': '0',
-              '--pull-quote-pad-inline': '0',
               '--pull-quote-pad-block': 'var(--space-md)',
-              '--pull-quote-mark-display': 'none',
             },
           },
           {
             id: 'cut-out',
             tokens: {
-              '--callout-angle': '-2.5deg',
               '--pull-quote-rule-block-width': '0',
               '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
               '--pull-quote-pad-inline': 'var(--space-md)',
               '--pull-quote-pad-block': 'var(--space-sm)',
-              '--pull-quote-mark-display': 'none',
             },
           },
         ],
@@ -1841,11 +1604,8 @@ const PRESETS = Object.freeze({
           {
             id: 'contact-sheet',
             tokens: {
-              '--directory-portrait-aspect': '1 / 1',
               '--directory-portrait-radius': '0',
-              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
               '--directory-rule-width': 'var(--rule-strong-width)',
-              '--directory-entry-pad-block': 'var(--space-2xs)',
             },
           },
           {
@@ -1854,8 +1614,6 @@ const PRESETS = Object.freeze({
               '--directory-portrait-aspect': '4 / 5',
               '--directory-portrait-radius': '0',
               '--directory-portrait-ground': 'rgb(var(--color-surface-rgb))',
-              '--directory-rule-width': 'var(--rule-hairline-width)',
-              '--directory-entry-pad-block': 'var(--space-2xs)',
             },
           },
         ],
@@ -1867,14 +1625,12 @@ const PRESETS = Object.freeze({
             id: 'rule-and-folio',
             tokens: {
               '--section-folio-display': 'inline',
-              '--section-folio-placement': 'end',
             },
           },
           {
             id: 'rule-only',
             tokens: {
               '--section-folio-display': 'none',
-              '--section-folio-placement': 'end',
             },
           },
         ],
@@ -1886,20 +1642,17 @@ const PRESETS = Object.freeze({
             id: 'hairline-rows',
             tokens: {
               '--table-head-rule-width': 'var(--rule-hairline-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
             id: 'ruled-head',
             tokens: {
               '--table-head-rule-width': 'var(--rule-strong-width)',
-              '--table-column-rule-width': '0',
             },
           },
           {
             id: 'full-grid',
             tokens: {
-              '--table-head-rule-width': 'var(--rule-strong-width)',
               '--table-column-rule-width': 'var(--rule-hairline-width)',
             },
           },
@@ -2036,11 +1789,7 @@ const COMPONENT_TOKEN_DEFAULTS = Object.freeze({
   '--directory-entry-pad-block': 'var(--space-2xs)',
   '--drop-cap-float': 'none',
   '--drop-cap-size': '1em',
-  '--drop-cap-leading': 'inherit',
-  '--drop-cap-font': 'inherit',
-  '--drop-cap-weight': 'inherit',
   '--drop-cap-pad-inline-end': '0',
-  '--drop-cap-margin-block-start': '0',
   '--long-read-opening-size': 'var(--text-body)',
   '--long-read-opening-leading': 'var(--text-body-leading)',
 });

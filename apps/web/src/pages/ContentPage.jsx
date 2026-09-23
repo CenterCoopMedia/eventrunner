@@ -30,7 +30,6 @@ import AreaMap from '../components/AreaMap.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import LongReadOpening from '../components/editorial/LongReadOpening.jsx';
-import { templateOf } from '../lib/pageTemplates.js';
 import SectionIndexNav from '../components/SectionIndexNav.jsx';
 import { blockMatchesQuery } from '../lib/blockSearchText.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
@@ -253,7 +252,11 @@ export default function ContentPage() {
 
   const trimmedQuery = query.trim();
   const settledTrimmedQuery = settledQuery.trim();
-  const isLongRead = templateOf(page) === 'long-read';
+  // The stored template id, read directly: a page STATES the Long read
+  // template or it does not, and pulling the template table (with its
+  // editor copy) into the public bundle to say so would cost every reader
+  // the words an operator reads.
+  const isLongRead = page.template === 'long-read';
   // THE MAP COUNTS AS ONE. It is not a block, so counting blocks alone made
   // the live region announce "No items match" over a page that was, right
   // then, showing the plan the query had retained (filterSections keeps a

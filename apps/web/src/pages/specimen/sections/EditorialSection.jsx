@@ -155,11 +155,7 @@ const PLATE_NUMBER_ON = Object.freeze({ '--plate-number-display': 'inline' });
 const DROP_CAP_ON = Object.freeze({
   '--drop-cap-float': 'left',
   '--drop-cap-size': '3.1em',
-  '--drop-cap-leading': '0.8',
-  '--drop-cap-font': 'var(--font-heading)',
-  '--drop-cap-weight': 'var(--weight-semibold)',
   '--drop-cap-pad-inline-end': 'var(--space-xs)',
-  '--drop-cap-margin-block-start': '0.08em',
 });
 const OPENING_COPY = 'Three days to make local news work better. Compare reporting methods, build a budget that survives a thin year, and leave with a shared project plan and a partner to test it with.';
 const OPENING_SECOND = 'Every session is written for people who report, edit, and run local newsrooms.';
