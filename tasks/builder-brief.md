@@ -47,6 +47,13 @@ worktree, a branch, and a list of issues.
   change needs. Tick the issue in `docs/ROADMAP.md`.
 - If a choice is not clear, take the simplest option that fits the parity plan
   and the design record, and write it down in your report. Do not stop to ask.
+- Before you write "Done when met", quote each clause of the issue's "Done
+  when" line and name the test that proves it. Reproduce the issue's own
+  evidence path (its screenshot, its fixture, its named file), not a nearby
+  case. A test that calls an internal helper does not prove what a user sees:
+  render the real surface (the shipped email template, the page, the endpoint).
+- A timeout or wait fix is proven only when no explicit value in the file
+  still overrides the new budget.
 
 ## Commits
 
