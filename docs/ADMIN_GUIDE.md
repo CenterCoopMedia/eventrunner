@@ -63,7 +63,7 @@ Every page document (About, Travel, Conduct, and anything else seeded or added) 
 
 **One item is not a page.** The navigation ends with the account control, which the site adds itself. It reads **Sign in** for a reader who is not signed in and **Your profile** for one who is. You cannot remove it or reorder it, and it needs no page document.
 
-**The footer lists the same pages.** The footer repeats the page list under the same rules, so a page you hide leaves both places at once and a page you rename is renamed in both. Below it the footer names the organization that operates the event and links its support address, both from the event configuration, and lists the event's social accounts if the configuration records any. Each account link is labelled with the service and the handle together, such as Mastodon @summit, so two accounts on one service can be told apart; an account recorded with no handle is labelled with the service name alone. An event with no social accounts gets no social block, not an empty one. You add and edit the accounts under Settings → Event settings, in the **Social accounts** panel.
+**The footer lists the same pages.** The footer repeats the page list under the same rules, so a page you hide leaves both places at once and a page you rename is renamed in both. Below it the footer names the organization that operates the event and links its support address, both from the event configuration, and lists the event's social accounts if the configuration records any. Each account link is labelled with the service and the handle together, such as Mastodon @eventname, so two accounts on one service can be told apart; an account recorded with no handle is labelled with the service name alone. An event with no social accounts gets no social block, not an empty one. You add and edit the accounts under Settings → Event settings, in the **Social accounts** panel.
 
 **Pick what kind of page this is.** Six named tasks, and picking one shapes the page:
 
@@ -263,19 +263,19 @@ The places and movements fields are checked as you type, and a field that breaks
 
 ### Social accounts
 
-The **Social accounts** panel holds the event's own accounts. The site footer and the email footer list them, in the order the panel shows. Leave the list empty and neither footer shows social links.
+The **Social accounts** panel holds the event's own accounts. The site footer and the footer of every built-in email list them, in the order the panel shows. In an email, the formatted copy links each service name, and the plain-text copy gives one line per account: The service, then the address. An email template override that replaces a body keeps the footer that body has. Leave the list empty and neither footer shows social links.
 
 Select **Add account**. Focus moves to the new row's **Service** field. Each account has three fields:
 
 - **Service**: The name readers see, such as Mastodon. Required, at most 40 characters.
-- **Handle**: Optional, such as @summit, at most 40 characters. The site footer prints it beside the service, so two accounts on one service can be told apart. The email footer prints the service name alone.
+- **Handle**: Optional, such as @eventname, at most 40 characters. The site footer prints it beside the service, so two accounts on one service can be told apart. The email footer leaves it out.
 - **Link**: The full address of the account. It must start with `https://` or `http://`.
 
 **Removing an account.** Select **Remove account** on its row. Focus moves to the remove control of the account that takes its place, or of the one before it when you removed the last, or to **Add account** when none is left. The account goes when you save.
 
-**What the save checks.** The accounts are checked when you select **Save event settings**. A save is refused, and focus moves to the first field that needs a fix, when a service name is empty, a link is not a full `https://` or `http://` address, or the same service and link are listed twice. A link with no scheme, such as `example.org/@summit`, is refused, and so is a `javascript:` link. The server checks the same rules and names the field it refused.
+**What the save checks.** The accounts are checked when you select **Save event settings**. A save is refused, and focus moves to the first field that needs a fix, when a service name is empty, a link is not a full `https://` or `http://` address, or the same service and link are listed twice. A link with no scheme, such as `example.org/@eventname`, is refused, and so is a `javascript:` link. The server checks the same rules and names the field it refused.
 
-**Social hashtag.** One word with no spaces, such as #Summit. The event settings store it, but the site and its email do not show it.
+**Social hashtag.** One word with no spaces, such as #EventName. The event settings store it, but the site and its email do not show it.
 
 ## Settings → Features
 

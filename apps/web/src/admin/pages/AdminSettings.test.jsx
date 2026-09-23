@@ -602,15 +602,15 @@ describe('event settings', () => {
     await pushConfig('event', {
       ...LIVE_EVENT,
       social: {
-        hashtag: '#Summit',
-        handles: [{ platform: 'Mastodon', url: 'https://example.org/@summit' }],
+        hashtag: '#EventName',
+        handles: [{ platform: 'Mastodon', url: 'https://example.org/@eventname' }],
       },
     });
-    expect(screen.getByLabelText('Social hashtag')).toHaveValue('#Summit');
+    expect(screen.getByLabelText('Social hashtag')).toHaveValue('#EventName');
     expect(screen.getByLabelText('Account 1 service')).toHaveValue('Mastodon');
-    expect(screen.getByLabelText('Account 1 link')).toHaveValue('https://example.org/@summit');
+    expect(screen.getByLabelText('Account 1 link')).toHaveValue('https://example.org/@eventname');
 
-    fireEvent.change(screen.getByLabelText('Account 1 handle'), { target: { value: '@summit' } });
+    fireEvent.change(screen.getByLabelText('Account 1 handle'), { target: { value: '@eventname' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
     fireEvent.change(screen.getByLabelText('Account 2 service'), { target: { value: 'Video' } });
     fireEvent.change(screen.getByLabelText('Account 2 link'), {
@@ -620,9 +620,9 @@ describe('event settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).event.social).toEqual({
-      hashtag: '#Summit',
+      hashtag: '#EventName',
       handles: [
-        { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/@summit' },
+        { platform: 'Mastodon', handle: '@eventname', url: 'https://example.org/@eventname' },
         { platform: 'Video', url: 'https://example.org/channel' },
       ],
     });
@@ -668,21 +668,66 @@ describe('event settings', () => {
     expect(fetch).not.toHaveBeenCalled();
 
     // Fixed, and the same control saves.
-    fireEvent.change(link, { target: { value: 'https://example.org/@summit' } });
+    fireEvent.change(link, { target: { value: 'https://example.org/@eventname' } });
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).event.social.handles).toEqual([
-      { platform: 'Mastodon', url: 'https://example.org/@summit' },
+      { platform: 'Mastodon', url: 'https://example.org/@eventname' },
     ]);
   }, 20000);
+
+  // A link with no scheme is one the BROWSER calls invalid for a url field.
+  // Without noValidate the browser answered it with its own bubble and fired
+  // no submit, so the form's own check never ran and nothing was marked —
+  // including other fields that were wrong beside it.
+  it('marks a link with no scheme itself, because the browser does not answer first', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    const form = screen.getByRole('button', { name: 'Save event settings' }).closest('form');
+    expect(form).toHaveAttribute('novalidate');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
+    fireEvent.change(screen.getByLabelText('Account 1 service'), { target: { value: 'Mastodon' } });
+    const link = screen.getByLabelText('Account 1 link');
+    fireEvent.change(link, { target: { value: 'example.org/@eventname' } });
+    // The field keeps its url type for the keyboard it brings up.
+    expect(link).toHaveAttribute('type', 'url');
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await waitFor(() => expect(document.activeElement).toBe(link));
+    expect(link).toHaveAttribute('aria-invalid', 'true');
+    expect(link).toHaveAccessibleDescription(/Enter the full link/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('sends a malformed email address to the server, and marks the field it refuses', async () => {
+    // The email fields have no check of their own in the form. With the
+    // browser's check off, the server's refusal is the one that names them.
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, legal: { supportEmail: 'help@example.org' } });
+    fireEvent.change(screen.getByLabelText('Support email'), { target: { value: 'not an address' } });
+    fetch.mockResolvedValueOnce(
+      errorResponse(
+        400,
+        'bad-request',
+        'legal.supportEmail: must be null or an email address, got "not an address"',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await screen.findByRole('alert');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(bodyOf(0).event.legal.supportEmail).toBe('not an address');
+    expect(screen.getByLabelText('Support email')).toHaveAttribute('aria-invalid', 'true');
+  });
 
   it('marks the social and legal fields the server refused, each against its own control', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', {
       ...LIVE_EVENT,
       legal: { operatorName: 'Example Trust', supportEmail: 'help@example.org' },
-      social: { handles: [{ platform: 'Mastodon', url: 'https://example.org/@summit' }] },
+      social: { handles: [{ platform: 'Mastodon', url: 'https://example.org/@eventname' }] },
     });
     fetch.mockResolvedValueOnce(
       errorResponse(

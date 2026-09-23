@@ -269,6 +269,76 @@ test('account.welcome renders login_url in both bodies and next_steps_html from 
   assert.deepEqual(out.warnings, []);
 });
 
+// --- the event's social accounts in the footer (#231) ----------------------
+
+const WITH_ACCOUNTS = {
+  ...CONFIG,
+  event: {
+    ...CONFIG.event,
+    social: {
+      handles: [
+        { platform: 'Mastodon', handle: '@eventname', url: 'https://example.org/@eventname' },
+        { platform: 'Video', url: 'https://example.org/channel' },
+      ],
+    },
+  },
+};
+
+/** A stand-in value for every token a template requires, so each renders. */
+function requiredValues(template) {
+  return Object.fromEntries(template.requiredTokens.map((token) => [token, 'x']));
+}
+
+test('account.welcome lists the event social accounts in both footers', () => {
+  const out = render({
+    template: getDefaultTemplate('account.welcome'),
+    tokenValues: { first_name: 'Ada', profile_url: 'https://summit.example.org/profile' },
+    config: WITH_ACCOUNTS,
+  });
+  assert.ok(out.html.includes('<a href="https://example.org/@eventname">Mastodon</a>'));
+  assert.ok(out.html.includes('<a href="https://example.org/channel">Video</a>'));
+  // Plain text keeps the address, one account per line, after the postal block.
+  assert.ok(
+    out.text.endsWith(
+      'Example Org\n1 Main St\nSpringfield\n\n'
+        + 'Mastodon: https://example.org/@eventname\nVideo: https://example.org/channel',
+    ),
+    out.text,
+  );
+  assert.deepEqual(out.warnings, []);
+});
+
+test('every shipped template carries the social accounts in html and text', () => {
+  for (const id of listTemplateIds()) {
+    const template = getDefaultTemplate(id);
+    const out = render({ template, tokenValues: requiredValues(template), config: WITH_ACCOUNTS });
+    assert.ok(out.html.includes('<a href="https://example.org/@eventname">Mastodon</a>'), id);
+    assert.ok(out.text.includes('Mastodon: https://example.org/@eventname'), id);
+    assert.ok(out.text.includes('Video: https://example.org/channel'), id);
+  }
+});
+
+test('an event with no usable social account adds nothing to either footer', () => {
+  const template = getDefaultTemplate('account.welcome');
+  const tokenValues = { first_name: 'Ada', profile_url: 'https://summit.example.org/profile' };
+  const none = render({ template, tokenValues, config: CONFIG });
+  // No row, no separator, and no blank line after the postal block.
+  assert.ok(none.text.endsWith('--\nExample Org\n1 Main St\nSpringfield'), none.text);
+  assert.doesNotMatch(none.html, /<p[^>]*>\s*<\/p>/);
+  assert.ok(!none.html.includes('&middot;'));
+  assert.deepEqual(none.warnings, []);
+  // Absent, and holding only a link the shared check refuses, read the same.
+  for (const social of [undefined, { handles: [{ platform: 'Script', url: 'javascript:alert(1)' }] }]) {
+    const out = render({
+      template,
+      tokenValues,
+      config: { ...CONFIG, event: { ...CONFIG.event, social } },
+    });
+    assert.equal(out.html, none.html);
+    assert.equal(out.text, none.text);
+  }
+});
+
 // --- loader caching ---------------------------------------------------------
 
 test('loadTemplate reads once within the TTL and re-reads after', async () => {

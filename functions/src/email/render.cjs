@@ -70,7 +70,7 @@ function stripHtmlToText(html) {
 }
 
 /**
- * The event's social accounts as links, for the mail footer.
+ * The event's social accounts the mail footer lists.
  *
  * The shared schema refuses a malformed account at save, but a document
  * written before that rule is still read here. So an entry with no service
@@ -79,17 +79,42 @@ function stripHtmlToText(html) {
  * site footer lists (apps/web Layout).
  *
  * @param {object|null|undefined} social config/event.social
+ * @returns {Array<{ platform: string, href: string }>}
  */
-function buildSocialLinksHtml(social) {
+function socialAccounts(social) {
   const handles = Array.isArray(social?.handles) ? social.handles : [];
-  const links = [];
+  const accounts = [];
   for (const h of handles) {
     if (!h || typeof h.platform !== 'string' || !h.platform.trim()) continue;
     const href = safeUrlHref(h.url);
     if (!href) continue;
-    links.push(`<a href="${escapeHtml(href)}">${escapeHtml(h.platform.trim())}</a>`);
+    accounts.push({ platform: h.platform.trim(), href });
   }
-  return links.join(' &middot; ');
+  return accounts;
+}
+
+/** The accounts as links, for the html footer. @param {object|null|undefined} social */
+function buildSocialLinksHtml(social) {
+  return socialAccounts(social)
+    .map(({ platform, href }) => `<a href="${escapeHtml(href)}">${escapeHtml(platform)}</a>`)
+    .join(' &middot; ');
+}
+
+/**
+ * The accounts as plain text, one "Service: link" line each, for the text
+ * footer. Stripping the html links would keep the names and lose the
+ * addresses, so the text body gets its own token.
+ *
+ * It is also the guard the layout's footer row tests: `{{#if}}` reads plain
+ * values only, and an empty string here means the event lists no account, so
+ * the row and its blank line are left out.
+ *
+ * @param {object|null|undefined} social
+ */
+function buildSocialLinksText(social) {
+  return socialAccounts(social)
+    .map(({ platform, href }) => `${platform}: ${href}`)
+    .join('\n');
 }
 
 /**
@@ -167,6 +192,7 @@ function buildGlobalTokens(config, { now = () => new Date() } = {}) {
     login_url: site ? `${site}/login` : '',
     schedule_url: site ? `${site}/schedule` : '',
     support_email: event.legal?.supportEmail || '',
+    social_links_text: buildSocialLinksText(event.social),
     sender_name: event.sender?.name || '',
     sender_email: event.sender?.email || '',
     operator_name: event.legal?.operatorName || '',
@@ -378,6 +404,7 @@ module.exports = {
     substitute,
     HTML_TOKEN_RESOLVERS,
     buildSocialLinksHtml,
+    buildSocialLinksText,
     formatEventDates,
     formatVenueAddress,
     CONDITIONAL_RE,

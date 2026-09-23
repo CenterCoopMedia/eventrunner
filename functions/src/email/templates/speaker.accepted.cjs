@@ -32,7 +32,7 @@
  * credential, so the ordinary `sent_emails` audit applies.
  */
 
-const { wrap } = require('./layout.cjs');
+const { wrap, TEXT_FOOTER } = require('./layout.cjs');
 const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
 
 const html = wrap(
@@ -57,8 +57,7 @@ const text = [
   '',
   'Your speaker profile appears publicly once an organizer has reviewed it.',
   '',
-  '--',
-  '{{postal_address_html}}',
+  TEXT_FOOTER,
 ].join('\n');
 
 module.exports = {

@@ -8,7 +8,7 @@
  * render.cjs's HTML_TOKEN_RESOLVERS (config/code, never per-send).
  */
 
-const { wrap } = require('./layout.cjs');
+const { wrap, TEXT_FOOTER } = require('./layout.cjs');
 const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
 
 const html = wrap(
@@ -40,8 +40,7 @@ const text = [
   '',
   'You can update your details any time on your profile: {{profile_url}}',
   '',
-  '--',
-  '{{postal_address_html}}',
+  TEXT_FOOTER,
 ].join('\n');
 
 module.exports = {

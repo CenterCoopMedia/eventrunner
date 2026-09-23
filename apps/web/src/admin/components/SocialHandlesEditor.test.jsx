@@ -13,14 +13,14 @@ describe('social account helpers', () => {
     expect(
       normalizeSocialHandles({
         handles: [
-          { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/@summit' },
+          { platform: 'Mastodon', handle: '@eventname', url: 'https://example.org/@eventname' },
           { platform: 'Video', url: 'https://example.org/v', handle: null },
           'https://example.org/stray',
           null,
         ],
       }),
     ).toEqual([
-      { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/@summit' },
+      { platform: 'Mastodon', handle: '@eventname', url: 'https://example.org/@eventname' },
       { platform: 'Video', handle: '', url: 'https://example.org/v' },
     ]);
     expect(normalizeSocialHandles(undefined)).toEqual([]);
@@ -30,11 +30,11 @@ describe('social account helpers', () => {
   it('sends trimmed values, the canonical link, and no empty handle', () => {
     expect(
       socialHandlesPayload([
-        { platform: ' Mastodon ', handle: ' @summit ', url: ' https://EXAMPLE.org ' },
+        { platform: ' Mastodon ', handle: ' @eventname ', url: ' https://EXAMPLE.org ' },
         { platform: 'Video', handle: '  ', url: 'https://example.org/v' },
       ]),
     ).toEqual([
-      { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/' },
+      { platform: 'Mastodon', handle: '@eventname', url: 'https://example.org/' },
       { platform: 'Video', url: 'https://example.org/v' },
     ]);
   });
@@ -42,7 +42,7 @@ describe('social account helpers', () => {
   it('names each field the shared schema would refuse, by the path the server uses', () => {
     const errors = validateSocialHandles([
       { platform: '', handle: '', url: 'javascript:alert(1)' },
-      { platform: 'Mastodon', handle: 'x'.repeat(41), url: 'https:example.org/@summit' },
+      { platform: 'Mastodon', handle: 'x'.repeat(41), url: 'https:example.org/@eventname' },
       { platform: 'Video', handle: '', url: 'https://example.org/v' },
       { platform: 'Video', handle: '', url: 'https://EXAMPLE.org/v' },
     ]);

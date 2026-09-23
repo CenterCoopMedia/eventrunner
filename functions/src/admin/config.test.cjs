@@ -597,18 +597,18 @@ test('tracks are editable on config/event, and a bad letter is rejected by name'
 test('social accounts are editable on config/event, and a malformed link is refused by name', async () => {
   const deps = makeDeps({ 'config/event': { ...validEvent(), ...STORED_EXTRAS } });
   const handles = [
-    { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/@summit' },
+    { platform: 'Mastodon', handle: '@eventname', url: 'https://example.org/@eventname' },
     { platform: 'Video', url: 'https://example.org/channel' },
   ];
   const ok = makeRes();
   await createUpdateEventConfigHandler(deps)(
-    makeReq({ event: { social: { hashtag: '#Summit', handles } } }),
+    makeReq({ event: { social: { hashtag: '#EventName', handles } } }),
     ok,
   );
   assert.equal(ok.statusCode, 200);
-  assert.deepEqual(deps.db.docs.get('config/event').social, { hashtag: '#Summit', handles });
+  assert.deepEqual(deps.db.docs.get('config/event').social, { hashtag: '#EventName', handles });
 
-  for (const url of ['javascript:alert(1)', 'https:example.org/@summit', '/about']) {
+  for (const url of ['javascript:alert(1)', 'https:example.org/@eventname', '/about']) {
     const bad = makeRes();
     await createUpdateEventConfigHandler(deps)(
       makeReq({ event: { social: { handles: [{ platform: 'Mastodon', url }] } } }),

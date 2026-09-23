@@ -38,6 +38,7 @@ const {
   validateTheme,
   validateBadgesConfig,
   KNOWN_FEATURE_KEYS,
+  MAX_SOCIAL_LABEL_LENGTH,
 } = require('shared/config');
 const { safeUrlHref } = require('shared/urlSafety');
 const { defaultTheme } = require('./theme.cjs');
@@ -75,7 +76,7 @@ const PROMPTS = Object.freeze([
     path: 'event.social.handles',
     question:
       'Social accounts as service=link pairs, comma separated ' +
-      '(e.g. Mastodon=https://example.org/@event)',
+      '(e.g. Mastodon=https://example.org/@eventname)',
     required: false,
     parse: parseSocialHandles,
   },
@@ -113,15 +114,18 @@ function parseDayList(raw) {
 }
 
 /**
- * "Mastodon=https://example.org/@event, Video=https://example.org/channel"
+ * "Mastodon=https://example.org/@eventname, Video=https://example.org/channel"
  * → the `config/event.social.handles[]` array. Each pair is split at its
  * FIRST `=`, so a link that carries a query string keeps it.
  *
  * The link is checked with shared/urlSafety, the same check the schema and
- * the admin form run, and stored in the canonical form it returns. A pair
- * that fails is refused by name so the prompt can ask again; the handle
- * ("@event") is not asked for here, and an admin adds it later from Event
- * settings.
+ * the admin form run, and stored in the canonical form it returns. Every
+ * other rule the schema applies to an account is checked here too, in its
+ * wording: a service name over MAX_SOCIAL_LABEL_LENGTH, and the same
+ * service with the same link twice. A pair that fails is refused by name so
+ * the prompt asks again, rather than init aborting after the last question.
+ * The handle ("@eventname") is not asked for here; an admin adds it later
+ * from Event settings.
  *
  * @param {string} raw
  * @returns {Array<{ platform: string, url: string }>|Error}
@@ -137,6 +141,14 @@ function parseSocialHandles(raw) {
       return new Error(
         `"${part}" is not service=link (the link starts with https:// or http://)`,
       );
+    }
+    if (platform.length > MAX_SOCIAL_LABEL_LENGTH) {
+      return new Error(
+        `"${platform}": the service name must be at most ${MAX_SOCIAL_LABEL_LENGTH} characters`,
+      );
+    }
+    if (handles.some((entry) => entry.platform === platform && entry.url === url)) {
+      return new Error(`"${part}": this ${platform} account is already listed`);
     }
     handles.push({ platform, url });
   }

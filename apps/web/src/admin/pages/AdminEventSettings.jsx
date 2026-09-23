@@ -334,7 +334,11 @@ export default function AdminEventSettings() {
   const verified = eventConfig?.sender?.domainVerified === true;
 
   return (
-    <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit}>
+    // noValidate: the form answers for its own fields (issue #219). Left to
+    // the browser, a url or email field it calls invalid stops the submit
+    // with a bubble, so this form's check never runs and nothing is marked.
+    // The fields keep their types for the keyboard each one brings up.
+    <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit} noValidate>
       <AdminPageHeader
         title="Event"
         description="Name, dates, venue, social accounts, and the addresses the site and its email use."

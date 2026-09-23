@@ -616,9 +616,9 @@ test('validateEventConfig accepts social accounts with and without a handle, and
   const result = validateEventConfig({
     ...VALID_EVENT,
     social: {
-      hashtag: '#DemoSummit',
+      hashtag: '#EventName',
       handles: [
-        { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/@summit' },
+        { platform: 'Mastodon', handle: '@eventname', url: 'https://example.org/@eventname' },
         { platform: 'Video', url: 'http://example.org/channel' },
         { platform: 'Newsletter', handle: null, url: 'https://example.org/news' },
       ],
@@ -635,12 +635,12 @@ test('validateEventConfig refuses a handle whose link is not a safe absolute lin
   for (const url of [
     'javascript:alert(1)',
     'data:text/html,hi',
-    'mailto:summit@example.org',
+    'mailto:events@example.org',
     '/about',
-    '//example.org/@summit',
+    '//example.org/@eventname',
     // A special scheme with no slashes resolves against the event's own page.
-    'https:example.org/@summit',
-    'example.org/@summit',
+    'https:example.org/@eventname',
+    'example.org/@eventname',
     '',
     null,
     42,
@@ -702,7 +702,7 @@ test('an event social label is capped at the length a speaker social label is', 
 test('validateEventConfig refuses a malformed social block and hashtag by name', () => {
   const result = validateEventConfig({
     ...VALID_EVENT,
-    social: { hashtag: 'Demo Summit', handles: { platform: 'Mastodon' }, feed: true },
+    social: { hashtag: 'Event Name', handles: { platform: 'Mastodon' }, feed: true },
   });
   assert.equal(result.ok, false);
   assert.ok(result.errors.some((e) => e.startsWith('social.hashtag: must be null or one word')));

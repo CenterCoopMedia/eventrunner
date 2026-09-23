@@ -3,9 +3,9 @@
 //
 // `handles` is `{ platform, handle?, url }[]` (ADR 0001 §2.2). The site
 // footer (components/Layout.jsx) and the email footer
-// (functions/src/email/render.cjs) both list it, in this order. `hashtag`
-// sits in the same block and is stored only: nothing on the site or in the
-// mail prints it.
+// (functions/src/email/templates/layout.cjs, html and text) both list it,
+// in this order. `hashtag` sits in the same block and is stored only:
+// nothing on the site or in the mail prints it.
 //
 // The rows follow the repeater the venue editor already uses
 // (VenueReferenceEditor.jsx): a labelled field per value, an add control in
@@ -141,7 +141,7 @@ export default function SocialHandlesEditor({ social, onChange, errorFor }) {
   return (
     <Panel
       title="Social accounts"
-      description="The event’s own accounts. The site footer and the email footer list them in this order. Leave the list empty and neither footer shows social links."
+      description="The event’s own accounts. The site footer and the footer of every built-in email list them in this order. Leave the list empty and neither footer shows social links."
       actions={
         <button ref={addRef} type="button" className={secondaryButtonClass} onClick={addHandle}>
           Add account
@@ -155,7 +155,7 @@ export default function SocialHandlesEditor({ social, onChange, errorFor }) {
             value={social.hashtag}
             onChange={(value) => onChange({ hashtag: value })}
             error={errorFor('social.hashtag')}
-            hint="One word, such as #Summit. The site and its email do not show it."
+            hint="One word, such as #EventName. The site and its email do not show it."
           />
         </div>
         {notice ? (
@@ -190,7 +190,7 @@ export default function SocialHandlesEditor({ social, onChange, errorFor }) {
                     onChange={(value) => changeHandle(index, { handle: value })}
                     error={errorFor(`social.handles[${index}].handle`)}
                     maxLength={MAX_SOCIAL_LABEL_LENGTH}
-                    hint="Optional, such as @summit. It tells two accounts on one service apart."
+                    hint="Optional, such as @eventname. It tells two accounts on one service apart."
                   />
                   <TextField
                     label={`Account ${index + 1} link`}

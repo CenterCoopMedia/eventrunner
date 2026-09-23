@@ -73,9 +73,9 @@ test('parseEmailList lowercases and de-duplicates — rules compare against emai
 // form use.
 test('parseSocialHandles builds the handles list and refuses a pair that is not a safe link', () => {
   assert.deepEqual(
-    parseSocialHandles('Mastodon=https://EXAMPLE.org/@event, Video = https://example.org/v?list=a'),
+    parseSocialHandles('Mastodon=https://EXAMPLE.org/@eventname, Video = https://example.org/v?list=a'),
     [
-      { platform: 'Mastodon', url: 'https://example.org/@event' },
+      { platform: 'Mastodon', url: 'https://example.org/@eventname' },
       // Split at the first '=' only, so a query string survives.
       { platform: 'Video', url: 'https://example.org/v?list=a' },
     ],
@@ -92,6 +92,27 @@ test('parseSocialHandles builds the handles list and refuses a pair that is not 
     assert.ok(parsed instanceof Error, raw);
     assert.match(parsed.message, /service=link/);
   }
+});
+
+// The prompt asks again for anything the schema would refuse at the end,
+// rather than letting init walk every question and then abort.
+test('parseSocialHandles refuses a long service name and a repeated account, in the schema wording', () => {
+  const long = parseSocialHandles(`${'x'.repeat(41)}=https://example.org/@eventname`);
+  assert.ok(long instanceof Error);
+  assert.match(long.message, /must be at most 40 characters/);
+  assert.ok(Array.isArray(parseSocialHandles(`${'x'.repeat(40)}=https://example.org/@eventname`)));
+
+  // The same service and the same link once parsed, even written two ways.
+  const twice = parseSocialHandles(
+    'Mastodon=https://example.org/@eventname, Mastodon=https://EXAMPLE.org/@eventname',
+  );
+  assert.ok(twice instanceof Error);
+  assert.match(twice.message, /this Mastodon account is already listed/);
+  // One link under two services is two accounts.
+  assert.equal(
+    parseSocialHandles('Mastodon=https://example.org/a, Video=https://example.org/a').length,
+    2,
+  );
 });
 
 test('init asks for social accounts, optionally', () => {
