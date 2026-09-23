@@ -58,6 +58,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server. The readiness table lists, for pages, content blocks, sessions, organizations, the
   timeline, and updates, the records on the site and the records with unpublished changes. Both
   state zero in words: "No one has signed up yet." and "Nothing is on the site yet."
+- A **Most saved** panel on the admin Sessions page (#182). It ranks sessions by the public
+  bookmark counts, most saved first, in a scrolling ruled table with the session (a link to its
+  editor), its day heading, and the count. It says how many sessions on the site have no saves,
+  says "No session has been saved yet." when none has, says so when saving sessions is switched
+  off, and keeps the last counts under a notice if the listener fails. `useBookmarkCounts` now
+  also answers `ready` and `error`.
 
 - A `fact` block for a fact that is not a number (#234): The term, the fact itself, and one
   optional line under it. It renders through the new definition list device, a real `<dl>` ruled
