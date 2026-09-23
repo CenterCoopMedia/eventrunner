@@ -24,10 +24,10 @@
  * it from both.
  *
  * THE LAST OPERATOR. A write that would leave `adminEmails` empty is
- * refused (409 `last-operator`) whoever asked — the caller demoting or
- * removing themselves, or removing the only other operator. Staff cannot
- * restore anyone's access, so a deployment with no operator is a
- * deployment nobody can administer without a redeploy of config.
+ * refused (409 `last-operator`): demoting or removing the last operator,
+ * the caller's own grant included. Staff cannot restore anyone's access,
+ * so a deployment with no operator is a deployment nobody can administer
+ * without a redeploy of config.
  *
  * Every accepted change writes an admin_logs row through the shared
  * logAdminAction, carrying the address and the tier it moved to and from
