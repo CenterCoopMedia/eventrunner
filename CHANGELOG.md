@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs/adr/0003-optional-google-calendar-sync.md`, the proposed decision record for the optional
+  Google Calendar sync of saved sessions (#177). It supersedes the one row of ADR 0001 §9 that
+  removed the feature, names the client's own Google Cloud project as the owner of the consent
+  screen and the OAuth client, picks the `calendar.app.created` scope, adds no secret, and says
+  how the `calendarSync` flag behaves when a client has not finished the Google setup: the `.ics`
+  download stays and nothing is written. The record is proposed, not accepted, and the flag stays
+  off. The documentation site lists it under Decisions.
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.
   Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,
