@@ -7,8 +7,10 @@ const {
   validateTheme,
   validateBadgesConfig,
   validateFeatures,
+  MAX_SOCIAL_LABEL_LENGTH,
 } = require('./schema.cjs');
 const { MAX_TOTAL_BADGES } = require('../badges.cjs');
+const { internals: speakerInternals } = require('../speaker.cjs');
 
 const VALID_EVENT = {
   name: 'Demo Summit',
@@ -549,6 +551,171 @@ test('validateEventConfig requires a usable sender (the OTP From address)', () =
     sender: { email: 'a@b.org', domainVerified: true, domainVerifiedAt: null },
   });
   assert.deepEqual(minimal, { ok: true, errors: [] });
+});
+
+// THE LEGAL BLOCK (ADR 0001 §2.2). The shapes a deployment arrives in: the
+// block init seeds, the block the admin form sends (nulls for blanks), and
+// no block at all.
+const SEEDED_LEGAL = Object.freeze({
+  operatorName: 'Example Operator',
+  postalAddressHtml: '<p>Example Operator<br>1 Example Street</p>',
+  supportEmail: 'support@example.org',
+  conductEmail: 'conduct@example.org',
+  reviewRequired: true,
+});
+
+test('validateEventConfig accepts the seeded legal block, a cleared one, and none', () => {
+  assert.deepEqual(validateEventConfig({ ...VALID_EVENT, legal: SEEDED_LEGAL }), { ok: true, errors: [] });
+  const cleared = validateEventConfig({
+    ...VALID_EVENT,
+    legal: { operatorName: null, supportEmail: null, conductEmail: null, reviewRequired: false },
+  });
+  assert.deepEqual(cleared, { ok: true, errors: [] });
+  // Init seeds an empty string for an address nobody answered.
+  const unanswered = validateEventConfig({
+    ...VALID_EVENT,
+    legal: { operatorName: '', supportEmail: '', conductEmail: '' },
+  });
+  assert.deepEqual(unanswered, { ok: true, errors: [] });
+  assert.equal(validateEventConfig({ ...VALID_EVENT, legal: null }).ok, true);
+  assert.equal(validateEventConfig({ ...VALID_EVENT, legal: undefined }).ok, true);
+});
+
+test('validateEventConfig names every problem with the legal block', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    legal: {
+      operatorName: 42,
+      postalAddressHtml: ['<p>x</p>'],
+      supportEmail: 'support at example',
+      conductEmail: 7,
+      reviewRequired: 'no',
+      privacyUrl: 'https://example.org/privacy',
+    },
+  });
+  assert.equal(result.ok, false);
+  for (const prefix of [
+    'legal.operatorName: must be null or a string',
+    'legal.postalAddressHtml: must be null or a string',
+    'legal.supportEmail: must be null or an email address',
+    'legal.conductEmail: must be null or an email address',
+    'legal.reviewRequired: must be a boolean',
+    'legal.privacyUrl: unknown legal field',
+  ]) {
+    assert.ok(result.errors.some((e) => e.startsWith(prefix)), prefix);
+  }
+  for (const legal of ['x', ['a'], 3]) {
+    const bad = validateEventConfig({ ...VALID_EVENT, legal });
+    assert.ok(bad.errors.includes('legal: must be an object or null'), JSON.stringify(legal));
+  }
+});
+
+// THE SOCIAL BLOCK (ADR 0001 §2.2): the accounts the site footer and the
+// email footer list, and a hashtag.
+test('validateEventConfig accepts social accounts with and without a handle, and none', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    social: {
+      hashtag: '#DemoSummit',
+      handles: [
+        { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/@summit' },
+        { platform: 'Video', url: 'http://example.org/channel' },
+        { platform: 'Newsletter', handle: null, url: 'https://example.org/news' },
+      ],
+    },
+  });
+  assert.deepEqual(result, { ok: true, errors: [] });
+  // The seeded block, and no block at all.
+  for (const social of [{ hashtag: null, handles: [] }, {}, null, undefined]) {
+    assert.equal(validateEventConfig({ ...VALID_EVENT, social }).ok, true, JSON.stringify(social));
+  }
+});
+
+test('validateEventConfig refuses a handle whose link is not a safe absolute link', () => {
+  for (const url of [
+    'javascript:alert(1)',
+    'data:text/html,hi',
+    'mailto:summit@example.org',
+    '/about',
+    '//example.org/@summit',
+    // A special scheme with no slashes resolves against the event's own page.
+    'https:example.org/@summit',
+    'example.org/@summit',
+    '',
+    null,
+    42,
+  ]) {
+    const result = validateEventConfig({
+      ...VALID_EVENT,
+      social: { handles: [{ platform: 'Mastodon', url }] },
+    });
+    assert.equal(result.ok, false, JSON.stringify(url));
+    assert.ok(
+      result.errors.some((e) =>
+        e.startsWith('social.handles[0].url: must be an absolute http:// or https:// link')),
+      JSON.stringify(url),
+    );
+  }
+});
+
+test('validateEventConfig names every other problem with a social account', () => {
+  const long = 'x'.repeat(41);
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    social: {
+      handles: [
+        { platform: '  ', url: 'https://example.org/a' },
+        { platform: long, handle: long, url: 'https://example.org/b' },
+        { platform: 'Mastodon', handle: '', url: 'https://example.org/c', icon: 'm' },
+        'https://example.org/d',
+        { platform: 'Mastodon', url: 'https://EXAMPLE.org/c' },
+      ],
+    },
+  });
+  assert.equal(result.ok, false);
+  for (const prefix of [
+    'social.handles[0].platform: must be a nonempty string',
+    'social.handles[1].platform: must be at most 40 characters',
+    'social.handles[1].handle: must be at most 40 characters',
+    'social.handles[2].handle: must be null or a nonempty string',
+    'social.handles[2].icon: unknown handle field',
+    'social.handles[3]: must be an object',
+    // The same account twice, compared on the parsed link.
+    'social.handles[4].url: this Mastodon account is already listed',
+  ]) {
+    assert.ok(result.errors.some((e) => e.startsWith(prefix)), prefix);
+  }
+  // Exactly the limit is fine.
+  const edge = validateEventConfig({
+    ...VALID_EVENT,
+    social: {
+      handles: [{ platform: 'x'.repeat(40), handle: 'y'.repeat(40), url: 'https://example.org' }],
+    },
+  });
+  assert.equal(edge.ok, true);
+});
+
+test('an event social label is capped at the length a speaker social label is', () => {
+  assert.equal(MAX_SOCIAL_LABEL_LENGTH, speakerInternals.MAX_SOCIAL_LABEL_LENGTH);
+});
+
+test('validateEventConfig refuses a malformed social block and hashtag by name', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    social: { hashtag: 'Demo Summit', handles: { platform: 'Mastodon' }, feed: true },
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.startsWith('social.hashtag: must be null or one word')));
+  assert.ok(result.errors.includes('social.handles: must be an array'));
+  assert.ok(result.errors.includes('social.feed: unknown social field'));
+  for (const hashtag of ['', 7]) {
+    const bad = validateEventConfig({ ...VALID_EVENT, social: { hashtag } });
+    assert.ok(bad.errors.some((e) => e.startsWith('social.hashtag:')), JSON.stringify(hashtag));
+  }
+  for (const social of ['x', [], 3]) {
+    const bad = validateEventConfig({ ...VALID_EVENT, social });
+    assert.ok(bad.errors.includes('social: must be an object or null'), JSON.stringify(social));
+  }
 });
 
 test('validateEventConfig never throws on garbage', () => {

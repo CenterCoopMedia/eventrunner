@@ -590,6 +590,62 @@ test('tracks are editable on config/event, and a bad letter is rejected by name'
   assert.match(bad.body.error.message, /tracks\[0\]\.letter: must be a single capital letter/);
 });
 
+// THE SOCIAL AND LEGAL BLOCKS (#231). The form checks a handle before it
+// sends one, but the refusal that counts is this one: the shared validator
+// runs on the merged document, so a caller that skips the form is refused
+// the same way.
+test('social accounts are editable on config/event, and a malformed link is refused by name', async () => {
+  const deps = makeDeps({ 'config/event': { ...validEvent(), ...STORED_EXTRAS } });
+  const handles = [
+    { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/@summit' },
+    { platform: 'Video', url: 'https://example.org/channel' },
+  ];
+  const ok = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { social: { hashtag: '#Summit', handles } } }),
+    ok,
+  );
+  assert.equal(ok.statusCode, 200);
+  assert.deepEqual(deps.db.docs.get('config/event').social, { hashtag: '#Summit', handles });
+
+  for (const url of ['javascript:alert(1)', 'https:example.org/@summit', '/about']) {
+    const bad = makeRes();
+    await createUpdateEventConfigHandler(deps)(
+      makeReq({ event: { social: { handles: [{ platform: 'Mastodon', url }] } } }),
+      bad,
+    );
+    assert.equal(bad.statusCode, 400, url);
+    assert.match(
+      bad.body.error.message,
+      /social\.handles\[0\]\.url: must be an absolute http:\/\/ or https:\/\/ link/,
+    );
+  }
+  assert.deepEqual(
+    deps.db.docs.get('config/event').social.handles,
+    handles,
+    'the stored accounts are untouched',
+  );
+});
+
+test('an unknown legal or social field is refused by name, and nothing is written', async () => {
+  const deps = makeDeps({ 'config/event': { ...validEvent(), ...STORED_EXTRAS } });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({
+      event: {
+        legal: { privacyUrl: 'https://example.org/privacy', supportEmail: 'not an address' },
+        social: { handles: [{ platform: 'Mastodon', url: 'https://example.org/@s', icon: 'm' }] },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /legal\.privacyUrl: unknown legal field/);
+  assert.match(res.body.error.message, /legal\.supportEmail: must be null or an email address/);
+  assert.match(res.body.error.message, /social\.handles\[0\]\.icon: unknown handle field/);
+  assert.equal(deps.db.writes.length, 0);
+});
+
 test('a first event write defaults the verification pair, never omits it', async () => {
   const deps = makeDeps();
   const res = makeRes();

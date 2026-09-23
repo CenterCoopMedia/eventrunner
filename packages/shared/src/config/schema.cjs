@@ -61,6 +61,33 @@ const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 // that cannot be a From address at all.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Keys `config/event.legal` may carry (ADR 0001 §2.2). */
+const LEGAL_KEYS = Object.freeze([
+  'operatorName',
+  'postalAddressHtml',
+  'supportEmail',
+  'conductEmail',
+  'reviewRequired',
+]);
+/** Keys `config/event.social` may carry (ADR 0001 §2.2). */
+const SOCIAL_KEYS = Object.freeze(['hashtag', 'handles']);
+/**
+ * Keys one `config/event.social.handles[]` entry may carry. `handle` is the
+ * optional "@name" beside the service, the one thing that tells two accounts
+ * on one service apart in the site footer.
+ */
+const SOCIAL_HANDLE_KEYS = Object.freeze(['platform', 'handle', 'url']);
+/**
+ * The longest service name, and the longest handle, one social account may
+ * carry: the same 40 speaker.cjs caps a speaker's social label at (a test
+ * holds the two together). Declared here rather than required from there
+ * because this module is in the public site's first paint and the speaker
+ * module is not.
+ */
+const MAX_SOCIAL_LABEL_LENGTH = 40;
+// A hashtag is one word. A space would end it wherever it is posted.
+const HASHTAG_RE = /^\S+$/;
+
 /**
  * The canonical href of an https URL a browser may be sent to, or '' when
  * the value is not one.
@@ -551,6 +578,122 @@ function validateEventConfig(event) {
     }
   }
 
+  // THE LEGAL BLOCK (ADR 0001 §2.2). Optional, and so is every field in it:
+  // init seeds the block and an admin edits it. What IS checked is what a
+  // reader meets. The support address becomes the footer's `mailto:` link
+  // and the `support_email` token in every email, and the seeded conduct
+  // page prints the conduct address, so a value that is not an address is
+  // refused here rather than sent. An empty string is accepted beside null
+  // because it is what init seeds for an address nobody answered, and every
+  // reader of these fields already treats it as "not set".
+  //
+  // UNKNOWN FIELDS ARE REFUSED BY NAME. config/event is merge-then-validate
+  // (functions/src/admin/config.cjs), so a field nothing reads, once
+  // written, would be carried forward by every later save.
+  const legal = event.legal;
+  if (legal != null) {
+    if (typeof legal !== 'object' || Array.isArray(legal)) {
+      errors.push('legal: must be an object or null');
+    } else {
+      for (const key of Object.keys(legal)) {
+        if (!LEGAL_KEYS.includes(key)) errors.push(`legal.${key}: unknown legal field`);
+      }
+      for (const key of ['operatorName', 'postalAddressHtml']) {
+        if (legal[key] != null && typeof legal[key] !== 'string') {
+          errors.push(`legal.${key}: must be null or a string`);
+        }
+      }
+      for (const key of ['supportEmail', 'conductEmail']) {
+        const value = legal[key];
+        if (value != null && value !== '' && (typeof value !== 'string' || !EMAIL_RE.test(value))) {
+          errors.push(`legal.${key}: must be null or an email address, got ${JSON.stringify(value)}`);
+        }
+      }
+      // The launch-readiness row reads `=== false`, so anything else is
+      // "not reviewed" there; a stored non-boolean would only hide that.
+      if (legal.reviewRequired != null && typeof legal.reviewRequired !== 'boolean') {
+        errors.push('legal.reviewRequired: must be a boolean');
+      }
+    }
+  }
+
+  // THE SOCIAL BLOCK (ADR 0001 §2.2): the event's own accounts, which the
+  // site footer and the email footer both list, and a hashtag.
+  //
+  // A HANDLE'S LINK IS CHECKED WITH shared/urlSafety, NOT A RULE OF ITS OWN.
+  // It is a link that leaves the site, which is exactly the question
+  // safeUrlHref answers for every other such link: an absolute http(s) URL,
+  // with the scheme's two slashes. `javascript:`, a relative path, and
+  // `https:example.org` (which a browser resolves against the event's own
+  // page) are all refused. Plain http is allowed, as it is for any link an
+  // operator types: this is the operator's own content, not an action the
+  // site draws.
+  //
+  // The service name and the handle are capped at MAX_SOCIAL_LABEL_LENGTH,
+  // the length the footer would otherwise cut them to. Refusing a longer one
+  // here says so while the operator can still fix it.
+  const social = event.social;
+  if (social != null) {
+    if (typeof social !== 'object' || Array.isArray(social)) {
+      errors.push('social: must be an object or null');
+    } else {
+      for (const key of Object.keys(social)) {
+        if (!SOCIAL_KEYS.includes(key)) errors.push(`social.${key}: unknown social field`);
+      }
+      if (social.hashtag != null
+        && (typeof social.hashtag !== 'string' || !HASHTAG_RE.test(social.hashtag))) {
+        errors.push(
+          `social.hashtag: must be null or one word with no spaces, got ${JSON.stringify(social.hashtag)}`,
+        );
+      }
+      if (social.handles != null) {
+        if (!Array.isArray(social.handles)) {
+          errors.push('social.handles: must be an array');
+        } else {
+          const seen = new Set();
+          social.handles.forEach((entry, i) => {
+            const at = `social.handles[${i}]`;
+            if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+              errors.push(`${at}: must be an object`);
+              return;
+            }
+            for (const key of Object.keys(entry)) {
+              if (!SOCIAL_HANDLE_KEYS.includes(key)) errors.push(`${at}.${key}: unknown handle field`);
+            }
+            // A link with no name is a link a reader cannot choose.
+            if (!isNonEmptyString(entry.platform)) {
+              errors.push(`${at}.platform: must be a nonempty string`);
+            } else if (entry.platform.trim().length > MAX_SOCIAL_LABEL_LENGTH) {
+              errors.push(`${at}.platform: must be at most ${MAX_SOCIAL_LABEL_LENGTH} characters`);
+            }
+            if (entry.handle != null) {
+              if (!isNonEmptyString(entry.handle)) {
+                errors.push(`${at}.handle: must be null or a nonempty string`);
+              } else if (entry.handle.trim().length > MAX_SOCIAL_LABEL_LENGTH) {
+                errors.push(`${at}.handle: must be at most ${MAX_SOCIAL_LABEL_LENGTH} characters`);
+              }
+            }
+            const href = safeUrlHref(entry.url);
+            if (!href) {
+              errors.push(
+                `${at}.url: must be an absolute http:// or https:// link, got ${JSON.stringify(entry.url)}`,
+              );
+            } else if (isNonEmptyString(entry.platform)) {
+              // One account listed twice is one link printed twice. The
+              // footer would drop the repeat; the save says so instead.
+              const account = `${entry.platform.trim()}\u0000${href}`;
+              if (seen.has(account)) {
+                errors.push(`${at}.url: this ${entry.platform.trim()} account is already listed`);
+              } else {
+                seen.add(account);
+              }
+            }
+          });
+        }
+      }
+    }
+  }
+
   return { ok: errors.length === 0, errors };
 }
 
@@ -886,6 +1029,10 @@ module.exports = {
   validateFeatures,
   KNOWN_FEATURE_KEYS,
   TRACK_LETTER_RE,
+  LEGAL_KEYS,
+  SOCIAL_KEYS,
+  SOCIAL_HANDLE_KEYS,
+  MAX_SOCIAL_LABEL_LENGTH,
   isHttpsUrl,
   httpsUrlHref,
 };

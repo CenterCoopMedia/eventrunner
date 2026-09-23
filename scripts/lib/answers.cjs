@@ -39,6 +39,7 @@ const {
   validateBadgesConfig,
   KNOWN_FEATURE_KEYS,
 } = require('shared/config');
+const { safeUrlHref } = require('shared/urlSafety');
 const { defaultTheme } = require('./theme.cjs');
 
 /** Feature toggles default false except the first four (spec §2.2). */
@@ -71,6 +72,14 @@ const PROMPTS = Object.freeze([
   { path: 'event.legal.supportEmail', question: 'Support email address', required: true },
   { path: 'event.legal.conductEmail', question: 'Code-of-conduct contact address', required: false },
   {
+    path: 'event.social.handles',
+    question:
+      'Social accounts as service=link pairs, comma separated ' +
+      '(e.g. Mastodon=https://example.org/@event)',
+    required: false,
+    parse: parseSocialHandles,
+  },
+  {
     path: 'adminEmails',
     question: 'First admin email addresses (comma separated)',
     required: true,
@@ -101,6 +110,37 @@ function parseDayList(raw) {
     });
   }
   return days;
+}
+
+/**
+ * "Mastodon=https://example.org/@event, Video=https://example.org/channel"
+ * → the `config/event.social.handles[]` array. Each pair is split at its
+ * FIRST `=`, so a link that carries a query string keeps it.
+ *
+ * The link is checked with shared/urlSafety, the same check the schema and
+ * the admin form run, and stored in the canonical form it returns. A pair
+ * that fails is refused by name so the prompt can ask again; the handle
+ * ("@event") is not asked for here, and an admin adds it later from Event
+ * settings.
+ *
+ * @param {string} raw
+ * @returns {Array<{ platform: string, url: string }>|Error}
+ */
+function parseSocialHandles(raw) {
+  const parts = String(raw).split(',').map((s) => s.trim()).filter(Boolean);
+  const handles = [];
+  for (const part of parts) {
+    const at = part.indexOf('=');
+    const platform = at === -1 ? '' : part.slice(0, at).trim();
+    const url = at === -1 ? '' : safeUrlHref(part.slice(at + 1));
+    if (!platform || !url) {
+      return new Error(
+        `"${part}" is not service=link (the link starts with https:// or http://)`,
+      );
+    }
+    handles.push({ platform, url });
+  }
+  return handles;
 }
 
 /**
@@ -451,6 +491,7 @@ module.exports = {
   parseAnswersFile,
   parseDayList,
   parseEmailList,
+  parseSocialHandles,
   buildConfigDocs,
   buildEvent,
   buildFeatures,

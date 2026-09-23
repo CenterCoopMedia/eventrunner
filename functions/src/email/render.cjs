@@ -1,6 +1,7 @@
 'use strict';
 
 const { configuredThemeColor } = require('shared/theme');
+const { safeUrlHref } = require('shared/urlSafety');
 
 /**
  * Template renderer (spec §6.1–6.2).
@@ -68,12 +69,26 @@ function stripHtmlToText(html) {
     .trim();
 }
 
-/** @param {object|null|undefined} social config/event.social */
+/**
+ * The event's social accounts as links, for the mail footer.
+ *
+ * The shared schema refuses a malformed account at save, but a document
+ * written before that rule is still read here. So an entry with no service
+ * name, or a link that is not an absolute http(s) URL, is dropped, and the
+ * href is the canonical form shared/urlSafety approved: the same set the
+ * site footer lists (apps/web Layout).
+ *
+ * @param {object|null|undefined} social config/event.social
+ */
 function buildSocialLinksHtml(social) {
   const handles = Array.isArray(social?.handles) ? social.handles : [];
-  const links = handles
-    .filter((h) => h && typeof h.url === 'string' && typeof h.platform === 'string')
-    .map((h) => `<a href="${escapeHtml(h.url)}">${escapeHtml(h.platform)}</a>`);
+  const links = [];
+  for (const h of handles) {
+    if (!h || typeof h.platform !== 'string' || !h.platform.trim()) continue;
+    const href = safeUrlHref(h.url);
+    if (!href) continue;
+    links.push(`<a href="${escapeHtml(href)}">${escapeHtml(h.platform.trim())}</a>`);
+  }
   return links.join(' &middot; ');
 }
 

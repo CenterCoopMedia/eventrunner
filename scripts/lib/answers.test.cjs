@@ -7,6 +7,7 @@ const {
   parseAnswersFile,
   parseDayList,
   parseEmailList,
+  parseSocialHandles,
   buildConfigDocs,
   buildProviders,
   PROMPTS,
@@ -65,6 +66,61 @@ test('parseDayList builds stable day ids and rejects bad dates', () => {
 test('parseEmailList lowercases and de-duplicates — rules compare against email.lower()', () => {
   assert.deepEqual(parseEmailList('Ops@Example.org, ops@example.org'), ['ops@example.org']);
   assert.ok(parseEmailList('not-an-email') instanceof Error);
+});
+
+// The event's social accounts (#231): asked for at init as service=link
+// pairs, checked with the same shared URL rule the schema and the admin
+// form use.
+test('parseSocialHandles builds the handles list and refuses a pair that is not a safe link', () => {
+  assert.deepEqual(
+    parseSocialHandles('Mastodon=https://EXAMPLE.org/@event, Video = https://example.org/v?list=a'),
+    [
+      { platform: 'Mastodon', url: 'https://example.org/@event' },
+      // Split at the first '=' only, so a query string survives.
+      { platform: 'Video', url: 'https://example.org/v?list=a' },
+    ],
+  );
+  for (const raw of [
+    'Mastodon',
+    'https://example.org/@event',
+    '=https://example.org/@event',
+    'Mastodon=javascript:alert(1)',
+    'Mastodon=example.org/@event',
+    'Mastodon=https:example.org/@event',
+  ]) {
+    const parsed = parseSocialHandles(raw);
+    assert.ok(parsed instanceof Error, raw);
+    assert.match(parsed.message, /service=link/);
+  }
+});
+
+test('init asks for social accounts, optionally', () => {
+  const prompt = PROMPTS.find((p) => p.path === 'event.social.handles');
+  assert.ok(prompt, 'a prompt writes event.social.handles');
+  assert.equal(prompt.required, false);
+  assert.equal(prompt.parse, parseSocialHandles);
+});
+
+test('social accounts from an answers file land on config/event, and a bad link is refused', () => {
+  const handles = [{ platform: 'Mastodon', handle: '@event', url: 'https://example.org/@event' }];
+  const built = buildConfigDocs({
+    answers: { ...MINIMAL, event: { ...MINIMAL.event, social: { hashtag: '#Event', handles } } },
+    tierA: TIER_A,
+    now: () => 0,
+  });
+  assert.equal(built.ok, true, built.errors.join('; '));
+  assert.deepEqual(built.docs.event.social, { hashtag: '#Event', handles });
+
+  const bad = buildConfigDocs({
+    answers: {
+      ...MINIMAL,
+      event: { ...MINIMAL.event, social: { handles: [{ platform: 'Mastodon', url: '/about' }] } },
+    },
+    tierA: TIER_A,
+    now: () => 0,
+  });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.startsWith('config/event: social.handles[0].url:')));
 });
 
 test('buildConfigDocs produces documents that pass the real shared validators', () => {

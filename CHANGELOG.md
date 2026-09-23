@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interaction states — it draws the states it has and says which ones it does not have, and why.
   A state that is missing looks the same as a state somebody decided against, and only one of
   those is a defect.
+- Event settings has a Social accounts panel. An operator adds, edits, and removes the event's own
+  accounts there: A service name, an optional handle, and a link. The site footer and the email
+  footer list them. The form and the server both refuse a link that is not an absolute `http://`
+  or `https://` address, and each names the field. `init-event` asks for the accounts as
+  `service=link` pairs. The shared event schema now validates the `legal` and `social` blocks and
+  refuses an unknown field in either by name. The email footer drops a stored link that fails the
+  same check, as the site footer already did (#231).
 
 ### Changed
 

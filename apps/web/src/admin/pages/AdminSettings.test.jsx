@@ -593,6 +593,114 @@ describe('event settings', () => {
     await screen.findByRole('alert');
     expect(screen.getByLabelText('Event name')).toHaveValue('   ');
   });
+
+  // THE SOCIAL ACCOUNTS (#231). The site footer and the email footer both
+  // list config/event.social.handles, and this panel is the one place an
+  // operator edits it.
+  it('adds, edits, and removes social accounts, and sends them with the event', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      social: {
+        hashtag: '#Summit',
+        handles: [{ platform: 'Mastodon', url: 'https://example.org/@summit' }],
+      },
+    });
+    expect(screen.getByLabelText('Social hashtag')).toHaveValue('#Summit');
+    expect(screen.getByLabelText('Account 1 service')).toHaveValue('Mastodon');
+    expect(screen.getByLabelText('Account 1 link')).toHaveValue('https://example.org/@summit');
+
+    fireEvent.change(screen.getByLabelText('Account 1 handle'), { target: { value: '@summit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
+    fireEvent.change(screen.getByLabelText('Account 2 service'), { target: { value: 'Video' } });
+    fireEvent.change(screen.getByLabelText('Account 2 link'), {
+      target: { value: 'https://example.org/channel' },
+    });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.social).toEqual({
+      hashtag: '#Summit',
+      handles: [
+        { platform: 'Mastodon', handle: '@summit', url: 'https://example.org/@summit' },
+        { platform: 'Video', url: 'https://example.org/channel' },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove account 1' }));
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).event.social.handles).toEqual([
+      { platform: 'Video', url: 'https://example.org/channel' },
+    ]);
+  }, 20000);
+
+  it('refuses a malformed social account at submit and puts the keyboard on it', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
+    // A just-added row says nothing until a save is attempted.
+    expect(screen.getByLabelText('Account 1 service')).not.toHaveAttribute('aria-invalid');
+    fireEvent.change(screen.getByLabelText('Account 1 link'), {
+      target: { value: 'javascript:alert(1)' },
+    });
+    const save = screen.getByRole('button', { name: 'Save event settings' });
+    expect(save).toBeEnabled();
+    save.focus();
+    fireEvent.click(save);
+
+    // Document order: the service field comes first, so it takes the focus.
+    const service = screen.getByLabelText('Account 1 service');
+    await waitFor(() => expect(document.activeElement).toBe(service));
+    expect(service).toHaveAttribute('aria-invalid', 'true');
+    const link = screen.getByLabelText('Account 1 link');
+    expect(link).toHaveAttribute('aria-invalid', 'true');
+    expect(link).toHaveAccessibleDescription(/Enter the full link, starting with https:\/\//);
+    expect(fetch).not.toHaveBeenCalled();
+
+    // The service is fixed; the link still refuses, and now takes the focus.
+    fireEvent.change(service, { target: { value: 'Mastodon' } });
+    expect(service).not.toHaveAttribute('aria-invalid');
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(document.activeElement).toBe(link));
+    expect(fetch).not.toHaveBeenCalled();
+
+    // Fixed, and the same control saves.
+    fireEvent.change(link, { target: { value: 'https://example.org/@summit' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.social.handles).toEqual([
+      { platform: 'Mastodon', url: 'https://example.org/@summit' },
+    ]);
+  }, 20000);
+
+  it('marks the social and legal fields the server refused, each against its own control', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      legal: { operatorName: 'Example Trust', supportEmail: 'help@example.org' },
+      social: { handles: [{ platform: 'Mastodon', url: 'https://example.org/@summit' }] },
+    });
+    fetch.mockResolvedValueOnce(
+      errorResponse(
+        400,
+        'bad-request',
+        'social.handles[0].url: this Mastodon account is already listed; '
+          + 'social.hashtag: must be null or one word with no spaces, got "a b"; '
+          + 'legal.supportEmail: must be null or an email address, got "x"',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Account 1 link')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Social hashtag')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Support email')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Account 1 service')).not.toHaveAttribute('aria-invalid');
+  });
 });
 
 // Every one of these forms seeds itself once and then saves its document

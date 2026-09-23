@@ -95,7 +95,9 @@ The answers file is JSON:
              "days": [{ "id": "day-1", "label": "Day one", "date": "2027-05-13",
                         "startTime": "09:00", "endTime": "17:00" }],
              "venue": { "…": "…" }, "sender": { "email": "hello@example.org" },
-             "legal": { "operatorName": "…", "supportEmail": "…" } },
+             "legal": { "operatorName": "…", "supportEmail": "…" },
+             "social": { "handles": [{ "platform": "Mastodon",
+                                       "url": "https://example.org/@event" }] } },
   "features": { "badges": true }
 }
 ```
