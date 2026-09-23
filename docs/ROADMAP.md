@@ -128,25 +128,25 @@ pull request stacked on the wave below.
 - [ ] Wave 5: three site styles: Gallery, Playbill, Listings
 - [ ] Wave 6: admin devices on the M9 to M11 pages
 
-### M8: Attendee and schedule experience
+### M8: Attendee and schedule experience — complete except #177
 
 An attendee can find a session, build a personal schedule, and take it with them.
 
-- [ ] Add schedule search (#162)
-- [ ] Add format and track filters (#163)
-- [ ] Add a sort control and put filter state in the URL (#164)
-- [ ] Show bookmark counts on session rows (#165)
-- [ ] Add the print control, the PDF control, and a plain text view (#166)
-- [ ] Mark running and finished sessions during the event (#167)
-- [ ] Build the attendee dashboard shell (#168)
-- [ ] Add the personal schedule and resource cards to the dashboard (#169)
-- [ ] Add per session private notes (#170)
-- [ ] Generate a personal schedule PDF (#171)
-- [ ] Share a personal schedule from its own projection (#172)
-- [ ] Add the public shared schedule page (#173)
-- [ ] Add search and an organization filter to the attendee directory (#174)
-- [ ] Add photo cropping and default avatars to the photo fields (#175)
-- [ ] Add free text custom badges behind a flag (#176)
+- [x] Add schedule search (#162)
+- [x] Add format and track filters (#163)
+- [x] Add a sort control and put filter state in the URL (#164)
+- [x] Show bookmark counts on session rows (#165)
+- [x] Add the print control, the PDF control, and a plain text view (#166)
+- [x] Mark running and finished sessions during the event (#167)
+- [x] Build the attendee dashboard shell (#168)
+- [x] Add the personal schedule and resource cards to the dashboard (#169)
+- [x] Add per session private notes (#170)
+- [x] Generate a personal schedule PDF (#171)
+- [x] Share a personal schedule from its own projection (#172)
+- [x] Add the public shared schedule page (#173)
+- [x] Add search and an organization filter to the attendee directory (#174)
+- [x] Add photo cropping and default avatars to the photo fields (#175)
+- [x] Add free text custom badges behind a flag (#176)
 - [ ] Add optional calendar sync of saved sessions (#177)
 
 ### M9: Admin overview and operations
