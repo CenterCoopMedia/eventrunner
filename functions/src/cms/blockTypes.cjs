@@ -110,8 +110,8 @@ const BLOCK_TYPES = Object.freeze({
     id: 'quote',
     label: 'Quote',
     description:
-      'A quoted sentence from a speaker or a session, with who said it. One per page ' +
-      'at most.',
+      'A quoted sentence from a speaker or a session, with who said it. The first on a page ' +
+      'is set as the pull quote; any other is set as a plain quotation.',
     fields: [
       field('text', 'string', true),
       field('attribution', 'string', false),

@@ -5,7 +5,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { defaultPages, buildSeedContent, placeholderBlock, LEGAL_PAGE_IDS } = require('./seed.cjs');
+const {
+  defaultPages, buildSeedContent, placeholderBlock, LEGAL_PAGE_IDS, OBSOLETE_CONTENT_IDS, REPLACED_CONTENT_IDS,
+} = require('./seed.cjs');
 const { pageHeading } = require('shared/page');
 const { buildConfigDocs } = require('./answers.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
@@ -518,18 +520,20 @@ test('the home page seeds a key facts section built from fact blocks', () => {
 test('the seeded date range reads as one range in the event’s own dates', () => {
   const { eventDateRange } = require('./seed.cjs').internals;
   assert.equal(eventDateRange({ days: [] }), null);
-  assert.equal(eventDateRange({ days: [{ date: '2026-10-14' }] }), '14 October 2026');
+  // The same shapes the home page writes live (apps/web/src/lib/eventTime.js
+  // eventDateRangeLabel), so the stored fact and the shown one agree.
+  assert.equal(eventDateRange({ days: [{ date: '2026-10-14' }] }), 'October 14, 2026');
   assert.equal(
     eventDateRange({ days: [{ date: '2026-10-16' }, { date: '2026-10-14' }, { date: '2026-10-15' }] }),
-    '14–16 October 2026',
+    'October 14–16, 2026',
   );
   assert.equal(
     eventDateRange({ days: [{ date: '2026-09-30' }, { date: '2026-10-02' }] }),
-    '30 September – 2 October 2026',
+    'September 30 – October 2, 2026',
   );
   assert.equal(
     eventDateRange({ days: [{ date: '2026-12-31' }, { date: '2027-01-02' }] }),
-    '31 December 2026 – 2 January 2027',
+    'December 31, 2026 – January 2, 2027',
   );
 });
 
@@ -576,6 +580,25 @@ test('placeholderBlock covers every block type in the registry', () => {
     for (const field of def.fields) {
       if (!field.required) continue;
       assert.ok(field.id in fields, `${id} placeholder is missing required field ${field.id}`);
+    }
+  }
+});
+
+test('every replacement is a block this release seeds, and every predecessor is obsolete', () => {
+  // The upgrade rule (scripts/lib/write.cjs withholdUpgradeSeeds) only means
+  // something when the replacement is really seeded and the predecessor is
+  // really on the removal list; a map entry that names neither would
+  // silently protect nothing.
+  const seededIds = new Set(
+    buildSeedContent({ pages: defaultPages(), docs: configDocs(), tierA: TIER_A }).map((doc) => doc.id),
+  );
+  assert.ok(Object.keys(REPLACED_CONTENT_IDS).length > 0);
+  for (const [replacement, predecessors] of Object.entries(REPLACED_CONTENT_IDS)) {
+    assert.ok(seededIds.has(replacement), `${replacement} is seeded by this release`);
+    assert.ok(predecessors.length > 0, `${replacement} names what it replaces`);
+    for (const predecessor of predecessors) {
+      assert.ok(OBSOLETE_CONTENT_IDS.includes(predecessor), `${predecessor} is on the obsolete list`);
+      assert.equal(seededIds.has(predecessor), false, `${predecessor} is no longer seeded`);
     }
   }
 });

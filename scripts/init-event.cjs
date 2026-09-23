@@ -62,6 +62,7 @@ const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { PROMPTS, parseAnswersFile, buildConfigDocs } = require('./lib/answers.cjs');
 const {
   defaultPages, buildSeedContent, buildLegalContentDocs, buildEmailTemplateSeeds, OBSOLETE_CONTENT_IDS,
+  REPLACED_CONTENT_IDS,
 } = require('./lib/seed.cjs');
 const { validatePageDoc } = require('../functions/src/cms/pages.cjs');
 const { getTierA } = require('../functions/src/core/config.cjs');
@@ -71,7 +72,8 @@ const { manualChecklist, formatChecklist } = require('./lib/checklist.cjs');
 const { validateDeployEnv } = require('shared/config');
 const { uploadPlaceholderBranding } = require('./lib/branding.cjs');
 const {
-  writeConfigDocs, seedCollection, removeObsoleteSeeds, findPagePathCollisions, findPageSectionCollisions,
+  writeConfigDocs, seedCollection, removeObsoleteSeeds, withholdUpgradeSeeds, findPagePathCollisions,
+  findPageSectionCollisions,
   seedEmailTemplateOverrides, countSeeded, readConfig,
 } = require('./lib/write.cjs');
 
@@ -410,11 +412,23 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   );
   for (const s of pageResult.skipped) console.log(`    - ${s.id}: ${s.reason}`);
 
-  const contentResult = await seedCollection({ db, store, collection: 'cmsContent', docs: content, dryRun, now, force });
+  // THE UPGRADE RULE FOR NEW CONTENT (adversarial review of the 2026-09-10
+  // wave). A block this release seeds and the site does not have is not
+  // simply created: a replacement for blocks the client has edited would
+  // state the same thing twice, and a placeholder published into a section
+  // the client has written is a "[Replace]" line on a live page. Both are
+  // withheld and reported, the way an obsolete seed the client owns is.
+  const upgrade = await withholdUpgradeSeeds({
+    db, collection: 'cmsContent', docs: content, replacedBy: REPLACED_CONTENT_IDS,
+  });
+  const contentResult = await seedCollection({
+    db, store, collection: 'cmsContent', docs: upgrade.docs, dryRun, now, force,
+  });
   console.log(
     `  cmsContent        ${contentResult.created.length} created, ${contentResult.refreshed.length} refreshed, ` +
-    `${contentResult.skipped.length} left alone`,
+    `${contentResult.skipped.length + upgrade.withheld.length} left alone`,
   );
+  for (const w of upgrade.withheld) console.log(`    - ${w.id}: not created (${w.reason})`);
 
   // (e, continued) UPGRADE CLEANUP. A block this release no longer seeds is
   // still sitting on every site an earlier release initialized: seeding
@@ -425,14 +439,22 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   // the same question every seed write asks — and what went is printed,
   // because a delete an operator cannot see in the output is a delete they
   // cannot undo.
+  // A predecessor whose replacement was withheld stays whole, edited or
+  // not: removing the still-seeded address line beside the client's venue
+  // line would lose the address the withheld fact was to carry.
+  const protectedIds = new Set(upgrade.protected);
   const obsolete = await removeObsoleteSeeds({
-    db, store, collection: 'cmsContent', docIds: OBSOLETE_CONTENT_IDS, dryRun,
+    db, store, collection: 'cmsContent', dryRun,
+    docIds: OBSOLETE_CONTENT_IDS.filter((id) => !protectedIds.has(id)),
   });
   for (const id of obsolete.removed) {
     console.log(`    - ${id}: removed (this release no longer seeds it)`);
   }
   for (const k of obsolete.kept) {
     console.log(`    - ${k.id}: no longer seeded, kept (${k.reason})`);
+  }
+  for (const id of upgrade.protected) {
+    console.log(`    - ${id}: no longer seeded, kept (its replacement was withheld)`);
   }
 
   // (f) email_templates overrides for the two client-visible templates

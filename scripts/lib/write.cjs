@@ -201,6 +201,115 @@ async function removeObsoleteSeeds({ db, store, collection, docIds, dryRun = fal
   return { removed, kept };
 }
 
+/** Whether a seeded document is placeholder copy an operator has to replace. */
+function isPlaceholder(fields) {
+  return Object.values(fields).some((value) => typeof value === 'string' && value.includes('[Replace]'));
+}
+
+/**
+ * The upgrade rule for content this release seeds and the site does not yet
+ * have (adversarial review of the 2026-09-10 wave).
+ *
+ * `seedCollection` decides document by document, by the id it was handed,
+ * and it has no idea that `info__where` says the same thing two older
+ * documents say. On a launched site those two are the client's (they were
+ * placeholders the client filled), so `removeObsoleteSeeds` rightly keeps
+ * them — and the seed would then CREATE the replacement beside them: the
+ * venue stated twice on the home page. And a brand-new placeholder, created
+ * and published into a section a client has already written, is a
+ * "[Replace]" line on a live home page that nobody asked for.
+ *
+ * So, for a document NEITHER revision holds yet:
+ *
+ *   - a replacement (`replacedBy[id]` names its predecessors) is withheld
+ *     while any predecessor survives as client-edited, and those predecessors
+ *     are reported as protected so the caller keeps them out of the obsolete
+ *     removal — deleting the still-seeded address line while keeping the
+ *     client's venue line would lose the address;
+ *   - a placeholder is withheld when its section already holds a document
+ *     the seed may not touch, in either revision. A section the client has
+ *     written is theirs to add to from the palette. An unpublished draft
+ *     would be a block the operator never wrote, waiting to ride the next
+ *     publish, so the placeholder is not created at all.
+ *
+ * A document the site already has is passed through untouched:
+ * `seedCollection` refreshes or skips it under the ownership rule it has
+ * always applied. Nothing here writes.
+ *
+ * @param {{ db: object, collection: string, docs: object[],
+ *           replacedBy?: Record<string, readonly string[]> }} args
+ * @returns {Promise<{ docs: object[], withheld: Array<{ id: string, reason: string }>,
+ *                     protected: string[] }>}
+ */
+async function withholdUpgradeSeeds({ db, collection, docs, replacedBy = {} }) {
+  const draftCollection = draftCollectionFor(collection);
+  const readBoth = async (id) => {
+    const [snap, draftSnap] = await Promise.all([
+      db.collection(collection).doc(id).get(),
+      db.collection(draftCollection).doc(id).get(),
+    ]);
+    return {
+      existing: snap.exists ? snap.data() : null,
+      draft: draftSnap.exists ? draftSnap.data() : null,
+    };
+  };
+  const present = ({ existing, draft }) => existing != null || draft != null;
+  const clientOwned = (both) => present(both) && decideSeedWrite(both.existing, { draft: both.draft }).action === 'skip';
+
+  // Whether a section holds anything the seed may not touch, asked once per
+  // section: every document of the section in both revisions, paired by id.
+  const editedSections = new Map();
+  async function sectionEdited(sectionId) {
+    if (editedSections.has(sectionId)) return editedSections.get(sectionId);
+    const [live, drafts] = await Promise.all([
+      db.collection(collection).where('section', '==', sectionId).get(),
+      db.collection(draftCollection).where('section', '==', sectionId).get(),
+    ]);
+    const byId = new Map();
+    for (const doc of live.docs) byId.set(doc.id, { existing: doc.data(), draft: null });
+    for (const doc of drafts.docs) {
+      const entry = byId.get(doc.id) ?? { existing: null, draft: null };
+      entry.draft = doc.data();
+      byId.set(doc.id, entry);
+    }
+    const edited = [...byId.values()].some(clientOwned);
+    editedSections.set(sectionId, edited);
+    return edited;
+  }
+
+  const out = [];
+  const withheld = [];
+  const protectedIds = new Set();
+  for (const doc of docs) {
+    const { id, ...fields } = doc;
+    if (present(await readBoth(id))) {
+      out.push(doc);
+      continue;
+    }
+    const survivors = [];
+    for (const predecessor of replacedBy[id] ?? []) {
+      if (clientOwned(await readBoth(predecessor))) survivors.push(predecessor);
+    }
+    if (survivors.length > 0) {
+      for (const predecessor of replacedBy[id]) protectedIds.add(predecessor);
+      withheld.push({
+        id,
+        reason: `replaces ${survivors.join(' and ')}, which the client has edited`,
+      });
+      continue;
+    }
+    if (isPlaceholder(fields) && typeof fields.section === 'string' && (await sectionEdited(fields.section))) {
+      withheld.push({
+        id,
+        reason: `a placeholder, and the ${fields.section} section already holds client-edited blocks`,
+      });
+      continue;
+    }
+    out.push(doc);
+  }
+  return { docs: out, withheld, protected: [...protectedIds] };
+}
+
 /**
  * Path-collision preflight for the page seed (Codex review, seed a recap
  * page and a guidelines page: P1).
@@ -421,6 +530,7 @@ module.exports = {
   writeConfigDocs,
   seedCollection,
   removeObsoleteSeeds,
+  withholdUpgradeSeeds,
   findPagePathCollisions,
   findPageSectionCollisions,
   seedEmailTemplateOverrides,

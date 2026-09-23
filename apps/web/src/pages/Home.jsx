@@ -16,7 +16,7 @@ import RegistrationAction, {
 } from '../components/RegistrationAction.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { SponsorStrip } from '../components/SponsorWall.jsx';
-import { formatDayDate } from '../lib/eventTime.js';
+import { eventDateRangeLabel, formatDayDate } from '../lib/eventTime.js';
 
 /**
  * The one composed moment on the first screen: three equal cells across the
@@ -84,6 +84,28 @@ export function SummaryRow({ days, timezone, eventConfig, facts, className = '' 
   );
 }
 
+/**
+ * The seeded When fact reads the dates live.
+ *
+ * The seed writes the event's date range into `info__when` so the card is
+ * right the moment init runs (scripts/lib/seed.cjs), and the Dates list
+ * beside it reads config/event live — so the moment an operator moved a day,
+ * the two disagreed (adversarial review of the 2026-09-10 wave). While the
+ * fact is still the SEED'S (`seeded: true`, the flag the CMS clears on the
+ * first edit, §5.4), its value is the live range; once an operator has
+ * edited it, it reads as they wrote it. Keyed on the seed's own field id,
+ * which is the seed's contract with this page and nothing an operator types.
+ *
+ * @param {object} block
+ * @param {object} eventConfig
+ * @returns {object}
+ */
+export function withLiveDates(block, eventConfig) {
+  if (block?.blockType !== 'fact' || block.seeded !== true || block.field !== 'when') return block;
+  const live = eventDateRangeLabel(eventConfig);
+  return live ? { ...block, value: live } : block;
+}
+
 export default function Home() {
   const { eventConfig, features, theme } = useEventConfig();
   const { getPage, getSectionBlocks, getBlock, source } = useContent();
@@ -147,7 +169,7 @@ export default function Home() {
       // Grouped before the section is opened, because a section whose
       // blocks are all of some type this arrangement does not draw would
       // otherwise print its heading over nothing.
-      const cards = groupIntoCards(blocks);
+      const cards = groupIntoCards(blocks.map((block) => withLiveDates(block, eventConfig)));
       // THE KEY FACTS ARE ONE CELL OF THE SUMMARY ROW, and the row is drawn
       // HERE, in this section's own place in the operator's order. Moving
       // the section in the admin moves the whole row, which is the control

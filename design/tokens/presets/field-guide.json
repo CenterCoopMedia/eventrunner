@@ -259,6 +259,7 @@
             "--pull-quote-rule-inline-width": "0",
             "--pull-quote-pad-inline": "0",
             "--pull-quote-mark-display": "block",
+            "--pull-quote-quotes-display": "none",
             "--pull-quote-align": "center"
           }
         }

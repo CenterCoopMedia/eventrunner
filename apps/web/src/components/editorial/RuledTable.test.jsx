@@ -1,8 +1,13 @@
 // RuledTable: a real table with a sortable head that states its order.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import RuledTable from './RuledTable.jsx';
 import { renderInEveryStyle } from '../../test/everyStyle.jsx';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const COLUMNS = [
   { id: 'session', label: 'Session', sortable: true },
@@ -69,6 +74,25 @@ describe('RuledTable', () => {
     const region = container.querySelector('.horizontal-scroll-region');
     expect(region).not.toBeNull();
     expect(region).toHaveAttribute('data-scroll-label', 'Sessions');
+  });
+
+  it('gives the region its own overflow, so a wide table scrolls inside it and not the page', () => {
+    // jsdom measures no layout, so the class is the proof: the region is
+    // the scroll container whether or not the caller passes one, and the
+    // caller's own classes join it rather than replacing it.
+    const { container, rerender } = render(<RuledTable caption="Sessions" columns={COLUMNS} rows={ROWS} />);
+    expect(container.querySelector('.horizontal-scroll-region')).toHaveClass('overflow-x-auto');
+    rerender(<RuledTable caption="Sessions" columns={COLUMNS} rows={ROWS} className="mt-sm" />);
+    const region = container.querySelector('.horizontal-scroll-region');
+    expect(region).toHaveClass('overflow-x-auto');
+    expect(region).toHaveClass('mt-sm');
+  });
+
+  it('claims no sticky head: the stylesheet pins nothing inside the scroll region', () => {
+    const css = fs.readFileSync(path.resolve(here, '..', '..', 'index.css'), 'utf8');
+    const rule = css.match(/\.ruled-table thead th \{[^}]*\}/u)?.[0] ?? '';
+    expect(rule).not.toBe('');
+    expect(rule).not.toContain('position: sticky');
   });
 
   it('renders in every style and both modes', () => {

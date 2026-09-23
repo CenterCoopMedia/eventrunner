@@ -60,6 +60,7 @@
     "--section-rule-width": "var(--rule-strong-width)",
     "--definition-list-term-width": "10rem",
     "--pull-quote-mark-display": "block",
+    "--pull-quote-quotes-display": "none",
     "--pull-quote-pad-block": "var(--space-lg)",
     "--notice-bar-urgent-rule-width": "var(--rule-nameplate-width)",
     "--table-head-transform": "uppercase",
@@ -217,7 +218,8 @@
             "--pull-quote-rule-block-width": "0",
             "--pull-quote-rule-inline-width": "var(--rule-strong-width)",
             "--pull-quote-pad-inline": "var(--space-md)",
-            "--pull-quote-mark-display": "none"
+            "--pull-quote-mark-display": "none",
+            "--pull-quote-quotes-display": "inline"
           }
         },
         {

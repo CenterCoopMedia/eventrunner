@@ -345,13 +345,18 @@ export default function Layout() {
   // timetable, and behind an about page or a speaker bio it is texture for
   // its own sake. Schedule.jsx and MySchedule.jsx carry the `map-grid` class
   // on the surface that holds the programme.
+  // tabindex -1 makes the landmark a programmatic focus target: the skip
+  // link lands here, and so does focus after a notice bar is dismissed
+  // (components/NoticeBar.jsx), rather than dropping to the body. It is not
+  // in the tab order and it is not a control, so it draws no ring.
   const main = (
     <main
       id="main-content"
+      tabIndex={-1}
       className={
         navPlacement === 'side'
-          ? 'min-w-0 flex-1 pb-2xl pt-xl'
-          : 'stage flex-1 pb-2xl pt-md'
+          ? 'min-w-0 flex-1 pb-2xl pt-xl outline-none'
+          : 'stage flex-1 pb-2xl pt-md outline-none'
       }
     >
       <Outlet />

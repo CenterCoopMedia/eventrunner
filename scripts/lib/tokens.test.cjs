@@ -26,6 +26,8 @@ const {
   THEME_MOTIF_SET_IDS,
   THEME_PRESET_IDS,
   getPreset,
+  recommendedConfiguration,
+  resolvePresetTokens,
 } = require('shared/theme');
 
 const THEME = defaultTheme();
@@ -725,5 +727,65 @@ test('every component token has a rule that draws it', () => {
     // A rule reads a token with var(), and a style query reads one by name.
     const read = stylesheet.includes(`var(${name}`) || stylesheet.includes(`style(${name}`);
     assert.ok(read, `${name} is declared in components.json but no rule draws it`);
+  }
+});
+
+test('every style shows an urgent notice and a held-over dropzone by more than colour', () => {
+  // Adversarial review of the 2026-09-10 wave: Zine set the notice bar's
+  // rest rule to the strong width, which is the urgent width, and Zine and
+  // Atlas drew the dropzone solid at rest, which is the drag-over style. A
+  // level or a state shown by colour alone is what brief §2.4 forbids, so
+  // the resolved tokens of every style, in its recommended configuration,
+  // must differ between the two states on a width or a style.
+  const contracts = JSON.parse(fs.readFileSync(path.join(TOKENS_DIR, 'components.json'), 'utf8'));
+  const defaults = {};
+  for (const [name, contract] of Object.entries(contracts)) {
+    if (name.startsWith('$')) continue;
+    for (const [token, value] of Object.entries(contract)) {
+      if (!token.startsWith('$')) defaults[token] = value;
+    }
+  }
+  for (const id of THEME_PRESET_IDS) {
+    const resolved = {
+      ...defaults,
+      ...resolvePresetTokens(recommendedConfiguration(id), { resetComponents: true }),
+    };
+    assert.notEqual(
+      resolved['--notice-bar-rule-width'],
+      resolved['--notice-bar-urgent-rule-width'],
+      `${id}: an urgent notice takes a different rule weight from a plain one`,
+    );
+    const rest = `${resolved['--dropzone-rule-style']} ${resolved['--dropzone-rule-width']}`;
+    const held = `solid ${resolved['--dropzone-drag-rule-width']}`;
+    assert.notEqual(rest, held, `${id}: a held-over dropzone changes its rule, not only its colour`);
+  }
+});
+
+test('every style and every quote choice draws quotation marks, and never two sets', () => {
+  // The editor tells operators not to type quotation marks because the page
+  // draws them (adversarial review of the 2026-09-10 wave: four of six
+  // styles drew none). Two devices: the large opening mark above the
+  // sentence and the inline pair around it. Every configuration turns on
+  // exactly one.
+  const contracts = JSON.parse(fs.readFileSync(path.join(TOKENS_DIR, 'components.json'), 'utf8'));
+  const quote = Object.fromEntries(
+    Object.entries(contracts['pull-quote']).filter(([token]) => !token.startsWith('$')),
+  );
+  for (const id of THEME_PRESET_IDS) {
+    const preset = getPreset(id);
+    const choices = (preset.options.quote?.choices ?? []).map((choice) => choice.id);
+    for (const choice of [undefined, ...choices]) {
+      const theme = { ...recommendedConfiguration(id) };
+      if (choice) theme.optionPicks = { ...theme.optionPicks, quote: choice };
+      const resolved = { ...quote, ...resolvePresetTokens(theme, { resetComponents: true }) };
+      const large = resolved['--pull-quote-mark-display'] !== 'none';
+      const inline = resolved['--pull-quote-quotes-display'] !== 'none';
+      assert.equal(
+        large || inline,
+        true,
+        `${id} ${choice ?? '(recommended)'}: the quote draws its marks`,
+      );
+      assert.equal(large && inline, false, `${id} ${choice ?? '(recommended)'}: not both sets of marks`);
+    }
   }
 });

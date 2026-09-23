@@ -27,6 +27,7 @@
 import { Fragment } from 'react';
 import { useContent } from '../contexts/ContentContext.jsx';
 import SectionBlocks from './blocks/SectionBlocks.jsx';
+import { PullQuoteBudget } from './blocks/pullQuoteBudget.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
 import { resolvePageLayout, sectionsBySlot, statedPageLayout } from '../lib/pageLayout.js';
 
@@ -139,27 +140,34 @@ export default function SystemPage({
   // directory, most of all — so it may arrive as a function of it.
   const core = typeof children === 'function' ? children(layout) : children;
 
+  // The page's one pull quote (expansion record §3.1) goes to the first
+  // quote block in READING order — above, then main, then below — which is
+  // not the operator's section order once slots are stated.
+  const readingOrder = [...slots.above, ...slots.main, ...slots.below];
+
   return (
-    <article {...(stated.density ? { 'data-density': stated.density } : null)} {...articleProps}>
-      <SlotSections
-        sections={slots.above}
-        getSectionBlocks={getSectionBlocks}
-        renderSection={renderSection}
-        arrangement={layout.arrangement}
-      />
-      {core}
-      <SlotSections
-        sections={slots.main}
-        getSectionBlocks={getSectionBlocks}
-        renderSection={renderSection}
-        arrangement={layout.arrangement}
-      />
-      <SlotSections
-        sections={slots.below}
-        getSectionBlocks={getSectionBlocks}
-        renderSection={renderSection}
-        arrangement={layout.arrangement}
-      />
-    </article>
+    <PullQuoteBudget sections={readingOrder} getSectionBlocks={getSectionBlocks}>
+      <article {...(stated.density ? { 'data-density': stated.density } : null)} {...articleProps}>
+        <SlotSections
+          sections={slots.above}
+          getSectionBlocks={getSectionBlocks}
+          renderSection={renderSection}
+          arrangement={layout.arrangement}
+        />
+        {core}
+        <SlotSections
+          sections={slots.main}
+          getSectionBlocks={getSectionBlocks}
+          renderSection={renderSection}
+          arrangement={layout.arrangement}
+        />
+        <SlotSections
+          sections={slots.below}
+          getSectionBlocks={getSectionBlocks}
+          renderSection={renderSection}
+          arrangement={layout.arrangement}
+        />
+      </article>
+    </PullQuoteBudget>
   );
 }

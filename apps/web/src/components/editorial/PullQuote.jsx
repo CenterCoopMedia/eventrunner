@@ -1,8 +1,10 @@
 // PullQuote — a quoted sentence from a speaker or a session, with its
 // attribution (expansion record §3.1).
 //
-// ONE PER PAGE AT MOST. That is a wiring rule the quote block's section cap
-// carries; this component draws whatever it is handed.
+// ONE PER PAGE AT MOST. The page enforces it (components/blocks/
+// pullQuoteBudget.jsx): the first quote block on a page renders through this
+// device and any later one is set as a plain quotation. This component draws
+// whatever it is handed.
 //
 // THE SENTENCE IS THE CALLOUT. Zine's handwritten line (brief §4.3) had a
 // contract, a stylesheet and a test, and no call site, because the CMS had
@@ -19,9 +21,17 @@
 // BELOW the quote, in the data face, and never above it.
 //
 // A <figure> with a <blockquote> and a <figcaption>, which is the markup a
-// quotation with a source has. The opening mark is drawn by the stylesheet
-// and hidden from assistive technology, so a reader hears the sentence and
-// not a quotation mark read aloud.
+// quotation with a source has.
+//
+// EVERY STYLE DRAWS THE MARKS (adversarial review of the 2026-09-10 wave: the
+// editor told operators not to type quotation marks while four of six styles
+// drew none). Two devices, one of which is always on: the LARGE OPENING MARK
+// above the sentence (`--pull-quote-mark-display`), which Newsroom and
+// Broadsheet set, and the INLINE PAIR around the sentence
+// (`--pull-quote-quotes-display`), which every other style and choice keeps.
+// A style that turns the large mark on turns the pair off, so a quote never
+// carries both. All three marks are hidden from assistive technology, so a
+// reader hears the sentence and not a quotation mark read aloud.
 import Callout from './Callout.jsx';
 
 /** A string with something in it, or null. */
@@ -45,7 +55,15 @@ export default function PullQuote({ children, attribution, className = '' }) {
         “
       </span>
       <blockquote>
-        <Callout>{children}</Callout>
+        <Callout>
+          <span aria-hidden="true" className="pull-quote__quote">
+            “
+          </span>
+          {children}
+          <span aria-hidden="true" className="pull-quote__quote">
+            ”
+          </span>
+        </Callout>
       </blockquote>
       {credit ? (
         <figcaption className="pull-quote__attribution mt-sm text-caption text-text-secondary">

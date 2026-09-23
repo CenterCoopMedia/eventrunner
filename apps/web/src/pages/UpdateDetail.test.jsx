@@ -23,11 +23,14 @@ const HIDDEN_UPDATE = {
   visible: false,
 };
 
-function renderDetail(id, { features = { updates: true }, updates = [VISIBLE_UPDATE] } = {}) {
+function renderDetail(
+  id,
+  { features = { updates: true }, updates = [VISIBLE_UPDATE], eventConfig = {} } = {},
+) {
   return render(
     <MemoryRouter initialEntries={[`/updates/${id}`]}>
       <EventConfigContext.Provider
-        value={{ eventConfig: {}, features, theme: {}, badges: null, source: 'snapshot' }}
+        value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <ContentContext.Provider value={{ updates, getBlock: () => null }}>
           <Routes>
@@ -54,6 +57,21 @@ describe('UpdateDetail', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Please use lot B starting Thursday.')).toBeInTheDocument();
     expect(screen.getByText('October 1, 2026')).toBeInTheDocument();
+  });
+
+  it('dates the update on the event’s clock, not the reader’s', () => {
+    // The dateline device carries the event's clock (design record §3.1).
+    // Half past two in the morning UTC on 1 October is the evening of 30
+    // September at a west-coast venue; the test runner's own zone is UTC,
+    // so a dateline in the reader's zone would say 1 October.
+    renderDetail('late-night', {
+      eventConfig: { timezone: 'America/Los_Angeles' },
+      updates: [{ ...VISIBLE_UPDATE, id: 'late-night', publishAt: new Date('2026-10-01T02:30:00Z') }],
+    });
+    const time = screen.getByText('September 30, 2026');
+    expect(time.tagName).toBe('TIME');
+    expect(time).toHaveAttribute('dateTime', '2026-10-01T02:30:00.000Z');
+    expect(time.closest('p')).toHaveClass('byline');
   });
 
   it('404s (designed empty state) for an unknown update id', () => {

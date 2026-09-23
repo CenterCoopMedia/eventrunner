@@ -61,10 +61,23 @@ describe('Repeater', () => {
     expect(screen.getByRole('button', { name: 'Add a link' })).toHaveFocus();
   });
 
-  it('states the count against a cap and withdraws the add control at it', () => {
+  it('states the count against a cap and keeps the add control at it, unavailable and explained', () => {
     render(<Harness start={[{ id: 'a', url: '' }, { id: 'b', url: '' }]} max={2} />);
     expect(screen.getByRole('group', { name: /Links.*2 of 2/u })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Add a link' })).toBeNull();
+    // The control is never removed (expansion record §2.1): it stays in the
+    // tab order with aria-disabled, its name states the limit, and pressing
+    // it adds nothing.
+    const add = screen.getByRole('button', { name: 'Add a link (2 of 2, the limit)' });
+    expect(add).toHaveAttribute('aria-disabled', 'true');
+    expect(add).not.toBeDisabled();
+    fireEvent.click(add);
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    // Remove one and the control is available again under its plain name.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove link 2' }));
+    const again = screen.getByRole('button', { name: 'Add a link' });
+    expect(again).not.toHaveAttribute('aria-disabled');
+    fireEvent.click(again);
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 
   it('rules its rows through the contract class', () => {

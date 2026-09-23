@@ -43,7 +43,7 @@ function excerpt(body, maxLen = 200) {
 }
 
 export default function Updates() {
-  const { features } = useEventConfig();
+  const { features, eventConfig } = useEventConfig();
   const { updates } = useContent();
 
   if (!features.updates) {
@@ -77,7 +77,7 @@ export default function Updates() {
         </div>
       ) : (
         <div className="update-feed mt-lg">
-          {groupUpdates(visible).map((run, index) => (
+          {groupUpdates(visible, eventConfig?.timezone).map((run, index) => (
             <section
               key={`${run.kind}-${run.label}`}
               aria-labelledby={`update-run-${index}`}
@@ -92,7 +92,7 @@ export default function Updates() {
               />
               <ul className="mt-sm">
                 {run.members.map((update) => {
-                  const dateLabel = publishDateLabel(update.publishAt);
+                  const dateLabel = publishDateLabel(update.publishAt, eventConfig?.timezone);
                   const publishDate = toPublishDate(update.publishAt);
                   const body = excerpt(update.body);
                   return (

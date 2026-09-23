@@ -89,8 +89,8 @@ describe('blockSearchText', () => {
 
   it('joins the term, the fact and its note on a fact block', () => {
     expect(
-      blockSearchText({ blockType: 'fact', label: 'Where', value: 'The hall', note: '12 Quay Street' }),
-    ).toBe('Where The hall 12 Quay Street');
+      blockSearchText({ blockType: 'fact', label: 'Where', value: 'The hall', note: '1 Test Way' }),
+    ).toBe('Where The hall 1 Test Way');
     expect(blockMatchesQuery({ blockType: 'fact', label: 'Where', value: 'The hall' }, 'hall')).toBe(true);
   });
 

@@ -57,7 +57,7 @@
   "shape": { "radius": "sharp", "texture": "paper", "density": "loose" },
   "motifSet": "none",
 
-  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses strong rules, the monospaced font for folio text, a small callout angle, and no marginalia by default. The definition list sets its terms in the monospaced font in capitals between strong rules. The pull quote is the handwritten callout between strong rules. The timeline spine is a strong rule, the progress fill is toner black with square ends, the notice bar sits on the page ground between strong rules, and table heads are set in the monospaced font in capitals. The avatar, the dropzone and the repeater take strong rules with square corners, the count figure the bold weight, the legend a struck rule above it, the state marker and the byline the monospaced font, and the standfirst a strong rule under it in the full ink.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses strong rules, the monospaced font for folio text, a small callout angle, and no marginalia by default. The definition list sets its terms in the monospaced font in capitals between strong rules. The pull quote is the handwritten callout between strong rules. The timeline spine is a strong rule, the progress fill is toner black with square ends, the notice bar sits on the page ground between strong rules and doubles them for an urgent notice, and table heads are set in the monospaced font in capitals. The avatar, the dropzone and the repeater take strong rules with square corners (the dropzone doubles its rule while a file is held over it), the count figure the bold weight, the legend a struck rule above it, the state marker and the byline the monospaced font, and the standfirst a strong rule under it in the full ink.",
   "tokens": {
     "--session-card-rule-width": "var(--rule-strong-width)",
     "--folio-rule-width": "var(--rule-strong-width)",
@@ -74,6 +74,7 @@
     "--progress-radius": "0",
     "--notice-bar-ground": "rgb(var(--color-surface-rgb))",
     "--notice-bar-rule-width": "var(--rule-strong-width)",
+    "--notice-bar-urgent-rule-width": "calc(var(--rule-strong-width) * 2)",
     "--notice-bar-word-font": "var(--font-mono)",
     "--table-head-font": "var(--font-mono)",
     "--table-head-transform": "uppercase",
@@ -87,6 +88,7 @@
     "--avatar-radius": "0",
     "--dropzone-rule-style": "solid",
     "--dropzone-rule-width": "var(--rule-strong-width)",
+    "--dropzone-drag-rule-width": "calc(var(--rule-strong-width) * 2)",
     "--repeater-rule-width": "var(--rule-strong-width)",
     "--count-figure-weight": "var(--weight-bold)",
     "--legend-font": "var(--font-mono)",

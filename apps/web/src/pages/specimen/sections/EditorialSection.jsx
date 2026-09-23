@@ -387,7 +387,7 @@ export default function EditorialSection({ folio }) {
         name="Ruled table"
         file="components/editorial/RuledTable.jsx"
         contract="table"
-        note="A real table with row rules, tabular figures and a head that stays in view. Press a sortable head to sort: the head is a button and the column carries aria-sort. At narrow widths the table scrolls inside its own region and the page does not."
+        note="A real table with row rules and tabular figures. Press a sortable head to sort: the head is a button and the column carries aria-sort. At narrow widths the table scrolls inside its own region and the page does not; the head is read once and the rows follow it."
       >
         <SessionTable />
       </Figure>

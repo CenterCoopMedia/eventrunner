@@ -11,7 +11,17 @@
 // A STATED PROGRESS LINE WITH A <progress> ELEMENT, never a spinner: the
 // caller reports how many files have gone and the region says "2 of 3 files
 // sent" through the progress device. A SENT LIST WITH A STATE WORD per file,
-// "Sent", "Sending…", "Failed", in the data face; never colour alone.
+// "Sent", "Sending…", "Failed", in the data face; never colour alone. The
+// progress line and the sent list sit in one `role="status"` region, so a
+// screen reader hears the result land, and the region carries
+// `aria-busy="true"` while a send is under way (the state grammar's busy
+// state, expansion record §2.1).
+//
+// A REFUSAL IS A RULE AS WELL AS A SENTENCE. The error is stated under the
+// region and the input carries `aria-invalid`; the region itself takes
+// `data-invalid`, which the stylesheet draws as the strong rule in the
+// danger ink — the same alarm rule a checkbox in error draws — so the state
+// is never the red sentence alone (brief §2.4).
 //
 // The dropzone draws and reports. Where the bytes go, what a refusal says,
 // and whether a file is too large are the caller's (lib/mediaSource.js
@@ -85,6 +95,8 @@ export default function Dropzone({
       <div
         className="dropzone flex flex-col items-start gap-xs"
         data-dragging={dragging ? 'true' : undefined}
+        data-invalid={error ? 'true' : undefined}
+        aria-busy={progress ? 'true' : undefined}
         onDragOver={onDragOver}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
@@ -113,8 +125,13 @@ export default function Dropzone({
             event.target.value = '';
           }}
         />
-        <p className="text-caption text-text-secondary">
-          Drop {multiple ? 'files' : 'a file'} here, or{' '}
+        {/* Two sentences, not one with a control in the middle of it: the
+            invitation is a line of copy and the control keeps its own
+            sentence-case label, so neither carries a capital mid-sentence. */}
+        <div className="flex flex-wrap items-baseline gap-x-sm gap-y-xs">
+          <p className="text-caption text-text-secondary">
+            Drop {multiple ? 'files' : 'a file'} here.
+          </p>
           <button
             type="button"
             className={quietActionClass}
@@ -123,18 +140,23 @@ export default function Dropzone({
           >
             {chooseLabel}
           </button>
-        </p>
-        {progress ? (
-          <Progress
-            className="w-full"
-            value={progress.value}
-            max={progress.max}
-            unit={progress.max === 1 ? 'file' : 'files'}
-            done="sent"
-          />
-        ) : null}
-        {sent.length > 0 ? (
-          <ul className="dropzone__sent mt-xs w-full pt-xs">
+        </div>
+        {/* One live region for the result: the progress line while files
+            go, the sent list once they have. It is in the document from the
+            start, so assistive technology is listening when the first
+            change lands. */}
+        <div role="status" className="flex w-full flex-col gap-xs">
+          {progress ? (
+            <Progress
+              className="w-full"
+              value={progress.value}
+              max={progress.max}
+              unit={progress.max === 1 ? 'file' : 'files'}
+              done="sent"
+            />
+          ) : null}
+          {sent.length > 0 ? (
+            <ul className="dropzone__sent mt-xs w-full pt-xs">
             {sent.map((file) => (
               <li
                 key={file.id}
@@ -149,8 +171,9 @@ export default function Dropzone({
                 </span>
               </li>
             ))}
-          </ul>
-        ) : null}
+            </ul>
+          ) : null}
+        </div>
       </div>
       {error ? (
         <p id={errorId} className="text-caption text-danger">

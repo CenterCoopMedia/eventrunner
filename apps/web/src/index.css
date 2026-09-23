@@ -243,6 +243,16 @@
     background-color: rgb(var(--color-accent-rgb));
     color: rgb(var(--color-surface-rgb));
   }
+  /* An unavailable option (expansion record §2.1): a dashed rule under the
+     word, so the state is a mark a sighted reader sees and not the ground
+     tint alone. Its reason is in its name and, while it has focus or the
+     pointer, drawn under the row (components/forms/SegmentedControl.jsx). */
+  .segmented__option[aria-disabled='true'] {
+    text-decoration-line: underline;
+    text-decoration-style: dashed;
+    text-decoration-thickness: var(--rule-hairline-width);
+    text-underline-offset: 0.25em;
+  }
 
   /* TABS (expansion record §3.3): the ARIA tab pattern. The list rules
      across at the hairline and the selected tab carries the STRONG RULE,
@@ -260,6 +270,14 @@
   }
   .tab[aria-selected='true'] {
     border-block-end-color: rgb(var(--rule-strong-rgb));
+  }
+  /* An unavailable tab: a dashed rule where the open tab's strong rule would
+     be, so the state is drawn and not the ground tint alone. Its reason is
+     in its name and, while it has focus or the pointer, drawn under the row
+     (components/forms/Tabs.jsx). */
+  .tab[aria-disabled='true'] {
+    border-block-end-style: dashed;
+    border-block-end-color: rgb(var(--rule-hairline-rgb));
   }
 
   /* THE PUBLIC DIALOG (expansion record §2.1).
@@ -1616,15 +1634,20 @@
     border-inline-start: var(--pull-quote-rule-inline-width) solid rgb(var(--pull-quote-rule-rgb));
     text-align: var(--pull-quote-align);
   }
-  /* The opening mark is drawn, never typed into the copy, so a screen
-     reader reads the sentence and not a stray quotation mark. `none` keeps
-     it out of the document in every style that does not draw one. */
+  /* The marks are drawn, never typed into the copy, so a screen reader
+     reads the sentence and not a stray quotation mark. Two devices, one of
+     which every style keeps on: the large opening mark above the sentence,
+     and the inline pair around it. A style that draws the large mark turns
+     the pair off (design/tokens/presets), so a quote never carries both. */
   .pull-quote__mark {
     display: var(--pull-quote-mark-display);
     font-family: var(--pull-quote-mark-font);
     font-size: var(--text-h1);
     line-height: 0.6;
     color: rgb(var(--callout-rgb));
+  }
+  .pull-quote__quote {
+    display: var(--pull-quote-quotes-display);
   }
   /* A centred quote centres its sentence too. The callout is an inline
      block with a measure of its own, so the block's text-align places it. */
@@ -1634,6 +1657,13 @@
   .pull-quote__attribution {
     font-family: var(--pull-quote-attribution-font);
     text-transform: var(--pull-quote-attribution-transform);
+  }
+  /* A page's second quote (record §3.1: one pull quote per page at most,
+     which the page enforces). The same words in the body register, inside
+     a hairline at the inline start; no callout, no large mark. */
+  .quote-plain {
+    padding-inline-start: var(--space-md);
+    border-inline-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
   }
 
   /* THE TIMELINE (record §3.1): dated entries in order, on a spine. A
@@ -1728,11 +1758,14 @@
     text-transform: var(--notice-bar-word-transform);
   }
 
-  /* THE RULED TABLE (record §3.1): a real <table>, ruled between rows, with
-     a head that stays in view while the body scrolls under it. The three
-     widths are what the Table rules option moves: hairline rows, a ruled
-     head, or the full grid. Figures sit in tabular numerals so a column
-     of them lines up. */
+  /* THE RULED TABLE (record §3.1): a real <table>, ruled between rows,
+     inside a region that scrolls sideways at narrow widths so the page
+     never does. The head does not stick: the region is the scroll
+     container, and a head pinned inside a container that scrolls only
+     sideways pins to nothing the reader scrolls (adversarial review of the
+     wave). The three widths are what the Table rules option moves:
+     hairline rows, a ruled head, or the full grid. Figures sit in tabular
+     numerals so a column of them lines up. */
   .ruled-table {
     inline-size: 100%;
     border-collapse: collapse;
@@ -1757,9 +1790,6 @@
     border-inline-start: 0;
   }
   .ruled-table thead th {
-    position: sticky;
-    inset-block-start: 0;
-    z-index: 1;
     border-block-start: 0;
     border-block-end: var(--table-head-rule-width) solid rgb(var(--table-head-rule-rgb));
     background-color: var(--table-head-ground);
@@ -1830,9 +1860,21 @@
     border-radius: var(--dropzone-radius);
     background-color: var(--dropzone-ground);
   }
+  /* Held over: solid AND at the drag width, so a style whose rest rule is
+     already solid (Atlas) or already strong (Zine, which doubles the drag
+     width) still shows the state by more than its colour. */
   .dropzone[data-dragging='true'] {
     border-style: solid;
+    border-width: var(--dropzone-drag-rule-width);
     border-color: rgb(var(--color-accent-rgb));
+  }
+  /* The alarm rule (state grammar, error): the strong width in the danger
+     ink, the same rule a checkbox in error draws, so a refusal is never the
+     red sentence under the region alone. */
+  .dropzone[data-invalid='true'] {
+    border-style: solid;
+    border-width: var(--rule-strong-width);
+    border-color: rgb(var(--semantic-danger-rgb));
   }
   .dropzone:focus-within {
     outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));

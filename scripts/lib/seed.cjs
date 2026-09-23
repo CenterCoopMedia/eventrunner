@@ -487,10 +487,15 @@ const LEGAL_PAGE_IDS = Object.freeze(['privacy', 'terms']);
  * @param {object} event config/event
  * @returns {string|null}
  */
-const FULL_DATE = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+// The same range the home page shows while the When fact is still the
+// seed's (apps/web/src/lib/eventTime.js eventDateRangeLabel): "October 15,
+// 2026", "October 15–17, 2026", "October 30 – November 1, 2026", or
+// "December 31, 2026 – January 2, 2027". The days are calendar dates, so they
+// are formatted as the wall dates they are.
+const FULL_DATE = new Intl.DateTimeFormat('en-US', {
+  month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
 });
-const DAY_MONTH = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+const MONTH_DAY = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
 
 function eventDateRange(event = {}) {
   const dates = (Array.isArray(event.days) ? event.days : [])
@@ -500,11 +505,11 @@ function eventDateRange(event = {}) {
   if (dates.length === 0) return null;
   const first = new Date(`${dates[0]}T00:00:00Z`);
   const last = new Date(`${dates[dates.length - 1]}T00:00:00Z`);
-  if (dates.length === 1 || dates[0] === dates[dates.length - 1]) return FULL_DATE.format(first);
+  if (dates[0] === dates[dates.length - 1]) return FULL_DATE.format(first);
   const sameYear = first.getUTCFullYear() === last.getUTCFullYear();
   const sameMonth = sameYear && first.getUTCMonth() === last.getUTCMonth();
-  if (sameMonth) return `${first.getUTCDate()}–${FULL_DATE.format(last)}`;
-  return `${(sameYear ? DAY_MONTH : FULL_DATE).format(first)} – ${FULL_DATE.format(last)}`;
+  if (sameMonth) return `${MONTH_DAY.format(first)}–${last.getUTCDate()}, ${last.getUTCFullYear()}`;
+  return `${(sameYear ? MONTH_DAY : FULL_DATE).format(first)} – ${FULL_DATE.format(last)}`;
 }
 
 /** Full street address from `config/event.venue`, blank parts dropped. */
@@ -551,7 +556,10 @@ const CONFIG_SEEDS = Object.freeze({
   // and a description, and neither of these needs a source line. A note
   // is written only where the venue states an address, because a fact's
   // note is optional and an empty one is a field an operator has to notice
-  // and delete.
+  // and delete. The When fact is seeded with the range so the stored block
+  // is right, and the home page reads the range LIVE from config/event for
+  // as long as the block is still the seed's (pages/Home.jsx
+  // withLiveDates), so a moved day never leaves a stale fact.
   'info.when': ({ event }) => ({
     label: 'When',
     value: eventDateRange(event) || '[Replace] The dates the event runs.',
@@ -797,10 +805,39 @@ const OBSOLETE_CONTENT_IDS = Object.freeze([
   // #234: the venue's name and address were two labelled lines under the
   // dates card. They are the `info__where` fact now, with the address as
   // its note, so a site upgraded in place would otherwise state the venue
-  // twice.
+  // twice. Removed only while they are still the seed's; see
+  // REPLACED_CONTENT_IDS for what happens when a client has edited them.
   'info__where_venue',
   'info__where_address',
 ]);
+
+/**
+ * Seeded documents that REPLACE documents an earlier release seeded, keyed
+ * replacement → predecessors (adversarial review of the 2026-09-10 wave).
+ *
+ * `OBSOLETE_CONTENT_IDS` removes a predecessor only while it is still the
+ * seed's. On a launched site the predecessors are usually the client's —
+ * `info__where_venue` and `info__where_address` were placeholders nothing
+ * filled, so every live site has typed the venue into them — and the seed
+ * then keeps them and would CREATE the replacement beside them: the venue
+ * stated twice on the home page, once in the client's words and once in
+ * the seed's. So `withholdUpgradeSeeds` (scripts/lib/write.cjs) does not
+ * create a replacement while any predecessor survives as client-edited, and
+ * init keeps those predecessors out of the obsolete removal, so a client
+ * who edited only the venue line does not lose the address line beside it.
+ * Both are reported as kept, the way an obsolete seed the client owns is.
+ *
+ * `info__who` and `info__when` replace nothing: `info__when` keeps its id
+ * from the earlier release (a stat then, a fact now, refreshed only while it
+ * is still the seed's), and `info__who` is new. A new placeholder is not
+ * published onto a launched home page either — `withholdUpgradeSeeds`
+ * creates no "[Replace]" block in a section a client has edited — so
+ * `info__who` arrives on a fresh site and on one whose key facts are still
+ * the seed's, and nowhere else; an operator adds it from the palette.
+ */
+const REPLACED_CONTENT_IDS = Object.freeze({
+  info__where: Object.freeze(['info__where_venue', 'info__where_address']),
+});
 
 module.exports = {
   defaultPages,
@@ -810,6 +847,7 @@ module.exports = {
   placeholderBlock,
   LEGAL_PAGE_IDS,
   OBSOLETE_CONTENT_IDS,
+  REPLACED_CONTENT_IDS,
   EMAIL_TEMPLATE_OVERRIDE_IDS,
   internals: { venueAddress, eventDateRange, CONFIG_SEEDS },
 };

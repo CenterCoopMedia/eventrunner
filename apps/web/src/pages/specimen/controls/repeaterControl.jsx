@@ -51,7 +51,7 @@ export default Object.freeze({
   name: 'Repeater',
   file: 'components/forms/Repeater.jsx',
   contract: 'repeater',
-  note: 'Each row’s fields are labelled, each row has a remove control that names it, and one add control sits under the list. Focus follows the change: a new row takes focus on its first field, and a removed row hands focus to the row before it or to the add control.',
+  note: 'Each row’s fields are labelled, each row has a remove control that names it, and one add control sits under the list; at the cap it stays, unavailable, and its name states the limit. Focus follows the change: a new row takes focus on its first field, and a removed row hands focus to the row before it or to the add control.',
   states: Object.freeze(['rest', 'error', 'empty']),
   absent: Object.freeze([
     fieldRegister('hover'),

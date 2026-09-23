@@ -34,7 +34,7 @@ function NotFoundState() {
 
 export default function UpdateDetail() {
   const { id } = useParams();
-  const { features } = useEventConfig();
+  const { features, eventConfig } = useEventConfig();
   const { updates } = useContent();
 
   if (!features.updates) {
@@ -54,7 +54,8 @@ export default function UpdateDetail() {
   const update = updates.find((u) => u.id === id && u.visible !== false);
   if (!update) return <NotFoundState />;
 
-  const dateLabel = publishDateLabel(update.publishAt);
+  // On the event's clock (design record §3.1), never the reader's.
+  const dateLabel = publishDateLabel(update.publishAt, eventConfig?.timezone);
   const dateInstant = toPublishDate(update.publishAt);
 
   return (
