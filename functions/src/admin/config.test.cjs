@@ -691,3 +691,100 @@ test('a failed admin_logs write never fails the call', async () => {
   assert.equal(res.statusCode, 200);
   assert.equal(deps.db.docs.get('config/features').schedule, true);
 });
+
+// ------------------------------------------------------- the two tiers (#186)
+
+const STAFF_EMAIL = 'staff@example.org';
+const { internals } = require('./config.cjs');
+
+/** makeDeps with a staff caller on the token and both lists on bootstrap. */
+function tieredDeps(seed = {}) {
+  const deps = makeDeps(seed);
+  return {
+    ...deps,
+    auth: {
+      async verifyIdToken(token) {
+        if (token === 'admin-token') {
+          return { uid: 'admin-1', email: ADMIN_EMAIL, email_verified: true };
+        }
+        if (token === 'staff-token') {
+          return { uid: 'staff-1', email: STAFF_EMAIL, email_verified: true };
+        }
+        throw new Error('bad token');
+      },
+    },
+    getConfig: async () => ({
+      bootstrap: { adminEmails: [ADMIN_EMAIL], staffEmails: [STAFF_EMAIL] },
+    }),
+  };
+}
+
+test('every panel-writable doc states a tier, and only features and theme are operator-only', () => {
+  const { CONFIG_DOC_TIERS, WRITABLE_CONFIG_DOCS } = internals;
+  assert.deepEqual(Object.keys(CONFIG_DOC_TIERS).sort(), Object.keys(WRITABLE_CONFIG_DOCS).sort());
+  assert.deepEqual(CONFIG_DOC_TIERS, { event: 'staff', features: 'operator', theme: 'operator', badges: 'staff' });
+});
+
+test('a staff caller is refused a theme write and a features write — the branding and flag surfaces are the operator’s', async () => {
+  for (const [create, body] of [
+    [createUpdateThemeHandler, { theme: validTheme() }],
+    [createUpdateFeaturesHandler, { features: { schedule: true } }],
+  ]) {
+    const deps = tieredDeps();
+    const res = makeRes();
+    await create(deps)(makeReq(body, { token: 'staff-token' }), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.error.code, 'forbidden');
+    assert.equal(res.body.error.message, 'Operator access required.');
+    assert.equal(deps.db.writes.length, 0);
+  }
+});
+
+test('a staff caller keeps the event settings and the badge catalogue', async () => {
+  const eventDeps = tieredDeps({ 'config/event': validEvent() });
+  let res = makeRes();
+  await createUpdateEventConfigHandler(eventDeps)(
+    makeReq({ event: { tagline: 'Set by the desk' } }, { token: 'staff-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(eventDeps.db.docs.get('config/event').tagline, 'Set by the desk');
+  assert.equal(eventDeps.db.docs.get('config/event').updatedBy, STAFF_EMAIL);
+
+  const badgeDeps = tieredDeps();
+  res = makeRes();
+  await createUpdateBadgesHandler(badgeDeps)(makeReq({ badges: validBadges() }, { token: 'staff-token' }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('a staff event save that touches sender is refused by name, whole, before anything is written', async () => {
+  const deps = tieredDeps({ 'config/event': validEvent() });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { tagline: 'Fine', sender: { email: 'other@example.org' } } }, { token: 'staff-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.message, 'sender: operator access required');
+  assert.equal(deps.db.docs.get('config/event').tagline, undefined);
+  assert.equal(deps.db.writes.length, 0);
+});
+
+test('an operator may still write sender on config/event', async () => {
+  const deps = tieredDeps({ 'config/event': validEvent() });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { sender: { email: 'ops@example.org', name: 'Ops' } } }, { token: 'admin-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(deps.db.docs.get('config/event').sender.email, 'ops@example.org');
+});
+
+test('findTierViolations names only operator keys, only on config/event, only for staff', () => {
+  const { findTierViolations } = internals;
+  assert.deepEqual(findTierViolations('event', { sender: {}, tagline: 'x' }, 'staff'), ['sender: operator access required']);
+  assert.deepEqual(findTierViolations('event', { sender: {} }, 'operator'), []);
+  assert.deepEqual(findTierViolations('event', { tagline: 'x' }, 'staff'), []);
+  assert.deepEqual(findTierViolations('badges', { sender: {} }, 'staff'), []);
+});

@@ -8,9 +8,11 @@
 //   • signed in, not an admin → a plain denial, no retry affordance.
 // "Admin" is exactly what AuthContext's admin probe reports: a read of an
 // admin-only drafts collection, decided by firestore.rules isAdmin(), which
-// is the same config/bootstrap.adminEmails + verified-email test the server's
+// is the same config/bootstrap + verified-email test the server's
 // requireAdmin applies. Its tri-state (adminStatus) is what keeps the gate
-// from answering before the probe has.
+// from answering before the probe has. Which TIER the admin holds is
+// AdminLayout's concern: each docket item declares the tier it needs, and
+// the layout hides the rest and refuses their routes (issue #186).
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';

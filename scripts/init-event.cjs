@@ -13,11 +13,13 @@
  *   b. writes `config/event`, `config/features`, `config/theme`,
  *      `config/badges`, `config/providers` from `--answers <file>` or
  *      interactive prompts;
- *   c. writes `config/bootstrap.adminEmails` from `--admin` flags — the
+ *   c. writes `config/bootstrap` from `--admin` and `--staff` flags — the
  *      single source of admin identity for the whole platform
  *      (functions/src/core/auth.cjs requireAdmin, firestore.rules isAdmin,
  *      and the web AuthContext probe all read it; nothing reads an
- *      ADMIN_EMAILS env var any more);
+ *      ADMIN_EMAILS env var any more). `adminEmails` is the operator tier
+ *      and `staffEmails` the staff tier (issue #186); later grants happen
+ *      in the admin's Access page, and a re-run never removes them;
  *   d. seeds `cmsPages` with the fifteen default pages (§5.3);
  *   e. seeds `cmsContent` with placeholder blocks for every `defaultBlocks`
  *      entry, and the two legal pages from the provider-aware templates
@@ -74,7 +76,7 @@ const {
 } = require('./lib/write.cjs');
 
 const FLAGS = [
-  'answers', 'admin', 'force', 'check', 'attest-auth', 'dry-run',
+  'answers', 'admin', 'staff', 'force', 'check', 'attest-auth', 'dry-run',
   'skip-branding', 'seeded-threshold', 'help',
 ];
 
@@ -83,7 +85,8 @@ function usage() {
     'Usage: node scripts/init-event.cjs [options]',
     '',
     '  --answers <file>        client answers JSON (otherwise prompts interactively)',
-    '  --admin <email>         first admin address; repeatable',
+    '  --admin <email>         first operator address; repeatable',
+    '  --staff <email>         staff address (content, schedule, speakers, attendees); repeatable',
     '  --force                 re-run against a project that already has config/event',
     '                          (client-edited documents are still never overwritten)',
     '  --check                 read-only launch-readiness check; exits non-zero if unmet',
@@ -299,6 +302,8 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   // the one who knows which address can actually sign in today.
   const adminFlags = Array.isArray(args.admin) ? args.admin : (args.admin ? [args.admin] : []);
   if (adminFlags.length > 0) answers.adminEmails = adminFlags;
+  const staffFlags = Array.isArray(args.staff) ? args.staff : (args.staff ? [args.staff] : []);
+  if (staffFlags.length > 0) answers.staffEmails = staffFlags;
 
   const built = buildConfigDocs({ answers, tierA, now });
   for (const warning of built.warnings) console.warn(`warning: ${warning}`);
@@ -467,7 +472,7 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
 }
 
 async function main(argv) {
-  const args = parseArgv(argv, { withValue: ['answers', 'seeded-threshold'], repeatable: ['admin'] });
+  const args = parseArgv(argv, { withValue: ['answers', 'seeded-threshold'], repeatable: ['admin', 'staff'] });
   if (args.help) {
     console.log(usage());
     return 0;

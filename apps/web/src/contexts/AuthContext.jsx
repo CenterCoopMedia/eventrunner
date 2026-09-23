@@ -22,14 +22,23 @@
 // no key the header is absent and nothing changes; the server only requires it
 // when the deployment sets EVENT_APP_CHECK_ENFORCED=true.
 //
-// isAdmin: config/bootstrap.adminEmails is server-only (firestore.rules), so
-// the client cannot read the allowlist. It learns admin-ness by probing one
+// isAdmin: config/bootstrap is server-only (firestore.rules), so the client
+// cannot read either allowlist. It learns admin-ness by probing one
 // admin-only read (cmsContent_drafts, limit 1): the rules' isAdmin() decides,
 // the flag is UI convenience only — never an authorization boundary.
 // `adminStatus` ('unknown' | 'admin' | 'denied') is the same answer with its
 // in-flight state kept: `loading` reports the auth handshake, which finishes
 // before the probe does, so a consumer that must not render a denial
 // prematurely waits on adminStatus === 'unknown' instead.
+//
+// adminTier (issue #186): the same device answers WHICH tier. A second probe
+// reads admin_logs (limit 1), the one client-readable collection the rules
+// grant to isOperator() alone; success is 'operator', a refusal is 'staff'.
+// Both probes run together and adminStatus stays 'unknown' until both have
+// answered, so the docket never draws the staff set and then grows. The
+// tier hides out-of-tier sections and refuses their routes in the shell
+// (AdminLayout.jsx); the server (requireAdmin's tier option) and the rules
+// (isOperator) are the enforcement.
 import {
   createContext,
   useCallback,
@@ -135,6 +144,8 @@ export function AuthProvider({ children }) {
   // that read isAdmin at that instant would show "not an admin" to an admin
   // for a tick, so the tri-state is exposed alongside the boolean.
   const [adminStatus, setAdminStatus] = useState('unknown'); // 'unknown'|'admin'|'denied'
+  // null until adminStatus is 'admin'; then 'operator' or 'staff'.
+  const [adminTier, setAdminTier] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -144,24 +155,30 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
-  // Admin probe (see module comment). Runs once per signed-in user; a
-  // permission-denied answer simply means "not an admin".
+  // Admin probes (see module comment). Run once per signed-in user; a
+  // permission-denied answer on the first simply means "not an admin", and
+  // on the second "an admin, but not an operator".
   useEffect(() => {
     if (!user) {
       setAdminStatus('denied');
+      setAdminTier(null);
       return undefined;
     }
     let cancelled = false;
     // A new user means the previous answer no longer applies; go back to
     // 'unknown' so consumers wait rather than reusing a stale verdict.
     setAdminStatus('unknown');
+    setAdminTier(null);
+    const probe = (name) =>
+      getDocs(query(collection(db, name), limit(1))).then(() => true, () => false);
     (async () => {
-      try {
-        await getDocs(query(collection(db, 'cmsContent_drafts'), limit(1)));
-        if (!cancelled) setAdminStatus('admin');
-      } catch {
-        if (!cancelled) setAdminStatus('denied');
-      }
+      const [isAnyAdmin, isOperator] = await Promise.all([
+        probe('cmsContent_drafts'),
+        probe('admin_logs'),
+      ]);
+      if (cancelled) return;
+      setAdminTier(isAnyAdmin ? (isOperator ? 'operator' : 'staff') : null);
+      setAdminStatus(isAnyAdmin ? 'admin' : 'denied');
     })();
     return () => {
       cancelled = true;
@@ -169,6 +186,7 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   const isAdmin = adminStatus === 'admin';
+  const isOperator = adminTier === 'operator';
 
   const signInWithGoogle = useCallback(
     () => signInWithPopup(auth, new GoogleAuthProvider()),
@@ -200,7 +218,9 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       isAdmin,
+      isOperator,
       adminStatus,
+      adminTier,
       loading,
       signInWithGoogle,
       sendOtpCode,
@@ -210,7 +230,9 @@ export function AuthProvider({ children }) {
     [
       user,
       isAdmin,
+      isOperator,
       adminStatus,
+      adminTier,
       loading,
       signInWithGoogle,
       sendOtpCode,

@@ -980,3 +980,21 @@ test('the session seam leaves every other collection alone', async () => {
   );
   assert.equal(res.statusCode, 200);
 });
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('mutation handlers admit a staff admin — content is staff work', async () => {
+  const STAFF = { uid: 'staff-1', email: 'staff@example.org', email_verified: true };
+  const staffDeps = (db) => deps(db, {
+    auth: { async verifyIdToken(t) { if (t === 'staff-token') return STAFF; throw new Error('bad'); } },
+    getConfig: async () => ({ bootstrap: { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] } }),
+  });
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(staffDeps(db))(
+    req({ token: 'staff-token', body: { collection: 'cmsContent', section: 'hero', field: 'title', fields: { value: 'Set by staff' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsContent_drafts', 'hero__title').updatedBy, 'staff@example.org');
+});

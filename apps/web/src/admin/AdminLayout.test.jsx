@@ -53,7 +53,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../App.jsx';
-import { DOCKET } from './AdminLayout.jsx';
+import { ADMIN_TIERS, DOCKET, docketForTier, sectionTier, tierReaches } from './AdminLayout.jsx';
 
 async function renderAdmin(path = '/admin/pages') {
   const result = render(
@@ -130,8 +130,8 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Fifteen sections, every one a word. No icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(15);
+    // Sixteen sections, every one a word. No icon rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(16);
     expect(nav.querySelector('svg')).toBeNull();
     for (const link of nav.querySelectorAll('a')) {
       expect(link.textContent.trim().length).toBeGreaterThan(0);
@@ -176,6 +176,59 @@ describe('the admin shell', () => {
   it('keeps the signed-in identity in the data face', async () => {
     await renderAdmin();
     expect(screen.getByText('admin@example.org').className).toContain('font-admin-data');
+  });
+
+  // The tiers (issue #186): one declaration per docket item, read in two
+  // places — the rail and the route.
+  it('declares a tier on every docket item, and every tier is one the server knows', () => {
+    for (const group of DOCKET) {
+      for (const item of group.items) {
+        expect(ADMIN_TIERS, `${item.to} declares a tier`).toContain(item.tier);
+      }
+    }
+    expect(ADMIN_TIERS).toEqual(['operator', 'staff']);
+  });
+
+  it('classifies the sections: content, people and operations are staff; features, branding, access and system errors are operator', () => {
+    const byTier = (tier) =>
+      DOCKET.flatMap((group) => group.items).filter((item) => item.tier === tier).map((item) => item.to);
+    expect(byTier('operator')).toEqual(['features', 'branding', 'access', 'system-errors']);
+    expect(byTier('staff')).toEqual([
+      'pages', 'sessions', 'content', 'media', 'materials',
+      'speakers', 'attendees', 'badges',
+      'live-updates', 'ticketing', 'feedback',
+      'settings',
+    ]);
+  });
+
+  it('reads a route’s tier from its docket entry, owning every path under the section', () => {
+    expect(sectionTier('/admin/branding')).toBe('operator');
+    expect(sectionTier('/admin/pages')).toBe('staff');
+    expect(sectionTier('/admin/pages/new')).toBe('staff');
+    expect(sectionTier('/admin/sessions/abc')).toBe('staff');
+    expect(sectionTier('/admin')).toBeNull();
+    expect(sectionTier('/admin/')).toBeNull();
+    expect(sectionTier('/admin/nope')).toBeNull();
+  });
+
+  it('lets an operator reach everything, staff reach staff only, and an undeclared tier reach nothing but operators', () => {
+    expect(tierReaches('operator', 'operator')).toBe(true);
+    expect(tierReaches('operator', 'staff')).toBe(true);
+    expect(tierReaches('staff', 'staff')).toBe(true);
+    expect(tierReaches('staff', 'operator')).toBe(false);
+    expect(tierReaches(null, 'staff')).toBe(false);
+    // A forgotten declaration closes a section, the same default the
+    // server's requireAdmin takes.
+    expect(tierReaches('staff', undefined)).toBe(false);
+    expect(tierReaches('operator', undefined)).toBe(true);
+  });
+
+  it('draws the staff docket without the operator sections and drops an emptied group', () => {
+    const staffDocket = docketForTier('staff');
+    expect(staffDocket.map((group) => group.id)).toEqual(['content', 'people', 'operations', 'system']);
+    expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings']);
+    expect(docketForTier('operator')).toEqual(DOCKET);
+    expect(docketForTier(null)).toEqual([]);
   });
 
   it('holds the account controls at the control height on every pointer', async () => {

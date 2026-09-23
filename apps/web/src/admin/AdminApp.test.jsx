@@ -42,14 +42,22 @@ vi.mock('firebase/auth', () => ({
 // The isAdmin probe: resolving means firestore.rules allowed the admin-only
 // drafts read (i.e. an admin); rejecting means it did not.
 let adminProbeShouldSucceed = true;
-// When set, the probe hangs until the test settles it — the window in which
-// the auth handshake has finished but admin-ness is still unknown.
+// The tier probe (issue #186): resolving means the rules allowed the
+// operator-only admin_logs read; rejecting means staff.
+let operatorProbeShouldSucceed = true;
+// When set, the drafts probe hangs until the test settles it — the window
+// in which the auth handshake has finished but admin-ness is still unknown.
 let pendingProbe = null;
 vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(() => ({})),
-  query: vi.fn(() => ({})),
+  collection: vi.fn((_db, name) => ({ name })),
+  query: vi.fn((ref) => ref),
   limit: vi.fn(() => ({})),
-  getDocs: vi.fn(() => {
+  getDocs: vi.fn((ref) => {
+    if (ref?.name === 'admin_logs') {
+      return operatorProbeShouldSucceed
+        ? Promise.resolve({ docs: [] })
+        : Promise.reject(new Error('permission denied'));
+    }
     if (pendingProbe) {
       return new Promise((resolve, reject) => {
         pendingProbe = { resolve, reject };
@@ -86,6 +94,7 @@ async function renderAt(path) {
 
 beforeEach(() => {
   adminProbeShouldSucceed = true;
+  operatorProbeShouldSucceed = true;
   pendingProbe = null;
   currentUser = { uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' };
 });
@@ -174,5 +183,62 @@ describe('admin route gating', () => {
   it('does not gate the public site behind the admin routes', async () => {
     await renderAt('/');
     expect(screen.queryByRole('navigation', { name: 'Admin sections' })).toBeNull();
+  });
+
+  // The two tiers (issue #186). The rules decide the tier the same way they
+  // decide admin-ness, and the shell draws only what that tier may reach.
+  it('gives a staff admin the content, people and operations sections and none of the operator’s', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    await renderAt('/admin');
+
+    expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Pages' })).toBeInTheDocument();
+    for (const tab of ['Pages', 'Sessions', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Event']) {
+      expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
+    }
+    for (const tab of ['Features', 'Branding', 'Access', 'System errors']) {
+      expect(screen.queryByRole('link', { name: tab })).toBeNull();
+    }
+    // The tier is said in a word beside the address, never left to inference.
+    expect(screen.getByText('Staff')).toBeInTheDocument();
+  });
+
+  it('refuses a staff admin an operator route rather than only hiding its link', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    await renderAt('/admin/branding');
+
+    expect(
+      screen.getByRole('heading', { name: 'This section needs operator access' }),
+    ).toBeInTheDocument();
+    // Still inside the shell: the rail stays beside the refusal.
+    expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Branding' })).toBeNull();
+  });
+
+  it('keeps a staff admin on the content paths, editors included', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    await renderAt('/admin/pages/new');
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+  });
+
+  it('waits for the tier probe too, so the docket never draws the staff set and then grows', async () => {
+    // The drafts probe answers at once and the tier probe hangs: the gate
+    // must still be checking, because a docket drawn before the tier is
+    // known would be the staff docket for every operator, for a tick.
+    pendingProbe = true;
+    adminProbeShouldSucceed = true;
+    await renderAt('/admin/pages');
+    expect(screen.getByRole('status', { name: 'Checking your access…' })).toBeInTheDocument();
+    await act(async () => {
+      pendingProbe.resolve({ docs: [] });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('link', { name: 'Branding' })).toBeInTheDocument();
+    expect(screen.getByText('Operator')).toBeInTheDocument();
   });
 });
