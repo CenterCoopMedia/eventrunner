@@ -37,17 +37,17 @@ and the pull request says "Refs #177", not "Closes".
 
 | Id | Model | Issues | State |
 |---|---|---|---|
-| a1 | Sonnet | #248, #227, #230, #247 | reviewed, fixed, integrated |
+| a1 | Sonnet | #248, #227, #230, #247 | merged as #263 |
 | a2 | Opus | #231, #226 | merged as #262 |
 | a3 | Fable | design wave 2 of #249, #234 | reviewing the catalog split |
-| a4 | Fable | #186, #187 | fixing review findings |
-| b1 | Opus | #178, #179, #180, #181, #182 | queued |
-| b2 | Opus | #183 | queued, after a4 |
-| b3 | Opus | #184, #185 | queued |
+| a4 | Fable | #186, #187 | fixed; second review of the fixes running |
+| b1 | Opus | #178, #179, #180, #181, #182 | dispatched from the tiers tip |
+| b2 | Opus | #183 | dispatched from the tiers tip |
+| b3 | Opus | #184, #185 | dispatched from the tiers tip |
 | b4 | Opus | #188 | queued |
 | b5 | Opus | #189 | queued |
-| b6 | Opus | #218 | dispatched from the #262 tip |
-| b7 | Fable | #177 decision record only | opened as #264 |
+| b6 | Opus | #218 | reviewed, fixed, integrated |
+| b7 | Fable | #177 decision record only | merged as #264 |
 | c1 | Opus | #190, #191 | queued (M10) |
 | c2 | Opus | #192, #193 | queued |
 | c3 | Opus | #194 | queued |
@@ -70,8 +70,10 @@ and the pull request says "Refs #177", not "Closes".
 | Pull request | Branch | Issues |
 |---|---|---|
 | #262 (merged 2026-09-23) | `joe/confident-gates-gy99ip` | #231, #226 |
-| #263 | `joe/confident-gates-gy99ip`, restarted from main | #248, #227, #230, #247 |
-| #264 | `joe/confident-gates-gy99ip-3-calendar-record` | refs #177 (record only) |
+| #263 (merged 2026-09-23) | `joe/confident-gates-gy99ip`, restarted from main | #248, #227, #230, #247 |
+| #264 (merged 2026-09-23) | `joe/confident-gates-gy99ip-3-calendar-record` | refs #177 (record only; status still Proposed) |
+| next | `joe/confident-gates-gy99ip`, restarted from main | #218 |
+| after it | `joe/confident-gates-gy99ip-5-admin-tiers` | #186, #187 |
 
 ### After every integration
 
