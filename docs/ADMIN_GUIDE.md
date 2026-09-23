@@ -199,7 +199,7 @@ A place is one named room or hall at the venue. Sessions, movements, and the ven
 Select **Add place** in the **Places** panel. Each place has three fields:
 
 - **Name**: The name readers see, such as Main hall. Required.
-- **Id**: The stable key that sessions, movements, and map markers store. Use lowercase letters, digits, and single hyphens, such as `main-hall`. For a new place, the id fills in from the name as you type. Type an id of your own and it stops following the name.
+- **Id**: The stable key that sessions, movements, and map markers store. Use lowercase letters, digits, and single hyphens, such as `main-hall`. For a new place, the id fills in from the name as you type. Type in the id field and the id stops following the name. Until you save, a movement or map marker that already picked the new place follows its id when the id changes.
 - **Floor**: Optional, such as Level 2. The room list beside the venue map and the transfer line both show it.
 
 **Keep a saved id the same.** Change a place's name as often as you need to; the id stays. A saved place's id does not follow its name. If you change a saved id anyway, every movement and marker that named the old id is refused until you point it at the new one. The server also refuses the save while a live or draft session still uses the old id.

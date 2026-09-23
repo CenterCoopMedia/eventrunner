@@ -13,7 +13,16 @@ const PLACE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EMPTY_REFERENCES = Object.freeze([]);
 const EMPTY_MAP = Object.freeze({ image: '', alt: '', markers: EMPTY_REFERENCES });
 
-export const blankPlace = () => ({ id: '', name: '', floor: '', persisted: false });
+// `persisted` and `idTouched` are the form's own flags, never stored:
+// venueReferencesPayload sends id, name, and floor only. A new place's id
+// follows its name until `idTouched` says somebody typed in the id field.
+export const blankPlace = () => ({
+  id: '',
+  name: '',
+  floor: '',
+  persisted: false,
+  idTouched: false,
+});
 export const blankMovement = () => ({
   from: '',
   to: '',
@@ -260,12 +269,47 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
     [places],
   );
 
-  const changePlace = (index, patch) =>
-    onChange({
-      places: places.map((place, placeIndex) =>
-        placeIndex === index ? { ...place, ...patch } : place,
+  /**
+   * Change one place. When an UNSAVED place's id moves, every movement and
+   * marker that already picked it moves too, in the same change: the id is
+   * the only thing they store, so left alone they would point at nothing.
+   * A saved place's id is left to the rule the server enforces instead.
+   * Nothing is rewritten from or to an empty id, or from an id another row
+   * also carries, because then there is no one place the references mean.
+   */
+  const changePlace = (index, patch) => {
+    const place = places[index];
+    const change = {
+      places: places.map((entry, placeIndex) =>
+        placeIndex === index ? { ...entry, ...patch } : entry,
       ),
-    });
+    };
+    const oldId = place.id;
+    const nextId = patch.id;
+    const idMoves = !place.persisted
+      && typeof nextId === 'string'
+      && oldId
+      && nextId
+      && nextId !== oldId
+      && !places.some((other, otherIndex) => otherIndex !== index && other.id === oldId);
+    if (idMoves) {
+      const follow = (id) => (id === oldId ? nextId : id);
+      if (movements.some((movement) => movement.from === oldId || movement.to === oldId)) {
+        change.movements = movements.map((movement) => ({
+          ...movement,
+          from: follow(movement.from),
+          to: follow(movement.to),
+        }));
+      }
+      if (markers.some((marker) => marker.placeId === oldId)) {
+        change.map = {
+          ...map,
+          markers: markers.map((marker) => ({ ...marker, placeId: follow(marker.placeId) })),
+        };
+      }
+    }
+    onChange(change);
+  };
   const changeMovement = (index, patch) =>
     onChange({
       movements: movements.map((movement, movementIndex) =>
@@ -374,11 +418,11 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                       onChange={(value) => {
                         const patch = { name: value };
                         // A new place's id follows its name, key by key,
-                        // until somebody types an id of their own. A saved
+                        // until somebody types in the id field. A saved
                         // place's id never moves: sessions point at it.
-                        const following =
-                          !place.id || place.id === placeIdFromName(place.name);
-                        if (!place.persisted && following) patch.id = placeIdFromName(value);
+                        if (!place.persisted && !place.idTouched) {
+                          patch.id = placeIdFromName(value);
+                        }
                         changePlace(index, patch);
                       }}
                       error={errorFor(`venue.places[${index}].name`)}
@@ -386,7 +430,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                     <TextField
                       label={`Place ${index + 1} id`}
                       value={place.id}
-                      onChange={(value) => changePlace(index, { id: value })}
+                      onChange={(value) => changePlace(index, { id: value, idTouched: true })}
                       error={errorFor(`venue.places[${index}].id`) ?? errorFor('venue.places')}
                       hint="Lowercase letters, digits, and single hyphens. Keep a saved id stable."
                       className="font-admin-data"

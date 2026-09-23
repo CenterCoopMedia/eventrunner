@@ -131,7 +131,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   review threads. The main branch requires this check and CI, including for administrators.
 - In event settings, a new place's id kept only the first letter of the name typed into it, and a
   change to a place, movement, or map marker field moved keyboard focus out of the row. The id now
-  follows the whole name until you type an id of your own, and focus stays in the field.
+  follows the whole name until you type in the id field, and focus stays in the field. Until the
+  save, a movement or map marker that already picked a new place follows its id when it changes.
 
 - Pressing Save in an admin editor with an invalid field did nothing and said nothing, because the
   control was disabled. Save now stays enabled until the request starts, sends nothing while a
