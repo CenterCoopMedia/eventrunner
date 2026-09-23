@@ -29,7 +29,6 @@ import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminMedia from './pages/AdminMedia.jsx';
 import AdminMaterialsTab from './pages/AdminMaterialsTab.jsx';
-import AdminAttendees from './pages/AdminAttendees.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
@@ -61,6 +60,10 @@ const AdminBranding = lazy(() => import('./pages/AdminBranding.jsx'));
 // The email log carries the preview frame and its document builder; it is
 // one screen behind one link, so it waits for somebody to ask for it.
 const AdminEmailLog = lazy(() => import('./pages/AdminEmailLog.jsx'));
+// Attendees gained the export, the record panel, and the account delete
+// (issues 184 and 185), and with them it pushed the entry chunk past the
+// same ceiling. One screen behind one link, loaded the same way.
+const AdminAttendees = lazy(() => import('./pages/AdminAttendees.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -171,7 +174,10 @@ export default function AdminApp() {
           <Route path="branding" element={<DeferredAdminPage label="branding"><AdminBranding /></DeferredAdminPage>} />
           <Route path="media" element={<AdminMedia />} />
           <Route path="materials" element={<AdminMaterialsTab />} />
-          <Route path="attendees" element={<AdminAttendees />} />
+          <Route
+            path="attendees"
+            element={<DeferredAdminPage label="attendees"><AdminAttendees /></DeferredAdminPage>}
+          />
           <Route path="ticketing" element={<AdminTicketing />} />
           <Route path="live-updates" element={<AdminLiveUpdates />} />
           <Route path="feedback" element={<AdminFeedback />} />

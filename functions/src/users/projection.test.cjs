@@ -260,3 +260,17 @@ test('a features refresh removes stored custom badges when the flag is disabled'
   await refresh();
   assert.equal(Object.hasOwn(db.docs.get('users_public/u1'), 'customBadges'), false);
 });
+
+test('pastAttendance never reaches users_public', async () => {
+  // An organizer-owned field (issue 185, users/records.cjs): it is on the
+  // export and the account document, and on no public projection.
+  const { db, sync } = build({ 'users/u1': userDoc({ pastAttendance: ['2024', '2025'] }) });
+  assert.equal((await sync({ uid: 'u1' })).action, 'written');
+  assert.equal(Object.hasOwn(db.docs.get('users_public/u1'), 'pastAttendance'), false);
+
+  // An edit to the list alone changes nothing public, so nothing is written.
+  db.docs.set('users/u1', userDoc({ pastAttendance: ['2023', '2024', '2025'] }));
+  const before = db.writes.length;
+  assert.equal((await sync({ uid: 'u1' })).action, 'unchanged');
+  assert.equal(db.writes.length, before);
+});

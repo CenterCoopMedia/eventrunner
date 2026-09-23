@@ -162,7 +162,7 @@ An organizer can see how the event is going and act on it without leaving the ad
 - [x] Add session popularity to the admin (#182)
 - [x] Add the outbound email log (#183)
 - [x] Add attendee export (#184)
-- [ ] Extend attendee administration (#185)
+- [x] Extend attendee administration (#185)
 - [x] Add operator and staff admin tiers (#186)
 - [x] Add the admin access page (#187)
 - [ ] Add the change request queue (#188)

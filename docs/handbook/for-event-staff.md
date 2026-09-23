@@ -31,6 +31,8 @@ Custom badges are off by default. If enabled in Features, attendees can write up
 
 Approve and revoke registrations in Attendees. Select **Export** to save the rows on screen as a spreadsheet file. The file holds names, email addresses, organizations, roles, registration status, badges, past attendance, social handles, and profile visibility. Treat it as personal data. Every export is recorded in the admin log with your address.
 
+**Edit record** on a row holds what only organizers keep: the past attendance list, one edition per line. Attendees cannot change it. The same panel deletes an account. A delete takes the person out of the directory at once and removes their sign-in, saved sessions, notes, profile photo, and ticket claim. It cannot be undone. You cannot delete your own account, an admin account, or an account linked to a speaker. If a delete stops part way, select **Try the delete again**.
+
 ## Materials
 
 Upload or link files on the session. Embargo holds them until the session ends. Prefer a real label ("Slides") over a raw URL as the link text.

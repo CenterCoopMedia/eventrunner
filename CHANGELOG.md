@@ -82,6 +82,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Every export writes an `admin_logs` row with the actor, the row count, the status filter, and
   whether a search was used, never the search text; the server refuses the file when that row
   cannot be written, and keeps no copy of it.
+- Attendee records and a guarded account delete (#185). **Edit record** on an Attendees row opens
+  the organizer-owned past attendance list, saved through the staff-tier `updateAttendee`
+  endpoint; the rules deny the field to every client, its owner included. The same panel deletes
+  an account through `deleteAttendee`: one transaction checks that the account is not the
+  caller's, not an admin's, and not linked to a speaker, then removes the account, its directory
+  profile, and its schedule share, releases its ticket claims, and writes the audit row. The
+  sign-in, saved sessions, notes, and profile photos are cleared after it, and a part-way delete
+  keeps a "Try the delete again" action that resumes it. Approve and revoke are unchanged.
 
 - A `fact` block for a fact that is not a number (#234): The term, the fact itself, and one
   optional line under it. It renders through the new definition list device, a real `<dl>` ruled

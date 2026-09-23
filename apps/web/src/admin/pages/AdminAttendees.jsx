@@ -34,6 +34,14 @@
 // never the search text, which can name a person and would outlive them in
 // the audit row. The server re-reads each account, writes the admin_logs
 // row, and only then returns the file (functions/src/users/export.cjs).
+//
+// The organizer record (issue #185): "Edit record" on a row opens its
+// AttendeeRecordPanel, one at a time — the organizer-owned past attendance
+// list and the account delete. A deleted row leaves through the listener,
+// so a delete's result is stated HERE, at page level: a success line that
+// takes focus, or, when the account left the directory but some of its
+// data did not clear, an error notice that keeps the uid and offers "Try
+// the delete again" until a retry succeeds.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -49,6 +57,7 @@ import {
   rowMetaClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AttendeeRecordPanel, { AttendeeRecordToggle } from '../components/AttendeeRecordPanel.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -123,6 +132,17 @@ export default function AdminAttendees() {
   // A second press in the same tick, before the disabled state renders,
   // must not start a second export: each one writes an audit row.
   const exportingRef = useRef(false);
+  const [openUid, setOpenUid] = useState(null);
+  // { tone: 'ok', message } after a delete, or { tone: 'incomplete', uid,
+  // name, message } while an account is out of the directory with data
+  // still to clear. It outlives the row, which the listener removes.
+  const [deleteResult, setDeleteResult] = useState(null);
+  const [retrying, setRetrying] = useState(false);
+  const deleteResultRef = useRef(null);
+
+  useEffect(() => {
+    if (deleteResult) deleteResultRef.current?.focus();
+  }, [deleteResult]);
 
   useEffect(() => {
     return subscribeAdminCollection(
@@ -180,6 +200,33 @@ export default function AdminAttendees() {
     }
   }
 
+  function deleted({ name }) {
+    setOpenUid(null);
+    setDeleteResult({ tone: 'ok', message: `Deleted the account for ${name}.` });
+  }
+
+  function deleteIncomplete({ uid, name, message }) {
+    setOpenUid(null);
+    setDeleteResult({ tone: 'incomplete', uid, name, message });
+  }
+
+  async function retryDelete() {
+    if (deleteResult?.tone !== 'incomplete' || retrying) return;
+    const { uid, name } = deleteResult;
+    setRetrying(true);
+    try {
+      await call('deleteAttendee', { uid });
+      deleted({ name });
+    } catch (err) {
+      // A 404 on a retry means nothing of the account remains: the earlier
+      // call finished the work after all.
+      if (err?.status === 404) deleted({ name });
+      else deleteIncomplete({ uid, name, message: err.message });
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   async function removeCustomBadge(uid, badge) {
     const pendingKey = `${uid}:${badge}`;
     setRemovingBadges((current) => [...current, pendingKey]);
@@ -219,6 +266,31 @@ export default function AdminAttendees() {
 
       {exportResult?.tone === 'ok' ? <SaveStatus message={exportResult.message} /> : null}
       {exportResult?.tone === 'error' ? <Notice tone="error" message={exportResult.message} /> : null}
+
+      {deleteResult?.tone === 'ok' ? (
+        <p
+          ref={deleteResultRef}
+          tabIndex={-1}
+          role="status"
+          className="text-admin-sm text-admin-ink-secondary"
+        >
+          {deleteResult.message}
+        </p>
+      ) : null}
+      {deleteResult?.tone === 'incomplete' ? (
+        <div ref={deleteResultRef} tabIndex={-1} className="flex flex-col items-start gap-xs">
+          <Notice tone="error" message={`${deleteResult.name}: ${deleteResult.message}`} />
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={retryDelete}
+            disabled={retrying}
+            aria-busy={retrying ? 'true' : undefined}
+          >
+            {retrying ? 'Deleting…' : 'Try the delete again'}
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-end gap-sm">
         <div className="min-w-0 flex-1">
@@ -269,6 +341,11 @@ export default function AdminAttendees() {
                       {row.speakerId ? <StatusBadge tone="info">Speaker</StatusBadge> : null}
                     </div>
                     <p className={`mt-3xs truncate ${rowMetaClass}`}>{row.email}</p>
+                    {Array.isArray(row.pastAttendance) && row.pastAttendance.length > 0 ? (
+                      <p className={`mt-3xs ${rowMetaClass}`}>
+                        Past attendance: {row.pastAttendance.filter((entry) => typeof entry === 'string').join('; ')}
+                      </p>
+                    ) : null}
                     {Array.isArray(row.customBadges) && row.customBadges.length > 0 ? (
                       <div className="mt-xs">
                         <p className={rowMetaClass}>Custom badges</p>
@@ -304,7 +381,7 @@ export default function AdminAttendees() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="flex shrink-0 gap-xs">
+                  <div className="flex shrink-0 flex-wrap items-center gap-xs">
                     {canApprove(row) ? (
                       <button
                         type="button"
@@ -327,8 +404,20 @@ export default function AdminAttendees() {
                         onConfirm={() => act('revokeUser', row.id)}
                       />
                     ) : null}
+                    <AttendeeRecordToggle
+                      uid={row.id}
+                      open={openUid === row.id}
+                      onToggle={() => setOpenUid((current) => (current === row.id ? null : row.id))}
+                    />
                   </div>
                 </div>
+                {openUid === row.id ? (
+                  <AttendeeRecordPanel
+                    row={row}
+                    onDeleted={deleted}
+                    onDeleteIncomplete={deleteIncomplete}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>

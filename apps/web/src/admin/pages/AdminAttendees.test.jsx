@@ -281,3 +281,117 @@ describe('AdminAttendees export', () => {
     expect(exportButton()).toBeEnabled();
   });
 });
+
+// The organizer record (issue 185): the panel under a row, and a delete's
+// result stated at page level, where it outlives the row.
+describe('AdminAttendees record and delete', () => {
+  const INCOMPLETE = 'The account is out of the directory. Some of its data could not be cleared. Try again.';
+
+  function incompleteError() {
+    return Object.assign(new Error(INCOMPLETE), { code: 'delete-incomplete', status: 500 });
+  }
+
+  async function deleteFromPanel(name = 'Ada Lovelace') {
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit record' })[0]);
+    expect(screen.getByRole('region', { name: `Record for ${name}` })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this account' }));
+    await act(async () => { await Promise.resolve(); });
+  }
+
+  it('shows past attendance as a meta line on the row face', () => {
+    render(<AdminAttendees />);
+    pushRows([row({ pastAttendance: ['2024', '2025'] }), row({ id: 'uid-bo', displayName: 'Bo Reyes' })]);
+    const items = screen.getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('Past attendance: 2024; 2025');
+    expect(items[1]).not.toHaveTextContent('Past attendance');
+  });
+
+  it('opens one record at a time', () => {
+    render(<AdminAttendees />);
+    pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+    const [adaToggle, boToggle] = screen.getAllByRole('button', { name: 'Edit record' });
+
+    fireEvent.click(adaToggle);
+    expect(adaToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('region', { name: 'Record for Ada Lovelace' })).toBeInTheDocument();
+
+    fireEvent.click(boToggle);
+    expect(adaToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(boToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByRole('region', { name: 'Record for Ada Lovelace' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Record for Bo Reyes' })).toBeInTheDocument();
+  });
+
+  it('states a completed delete at page level and moves focus to it once the row has left', async () => {
+    callMock.mockReset();
+    callMock.mockResolvedValueOnce({ ok: true, uid: 'uid-ada', removed: {} });
+    render(<AdminAttendees />);
+    pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+
+    await deleteFromPanel();
+    expect(callMock).toHaveBeenCalledWith('deleteAttendee', { uid: 'uid-ada' });
+
+    // The listener drops the row.
+    pushRows([row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+    const done = screen.getByText('Deleted the account for Ada Lovelace.');
+    expect(done).toHaveAttribute('role', 'status');
+    expect(document.activeElement).toBe(done);
+    expect(screen.queryByText('Ada Lovelace')).toBeNull();
+  });
+
+  it('keeps a delete-incomplete notice and a retry after the row leaves; the retry deletes the kept uid', async () => {
+    callMock.mockReset();
+    callMock.mockRejectedValueOnce(incompleteError());
+    render(<AdminAttendees />);
+    pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+
+    await deleteFromPanel();
+    // The account left the directory, so the listener drops the row.
+    pushRows([row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(`Ada Lovelace: ${INCOMPLETE}`);
+    expect(document.activeElement).toBe(alert.parentElement);
+    const retry = screen.getByRole('button', { name: 'Try the delete again' });
+
+    // A retry that fails again keeps the notice and the retry.
+    callMock.mockRejectedValueOnce(incompleteError());
+    fireEvent.click(retry);
+    await act(async () => { await Promise.resolve(); });
+    expect(callMock).toHaveBeenLastCalledWith('deleteAttendee', { uid: 'uid-ada' });
+    expect(screen.getByRole('button', { name: 'Try the delete again' })).toBeInTheDocument();
+
+    // A retry that succeeds replaces it with the stated result.
+    let finish;
+    callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try the delete again' }));
+    const busy = screen.getByRole('button', { name: 'Deleting…' });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    await act(async () => { finish({ ok: true, uid: 'uid-ada', removed: {} }); });
+
+    expect(callMock).toHaveBeenCalledTimes(3);
+    expect(callMock.mock.calls.every(([name, body]) => name === 'deleteAttendee' && body.uid === 'uid-ada')).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Try the delete again' })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByText('Deleted the account for Ada Lovelace.'));
+  });
+
+  it('treats a 404 on the retry as done: nothing of the account remains', async () => {
+    callMock.mockReset();
+    callMock.mockRejectedValueOnce(incompleteError());
+    render(<AdminAttendees />);
+    pushRows([row()]);
+    await deleteFromPanel();
+    pushRows([]);
+
+    callMock.mockRejectedValueOnce(Object.assign(new Error('No such account.'), { code: 'not-found', status: 404 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try the delete again' }));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(screen.getByText('Deleted the account for Ada Lovelace.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try the delete again' })).toBeNull();
+  });
+});
+

@@ -13,6 +13,7 @@ import {
   collection,
   doc,
   deleteDoc,
+  deleteField,
   getDoc,
   getDocs,
   limit,
@@ -1557,3 +1558,101 @@ describe("attendee export: the source rows and the audit row (issue 184)", () =>
     await assertFails(getDoc(doc(nonAdmin(), "admin_logs/export-1")));
   });
 });
+
+// Organizer-owned account fields (issue 185). `pastAttendance` is written by
+// the updateAttendee endpoint alone. The rules deny it to every client by
+// leaving it off the self-edit allowlist, and this block is the proof: each
+// denied write has a control, the same write without the organizer field,
+// that succeeds — so the denial is for that key and nothing else.
+describe("organizer-owned account fields stay server-written (issue 185)", () => {
+  const PROFILE = {
+    email: "records@example.com",
+    displayName: "Records One",
+    pronouns: "",
+    bio: "",
+    organization: "",
+    jobTitle: "",
+    photoPath: null,
+    socialHandles: {},
+    badges: [],
+    profileVisibility: "attendees_only",
+    profileComplete: true,
+    registrationStatus: "approved",
+    approvalSource: "admin",
+    speakerId: null,
+    role: "attendee",
+  };
+  // One account with no list yet, and one that already holds a list.
+  const FRESH = { uid: "records-fresh", ...PROFILE };
+  const HELD = { uid: "records-held", ...PROFILE, pastAttendance: ["2024"] };
+
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "users/records-fresh"), FRESH);
+      await setDoc(doc(db, "users/records-held"), HELD);
+      await setDoc(doc(db, "users_public/records-held"), {
+        uid: "records-held",
+        displayName: "Records One",
+        badges: [],
+        profileVisibility: "attendees_only",
+        speakerId: null,
+      });
+      await setDoc(doc(db, "schedule_shares/records-held"), {
+        sessionIds: ["session-1"],
+        displayName: "Records One",
+        scheduleVisibility: "private",
+      });
+    });
+  });
+
+  const fresh = () => doc(attendee("records-fresh"), "users/records-fresh");
+  const held = () => doc(attendee("records-held"), "users/records-held");
+
+  it("the owner cannot set pastAttendance alone", async () => {
+    await assertFails(updateDoc(fresh(), { pastAttendance: ["2023"] }));
+  });
+
+  it("the owner cannot set it beside a field they own; the same edit without it succeeds", async () => {
+    await assertFails(updateDoc(fresh(), { displayName: "Records Renamed", pastAttendance: ["2023"] }));
+    await assertSucceeds(updateDoc(fresh(), { displayName: "Records Renamed" }));
+  });
+
+  it("the owner cannot set it through a setDoc that repeats every stored field; the same setDoc without it succeeds", async () => {
+    const stored = { ...FRESH, displayName: "Records Renamed" };
+    await assertFails(setDoc(fresh(), { ...stored, pastAttendance: ["2023"] }));
+    await assertSucceeds(setDoc(fresh(), { ...stored, bio: "A new bio." }));
+  });
+
+  it("the owner cannot change or remove a stored list, by update, deleteField, or a setDoc that leaves it out", async () => {
+    await assertFails(updateDoc(held(), { pastAttendance: ["2024", "2025"] }));
+    await assertFails(updateDoc(held(), { pastAttendance: [] }));
+    await assertFails(updateDoc(held(), { pastAttendance: deleteField() }));
+    const { pastAttendance: _list, ...withoutList } = HELD;
+    await assertFails(setDoc(held(), withoutList));
+    // The control: repeating the stored list unchanged is not a write to it.
+    await assertSucceeds(setDoc(held(), { ...HELD, bio: "Still here." }));
+    await assertSucceeds(updateDoc(held(), { bio: "Here again." }));
+  });
+
+  it("another attendee and both admin tiers are denied the same writes from the browser", async () => {
+    for (const db of [attendee("approved-1"), staff(), admin()]) {
+      await assertFails(updateDoc(doc(db, "users/records-fresh"), { pastAttendance: ["2023"] }));
+      await assertFails(updateDoc(doc(db, "users/records-held"), { pastAttendance: deleteField() }));
+    }
+  });
+
+  it("no client of either tier can delete the account, its directory profile, or its schedule share", async () => {
+    for (const db of [staff(), admin(), attendee("records-held")]) {
+      await assertFails(deleteDoc(doc(db, "users/records-held")));
+      await assertFails(deleteDoc(doc(db, "users_public/records-held")));
+      await assertFails(deleteDoc(doc(db, "schedule_shares/records-held")));
+    }
+  });
+
+  it("the owner can still read their own account document, list included", async () => {
+    const snap = await assertSucceeds(getDoc(held()));
+    if (!snap.data().pastAttendance) throw new Error("pastAttendance is on the owner's own account document");
+  });
+});
+

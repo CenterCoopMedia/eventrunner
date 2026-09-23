@@ -30,7 +30,7 @@ Session files and links stay closed until the session is over, unless staff rele
 
 ## Profile and directory
 
-Your public profile is the slice other attendees can see. The rest stays on your account. You pick badges from the list the event offers. If the event enables custom badges, you can also enter up to three short badges on your profile. Each is limited to 24 characters. Blocked words and duplicate badges are refused. Staff can remove a custom badge.
+Your public profile is the slice other attendees can see. The rest stays on your account. You pick badges from the list the event offers. If the event enables custom badges, you can also enter up to three short badges on your profile. Each is limited to 24 characters. Blocked words and duplicate badges are refused. Staff can remove a custom badge. Organizers keep a list of the past editions you attended on your account, and they can delete your account on request.
 
 ## FAQ and long pages
 
