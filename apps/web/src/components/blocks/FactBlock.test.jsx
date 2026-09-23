@@ -14,8 +14,8 @@ const termNamed = (term) =>
 const WHERE = {
   blockType: 'fact',
   label: 'Where',
-  value: 'Harborlight Hall',
-  note: '12 Quay Street, Portsmouth',
+  value: 'Test Hall',
+  note: '1 Test Way',
 };
 
 describe('FactBlock', () => {
@@ -26,7 +26,7 @@ describe('FactBlock', () => {
       </dl>,
     );
     expect(termNamed('Where')).toBeInTheDocument();
-    expect(screen.getByText('Harborlight Hall').tagName).toBe('DD');
+    expect(screen.getByText('Test Hall').tagName).toBe('DD');
   });
 
   it('renders the optional note under the description, and nothing when there is none', () => {
@@ -59,7 +59,7 @@ describe('FactBlock', () => {
     const { container } = render(
       <dl>
         <FactBlock block={{ blockType: 'fact', label: 'Where', value: '  ' }} />
-        <FactBlock block={{ blockType: 'fact', value: 'Harborlight Hall' }} />
+        <FactBlock block={{ blockType: 'fact', value: 'Test Hall' }} />
       </dl>,
     );
     expect(container.querySelector('dl')).toBeEmptyDOMElement();

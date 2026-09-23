@@ -89,7 +89,8 @@ describe('Home', () => {
     const infoSection = home.sections.find((s) => s.id === 'info');
     expect(screen.getAllByRole('heading', { name: infoSection.label })).toHaveLength(1);
     // The cards are facts (#234): a term and a description, no evidence.
-    expect(screen.getByText(siteContent.info__when.value)).toBeInTheDocument();
+    // The hero states the range too, so the card is found as its <dd>.
+    expect(screen.getByText(siteContent.info__when.value, { selector: 'dd' })).toBeInTheDocument();
     expect(screen.getByText(siteContent.info__where.value)).toBeInTheDocument();
     // The sponsor strip (M7 issue 10) draws the demo's own published
     // organizations on the home page, in the section's own place: it comes

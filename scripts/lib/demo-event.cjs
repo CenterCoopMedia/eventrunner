@@ -214,9 +214,11 @@ const DEMO_CONTENT = Object.freeze({
   hero__subtitle: {
     value: 'Sessions and workshops for people who operate local and cooperative newsrooms.'
   },
+  // The value stays the seed's: the range from the demo's own days, in the
+  // same shape the home page shows live while the fact is still seeded
+  // (pages/Home.jsx withLiveDates), so the snapshot and the page agree.
   info__when: {
     label: 'When',
-    value: '14–16 October 2026',
     note: 'Wednesday to Friday, in the Eastern timezone. Doors open at 09:00 each day.'
   },
   info__where: {

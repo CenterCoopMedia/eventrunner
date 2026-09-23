@@ -4,13 +4,14 @@
 // date used to resolve — and render — as if it were a real, different day.
 import { describe, expect, it } from 'vitest';
 import {
-  zonedDateTime,
   countdownParts,
+  eventDateRangeLabel,
   formatDayDate,
   formatEventDateRange,
   formatSessionStart,
   formatSessionTimeRange,
   resolveEventStart,
+  zonedDateTime,
 } from './eventTime.js';
 
 describe('zonedDateTime', () => {
@@ -196,5 +197,29 @@ describe('countdownParts', () => {
 
   it('is zeroed for non-finite input', () => {
     expect(countdownParts(NaN)).toEqual({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  });
+});
+
+describe('eventDateRangeLabel', () => {
+  // The same shapes the seed writes into the home page's When fact
+  // (scripts/lib/seed.cjs eventDateRange), so the fact the page shows live
+  // and the fact the seed stored agree to the character.
+  it('states one day, a run inside a month, a run across months, and a run across years', () => {
+    expect(eventDateRangeLabel({ days: [{ date: '2026-10-14' }] })).toBe('October 14, 2026');
+    expect(
+      eventDateRangeLabel({ days: [{ date: '2026-10-16' }, { date: '2026-10-14' }, { date: '2026-10-15' }] }),
+    ).toBe('October 14–16, 2026');
+    expect(eventDateRangeLabel({ days: [{ date: '2026-09-30' }, { date: '2026-10-02' }] })).toBe(
+      'September 30 – October 2, 2026',
+    );
+    expect(eventDateRangeLabel({ days: [{ date: '2026-12-31' }, { date: '2027-01-02' }] })).toBe(
+      'December 31, 2026 – January 2, 2027',
+    );
+  });
+
+  it('answers null with no dated day, and ignores a malformed date', () => {
+    expect(eventDateRangeLabel({ days: [] })).toBeNull();
+    expect(eventDateRangeLabel({})).toBeNull();
+    expect(eventDateRangeLabel({ days: [{ date: 'soon' }, { date: '2026-10-14' }] })).toBe('October 14, 2026');
   });
 });

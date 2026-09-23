@@ -175,12 +175,13 @@
     "--definition-list-term-width": "9rem",
     "--definition-list-pad-block": "var(--space-xs)"
   },
-  "$pull-quote-note": "A quoted sentence from a speaker or a session, with its attribution (record §3.1). One per page at most. The TEXT is the callout device: PullQuote renders its sentence through Callout.jsx, so the face, the size, the ink and the angle come from the callout contract and Zine's handwritten line is the same element as every other style's quote. What this contract holds is the frame around the sentence: the rules above and below, the rule at the inline start, the large opening mark, the alignment, and the attribution's face. The Quote device option group in each preset remaps both contracts.",
+  "$pull-quote-note": "A quoted sentence from a speaker or a session, with its attribution (record §3.1). One per page at most. The TEXT is the callout device: PullQuote renders its sentence through Callout.jsx, so the face, the size, the ink and the angle come from the callout contract and Zine's handwritten line is the same element as every other style's quote. What this contract holds is the frame around the sentence: the rules above and below, the rule at the inline start, the marks, the alignment, and the attribution's face. Every style draws quotation marks, because the editor tells operators not to type them: either the large opening mark above the sentence (--pull-quote-mark-display) or the inline pair around it (--pull-quote-quotes-display), never both and never neither. The Quote device option group in each preset remaps both contracts.",
   "pull-quote": {
     "--pull-quote-rule-rgb": "--rule-strong-rgb",
     "--pull-quote-rule-block-width": "var(--rule-strong-width)",
     "--pull-quote-rule-inline-width": "0",
     "--pull-quote-mark-display": "none",
+    "--pull-quote-quotes-display": "inline",
     "--pull-quote-mark-font": "var(--font-heading)",
     "--pull-quote-align": "start",
     "--pull-quote-pad-inline": "0",
@@ -220,7 +221,7 @@
     "--notice-bar-word-transform": "uppercase",
     "--notice-bar-pad-block": "var(--space-sm)"
   },
-  "$table-note": "Rows and columns a reader compares (record §3.1): a real <table> with row rules, tabular figures, a sticky head, and a horizontal scroll region at narrow widths. A sortable head holds a <button> that sorts, and the <th> carries aria-sort. The Table rules option group in each preset picks hairline rows, a ruled head, or the full grid by remapping the three widths here; the head's face and case are the style's own.",
+  "$table-note": "Rows and columns a reader compares (record §3.1): a real <table> with row rules, tabular figures, and a horizontal scroll region at narrow widths; the head does not stick, because the region is the scroll container. A sortable head holds a <button> that sorts, and the <th> carries aria-sort. The Table rules option group in each preset picks hairline rows, a ruled head, or the full grid by remapping the three widths here; the head's face and case are the style's own.",
   "table": {
     "--table-rule-rgb": "--rule-hairline-rgb",
     "--table-rule-width": "var(--rule-hairline-width)",
@@ -243,11 +244,12 @@
     "--avatar-radius": "var(--radius-base)",
     "--avatar-font": "var(--font-heading)"
   },
-  "$dropzone-note": "Send a file (record §3.3): a ruled region around a real file input, a stated progress line with a <progress> element, and a sent list with a state word per file. The region's rule is the control boundary, drawn dashed at rest so an empty region reads as a place to put something, and solid while a file is held over it. Zine draws it solid and strong; Broadsheet and Field Guide keep a hairline.",
+  "$dropzone-note": "Send a file (record §3.3): a ruled region around a real file input, a stated progress line with a <progress> element, and a sent list with a state word per file. The region's rule is the control boundary, drawn dashed at rest so an empty region reads as a place to put something, and solid at the drag width while a file is held over it, so the state is a change of style and of weight and never the accent alone. Zine draws it solid and strong at rest and doubles the drag width; Atlas draws it solid at rest and widens it; Broadsheet and Field Guide keep a hairline. In error the region takes the strong rule in the danger ink.",
   "dropzone": {
     "--dropzone-rule-rgb": "--color-border-control-rgb",
     "--dropzone-rule-width": "var(--rule-hairline-width)",
     "--dropzone-rule-style": "dashed",
+    "--dropzone-drag-rule-width": "var(--rule-strong-width)",
     "--dropzone-ground": "rgb(var(--color-surface-rgb))",
     "--dropzone-pad": "var(--space-lg)",
     "--dropzone-radius": "var(--radius-base)"

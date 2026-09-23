@@ -15,6 +15,12 @@
 //
 // A REMOVE CONTROL NAMES ITS ROW. "Remove" six times is six identical
 // buttons to a screen reader; "Remove link 2" is not.
+//
+// THE ADD CONTROL STAYS AT THE CAP (expansion record §2.1: an unavailable
+// control is never removed). It takes `aria-disabled="true"`, refuses to
+// act, and says why in its own name — "Add a link (4 of 4, the limit)" —
+// so a reader who reaches it learns the limit rather than finding the
+// control gone.
 import { useEffect, useRef } from 'react';
 import { quietActionClass } from '../controlClasses.js';
 
@@ -27,8 +33,8 @@ import { quietActionClass } from '../controlClasses.js';
  * @param {(id: string) => void} props.onRemove
  * @param {string} [props.addLabel]
  * @param {string} [props.rowName] the noun a remove control names: "link"
- * @param {number} [props.max] rows the list may hold; the add control goes
- *   when it is reached, and the legend says so
+ * @param {number} [props.max] rows the list may hold; at the cap the add
+ *   control stays, unavailable, and its name says so
  * @param {string} [props.emptyLine] what the list says with no row in it
  */
 export default function Repeater({
@@ -99,13 +105,20 @@ export default function Repeater({
           </li>
         ))}
       </ol>
-      {full ? null : (
-        <div>
-          <button ref={addRef} type="button" className={quietActionClass} onClick={onAdd}>
-            {addLabel}
-          </button>
-        </div>
-      )}
+      <div>
+        <button
+          ref={addRef}
+          type="button"
+          className={quietActionClass}
+          aria-disabled={full || undefined}
+          onClick={() => {
+            if (!full) onAdd();
+          }}
+        >
+          {addLabel}
+          {full ? <span className="sr-only">{` (${rows.length} of ${max}, the limit)`}</span> : null}
+        </button>
+      </div>
     </fieldset>
   );
 }

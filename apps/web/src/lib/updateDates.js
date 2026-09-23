@@ -17,15 +17,34 @@ export function toPublishDate(publishAt) {
   return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
-/** "October 15, 2026" display copy, or null when unresolvable. */
-export function publishDateLabel(publishAt) {
+/**
+ * A formatter in the event's zone, or in the reader's when none is given or
+ * the given one is not a zone the runtime knows. A dateline carries the
+ * event's clock (design record §3.1): a post published late in the evening
+ * at the venue is dated that day, not the reader's next morning.
+ */
+function formatterIn(timeZone, options) {
+  if (typeof timeZone === 'string' && timeZone) {
+    try {
+      return new Intl.DateTimeFormat(DISPLAY_LOCALE, { timeZone, ...options });
+    } catch {
+      // An unknown zone: fall through to the reader's clock rather than
+      // failing the page over a date.
+    }
+  }
+  return new Intl.DateTimeFormat(DISPLAY_LOCALE, options);
+}
+
+/**
+ * "October 15, 2026" display copy, or null when unresolvable.
+ *
+ * @param {*} publishAt
+ * @param {string} [timeZone] the event's zone (config/event.timezone)
+ */
+export function publishDateLabel(publishAt, timeZone) {
   const date = toPublishDate(publishAt);
   if (!date) return null;
-  return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
+  return formatterIn(timeZone, { month: 'long', day: 'numeric', year: 'numeric' }).format(date);
 }
 
 /**
@@ -49,11 +68,17 @@ export function sortUpdates(updates) {
   });
 }
 
-/** "October 2026" — the standing head one month of the feed sits under. */
-export function publishMonthLabel(publishAt) {
+/**
+ * "October 2026" — the standing head one month of the feed sits under, on
+ * the event's clock when a zone is given.
+ *
+ * @param {*} publishAt
+ * @param {string} [timeZone]
+ */
+export function publishMonthLabel(publishAt, timeZone) {
   const date = toPublishDate(publishAt);
   if (!date) return null;
-  return new Intl.DateTimeFormat(DISPLAY_LOCALE, { month: 'long', year: 'numeric' }).format(date);
+  return formatterIn(timeZone, { month: 'long', year: 'numeric' }).format(date);
 }
 
 /**
@@ -78,9 +103,10 @@ export function publishMonthLabel(publishAt) {
  * hold a post the sort would have put elsewhere.
  *
  * @param {Array<object>} sorted output of sortUpdates
+ * @param {string} [timeZone] the event's zone, so a month head is the event's month
  * @returns {Array<{ kind: 'pinned'|'month'|'undated', label: string, members: object[] }>}
  */
-export function groupUpdates(sorted) {
+export function groupUpdates(sorted, timeZone) {
   const runs = [];
   const push = (kind, label, update) => {
     const last = runs[runs.length - 1];
@@ -92,7 +118,7 @@ export function groupUpdates(sorted) {
       push('pinned', 'Pinned', update);
       continue;
     }
-    const month = publishMonthLabel(update?.publishAt);
+    const month = publishMonthLabel(update?.publishAt, timeZone);
     if (month) push('month', month, update);
     else push('undated', 'Undated', update);
   }

@@ -28,6 +28,7 @@ import NotFound from './NotFound.jsx';
 import VenueMap, { useVenueMapImage } from '../components/VenueMap.jsx';
 import AreaMap from '../components/AreaMap.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
+import { PullQuoteBudget } from '../components/blocks/pullQuoteBudget.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import LongReadOpening from '../components/editorial/LongReadOpening.jsx';
 import SectionIndexNav from '../components/SectionIndexNav.jsx';
@@ -295,6 +296,9 @@ export default function ContentPage() {
   };
 
   return (
+    // The page's one pull quote (expansion record §3.1) goes to the first
+    // quote block in the page's section order; any later one is set plain.
+    <PullQuoteBudget sections={page.sections ?? []} getSectionBlocks={getSectionBlocks}>
     <article>
       <h1 className="pb-lg font-heading text-h1 font-semibold text-text-primary">
         {pageHeading(page)}
@@ -437,5 +441,6 @@ export default function ContentPage() {
         </>
       )}
     </article>
+    </PullQuoteBudget>
   );
 }

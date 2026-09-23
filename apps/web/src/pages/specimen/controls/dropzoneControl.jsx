@@ -40,7 +40,7 @@ export default Object.freeze({
   name: 'Dropzone',
   file: 'components/forms/Dropzone.jsx',
   contract: 'dropzone',
-  note: 'A real file input inside a ruled region; the region takes the one focus ring while the input has focus. Progress is a stated line with a progress element, and each sent file carries a state word. The rule is dashed at rest and solid while a file is held over it.',
+  note: 'A real file input inside a ruled region; the region takes the one focus ring while the input has focus. Progress is a stated line with a progress element and the region says it is busy; each sent file carries a state word in one status region. The rule is dashed at rest and solid at the strong width while a file is held over it, and a refusal draws the strong rule in the danger ink as well as its sentence.',
   states: Object.freeze(['rest', 'disabled', 'busy', 'error', 'success']),
   absent: Object.freeze([
     fieldRegister('hover'),

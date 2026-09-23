@@ -31,7 +31,7 @@ export default Object.freeze({
   name: 'Segmented control',
   file: 'components/forms/SegmentedControl.jsx',
   contract: null,
-  note: 'A radio group set as one ruled row. One tab stop; the arrow keys move and choose inside it. The chosen word takes the filled ground and the bold weight, so the state is never colour alone. An unavailable choice stays in the row with aria-disabled: the arrow keys land on it and a reader hears why, and it is never chosen.',
+  note: 'A radio group set as one ruled row. One tab stop; the arrow keys move and choose inside it. The chosen word takes the filled ground and the bold weight, so the state is never colour alone. An unavailable choice stays in the row with aria-disabled under a dashed rule: the arrow keys land on it, a reader hears why, a sighted reader sees the reason under the row while it has focus or the pointer, and it is never chosen.',
   states: Object.freeze(['rest', 'selected', 'disabled']),
   absent: Object.freeze([
     sharedGrammar('hover'),

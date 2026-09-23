@@ -28,6 +28,10 @@ function textBlock(id) {
   return { section: id, field: 'body', blockType: 'text', value: `${id} body`, order: 0 };
 }
 
+function quoteBlock(id, text) {
+  return { id: `${id}__quote`, section: id, field: 'quote', blockType: 'quote', text, order: 0 };
+}
+
 function renderPage(props = {}) {
   return render(
     <MemoryRouter>
@@ -260,5 +264,26 @@ describe('SystemPage renderSection', () => {
     const { container } = renderPage({ renderSection: custom });
     // The generic section still renders, and the empty one still does not.
     expect(readingOrder(container)).toEqual(['Core', 'one label', 'one body']);
+  });
+
+  // One pull quote per page at most (expansion record §3.1), and the page is
+  // what enforces it: the first quote in READING order takes the device,
+  // whatever the operator's section order says.
+  it('sets the first quote in reading order as the page’s pull quote and the rest plain', () => {
+    page = {
+      id: 'schedule',
+      sections: [section('main-one', 'main'), section('above-one', 'above')],
+    };
+    blocksBySection = {
+      'main-one': [quoteBlock('main-one', 'The second quote, further down the page.')],
+      'above-one': [quoteBlock('above-one', 'The first quote a reader meets.')],
+    };
+    const { container } = renderPage();
+    const pulled = container.querySelectorAll('figure.pull-quote');
+    expect(pulled).toHaveLength(1);
+    expect(pulled[0].textContent).toContain('The first quote a reader meets.');
+    const plain = container.querySelectorAll('figure.quote-plain');
+    expect(plain).toHaveLength(1);
+    expect(plain[0].textContent).toContain('The second quote, further down the page.');
   });
 });

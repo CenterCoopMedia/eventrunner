@@ -732,3 +732,26 @@ test('the remaps register once required, and a style resolves its picks in full'
   assert.throws(() => registerPresetRemaps({ presets: {} }), TypeError);
   assert.equal(presetRemapsLoaded(), true);
 });
+
+test('a resolver asked for a style before the remaps load throws, naming the module; a document with no style never does', () => {
+  // A fresh copy of the resolver, with nothing registered: what a first
+  // paint sees before the lazy chunk lands. The public path asks it for no
+  // style (the generated stylesheet already carries the look), and a
+  // document that names no preset resolves to nothing without the remaps.
+  const key = require.resolve('./theme.cjs');
+  const cached = require.cache[key];
+  delete require.cache[key];
+  try {
+    const fresh = require('./theme.cjs');
+    assert.equal(fresh.presetRemapsLoaded(), false);
+    assert.deepEqual(fresh.resolvePresetTokens({}), {});
+    assert.deepEqual(fresh.resolveComponentFonts({}), {});
+    assert.deepEqual(fresh.resolveFontRoles({ fonts: { heading: 'karrik' } }), { heading: 'karrik' });
+    assert.deepEqual(fresh.pickedChoices({}), []);
+    assert.throws(() => fresh.resolvePresetTokens({ preset: 'civic' }), /shared\/presetRemaps/);
+    assert.throws(() => fresh.resolveComponentFonts({ preset: 'zine' }), /shared\/presetRemaps/);
+    assert.throws(() => fresh.resolveFontRoles({ preset: 'zine' }), /shared\/presetRemaps/);
+  } finally {
+    require.cache[key] = cached;
+  }
+});

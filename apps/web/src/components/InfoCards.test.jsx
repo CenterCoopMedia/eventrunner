@@ -51,7 +51,7 @@ const WHEN_WHERE_WHO = [
 // line under the second.
 const THREE_FACTS = [
   fact('when', 'When', '14–16 October 2026', 'Doors open at 09:00.'),
-  fact('where', 'Where', 'Harborlight Hall', '12 Quay Street, Portsmouth'),
+  fact('where', 'Where', 'Test Hall', '1 Test Way'),
   line('where_transit', 'Ten minutes on foot from the station.'),
   fact('who', 'Who', 'Local newsroom staff and their partners'),
 ];
@@ -137,8 +137,8 @@ describe('InfoCards', () => {
     const lists = [...container.querySelectorAll('dl.definition-list')];
     expect(lists).toHaveLength(3);
     expect(termNamed('Where')).toBeInTheDocument();
-    expect(screen.getByText('Harborlight Hall').tagName).toBe('DD');
-    expect(screen.getByText('12 Quay Street, Portsmouth').tagName).toBe('DD');
+    expect(screen.getByText('Test Hall').tagName).toBe('DD');
+    expect(screen.getByText('1 Test Way').tagName).toBe('DD');
     // The line under the fact is that card's own.
     expect(within(lists[1].parentElement).getByText('Ten minutes on foot from the station.')).toBeInTheDocument();
     // No evidence fields are drawn, because a fact carries none.

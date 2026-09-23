@@ -1,11 +1,20 @@
 // RuledTable — rows and columns a reader compares (expansion record §3.1).
 //
 // A REAL <table>, with a caption, column heads, row rules, tabular figures,
-// a head that stays in view while the body scrolls under it, and a
-// horizontal scroll region at narrow widths so the page never scrolls
+// and a horizontal scroll region at narrow widths so the page never scrolls
 // sideways. A grid of divs would lose the reading a screen reader gives a
 // table — the column head announced with every cell — and that reading is
 // what a table is for.
+//
+// THE REGION SCROLLS, SO THE HEAD DOES NOT STICK (adversarial review of the
+// 2026-09-10 wave). The region is the table's scroll container: it takes
+// `overflow-x-auto` here, not from the caller, because a region that can
+// become a focusable landmark and cannot scroll is the defect the review
+// found. A head pinned inside a container that scrolls only sideways never
+// pins to anything the reader scrolls, and pinning it would mean bounding
+// the region's height and scrolling the table inside a box — a widget the
+// system does not draw. The tables on this site are short; the head is
+// read once and the rows follow it.
 //
 // A SORTABLE HEAD HOLDS A <button> THAT SORTS, AND THE <th> CARRIES
 // aria-sort. The button is the whole word, so the target is the word a
@@ -58,7 +67,10 @@ export default function RuledTable({
   if (heads.length === 0) return null;
 
   return (
-    <HorizontalScrollRegion label={caption} className={className}>
+    <HorizontalScrollRegion
+      label={caption}
+      className={['overflow-x-auto', className].filter(Boolean).join(' ')}
+    >
       <table className="ruled-table">
         <caption
           className={

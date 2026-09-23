@@ -81,8 +81,8 @@ export const BLOCK_TYPES = Object.freeze({
     id: 'quote',
     label: 'Quote',
     description:
-      'A quoted sentence from a speaker or a session, with who said it. One per page ' +
-      'at most.',
+      'A quoted sentence from a speaker or a session, with who said it. The first on a page ' +
+      'is set as the pull quote; any other is set as a plain quotation.',
     fields: [
       { id: 'text', type: 'string', required: true },
       { id: 'attribution', type: 'string', required: false },
@@ -145,12 +145,15 @@ export const STAT_CONTRACT_HINTS = Object.freeze({
  */
 export const FACT_HINTS = Object.freeze({
   label: 'The term. “Where”, “Who”, “Format”.',
-  value: 'The fact itself. “Harborlight Hall”, “Local newsroom staff”.',
+  value: 'The fact itself. “The main hall”, “Local newsroom staff”.',
   note: 'One line under the fact, if it needs one. An address, a way to get there.',
 });
 
 export const QUOTE_HINTS = Object.freeze({
-  text: 'The sentence as it was said, without quotation marks. The page draws those.',
+  text:
+    'The sentence as it was said, without quotation marks: the page draws them in every site ' +
+    'style. The first quote on a page is set as the pull quote; any quote after it is set as a ' +
+    'plain quotation in the body.',
   attribution: 'Who said it, and in what role. “Marisol Reyes, opening talk”.',
 });
 

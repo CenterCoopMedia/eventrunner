@@ -9,7 +9,7 @@ const termNamed = (term) =>
   [...document.querySelectorAll('dt')].find((node) => node.textContent === term) ?? null;
 
 const ITEMS = [
-  { term: 'Where', description: 'Harborlight Hall', note: '12 Quay Street, Portsmouth' },
+  { term: 'Where', description: 'Test Hall', note: '1 Test Way' },
   { term: 'Format', description: 'Workshops and panels' },
 ];
 
@@ -20,14 +20,14 @@ describe('DefinitionList', () => {
     expect(list).not.toBeNull();
     expect(list.querySelectorAll('dt')).toHaveLength(2);
     expect(termNamed('Where')).toBeInTheDocument();
-    expect(screen.getByText('Harborlight Hall').tagName).toBe('DD');
+    expect(screen.getByText('Test Hall').tagName).toBe('DD');
   });
 
   it('puts the note under the description as a second dd', () => {
     const { container } = render(<DefinitionList items={ITEMS} />);
     const first = container.querySelector('.definition-list__pair');
     expect(first.querySelectorAll('dd')).toHaveLength(2);
-    expect(first.querySelectorAll('dd')[1].textContent).toBe('12 Quay Street, Portsmouth');
+    expect(first.querySelectorAll('dd')[1].textContent).toBe('1 Test Way');
   });
 
   it('builds every pair out of the elements a dl allows', () => {

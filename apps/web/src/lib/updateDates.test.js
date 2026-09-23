@@ -5,9 +5,29 @@
 // of the page would drag August's month head above October's. Pinned is not
 // a date, so it is its own named run. These pin that.
 import { describe, expect, it } from 'vitest';
-import { groupUpdates, publishMonthLabel, sortUpdates } from './updateDates.js';
+import { groupUpdates, publishDateLabel, publishMonthLabel, sortUpdates } from './updateDates.js';
 
 const post = (id, publishAt, extra = {}) => ({ id, title: id, publishAt, ...extra });
+
+describe('publishDateLabel', () => {
+  // A dateline carries the event's clock (design record §3.1). Half past two
+  // in the morning UTC is still the evening before on the west coast, so a
+  // post published then is dated the evening before, whatever zone the
+  // reader's browser runs in.
+  it('dates a post on the event’s clock when the event’s zone is given', () => {
+    const instant = '2026-10-01T02:30:00Z';
+    expect(publishDateLabel(instant, 'America/Los_Angeles')).toBe('September 30, 2026');
+    expect(publishDateLabel(instant, 'Pacific/Auckland')).toBe('October 1, 2026');
+    expect(publishMonthLabel('2026-11-01T02:30:00Z', 'America/Los_Angeles')).toBe('October 2026');
+  });
+
+  it('falls back to the reader’s clock for no zone or a zone it does not know', () => {
+    const instant = '2026-10-01T12:00:00Z';
+    expect(publishDateLabel(instant)).toBe(publishDateLabel(instant, undefined));
+    expect(publishDateLabel(instant, 'Not/AZone')).toBe(publishDateLabel(instant));
+    expect(publishDateLabel(null, 'America/Los_Angeles')).toBeNull();
+  });
+});
 
 describe('publishMonthLabel', () => {
   it('names the month a post belongs to', () => {

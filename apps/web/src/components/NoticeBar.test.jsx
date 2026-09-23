@@ -46,6 +46,52 @@ describe('NoticeBar', () => {
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
+  it('shows a new notice that replaces a dismissed one in the same mounted slot', () => {
+    // The slot under the header stays mounted while the notice in it
+    // changes. A dismissal remembered as a flag would hide the next notice,
+    // urgent or not; keyed to the id, it hides only the one dismissed.
+    const { container, rerender } = render(<NoticeBar id="doors">Doors open at nine.</NoticeBar>);
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss this notice' }));
+    expect(container).toBeEmptyDOMElement();
+    rerender(
+      <NoticeBar id="closure" level="urgent">
+        The hall is closed this morning.
+      </NoticeBar>,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('The hall is closed this morning.');
+    // And the dismissed one stays dismissed if it comes back.
+    rerender(<NoticeBar id="doors">Doors open at nine.</NoticeBar>);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('hands focus to the main landmark after a dismissal, never to the body', () => {
+    render(
+      <>
+        <NoticeBar id="doors">Doors open at nine.</NoticeBar>
+        <main id="main-content" tabIndex={-1}>
+          The page.
+        </main>
+      </>,
+    );
+    const button = screen.getByRole('button', { name: 'Dismiss this notice' });
+    button.focus();
+    fireEvent.click(button);
+    expect(screen.getByRole('main')).toHaveFocus();
+  });
+
+  it('hands focus to the target the caller names', () => {
+    render(
+      <>
+        <NoticeBar id="doors" focusTargetId="after-notice">Doors open at nine.</NoticeBar>
+        <h1 id="after-notice" tabIndex={-1}>
+          The title
+        </h1>
+      </>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss this notice' }));
+    expect(screen.getByRole('heading')).toHaveFocus();
+  });
+
   it('shows the bar when storage refuses, which is the safe failure', () => {
     const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('blocked');

@@ -20,8 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Four more devices of the design vocabulary's second wave, each with a tier 3 contract every
   site style remaps and a figure in the specimen book: a timeline (an ordered list on the same
   spine the updates feed draws, dated by real dates), a ruled table (a real table with row rules,
-  tabular figures, a head that stays in view, a horizontal scroll region at narrow widths, and a
-  sortable head whose button sorts while the column carries `aria-sort`), a progress device (a
+  tabular figures, a horizontal scroll region at narrow widths, and a sortable head whose button
+  sorts while the column carries `aria-sort`), a progress device (a
   native `<progress>` with "3 of 5 tasks done" stated beside it, never a ring), and a notice bar (a
   ruled band with a level as a word and a rule weight, `status` or `alert`, with a dismiss control
   remembered per browser).
@@ -57,6 +57,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interaction states — it draws the states it has and says which ones it does not have, and why.
   A state that is missing looks the same as a state somebody decided against, and only one of
   those is a defect.
+
+### Fixed
+
+- The second wave's devices, after an adversarial review of the branch. The ruled table's scroll
+  region carries its own overflow, so a wide table scrolls inside it and the page never scrolls
+  sideways; the head no longer claims to stick, because a head pinned inside a region that scrolls
+  only sideways pins to nothing. A notice bar keys its dismissal to the notice it is showing now, so
+  a new or urgent notice in the same slot shows after an earlier one was dismissed, and it hands
+  focus to the main landmark rather than the body. One pull quote per page is enforced at render:
+  the first quote block in reading order is the pull quote and any later one is set as a plain
+  quotation, and every site style draws quotation marks (the large opening mark or an inline pair).
+  An unavailable tab or segment holds the row's one tab stop while it has focus, takes a dashed rule
+  a sighted reader sees, and shows its reason under the row while it has focus or the pointer. The
+  dropzone says it is busy while files go, announces its progress and its sent list through one
+  status region, draws the strong rule in the danger ink on a refusal, and invites the drop in one
+  sentence with the control's own label beside it. The repeater keeps its add control at the cap,
+  unavailable and named with the limit. Zine's urgent notice doubles the rule and Zine's and Atlas's
+  dropzone widens it while a file is held over it, so neither state is colour alone. An update's
+  dateline is formatted on the event's clock, not the reader's. The home page's seeded When fact
+  reads the dates live from the event settings for as long as it is still the seed's.
+- Upgrading a launched site to the fact block (#234) no longer states the venue twice or publishes a
+  new placeholder onto the home page: a seeded replacement is withheld while the blocks it replaces
+  survive as the client's (and those blocks are kept whole), and a placeholder is not created in a
+  section the client has already written. Both are reported by init as kept.
 
 ### Changed
 
