@@ -102,3 +102,44 @@ test('bootstrap re-runs report skip when the admin list is unchanged', () => {
   assert.equal(added.action, 'overwrite');
   assert.deepEqual(added.value.adminEmails, ['ops@example.org', 'new@example.org']);
 });
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('staff emails merge additively too, and an address promoted to operator leaves the staff list', () => {
+  const merged = mergeAdminEmails(
+    { adminEmails: ['ops@example.org'], staffEmails: ['granted-in-ui@example.org'] },
+    { adminEmails: ['granted-in-ui@example.org'], staffEmails: ['Desk@Example.org'] },
+  );
+  assert.deepEqual(merged.adminEmails, ['ops@example.org', 'granted-in-ui@example.org']);
+  assert.deepEqual(merged.staffEmails, ['desk@example.org']);
+});
+
+test('a bootstrap re-run keeps the staff a client granted through the UI, and reports skip when nothing moved', () => {
+  const existing = { adminEmails: ['ops@example.org'], staffEmails: ['desk@example.org'], createdAt: 'x' };
+  const same = decideConfigWrite({
+    docId: 'bootstrap',
+    existing,
+    next: { adminEmails: ['ops@example.org'], staffEmails: [], createdAt: 'y' },
+  });
+  assert.equal(same.action, 'skip');
+  assert.deepEqual(same.value.staffEmails, ['desk@example.org']);
+
+  const added = decideConfigWrite({
+    docId: 'bootstrap',
+    existing,
+    next: { adminEmails: ['ops@example.org'], staffEmails: ['new-desk@example.org'] },
+  });
+  assert.equal(added.action, 'overwrite');
+  assert.deepEqual(added.value.staffEmails, ['desk@example.org', 'new-desk@example.org']);
+  assert.equal(added.value.createdAt, 'x');
+});
+
+test('a bootstrap document from before the split (no staffEmails) merges to an empty staff list', () => {
+  const decision = decideConfigWrite({
+    docId: 'bootstrap',
+    existing: { adminEmails: ['ops@example.org'] },
+    next: { adminEmails: ['ops@example.org'], staffEmails: [] },
+  });
+  assert.equal(decision.action, 'skip');
+  assert.deepEqual(decision.value.staffEmails, []);
+});

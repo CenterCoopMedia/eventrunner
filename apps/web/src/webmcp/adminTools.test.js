@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ADMIN_TOOL_DEFINITIONS, adminToolInternals } from './adminTools.js';
+import { ADMIN_TOOL_DEFINITIONS, adminToolInternals, adminToolsForTier } from './adminTools.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -57,5 +57,33 @@ describe('admin WebMCP tools', () => {
       .toBe('unavailable-diagnostic');
     expect(adminToolInternals.errorResult({ status: 500 }).error.code)
       .toBe('temporary-server-failure');
+  });
+
+  // The two tiers (issue #186): each tool mirrors the tier its endpoint asks
+  // for, and a staff registration mounts the staff set only.
+  it('declares a tier on every tool, with only the system-error inspection held to operators', () => {
+    const byTier = (tier) => ADMIN_TOOL_DEFINITIONS.filter((tool) => tool.tier === tier).map((tool) => tool.name);
+    expect(byTier('operator')).toEqual(['inspect_system_errors']);
+    expect(byTier('staff')).toEqual([
+      'check_event_readiness',
+      'validate_current_page_draft',
+      'inspect_publish_queue',
+      'check_media_usage',
+      'check_ticketing_health',
+    ]);
+  });
+
+  it('mounts every tool for an operator, the staff set for staff, and nothing for an unknown tier', () => {
+    expect(adminToolsForTier('operator')).toBe(ADMIN_TOOL_DEFINITIONS);
+    expect(adminToolsForTier('staff').map((tool) => tool.name)).not.toContain('inspect_system_errors');
+    expect(adminToolsForTier('staff')).toHaveLength(5);
+    expect(adminToolsForTier(null)).toEqual([]);
+  });
+
+  it('passes the server’s tier refusal through as its own words', () => {
+    expect(adminToolInternals.errorResult({ status: 403, message: 'Operator access required.' }).error.message)
+      .toBe('Operator access is required.');
+    expect(adminToolInternals.errorResult({ status: 403, message: 'Admin access required.' }).error.message)
+      .toBe('Admin access is required.');
   });
 });

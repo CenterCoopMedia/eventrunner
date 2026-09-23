@@ -21,10 +21,12 @@ The admin set contains these tools:
 
 Each tool calls one fixed server endpoint. The current-page validator uses only the page id from the open admin editor route. It is unavailable on other admin routes.
 
+The admin set follows the admin tiers. An operator holds all six tools. A staff account holds five: `inspect_system_errors` is registered for operators only, and the server refuses it to staff regardless of what is registered.
+
 Results do not contain attendee records, ticket details, payments, invitations, email content, provider credentials, storage administration, secrets, tokens, or unrestricted internal logs. Publish and system-error lists report their total and truncated count. Media checks report the total, checked, and truncated asset counts without object paths.
 
 ## Limits
 
 The tools cannot save, publish, deploy, delete, send email, export data, change provider setup, or run an arbitrary function. Use the visible admin controls for all changes.
 
-Before either experimental setting is enabled outside the demo, invoke every tool in a real supported top-level browser and compare the result with the related screen. Confirm that public routes list no admin tool name. Sign out and confirm that the six admin names disappear. Record any mismatch as an issue.
+Before either experimental setting is enabled outside the demo, invoke every tool in a real supported top-level browser and compare the result with the related screen. Confirm that public routes list no admin tool name. Sign out and confirm that the admin names disappear. Record any mismatch as an issue.

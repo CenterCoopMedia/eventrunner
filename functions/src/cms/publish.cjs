@@ -47,7 +47,7 @@ async function gateAdminPost({ auth, getConfig }, req, res) {
     methodNotAllowed(res, ['POST']);
     return null;
   }
-  const verdict = await requireAdmin({ auth, getConfig }, req);
+  const verdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
   if (!verdict.ok) {
     sendError(res, verdict.status, verdict.code, verdict.message);
     return null;

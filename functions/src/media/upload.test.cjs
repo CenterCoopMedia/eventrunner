@@ -573,3 +573,31 @@ test('speakerPhotoDelete is POST-only', async () => {
   );
   assert.equal(res.statusCode, 405);
 });
+
+// ------------------------------------------------------- the two tiers (#186)
+
+const STAFF_EMAIL = 'staff@example.org';
+const tieredBootstrap = async () => ({ bootstrap: { adminEmails: [ADMIN_EMAIL], staffEmails: [STAFF_EMAIL] } });
+
+test('mediaUpload admits a staff admin — the media library is staff work', async () => {
+  const db = makeFakeDb({});
+  const res = fakeRes();
+  await createMediaUploadHandler(
+    deps(db, fakeBucket(), {
+      auth: { verifyIdToken: async () => ({ uid: 'staff-1', email: STAFF_EMAIL, email_verified: true }) },
+      getConfig: tieredBootstrap,
+    }),
+  )(post({ folder: 'cms-images', contentType: 'image/png', data: PNG }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('media_assets', ASSET_ID).uploadedBy, STAFF_EMAIL);
+});
+
+test('speakerPhotoUpload treats a staff admin as an admin: no ownership check', async () => {
+  const bucket = fakeBucket();
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler({
+    ...speakerAuthDeps(speakerWorld(), bucket, { uid: 'staff-1', email: STAFF_EMAIL }),
+    getConfig: tieredBootstrap,
+  })(post({ speakerId: 'rae', contentType: 'image/png', data: PNG }), res);
+  assert.equal(res.statusCode, 200);
+});

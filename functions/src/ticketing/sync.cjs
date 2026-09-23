@@ -338,7 +338,7 @@ function createTicketingSyncHandler({ db, provider, auth, getConfig, now, log = 
       res.status(405).json({ error: { code: 'method-not-allowed', message: 'Use POST.' } });
       return;
     }
-    const verdict = await requireAdmin({ auth, getConfig }, req);
+    const verdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
     if (!verdict.ok) {
       res.status(verdict.status).json({ error: { code: verdict.code, message: verdict.message } });
       return;

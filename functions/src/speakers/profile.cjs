@@ -24,7 +24,7 @@
  * fixture and the web app cannot drift from the server.
  */
 
-const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
+const { requireAdmin, resolveAdminTier, verifyAuthToken } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
 const { validateSpeaker, SELF_EDITABLE_SPEAKER_FIELDS } = require('shared/speaker');
@@ -96,7 +96,7 @@ async function gateAdminPost({ auth, getConfig }, req, res) {
     methodNotAllowed(res, ['POST']);
     return null;
   }
-  const verdict = await requireAdmin({ auth, getConfig }, req);
+  const verdict = await requireAdmin({ auth, getConfig }, req, { tier: 'staff' });
   if (!verdict.ok) {
     sendError(res, verdict.status, verdict.code, verdict.message);
     return null;
@@ -401,16 +401,13 @@ async function gateSpeakerSelfOrAdmin({ auth, getConfig }, req) {
   if (!decoded?.uid) {
     return { ok: false, status: 401, code: 'unauthorized', message: 'Authentication required.' };
   }
+  // Either tier counts: speakers are staff work (core/auth.cjs
+  // resolveAdminTier is the one predicate both tiers are read through).
   let isAdmin = false;
   const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
   if (email && decoded.email_verified === true) {
     const config = await getConfig();
-    const adminEmails = Array.isArray(config?.bootstrap?.adminEmails)
-      ? config.bootstrap.adminEmails
-      : [];
-    isAdmin = adminEmails.some(
-      (entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email,
-    );
+    isAdmin = resolveAdminTier(config?.bootstrap, email) !== null;
   }
   return {
     ok: true,

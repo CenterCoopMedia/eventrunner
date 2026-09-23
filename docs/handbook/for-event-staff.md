@@ -37,7 +37,7 @@ Your operator chose Eventbrite, a spreadsheet import, or no ticketing. Signup em
 
 ## When to email CCM instead of posting
 
-- Someone needs admin
+- Someone needs operator access (an operator can grant staff access from Settings → Access without asking)
 - Login codes are not arriving (sender domain / spam)
 - The site is down
 - You need a new day added after launch and the admin will not let you

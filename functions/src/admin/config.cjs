@@ -6,7 +6,16 @@
  * updateTheme, updateBadges. Every write:
  *
  *   1. Requires admin (core/auth requireAdmin — token + verified email +
- *      config/bootstrap.adminEmails membership).
+ *      config/bootstrap membership) at the doc's tier (issue #186):
+ *      features and theme are operator-only, because a feature flag or the
+ *      site's identity is a deployment decision; event and badges admit
+ *      staff, because dates, venue, places, tracks, the register link,
+ *      social handles, and the badge catalogue are the content an
+ *      organizer runs day to day. One field of config/event is held back:
+ *      `sender` (the outbound address and display name) needs an
+ *      operator, because it is the email identity verify-sender-domain.cjs
+ *      attests — a staff member changing it could point the deployment's
+ *      mail at an address nobody verified.
  *   2. Targets only {event, features, theme, badges}. `config/bootstrap`
  *      (the admin-list seed) and `config/providers` (a read-only mirror of
  *      Tier A deploy env) are NEVER writable from the panel, and the
@@ -104,6 +113,39 @@ const EVENT_EDITABLE_KEYS = Object.freeze([
 
 /** Only verify-sender-domain.cjs may set these (spec §1.3 item 3). */
 const SENDER_VERIFICATION_FIELDS = Object.freeze(['domainVerified', 'domainVerifiedAt']);
+
+/**
+ * Top-level config/event keys only an operator may write (issue #186).
+ * Everything else on EVENT_EDITABLE_KEYS is staff content.
+ */
+const EVENT_OPERATOR_KEYS = Object.freeze(['sender']);
+
+/**
+ * The tier each panel-writable doc asks of its caller (issue #186). The
+ * classification the module doc explains; `createConfigWriteHandler` reads
+ * it so every handler states its tier in exactly one place.
+ */
+const CONFIG_DOC_TIERS = Object.freeze({
+  event: 'staff',
+  features: 'operator',
+  theme: 'operator',
+  badges: 'staff',
+});
+
+/**
+ * Operator-only keys a staff payload touches, each named. Pure.
+ *
+ * @param {string} docId
+ * @param {object} payload
+ * @param {'operator'|'staff'} tier the caller's tier
+ * @returns {string[]}
+ */
+function findTierViolations(docId, payload, tier) {
+  if (tier === 'operator' || docId !== 'event') return [];
+  return EVENT_OPERATOR_KEYS
+    .filter((key) => key in payload)
+    .map((key) => `${key}: operator access required`);
+}
 
 /** Server-stamped bookkeeping — silently stripped from payloads. */
 const STAMP_FIELDS = Object.freeze(['updatedAt', 'updatedBy']);
@@ -382,13 +424,24 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
 function createConfigWriteHandler({ docId, action }, { db, auth, getConfig, now = Date.now, log = console }) {
+  // An unknown doc id falls to the strictest tier; applyConfigWrite then
+  // refuses it by name, so the two refusals agree on who gets past the gate.
+  const tier = CONFIG_DOC_TIERS[docId] ?? 'operator';
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, getConfig }, req, { tier });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const payload = req.body?.[docId];
     if (!isPlainObject(payload)) return badRequest(res, `${docId}: must be an object`);
+
+    // A staff save that carries an operator-only key is refused whole, by
+    // name, before anything is validated or written — the same shape every
+    // other read-only refusal takes, so the form can mark the field.
+    const tierViolations = findTierViolations(docId, payload, gate.tier);
+    if (tierViolations.length > 0) {
+      return sendError(res, 403, 'forbidden', tierViolations.join('; '));
+    }
 
     const actor = { uid: gate.uid, email: gate.email };
     let result;
@@ -474,7 +527,10 @@ module.exports = {
     deepMerge,
     stripStamps,
     createConfigWriteHandler,
+    findTierViolations,
     WRITABLE_CONFIG_DOCS,
+    CONFIG_DOC_TIERS,
+    EVENT_OPERATOR_KEYS,
     TIER_A_FIELDS,
     EVENT_EDITABLE_KEYS,
     SENDER_VERIFICATION_FIELDS,

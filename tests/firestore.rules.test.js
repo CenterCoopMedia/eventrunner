@@ -15,6 +15,7 @@ import {
   deleteDoc,
   getDoc,
   getDocs,
+  limit,
   query,
   serverTimestamp,
   setDoc,
@@ -23,6 +24,38 @@ import {
 } from "firebase/firestore";
 
 const ADMIN_EMAIL = "admin@example.com";
+const STAFF_EMAIL = "staff@example.com";
+
+/**
+ * Every collection an admin may read directly from the browser, with the
+ * tier it asks for (issue #186). `admin` here is "either tier"; `operator`
+ * is adminEmails only. The bootstrap doc itself is on no list on purpose:
+ * it is server-only for both tiers, and the config block below pins that.
+ * A new admin-readable collection is added HERE, so the both-tiers matrix
+ * below covers it without a hand-written case.
+ */
+const ADMIN_READABLE = [
+  { path: "cmsContent/hidden", tier: "admin" },
+  { path: "cmsContent_drafts/pub", tier: "admin" },
+  { path: "cmsSchedule/hidden", tier: "admin" },
+  { path: "cmsSchedule_drafts/pub", tier: "admin" },
+  { path: "cmsOrganizations/hidden", tier: "admin" },
+  { path: "cmsOrganizations_drafts/pub", tier: "admin" },
+  { path: "cmsTimeline/hidden", tier: "admin" },
+  { path: "cmsTimeline_drafts/pub", tier: "admin" },
+  { path: "cmsUpdates/hidden", tier: "admin" },
+  { path: "cmsUpdates_drafts/pub", tier: "admin" },
+  { path: "cmsPages/hidden", tier: "admin" },
+  { path: "cmsPages_drafts/pub", tier: "admin" },
+  { path: "cmsVersionHistory/v1", tier: "admin" },
+  { path: "cmsPublishQueue/q1", tier: "admin" },
+  { path: "admin_logs/l1", tier: "operator" },
+  { path: "media_assets/asset-1", tier: "admin" },
+  { path: "users/pending-1", tier: "admin" },
+  { path: "users_public/private-profile", tier: "admin" },
+  { path: "speakers/spk-tier", tier: "admin" },
+  { path: "feedback/f-tier", tier: "admin" },
+];
 
 /**
  * All six publishable collections from ADR §8.4 — the rules blocks are
@@ -44,11 +77,26 @@ function anon() {
   return testEnv.unauthenticatedContext().firestore();
 }
 
-/** Signed-in client whose (verified) email is on config/bootstrap.adminEmails. */
+/**
+ * Signed-in client whose (verified) email is on config/bootstrap.adminEmails
+ * — the OPERATOR tier (issue #186). Every pre-tier "admin" expectation in
+ * this file is an operator expectation, which is the point of keeping the
+ * list's name: an existing deployment's admins lose nothing.
+ */
 function admin() {
   return testEnv
     .authenticatedContext("admin-1", {
       email: ADMIN_EMAIL,
+      email_verified: true,
+    })
+    .firestore();
+}
+
+/** Signed-in client whose (verified) email is on config/bootstrap.staffEmails only. */
+function staff() {
+  return testEnv
+    .authenticatedContext("staff-1", {
+      email: STAFF_EMAIL,
       email_verified: true,
     })
     .firestore();
@@ -110,8 +158,27 @@ beforeAll(async () => {
     const db = ctx.firestore();
     await setDoc(doc(db, "config/bootstrap"), {
       adminEmails: [ADMIN_EMAIL],
+      staffEmails: [STAFF_EMAIL],
     });
     await setDoc(doc(db, "config/event"), { title: "Test event" });
+    // One row each in the two admin-readable collections the later suites
+    // seed inside their own beforeAll, so the both-tiers matrix has a
+    // document to read whatever order the suites run in.
+    await setDoc(doc(db, "speakers/spk-tier"), {
+      firstName: "Tier",
+      lastName: "Fixture",
+      slug: "tier-fixture",
+      email: "tier@example.com",
+      status: "draft",
+      uid: null,
+    });
+    await setDoc(doc(db, "feedback/f-tier"), {
+      message: "Tier fixture.",
+      email: null,
+      category: "other",
+      status: "new",
+      createdAt: new Date(),
+    });
     // publicAttendeeProfiles starts OFF: the rules gate a move to `public`
     // profile visibility on it, and setPublicProfilesFeature() flips it.
     await setDoc(doc(db, "config/features"), {
@@ -209,13 +276,109 @@ describe("config", () => {
     await assertFails(getDoc(doc(nonAdmin(), "config/bootstrap")));
   });
 
-  it("denies config/bootstrap even to admin-token clients", async () => {
+  it("denies config/bootstrap even to admin-token clients, of either tier", async () => {
     await assertFails(getDoc(doc(admin(), "config/bootstrap")));
+    await assertFails(getDoc(doc(staff(), "config/bootstrap")));
   });
 
   it("denies all client writes to config", async () => {
     await assertFails(setDoc(doc(anon(), "config/event"), { title: "x" }));
     await assertFails(setDoc(doc(admin(), "config/event"), { title: "x" }));
+  });
+
+  it("refuses a staff branding write, and an operator's too — config is written by the server alone (issue 186)", async () => {
+    // The tier split for WRITES is enforced by the server (updateTheme is
+    // operator-only there); the rules' part is that no browser, whatever
+    // its tier, writes a config document directly.
+    for (const docId of ["theme", "features", "event", "badges", "bootstrap"]) {
+      await assertFails(setDoc(doc(staff(), `config/${docId}`), { touched: true }));
+      await assertFails(updateDoc(doc(staff(), `config/${docId}`), { touched: true }));
+      await assertFails(setDoc(doc(admin(), `config/${docId}`), { touched: true }));
+    }
+  });
+});
+
+// The two admin tiers (issue #186): every admin-readable collection, read
+// as an operator and as a staff member. The matrix is the done-when line —
+// "rules tests cover both tiers on every admin collection" — so a new
+// admin-readable collection joins ADMIN_READABLE rather than getting a
+// one-off case that could describe one tier and forget the other.
+describe("admin tiers on every admin-readable collection (issue 186)", () => {
+  for (const { path, tier } of ADMIN_READABLE) {
+    it(`${path}: operator reads it`, async () => {
+      await assertSucceeds(getDoc(doc(admin(), path)));
+    });
+
+    if (tier === "admin") {
+      it(`${path}: staff reads it too`, async () => {
+        await assertSucceeds(getDoc(doc(staff(), path)));
+      });
+    } else {
+      it(`${path}: staff is refused — ${tier} tier only`, async () => {
+        await assertFails(getDoc(doc(staff(), path)));
+      });
+    }
+
+    it(`${path}: a signed-in non-admin and an anonymous client are refused`, async () => {
+      await assertFails(getDoc(doc(nonAdmin(), path)));
+      await assertFails(getDoc(doc(anon(), path)));
+    });
+
+    it(`${path}: neither tier may write it`, async () => {
+      await assertFails(setDoc(doc(staff(), path), { touched: true }));
+      await assertFails(setDoc(doc(admin(), path), { touched: true }));
+    });
+  }
+
+  it("the tier probe: staff may list a draft collection and may not list admin_logs", async () => {
+    // AuthContext.jsx learns "admin" from the first read and "operator"
+    // from the second; both are limit-1 list queries, so the shape is
+    // pinned here and not only the single-document reads above.
+    await assertSucceeds(getDocs(query(collection(staff(), "cmsContent_drafts"), limit(1))));
+    await assertFails(getDocs(query(collection(staff(), "admin_logs"), limit(1))));
+    await assertSucceeds(getDocs(query(collection(admin(), "admin_logs"), limit(1))));
+  });
+
+  it("staff access is case-insensitive on the token side, and needs a verified email", async () => {
+    const mixedCase = testEnv
+      .authenticatedContext("staff-2", { email: "Staff@Example.com", email_verified: true })
+      .firestore();
+    await assertSucceeds(getDoc(doc(mixedCase, "cmsContent_drafts/pub")));
+    const unverified = testEnv
+      .authenticatedContext("staff-3", { email: STAFF_EMAIL, email_verified: false })
+      .firestore();
+    await assertFails(getDoc(doc(unverified, "cmsContent_drafts/pub")));
+  });
+
+  it("an address on both lists is an operator — the wider grant wins", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "config/bootstrap"), {
+        adminEmails: [ADMIN_EMAIL, STAFF_EMAIL],
+        staffEmails: [STAFF_EMAIL],
+      });
+    });
+    await assertSucceeds(getDoc(doc(staff(), "admin_logs/l1")));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "config/bootstrap"), {
+        adminEmails: [ADMIN_EMAIL],
+        staffEmails: [STAFF_EMAIL],
+      });
+    });
+  });
+
+  it("a bootstrap document with no staffEmails field at all — every deployment set up before the split — keeps the operator working and admits no staff", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "config/bootstrap"), { adminEmails: [ADMIN_EMAIL] });
+    });
+    await assertSucceeds(getDoc(doc(admin(), "cmsContent_drafts/pub")));
+    await assertSucceeds(getDoc(doc(admin(), "admin_logs/l1")));
+    await assertFails(getDoc(doc(staff(), "cmsContent_drafts/pub")));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "config/bootstrap"), {
+        adminEmails: [ADMIN_EMAIL],
+        staffEmails: [STAFF_EMAIL],
+      });
+    });
   });
 });
 
