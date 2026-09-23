@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   card. A `quote` block renders a quoted sentence and its attribution through the new pull quote
   device, whose sentence is Zine's handwritten callout in every style and whose frame each style
   remaps. Both blocks are in the admin palette with a hint under each field.
+- Four more devices of the design vocabulary's second wave, each with a tier 3 contract every
+  site style remaps and a figure in the specimen book: a timeline (an ordered list on the same
+  spine the updates feed draws, dated by real dates), a ruled table (a real table with row rules,
+  tabular figures, a head that stays in view, a horizontal scroll region at narrow widths, and a
+  sortable head whose button sorts while the column carries `aria-sort`), a progress device (a
+  native `<progress>` with "3 of 5 tasks done" stated beside it, never a ring), and a notice bar (a
+  ruled band with a level as a word and a rule weight, `status` or `alert`, with a dismiss control
+  remembered per browser).
 - A specimen book at `/specimen`: every device the system has, drawn in the site style and display
   mode the page is set to, with the component file and the tier 3 contract beside each one.
   Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,
