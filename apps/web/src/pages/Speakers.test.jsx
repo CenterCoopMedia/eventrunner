@@ -78,7 +78,9 @@ describe('Speakers', () => {
     expect(container.querySelector('ul').className).toContain('sm:grid-cols-2');
     expect(container.querySelectorAll('li')).toHaveLength(2);
     for (const row of container.querySelectorAll('li')) {
-      expect(row.className).toContain('border-t-rule-hairline');
+      // The rule between entries is the plate's own, read from the directory
+      // contract (components/editorial: the `directory` contract).
+      expect(row.className).toContain('portrait-shelf__plate');
       expect(row.className).not.toContain('rounded');
     }
   });
@@ -109,7 +111,9 @@ describe('Speakers', () => {
     speakers = [PROJECTED];
     const { container } = renderSpeakers();
     expect(container.querySelector('.portrait-shelf__frame')).not.toBeNull();
-    expect(indexCss).toMatch(/\.portrait-shelf__frame \{[^}]*aspect-ratio: 1 \/ 1;/);
+    // The proportion is the directory contract's token, square by default
+    // (design/tokens/components.json).
+    expect(indexCss).toMatch(/\.portrait-shelf__frame \{[^}]*aspect-ratio: var\(--directory-portrait-aspect\);/);
     expect(indexCss).not.toMatch(/\.portrait-shelf__frame \{[^}]*border-radius: 50%/);
   });
 
@@ -131,7 +135,10 @@ describe('Speakers', () => {
     speakers = [PROJECTED];
     const { container } = renderSpeakers();
     const entry = container.querySelector('li');
-    expect(entry).toHaveClass('border-t-hairline', 'border-t-rule-hairline');
+    // The rule between entries is drawn by the plate's own rule, which reads
+    // the directory contract, so no border utility sits on the element.
+    expect(entry).toHaveClass('portrait-shelf__plate');
+    expect(indexCss).toMatch(/\.portrait-shelf__plate \{[^}]*border-block-start: var\(--directory-rule-width\)/);
     expect(entry.className).not.toContain('rounded-brand-lg');
     expect(container.querySelector('ul').className).not.toContain('sm:grid-cols-2');
   });

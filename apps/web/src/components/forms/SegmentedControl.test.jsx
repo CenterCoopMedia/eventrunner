@@ -70,4 +70,31 @@ describe('SegmentedControl', () => {
     const { options } = renderControl('all');
     expect(options[2].className).toContain('aria-checked:font-bold');
   });
+
+  // An unavailable option (expansion record §2.1): aria-disabled, focusable
+  // so it can explain itself, and every activation path refused.
+  it('marks an unavailable option and refuses to choose it by pointer or by key', () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        label="Range"
+        options={[OPTIONS[0], { ...OPTIONS[1], disabled: true, hint: 'No sessions this week' }, OPTIONS[2]]}
+        value="day"
+        onChange={onChange}
+      />,
+    );
+    const options = screen.getAllByRole('radio');
+    expect(options[1]).toHaveAttribute('aria-disabled', 'true');
+    expect(options[1]).not.toBeDisabled();
+    expect(options[1]).toHaveAccessibleName('Week (No sessions this week)');
+    fireEvent.click(options[1]);
+    expect(onChange).not.toHaveBeenCalled();
+    options[0].focus();
+    fireEvent.keyDown(screen.getByRole('radiogroup'), { key: 'ArrowRight' });
+    expect(options[1]).toHaveFocus();
+    expect(onChange).not.toHaveBeenCalled();
+    // From the unavailable option the next key moves on and chooses.
+    fireEvent.keyDown(screen.getByRole('radiogroup'), { key: 'ArrowRight' });
+    expect(onChange).toHaveBeenCalledWith('all');
+  });
 });

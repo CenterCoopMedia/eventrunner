@@ -40,7 +40,7 @@ The catalog is one flat, ordered list: Six styles, every one of them finished wo
 - **Devices**: The institutional letterhead header; the posted agenda for the schedule.
 - **Illustrations**: None.
 - **Why it is the default**: It is the plainest of the six, it targets the highest accessibility bar, and it is the look a client is least likely to have to undo. A fresh deployment starts here.
-- **Deeper controls**: The heading face can move to Source Serif 4 (warmer) or to Public Sans bold (drops the serif entirely, for an event that is not a document). The header can become a two-part lockup, for an event run by two organizations, or a compact standing head. The schedule can number its agenda items, which a formal proceeding often wants.
+- **Deeper controls**: The heading face can move to Source Serif 4 (warmer) or to Public Sans bold (drops the serif entirely, for an event that is not a document). The header can become a two-part lockup, for an event run by two organizations, or a compact standing head. The schedule can number its agenda items, which a formal proceeding often wants. A long read opens plain; a quote is a ruled minute or plain rules; the directory is ruled entries or portrait plates; a table takes the full grid; a section boundary keeps its folio, drops it, or moves it to the margin.
 
 ### Newsroom
 
@@ -51,7 +51,7 @@ The catalog is one flat, ordered list: Six styles, every one of them finished wo
 - **Shape**: The small radius, flat surfaces, comfortable spacing.
 - **Devices**: The rule-bounded bar header; the hairline row for a session.
 - **Illustrations**: None.
-- **Deeper controls**: The heading face can move to Newsreader at display weights (one family throughout, quieter) or to Archivo bold condensed (more sessions per screen in a headline). The header can stack with a deck, which suits an event whose name needs a sentence after it, or become section-aware so the running header names where the reader is. Sessions can run as "lead and rest", which gives the first session of a day the room a keynote deserves.
+- **Deeper controls**: The heading face can move to Newsreader at display weights (one family throughout, quieter) or to Archivo bold condensed (more sessions per screen in a headline). The header can stack with a deck, which suits an event whose name needs a sentence after it, or become section-aware so the running header names where the reader is. Sessions can run as "lead and rest", which gives the first session of a day the room a keynote deserves. A long read opens on a standfirst; a quote is ruled with an opening mark, a side rule, or the mark alone; the directory is a portrait shelf or tall portraits; a table closes its head with a strong rule; a section boundary keeps its folio, drops it, or moves it to the margin.
 
 ### Zine
 
@@ -63,7 +63,7 @@ The catalog is one flat, ordered list: Six styles, every one of them finished wo
 - **Devices**: The full-sheet header; the flat block for a session.
 - **Illustrations**: None.
 - **The one exception in the whole system**: Zine may print a session block off-register, like a stamp that missed. It is the only place the design brief grants a deliberate imperfection, and it is **off by default** — a printing artefact is something a client turns on, not something they discover on their own schedule page.
-- **Deeper controls**: The heading face can move to Bagnard or Avara. The header can become a stacked block or a boxed bill. The session block can take the off-register stamp or the struck folio. Pen marks — the hand that went over the page afterwards — can be turned on, and they are their own control, so a client can take the stamp without the pen.
+- **Deeper controls**: The heading face can move to Bagnard or Avara. The header can become a stacked block or a boxed bill. The session block can take the off-register stamp or the struck folio. Pen marks — the hand that went over the page afterwards — can be turned on, and they are their own control, so a client can take the stamp without the pen. A long read opens plain; a quote is handwritten, a toner block in the poster face, or a cut-out beside a strong rule; the directory is a contact sheet or cut-outs; a table closes its head with a strong rule; a section boundary keeps its folio or drops it.
 
 ### Broadsheet
 
@@ -74,7 +74,7 @@ The catalog is one flat, ordered list: Six styles, every one of them finished wo
 - **Shape**: Sharp corners, flat surfaces, tight spacing — a broadsheet fits a lot on a page.
 - **Devices**: The full-measure header; the ruled programme for the schedule.
 - **Illustrations**: None.
-- **Deeper controls**: The heading face can move to Libre Baskerville or Spectral semibold. The header can centre itself under a double rule, or compact to the left with a standing edition line. The schedule can drop to an agate block — the dense small-type listing a printed programme uses when the day is long.
+- **Deeper controls**: The heading face can move to Libre Baskerville or Spectral semibold. The header can centre itself under a double rule, or compact to the left with a standing edition line. The schedule can drop to an agate block — the dense small-type listing a printed programme uses when the day is long. A long read opens on a drop cap; a quote is centred with an opening mark or set beside a column rule; the directory is an agate directory or plate portraits; a table takes the full hairline grid; a section boundary keeps its folio, drops it, or moves it to the margin.
 
 ### Field Guide
 
@@ -85,7 +85,7 @@ The catalog is one flat, ordered list: Six styles, every one of them finished wo
 - **Shape**: Sharp corners, comfortable spacing, and the paper tone available as an advanced setting.
 - **Devices**: A plain ruled title head; the specimen label for a session.
 - **Illustrations**: The botanical set exists for this style and ships **off**. Drawings on every page of a real programme read as decoration rather than as observation. Turn them on for an event where they mean something.
-- **Deeper controls**: The heading face can move to Vollkorn at display size or to Spectral semibold. The header can become a framed title page or a plate-and-label lockup. Sessions can run as a field-notes column. A pencil line can be turned on in the margins. The empty-state plate stays framed whatever you pick, because a blank sheet really is one.
+- **Deeper controls**: The heading face can move to Vollkorn at display size or to Spectral semibold. The header can become a framed title page or a plate-and-label lockup. Sessions can run as a field-notes column. A pencil line can be turned on in the margins. The empty-state plate stays framed whatever you pick, because a blank sheet really is one. A long read opens on a drop cap; a quote is a field note or a pressed page; the directory is specimen plates or a field list; a table closes its head with a hairline; a section boundary keeps its folio, drops it, or moves it to the margin.
 
 ### Atlas
 
@@ -97,7 +97,7 @@ The catalog is one flat, ordered list: Six styles, every one of them finished wo
 - **Devices**: The corner title block; the departure board for the schedule.
 - **Illustrations**: The cartographic set, on by default for this style.
 - **Where the grid is drawn**: The coordinate grid and the route marks sit on the schedule surface only. A grid behind the about page, the speaker bios, and the code of conduct is texture; a grid behind a timetable is a reading device.
-- **Deeper controls**: The heading face can move to Libre Franklin extrabold or Archivo Condensed. The header can take a scale line or become a departure-board header. The schedule can run as a line diagram or a gazetteer list.
+- **Deeper controls**: The heading face can move to Libre Franklin extrabold or Archivo Condensed. The header can take a scale line or become a departure-board header. The schedule can run as a line diagram or a gazetteer list. A long read opens plain; a quote is a route line or a boxed sign; the directory is a gazetteer or a station index; a table takes the departure board's full grid; a section boundary keeps its folio or drops it.
 
 ## Header style
 
@@ -272,6 +272,13 @@ The devices, and the one job each has. The implementations live in `apps/web/src
 - **Ruled table** — rows and columns a reader compares, as a real `<table>` with row rules, tabular figures, a head that stays in view, and a horizontal scroll region at narrow widths. A sortable head holds a `<button>` that sorts and the `<th>` carries `aria-sort`. The three rule widths are the `table` contract, which the Table rules option remaps.
 - **Progress** — how much of a set of tasks is done: A native `<progress>` with the fraction stated beside it, "3 of 5 tasks done". `<meter>` is not used, because it measures a quantity in a range rather than completion. Never a ring. The track, the fill, the height and the corner are the `progress` contract.
 - **Notice bar** — a site-wide message with a level, as a ruled band under the header. `role="status"` for information and `role="alert"` for urgent; the level is a word and a rule weight, never a colour alone. A dismiss control, remembered per browser by the notice's own id. The `notice-bar` contract sets the ground, the rules and the faces.
+- **Standfirst** — the one sentence under a heading that says what the page or session is, at the lead step and never above the heading. Each style names its face and its rule through the `standfirst` contract.
+- **Byline and dateline** — who, in what role, and when, in the data face under the title. A dateline carries the event's clock, never the reader's. One `byline` contract sets both.
+- **Long read opening** — the first paragraph of a page on the Long read template takes the style's opening: A drop cap, a standfirst-sized line, or nothing. The Long read opening option picks one by remapping the `long-read` contract; a page whose values merely resemble the template gets none.
+- **Count** — a labelled figure beside the thing it counts, "12 saved": The figure in the mono face with tabular figures, the label always present in the data face, never a bubble. The **figure sentence** composes the same figures into a line of body copy in place of a tile.
+- **Legend** — one line at the head of a list, in the data face, naming what a mark or a count means.
+- **Session state marker** — "Running now", "Next", "Finished" as a word in the data face with an ink change and a rule under it. A live session takes the accent; a finished one takes the back-issue ink on the hairline. Never a pill.
+- **Avatar** — a person's picture, or their initial where there is none, square on the brand radius and never a circle. Initials in the heading face on the alternate ground, inside a hairline frame; the `avatar` contract sets the ground, the ink, the frame and the corner.
 - **Pull quote** — a quoted sentence with its attribution under it, one per page at most. The sentence is the callout device, so Zine's handwritten line and every other style's ruled quote are one element; the frame around it (the rules above and below, the rule at the inline start, the large opening mark, the alignment) is the `pull-quote` contract, and the `quote` block renders through it.
 - **Grid schedule** — time down the left, lettered tracks across the head, at wide viewports. A real table, and it degrades to the time-ordered list, which is the accessible baseline and not a lesser view.
 - **Back issue** — the archival state of a past day. Reduce the palette to the archive tokens, add the folio, remove the live controls. Never hide the content.
@@ -290,6 +297,9 @@ Keyboard-first, on the token system, in `apps/web/src/components/forms/`. Every 
 - **Search field** — a labelled search input, a stated clear control, and a result count the page speaks as well as shows.
 - **Sort control** — a labelled select. The label names what is being ordered.
 - **Filter group** — a fieldset with a legend, the count of what is on inside the legend, and one clear control for the whole group.
+- **Dropzone** — send a file: A ruled region around a real file input, a stated progress line with a `<progress>` element, and a sent list with a state word per file. The region's rule is dashed at rest and solid while a file is held over it, and it shows the focus ring while the input inside it has focus. The `dropzone` contract sets the rule, the ground and the corner.
+- **Repeater** — a short list of rows a person adds and removes: Each row's fields labelled, one remove control per row that names its row, one add control under the list, and focus that follows the change. Rows are ruled between through the `repeater` contract.
+- **An unavailable tab or segment** stays in its row with `aria-disabled="true"` rather than leaving it, so the arrow keys can land on it and a screen reader hears that it is unavailable and why (the `hint` is read as part of its name); its handler refuses every activation path, and a test proves it. A tab or a set with nothing behind it at all is not rendered.
 - **Dialog** — a native dialog opened as a modal, so focus is trapped, the page behind is inert, and Escape closes it. Focus returns to the control that opened it. The scrim is tinted ink, never a blur.
 - **External link** — any link that opens a new tab says so inside the link's own name.
 
@@ -344,7 +354,7 @@ What a developer can add, and what the system will refuse.
 
 **A new site style.** Add its JSON under `design/tokens/presets/`, with both palettes, its type map, its shape, and its option groups. A style joins the catalog only when it is complete: It is built to that standard on its branch, it clears the contrast gate in both modes, and only then does it register — so nothing half-finished can reach the picker, and no registration carries a stability tier, because the catalog has none.
 
-**A new option inside a style.** An option remaps tokens the style already declares. It may not introduce a property name and it may not introduce a class. If it needs a name that does not exist, the thing you are adding is a token, not an option.
+**A new option inside a style.** An option remaps tokens the style already declares. It may not introduce a property name and it may not introduce a class. If it needs a name that does not exist, the thing you are adding is a token, not an option. Every style now carries eight groups: The heading face, the header style and the schedule style, plus the five the vocabulary expansion added — the long read opening (`longReadOpening`), the quote device (`quote`), the directory style (`directory`), the section boundary (`sectionBoundary`) and the table rules (`tableRules`) — and Zine and Field Guide keep their pen marks. A choice may name a component face as well as tokens (`componentFonts`), which is how Zine's toner-block quote drops the script face.
 
 **A new font set.** Add the woff2 to the bundle, declare the family, and register the set. It becomes selectable everywhere at once, because the type map is live.
 

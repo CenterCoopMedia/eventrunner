@@ -31,6 +31,8 @@ Work down the controls in this order.
 
 **Main brand colour.** One colour, as a hex value. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. Leave it blank to keep the site style's own colour.
 
+**Five more choices sit under Advanced.** Each site style also answers **Long read opening** (a drop cap, a standfirst, or plain, for the first paragraph of a page on the Long read template), **Quote device** (how a quoted sentence is set), **Directory style** (how the speaker shelf and the attendee index are set), **Section boundary** (whether a section heading carries its folio, and where), and **Table rules** (hairline rows, a ruled head, or the full grid). Every style comes with the answer that suits it, and each choice retunes values the style already declares.
+
 **Header and schedule.** One panel holding two choices. **Header style** is how the site's identity appears at the top of every page: Each site style offers its own three — a letterhead, a masthead bar, a title page — and comes with the one that suits it. It is a site-wide choice on purpose, because the header is furniture a reader should stop noticing and it stops working the moment it differs page to page. **Schedule style** is how a session is set out on the schedule: A posted agenda, a hairline row, a departure board, and so on, depending on the style. Both retune the site style rather than inventing a value of their own, so you cannot make a combination the house has not looked at.
 
 **Light or dark.** Always light, always dark, or follow the reader's own setting. Every site style defines both, so there is no wrong answer here.

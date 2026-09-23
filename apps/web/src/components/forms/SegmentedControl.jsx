@@ -21,9 +21,29 @@ const optionClass =
   'px-md py-xs font-data text-caption font-medium text-text-primary';
 
 /**
+ * The index of the option that holds focus, or of the checked one when none
+ * does, so the arrow keys move from where the reader is.
+ */
+function focusedIndex(rowRef, options, value) {
+  const nodes = [...(rowRef.current?.querySelectorAll('[role="radio"]') ?? [])];
+  const active = nodes.indexOf(globalThis.document?.activeElement);
+  if (active >= 0) return active;
+  return Math.max(0, options.findIndex((option) => option.value === value));
+}
+
+/**
+ * AN UNAVAILABLE OPTION STAYS IN THE ROW AND EXPLAINS ITSELF (expansion
+ * record §2.1). It carries `aria-disabled="true"` rather than `disabled`,
+ * so the arrow keys can still land on it and a screen reader hears that it
+ * is unavailable and why — `hint` is read as part of the option's name —
+ * and its handler refuses every activation path: a click goes nowhere and
+ * the arrow keys move focus onto it without choosing it. A set with no
+ * choice left is not rendered; this is for a choice that exists and cannot
+ * be taken yet.
+ *
  * @param {object} props
  * @param {string} props.label the group's own name
- * @param {Array<{ value: string, label: string }>} props.options
+ * @param {Array<{ value: string, label: string, disabled?: boolean, hint?: string }>} props.options
  * @param {string} props.value
  * @param {(next: string) => void} props.onChange
  * @param {boolean} [props.hideLabel] render the legend for readers only
@@ -38,13 +58,15 @@ export default function SegmentedControl({ label, options, value, onChange, hide
   );
 
   function onKeyDown(event) {
-    const index = nextRovingIndex(event.key, current, options.length);
+    const index = nextRovingIndex(event.key, focusedIndex(rowRef, options, value), options.length);
     if (index === null) return;
     event.preventDefault();
-    onChange(options[index].value);
-    // Focus follows the selection, which is what a radio group does: the
-    // arrow key both moves and chooses.
+    // Focus follows the key, which is what a radio group does: the arrow
+    // key both moves and chooses — unless the option it lands on states it
+    // is unavailable, and then it only moves.
     rowRef.current?.querySelectorAll('[role="radio"]')[index]?.focus();
+    if (options[index].disabled) return;
+    onChange(options[index].value);
   }
 
   // `items-start` matters: the row is an inline-flex, and a stretching column
@@ -73,11 +95,15 @@ export default function SegmentedControl({ label, options, value, onChange, hide
             type="button"
             role="radio"
             aria-checked={option.value === value}
+            aria-disabled={option.disabled || undefined}
             tabIndex={index === current ? 0 : -1}
-            onClick={() => onChange(option.value)}
+            onClick={() => {
+              if (!option.disabled) onChange(option.value);
+            }}
             className={optionClass}
           >
             {option.label}
+            {option.disabled && option.hint ? <span className="sr-only">{` (${option.hint})`}</span> : null}
           </button>
         ))}
       </div>

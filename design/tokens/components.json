@@ -62,10 +62,13 @@
     "--venue-map-max-block-size": "38rem"
   },
   "$section-rule-note": "The section boundary (brief §2.1): the rule, then the gap, then the head. The gap is one of the three surfaces config/theme.density reaches, so index.css multiplies it by --density-step.",
+  "$section-boundary-note": "The Section boundary option (2026-09-10 record, §4) moves the two folio tokens: `inline` or `none` for whether the folio is drawn beside the head, and `end` or `margin` for where it sits — at the far end of the rule, or knocked out of the rule where the margin column opens beside the measure at lg and above. Zine and Atlas offer the first two choices only.",
   "section-rule": {
     "--section-rule-rgb": "--rule-strong-rgb",
     "--section-rule-width": "var(--rule-strong-width)",
-    "--section-rule-gap": "var(--space-sm)"
+    "--section-rule-gap": "var(--space-sm)",
+    "--section-folio-display": "inline",
+    "--section-folio-placement": "end"
   },
   "$page-note": "The hybrid page shell (brief §6.1, §6.2). A system page's composable sections sit at --page-section-gap from what comes before them, and a ruled directory row is padded at --page-row-pad-block. Both are what the `density` layout variant moves: tight, comfortable, and loose remap them in index.css, and a page that states no density keeps the preset's own.",
   "$stage-note": "The stage and the measure (2026-09-10 vocabulary expansion). --stage-max is the frame: the header, the navigation, the schedule grid, the directories, the logo wall, the footer, and every section head run to it. --measure-text is the text measure: a paragraph, a list, a rich text block, a stat description, or an FAQ answer never exceeds it. Both default to the tier 2 stage family, and a style retunes either one in its preset file where its story asks: a broadsheet may run wider, a zine narrower. Neither is a fixed width. index.css reads them as a maximum inline size, and the margin column beside the measure opens only at lg and above.",
@@ -230,5 +233,104 @@
     "--table-head-ground": "rgb(var(--color-surface-rgb))",
     "--table-cell-pad-block": "var(--space-xs)",
     "--table-cell-pad-inline": "var(--space-sm)"
+  },
+  "$avatar-note": "A person's picture, or their initials where there is none (record §3.3). Square on the brand radius, never a circle: a circular crop is a generic-template tell. Initials are set in the heading face on the alternate ground, inside a hairline frame drawn as an inset outline so the picture keeps its full size. Zine and Atlas frame it in the strong rule; Broadsheet sets the initial in the full ink.",
+  "avatar": {
+    "--avatar-ground": "rgb(var(--color-surface-alt-rgb))",
+    "--avatar-ink": "rgb(var(--color-text-secondary-rgb))",
+    "--avatar-frame-rgb": "--rule-hairline-rgb",
+    "--avatar-frame-width": "var(--rule-hairline-width)",
+    "--avatar-radius": "var(--radius-base)",
+    "--avatar-font": "var(--font-heading)"
+  },
+  "$dropzone-note": "Send a file (record §3.3): a ruled region around a real file input, a stated progress line with a <progress> element, and a sent list with a state word per file. The region's rule is the control boundary, drawn dashed at rest so an empty region reads as a place to put something, and solid while a file is held over it. Zine draws it solid and strong; Broadsheet and Field Guide keep a hairline.",
+  "dropzone": {
+    "--dropzone-rule-rgb": "--color-border-control-rgb",
+    "--dropzone-rule-width": "var(--rule-hairline-width)",
+    "--dropzone-rule-style": "dashed",
+    "--dropzone-ground": "rgb(var(--color-surface-rgb))",
+    "--dropzone-pad": "var(--space-lg)",
+    "--dropzone-radius": "var(--radius-base)"
+  },
+  "$repeater-note": "A short list of rows a person adds and removes (record §3.3): each row's fields labelled, one remove control per row, one add control under the list, every one on the keyboard path. Rows are ruled between, like every list in the system. Zine rules them at the strong width; the rest keep the hairline.",
+  "repeater": {
+    "--repeater-rule-rgb": "--rule-hairline-rgb",
+    "--repeater-rule-width": "var(--rule-hairline-width)",
+    "--repeater-row-pad-block": "var(--space-sm)"
+  },
+  "$count-note": "A labelled figure beside the thing it counts (record §3.2): \"12 saved\". The figure in the mono face with tabular figures, the label always present in the data face, never a bubble. The figure sentence composes the same figures into a line of body copy: \"412 registered, 38 in the last day, read at 09:14\". Broadsheet sets both figures in its serif data face through the role; Zine gives the figure the bold weight.",
+  "count": {
+    "--count-figure-font": "var(--font-mono)",
+    "--count-figure-weight": "var(--weight-semibold)",
+    "--count-label-font": "var(--font-data)"
+  },
+  "figure-sentence": {
+    "--figure-sentence-font": "var(--font-body)",
+    "--figure-sentence-size": "var(--text-body)",
+    "--figure-sentence-figure-font": "var(--font-mono)",
+    "--figure-sentence-figure-weight": "var(--weight-semibold)"
+  },
+  "$legend-note": "Names what a marker or a count means on a page (record §3.2): one line at the head of the list, in the data face. Zine rules it above at the strong width, the way its folios are struck; Broadsheet sets it in small capitals.",
+  "legend": {
+    "--legend-font": "var(--font-data)",
+    "--legend-size": "var(--text-caption)",
+    "--legend-transform": "none",
+    "--legend-tracking": "0em",
+    "--legend-rule-rgb": "--rule-hairline-rgb",
+    "--legend-rule-width": "0",
+    "--legend-pad-block": "0"
+  },
+  "$state-marker-note": "\"Now\", \"Next\", \"Finished\" on a session row during the event (record §3.2): a word in the data face with an ink change and a rule under it. A live session takes the accent, a finished one takes the back-issue ink and the hairline. Never a pill: the word is the signal and the rule and the ink are its second and third. Zine and Atlas set the word in the mono face.",
+  "state-marker": {
+    "--state-marker-font": "var(--font-data)",
+    "--state-marker-transform": "uppercase",
+    "--state-marker-tracking": "var(--text-folio-tracking)",
+    "--state-marker-rule-width": "var(--rule-strong-width)",
+    "--state-marker-live-ink": "rgb(var(--color-accent-rgb))",
+    "--state-marker-next-ink": "rgb(var(--color-text-primary-rgb))",
+    "--state-marker-past-ink": "rgb(var(--back-issue-ink-rgb))"
+  },
+  "$standfirst-note": "The one sentence under a heading that says what the page or session is (record §3.1). It sits below the heading, never above it, at the lead step. Each style names its face and its rule: Broadsheet and Field Guide set it in italic, Newsroom in the heading face, Zine on a strong rule, Atlas in the heading face at regular weight.",
+  "standfirst": {
+    "--standfirst-font": "var(--font-body)",
+    "--standfirst-size": "var(--text-lead)",
+    "--standfirst-leading": "var(--text-lead-leading)",
+    "--standfirst-style": "normal",
+    "--standfirst-weight": "var(--weight-regular)",
+    "--standfirst-ink": "rgb(var(--color-text-secondary-rgb))",
+    "--standfirst-rule-rgb": "--rule-hairline-rgb",
+    "--standfirst-rule-width": "0",
+    "--standfirst-pad-block-end": "0"
+  },
+  "$byline-note": "Who, in what role, and when (record §3.1). The byline and the dateline share one contract: both are set in the data face at the caption step, and a dateline carries the event's clock, never the reader's. Broadsheet sets both in small capitals with tracking; Zine, Atlas and Field Guide set them in the mono face.",
+  "byline": {
+    "--byline-font": "var(--font-data)",
+    "--byline-size": "var(--text-caption)",
+    "--byline-ink": "rgb(var(--color-text-secondary-rgb))",
+    "--byline-transform": "none",
+    "--byline-tracking": "0em",
+    "--byline-weight": "var(--weight-regular)"
+  },
+  "$directory-note": "The four directories (brief §5.1) on one token system. A style's Directory style option remaps these: the rule between entries, the portrait's proportion, ground and corner on the speaker shelf, and the row padding of the attendee index. The sponsor wall keeps its own logo-wall size token and the updates feed reads the timeline contract.",
+  "directory": {
+    "--directory-rule-rgb": "--rule-hairline-rgb",
+    "--directory-rule-width": "var(--rule-hairline-width)",
+    "--directory-portrait-aspect": "1 / 1",
+    "--directory-portrait-ground": "rgb(var(--color-surface-alt-rgb))",
+    "--directory-portrait-radius": "var(--radius-base)",
+    "--directory-entry-pad-block": "var(--space-2xs)"
+  },
+  "$long-read-note": "The opening of a long read (record §3.1, brief §2.1): a drop cap, a standfirst, or plain. The Long read opening option in each preset picks one by remapping these tokens; the contract defaults are the plain opening, so a style that names nothing draws no cap. One drop cap per page at most, on the first paragraph of the first block of a page on the Long read template, never on a short intro and never on a card. Broadsheet and Field Guide default to the cap, Newsroom to the standfirst, Civic, Zine and Atlas to plain.",
+  "long-read": {
+    "--drop-cap-float": "none",
+    "--drop-cap-size": "1em",
+    "--drop-cap-leading": "inherit",
+    "--drop-cap-font": "inherit",
+    "--drop-cap-weight": "inherit",
+    "--drop-cap-ink": "currentColor",
+    "--drop-cap-pad-inline-end": "0",
+    "--drop-cap-margin-block-start": "0",
+    "--long-read-opening-size": "var(--text-body)",
+    "--long-read-opening-leading": "var(--text-body-leading)"
   }
 }

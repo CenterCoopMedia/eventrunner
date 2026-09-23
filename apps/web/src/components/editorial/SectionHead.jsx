@@ -68,7 +68,7 @@ export default function SectionHead({
           {title}
         </Tag>
         <span aria-hidden="true" className="folio__rule flex-1 self-center" />
-        {folio ? <p className="folio font-medium">{folio}</p> : null}
+        {folio ? <p className="section-head__folio folio font-medium">{folio}</p> : null}
       </div>
     </div>
   );

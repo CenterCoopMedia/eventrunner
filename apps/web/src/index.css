@@ -681,7 +681,31 @@
      takes the density step the same way the nameplate and the schedule row
      do. */
   .section-head {
+    position: relative;
     margin-block-start: calc(var(--section-rule-gap) * var(--density-step, 1));
+  }
+  /* THE SECTION BOUNDARY OPTION (2026-09-10 record, §4). The folio beside
+     the head is drawn or not, and sits at the far end of the rule or is
+     knocked out of the rule where the margin column opens beside the
+     measure — the same geometry .stage-split uses, so a folio in the margin
+     lines up with whatever else the page puts there. Below lg the margin is
+     closed and the folio takes its end placement. The switch is a style
+     query, and a browser that cannot read one keeps the end placement. */
+  .section-head__folio {
+    display: var(--section-folio-display);
+  }
+  @container style(--section-folio-placement: margin) {
+    @media (min-width: 64rem) {
+      .section-head__folio {
+        position: absolute;
+        inset-block-start: 50%;
+        inset-inline-start: calc(var(--measure-text) + var(--space-2xl));
+        transform: translateY(-50%);
+        margin: 0;
+        padding-inline: var(--space-2xs);
+        background-color: rgb(var(--color-surface-rgb));
+      }
+    }
   }
 
   /* A composable section on a system page (brief §6.2). The gap above it is
@@ -718,16 +742,20 @@
      than a hole in the shelf. */
   .portrait-shelf__plate {
     padding-block: var(--page-row-pad-block);
+    /* The rule between entries is the directory contract (2026-09-10
+       vocabulary expansion, §4): the Directory style option moves it. */
+    border-block-start: var(--directory-rule-width) solid rgb(var(--directory-rule-rgb));
   }
   .portrait-shelf__frame {
-    /* Square, on the house radius, never a circle (interface guidelines,
-       User interface). On the stage the shelf runs three across at lg and
-       four at xl, which leaves a face about 200px wide at the narrower of
-       the two — a size a face survives. */
-    aspect-ratio: 1 / 1;
+    /* Square by default, on the house radius, never a circle (interface
+       guidelines, User interface). On the stage the shelf runs three across
+       at lg and four at xl, which leaves a face about 200px wide at the
+       narrower of the two — a size a face survives. The proportion, the
+       ground and the corner are the directory contract's. */
+    aspect-ratio: var(--directory-portrait-aspect);
     overflow: hidden;
-    border-radius: var(--radius-base);
-    background-color: rgb(var(--color-surface-alt-rgb));
+    border-radius: var(--directory-portrait-radius);
+    background-color: var(--directory-portrait-ground);
   }
   .portrait-shelf__frame > img {
     inline-size: 100%;
@@ -751,7 +779,7 @@
     padding-block-end: var(--space-3xs);
   }
   .attendee-index__entry {
-    padding-block: var(--space-2xs);
+    padding-block: var(--directory-entry-pad-block);
   }
 
   /* ------------------------------------------------------------------
@@ -1745,6 +1773,179 @@
     letter-spacing: inherit;
     text-transform: inherit;
     text-align: inherit;
+  }
+
+  /* THE AVATAR (record §3.3): a person's picture, or their initial where
+     there is none. Square on the brand radius, never a circle. The frame is
+     an inset outline so the picture keeps its full size, and the initial
+     sits in the heading face on the alternate ground. */
+  .avatar {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    border-radius: var(--avatar-radius);
+    background-color: var(--avatar-ground);
+    color: var(--avatar-ink);
+    font-family: var(--avatar-font);
+    font-weight: var(--weight-semibold);
+    object-fit: cover;
+    outline: var(--avatar-frame-width) solid rgb(var(--avatar-frame-rgb));
+    outline-offset: calc(-1 * var(--avatar-frame-width));
+  }
+  .avatar--sm {
+    inline-size: 1.75rem;
+    font-size: var(--text-caption);
+  }
+  .avatar--md {
+    inline-size: 3rem;
+    font-size: var(--text-body);
+  }
+  .avatar--lg {
+    inline-size: 6rem;
+    font-size: var(--text-h2);
+  }
+
+  /* THE DROPZONE (record §3.3): a ruled region around a real file input.
+     The rule is the control boundary, dashed at rest and solid while a file
+     is held over it, and the region shows the one focus ring when the input
+     inside it has focus, because the input itself is off screen. */
+  .dropzone {
+    position: relative;
+    padding: var(--dropzone-pad);
+    border: var(--dropzone-rule-width) var(--dropzone-rule-style) rgb(var(--dropzone-rule-rgb));
+    border-radius: var(--dropzone-radius);
+    background-color: var(--dropzone-ground);
+  }
+  .dropzone[data-dragging='true'] {
+    border-style: solid;
+    border-color: rgb(var(--color-accent-rgb));
+  }
+  .dropzone:focus-within {
+    outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
+    outline-offset: var(--focus-ring-offset);
+  }
+  .dropzone__sent {
+    border-block-start: var(--dropzone-rule-width) solid rgb(var(--rule-hairline-rgb));
+  }
+
+  /* THE REPEATER (record §3.3): a short list of rows a person adds and
+     removes, ruled between rows. */
+  .repeater__row {
+    padding-block: var(--repeater-row-pad-block);
+    border-block-start: var(--repeater-rule-width) solid rgb(var(--repeater-rule-rgb));
+  }
+
+  /* THE COUNT (record §3.2): a labelled figure beside the thing it counts.
+     The figure in the mono face with tabular figures, the label in the data
+     face, and never a bubble. */
+  .count__figure {
+    font-family: var(--count-figure-font);
+    font-weight: var(--count-figure-weight);
+    font-variant-numeric: tabular-nums;
+  }
+  .count__label {
+    font-family: var(--count-label-font);
+  }
+
+  /* THE FIGURE SENTENCE (record §3.4): a line of body copy whose figures
+     are set in the mono face, in place of a tile. */
+  .figure-sentence {
+    font-family: var(--figure-sentence-font);
+    font-size: var(--figure-sentence-size);
+    line-height: var(--text-body-leading);
+  }
+  .figure-sentence__figure {
+    font-family: var(--figure-sentence-figure-font);
+    font-weight: var(--figure-sentence-figure-weight);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* THE LEGEND (record §3.2): one line at the head of a list, naming what a
+     marker or a count means. */
+  .legend {
+    font-family: var(--legend-font);
+    font-size: var(--legend-size);
+    line-height: var(--text-caption-leading);
+    text-transform: var(--legend-transform);
+    letter-spacing: var(--legend-tracking);
+    padding-block: var(--legend-pad-block);
+    border-block-start: var(--legend-rule-width) solid rgb(var(--legend-rule-rgb));
+  }
+
+  /* THE SESSION STATE MARKER (record §3.2): a word in the data face with an
+     ink change and a rule under it. A live session takes the accent, a
+     finished one the back-issue ink and the hairline, so a row that has
+     passed reads quieter and never disappears. */
+  .state-marker {
+    display: inline-block;
+    font-family: var(--state-marker-font);
+    font-size: var(--text-folio);
+    line-height: var(--text-folio-leading);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--state-marker-tracking);
+    text-transform: var(--state-marker-transform);
+    padding-block-end: var(--space-3xs);
+    border-block-end: var(--state-marker-rule-width) solid currentColor;
+  }
+  .state-marker--live {
+    color: var(--state-marker-live-ink);
+  }
+  .state-marker--next {
+    color: var(--state-marker-next-ink);
+  }
+  .state-marker--past {
+    color: var(--state-marker-past-ink);
+    border-block-end-width: var(--rule-hairline-width);
+  }
+
+  /* THE STANDFIRST (record §3.1): the one sentence under a heading that says
+     what the page is. Below the heading, never above it. */
+  .standfirst {
+    font-family: var(--standfirst-font);
+    font-size: var(--standfirst-size);
+    line-height: var(--standfirst-leading);
+    font-style: var(--standfirst-style);
+    font-weight: var(--standfirst-weight);
+    color: var(--standfirst-ink);
+    padding-block-end: var(--standfirst-pad-block-end);
+    border-block-end: var(--standfirst-rule-width) solid rgb(var(--standfirst-rule-rgb));
+    text-wrap: pretty;
+  }
+
+  /* THE BYLINE AND THE DATELINE (record §3.1): who, in what role, and when,
+     in the data face. A dateline carries the event's clock. */
+  .byline {
+    font-family: var(--byline-font);
+    font-size: var(--byline-size);
+    line-height: var(--text-caption-leading);
+    font-weight: var(--byline-weight);
+    color: var(--byline-ink);
+    text-transform: var(--byline-transform);
+    letter-spacing: var(--byline-tracking);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* THE LONG READ OPENING (record §3.1, brief §2.1): the first paragraph of
+     the first block on a Long read page takes the style's opening — a drop
+     cap, a standfirst-sized line, or nothing. The contract defaults draw
+     nothing; the Long read opening option remaps them. One cap per page, on
+     that first paragraph and nowhere else. */
+  .long-read-opening .rich-text:first-child > p:first-child {
+    font-size: var(--long-read-opening-size);
+    line-height: var(--long-read-opening-leading);
+  }
+  .long-read-opening .rich-text:first-child > p:first-child::first-letter {
+    float: var(--drop-cap-float);
+    font-family: var(--drop-cap-font);
+    font-size: var(--drop-cap-size);
+    line-height: var(--drop-cap-leading);
+    font-weight: var(--drop-cap-weight);
+    color: var(--drop-cap-ink);
+    padding-inline-end: var(--drop-cap-pad-inline-end);
+    margin-block-start: var(--drop-cap-margin-block-start);
   }
 }
 

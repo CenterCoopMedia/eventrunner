@@ -29,6 +29,8 @@ import VenueMap, { useVenueMapImage } from '../components/VenueMap.jsx';
 import AreaMap from '../components/AreaMap.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import LongReadOpening from '../components/editorial/LongReadOpening.jsx';
+import { templateOf } from '../lib/pageTemplates.js';
 import SectionIndexNav from '../components/SectionIndexNav.jsx';
 import { blockMatchesQuery } from '../lib/blockSearchText.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
@@ -251,6 +253,7 @@ export default function ContentPage() {
 
   const trimmedQuery = query.trim();
   const settledTrimmedQuery = settledQuery.trim();
+  const isLongRead = templateOf(page) === 'long-read';
   // THE MAP COUNTS AS ONE. It is not a block, so counting blocks alone made
   // the live region announce "No items match" over a page that was, right
   // then, showing the plan the query had retained (filterSections keeps a
@@ -392,7 +395,14 @@ export default function ContentPage() {
                 />
               )}
               <div className={index === 0 ? undefined : 'mt-md'}>
-                <SectionBlocks blocks={blocks} />
+                {/* The long read opening (expansion record §3.1): the first
+                    block of the first section of a page that STATES the
+                    Long read template takes the style's opening — a drop
+                    cap, a standfirst-sized line, or nothing. Never inferred
+                    from the layout values, and never on any later section. */}
+                <LongReadOpening active={isLongRead && index === 0}>
+                  <SectionBlocks blocks={blocks} />
+                </LongReadOpening>
                 {page.id === 'travel' && section.id === 'travel_local' ? <AreaMap url={eventConfig.venue?.mapUrl} /> : null}
                 <VenueMap
                   map={sectionMap}

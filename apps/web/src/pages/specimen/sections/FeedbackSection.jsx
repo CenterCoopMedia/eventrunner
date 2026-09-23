@@ -11,6 +11,10 @@ import InfoCards, { groupIntoCards } from '../../../components/InfoCards.jsx';
 import LoadingState from '../../../components/LoadingState.jsx';
 import NoticeBar, { NOTICE_LEVELS } from '../../../components/NoticeBar.jsx';
 import Progress from '../../../components/Progress.jsx';
+import Count from '../../../components/editorial/Count.jsx';
+import FigureSentence, { SentenceFigure } from '../../../components/editorial/FigureSentence.jsx';
+import Legend from '../../../components/editorial/Legend.jsx';
+import StateMarker from '../../../components/editorial/StateMarker.jsx';
 import RegistrationAction, {
   resolveRegistrationLink,
 } from '../../../components/RegistrationAction.jsx';
@@ -166,6 +170,62 @@ export default function FeedbackSection({ folio }) {
             <NoticeSpecimen key={level} level={level} />
           ))}
         </div>
+      </Figure>
+
+      <Figure
+        name="Count"
+        file="components/editorial/Count.jsx"
+        contract="count"
+        note="A labelled figure beside the thing it counts. The figure in the mono face with tabular figures, the label always present, never a bubble. The saved figure on a session row is this device."
+      >
+        <ul className="flex flex-wrap gap-lg">
+          {[[12, 'saved'], [3, 'sessions'], [0, 'matches']].map(([value, label]) => (
+            <li key={label} className="text-caption text-text-secondary">
+              <Count value={value} label={label} />
+            </li>
+          ))}
+        </ul>
+      </Figure>
+
+      <Figure
+        name="Figure sentence"
+        file="components/editorial/FigureSentence.jsx"
+        contract="figure-sentence"
+        note="A line of copy whose figures are set as figures, in place of a tile: the number, what it counts, over what period, and when it was read, in the order a person would say them."
+      >
+        <FigureSentence>
+          <SentenceFigure>412</SentenceFigure> registered, <SentenceFigure>38</SentenceFigure> in
+          the last day, read at <SentenceFigure>09:14</SentenceFigure>.
+        </FigureSentence>
+      </Figure>
+
+      <Figure
+        name="Legend"
+        file="components/editorial/Legend.jsx"
+        contract="legend"
+        note="One line at the head of a list that names what a mark or a count means. The schedule header carries this line above the saved figures."
+      >
+        <Legend
+          items={[
+            { term: 'Saved', meaning: 'how many attendees bookmarked a session' },
+            { term: 'Running now', meaning: 'a session on at this minute, on the event’s clock' },
+          ]}
+        />
+      </Figure>
+
+      <Figure
+        name="Session state marker"
+        file="components/editorial/StateMarker.jsx"
+        contract="state-marker"
+        note="A word in the data face with an ink change and a rule under it. A live session takes the accent, the next one the ink, and a finished one the back-issue ink on the hairline. Never a pill, never a dot."
+      >
+        <ul className="flex flex-wrap items-baseline gap-lg">
+          {[['live', 'Running now'], ['next', 'Next'], ['past', 'Finished']].map(([tone, word]) => (
+            <li key={tone}>
+              <StateMarker tone={tone}>{word}</StateMarker>
+            </li>
+          ))}
+        </ul>
       </Figure>
 
       <Figure

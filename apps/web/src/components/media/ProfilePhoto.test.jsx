@@ -66,19 +66,21 @@ describe('ProfilePhoto', () => {
     expect(image).toHaveAttribute('alt', '');
   });
 
-  it('is a square portrait on the brand radius, never a circle', () => {
+  it('is the avatar device: a square portrait on the brand radius, never a circle', () => {
     const { container } = render(
       <ProfilePhoto photoPath="profile-photos/u1/photo.png" displayName="Rae Okonkwo" />,
     );
     const image = container.querySelector('img');
-    expect(image).toHaveClass('rounded-brand');
+    // The radius is the `--avatar-radius` token (the brand radius by
+    // default), read by the .avatar rule rather than a utility class.
+    expect(image).toHaveClass('avatar');
     expect(image).not.toHaveClass('rounded-full');
   });
 
   it('keeps the initial stand-in a square portrait too', () => {
     render(<ProfilePhoto photoPath={null} displayName="Rae Okonkwo" />);
     const stub = screen.getByText('R');
-    expect(stub).toHaveClass('rounded-brand');
+    expect(stub).toHaveClass('avatar');
     expect(stub).not.toHaveClass('rounded-full');
   });
 

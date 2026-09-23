@@ -8,6 +8,9 @@ import DefinitionList from '../../../components/editorial/DefinitionList.jsx';
 import Folio from '../../../components/editorial/Folio.jsx';
 import PullQuote from '../../../components/editorial/PullQuote.jsx';
 import RuledTable from '../../../components/editorial/RuledTable.jsx';
+import Standfirst from '../../../components/editorial/Standfirst.jsx';
+import Byline, { Dateline } from '../../../components/editorial/Byline.jsx';
+import LongReadOpening from '../../../components/editorial/LongReadOpening.jsx';
 import Timeline from '../../../components/editorial/Timeline.jsx';
 import Marginalia from '../../../components/editorial/Marginalia.jsx';
 import Nameplate, { buildNameplate } from '../../../components/editorial/Nameplate.jsx';
@@ -25,7 +28,7 @@ import FactBlock from '../../../components/blocks/FactBlock.jsx';
 import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
 import { useState } from 'react';
-import { formatDayDate } from '../../../lib/eventTime.js';
+import { formatDayDate, formatSessionStart } from '../../../lib/eventTime.js';
 import { EXAMPLE_SESSIONS, specimenDays, specimenSchedule, specimenTracks } from '../exampleContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import { scheduleData } from '@generated/scheduleData.js';
@@ -146,6 +149,20 @@ const QUOTE = Object.freeze({
 // way a preset does, and its caption says which styles draw it on their
 // own.
 const PLATE_NUMBER_ON = Object.freeze({ '--plate-number-display': 'inline' });
+// The drop cap as the two styles that open on it draw it. The contract
+// defaults are the plain opening, so the cap is forced here the way a
+// preset's Long read opening option forces it, and the caption says so.
+const DROP_CAP_ON = Object.freeze({
+  '--drop-cap-float': 'left',
+  '--drop-cap-size': '3.1em',
+  '--drop-cap-leading': '0.8',
+  '--drop-cap-font': 'var(--font-heading)',
+  '--drop-cap-weight': 'var(--weight-semibold)',
+  '--drop-cap-pad-inline-end': 'var(--space-xs)',
+  '--drop-cap-margin-block-start': '0.08em',
+});
+const OPENING_COPY = 'Three days to make local news work better. Compare reporting methods, build a budget that survives a thin year, and leave with a shared project plan and a partner to test it with.';
+const OPENING_SECOND = 'Every session is written for people who report, edit, and run local newsrooms.';
 const LABEL_KEY_ON = Object.freeze({ '--specimen-label-key-display': 'inline' });
 const MARGINALIA_ON = Object.freeze({ '--marginalia-display': 'inline' });
 
@@ -306,6 +323,56 @@ export default function EditorialSection({ folio }) {
       >
         <div className="max-w-prose">
           <DefinitionList items={FACTS} />
+        </div>
+      </Figure>
+
+      <Figure
+        name="Standfirst"
+        file="components/editorial/Standfirst.jsx"
+        contract="standfirst"
+        note="The one sentence under a heading that says what the page is, at the lead step and never above the heading. Each style names its face and its rule."
+      >
+        <h3 className="font-heading text-h2 font-semibold text-text-primary">{firstSession.title}</h3>
+        <Standfirst className="mt-2xs">{firstSession.description}</Standfirst>
+      </Figure>
+
+      <Figure
+        name="Byline and dateline"
+        file="components/editorial/Byline.jsx"
+        contract="byline"
+        note="Who, in what role, and when, in the data face under the title. A dateline carries the event's clock, never the reader's."
+      >
+        <h3 className="font-heading text-h3 font-semibold text-text-primary">{secondSession.title}</h3>
+        <Byline className="mt-2xs" name="Marisol Reyes" role="opening speaker" />
+        <Dateline
+          className="mt-3xs"
+          dateTime={`${DAY_ENTRIES[0]?.date ?? ''}T${secondSession.startTime ?? '09:00'}`}
+          label={formatSessionStart(eventConfig, secondSession) ?? secondSession.startTime}
+        />
+      </Figure>
+
+      <Figure
+        name="Long read opening"
+        file="components/editorial/LongReadOpening.jsx"
+        contract="long-read"
+        note="The first paragraph of a page on the Long read template takes the style's opening: a drop cap, a standfirst-sized line, or nothing. The first copy is this style's own default; the second forces the cap the way Broadsheet and Field Guide set it, so the device is visible in every style."
+      >
+        <div className="grid gap-lg lg:grid-cols-2">
+          {[null, DROP_CAP_ON].map((forced, index) => (
+            <div key={index} style={forced ?? undefined}>
+              <p className="mb-xs font-data text-caption text-text-secondary">
+                {forced ? 'Drop cap, forced on' : 'This style’s own opening'}
+              </p>
+              <LongReadOpening active>
+                <div>
+                  <div className="rich-text max-w-prose">
+                    <p>{OPENING_COPY}</p>
+                    <p>{OPENING_SECOND}</p>
+                  </div>
+                </div>
+              </LongReadOpening>
+            </div>
+          ))}
         </div>
       </Figure>
 

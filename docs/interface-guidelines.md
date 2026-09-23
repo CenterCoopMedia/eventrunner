@@ -147,6 +147,10 @@ Each one is keyboard-first, reads the tier-2 tokens, and lives in `apps/web/src/
 | `SearchField` | Narrow a list by words | A labelled `type="search"` input, a stated clear control, and the result count in a `role="status"` line the caller feeds. |
 | `SortControl` | Order a list | A labelled select. The label names what is being ordered. |
 | `FilterGroup` | Narrow a list by a facet | A `<fieldset>` with a `<legend>`, the active count in the legend, and one clear control for the whole group. |
+| `Dropzone` | Send a file | A ruled region around a real `type="file"` input, which stays the keyboard's; the region shows the focus ring while the input has focus. A stated progress line with a `<progress>` element, and a sent list with a state word per file. |
+| `Repeater` | A short list of rows a person adds and removes | A `<fieldset>` with a `<legend>`, every row's fields labelled, one remove control per row that names its row, one add control under the list. Focus follows the change: a new row's first field, or the row before a removed one. |
+
+**An unavailable tab or segment stays in its row.** `Tab` and a `SegmentedControl` option take `disabled`: the control carries `aria-disabled="true"` rather than `disabled`, so the arrow keys can still land on it and a screen reader hears that it is unavailable and why (`hint` is read as part of its name), and its handler refuses every activation path — a click, Enter, Space, and the arrow keys, which move focus onto it without selecting it. `Tabs.test.jsx` and `SegmentedControl.test.jsx` prove the refusal. A tab or a set with nothing behind it at all is not rendered; this state is for a panel or a choice that exists and cannot be taken yet.
 
 ## Animation
 

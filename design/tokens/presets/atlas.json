@@ -55,7 +55,7 @@
   "shape": { "radius": "sharp", "texture": "flat", "density": "tight" },
   "motifSet": "cartographic",
 
-  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule trace connects entries vertically. The grid remains below hairline contrast. Other styles set the trace width to zero. The definition list sets its terms as a map key: the monospaced font in capitals in a narrow column. The pull quote takes a strong rule at its inline start, like a route line, and no rules above or below. The timeline draws a station stop on its spine, the progress bar is a thin route line, the notice word and table heads are set in the monospaced font in capitals, and tables take the departure board grid.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule trace connects entries vertically. The grid remains below hairline contrast. Other styles set the trace width to zero. The definition list sets its terms as a map key: the monospaced font in capitals in a narrow column. The pull quote takes a strong rule at its inline start, like a route line, and no rules above or below. The timeline draws a station stop on its spine, the progress bar is a thin route line, the notice word and table heads are set in the monospaced font in capitals, and tables take the departure board grid. The avatar takes a strong frame, the dropzone a solid rule, the legend, the state marker and the byline the monospaced font, and the standfirst the sign typeface at regular weight.",
   "tokens": {
     "--definition-list-term-font": "var(--font-mono)",
     "--definition-list-term-transform": "uppercase",
@@ -72,7 +72,6 @@
     "--table-head-font": "var(--font-mono)",
     "--table-head-transform": "uppercase",
     "--table-head-tracking": "0.05em",
-    "--table-column-rule-width": "var(--rule-hairline-width)",
     "--map-grid-size": "var(--space-xl)",
     "--schedule-trace-width": "var(--rule-strong-width)",
     "--route-mark-radius": "var(--radius-base)",
@@ -100,7 +99,14 @@
     "--schedule-route-pad-inline-start": "var(--space-lg)",
     "--schedule-route-line-width": "2px",
     "--schedule-route-stop-size": "12px",
-    "--schedule-route-stop-border-width": "3px"
+    "--schedule-route-stop-border-width": "3px",
+    "--avatar-frame-width": "var(--rule-strong-width)",
+    "--dropzone-rule-style": "solid",
+    "--legend-font": "var(--font-mono)",
+    "--state-marker-font": "var(--font-mono)",
+    "--standfirst-font": "var(--font-heading)",
+    "--standfirst-weight": "var(--weight-regular)",
+    "--byline-font": "var(--font-mono)"
   },
 
   "options": {
@@ -202,6 +208,182 @@
             "--map-grid-size": "0",
             "--schedule-data-size": "var(--text-folio)",
             "--schedule-row-leading": "var(--text-body-leading)"
+          }
+        }
+      ]
+    },
+    "longReadOpening": {
+      "label": "Long read opening",
+      "prompt": "Choose how the first paragraph of a Long read page opens.",
+      "default": "plain",
+      "choices": [
+        {
+          "id": "drop-cap",
+          "label": "Drop cap",
+          "why": "Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.",
+          "tokens": {
+            "--drop-cap-float": "left",
+            "--drop-cap-size": "3.1em",
+            "--drop-cap-leading": "0.8",
+            "--drop-cap-font": "var(--font-heading)",
+            "--drop-cap-weight": "var(--weight-semibold)",
+            "--drop-cap-pad-inline-end": "var(--space-xs)",
+            "--drop-cap-margin-block-start": "0.08em",
+            "--long-read-opening-size": "var(--text-body)",
+            "--long-read-opening-leading": "var(--text-body-leading)"
+          }
+        },
+        {
+          "id": "standfirst",
+          "label": "Standfirst",
+          "why": "Sets the first paragraph at the lead size, as a summary of the page.",
+          "tokens": {
+            "--drop-cap-float": "none",
+            "--drop-cap-size": "1em",
+            "--drop-cap-leading": "inherit",
+            "--drop-cap-font": "inherit",
+            "--drop-cap-weight": "inherit",
+            "--drop-cap-pad-inline-end": "0",
+            "--drop-cap-margin-block-start": "0",
+            "--long-read-opening-size": "var(--text-lead)",
+            "--long-read-opening-leading": "var(--text-lead-leading)"
+          }
+        },
+        {
+          "id": "plain",
+          "label": "Plain",
+          "why": "Keeps the first paragraph at body size with no drop cap.",
+          "tokens": {
+            "--drop-cap-float": "none",
+            "--drop-cap-size": "1em",
+            "--drop-cap-leading": "inherit",
+            "--drop-cap-font": "inherit",
+            "--drop-cap-weight": "inherit",
+            "--drop-cap-pad-inline-end": "0",
+            "--drop-cap-margin-block-start": "0",
+            "--long-read-opening-size": "var(--text-body)",
+            "--long-read-opening-leading": "var(--text-body-leading)"
+          }
+        }
+      ]
+    },
+    "quote": {
+      "label": "Quote device",
+      "prompt": "Choose how a quoted sentence is set.",
+      "default": "route-line",
+      "choices": [
+        {
+          "id": "route-line",
+          "label": "Route line",
+          "why": "Sets the quote beside one strong rule, like a route on the map, with the attribution in the monospaced font.",
+          "tokens": {
+            "--pull-quote-rule-block-width": "0",
+            "--pull-quote-rule-inline-width": "var(--rule-strong-width)",
+            "--pull-quote-pad-inline": "var(--space-md)",
+            "--pull-quote-mark-display": "none",
+            "--pull-quote-align": "start"
+          }
+        },
+        {
+          "id": "boxed-sign",
+          "label": "Boxed sign",
+          "why": "Sets the quote between strong rules above and below with the strong rule at its start, like a sign.",
+          "tokens": {
+            "--pull-quote-rule-block-width": "var(--rule-strong-width)",
+            "--pull-quote-rule-inline-width": "var(--rule-strong-width)",
+            "--pull-quote-pad-inline": "var(--space-md)",
+            "--pull-quote-mark-display": "none",
+            "--pull-quote-align": "start"
+          }
+        }
+      ]
+    },
+    "directory": {
+      "label": "Directory style",
+      "prompt": "Choose how the speaker shelf and the attendee index are set.",
+      "default": "gazetteer",
+      "choices": [
+        {
+          "id": "gazetteer",
+          "label": "Gazetteer",
+          "why": "Sets square portraits with tight index rows, like a place index.",
+          "tokens": {
+            "--directory-portrait-aspect": "1 / 1",
+            "--directory-portrait-radius": "var(--radius-base)",
+            "--directory-portrait-ground": "rgb(var(--color-surface-alt-rgb))",
+            "--directory-rule-width": "var(--rule-hairline-width)",
+            "--directory-entry-pad-block": "var(--space-3xs)"
+          }
+        },
+        {
+          "id": "station-index",
+          "label": "Station index",
+          "why": "Sets tall portraits and rules each entry at the strong width, like a departure board.",
+          "tokens": {
+            "--directory-portrait-aspect": "4 / 5",
+            "--directory-portrait-radius": "var(--radius-base)",
+            "--directory-portrait-ground": "rgb(var(--color-surface-alt-rgb))",
+            "--directory-rule-width": "var(--rule-strong-width)",
+            "--directory-entry-pad-block": "var(--space-xs)"
+          }
+        }
+      ]
+    },
+    "sectionBoundary": {
+      "label": "Section boundary",
+      "prompt": "Choose how a section heading is ruled and labelled.",
+      "default": "rule-and-folio",
+      "choices": [
+        {
+          "id": "rule-and-folio",
+          "label": "Rule and folio",
+          "why": "Draws the section rule with the folio at the far end of the heading line.",
+          "tokens": {
+            "--section-folio-display": "inline",
+            "--section-folio-placement": "end"
+          }
+        },
+        {
+          "id": "rule-only",
+          "label": "Rule only",
+          "why": "Draws the section rule and hides the folio beside the heading.",
+          "tokens": {
+            "--section-folio-display": "none",
+            "--section-folio-placement": "end"
+          }
+        }
+      ]
+    },
+    "tableRules": {
+      "label": "Table rules",
+      "prompt": "Choose how a table is ruled.",
+      "default": "full-grid",
+      "choices": [
+        {
+          "id": "hairline-rows",
+          "label": "Hairline rows",
+          "why": "Rules the rows and the head at the hairline and draws no column rules.",
+          "tokens": {
+            "--table-head-rule-width": "var(--rule-hairline-width)",
+            "--table-column-rule-width": "0"
+          }
+        },
+        {
+          "id": "ruled-head",
+          "label": "Ruled head",
+          "why": "Closes the head with a strong rule and rules the rows at the hairline, with no column rules.",
+          "tokens": {
+            "--table-head-rule-width": "var(--rule-strong-width)",
+            "--table-column-rule-width": "0"
+          }
+        },
+        {
+          "id": "full-grid",
+          "label": "Full grid",
+          "why": "Rules the rows and the columns at the hairline, with the head closed at the width the style sets.",
+          "tokens": {
+            "--table-head-rule-width": "var(--rule-strong-width)",
+            "--table-column-rule-width": "var(--rule-hairline-width)"
           }
         }
       ]

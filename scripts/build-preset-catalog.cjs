@@ -151,6 +151,7 @@ function renderingValues(preset) {
       choices: (spec.choices || []).map((choice) => {
         const kept = { id: choice.id };
         if (choice.fonts) kept.fonts = choice.fonts;
+        if (choice.componentFonts) kept.componentFonts = choice.componentFonts;
         if (choice.tokens) kept.tokens = choice.tokens;
         return kept;
       }),

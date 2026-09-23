@@ -75,6 +75,52 @@ describe('Tabs', () => {
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1);
   });
 
+  // An unavailable tab (expansion record §2.1): aria-disabled, focusable so
+  // it can explain itself, and every activation path refused.
+  function DisabledHarness() {
+    const [open, setOpen] = useState('programme');
+    return (
+      <Tabs value={open} onChange={setOpen} tabs={IDS}>
+        <TabList label="Event pages">
+          <Tab id="programme">Programme</Tab>
+          <Tab id="speakers" disabled hint="Opens after the session">
+            Speakers
+          </Tab>
+          <Tab id="venue">Venue</Tab>
+        </TabList>
+        <TabPanel id="programme">The running order.</TabPanel>
+        <TabPanel id="speakers">Who is talking.</TabPanel>
+        <TabPanel id="venue">Where to go.</TabPanel>
+      </Tabs>
+    );
+  }
+
+  it('marks an unavailable tab with aria-disabled and reads its reason in its name', () => {
+    render(<DisabledHarness />);
+    const tab = screen.getByRole('tab', { name: /Speakers/u });
+    expect(tab).toHaveAttribute('aria-disabled', 'true');
+    expect(tab).not.toBeDisabled();
+    expect(tab).toHaveAccessibleName('Speakers (Opens after the session)');
+  });
+
+  it('refuses every activation path on an unavailable tab', () => {
+    render(<DisabledHarness />);
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[1]);
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('The running order.');
+    // The arrow key lands on it, so the reader hears why, and opens nothing.
+    tabs[0].focus();
+    fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' });
+    expect(tabs[1]).toHaveFocus();
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    // The next arrow moves on from where the reader is, and that one opens.
+    fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' });
+    expect(tabs[2]).toHaveFocus();
+    expect(tabs[2]).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('Where to go.');
+  });
+
   it('refuses to render a part outside its own set', () => {
     // A stray <Tab> would render a control that answers to nothing.
     expect(() => render(<Tab id="stray">Stray</Tab>)).toThrow(/inside <Tabs>/);

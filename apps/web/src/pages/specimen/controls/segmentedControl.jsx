@@ -15,9 +15,15 @@ function SegmentedSpecimen({ state }) {
   const [value, setValue] = useState(
     state === 'selected' ? (OPTIONS[1] ?? OPTIONS[0]).value : OPTIONS[0].value,
   );
-  return (
-    <SegmentedControl label="Day" options={OPTIONS} value={value} onChange={setValue} />
-  );
+  const options =
+    state === 'disabled' && OPTIONS.length > 1
+      ? OPTIONS.map((option, index) =>
+          index === OPTIONS.length - 1
+            ? { ...option, disabled: true, hint: 'No sessions published for this day yet' }
+            : option,
+        )
+      : OPTIONS;
+  return <SegmentedControl label="Day" options={options} value={value} onChange={setValue} />;
 }
 
 export default Object.freeze({
@@ -25,16 +31,12 @@ export default Object.freeze({
   name: 'Segmented control',
   file: 'components/forms/SegmentedControl.jsx',
   contract: null,
-  note: 'A radio group set as one ruled row. One tab stop; the arrow keys move and choose inside it. The chosen word takes the filled ground and the bold weight, so the state is never colour alone.',
-  states: Object.freeze(['rest', 'selected']),
+  note: 'A radio group set as one ruled row. One tab stop; the arrow keys move and choose inside it. The chosen word takes the filled ground and the bold weight, so the state is never colour alone. An unavailable choice stays in the row with aria-disabled: the arrow keys land on it and a reader hears why, and it is never chosen.',
+  states: Object.freeze(['rest', 'selected', 'disabled']),
   absent: Object.freeze([
     sharedGrammar('hover'),
     sharedGrammar('focus'),
     sharedGrammar('pressed'),
-    Object.freeze({
-      state: 'disabled',
-      reason: 'The component takes no disabled prop. A facet with no choices left is not rendered at all rather than rendered dead.',
-    }),
     Object.freeze({
       state: 'busy',
       reason: 'The choice lands at once and the list under it resolves; the count beside the list is what states the result.',

@@ -1,8 +1,10 @@
 // An attendee's photo, or a lettered stand-in.
 //
-// Square portrait, brand radius (design brief §2.4): a circular crop is a
-// generic-template tell here, so the frame is `rounded-brand` — the same
-// radius every other shape in the system uses — not `rounded-full`.
+// THE FRAME IS THE AVATAR DEVICE (expansion record §3.3, components/
+// editorial/Avatar.jsx): square on the brand radius, never a circle, the
+// initial in the heading face on the alternate ground. What this component
+// owns is everything the device does not — which URL a stored path turns
+// into, and what happens when the object is gone.
 //
 // The value comes from `users_public/{uid}.photoPath` — a projection of an
 // unvalidated client-written field. Two guards, both deliberate:
@@ -14,17 +16,14 @@
 //     directory card that still reads correctly.
 //
 // The fallback is decorative: the name it stands for is already rendered as
-// text beside it, so the whole component is aria-hidden when there is no
-// photo, and a photo carries an empty alt for the same reason.
+// text beside it, so the stand-in is aria-hidden and a photo carries an
+// empty alt for the same reason.
 import { useEffect, useState } from 'react';
 import { assetUrl, isDefaultAvatarPath, storagePath } from '../../lib/mediaSource.js';
 import { bundledDemoAssetUrl } from '../../lib/bundledAssets.js';
+import Avatar, { initialOf } from '../editorial/Avatar.jsx';
 
-/** The first letter of a display name, for the stand-in. */
-export function initialOf(displayName) {
-  const name = typeof displayName === 'string' ? displayName.trim() : '';
-  return name ? Array.from(name)[0].toUpperCase() : '?';
-}
+export { initialOf };
 
 /**
  * Uploaded photos use the owner-bound namespace. Default avatars and
@@ -55,30 +54,12 @@ export default function ProfilePhoto({ photoPath, displayName, size = 'md', clas
     setFailed(false);
   }, [url]);
 
-  const dimensions =
-    size === 'lg'
-      ? 'h-24 w-24 text-2xl'
-      : size === 'sm'
-        ? 'h-7 w-7 text-caption'
-        : 'h-12 w-12 text-base';
-  const shared = `shrink-0 rounded-brand object-cover ${dimensions} ${className}`;
-
-  if (!url || failed) {
-    return (
-      <span
-        aria-hidden="true"
-        className={`flex items-center justify-center bg-brand-surface font-heading font-semibold text-brand-ink-muted outline outline-1 -outline-offset-1 outline-brand-ink/[0.12] ${shared}`}
-      >
-        {initialOf(displayName)}
-      </span>
-    );
-  }
   return (
-    <img
-      src={url}
-      alt=""
-      loading="lazy"
-      className={`bg-brand-surface outline outline-1 -outline-offset-1 outline-brand-ink/[0.08] ${shared}`}
+    <Avatar
+      src={failed ? null : url}
+      name={displayName}
+      size={size}
+      className={className}
       onError={() => setFailed(true)}
     />
   );

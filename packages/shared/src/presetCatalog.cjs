@@ -77,11 +77,11 @@ const PRESETS = Object.freeze({
       '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
       '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
       '--pull-quote-pad-inline': 'var(--space-md)',
-      '--table-column-rule-width': 'var(--rule-hairline-width)',
       '--hero-art-width': '58%',
       '--hero-art-position': '80% 50%',
       '--hero-title-size': 'clamp(2.5rem, 5vw, 5rem)',
       '--hero-title-tracking': '-.035em',
+      '--standfirst-size': 'var(--text-lead)',
     },
     options: {
       headingFace: {
@@ -155,6 +155,157 @@ const PRESETS = Object.freeze({
           },
         ],
       },
+      longReadOpening: {
+        default: 'plain',
+        choices: [
+          {
+            id: 'drop-cap',
+            tokens: {
+              '--drop-cap-float': 'left',
+              '--drop-cap-size': '3.1em',
+              '--drop-cap-leading': '0.8',
+              '--drop-cap-font': 'var(--font-heading)',
+              '--drop-cap-weight': 'var(--weight-semibold)',
+              '--drop-cap-pad-inline-end': 'var(--space-xs)',
+              '--drop-cap-margin-block-start': '0.08em',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+          {
+            id: 'standfirst',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-lead)',
+              '--long-read-opening-leading': 'var(--text-lead-leading)',
+            },
+          },
+          {
+            id: 'plain',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+        ],
+      },
+      quote: {
+        default: 'ruled-minute',
+        choices: [
+          {
+            id: 'ruled-minute',
+            tokens: {
+              '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
+              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
+              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
+              '--pull-quote-pad-inline': 'var(--space-md)',
+              '--pull-quote-mark-display': 'none',
+              '--pull-quote-align': 'start',
+            },
+          },
+          {
+            id: 'plain-rules',
+            tokens: {
+              '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
+              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
+              '--pull-quote-rule-inline-width': '0',
+              '--pull-quote-pad-inline': '0',
+              '--pull-quote-mark-display': 'none',
+              '--pull-quote-align': 'start',
+            },
+          },
+        ],
+      },
+      directory: {
+        default: 'ruled-entries',
+        choices: [
+          {
+            id: 'ruled-entries',
+            tokens: {
+              '--directory-portrait-aspect': '1 / 1',
+              '--directory-portrait-radius': 'var(--radius-base)',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+              '--directory-rule-width': 'var(--rule-hairline-width)',
+              '--directory-entry-pad-block': 'var(--space-2xs)',
+            },
+          },
+          {
+            id: 'portrait-plates',
+            tokens: {
+              '--directory-portrait-aspect': '4 / 5',
+              '--directory-portrait-radius': 'var(--radius-base)',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+              '--directory-rule-width': 'var(--rule-hairline-width)',
+              '--directory-entry-pad-block': 'var(--space-xs)',
+            },
+          },
+        ],
+      },
+      sectionBoundary: {
+        default: 'rule-and-folio',
+        choices: [
+          {
+            id: 'rule-and-folio',
+            tokens: {
+              '--section-folio-display': 'inline',
+              '--section-folio-placement': 'end',
+            },
+          },
+          {
+            id: 'rule-only',
+            tokens: {
+              '--section-folio-display': 'none',
+              '--section-folio-placement': 'end',
+            },
+          },
+          {
+            id: 'folio-in-margin',
+            tokens: {
+              '--section-folio-display': 'inline',
+              '--section-folio-placement': 'margin',
+            },
+          },
+        ],
+      },
+      tableRules: {
+        default: 'full-grid',
+        choices: [
+          {
+            id: 'hairline-rows',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-hairline-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'ruled-head',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'full-grid',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+              '--table-column-rule-width': 'var(--rule-hairline-width)',
+            },
+          },
+        ],
+      },
     },
   },
   newsroom: {
@@ -216,6 +367,8 @@ const PRESETS = Object.freeze({
       '--hero-copy-pad-inline-start': 'var(--space-md)',
       '--hero-copy-border-inline-start': '.35rem solid rgb(var(--color-accent-rgb))',
       '--hero-veil-background': 'linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%)',
+      '--standfirst-font': 'var(--font-heading)',
+      '--standfirst-weight': 'var(--weight-regular)',
     },
     options: {
       headingFace: {
@@ -291,6 +444,165 @@ const PRESETS = Object.freeze({
           },
         ],
       },
+      longReadOpening: {
+        default: 'standfirst',
+        choices: [
+          {
+            id: 'drop-cap',
+            tokens: {
+              '--drop-cap-float': 'left',
+              '--drop-cap-size': '3.1em',
+              '--drop-cap-leading': '0.8',
+              '--drop-cap-font': 'var(--font-heading)',
+              '--drop-cap-weight': 'var(--weight-semibold)',
+              '--drop-cap-pad-inline-end': 'var(--space-xs)',
+              '--drop-cap-margin-block-start': '0.08em',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+          {
+            id: 'standfirst',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-lead)',
+              '--long-read-opening-leading': 'var(--text-lead-leading)',
+            },
+          },
+          {
+            id: 'plain',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+        ],
+      },
+      quote: {
+        default: 'ruled-with-mark',
+        choices: [
+          {
+            id: 'ruled-with-mark',
+            tokens: {
+              '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
+              '--pull-quote-rule-inline-width': '0',
+              '--pull-quote-pad-inline': '0',
+              '--pull-quote-mark-display': 'block',
+              '--pull-quote-align': 'start',
+            },
+          },
+          {
+            id: 'side-rule',
+            tokens: {
+              '--pull-quote-rule-block-width': '0',
+              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
+              '--pull-quote-pad-inline': 'var(--space-md)',
+              '--pull-quote-mark-display': 'none',
+              '--pull-quote-align': 'start',
+            },
+          },
+          {
+            id: 'mark-only',
+            tokens: {
+              '--pull-quote-rule-block-width': '0',
+              '--pull-quote-rule-inline-width': '0',
+              '--pull-quote-pad-inline': '0',
+              '--pull-quote-mark-display': 'block',
+              '--pull-quote-align': 'start',
+            },
+          },
+        ],
+      },
+      directory: {
+        default: 'portrait-shelf',
+        choices: [
+          {
+            id: 'portrait-shelf',
+            tokens: {
+              '--directory-portrait-aspect': '1 / 1',
+              '--directory-portrait-radius': 'var(--radius-base)',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+              '--directory-rule-width': 'var(--rule-hairline-width)',
+              '--directory-entry-pad-block': 'var(--space-2xs)',
+            },
+          },
+          {
+            id: 'tall-portraits',
+            tokens: {
+              '--directory-portrait-aspect': '3 / 4',
+              '--directory-portrait-radius': 'var(--radius-base)',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+              '--directory-rule-width': 'var(--rule-hairline-width)',
+              '--directory-entry-pad-block': 'var(--space-2xs)',
+            },
+          },
+        ],
+      },
+      sectionBoundary: {
+        default: 'rule-and-folio',
+        choices: [
+          {
+            id: 'rule-and-folio',
+            tokens: {
+              '--section-folio-display': 'inline',
+              '--section-folio-placement': 'end',
+            },
+          },
+          {
+            id: 'rule-only',
+            tokens: {
+              '--section-folio-display': 'none',
+              '--section-folio-placement': 'end',
+            },
+          },
+          {
+            id: 'folio-in-margin',
+            tokens: {
+              '--section-folio-display': 'inline',
+              '--section-folio-placement': 'margin',
+            },
+          },
+        ],
+      },
+      tableRules: {
+        default: 'ruled-head',
+        choices: [
+          {
+            id: 'hairline-rows',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-hairline-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'ruled-head',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'full-grid',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+              '--table-column-rule-width': 'var(--rule-hairline-width)',
+            },
+          },
+        ],
+      },
     },
   },
   broadsheet: {
@@ -354,8 +666,6 @@ const PRESETS = Object.freeze({
       '--progress-block-size': 'var(--space-3xs)',
       '--progress-radius': '0',
       '--notice-bar-ground': 'rgb(var(--color-surface-rgb))',
-      '--table-head-rule-width': 'var(--rule-hairline-width)',
-      '--table-column-rule-width': 'var(--rule-hairline-width)',
       '--table-head-transform': 'uppercase',
       '--table-head-tracking': '0.06em',
       '--hero-rule-block-start': 'var(--rule-strong-width) double rgb(var(--rule-strong-rgb))',
@@ -363,6 +673,13 @@ const PRESETS = Object.freeze({
       '--hero-art-position': '85% 50%',
       '--hero-title-style': 'normal',
       '--hero-title-tracking': '-.055em',
+      '--avatar-ink': 'rgb(var(--color-text-primary-rgb))',
+      '--avatar-radius': '0',
+      '--legend-transform': 'uppercase',
+      '--legend-tracking': 'var(--text-folio-tracking)',
+      '--standfirst-style': 'italic',
+      '--byline-transform': 'uppercase',
+      '--byline-tracking': 'var(--text-folio-tracking)',
     },
     options: {
       headingFace: {
@@ -438,6 +755,159 @@ const PRESETS = Object.freeze({
           },
         ],
       },
+      longReadOpening: {
+        default: 'drop-cap',
+        choices: [
+          {
+            id: 'drop-cap',
+            tokens: {
+              '--drop-cap-float': 'left',
+              '--drop-cap-size': '3.1em',
+              '--drop-cap-leading': '0.8',
+              '--drop-cap-font': 'var(--font-heading)',
+              '--drop-cap-weight': 'var(--weight-semibold)',
+              '--drop-cap-pad-inline-end': 'var(--space-xs)',
+              '--drop-cap-margin-block-start': '0.08em',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+          {
+            id: 'standfirst',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-lead)',
+              '--long-read-opening-leading': 'var(--text-lead-leading)',
+            },
+          },
+          {
+            id: 'plain',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+        ],
+      },
+      quote: {
+        default: 'centred-mark',
+        choices: [
+          {
+            id: 'centred-mark',
+            tokens: {
+              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
+              '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
+              '--pull-quote-rule-inline-width': '0',
+              '--pull-quote-pad-inline': '0',
+              '--pull-quote-mark-display': 'block',
+              '--pull-quote-align': 'center',
+              '--pull-quote-attribution-transform': 'uppercase',
+            },
+          },
+          {
+            id: 'column-rule',
+            tokens: {
+              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
+              '--pull-quote-rule-block-width': '0',
+              '--pull-quote-rule-inline-width': 'var(--rule-hairline-width)',
+              '--pull-quote-pad-inline': 'var(--space-md)',
+              '--pull-quote-mark-display': 'none',
+              '--pull-quote-align': 'start',
+              '--pull-quote-attribution-transform': 'uppercase',
+            },
+          },
+        ],
+      },
+      directory: {
+        default: 'agate-directory',
+        choices: [
+          {
+            id: 'agate-directory',
+            tokens: {
+              '--directory-portrait-aspect': '1 / 1',
+              '--directory-portrait-radius': '0',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+              '--directory-rule-width': 'var(--rule-hairline-width)',
+              '--directory-entry-pad-block': 'var(--space-3xs)',
+            },
+          },
+          {
+            id: 'plate-portraits',
+            tokens: {
+              '--directory-portrait-aspect': '4 / 5',
+              '--directory-portrait-radius': '0',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+              '--directory-rule-width': 'var(--rule-strong-width)',
+              '--directory-entry-pad-block': 'var(--space-2xs)',
+            },
+          },
+        ],
+      },
+      sectionBoundary: {
+        default: 'rule-and-folio',
+        choices: [
+          {
+            id: 'rule-and-folio',
+            tokens: {
+              '--section-folio-display': 'inline',
+              '--section-folio-placement': 'end',
+            },
+          },
+          {
+            id: 'rule-only',
+            tokens: {
+              '--section-folio-display': 'none',
+              '--section-folio-placement': 'end',
+            },
+          },
+          {
+            id: 'folio-in-margin',
+            tokens: {
+              '--section-folio-display': 'inline',
+              '--section-folio-placement': 'margin',
+            },
+          },
+        ],
+      },
+      tableRules: {
+        default: 'full-grid',
+        choices: [
+          {
+            id: 'hairline-rows',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-hairline-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'ruled-head',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'full-grid',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-hairline-width)',
+              '--table-column-rule-width': 'var(--rule-hairline-width)',
+            },
+          },
+        ],
+      },
     },
   },
   atlas: {
@@ -502,7 +972,6 @@ const PRESETS = Object.freeze({
       '--table-head-font': 'var(--font-mono)',
       '--table-head-transform': 'uppercase',
       '--table-head-tracking': '0.05em',
-      '--table-column-rule-width': 'var(--rule-hairline-width)',
       '--map-grid-size': 'var(--space-xl)',
       '--schedule-trace-width': 'var(--rule-strong-width)',
       '--route-mark-radius': 'var(--radius-base)',
@@ -531,6 +1000,13 @@ const PRESETS = Object.freeze({
       '--schedule-route-line-width': '2px',
       '--schedule-route-stop-size': '12px',
       '--schedule-route-stop-border-width': '3px',
+      '--avatar-frame-width': 'var(--rule-strong-width)',
+      '--dropzone-rule-style': 'solid',
+      '--legend-font': 'var(--font-mono)',
+      '--state-marker-font': 'var(--font-mono)',
+      '--standfirst-font': 'var(--font-heading)',
+      '--standfirst-weight': 'var(--weight-regular)',
+      '--byline-font': 'var(--font-mono)',
     },
     options: {
       headingFace: {
@@ -616,6 +1092,148 @@ const PRESETS = Object.freeze({
           },
         ],
       },
+      longReadOpening: {
+        default: 'plain',
+        choices: [
+          {
+            id: 'drop-cap',
+            tokens: {
+              '--drop-cap-float': 'left',
+              '--drop-cap-size': '3.1em',
+              '--drop-cap-leading': '0.8',
+              '--drop-cap-font': 'var(--font-heading)',
+              '--drop-cap-weight': 'var(--weight-semibold)',
+              '--drop-cap-pad-inline-end': 'var(--space-xs)',
+              '--drop-cap-margin-block-start': '0.08em',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+          {
+            id: 'standfirst',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-lead)',
+              '--long-read-opening-leading': 'var(--text-lead-leading)',
+            },
+          },
+          {
+            id: 'plain',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+        ],
+      },
+      quote: {
+        default: 'route-line',
+        choices: [
+          {
+            id: 'route-line',
+            tokens: {
+              '--pull-quote-rule-block-width': '0',
+              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
+              '--pull-quote-pad-inline': 'var(--space-md)',
+              '--pull-quote-mark-display': 'none',
+              '--pull-quote-align': 'start',
+            },
+          },
+          {
+            id: 'boxed-sign',
+            tokens: {
+              '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
+              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
+              '--pull-quote-pad-inline': 'var(--space-md)',
+              '--pull-quote-mark-display': 'none',
+              '--pull-quote-align': 'start',
+            },
+          },
+        ],
+      },
+      directory: {
+        default: 'gazetteer',
+        choices: [
+          {
+            id: 'gazetteer',
+            tokens: {
+              '--directory-portrait-aspect': '1 / 1',
+              '--directory-portrait-radius': 'var(--radius-base)',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+              '--directory-rule-width': 'var(--rule-hairline-width)',
+              '--directory-entry-pad-block': 'var(--space-3xs)',
+            },
+          },
+          {
+            id: 'station-index',
+            tokens: {
+              '--directory-portrait-aspect': '4 / 5',
+              '--directory-portrait-radius': 'var(--radius-base)',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+              '--directory-rule-width': 'var(--rule-strong-width)',
+              '--directory-entry-pad-block': 'var(--space-xs)',
+            },
+          },
+        ],
+      },
+      sectionBoundary: {
+        default: 'rule-and-folio',
+        choices: [
+          {
+            id: 'rule-and-folio',
+            tokens: {
+              '--section-folio-display': 'inline',
+              '--section-folio-placement': 'end',
+            },
+          },
+          {
+            id: 'rule-only',
+            tokens: {
+              '--section-folio-display': 'none',
+              '--section-folio-placement': 'end',
+            },
+          },
+        ],
+      },
+      tableRules: {
+        default: 'full-grid',
+        choices: [
+          {
+            id: 'hairline-rows',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-hairline-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'ruled-head',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'full-grid',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+              '--table-column-rule-width': 'var(--rule-hairline-width)',
+            },
+          },
+        ],
+      },
     },
   },
   'field-guide': {
@@ -680,7 +1298,6 @@ const PRESETS = Object.freeze({
       '--table-head-font': 'var(--font-mono)',
       '--table-head-transform': 'uppercase',
       '--table-head-tracking': '0.06em',
-      '--table-head-rule-width': 'var(--rule-hairline-width)',
       '--plate-frame-width': 'var(--rule-hairline-width)',
       '--plate-pad': 'var(--space-md)',
       '--plate-number-display': 'inline',
@@ -693,6 +1310,10 @@ const PRESETS = Object.freeze({
       '--hero-art-position': '75% 45%',
       '--hero-title-style': 'italic',
       '--hero-title-weight': 'var(--weight-semibold)',
+      '--avatar-radius': '0',
+      '--legend-font': 'var(--font-mono)',
+      '--standfirst-style': 'italic',
+      '--byline-font': 'var(--font-mono)',
     },
     options: {
       headingFace: {
@@ -786,6 +1407,157 @@ const PRESETS = Object.freeze({
           },
         ],
       },
+      longReadOpening: {
+        default: 'drop-cap',
+        choices: [
+          {
+            id: 'drop-cap',
+            tokens: {
+              '--drop-cap-float': 'left',
+              '--drop-cap-size': '3.1em',
+              '--drop-cap-leading': '0.8',
+              '--drop-cap-font': 'var(--font-heading)',
+              '--drop-cap-weight': 'var(--weight-semibold)',
+              '--drop-cap-pad-inline-end': 'var(--space-xs)',
+              '--drop-cap-margin-block-start': '0.08em',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+          {
+            id: 'standfirst',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-lead)',
+              '--long-read-opening-leading': 'var(--text-lead-leading)',
+            },
+          },
+          {
+            id: 'plain',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+        ],
+      },
+      quote: {
+        default: 'field-note',
+        choices: [
+          {
+            id: 'field-note',
+            tokens: {
+              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
+              '--pull-quote-rule-block-width': '0',
+              '--pull-quote-rule-inline-width': 'var(--rule-hairline-width)',
+              '--pull-quote-pad-inline': 'var(--space-md)',
+              '--pull-quote-mark-display': 'none',
+              '--pull-quote-align': 'start',
+            },
+          },
+          {
+            id: 'pressed-page',
+            tokens: {
+              '--pull-quote-rule-rgb': 'var(--rule-hairline-rgb)',
+              '--pull-quote-rule-block-width': 'var(--rule-hairline-width)',
+              '--pull-quote-rule-inline-width': '0',
+              '--pull-quote-pad-inline': '0',
+              '--pull-quote-mark-display': 'block',
+              '--pull-quote-align': 'center',
+            },
+          },
+        ],
+      },
+      directory: {
+        default: 'specimen-plates',
+        choices: [
+          {
+            id: 'specimen-plates',
+            tokens: {
+              '--directory-portrait-aspect': '4 / 5',
+              '--directory-portrait-radius': '0',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-rgb))',
+              '--directory-rule-width': 'var(--rule-hairline-width)',
+              '--directory-entry-pad-block': 'var(--space-2xs)',
+            },
+          },
+          {
+            id: 'field-list',
+            tokens: {
+              '--directory-portrait-aspect': '1 / 1',
+              '--directory-portrait-radius': '0',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+              '--directory-rule-width': 'var(--rule-hairline-width)',
+              '--directory-entry-pad-block': 'var(--space-2xs)',
+            },
+          },
+        ],
+      },
+      sectionBoundary: {
+        default: 'rule-and-folio',
+        choices: [
+          {
+            id: 'rule-and-folio',
+            tokens: {
+              '--section-folio-display': 'inline',
+              '--section-folio-placement': 'end',
+            },
+          },
+          {
+            id: 'rule-only',
+            tokens: {
+              '--section-folio-display': 'none',
+              '--section-folio-placement': 'end',
+            },
+          },
+          {
+            id: 'folio-in-margin',
+            tokens: {
+              '--section-folio-display': 'inline',
+              '--section-folio-placement': 'margin',
+            },
+          },
+        ],
+      },
+      tableRules: {
+        default: 'ruled-head',
+        choices: [
+          {
+            id: 'hairline-rows',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-hairline-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'ruled-head',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'full-grid',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-hairline-width)',
+              '--table-column-rule-width': 'var(--rule-hairline-width)',
+            },
+          },
+        ],
+      },
     },
   },
   zine: {
@@ -862,6 +1634,20 @@ const PRESETS = Object.freeze({
       '--hero-title-tracking': '-.06em',
       '--hero-title-transform': 'uppercase',
       '--hero-press-display': 'block',
+      '--avatar-frame-width': 'var(--rule-strong-width)',
+      '--avatar-radius': '0',
+      '--dropzone-rule-style': 'solid',
+      '--dropzone-rule-width': 'var(--rule-strong-width)',
+      '--repeater-rule-width': 'var(--rule-strong-width)',
+      '--count-figure-weight': 'var(--weight-bold)',
+      '--legend-font': 'var(--font-mono)',
+      '--legend-rule-width': 'var(--rule-strong-width)',
+      '--legend-pad-block': 'var(--space-2xs)',
+      '--state-marker-font': 'var(--font-mono)',
+      '--standfirst-ink': 'rgb(var(--color-text-primary-rgb))',
+      '--standfirst-rule-width': 'var(--rule-strong-width)',
+      '--standfirst-pad-block-end': 'var(--space-sm)',
+      '--byline-font': 'var(--font-mono)',
     },
     options: {
       headingFace: {
@@ -961,6 +1747,164 @@ const PRESETS = Object.freeze({
           },
         ],
       },
+      longReadOpening: {
+        default: 'plain',
+        choices: [
+          {
+            id: 'drop-cap',
+            tokens: {
+              '--drop-cap-float': 'left',
+              '--drop-cap-size': '3.1em',
+              '--drop-cap-leading': '0.8',
+              '--drop-cap-font': 'var(--font-heading)',
+              '--drop-cap-weight': 'var(--weight-semibold)',
+              '--drop-cap-pad-inline-end': 'var(--space-xs)',
+              '--drop-cap-margin-block-start': '0.08em',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+          {
+            id: 'standfirst',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-lead)',
+              '--long-read-opening-leading': 'var(--text-lead-leading)',
+            },
+          },
+          {
+            id: 'plain',
+            tokens: {
+              '--drop-cap-float': 'none',
+              '--drop-cap-size': '1em',
+              '--drop-cap-leading': 'inherit',
+              '--drop-cap-font': 'inherit',
+              '--drop-cap-weight': 'inherit',
+              '--drop-cap-pad-inline-end': '0',
+              '--drop-cap-margin-block-start': '0',
+              '--long-read-opening-size': 'var(--text-body)',
+              '--long-read-opening-leading': 'var(--text-body-leading)',
+            },
+          },
+        ],
+      },
+      quote: {
+        default: 'handwritten',
+        choices: [
+          {
+            id: 'handwritten',
+            tokens: {
+              '--callout-angle': '-2.5deg',
+              '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
+              '--pull-quote-rule-inline-width': '0',
+              '--pull-quote-pad-inline': '0',
+              '--pull-quote-pad-block': 'var(--space-lg)',
+              '--pull-quote-mark-display': 'none',
+            },
+          },
+          {
+            id: 'toner-block',
+            componentFonts: {
+              '--callout-font': 'karrik',
+            },
+            tokens: {
+              '--callout-angle': '0deg',
+              '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
+              '--pull-quote-rule-inline-width': '0',
+              '--pull-quote-pad-inline': '0',
+              '--pull-quote-pad-block': 'var(--space-md)',
+              '--pull-quote-mark-display': 'none',
+            },
+          },
+          {
+            id: 'cut-out',
+            tokens: {
+              '--callout-angle': '-2.5deg',
+              '--pull-quote-rule-block-width': '0',
+              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
+              '--pull-quote-pad-inline': 'var(--space-md)',
+              '--pull-quote-pad-block': 'var(--space-sm)',
+              '--pull-quote-mark-display': 'none',
+            },
+          },
+        ],
+      },
+      directory: {
+        default: 'contact-sheet',
+        choices: [
+          {
+            id: 'contact-sheet',
+            tokens: {
+              '--directory-portrait-aspect': '1 / 1',
+              '--directory-portrait-radius': '0',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+              '--directory-rule-width': 'var(--rule-strong-width)',
+              '--directory-entry-pad-block': 'var(--space-2xs)',
+            },
+          },
+          {
+            id: 'cut-outs',
+            tokens: {
+              '--directory-portrait-aspect': '4 / 5',
+              '--directory-portrait-radius': '0',
+              '--directory-portrait-ground': 'rgb(var(--color-surface-rgb))',
+              '--directory-rule-width': 'var(--rule-hairline-width)',
+              '--directory-entry-pad-block': 'var(--space-2xs)',
+            },
+          },
+        ],
+      },
+      sectionBoundary: {
+        default: 'rule-and-folio',
+        choices: [
+          {
+            id: 'rule-and-folio',
+            tokens: {
+              '--section-folio-display': 'inline',
+              '--section-folio-placement': 'end',
+            },
+          },
+          {
+            id: 'rule-only',
+            tokens: {
+              '--section-folio-display': 'none',
+              '--section-folio-placement': 'end',
+            },
+          },
+        ],
+      },
+      tableRules: {
+        default: 'ruled-head',
+        choices: [
+          {
+            id: 'hairline-rows',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-hairline-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'ruled-head',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+              '--table-column-rule-width': '0',
+            },
+          },
+          {
+            id: 'full-grid',
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+              '--table-column-rule-width': 'var(--rule-hairline-width)',
+            },
+          },
+        ],
+      },
     },
   },
 });
@@ -997,6 +1941,8 @@ const COMPONENT_TOKEN_DEFAULTS = Object.freeze({
   '--hero-sign-display': 'none',
   '--hero-press-display': 'none',
   '--section-rule-width': 'var(--rule-strong-width)',
+  '--section-folio-display': 'inline',
+  '--section-folio-placement': 'end',
   '--folio-rule-width': 'var(--rule-hairline-width)',
   '--folio-rule-top-width': '0',
   '--folio-font': 'var(--font-data)',
@@ -1060,6 +2006,43 @@ const COMPONENT_TOKEN_DEFAULTS = Object.freeze({
   '--table-head-font': 'var(--font-data)',
   '--table-head-transform': 'none',
   '--table-head-tracking': '0em',
+  '--avatar-ink': 'rgb(var(--color-text-secondary-rgb))',
+  '--avatar-frame-width': 'var(--rule-hairline-width)',
+  '--avatar-radius': 'var(--radius-base)',
+  '--dropzone-rule-width': 'var(--rule-hairline-width)',
+  '--dropzone-rule-style': 'dashed',
+  '--repeater-rule-width': 'var(--rule-hairline-width)',
+  '--count-figure-weight': 'var(--weight-semibold)',
+  '--legend-font': 'var(--font-data)',
+  '--legend-transform': 'none',
+  '--legend-tracking': '0em',
+  '--legend-rule-width': '0',
+  '--legend-pad-block': '0',
+  '--state-marker-font': 'var(--font-data)',
+  '--standfirst-font': 'var(--font-body)',
+  '--standfirst-size': 'var(--text-lead)',
+  '--standfirst-style': 'normal',
+  '--standfirst-weight': 'var(--weight-regular)',
+  '--standfirst-ink': 'rgb(var(--color-text-secondary-rgb))',
+  '--standfirst-rule-width': '0',
+  '--standfirst-pad-block-end': '0',
+  '--byline-font': 'var(--font-data)',
+  '--byline-transform': 'none',
+  '--byline-tracking': '0em',
+  '--directory-rule-width': 'var(--rule-hairline-width)',
+  '--directory-portrait-aspect': '1 / 1',
+  '--directory-portrait-ground': 'rgb(var(--color-surface-alt-rgb))',
+  '--directory-portrait-radius': 'var(--radius-base)',
+  '--directory-entry-pad-block': 'var(--space-2xs)',
+  '--drop-cap-float': 'none',
+  '--drop-cap-size': '1em',
+  '--drop-cap-leading': 'inherit',
+  '--drop-cap-font': 'inherit',
+  '--drop-cap-weight': 'inherit',
+  '--drop-cap-pad-inline-end': '0',
+  '--drop-cap-margin-block-start': '0',
+  '--long-read-opening-size': 'var(--text-body)',
+  '--long-read-opening-leading': 'var(--text-body-leading)',
 });
 
 const ADMIN_TOKENS = Object.freeze({
