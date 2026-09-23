@@ -27,6 +27,8 @@ const {
   generateSiteFiles,
   EXIT,
 } = require('./publish-site.cjs');
+const { readPlaceholderIcons } = require('./lib/app-icons.cjs');
+const { decodePng, encodePng } = require('./lib/png.cjs');
 
 const ENV = {
   EVENT_SLUG: 'demo-event',
@@ -160,6 +162,10 @@ test('--dry-run also names the sitemap/robots/manifest write, in its real place 
   const sitemapIndex = lines.findIndex((l) => l.includes('[sitemap]'));
   const deployIndex = lines.findIndex((l) => l.includes('[deploy]'));
   assert.ok(buildIndex >= 0 && sitemapIndex > buildIndex && deployIndex > sitemapIndex);
+  assert.equal(
+    lines[sitemapIndex],
+    '  [sitemap] Write sitemap.xml, robots.txt, the web manifest, and the two app icons into apps/web/dist',
+  );
 });
 
 // --- the plan -----------------------------------------------------------------
@@ -247,6 +253,7 @@ test('generateSiteFiles is called with this project\'s db, its public URL, and t
   assert.equal(siteFilesCalls.length, 1);
   assert.equal(siteFilesCalls[0].db, db);
   assert.equal(siteFilesCalls[0].publicUrl, ENV.EVENT_PUBLIC_URL);
+  assert.equal(siteFilesCalls[0].storageBucket, ENV.EVENT_STORAGE_BUCKET);
   assert.match(siteFilesCalls[0].distDir, /apps[\\/]web[\\/]dist$/);
 });
 
@@ -473,6 +480,72 @@ test('generateSiteFiles writes all three files, and the sitemap and robots agree
     const manifest = JSON.parse(fs.readFileSync(path.join(distDir, 'manifest.webmanifest'), 'utf8'));
     assert.equal(manifest.name, 'Harborlight Summit');
     assert.equal(manifest.short_name, 'HARBOR');
+  } finally {
+    fs.rmSync(distDir, { recursive: true, force: true });
+  }
+});
+
+test('generateSiteFiles writes the committed placeholder icons for the default mark, and the manifest names them', async () => {
+  const db = fakeSiteDb({ ...SITE_DOCS, theme: { logos: { mark: 'branding/mark.svg' } } });
+  const distDir = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-site-test-'));
+  const lines = [];
+  try {
+    await generateSiteFiles({
+      db,
+      distDir,
+      publicUrl: 'https://example.org',
+      storageBucket: ENV.EVENT_STORAGE_BUCKET,
+      fetchImpl: () => { throw new Error('the default mark must not be fetched'); },
+      log: { log: (line) => lines.push(line), error() {} },
+    });
+    for (const file of readPlaceholderIcons()) {
+      assert.ok(fs.readFileSync(path.join(distDir, file.path)).equals(file.bytes), `${file.path} is the committed file`);
+    }
+    const manifest = JSON.parse(fs.readFileSync(path.join(distDir, 'manifest.webmanifest'), 'utf8'));
+    assert.deepEqual(manifest.icons, [
+      { src: 'branding/app-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: 'branding/app-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+    ]);
+    assert.ok(lines.some((line) => line.startsWith('app icons: neutral placeholder: ')));
+    assert.ok(lines.some((line) => line.includes('manifest.webmanifest, and the two app icons')));
+  } finally {
+    fs.rmSync(distDir, { recursive: true, force: true });
+  }
+});
+
+test('generateSiteFiles resamples an uploaded square PNG from the bucket, listed for purpose any', async () => {
+  const side = 1024;
+  const rgba = Buffer.alloc(side * side * 4, 255);
+  const upload = encodePng({ width: side, height: side, rgba });
+  const mark = 'branding/a1b2c3/square-icon.png';
+  const db = fakeSiteDb({ ...SITE_DOCS, theme: { logos: { mark } } });
+  const distDir = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-site-test-'));
+  const fetched = [];
+  try {
+    await generateSiteFiles({
+      db,
+      distDir,
+      publicUrl: 'https://example.org',
+      storageBucket: ENV.EVENT_STORAGE_BUCKET,
+      fetchImpl: async (url, init) => {
+        fetched.push({ url, init });
+        return new Response(upload, { status: 200 });
+      },
+      log: quiet,
+    });
+    assert.equal(fetched.length, 1);
+    assert.equal(
+      fetched[0].url,
+      'https://firebasestorage.googleapis.com/v0/b/demo-project.appspot.com/o/branding%2Fa1b2c3%2Fsquare-icon.png?alt=media',
+    );
+    assert.equal(fetched[0].init.redirect, 'error');
+    for (const size of [192, 512]) {
+      const icon = decodePng(fs.readFileSync(path.join(distDir, 'branding', `app-icon-${size}.png`)));
+      assert.equal(icon.width, size);
+      assert.equal(icon.height, size);
+    }
+    const manifest = JSON.parse(fs.readFileSync(path.join(distDir, 'manifest.webmanifest'), 'utf8'));
+    assert.deepEqual(manifest.icons.map((icon) => icon.purpose), ['any', 'any']);
   } finally {
     fs.rmSync(distDir, { recursive: true, force: true });
   }

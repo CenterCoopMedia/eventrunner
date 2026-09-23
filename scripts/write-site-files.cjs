@@ -2,8 +2,8 @@
 'use strict';
 
 /**
- * Write sitemap.xml, robots.txt, and the web manifest from a generated
- * content snapshot (M7 issue 5 follow-up).
+ * Write sitemap.xml, robots.txt, the web manifest, and the two app icons
+ * from a generated content snapshot (M7 issue 5 follow-up, #218).
  *
  * scripts/publish-site.cjs already writes these three files, but only from
  * a LIVE Firestore read, and only inside the Cloud Run `site-publisher`
@@ -45,9 +45,17 @@
  * refusal below names the page path anyway, because a page written before
  * it can, and renaming that page is the fix.
  *
+ * The app icons (scripts/lib/app-icons.cjs) come from the snapshot's
+ * `theme.logos.mark`. When it names an uploaded PNG and `--storage-bucket`
+ * is given, the file is fetched anonymously over its public download URL
+ * and resampled; the deploy workflow passes the client's bucket. With no
+ * flag nothing is fetched and the committed placeholders ship, which keeps
+ * the demo build and the tests offline.
+ *
  * Usage:
  *   node scripts/write-site-files.cjs --dist apps/web/dist --public-url https://example.org
  *   node scripts/write-site-files.cjs --dist apps/web/dist --generated /tmp/generated --public-url https://example.org
+ *   node scripts/write-site-files.cjs --dist apps/web/dist --generated /tmp/generated --public-url https://example.org --storage-bucket my-project.appspot.com
  */
 
 const fs = require('node:fs');
@@ -55,11 +63,12 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
-const { buildSiteArtifacts } = require('./lib/site-manifest.cjs');
+const { buildSiteArtifacts, buildWebManifest } = require('./lib/site-manifest.cjs');
+const { writeAppIcons } = require('./lib/app-icons.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_GENERATED_DIR = path.join(ROOT, 'apps', 'web', 'src', 'generated');
-const FLAGS = ['dist', 'generated', 'public-url', 'help'];
+const FLAGS = ['dist', 'generated', 'public-url', 'storage-bucket', 'help'];
 
 /**
  * The review-only routes this build must never advertise.
@@ -144,12 +153,16 @@ function excludedRouteMessage(routes, pages) {
 function usage() {
   return [
     'Usage: node scripts/write-site-files.cjs --dist <dir> --public-url <url> [--generated <dir>]',
+    '         [--storage-bucket <name>]',
     '',
-    '  --dist <dir>        directory to write sitemap.xml, robots.txt, and',
-    '                      manifest.webmanifest into (usually apps/web/dist)',
-    "  --public-url <url>  the site's own absolute base URL",
-    '  --generated <dir>   the generated snapshot to read (default:',
-    '                      apps/web/src/generated, the committed demo copy)',
+    '  --dist <dir>              directory to write sitemap.xml, robots.txt,',
+    '                            manifest.webmanifest, and the app icons into',
+    '                            (usually apps/web/dist)',
+    "  --public-url <url>        the site's own absolute base URL",
+    '  --generated <dir>         the generated snapshot to read (default:',
+    '                            apps/web/src/generated, the committed demo copy)',
+    '  --storage-bucket <name>   the bucket an uploaded square icon is read from;',
+    '                            without it the neutral placeholder icons ship',
   ].join('\n');
 }
 
@@ -207,11 +220,12 @@ async function readGeneratedSnapshot({ generatedDir, importModule = importGenera
 
 /**
  * @param {string[]} argv
- * @param {{ importModule?: typeof importGenerated, log?: Console }} [deps]
+ * @param {{ importModule?: typeof importGenerated, log?: Console,
+ *           fetchImpl?: typeof fetch }} [deps]
  * @returns {Promise<number>} process exit code
  */
-async function main(argv, { importModule = importGenerated, log = console } = {}) {
-  const parsed = parseArgv(argv, { withValue: ['dist', 'generated', 'public-url'] });
+async function main(argv, { importModule = importGenerated, log = console, fetchImpl } = {}) {
+  const parsed = parseArgv(argv, { withValue: ['dist', 'generated', 'public-url', 'storage-bucket'] });
   const unknown = unknownFlags(parsed, FLAGS);
   if (parsed.help) {
     log.log(usage());
@@ -253,14 +267,23 @@ async function main(argv, { importModule = importGenerated, log = console } = {}
     return 4;
   }
 
+  // The icons are resolved after the route check, so a refused sitemap
+  // writes nothing, and before the manifest, which says whether they are
+  // maskable.
   fs.mkdirSync(distDir, { recursive: true });
+  const icons = await writeAppIcons({
+    distDir, theme: snapshot.theme, bucket: parsed['storage-bucket'], fetchImpl, log,
+  });
+  const manifest = buildWebManifest({ event: snapshot.event, theme: snapshot.theme, maskable: icons.maskable });
   fs.writeFileSync(path.join(distDir, 'sitemap.xml'), artifacts.sitemapXml);
   fs.writeFileSync(path.join(distDir, 'robots.txt'), artifacts.robotsTxt);
   fs.writeFileSync(
     path.join(distDir, 'manifest.webmanifest'),
-    `${JSON.stringify(artifacts.manifest, null, 2)}\n`,
+    `${JSON.stringify(manifest, null, 2)}\n`,
   );
-  log.log(`write-site-files: wrote sitemap.xml, robots.txt, and manifest.webmanifest to ${distDir}`);
+  log.log(
+    `write-site-files: wrote sitemap.xml, robots.txt, manifest.webmanifest, and the two app icons to ${distDir}`,
+  );
   return 0;
 }
 

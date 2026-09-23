@@ -206,6 +206,14 @@ font CDN is ever requested at runtime — `theme.css` and the generated
 Per-event branding overrides these once an event is seeded; until then the
 shell stays event-neutral.
 
+Two raster placeholders sit beside them: `app-icon-192.png` and
+`app-icon-512.png`, the app icons `public/manifest.webmanifest` lists. They
+are drawn from the default mark's numbers, not converted from the SVG. The
+publish and deploy scripts replace them with an uploaded square PNG icon
+when there is one (`scripts/lib/app-icons.cjs`). Regenerate them after a
+change to `mark.svg` with `node scripts/dev/build-app-icons.mjs`; a unit test
+fails until you do.
+
 ## Testing
 
 ```bash

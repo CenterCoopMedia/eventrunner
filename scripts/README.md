@@ -171,9 +171,14 @@ alone does not decide what is public: a system page's own feature flag (`feature
 `features.updates`, …) can be off while `visible: true`, and the attendee directory
 (`Attendees.jsx`) additionally requires the viewer be signed in whenever
 `features.publicAttendeeProfiles` is off — the default — so that route is excluded from the
-sitemap and disallowed in robots.txt until an operator turns the flag on. The manifest's icons
-reuse the branding slots every deployment ships (`apps/web/public/branding/mark.svg`,
-`favicon.svg`), never a client's uploaded Storage asset.
+sitemap and disallowed in robots.txt until an operator turns the flag on. The manifest lists two
+raster app icons, `branding/app-icon-192.png` and `branding/app-icon-512.png`, which the same step
+writes beside it (`scripts/lib/app-icons.cjs`). When the live `config/theme.logos.mark` names an
+uploaded square PNG (`branding/{assetId}/{name}.png`, 512 to 4096 pixels), the job reads it from
+`EVENT_STORAGE_BUCKET` over its public download URL and resamples it; the icons are then listed for
+purpose `any`. In every other case the committed neutral placeholders ship, listed as
+`any maskable`, and the log line `app icons: neutral placeholder: <reason>` says why. An icon
+problem never fails the publish; only a failed file write does (exit `6`).
 
 This job only runs when a CMS publish triggers it (`functions/src/cms/publisher.cjs`) — a fresh
 deployment, and every ordinary code deploy, never runs it at all. `write-site-files.cjs`, below,
@@ -190,6 +195,8 @@ truth for what belongs in each file; only where the input documents come from di
 ```sh
 node scripts/write-site-files.cjs --dist apps/web/dist --public-url https://example.org
 node scripts/write-site-files.cjs --dist apps/web/dist --generated /tmp/generated --public-url https://example.org
+node scripts/write-site-files.cjs --dist apps/web/dist --generated /tmp/generated --public-url https://example.org \
+  --storage-bucket my-project.appspot.com
 ```
 
 `--generated` defaults to the committed `apps/web/src/generated` (the demo's own source of truth —
@@ -197,6 +204,13 @@ node scripts/write-site-files.cjs --dist apps/web/dist --generated /tmp/generate
 `build` job instead points `--generated` at the real, out-of-tree per-client snapshot
 `generate-content.cjs` already wrote earlier in the same workflow run, right after `npm run build`
 produces `apps/web/dist` from that same snapshot.
+
+The script also writes the two app icons, the same way `publish-site.cjs` does, from the snapshot's
+`theme.logos.mark`. `--storage-bucket` names the bucket an uploaded square PNG is read from, over
+its public download URL, so the workflow step needs no credentials; `deploy-client.yml` passes
+`EVENT_STORAGE_BUCKET`. Without the flag nothing is fetched and the committed placeholder icons
+ship, which keeps `build-demo.cjs` and the tests offline. A sitemap that exits `4` writes nothing,
+the icons included.
 
 `apps/web/src/generated/*.js` are Vite's own ES modules, not CommonJS, so they are loaded with
 dynamic `import()` rather than `require()`. `cmsUpdates` has no generated-snapshot counterpart at
@@ -340,6 +354,24 @@ never runs `playwright install`: a missing browser fails fast with a message rat
 for the network.
 
 Exit codes: `0` ok, `1` the capture failed, `2` bad arguments, `3` no build at `--dist`.
+
+### `dev/build-app-icons.mjs`
+
+Draws the neutral placeholder app icons, `apps/web/public/branding/app-icon-192.png` and
+`app-icon-512.png`, from the default mark's numbers (`PLACEHOLDER_MARK` in
+`scripts/lib/app-icons.cjs`). The ground fills the square and the ring stays inside the maskable
+safe zone. Nothing in the dependencies rasterizes SVG, so it draws the pixels itself and encodes
+them with `node:zlib`, like `dev/build-og-placeholder.mjs`. The output is committed. The publish
+scripts copy those bytes and never re-encode them, so `build-demo.cjs --check` stays byte stable.
+
+```sh
+node scripts/dev/build-app-icons.mjs           # write both files
+node scripts/dev/build-app-icons.mjs --check   # compare pixels, write nothing
+```
+
+`scripts/lib/app-icons.test.cjs` fails when a committed icon no longer matches a fresh render, or
+when `mark.svg` no longer holds the numbers the drawing uses. Re-run the script and commit both
+files.
 
 ## Planned
 

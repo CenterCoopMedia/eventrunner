@@ -647,6 +647,16 @@ describe('publishing the theme', () => {
     expect(screen.getByLabelText('Favicon').closest('[hidden]')).toBeNull();
     expect(screen.getAllByRole('button', { name: 'Choose or upload…' }).length).toBe(5);
   });
+
+  // The square icon also becomes the app icon when it is a square PNG. The
+  // field's description is where an operator learns that rule, so it is
+  // read through the field itself, as a screen reader reads it.
+  it('describes the square icon field with the app icon rule', async () => {
+    await renderBranding();
+    expect(screen.getByLabelText('Square icon')).toHaveAccessibleDescription(
+      'A square version for tight spaces. A square PNG of 512 pixels or more also becomes the app icon.',
+    );
+  }, 20_000);
 });
 
 describe('color picker input', () => {

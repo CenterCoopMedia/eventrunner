@@ -13,10 +13,11 @@
  *                                          through the Admin SDK.
  *   2. `npm run build -w apps/web`         the bundle, against that snapshot
  *                                          and this client's VITE_* values.
- *      sitemap.xml, robots.txt, and        written straight into the built
- *      the web manifest                    `apps/web/dist` (scripts/lib/
- *                                          site-manifest.cjs, M7 issue 5) so
- *                                          they deploy as ordinary hosting
+ *      sitemap.xml, robots.txt, the        written straight into the built
+ *      web manifest, and the two app       `apps/web/dist` (scripts/lib/
+ *      icons                               site-manifest.cjs, M7 issue 5;
+ *                                          scripts/lib/app-icons.cjs, #218)
+ *                                          so they deploy as ordinary hosting
  *                                          files. Not a spawned step: it
  *                                          reads this project's own
  *                                          config/event, config/features,
@@ -52,7 +53,9 @@
  *   3  snapshot generation failed
  *   4  web build failed
  *   5  hosting deploy failed
- *   6  writing sitemap.xml, robots.txt, or the web manifest failed
+ *   6  writing sitemap.xml, robots.txt, the web manifest, or the app
+ *      icons failed (an icon that cannot be fetched or decoded is not a
+ *      failure: the neutral placeholder ships and the log says why)
  *
  * When PUBLISH_QUEUE_ID is set (cmsPublish passes it as a per-execution
  * override), the terminal outcome is written back to that `cmsPublishQueue`
@@ -74,6 +77,7 @@ const { spawnSync } = require('node:child_process');
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { validateDeployEnv } = require('../packages/shared/src/config/deploy.cjs');
 const { buildSiteArtifacts } = require('./lib/site-manifest.cjs');
+const { writeAppIcons } = require('./lib/app-icons.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const DIST_DIR = path.join(ROOT, 'apps', 'web', 'dist');
@@ -336,33 +340,48 @@ async function readSiteDocs({ db }) {
 }
 
 /**
- * Write sitemap.xml, robots.txt, and the web manifest into the built
- * hosting directory (M7 issue 5). Runs after the build stage — `distDir`
- * must already hold the vite build's output — and before the two deploy
- * stages, so the three files ship as ordinary hosting files with no
- * separate rewrite or function.
+ * Write sitemap.xml, robots.txt, the web manifest, and the two app icons
+ * into the built hosting directory (M7 issue 5, #218). Runs after the build
+ * stage — `distDir` must already hold the vite build's output — and before
+ * the two deploy stages, so the files ship as ordinary hosting files with
+ * no separate rewrite or function.
+ *
+ * The icons come first because the manifest says whether they are
+ * maskable. When the live `config/theme.logos.mark` names an uploaded PNG,
+ * it is fetched from `storageBucket` over its public download URL; in any
+ * other case the committed placeholders ship (scripts/lib/app-icons.cjs).
  *
  * @param {{ db: object, distDir: string, publicUrl: string,
+ *           storageBucket?: string, fetchImpl?: typeof fetch,
  *           log?: Console }} args
  * @returns {Promise<void>}
  */
-async function generateSiteFiles({ db, distDir, publicUrl, log = console }) {
+async function generateSiteFiles({
+  db, distDir, publicUrl, storageBucket, fetchImpl, log = console,
+}) {
   if (!db) throw new Error('generateSiteFiles: no Firestore handle available');
   const {
     event, features, theme, pages, sessions, speakers, organizations, updates,
   } = await readSiteDocs({ db });
-  const artifacts = buildSiteArtifacts({
-    event, features, theme, pages, sessions, speakers, organizations, updates, publicUrl,
-  });
 
   fs.mkdirSync(distDir, { recursive: true });
+  const icons = await writeAppIcons({
+    distDir, theme, bucket: storageBucket, fetchImpl, log,
+  });
+  const artifacts = buildSiteArtifacts({
+    event, features, theme, pages, sessions, speakers, organizations, updates, publicUrl,
+    maskable: icons.maskable,
+  });
+
   fs.writeFileSync(path.join(distDir, 'sitemap.xml'), artifacts.sitemapXml);
   fs.writeFileSync(path.join(distDir, 'robots.txt'), artifacts.robotsTxt);
   fs.writeFileSync(
     path.join(distDir, 'manifest.webmanifest'),
     `${JSON.stringify(artifacts.manifest, null, 2)}\n`,
   );
-  log.log(`publish-site: wrote sitemap.xml, robots.txt, and manifest.webmanifest to ${distDir}`);
+  log.log(
+    `publish-site: wrote sitemap.xml, robots.txt, manifest.webmanifest, and the two app icons to ${distDir}`,
+  );
 }
 
 /**
@@ -376,7 +395,8 @@ async function generateSiteFiles({ db, distDir, publicUrl, log = console }) {
  *   writeFirebaseJson?: (config: object) => void,
  *   getDb?: () => object,
  *   generateSiteFiles?: (args: { db: object, distDir: string,
- *                                publicUrl: string, log: Console }) => Promise<void>,
+ *                                publicUrl: string, storageBucket: string,
+ *                                log: Console }) => Promise<void>,
  *   now?: () => number,
  *   log?: Console,
  * }} deps
@@ -426,7 +446,9 @@ async function main({
       // command/args of its own — printed here so a dry run still shows an
       // operator every effect a real run would have, in the order it runs.
       if (step.stage === 'build') {
-        log.log('  [sitemap] Write sitemap.xml, robots.txt, and the web manifest into apps/web/dist');
+        log.log(
+          '  [sitemap] Write sitemap.xml, robots.txt, the web manifest, and the two app icons into apps/web/dist',
+        );
       }
     }
     return EXIT.OK;
@@ -482,13 +504,20 @@ async function main({
         : `${step.command} exited ${result.status === null ? 'on a signal' : result.status}`;
       return finish(STAGE_EXIT[step.stage] || EXIT.UNEXPECTED, step.stage, reason);
     }
-    // Not a spawned step: sitemap.xml, robots.txt, and the web manifest are
-    // written straight into apps/web/dist right after the build produces
-    // it, and before either deploy step ships that directory to hosting.
+    // Not a spawned step: sitemap.xml, robots.txt, the web manifest, and
+    // the two app icons are written straight into apps/web/dist right after
+    // the build produces it, and before either deploy step ships that
+    // directory to hosting.
     if (step.stage === 'build') {
-      log.log('publish-site: [sitemap] Write sitemap.xml, robots.txt, and the web manifest');
+      log.log('publish-site: [sitemap] Write sitemap.xml, robots.txt, the web manifest, and the two app icons');
       try {
-        await generateSiteFilesFn({ db, distDir: DIST_DIR, publicUrl: resolved.EVENT_PUBLIC_URL, log });
+        await generateSiteFilesFn({
+          db,
+          distDir: DIST_DIR,
+          publicUrl: resolved.EVENT_PUBLIC_URL,
+          storageBucket: resolved.EVENT_STORAGE_BUCKET,
+          log,
+        });
       } catch (err) {
         return finish(EXIT.SITEMAP, 'sitemap', err?.message || err);
       }

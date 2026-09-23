@@ -103,6 +103,7 @@ A visitor can reach and read every page the seed creates, and the site presents 
 - [x] Add an uploaded venue map with labelled rooms (#159)
 - [x] Add search and a section index to long content pages (#160)
 - [x] Add a session recording link field (#161)
+- [x] Add raster app icons to the web manifest (#218)
 
 Follow-ups filed while the milestone ran, carried into later milestones rather
 than held against M7: #218, #219, #226, #227, #230, #231, #233, #234, #236.

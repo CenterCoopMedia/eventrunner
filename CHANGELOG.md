@@ -42,6 +42,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shared event schema now validates the `legal` and `social` blocks and refuses an unknown field
   in either by name. The email footer drops a stored link that fails the same check, as the site
   footer already did (#231).
+- The web manifest lists two raster app icons, 192 and 512 pixels square, so Chrome and Android can
+  install the site. When the square icon slot holds an uploaded square PNG of 512 to 4096 pixels,
+  the site publisher and the deploy build resample it to both sizes. Any other slot value ships
+  neutral placeholder icons drawn from the default mark, and the job log names the reason. The
+  placeholders are listed as `any maskable`; an uploaded icon is listed as `any`, because its safe
+  zone is unknown. The manifest no longer lists the SVG mark or favicon. The deploy build reads the
+  upload over its public download URL (`--storage-bucket`), so it needs no credentials. A PNG
+  decoder and resampler in `scripts/lib/png.cjs` use only `node:zlib`, so no new dependency ships.
+  The Branding page hint for the square icon states the rule, and an end-to-end test asks Chromium
+  whether the default site is installable (#218).
 
 ### Changed
 

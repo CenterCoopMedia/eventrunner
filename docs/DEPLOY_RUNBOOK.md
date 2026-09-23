@@ -567,6 +567,14 @@ demo copy), through the same builders in `scripts/lib/site-manifest.cjs` — so 
 goes without these files between its first deploy and its first content publish, whether or not the
 site publisher is enabled at all.
 
+**App icons.** Both paths also write two raster app icons beside the manifest,
+`branding/app-icon-192.png` and `branding/app-icon-512.png` (#218). When the square icon slot
+(`config/theme.logos.mark`) names an uploaded square PNG, the job reads it from
+`EVENT_STORAGE_BUCKET` over its public download URL and resamples it. `branding/` is public read in
+`storage.rules`, so neither the publisher nor the `build` job needs an IAM change or a credential
+for this. Any other slot value ships the neutral placeholder icons, and the job log names the
+reason on a line that starts `app icons: neutral placeholder:`. An icon problem never fails the job.
+
 **It is optional.** With `EVENT_SITE_PUBLISHER_ENABLED` unset or `false`, nothing below exists, the
 `publisher` deploy job is skipped, `EVENT_SITE_PUBLISHER_JOB` is never written into the functions
 env, and `cmsPublish` skips the invoke without writing anything. That is the phase 2–4 behavior:

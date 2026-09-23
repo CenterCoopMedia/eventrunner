@@ -26,6 +26,7 @@
 const { configuredThemeColor } = require('./shared-theme.cjs');
 const { SYSTEM_PAGE_ROUTES } = require('shared/routing');
 const { isPublicPage, pageFeatureGate } = require('shared/page');
+const { APP_ICON_SIZES, appIconPath } = require('./app-icons.cjs');
 
 /**
  * A `cmsPages` system page id -> the `config/features` key its own route
@@ -460,11 +461,16 @@ function buildRobotsTxt({ publicUrl, pages, features }) {
  * whether the manifest sits at the origin root or under a base path,
  * because both stay relative to wherever the manifest itself is.
  *
- * Icons reuse the branding slots every deployment ships —
- * `apps/web/public/branding/mark.svg` and `favicon.svg`
- * (scripts/lib/branding.cjs) — never a client's uploaded Storage asset:
- * those slots are the one pair guaranteed to exist in `apps/web/dist` on
- * every deployment, customized or not.
+ * Icons are the two raster app icons, 192 and 512 pixels square, the
+ * sizes Chrome and Android need before a site can be installed (#218).
+ * Both write paths put them beside the manifest under fixed names
+ * (scripts/lib/app-icons.cjs): resampled from the square icon slot when it
+ * holds an uploaded PNG, and the committed neutral placeholders otherwise,
+ * which also ship in `apps/web/public/branding/`. `maskable` says whether
+ * the icons keep their content inside the maskable safe zone: true for the
+ * placeholder, false for an upload, whose safe zone is unknown. No SVG is
+ * listed: Chrome may pick an SVG over a client's PNG, and the install check
+ * needs only the two rasters.
  *
  * `theme_color`/`background_color` are included only when the event has
  * configured them (`config/theme.colors`, via `configuredThemeColor` —
@@ -475,10 +481,10 @@ function buildRobotsTxt({ publicUrl, pages, features }) {
  * `apps/web/public/manifest.webmanifest` (see its own test) — the neutral
  * placeholder Vite ships when a build never runs the publisher.
  *
- * @param {{ event: object, theme: object }} args
+ * @param {{ event: object, theme: object, maskable?: boolean }} args
  * @returns {object} the manifest, ready for `JSON.stringify`
  */
-function buildWebManifest({ event = {}, theme = {} }) {
+function buildWebManifest({ event = {}, theme = {}, maskable = true }) {
   const colors = theme?.colors;
   const themeColor = configuredThemeColor(colors, 'primary');
   const backgroundColor = configuredThemeColor(colors, 'surface');
@@ -492,10 +498,12 @@ function buildWebManifest({ event = {}, theme = {} }) {
     start_url: './',
     scope: './',
     display: 'standalone',
-    icons: [
-      { src: 'branding/mark.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-      { src: 'branding/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
-    ],
+    icons: APP_ICON_SIZES.map((size) => ({
+      src: appIconPath(size),
+      sizes: `${size}x${size}`,
+      type: 'image/png',
+      purpose: maskable ? 'any maskable' : 'any',
+    })),
   };
   if (typeof event?.tagline === 'string' && event.tagline.trim()) {
     manifest.description = event.tagline.trim();
@@ -511,18 +519,19 @@ function buildWebManifest({ event = {}, theme = {} }) {
  *
  * @param {{ event: object, features: object, theme: object,
  *           pages: object[], sessions?: object[], speakers?: object[], organizations?: object[],
- *           updates?: object[], publicUrl: string }} args
+ *           updates?: object[], publicUrl: string, maskable?: boolean }} args
  * @returns {{ sitemapXml: string, robotsTxt: string, manifest: object }}
  */
 function buildSiteArtifacts({
   event, features, theme, pages, sessions = [], speakers = [], organizations = [], updates = [], publicUrl,
+  maskable = true,
 }) {
   return {
     sitemapXml: buildSitemapXml({
       publicUrl, pages, features, sessions, speakers, organizations, updates,
     }),
     robotsTxt: buildRobotsTxt({ publicUrl, pages, features }),
-    manifest: buildWebManifest({ event, theme }),
+    manifest: buildWebManifest({ event, theme, maskable }),
   };
 }
 

@@ -14,6 +14,8 @@ const {
   DEFAULT_GENERATED_DIR,
   NEVER_IN_SITEMAP,
 } = require('./write-site-files.cjs');
+const { REASONS, readPlaceholderIcons } = require('./lib/app-icons.cjs');
+const { decodePng, encodePng } = require('./lib/png.cjs');
 
 const quiet = { log() {}, error() {} };
 
@@ -109,13 +111,13 @@ test('a snapshot read failure is reported and exits 3, not 1', async () => {
  * exercises the actual `import()` mechanism this script depends on, not
  * only the injected-importer unit tests above.
  */
-function writeFixtureGeneratedDir() {
+function writeFixtureGeneratedDir({ theme = {} } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'write-site-files-fixture-'));
   fs.writeFileSync(
     path.join(dir, 'eventConfig.js'),
     "export const eventConfig = { name: 'Fixture Event', shortName: 'FIX' };\n"
     + "export const features = { schedule: true, speakers: true, sponsors: true, attendeeDirectory: true, updates: false };\n"
-    + 'export const theme = {};\n',
+    + `export const theme = ${JSON.stringify(theme)};\n`,
   );
   fs.writeFileSync(
     path.join(dir, 'pagesData.js'),
@@ -155,6 +157,7 @@ test('a full run reads a real generated directory and writes all three files', a
     const manifest = JSON.parse(fs.readFileSync(path.join(distDir, 'manifest.webmanifest'), 'utf8'));
     assert.equal(manifest.name, 'Fixture Event');
     assert.equal(manifest.start_url, './');
+    assertCommittedIcons(distDir);
   } finally {
     fs.rmSync(generatedDir, { recursive: true, force: true });
     fs.rmSync(distDir, { recursive: true, force: true });
@@ -169,9 +172,106 @@ test('a real run against the committed demo snapshot (no --generated) succeeds',
     assert.ok(fs.existsSync(path.join(distDir, 'sitemap.xml')));
     assert.ok(fs.existsSync(path.join(distDir, 'robots.txt')));
     assert.ok(fs.existsSync(path.join(distDir, 'manifest.webmanifest')));
+    // The demo keeps the seeded mark, so it ships the placeholder icons.
+    assertCommittedIcons(distDir);
   } finally {
     fs.rmSync(distDir, { recursive: true, force: true });
   }
+});
+
+// --- the two app icons ---------------------------------------------------------
+
+const UPLOADED_MARK = 'branding/a1b2c3/square-icon.png';
+const BUCKET = 'demo-run-of-show.appspot.com';
+
+/** Run main() against a fixture snapshot; returns the dist dir and the log. */
+async function runWithTheme(t, theme, extraArgs = [], deps = {}) {
+  const generatedDir = writeFixtureGeneratedDir({ theme });
+  const distDir = fs.mkdtempSync(path.join(os.tmpdir(), 'write-site-files-icons-'));
+  t.after(() => {
+    fs.rmSync(generatedDir, { recursive: true, force: true });
+    fs.rmSync(distDir, { recursive: true, force: true });
+  });
+  const lines = [];
+  const code = await main(
+    ['--dist', distDir, '--public-url', 'https://example.org', '--generated', generatedDir, ...extraArgs],
+    { log: { log: (line) => lines.push(line), error: (line) => lines.push(line) }, ...deps },
+  );
+  assert.equal(code, 0, lines.join('\n'));
+  const manifest = JSON.parse(fs.readFileSync(path.join(distDir, 'manifest.webmanifest'), 'utf8'));
+  return { distDir, lines, manifest };
+}
+
+const neverFetch = () => { throw new Error('fetch must not be called'); };
+
+function assertCommittedIcons(distDir) {
+  for (const file of readPlaceholderIcons()) {
+    assert.ok(fs.readFileSync(path.join(distDir, file.path)).equals(file.bytes), `${file.path} is the committed file`);
+  }
+}
+
+test('a run writes both placeholder icons, byte for byte, and the manifest lists them as maskable', async (t) => {
+  const { distDir, lines, manifest } = await runWithTheme(
+    t, { logos: { mark: 'branding/mark.svg' } }, [], { fetchImpl: neverFetch },
+  );
+  assertCommittedIcons(distDir);
+  assert.deepEqual(manifest.icons.map((icon) => [icon.src, icon.sizes, icon.purpose]), [
+    ['branding/app-icon-192.png', '192x192', 'any maskable'],
+    ['branding/app-icon-512.png', '512x512', 'any maskable'],
+  ]);
+  assert.ok(lines.includes(`app icons: neutral placeholder: ${REASONS.placeholder}`));
+});
+
+test('no --storage-bucket never fetches an uploaded mark, and says so', async (t) => {
+  const { distDir, lines } = await runWithTheme(t, { logos: { mark: UPLOADED_MARK } }, [], { fetchImpl: neverFetch });
+  assertCommittedIcons(distDir);
+  assert.ok(lines.includes(`app icons: neutral placeholder: ${REASONS.noBucket}`));
+});
+
+test('an empty --storage-bucket gives the placeholder with the no-bucket reason', async (t) => {
+  const { distDir, lines } = await runWithTheme(
+    t, { logos: { mark: UPLOADED_MARK } }, ['--storage-bucket='], { fetchImpl: neverFetch },
+  );
+  assertCommittedIcons(distDir);
+  assert.ok(lines.includes('app icons: neutral placeholder: no storage bucket was given'));
+});
+
+test('--storage-bucket with an uploaded square PNG writes resampled icons listed for purpose any', async (t) => {
+  const upload = encodePng({ width: 600, height: 600, rgba: Buffer.alloc(600 * 600 * 4, 128) });
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init });
+    return new Response(upload, { status: 200 });
+  };
+  const { distDir, lines, manifest } = await runWithTheme(
+    t, { logos: { mark: UPLOADED_MARK } }, ['--storage-bucket', BUCKET], { fetchImpl },
+  );
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/demo-run-of-show\.appspot\.com\/o\/branding%2Fa1b2c3%2Fsquare-icon\.png\?alt=media$/);
+  assert.equal(calls[0].init.redirect, 'error');
+  for (const size of [192, 512]) {
+    const icon = decodePng(fs.readFileSync(path.join(distDir, 'branding', `app-icon-${size}.png`)));
+    assert.equal(icon.width, size);
+    assert.equal(icon.height, size);
+  }
+  assert.deepEqual(manifest.icons.map((icon) => icon.purpose), ['any', 'any']);
+  assert.ok(lines.includes(`app icons: from the square icon slot (${UPLOADED_MARK})`));
+});
+
+test('an upload that fails to download still ships the placeholder and exits 0', async (t) => {
+  const { distDir, lines, manifest } = await runWithTheme(
+    t, { logos: { mark: UPLOADED_MARK } }, ['--storage-bucket', BUCKET],
+    { fetchImpl: async () => new Response('gone', { status: 404 }) },
+  );
+  assertCommittedIcons(distDir);
+  assert.equal(manifest.icons[0].purpose, 'any maskable');
+  assert.ok(lines.includes('app icons: neutral placeholder: the square icon could not be downloaded (HTTP 404)'));
+});
+
+test('the usage names --storage-bucket', async () => {
+  const lines = [];
+  await main(['--help'], { log: { log: (l) => lines.push(l), error: () => {} } });
+  assert.match(lines.join('\n'), /--storage-bucket <name>/);
 });
 
 // --- the specimen book stays out of the sitemap ------------------------------
@@ -253,6 +353,8 @@ test('the refusal names the reserved segment and the page that took it', async (
   const message = errors.join('\n');
   assert.match(message, /reserved for the specimen book/u);
   assert.match(message, /\/specimen/u);
+  // A refused sitemap writes nothing, the app icons included.
+  assert.deepEqual(fs.readdirSync(distDir), []);
 });
 
 test('the demo snapshot writes a sitemap that does not list the specimen book', async (t) => {
