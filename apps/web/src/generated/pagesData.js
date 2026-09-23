@@ -52,8 +52,9 @@ export const pagesData = [
       {
         id: 'info',
         label: 'Key facts',
-        description: 'The event’s own short answers. A stat opens a card; the list items after it are that card’s lines.',
+        description: 'The event’s own short answers. A fact or a stat opens a card; the list items after it are that card’s lines.',
         allowedBlocks: [
+          'fact',
           'stat',
           'list_item',
         ],
@@ -62,33 +63,34 @@ export const pagesData = [
         defaultBlocks: [
           {
             field: 'when',
-            blockType: 'stat',
+            blockType: 'fact',
             description: 'When the event runs.',
           },
           {
-            field: 'where_venue',
-            blockType: 'list_item',
-            description: 'The venue’s name, labelled.',
-          },
-          {
-            field: 'where_address',
-            blockType: 'list_item',
-            description: 'The venue’s street address, labelled.',
+            field: 'where',
+            blockType: 'fact',
+            description: 'Where the event happens: The venue’s name, with its address under it.',
           },
           {
             field: 'where_transit',
             blockType: 'list_item',
             description: 'The nearest transit to the venue, labelled.',
           },
+          {
+            field: 'who',
+            blockType: 'fact',
+            description: 'Who the event is for.',
+          },
         ],
       },
       {
         id: 'details',
         label: 'Details',
-        description: 'Body copy describing what happens at the event.',
+        description: 'Body copy describing what happens at the event. One quote at most.',
         allowedBlocks: [
           'richtext',
           'image',
+          'quote',
         ],
         maxBlocks: 6,
         reorderable: true,
