@@ -3,7 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { makeFakeDb } = require('../cms/firestoreFake.cjs');
+const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
+
+// requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
+// #186 review: it fails closed on an absent document), so every fake this
+// file builds carries the document the file's getConfig describes.
+const BOOTSTRAP_DOC = { adminEmails: ['admin@example.com'] };
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
 const {
   createTicketingImportCsvHandler,
   createTicketingListTicketsHandler,
@@ -29,8 +35,11 @@ function makeRes() {
 
 const ADMIN_EMAIL = 'admin@example.com';
 function makeAuthDeps({ admin = true } = {}) {
-  const auth = { async verifyIdToken() { return { uid: 'admin-1', email: ADMIN_EMAIL, email_verified: true }; } };
-  const getConfig = async () => ({ bootstrap: { adminEmails: admin ? [ADMIN_EMAIL] : [] } });
+  // The gate reads the admin list live off the db, so "not an admin" is a
+  // token whose address is not on it.
+  const email = admin ? ADMIN_EMAIL : 'stranger@example.com';
+  const auth = { async verifyIdToken() { return { uid: 'admin-1', email, email_verified: true }; } };
+  const getConfig = async () => ({ bootstrap: { adminEmails: [ADMIN_EMAIL] } });
   return { auth, getConfig };
 }
 

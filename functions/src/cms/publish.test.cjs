@@ -8,7 +8,13 @@ const {
   createGetPublishQueueHandler,
   createUpdatePublishStatusHandler,
 } = require('./publish.cjs');
-const { makeFakeDb } = require('./firestoreFake.cjs');
+const { makeFakeDb: makeBareFakeDb } = require('./firestoreFake.cjs');
+
+// requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
+// #186 review: it fails closed on an absent document), so every fake this
+// file builds carries the document the file's getConfig describes.
+const BOOTSTRAP_DOC = { adminEmails: ['admin@example.org'] };
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
 
 const NOW = 1_750_000_000_000;
 const now = () => NOW;

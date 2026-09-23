@@ -680,3 +680,35 @@ test('a re-run keeps the staff an operator granted through the Access page', asy
   assert.deepEqual(after.adminEmails, ['ops@example.org', 'second@example.org']);
   assert.deepEqual(after.staffEmails, ['granted@example.org']);
 });
+
+test('a re-run never puts back an address an operator removed on the Access page', async () => {
+  const db = makeFakeDb();
+  const answers = answersFile({ ...ANSWERS, adminEmails: ['ops@example.org', 'revoked@example.org'] });
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: { answers }, tierA: TIER_A, env: ENV, now: () => 0 }));
+  let bootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(bootstrap.adminEmails, ['ops@example.org', 'revoked@example.org']);
+
+  // The operator removes one address and demotes nobody else.
+  await db.collection('config').doc('bootstrap').set({ ...bootstrap, adminEmails: ['ops@example.org'] });
+
+  // The same answers file, re-run: the removed address stays removed, and
+  // the output says nothing was added.
+  const rerun = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: { answers, force: true }, tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  assert.equal(rerun.value, 0);
+  bootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(bootstrap.adminEmails, ['ops@example.org']);
+  assert.match(rerun.output, /config\/bootstrap.*no accounts added/);
+
+  // An explicit flag adds, and the output names it.
+  const flagged = await quietly(() => runInit({
+    db, store, bucket: noBucket,
+    args: { answers, force: true, admin: ['third@example.org'], staff: ['desk@example.org'] },
+    tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  bootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(bootstrap.adminEmails, ['ops@example.org', 'third@example.org']);
+  assert.deepEqual(bootstrap.staffEmails, ['desk@example.org']);
+  assert.match(flagged.output, /added operators: third@example\.org; added staff: desk@example\.org/);
+});

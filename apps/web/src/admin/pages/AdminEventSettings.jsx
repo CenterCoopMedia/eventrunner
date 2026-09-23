@@ -28,6 +28,7 @@ import {
 import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
 import { subscribeAdminCollection } from '../adminSource.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import VenueReferenceEditor, {
   normalizeVenueReferences,
   validateVenueMap,
@@ -114,7 +115,14 @@ const orNull = (value) => {
   return trimmed === '' || trimmed === undefined ? null : trimmed;
 };
 
-function toPayload(form) {
+/**
+ * The editable slice, shaped for updateEventConfig. `includeSender` is
+ * false for a staff caller: the sender block is the operator's to change
+ * (functions/src/admin/config.cjs), so staff neither edit it nor send it —
+ * a save that carried it unchanged would go through, but a save that never
+ * carries it cannot be refused for it either.
+ */
+function toPayload(form, { includeSender = true } = {}) {
   return {
     name: form.name,
     shortName: form.shortName,
@@ -145,11 +153,15 @@ function toPayload(form) {
       mapUrl: orNull(form.venue.mapUrl),
       ...venueReferencesPayload(form.venue),
     },
-    sender: {
-      email: form.sender.email,
-      name: orNull(form.sender.name),
-      replyTo: orNull(form.sender.replyTo),
-    },
+    ...(includeSender
+      ? {
+        sender: {
+          email: form.sender.email,
+          name: orNull(form.sender.name),
+          replyTo: orNull(form.sender.replyTo),
+        },
+      }
+      : {}),
     registration: {
       opensAt: orNull(form.registration.opensAt),
       closesAt: orNull(form.registration.closesAt),
@@ -177,6 +189,12 @@ export default function AdminEventSettings() {
   const { eventConfig, sources } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
+  // The sender block is the operator's (issue #186): staff read it here and
+  // never send it, so their save is never refused for a field they cannot
+  // change. The server compares a sent sender against the stored one and
+  // refuses only a CHANGE from staff; this is the client's half.
+  const { adminTier } = useAuth();
+  const canEditSender = adminTier === 'operator';
 
   const [form, setForm] = useState(() => toForm(eventConfig));
   const [error, setError] = useState(null);
@@ -312,7 +330,7 @@ export default function AdminEventSettings() {
     setError(null);
     setStatus('');
     try {
-      await call('updateEventConfig', { event: toPayload(form) });
+      await call('updateEventConfig', { event: toPayload(form, { includeSender: canEditSender }) });
       setForm((current) => ({
         ...current,
         venue: {
@@ -618,7 +636,11 @@ export default function AdminEventSettings() {
 
       <Panel
         title="Sender"
-        description="The From address every transactional email uses."
+        description={
+          canEditSender
+            ? 'The From address every transactional email uses.'
+            : 'The From address every transactional email uses. An operator changes the sender; staff can read it here.'
+        }
       >
         <div className="grid gap-sm sm:grid-cols-2">
           <TextField
@@ -627,12 +649,14 @@ export default function AdminEventSettings() {
             value={form.sender.email}
             onChange={(value) => setGroup('sender', { email: value })}
             error={errorFor('sender.email')}
+            readOnly={!canEditSender}
           />
           <TextField
             label="Sender name"
             value={form.sender.name}
             onChange={(value) => setGroup('sender', { name: value })}
             error={errorFor('sender.name')}
+            readOnly={!canEditSender}
           />
           <TextField
             label="Reply-to"
@@ -640,6 +664,7 @@ export default function AdminEventSettings() {
             value={form.sender.replyTo}
             onChange={(value) => setGroup('sender', { replyTo: value })}
             error={errorFor('sender.replyTo')}
+            readOnly={!canEditSender}
           />
           <p className="self-center text-admin-sm text-admin-ink-secondary">
             Sender domain:{' '}

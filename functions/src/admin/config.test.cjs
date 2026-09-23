@@ -155,7 +155,13 @@ function fakeDb(seed = {}) {
 }
 
 function makeDeps(seed = {}) {
-  const db = fakeDb(seed);
+  // requireAdmin reads config/bootstrap live from this db (fails closed on
+  // an absent document), so every fake carries the operator and the staff
+  // address the tests use.
+  const db = fakeDb({
+    'config/bootstrap': { adminEmails: [ADMIN_EMAIL], staffEmails: ['staff@example.org'] },
+    ...seed,
+  });
   return {
     db,
     auth: {
@@ -813,7 +819,7 @@ test('a staff caller keeps the event settings and the badge catalogue', async ()
   assert.equal(res.statusCode, 200);
 });
 
-test('a staff event save that touches sender is refused by name, whole, before anything is written', async () => {
+test('a staff event save that CHANGES sender is refused by name, and nothing is written', async () => {
   const deps = tieredDeps({ 'config/event': validEvent() });
   const res = makeRes();
   await createUpdateEventConfigHandler(deps)(
@@ -837,10 +843,86 @@ test('an operator may still write sender on config/event', async () => {
   assert.equal(deps.db.docs.get('config/event').sender.email, 'ops@example.org');
 });
 
-test('findTierViolations names only operator keys, only on config/event, only for staff', () => {
-  const { findTierViolations } = internals;
-  assert.deepEqual(findTierViolations('event', { sender: {}, tagline: 'x' }, 'staff'), ['sender: operator access required']);
-  assert.deepEqual(findTierViolations('event', { sender: {} }, 'operator'), []);
-  assert.deepEqual(findTierViolations('event', { tagline: 'x' }, 'staff'), []);
-  assert.deepEqual(findTierViolations('badges', { sender: {} }, 'staff'), []);
+/** The whole editable slice the Event form sends (AdminEventSettings toPayload), for `stored`. */
+function fullStaffPayload(stored, overrides = {}) {
+  return {
+    name: stored.name,
+    shortName: stored.shortName,
+    tagline: 'Set by the desk',
+    timezone: stored.timezone,
+    days: stored.days,
+    tracks: [],
+    venue: {
+      name: 'Riverside Hall', addressLine1: null, addressLine2: null, city: null, region: null,
+      postalCode: null, country: null, mapUrl: null, places: [], movements: [],
+    },
+    sender: { email: stored.sender.email, name: stored.sender.name ?? null, replyTo: stored.sender.replyTo ?? null },
+    registration: { opensAt: null, closesAt: null, externalUrl: null, actionLabel: null },
+    legal: { operatorName: null, supportEmail: null, conductEmail: null },
+    seo: { description: null, organizerName: null, organizerUrl: null },
+    social: { hashtag: null },
+    ...overrides,
+  };
+}
+
+test('a staff save of the whole form, sender carried unchanged, goes through', async () => {
+  // The form sends every editable field, the sender included; the review
+  // of the first cut found staff could therefore never save the page.
+  const stored = validEvent();
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: fullStaffPayload(stored) }, { token: 'staff-token' }), res);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const written = deps.db.docs.get('config/event');
+  assert.equal(written.tagline, 'Set by the desk');
+  assert.equal(written.sender.email, stored.sender.email);
+  assert.equal(written.updatedBy, STAFF_EMAIL);
+});
+
+test('a staff save whose sender differs only in case or whitespace is unchanged, and goes through', async () => {
+  const stored = validEvent();
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: fullStaffPayload(stored, { sender: { email: 'SUMMIT@Example.org', name: ' Example Summit ', replyTo: null } }) }, { token: 'staff-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+});
+
+test('a staff save that changes only the sender name, or only the reply-to, is refused by name', async () => {
+  const stored = validEvent();
+  for (const sender of [
+    { email: stored.sender.email, name: 'Someone else', replyTo: null },
+    { email: stored.sender.email, name: stored.sender.name, replyTo: 'desk@example.org' },
+  ]) {
+    const deps = tieredDeps({ 'config/event': stored });
+    const res = makeRes();
+    await createUpdateEventConfigHandler(deps)(makeReq({ event: fullStaffPayload(stored, { sender }) }, { token: 'staff-token' }), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.error.message, 'sender: operator access required');
+    assert.equal(deps.db.docs.get('config/event').tagline, undefined);
+  }
+});
+
+test('senderChanged compares the editable fields only, normalized the way the save stores them', () => {
+  const { senderChanged } = internals;
+  const stored = { email: 'summit@example.org', name: 'Example Summit', replyTo: null, domainVerified: true, domainVerifiedAt: 'x' };
+  assert.equal(senderChanged({ email: 'Summit@Example.org', name: ' Example Summit ', replyTo: '' }, stored), false);
+  assert.equal(senderChanged({ email: 'summit@example.org' }, stored), false);
+  assert.equal(senderChanged({ email: 'other@example.org' }, stored), true);
+  assert.equal(senderChanged({ name: 'Other' }, stored), true);
+  assert.equal(senderChanged({ replyTo: 'r@example.org' }, stored), true);
+  assert.equal(senderChanged(undefined, stored), false);
+  assert.equal(senderChanged({ email: 'summit@example.org' }, undefined), true);
+});
+
+test('findOperatorKeyChanges names sender only when a staff payload changes it, only on config/event', () => {
+  const { findOperatorKeyChanges } = internals;
+  const stored = { sender: { email: 'summit@example.org', name: null, replyTo: null } };
+  assert.deepEqual(findOperatorKeyChanges('event', { sender: { email: 'other@example.org' }, tagline: 'x' }, stored, 'staff'), ['sender: operator access required']);
+  assert.deepEqual(findOperatorKeyChanges('event', { sender: { email: 'summit@example.org' } }, stored, 'staff'), []);
+  assert.deepEqual(findOperatorKeyChanges('event', { sender: { email: 'other@example.org' } }, stored, 'operator'), []);
+  assert.deepEqual(findOperatorKeyChanges('event', { tagline: 'x' }, stored, 'staff'), []);
+  assert.deepEqual(findOperatorKeyChanges('badges', { sender: {} }, stored, 'staff'), []);
 });
