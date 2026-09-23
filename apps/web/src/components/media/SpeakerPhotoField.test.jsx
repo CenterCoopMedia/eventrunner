@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { chooseAndApplyCrop, installPhotoCropStubs, uninstallPhotoCropStubs } from '../../test/photoCropStubs.js';
+import { BRAND_UTILITY_PREFIX } from '../../test/retiredUtilityNames.js';
 
 const uploadSpeakerPhotoMock = vi.fn(async ({ speakerId }) => ({
   path: `speaker-photos/${speakerId}/photo.png`,
@@ -59,6 +60,25 @@ describe('SpeakerPhotoField', () => {
     const image = screen.getByAltText('Your current speaker photo');
     expect(image).toHaveClass('rounded-brand');
     expect(image).not.toHaveClass('rounded-full');
+  });
+
+  it('reads the tier 2 role tokens, not the old compatibility names (issue 247)', () => {
+    render(
+      <SpeakerPhotoField
+        user={user}
+        speakerId="rae"
+        value="speaker-photos/rae/photo.png"
+        onChange={vi.fn()}
+      />,
+    );
+    const image = screen.getByAltText('Your current speaker photo');
+    expect(image).toHaveClass('bg-surface-alt');
+    expect(image.className).not.toMatch(BRAND_UTILITY_PREFIX);
+    const upload = screen.getByText('Replace photo');
+    expect(upload).toHaveClass('bg-surface');
+    expect(upload).toHaveClass('text-text-primary');
+    expect(upload).toHaveClass('border-text-primary/20');
+    expect(upload.className).not.toMatch(BRAND_UTILITY_PREFIX);
   });
 
   it('uploads to the speaker’s own folder through speakerPhotoUpload, after the crop, and reports the path', async () => {

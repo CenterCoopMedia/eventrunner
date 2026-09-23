@@ -57,7 +57,7 @@ export default function AssetImage({ path, alt = '', className = '', decorative 
     }
     return (
       <span
-        className={`flex items-center justify-center bg-brand-surface-alt p-2 text-center text-xs text-brand-ink-muted ${className}`}
+        className={`flex items-center justify-center bg-surface-alt p-2 text-center text-xs text-text-secondary ${className}`}
       >
         This file is missing from storage.
       </span>

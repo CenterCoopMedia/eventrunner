@@ -67,7 +67,7 @@ export default function ProfilePhoto({ photoPath, displayName, size = 'md', clas
     return (
       <span
         aria-hidden="true"
-        className={`flex items-center justify-center bg-brand-surface font-heading font-semibold text-brand-ink-muted outline outline-1 -outline-offset-1 outline-brand-ink/[0.12] ${shared}`}
+        className={`flex items-center justify-center bg-surface font-heading font-semibold text-text-secondary outline outline-1 -outline-offset-1 outline-text-primary/[0.12] ${shared}`}
       >
         {initialOf(displayName)}
       </span>
@@ -78,7 +78,7 @@ export default function ProfilePhoto({ photoPath, displayName, size = 'md', clas
       src={url}
       alt=""
       loading="lazy"
-      className={`bg-brand-surface outline outline-1 -outline-offset-1 outline-brand-ink/[0.08] ${shared}`}
+      className={`bg-surface outline outline-1 -outline-offset-1 outline-text-primary/[0.08] ${shared}`}
       onError={() => setFailed(true)}
     />
   );

@@ -114,6 +114,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   place is, how a session names one, how a one-way movement is entered and where the site shows
   it, how the map lists and marks places, and every rule the save checks. It also covers the new
   Social accounts panel (#226).
+- The profile and speaker photo fields, and the shared avatar and missing-asset components, now
+  read the same tier 2 role tokens (`--color-*`, `--rule-*`) every other public component reads,
+  instead of the retired brand-* utility names. Rendered colour is pixel-identical in every site
+  style and mode (#247).
 
 ### Fixed
 
