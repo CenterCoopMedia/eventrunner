@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
 const {
   createExportAttendeesHandler,
-  internals: { escapeCell, EXPORT_COLUMNS },
+  internals: { escapeCell, EXPORT_COLUMNS, buildCsv },
 } = require('./export.cjs');
 
 // requireAdmin reads config/bootstrap LIVE from the db it is handed and
@@ -139,9 +139,9 @@ function adminLogs(db) {
   return db.ids('admin_logs').map((id) => db.read('admin_logs', id));
 }
 
-async function run(db, request, { getConfig = configWith(), now = () => T0 } = {}) {
+async function run(db, request, { getConfig = configWith(), now = () => T0, maxExportBytes } = {}) {
   const res = makeRes();
-  await createExportAttendeesHandler({ db, auth, getConfig, now, log: QUIET })(request, res);
+  await createExportAttendeesHandler({ db, auth, getConfig, now, log: QUIET, maxExportBytes })(request, res);
   return res;
 }
 
@@ -370,6 +370,34 @@ test('a 200 keeps request order, drops duplicates, skips absent accounts, and is
   assert.equal(res.body.skipped, 1);
   const rows = parseCsv(res.body.csv);
   assert.deepEqual(rows.slice(1).map((row) => row[0]), ['Bo Reyes', 'Ada Quill']);
+});
+
+// Profile fields have no length limit in the rules, so ten thousand rows
+// can still be a file too large to hold or send (connector review of PR
+// 274). The file is refused by its size, before the audit row, and no
+// account document is kept past the chunk it was read in.
+test('a file past the byte limit is refused with 413, and no audit row or file is written', async () => {
+  const db = makeFakeDb({
+    'users/uid-ada': fullAccount({ organization: 'x'.repeat(1500) }),
+    'users/uid-bo': fullAccount({ uid: 'uid-bo', displayName: 'Bo Reyes', organization: 'y'.repeat(1500) }),
+  });
+  const res = await run(db, req('admin', { uids: ['uid-ada', 'uid-bo'], filter: FILTER }), { maxExportBytes: 2000 });
+  assert.equal(res.statusCode, 413);
+  assert.equal(res.body.error.code, 'too-large');
+  assert.match(res.body.error.message, /Narrow the filter/);
+  assert.equal(res.body.csv, undefined);
+  assert.deepEqual(adminLogs(db), []);
+});
+
+test('the file built a chunk at a time is the same file buildCsv writes', async () => {
+  const accounts = {
+    'users/uid-ada': fullAccount(),
+    'users/uid-bo': fullAccount({ uid: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' }),
+  };
+  const db = makeFakeDb(accounts);
+  const res = await run(db, req('admin', { uids: ['uid-ada', 'uid-bo'], filter: FILTER }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.csv, buildCsv([accounts['users/uid-ada'], accounts['users/uid-bo']], await configWith()()));
 });
 
 test('the filename carries the UTC date of the export', async () => {

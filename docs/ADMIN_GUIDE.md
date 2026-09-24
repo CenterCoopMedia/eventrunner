@@ -210,7 +210,7 @@ A cell with more than one entry joins them with a semicolon. The file carries no
 
 **Formulas stay text.** A spreadsheet runs a cell that starts with `=`, `+`, `-`, or `@` as a formula. In the file, such a cell starts with an apostrophe, and so does a cell that starts with a tab or a carriage return, or with spaces and then one of those four characters. The spreadsheet shows the value as text.
 
-**Every export is recorded.** The server writes an admin log entry with your address, the number of rows, the status filter, and whether a search narrowed the list. It never records the search text, because that text can name a person. If the entry cannot be written, the server refuses the export and makes no file. The server keeps no copy of the file. One export holds at most 10,000 attendees.
+**Every export is recorded.** The server writes an admin log entry with your address, the number of rows, the status filter, and whether a search narrowed the list. It never records the search text, because that text can name a person. If the entry cannot be written, the server refuses the export and makes no file. The server keeps no copy of the file. One export holds at most 10,000 attendees and 10 MB; a larger one is refused before anything is recorded, and the message asks you to narrow the filter.
 
 **Past attendance.** Select **Edit record** on a row to open that account's record. **Past attendance** takes one edition per line, such as a year: at most 20 editions of up to 40 characters each, with no repeats. Select **Save record** to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.
 

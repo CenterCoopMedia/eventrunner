@@ -41,8 +41,24 @@ const {
 const USERS = 'users';
 const ADMIN_LOGS = 'admin_logs';
 
-/** Most rows one export may carry. About 3 MB of CSV, inside the response limit. */
+/** Most rows one export may carry. */
 const MAX_EXPORT_ROWS = 10000;
+
+/**
+ * The largest file one export may carry, in bytes of CSV. The rules put no
+ * length limit on profile fields, so the row cap alone does not bound the
+ * file (connector review of PR 274); this keeps it well inside what a
+ * function holds in memory and answers in one response.
+ */
+const MAX_EXPORT_BYTES = 10 * 1024 * 1024;
+
+/** The file would pass MAX_EXPORT_BYTES. */
+class ExportTooLargeError extends Error {
+  constructor(maxBytes) {
+    super(`the export would pass ${maxBytes} bytes`);
+    this.name = 'ExportTooLargeError';
+  }
+}
 
 /** Firestore's getAll batch size. */
 const READ_CHUNK = 500;
@@ -170,10 +186,23 @@ function exportRow(user, config) {
  * @returns {string}
  */
 function buildCsv(users, config) {
-  const lines = [EXPORT_COLUMNS.map((column) => escapeCell(column.header)).join(',')];
-  for (const user of users) {
-    lines.push(exportRow(user, config).map(escapeCell).join(','));
-  }
+  const lines = [csvHeader()];
+  for (const user of users) lines.push(csvLine(user, config));
+  return joinCsv(lines);
+}
+
+/** The header line. */
+function csvHeader() {
+  return EXPORT_COLUMNS.map((column) => escapeCell(column.header)).join(',');
+}
+
+/** One account's line: the exported cells only, escaped and quoted. */
+function csvLine(user, config) {
+  return exportRow(user, config).map(escapeCell).join(',');
+}
+
+/** The byte-order mark, the lines, CRLF line ends. */
+function joinCsv(lines) {
   return `\uFEFF${lines.join('\r\n')}\r\n`;
 }
 
@@ -240,31 +269,44 @@ function readExportRequest(body) {
 }
 
 /**
- * Read the accounts, in request order, in getAll chunks. An absent account
- * is skipped and counted.
+ * Read the accounts in request order, a getAll chunk at a time, and turn
+ * each into its line as it arrives, so no whole account document outlives
+ * its chunk. An absent account is skipped and counted. The file is refused
+ * as soon as it would pass `maxBytes`.
  *
- * @param {{ db: object, uids: string[] }} args
- * @returns {Promise<{ users: object[], skipped: number }>}
+ * @param {{ db: object, uids: string[], config: object, maxBytes?: number }} args
+ * @returns {Promise<{ csv: string, rowCount: number, skipped: number }>}
+ * @throws {ExportTooLargeError}
  */
-async function readAccounts({ db, uids }) {
-  const users = [];
+async function buildExport({ db, uids, config, maxBytes = MAX_EXPORT_BYTES }) {
+  const lines = [csvHeader()];
+  // The byte-order mark, the header and its line end.
+  let bytes = Buffer.byteLength(joinCsv(lines));
   let skipped = 0;
   for (let start = 0; start < uids.length; start += READ_CHUNK) {
     const refs = uids.slice(start, start + READ_CHUNK).map((uid) => db.collection(USERS).doc(uid));
     const snaps = await db.getAll(...refs);
     for (const snap of snaps) {
-      if (snap.exists) users.push(snap.data() || {});
-      else skipped += 1;
+      if (!snap.exists) {
+        skipped += 1;
+        continue;
+      }
+      const line = csvLine(snap.data() || {}, config);
+      bytes += Buffer.byteLength(line) + 2;
+      if (bytes > maxBytes) throw new ExportTooLargeError(maxBytes);
+      lines.push(line);
     }
   }
-  return { users, skipped };
+  return { csv: joinCsv(lines), rowCount: lines.length - 1, skipped };
 }
 
 /**
  * @param {{ db: object, auth: object, getConfig: () => Promise<object>,
- *           now?: () => Date, log?: Pick<Console, 'info'|'error'> }} deps
+ *           now?: () => Date, log?: Pick<Console, 'info'|'error'>, maxExportBytes?: number }} deps
  */
-function createExportAttendeesHandler({ db, auth, getConfig, now = () => new Date(), log = console }) {
+function createExportAttendeesHandler({
+  db, auth, getConfig, now = () => new Date(), log = console, maxExportBytes = MAX_EXPORT_BYTES,
+}) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
@@ -280,11 +322,14 @@ function createExportAttendeesHandler({ db, auth, getConfig, now = () => new Dat
     let skipped;
     try {
       const config = await getConfig();
-      const read = await readAccounts({ db, uids: request.uids });
-      csv = buildCsv(read.users, config);
-      rowCount = read.users.length;
-      skipped = read.skipped;
+      ({ csv, rowCount, skipped } = await buildExport({
+        db, uids: request.uids, config, maxBytes: maxExportBytes,
+      }));
     } catch (err) {
+      // Refused before the audit row: no row, no file.
+      if (err instanceof ExportTooLargeError) {
+        return sendError(res, 413, 'too-large', `This export is larger than ${MAX_EXPORT_BYTES / 1024 / 1024} MB. Narrow the filter and export again.`);
+      }
       log.error('exportAttendees: the accounts could not be read', err);
       return internal(res, 'The attendee list could not be read. Try again.');
     }
@@ -347,7 +392,9 @@ module.exports = {
   },
   internals: {
     EXPORT_COLUMNS,
+    MAX_EXPORT_BYTES,
     MAX_EXPORT_ROWS,
+    buildExport,
     STATUS_FILTER_VALUES,
     buildCsv,
     escapeCell,
