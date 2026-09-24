@@ -405,6 +405,26 @@ describe('AdminMaterialsTab: coverage', () => {
     expect(screen.getByText('No session has a speaker yet, so there is nothing to cover.')).toBeInTheDocument();
   });
 
+  it('says above the table when the list stops at 2,000, filtered or not', async () => {
+    const TRUNCATED = 'The list stops at 2,000 materials. Some materials are not shown.';
+    handlers.listAllSessionMaterials = () => ok({ materials: MATERIALS, truncated: true });
+    await renderLoaded();
+    const notice = screen.getByText(TRUNCATED);
+    expect(notice).toHaveAttribute('role', 'status');
+    const region = screen.getByRole('region', { name: 'Materials' });
+    expect(notice.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // An empty filter result is not a claim that nothing exists.
+    fireEvent.change(screen.getByLabelText('Session'), { target: { value: 's4' } });
+    expect(screen.getByRole('heading', { name: 'No materials match these filters.' })).toBeInTheDocument();
+    expect(screen.getByText(TRUNCATED)).toBeInTheDocument();
+  });
+
+  it('says nothing about a cut when the list is whole', async () => {
+    await renderLoaded();
+    expect(screen.queryByText(/The list stops at 2,000 materials/)).toBeNull();
+  });
+
   it('withholds coverage when the list is truncated, and when a listener fails', async () => {
     handlers.listAllSessionMaterials = () => ok({ materials: MATERIALS, truncated: true });
     const { unmount } = renderTab();

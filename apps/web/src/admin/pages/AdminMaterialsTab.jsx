@@ -833,6 +833,13 @@ export default function AdminMaterialsTab() {
           </button>
         }
       >
+        {/* The list is cut at 2,000 rows, so the table says so before an
+            empty filter can read as "nothing exists". */}
+        {result?.truncated && !refused ? (
+          <div className="px-md pb-sm">
+            <Notice tone="caution" message="The list stops at 2,000 materials. Some materials are not shown." />
+          </div>
+        ) : null}
         {/* A refresh that fails keeps the last list on screen and says so. */}
         {result && loadError && !refused ? (
           <div className="px-md pb-sm">
