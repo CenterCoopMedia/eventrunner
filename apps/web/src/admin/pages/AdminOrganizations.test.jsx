@@ -56,6 +56,17 @@ function refusal(status, message, code = 'bad-request') {
   return { ok: false, status, json: async () => ({ error: { code, message } }) };
 }
 
+/**
+ * Let every pending promise settle. A save reaches fetch only after
+ * `await getIdToken()`, so a check for "no call" made straight after the
+ * click passes even when a request is on its way.
+ */
+async function settle() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 function published(ids) {
   return response({ results: { cmsOrganizations: { published: ids, skipped: [] } } });
 }
@@ -284,6 +295,7 @@ describe('the organization editor', () => {
     const address = screen.getByLabelText(/^Page address/);
     expect(address).toHaveValue('tide-media');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await settle();
     expect(fetch).not.toHaveBeenCalled();
     await waitFor(() => expect(document.activeElement).toBe(address));
     expect(screen.getByText('Another organization already uses this address.')).toBeInTheDocument();
@@ -295,6 +307,7 @@ describe('the organization editor', () => {
     expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(0);
     fireEvent.change(screen.getByLabelText('Order'), { target: { value: 'first' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    await settle();
     expect(fetch).not.toHaveBeenCalled();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Name')));
     expect(screen.getByLabelText('Order')).toHaveAttribute('aria-invalid', 'true');
