@@ -206,7 +206,7 @@ describe('content browsing', () => {
 
     await renderAt('/admin/content/scholarships/intro/body');
 
-    expect(screen.getByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
     expect(screen.queryByDisplayValue(/STALE live content/)).toBeNull();
   });
 

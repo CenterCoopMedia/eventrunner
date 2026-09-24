@@ -133,6 +133,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The admin loads the Branding page and the block editor when someone opens them, not with the
+  rest of the admin. Together with the tiers work, the wave 2 block forms had pushed the admin
+  entry chunk past its 50,000-byte gzip ceiling; it is now about 35,000.
 - The preset catalog is split by who needs it. `shared/presetCatalog` carries the palettes, the
   type maps and every option group's default and choice ids; `shared/presetRemaps` carries what a
   style moves (its own token remaps, what each choice moves, and the component defaults a style

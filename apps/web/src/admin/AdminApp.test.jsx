@@ -294,7 +294,7 @@ describe('admin route gating', () => {
     await renderAt('/admin/branding');
     // Not refused: the server decides, and the page renders.
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
-    expect(screen.getByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
     expect(screen.queryByText('Staff')).toBeNull();
     expect(screen.queryByText('Operator')).toBeNull();
     const rail = screen.getByRole('navigation', { name: 'Admin sections' }).parentElement;

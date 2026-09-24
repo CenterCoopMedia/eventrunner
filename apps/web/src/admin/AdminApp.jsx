@@ -25,10 +25,8 @@ import AdminSpeakerEditor from './pages/AdminSpeakerEditor.jsx';
 import AdminContentPages from './pages/AdminContentPages.jsx';
 import AdminContentSections from './pages/AdminContentSections.jsx';
 import AdminContentSection from './pages/AdminContentSection.jsx';
-import AdminContentBlockEditor from './pages/AdminContentBlockEditor.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
-import AdminBranding from './pages/AdminBranding.jsx';
 import AdminMedia from './pages/AdminMedia.jsx';
 import AdminMaterialsTab from './pages/AdminMaterialsTab.jsx';
 import AdminAttendees from './pages/AdminAttendees.jsx';
@@ -49,6 +47,13 @@ const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
 // one link, exactly like the session editor above, so it is loaded when
 // somebody asks for it.
 const AdminEventSettings = lazy(() => import('./pages/AdminEventSettings.jsx'));
+// The block editor carries a form for every block type, and each new type
+// (the fact and the quote, design wave 2) added its fields to the entry
+// chunk. It opens from one link in a section list, so it loads the same way.
+const AdminContentBlockEditor = lazy(() => import('./pages/AdminContentBlockEditor.jsx'));
+// Branding is the largest page left in the entry chunk (the style picker,
+// the option groups and the preview frame), and only an operator opens it.
+const AdminBranding = lazy(() => import('./pages/AdminBranding.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -136,11 +141,11 @@ export default function AdminApp() {
               route can never collide with one. */}
           <Route
             path="content/:pageId/:sectionId/_new"
-            element={<AdminContentBlockEditor mode="create" />}
+            element={<DeferredAdminPage label="the block editor"><AdminContentBlockEditor mode="create" /></DeferredAdminPage>}
           />
           <Route
             path="content/:pageId/:sectionId/:field"
-            element={<AdminContentBlockEditor mode="edit" />}
+            element={<DeferredAdminPage label="the block editor"><AdminContentBlockEditor mode="edit" /></DeferredAdminPage>}
           />
           <Route
             path="settings"
@@ -152,7 +157,7 @@ export default function AdminApp() {
           />
           <Route path="features" element={<AdminFeatureSettings />} />
           <Route path="badges" element={<AdminBadgeSettings />} />
-          <Route path="branding" element={<AdminBranding />} />
+          <Route path="branding" element={<DeferredAdminPage label="branding"><AdminBranding /></DeferredAdminPage>} />
           <Route path="media" element={<AdminMedia />} />
           <Route path="materials" element={<AdminMaterialsTab />} />
           <Route path="attendees" element={<AdminAttendees />} />
