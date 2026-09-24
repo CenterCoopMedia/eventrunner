@@ -11,7 +11,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Version history, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -321,6 +321,16 @@ Session materials review — upload or link files against a session, with an opt
 **Every archive is recorded.** The server writes one admin log entry per file in the archive, with your address, before it sends the first byte. If those entries cannot be written, the server refuses the archive. A single-file download writes no entry.
 
 **Coverage.** The **Coverage** panel names the sessions with no materials and the speakers with no materials on any of their sessions. A pending or approved material counts; a rejected one does not. A session counts only when its published record names at least one speaker who is not removed, so a session with no speaker is left out. A speaker added in an unpublished draft does not count until the session is published. The panel reads the same list as the table, before any filter, and states when it read it. When the list passes 2,000 materials, the panel says so and shows no figures.
+
+## Version history
+
+Every publish keeps a version of the record. A version holds the record's content as it went live, the time it was published, and the account that published it. Saving a draft adds no version. Staff and operators can open it.
+
+- **Pick a collection, then a record.** **Collection** picks content blocks, pages, sessions, organizations, updates, or the timeline. The list shows the records that collection holds now, with their state, the version the site shows, and the time of the last publish. **Search by name or id** narrows the list as you type. **Order records by** sorts by the most recent publish or by name. The collection, the search, and the order stay in the page address, so a reload or a shared link keeps them.
+- **Read a version.** A record's page lists its versions, newest first, 20 at a time. **Load older versions** reads the next 20. Each version names its number, its time on the event's clock, and the account that published it. Its table lists each field that changed, with the value before and after the publish. The first version lists its values. A long value shows its first 300 characters, and **Show all** opens the rest. Every value shows as plain text: Rich text shows its tags, and a link is not clickable.
+- **Restore a version.** **Restore version 3** makes the content of version 3 the draft of the record again. The restore replaces the current draft, unpublished changes included. It runs the same checks as a save in the record's editor, so a version that names a speaker you have since deleted is refused, and the message names the speaker. The site does not change until you publish. **Publish now** publishes the restored draft, and that publish adds a new version. The version the site shows, with no newer draft, has no restore.
+- **A deleted record keeps its versions.** The list does not show it, because the list shows the records that exist now. Its page still opens at `/admin/versions/<collection>/<id>`, and a restore saves the record again as a draft.
+- **Nobody can change or delete a version here.** A value published by mistake stays in the history. An operator can remove it in the database console.
 
 ## System errors
 

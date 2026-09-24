@@ -75,6 +75,10 @@ const AdminOrganizationEditor = lazy(() => import('./pages/AdminOrganizationEdit
 // The updates list and editor (issue #190), loaded the same way.
 const AdminUpdatesList = lazy(() => import('./pages/AdminUpdatesList.jsx'));
 const AdminUpdateEditor = lazy(() => import('./pages/AdminUpdateEditor.jsx'));
+// Version history (issue #195): the record list and one record's versions,
+// with their formatters, load when somebody opens them.
+const AdminVersionRecords = lazy(() => import('./pages/AdminVersionRecords.jsx'));
+const AdminVersionHistory = lazy(() => import('./pages/AdminVersionHistory.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -216,6 +220,14 @@ export default function AdminApp() {
           <Route
             path="materials"
             element={<DeferredAdminPage label="materials"><AdminMaterialsTab /></DeferredAdminPage>}
+          />
+          <Route
+            path="versions"
+            element={<DeferredAdminPage label="version history"><AdminVersionRecords /></DeferredAdminPage>}
+          />
+          <Route
+            path="versions/:collection/:docId"
+            element={<DeferredAdminPage label="version history"><AdminVersionHistory /></DeferredAdminPage>}
           />
           <Route
             path="attendees"

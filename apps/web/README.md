@@ -266,7 +266,7 @@ attempting a network fetch.
 `node scripts/dev/login-smoke.mjs` above covers OTP sign-in on its own; the
 repo-root [`e2e/`](../../e2e/) Playwright suite (`npm run test:e2e`, spec
 §8.1, issue #38) covers that plus the other three critical journeys — admin
-CMS edit → publish → public, speaker invite → accept → wizard, ticket claim
+CMS edit → publish → public → version history, speaker invite → accept → wizard, ticket claim
 → approved → bookmark — and the updates editor (issues #190 and #191: an
 update written and saved as a draft in the admin stays off the public Updates
 page until the editor publishes it, and then leads the page as the featured

@@ -394,6 +394,23 @@ describe("admin tiers on every admin-readable collection (issue 186)", () => {
   });
 });
 
+// The version history page (issue #195) lists a collection's records from
+// two unfiltered list queries, the live collection and its drafts. The tier
+// matrix above reads single documents only, so the query shape the page
+// runs is pinned here, with a hidden live doc and a draft in every one.
+describe("the version history record list (issue 195)", () => {
+  it("both tiers may list every live and draft collection; a non-admin and an anonymous client may not", async () => {
+    for (const c of PUBLISHABLE) {
+      for (const name of [c, `${c}_drafts`]) {
+        await assertSucceeds(getDocs(collection(admin(), name)));
+        await assertSucceeds(getDocs(collection(staff(), name)));
+        await assertFails(getDocs(collection(nonAdmin(), name)));
+        await assertFails(getDocs(collection(anon(), name)));
+      }
+    }
+  });
+});
+
 for (const c of PUBLISHABLE) {
   describe(`${c} two-revision model`, () => {
     it("allows anonymous read of a visible live doc", async () => {

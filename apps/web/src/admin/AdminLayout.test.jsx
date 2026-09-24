@@ -136,11 +136,11 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Five links above the base's sixteen (the Overview, issue #179, the
+    // Six links above the base's sixteen (the Overview, issue #179, the
     // Email log, issue #183, Change requests, issue #188, Organizations,
-    // issue #192, and Updates, issue #190), every one a word. No icon rail,
-    // no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(21);
+    // issue #192, Updates, issue #190, and Version history, issue #195),
+    // every one a word. No icon rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(22);
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(nav.querySelector('svg')).toBeNull();
     for (const link of nav.querySelectorAll('a')) {
@@ -205,7 +205,7 @@ describe('the admin shell', () => {
     expect(byTier('operator')).toEqual(['features', 'branding', 'access', 'system-errors']);
     expect(byTier('staff')).toEqual([
       'overview',
-      'pages', 'sessions', 'organizations', 'content', 'updates', 'media', 'materials',
+      'pages', 'sessions', 'organizations', 'content', 'updates', 'media', 'materials', 'versions',
       'speakers', 'attendees', 'badges',
       'live-updates', 'ticketing', 'feedback', 'email-log', 'change-requests',
       'settings',
@@ -221,6 +221,9 @@ describe('the admin shell', () => {
     // Change requests are staff work (issue #188). An undeclared item would
     // fall to the operator and lock staff out of their own queue.
     expect(sectionTier('/admin/change-requests')).toBe('staff');
+    // Version history is staff work, the record route under it too (issue #195).
+    expect(sectionTier('/admin/versions')).toBe('staff');
+    expect(sectionTier('/admin/versions/cmsContent/x')).toBe('staff');
     expect(sectionTier('/admin/pages/new')).toBe('staff');
     expect(sectionTier('/admin/sessions/abc')).toBe('staff');
     // The organizations list and editor are content, so staff work (#192).

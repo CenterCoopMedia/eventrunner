@@ -67,6 +67,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   beside the title and opens with the first featured update in the feed's order under its own
   Featured head, with a dateline and a standfirst. The demo updates carry four categories and one
   featured update (#191).
+- Version history, under Content, for staff and operators. Pick a collection and a record to read
+  every version the record has had, newest first: the time of the publish on the event's clock,
+  the account that published it, and a table of each field that changed, with its value before
+  and after. `cmsGetVersionHistory` now compares each version with the one before it on the
+  server, at no extra read, and sends every time as milliseconds. A past version can be restored
+  as the draft of the record through the save endpoint of its own editor, so every check that
+  save runs applies, and the page then offers the publish. Every stored value shows as text
+  (#195).
 - The email log, under Operations, for staff and operators: every message the site sent, newest
   first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
   word. Search looks in the recipient and the subject across the 500 most recent messages at a

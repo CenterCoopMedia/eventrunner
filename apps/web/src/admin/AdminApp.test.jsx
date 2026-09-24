@@ -177,6 +177,7 @@ describe('admin route gating', () => {
       'Live updates',
       'Feedback',
       'Email log',
+      'Version history',
       'Change requests',
       'System errors',
     ]) {
@@ -241,7 +242,7 @@ describe('admin route gating', () => {
     // page they meet is one they may open.
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
-    for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Email log', 'Change requests', 'Event']) {
+    for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Media', 'Materials', 'Version history', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Email log', 'Change requests', 'Event']) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     for (const tab of ['Features', 'Branding', 'Access', 'System errors']) {
@@ -292,6 +293,32 @@ describe('admin route gating', () => {
     fireEvent.click(screen.getAllByRole('link', { name: 'Add an organization' })[0]);
     expect(await screen.findByRole('heading', { level: 1, name: 'New organization' }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+  });
+
+  it('opens version history for a staff admin, the record list and one record’s versions', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    adminCall.mockImplementation((name) =>
+      Promise.resolve(name === 'cmsGetVersionHistory' ? { entries: [], nextCursor: null } : {}),
+    );
+    await renderAt('/admin/versions');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Version history' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Version history' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('reads one record’s versions through the shell’s admin call, staff included', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    adminCall.mockImplementation((name) =>
+      Promise.resolve(name === 'cmsGetVersionHistory' ? { entries: [], nextCursor: null } : {}),
+    );
+    await renderAt('/admin/versions/cmsContent/hero__subtitle');
+
+    expect(await screen.findByRole('heading', { name: 'No published versions yet' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(adminCall).toHaveBeenCalledWith('cmsGetVersionHistory', { docPath: 'cmsContent/hero__subtitle', limit: 20 });
   });
 
   it('refuses a staff admin an operator route rather than only hiding its link', async () => {
@@ -447,7 +474,7 @@ describe('admin route gating', () => {
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin/features');
     const refusal = screen.getByRole('heading', { name: 'This section needs operator access' }).parentElement;
-    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests and Event');
+    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Version history, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests and Event');
     expect(refusal.textContent).not.toMatch(/deployment settings/);
   });
 });

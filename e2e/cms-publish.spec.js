@@ -9,11 +9,25 @@
 // way). The USER-OBSERVABLE half — a real browser loading the public home
 // page and seeing the new copy — is what this spec actually drives through
 // Playwright, which is the part no API call could stand in for.
+//
+// The same edit then has a history (issue #195): the admin's version
+// history page, in a signed-in browser, reads the publish back as a
+// version with its time, its account, and the one field it changed, and
+// restores the version before it through the admin, which the public page
+// then shows again.
 import { test, expect } from '@playwright/test';
-import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, signIn } from './helpers.mjs';
+import { ADMIN_EMAIL, APP_BASE_URL, adminDb, adminIdToken, callFunction, signIn } from './helpers.mjs';
 
 test.describe.serial('CMS edit -> publish -> public visibility', () => {
   const newSubtitle = `E2E edited subtitle ${Date.now()}`;
+  // Read from the database before the edit, and when the publish answered,
+  // for the version history cases below.
+  let oldSubtitle;
+  let publishedAt;
+  // The public page's rendering of the subtitle before the edit.
+  let publicBefore;
+
+  const subtitleDoc = () => adminDb().collection('cmsContent').doc('hero__subtitle');
 
   test('an admin edit is invisible on the public page until published, then appears', async ({ page }) => {
     const idToken = await adminIdToken();
@@ -49,6 +63,9 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     await expect(subtitle).toBeVisible();
     const before = await subtitle.textContent();
     expect(before).not.toBe(newSubtitle);
+    publicBefore = before;
+    oldSubtitle = (await subtitleDoc().get()).data()?.value;
+    expect(typeof oldSubtitle, 'the seeded subtitle holds a stored value').toBe('string');
 
     // Edit the hero subtitle block. This writes the DRAFT revision only —
     // the two-revision model (spec §8.4) — so the live/public doc, and this
@@ -80,11 +97,98 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
       docIds: ['hero__subtitle'],
     }, idToken);
     expect(published.status, `cmsPublish answered 200 (${JSON.stringify(published.body)})`).toBe(200);
+    publishedAt = Date.now();
 
     // The public page — a fresh navigation, no admin session, no
     // ?preview=1 — now shows the published change.
     await page.goto('/');
     await expect(subtitle).toHaveText(newSubtitle);
+  });
+
+  /** Sign the operator in, and open the subtitle's versions from the record list. */
+  async function openSubtitleHistory(page) {
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin/versions?collection=cmsContent');
+    await expect(page.getByRole('heading', { level: 1, name: 'Version history' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Collection' })).toHaveValue('cmsContent');
+    await page.getByRole('searchbox', { name: 'Search by name or id' }).fill('hero__subtitle');
+    const records = page.getByRole('region', { name: 'Records' });
+    await expect(records.getByRole('link')).toHaveCount(1);
+    await records.getByRole('link').click();
+    await expect(page).toHaveURL(/\/admin\/versions\/cmsContent\/hero__subtitle$/);
+  }
+
+  test('the edit and the publish read back as a version: what changed, when, and by which account', async ({ page }) => {
+    const live = (await subtitleDoc().get()).data();
+    expect(live.value).toBe(newSubtitle);
+    await openSubtitleHistory(page);
+
+    const versions = page.getByRole('list', { name: 'Versions' }).getByRole('listitem');
+    const latest = versions.first();
+    // Its number is the live document's revision, read, never assumed.
+    await expect(latest.getByRole('heading', { level: 2 })).toHaveText(`Version ${live.revision}`);
+    await expect(latest).toContainText(`by ${ADMIN_EMAIL}`);
+
+    // When: an instant within five minutes of the publish. A Timestamp sent
+    // unconverted would give no parseable time here.
+    const dateTime = await latest.locator('time').getAttribute('dateTime');
+    expect(Math.abs(Date.parse(dateTime) - publishedAt)).toBeLessThan(5 * 60_000);
+
+    // What changed: the one field, the stored text before and after.
+    const table = latest.getByRole('table', { name: `What changed in version ${live.revision}` });
+    const change = table.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'value', exact: true }) });
+    await expect(change).toHaveCount(1);
+    await expect(change.getByRole('cell').nth(0)).toHaveText(oldSubtitle);
+    await expect(change.getByRole('cell').nth(1)).toHaveText(newSubtitle);
+  });
+
+  test('restoring the version before the edit, through the admin, puts the old text back on the public page', async ({ page, browser }) => {
+    const editedRevision = (await subtitleDoc().get()).data().revision;
+    const earlier = editedRevision - 1;
+    await openSubtitleHistory(page);
+
+    const item = page.getByRole('listitem').filter({ has: page.getByRole('heading', { level: 2, name: `Version ${earlier}` }) });
+    await item.getByRole('button', { name: `Restore version ${earlier}` }).click();
+    const confirm = page.getByRole('region', { name: `Restore version ${earlier}?` });
+    await expect(confirm.getByRole('heading')).toBeFocused();
+    await confirm.getByRole('button', { name: 'Restore as draft' }).click();
+    await expect(page.getByText(`Version ${earlier} is now the draft. The site still shows version ${editedRevision} until you publish.`)).toBeVisible();
+
+    // A restore writes the draft only: the live document has not moved.
+    expect((await subtitleDoc().get()).data().value).toBe(newSubtitle);
+    const draft = (await adminDb().collection('cmsContent_drafts').doc('hero__subtitle').get()).data();
+    expect(draft.value).toBe(oldSubtitle);
+    expect(draft.status).toBe('dirty');
+
+    await page.getByRole('button', { name: 'Publish now' }).click();
+    await expect(page.getByText('Published. The public site picks it up live.')).toBeVisible();
+
+    // The publish is a new version, and it reads as the edit undone.
+    const restored = editedRevision + 1;
+    const latest = page.getByRole('list', { name: 'Versions' }).getByRole('listitem').first();
+    await expect(latest.getByRole('heading', { level: 2 })).toHaveText(`Version ${restored}`);
+    const change = latest
+      .getByRole('table', { name: `What changed in version ${restored}` })
+      .getByRole('row')
+      .filter({ has: page.getByRole('rowheader', { name: 'value', exact: true }) });
+    await expect(change.getByRole('cell').nth(0)).toHaveText(newSubtitle);
+    await expect(change.getByRole('cell').nth(1)).toHaveText(oldSubtitle);
+    const live = (await subtitleDoc().get()).data();
+    expect(live.revision).toBe(restored);
+    expect(live.value).toBe(oldSubtitle);
+
+    // And the public page shows the old text again, to a visitor with no
+    // admin session (the signed-in operator is sent to finish a profile).
+    const visitor = await browser.newContext();
+    try {
+      const publicPage = await visitor.newPage();
+      await publicPage.goto(`${APP_BASE_URL}/`);
+      await expect(publicPage.locator('article[data-content-source="live"]')).toBeVisible();
+      const subtitle = publicPage.locator('article[data-content-source] > section').first().locator('p').last();
+      await expect(subtitle).toHaveText(publicBefore);
+    } finally {
+      await visitor.close();
+    }
   });
 });
 
