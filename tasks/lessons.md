@@ -33,3 +33,6 @@ Rules written after user corrections. Read at session start.
   but not the one in the issue's screenshot. An adversarial review of every
   builder branch, before it joins the stack, caught both. The brief now asks
   for each clause quoted with the test that proves it, on the real surface.
+- A push of task files turned CI red: `npm run lint` also covers `tasks/`, and a
+  copied browser script used a global ESLint did not know. Run lint before any
+  push, even one that looks docs-only.
