@@ -60,8 +60,14 @@ const MAX_ARCHIVE_BYTES = 200 * 1024 * 1024;
 /** The name the browser saves the archive under. Fixed ASCII: nothing a person typed reaches a header. */
 const ARCHIVE_FILENAME = 'session-materials.zip';
 
-/** Longest folder or file name inside the archive, in characters. */
-const MAX_NAME_LENGTH = 150;
+/**
+ * Most UTF-8 bytes in one folder or file name inside the archive, its
+ * " (n)" and extension included. ext4 and APFS allow 255 bytes in a name
+ * and NTFS 255 UTF-16 units; 240 bytes stays under both, because no
+ * character takes more UTF-16 units than UTF-8 bytes. A cap in characters
+ * would not: 140 CJK characters are 420 bytes.
+ */
+const MAX_NAME_BYTES = 240;
 
 /** The longest ending kept as an extension when a long name is cut. */
 const MAX_EXTENSION_LENGTH = 16;
@@ -159,14 +165,26 @@ function splitExtension(name) {
   return [name.slice(0, dot), name.slice(dot)];
 }
 
+function utf8Length(text) {
+  return Buffer.byteLength(text, 'utf8');
+}
+
 /**
- * Cut a base so base plus extension fit MAX_NAME_LENGTH characters. Counts
- * code points, so a cut never splits a surrogate pair.
+ * Cut a base so base plus `tail` (the " (n)" and the extension) fit
+ * MAX_NAME_BYTES. The cut falls between code points, so it never splits a
+ * surrogate pair or a multi-byte character.
  */
-function fitName(base, extension) {
-  const baseChars = Array.from(base);
-  const room = Math.max(1, MAX_NAME_LENGTH - Array.from(extension).length);
-  return `${baseChars.slice(0, room).join('')}${extension}`;
+function fitName(base, tail) {
+  const room = MAX_NAME_BYTES - utf8Length(tail);
+  let kept = '';
+  let used = 0;
+  for (const character of base) {
+    const size = utf8Length(character);
+    if (used + size > room) break;
+    kept += character;
+    used += size;
+  }
+  return `${kept || 'file'}${tail}`;
 }
 
 /**
@@ -177,13 +195,15 @@ function fitName(base, extension) {
  * control characters and the characters Windows refuses become `-`; leading dots
  * and spaces go (so `..` and `.hidden` cannot climb or hide), and so do
  * trailing dots and spaces, which Windows drops on extraction; the name is
- * cut to 150 characters with its extension kept. An empty result is `file`.
+ * cut to 240 UTF-8 bytes with its extension kept. A lone surrogate becomes
+ * U+FFFD. An empty result is `file`.
  *
  * @param {unknown} part
  * @returns {string}
  */
 function cleanNamePart(part) {
   const cleaned = String(part ?? '')
+    .toWellFormed()
     .normalize('NFC')
     .replace(UNSAFE_NAME_CHARACTERS, '-')
     .replace(/^[.\s]+/u, '')
@@ -211,9 +231,7 @@ function entryNames(files) {
     if (taken.has(candidate.toLowerCase())) {
       const [base, extension] = splitExtension(name);
       for (let copy = 2; ; copy += 1) {
-        const suffix = ` (${copy})`;
-        const room = Math.max(1, MAX_NAME_LENGTH - Array.from(`${suffix}${extension}`).length);
-        candidate = `${folder}/${Array.from(base).slice(0, room).join('')}${suffix}${extension}`;
+        candidate = `${folder}/${fitName(base, ` (${copy})${extension}`)}`;
         if (!taken.has(candidate.toLowerCase())) break;
       }
     }
@@ -558,7 +576,7 @@ module.exports = {
     MAX_ARCHIVE_BYTES,
     ARCHIVE_FILENAME,
     ARCHIVE_ACTION,
-    MAX_NAME_LENGTH,
+    MAX_NAME_BYTES,
     listRow,
     readMaterialIds,
     cleanNamePart,

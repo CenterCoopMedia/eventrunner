@@ -22,7 +22,7 @@ const {
   createDownloadSessionMaterialsArchiveHandler,
   handlers,
   internals: {
-    MAX_LIST_ROWS, MAX_ARCHIVE_BYTES, ARCHIVE_ACTION, MAX_NAME_LENGTH,
+    MAX_LIST_ROWS, MAX_ARCHIVE_BYTES, ARCHIVE_ACTION,
     readMaterialIds, cleanNamePart, entryNames, parseSize, listRow, streamArchive,
   },
 } = require('./bulk.cjs');
@@ -439,19 +439,56 @@ test('one name in its composed and decomposed forms is one name: NFC, and the se
   for (const name of names) assert.equal(name, name.normalize('NFC'));
 });
 
-test('a long name is cut to 150 characters and keeps its extension, with or without a number', () => {
+// ext4 and APFS allow 255 bytes in one name, NTFS 255 UTF-16 units.
+const NAME_BYTES = 240;
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u;
+const bytes = (text) => Buffer.byteLength(text, 'utf8');
+
+function assertFits(part, label) {
+  assert.ok(bytes(part) <= NAME_BYTES, `${label}: ${bytes(part)} bytes`);
+  assert.ok(!LONE_SURROGATE.test(part), `${label}: no lone surrogate`);
+}
+
+test('a long name is cut to 240 UTF-8 bytes and keeps its extension, with or without a number', () => {
   const long = `${'x'.repeat(300)}.pptx`;
   const cleaned = cleanNamePart(long);
-  assert.equal(cleaned.length, MAX_NAME_LENGTH);
+  assert.equal(bytes(cleaned), NAME_BYTES);
   assert.ok(cleaned.endsWith('.pptx'));
 
   const [first, second] = entryNames([
     { sessionId: 's1', filename: long },
     { sessionId: 's1', filename: long },
   ]);
-  assert.equal(first.split('/')[1].length, MAX_NAME_LENGTH);
-  assert.equal(second.split('/')[1].length, MAX_NAME_LENGTH);
+  assert.equal(bytes(first.split('/')[1]), NAME_BYTES);
+  assertFits(second.split('/')[1], 'the numbered copy');
   assert.ok(second.endsWith(' (2).pptx'));
+});
+
+test('a long CJK or emoji name fits the byte limit, is cut on a character, and keeps its number and extension', () => {
+  const cjk = `${'\u8cc7\u6599'.repeat(100)}.pdf`;
+  const emoji = `${'\u{1F600}'.repeat(100)}.pptx`;
+  const names = entryNames([
+    { sessionId: 's1', filename: cjk },
+    { sessionId: 's1', filename: cjk },
+    { sessionId: 's1', filename: emoji },
+    { sessionId: 's1', filename: emoji },
+    { sessionId: '\u8cc7'.repeat(200), filename: 'a.pdf' },
+  ]);
+  const parts = names.map((name) => name.split('/'));
+  parts.forEach(([folder, file], index) => {
+    assertFits(folder, `folder ${index}`);
+    assertFits(file, `file ${index}`);
+  });
+  assert.ok(parts[0][1].endsWith('.pdf'));
+  assert.ok(bytes(parts[0][1]) > NAME_BYTES - 3, 'the CJK name is cut near the limit, not far short of it');
+  assert.ok(parts[1][1].endsWith(' (2).pdf'));
+  assert.ok(parts[2][1].endsWith('.pptx'));
+  assert.ok(parts[3][1].endsWith(' (2).pptx'));
+  // A lone surrogate in the stored name does not reach the archive.
+  assertFits(cleanNamePart('a\uD800b.pdf'), 'a stored lone surrogate');
+  for (const name of names) {
+    assert.doesNotThrow(() => new ZipFile().addBuffer(Buffer.from('x'), name), `yazl accepts ${name}`);
+  }
 });
 
 test('parseSize reads the decimal string Storage sends, and nothing else', () => {
