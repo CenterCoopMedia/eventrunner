@@ -49,6 +49,7 @@ vi.mock('firebase/firestore', () => ({
 
 import App from '../../App.jsx';
 import { NEW_TAB_NOTE } from '../../components/ExternalLink.jsx';
+import { markTourDone } from '../tourState.js';
 
 function response(body, status = 200) {
   return { ok: status < 400, status, json: async () => body };
@@ -99,6 +100,9 @@ const EDITED_DRAFT = { ...EDITED_LIVE, title: 'New wording', status: 'dirty' };
 const NEVER_PUBLISHED = { id: 'fresh', title: 'Not out yet', body: 'Soon.', publishAt: null, pinned: false, visible: false, status: 'dirty' };
 
 beforeEach(() => {
+  // The editor tour (issue #198) opens on a first visit and states the
+  // record words this file reads; the account has already ended it.
+  markTourDone('admin-1');
   adminSubscriptions.clear();
   adminErrors.clear();
   configSubscriptions.clear();

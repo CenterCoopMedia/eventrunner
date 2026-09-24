@@ -8,7 +8,7 @@
 // The same walk runs in a real browser in e2e/cms-publish.spec.js.
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { DOCKET, docketForTier } from '../AdminLayout.jsx';
+import { DOCKET, docketForTier, listWords } from '../AdminLayout.jsx';
 import AdminTour, { TOUR_GROUP_COPY, tourSteps } from './AdminTour.jsx';
 
 const TABBABLE =
@@ -155,11 +155,12 @@ describe('AdminTour', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByRole('heading', { level: 2, name: 'Content' })).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'In this group: Pages, Sessions, Content, Media, Materials and Unpublished changes.',
-      ),
-    ).toBeInTheDocument();
+    // Read from the docket, so a page a later branch adds to the group joins
+    // the sentence. The rail's first two Content pages open it.
+    const content = docketForTier('staff').find((group) => group.label === 'Content');
+    const labels = content.items.map((item) => item.label);
+    expect(labels.slice(0, 2)).toEqual(['Pages', 'Sessions']);
+    expect(screen.getByText(`In this group: ${listWords(labels)}.`)).toBeInTheDocument();
   });
 
   it('takes no focus when it opens on its own on a first visit', () => {
