@@ -176,6 +176,7 @@ describe('admin route gating', () => {
       'Live updates',
       'Feedback',
       'Email log',
+      'Change requests',
       'System errors',
     ]) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
@@ -239,7 +240,7 @@ describe('admin route gating', () => {
     // page they meet is one they may open.
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
-    for (const tab of ['Overview', 'Pages', 'Sessions', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Email log', 'Event']) {
+    for (const tab of ['Overview', 'Pages', 'Sessions', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Email log', 'Change requests', 'Event']) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     for (const tab of ['Features', 'Branding', 'Access', 'System errors']) {
@@ -262,6 +263,21 @@ describe('admin route gating', () => {
     expect(screen.getByRole('link', { name: 'Email log' })).toHaveAttribute('aria-current', 'page');
     // The page's calls go through the shell's admin call mock.
     await waitFor(() => expect(adminCall).toHaveBeenCalledWith('listSentEmails', expect.any(Object)));
+  });
+
+  it('opens change requests for a staff admin: the page loads on demand and reads the store', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    await renderAt('/admin/change-requests');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Change requests' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Change requests' })).toHaveAttribute('aria-current', 'page');
+    // The mocked listener answers with no rows.
+    expect(await screen.findByText('No one has sent a change request yet.')).toBeInTheDocument();
+    // The flag is off in the build-time snapshot: no form, and the notice.
+    expect(screen.queryByRole('button', { name: 'Send request' })).toBeNull();
+    expect(screen.getByText('Change requests are off. An operator can turn them on under Features.')).toBeInTheDocument();
   });
 
   it('refuses a staff admin an operator route rather than only hiding its link', async () => {
@@ -399,7 +415,7 @@ describe('admin route gating', () => {
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin/features');
     const refusal = screen.getByRole('heading', { name: 'This section needs operator access' }).parentElement;
-    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log and Event');
+    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests and Event');
     expect(refusal.textContent).not.toMatch(/deployment settings/);
   });
 });

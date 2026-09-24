@@ -56,6 +56,7 @@ const ADMIN_READABLE = [
   { path: "users_public/private-profile", tier: "admin" },
   { path: "speakers/spk-tier", tier: "admin" },
   { path: "feedback/f-tier", tier: "admin" },
+  { path: "change_requests/cr-tier", tier: "admin" },
 ];
 
 /**
@@ -179,6 +180,16 @@ beforeAll(async () => {
       category: "other",
       status: "new",
       createdAt: new Date(),
+    });
+    await setDoc(doc(db, "change_requests/cr-tier"), {
+      message: "Tier fixture.",
+      page: null,
+      status: "new",
+      uid: "attendee-1",
+      email: "attendee@example.com",
+      createdAt: new Date(),
+      updatedAt: null,
+      updatedBy: null,
     });
     // publicAttendeeProfiles starts OFF: the rules gate a move to `public`
     // profile visibility on it, and setPublicProfilesFeature() flips it.
@@ -495,6 +506,8 @@ describe("server-only collections stay deny-all", () => {
     "system_errors",
     "client_error_rate_limits",
     "email_templates",
+    // The change request rate limit (issue #188), one document per account.
+    "change_request_rate_limits",
     "speaker_slugs",
     "speaker_invites",
     // Ticketing (spec §3.3, §4.2). `tickets` names every purchaser's
@@ -1401,6 +1414,77 @@ describe("feedback_rate_limits stays deny-all", () => {
     await assertFails(getDoc(doc(anon(), "feedback_rate_limits/h1")));
     await assertFails(getDoc(doc(admin(), "feedback_rate_limits/h1")));
     await assertFails(setDoc(doc(admin(), "feedback_rate_limits/h1"), { requests: [] }));
+  });
+});
+
+// Change requests (issue #188). Admins of either tier read them through the
+// admin page's listener; no client writes them, admin included, because
+// every write must commit with its admin_logs row on the server. The
+// requester cannot read their own request back.
+describe("change requests", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "change_requests/cr1"), {
+        message: "The travel page lists the wrong hotel.",
+        page: "/travel",
+        status: "new",
+        uid: "attendee-1",
+        email: "attendee@example.com",
+        createdAt: new Date(),
+        updatedAt: null,
+        updatedBy: null,
+      });
+    });
+  });
+
+  it("an operator and a staff admin can get a request and list them all", async () => {
+    for (const db of [admin(), staff()]) {
+      await assertSucceeds(getDoc(doc(db, "change_requests/cr1")));
+      await assertSucceeds(getDocs(collection(db, "change_requests")));
+    }
+  });
+
+  it("a non-admin, the requester included, and an anonymous client cannot get or list them", async () => {
+    // nonAdmin() is attendee-1, the uid on the request.
+    for (const db of [nonAdmin(), attendee("approved-1"), anon()]) {
+      await assertFails(getDoc(doc(db, "change_requests/cr1")));
+      await assertFails(getDocs(collection(db, "change_requests")));
+      await assertFails(
+        getDocs(query(collection(db, "change_requests"), where("uid", "==", "attendee-1"))),
+      );
+    }
+  });
+
+  it("no client creates, changes, or removes a request, admin of either tier included", async () => {
+    const request = {
+      message: "Forged.",
+      page: null,
+      status: "new",
+      uid: "attendee-1",
+      email: "attendee@example.com",
+      createdAt: new Date(),
+    };
+    for (const db of [admin(), staff(), nonAdmin(), anon()]) {
+      await assertFails(setDoc(doc(db, "change_requests/forged"), request));
+      await assertFails(updateDoc(doc(db, "change_requests/cr1"), { status: "done" }));
+      await assertFails(setDoc(doc(db, "change_requests/cr1"), { status: "done" }, { merge: true }));
+      await assertFails(deleteDoc(doc(db, "change_requests/cr1")));
+    }
+  });
+
+  it("the rate limit store is closed to every client, the account it counts included", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "change_request_rate_limits/attendee-1"), {
+        requests: [Date.now()],
+        updatedAt: new Date(),
+      });
+    });
+    for (const db of [admin(), staff(), nonAdmin(), anon()]) {
+      await assertFails(getDoc(doc(db, "change_request_rate_limits/attendee-1")));
+      await assertFails(getDocs(collection(db, "change_request_rate_limits")));
+      await assertFails(setDoc(doc(db, "change_request_rate_limits/attendee-1"), { requests: [] }));
+      await assertFails(deleteDoc(doc(db, "change_request_rate_limits/attendee-1")));
+    }
   });
 });
 

@@ -444,6 +444,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Change requests (issue #188): admin-readable, either tier, for the
+    // admin page's listener; never client-written. submitChangeRequest,
+    // updateChangeRequestStatus and deleteChangeRequest write it through
+    // the Admin SDK, each with its admin_logs row. A requester cannot read
+    // their own request: only the event team reads the text.
+    match /change_requests/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // media_assets: the index of uploaded Storage objects behind the media
     // library (spec §4.1, §8.5). Admin-readable so the library can list and
     // search without a callable per keystroke; never client-written — every
@@ -492,6 +502,7 @@ service cloud.firestore {
     match /client_error_rate_limits/{docId} { allow read, write: if false; }
     match /email_templates/{docId} { allow read, write: if false; }
     match /feedback_rate_limits/{docId} { allow read, write: if false; }
+    match /change_request_rate_limits/{docId} { allow read, write: if false; }
     // Slug reservations (`speaker_slugs/{slug}` → `{ speakerId }`), the
     // deterministic-id lock that makes speaker slug uniqueness atomic
     // (functions/src/speakers/profile.cjs). Pure bookkeeping: nothing

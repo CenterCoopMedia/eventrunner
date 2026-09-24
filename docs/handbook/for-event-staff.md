@@ -31,7 +31,11 @@ Custom badges are off by default. If enabled in Features, attendees can write up
 
 Approve and revoke registrations in Attendees. Select **Export** to save the rows on screen as a spreadsheet file. The file holds names, email addresses, organizations, roles, registration status, badges, past attendance, social handles, and profile visibility. Treat it as personal data. Every export is recorded in the admin log with your address.
 
-**Edit record** on a row holds what only organizers keep: the past attendance list, one edition per line. Attendees cannot change it. The same panel deletes an account. A delete takes the person out of the directory at once and removes their sign-in, saved sessions, notes, profile photo, and ticket claim. It cannot be undone. You cannot delete your own account, an admin account, or an account linked to a speaker. If a delete stops part way, select **Try the delete again**.
+**Edit record** on a row holds what only organizers keep: the past attendance list, one edition per line. Attendees cannot change it. The same panel deletes an account. A delete takes the person out of the directory at once and removes their sign-in, saved sessions, notes, profile photo, change requests, and ticket claim. It cannot be undone. You cannot delete your own account, an admin account, or an account linked to a speaker. If a delete stops part way, select **Try the delete again**.
+
+## Change requests
+
+Change requests are off by default. An operator turns them on in Features. Then a signed-in visitor can select **Request a change** in the footer, and you can send one from the Change requests page. Every request lands in one list on that page. Move a request on with its button (**Mark in progress**, **Mark done**, **Reopen**) or select **Decline**. **Remove** deletes a request and its text for good. The admin log records every request, status change, and removal, but never the text.
 
 ## Materials
 

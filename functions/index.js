@@ -19,6 +19,7 @@ const adminConfig = require('./src/admin/config.cjs');
 const adminCustomBadges = require('./src/admin/customBadges.cjs');
 const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
 const adminFeedback = require('./src/admin/feedback.cjs');
+const adminChangeRequests = require('./src/admin/changeRequests.cjs');
 const adminAccess = require('./src/admin/access.cjs');
 const adminEventStats = require('./src/admin/eventStats.cjs');
 const webMcpDiagnostics = require('./src/admin/webMcpDiagnostics.cjs');
@@ -69,6 +70,7 @@ module.exports = {
   ...adminCustomBadges.handlers,
   ...adminLiveUpdates.handlers,
   ...adminFeedback.handlers,
+  ...adminChangeRequests.handlers,
   ...adminAccess.handlers,
   ...adminEventStats.handlers,
   ...webMcpDiagnostics.handlers,

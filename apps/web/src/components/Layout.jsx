@@ -53,7 +53,7 @@
 // So: what the page states, then what the site states, then the default.
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config';
@@ -70,6 +70,7 @@ import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
 import RegistrationAction from './RegistrationAction.jsx';
 import FeedbackModal from './FeedbackModal.jsx';
+import ChangeRequestModal from './ChangeRequestModal.jsx';
 import DemoBanner from './DemoBanner.jsx';
 import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
 
@@ -236,6 +237,17 @@ export default function Layout() {
   const operatorName = legal.operatorName;
   const supportEmail = legal.supportEmail;
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [changeRequestOpen, setChangeRequestOpen] = useState(false);
+  // A change request is free text from a reader the operator does not
+  // control, so it is offered only while the event turns it on, and only to
+  // a signed-in reader: the server stores the request against the sign-in
+  // and refuses a signed-out one (issue #188).
+  const canRequestChange = features.changeRequests === true && Boolean(user);
+  // The dialog goes with the control: a flag turned off or a sign-out closes
+  // it, and it does not come back on its own when either returns.
+  useEffect(() => {
+    if (!canRequestChange) setChangeRequestOpen(false);
+  }, [canRequestChange]);
 
   // The page this URL renders, if it has a document. A route below a page
   // (/schedule/:id) matches nothing here and keeps the shell's own rule,
@@ -485,19 +497,39 @@ export default function Layout() {
                 </ul>
               </nav>
             )}
-            {features.feedbackInbox ? (
-              <button
-                type="button"
-                className={`${quietActionClass} mt-md`}
-                onClick={() => setFeedbackOpen(true)}
-              >
-                Share feedback
-              </button>
+            {features.feedbackInbox || canRequestChange ? (
+              <div className="mt-md flex flex-wrap gap-xs">
+                {features.feedbackInbox ? (
+                  <button
+                    type="button"
+                    className={quietActionClass}
+                    onClick={() => setFeedbackOpen(true)}
+                  >
+                    Share feedback
+                  </button>
+                ) : null}
+                {canRequestChange ? (
+                  <button
+                    type="button"
+                    className={quietActionClass}
+                    onClick={() => setChangeRequestOpen(true)}
+                  >
+                    Request a change
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>
       </footer>
       {feedbackOpen ? <FeedbackModal onClose={() => setFeedbackOpen(false)} /> : null}
+      {changeRequestOpen && canRequestChange ? (
+        <ChangeRequestModal
+          user={user}
+          initialPage={pathname}
+          onClose={() => setChangeRequestOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

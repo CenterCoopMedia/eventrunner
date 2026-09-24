@@ -112,6 +112,7 @@ export const DOCKET = Object.freeze([
       { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
       { to: 'feedback', label: 'Feedback', tier: 'staff' },
       { to: 'email-log', label: 'Email log', tier: 'staff' },
+      { to: 'change-requests', label: 'Change requests', tier: 'staff' },
     ],
   },
   {

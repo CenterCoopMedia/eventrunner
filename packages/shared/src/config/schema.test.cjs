@@ -934,3 +934,12 @@ test('validateFeatures: booleans only, unknown keys rejected', () => {
   assert.equal(validateFeatures(null).ok, false);
   assert.equal(validateFeatures([]).ok, false);
 });
+
+// Issue #188: the change request flag is a known key, and a boolean only.
+test('validateFeatures: changeRequests is a known boolean flag', () => {
+  assert.equal(validateFeatures({ changeRequests: true }).ok, true);
+  assert.equal(validateFeatures({ changeRequests: false }).ok, true);
+  const bad = validateFeatures({ changeRequests: 'true' });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.includes('features.changeRequests: must be a boolean')));
+});

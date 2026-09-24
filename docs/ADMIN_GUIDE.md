@@ -11,7 +11,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, and Event settings | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -214,7 +214,7 @@ A cell with more than one entry joins them with a semicolon. The file carries no
 
 **Past attendance.** Select **Edit record** on a row to open that account's record. **Past attendance** takes one edition per line, such as a year: at most 20 editions of up to 40 characters each, with no repeats. Select **Save record** to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.
 
-**Delete an account.** In the record, select **Delete account**, read what the delete removes, and select **Delete this account**. The delete removes the account, its directory profile, and its shared schedule, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session's saved count), the private notes, and the profile photo. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.
+**Delete an account.** In the record, select **Delete account**, read what the delete removes, and select **Delete this account**. The delete removes the account, its directory profile, and its shared schedule, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session's saved count), the private notes, the profile photo, and the change requests the person sent. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.
 
 The server refuses a delete in four cases, and says why:
 
@@ -255,6 +255,20 @@ Every message the site sent, newest first: Sign-in codes, speaker invitations, a
 - **Every preview you open is recorded** in the admin log with your account and the message's record. The record never holds the address or the subject.
 
 Sent messages are closed to every browser, admins included. The page reads them through two admin-gated endpoints.
+
+## Change requests
+
+Requests for a change to the site, from signed-in visitors and from staff. Both kinds arrive in one list, newest first. Staff and operators can open it.
+
+- **The feature is off by default.** An operator turns on `changeRequests` in Settings → Features. While it is off, the footer has no **Request a change** button, this page has no form, and the server refuses every request. The list, the status changes, and **Remove** still work, so you can clear the list after the feature is off.
+- **Only a signed-in visitor can send one.** The footer shows **Request a change** only to a visitor who is signed in, and the server refuses a request from an address that is not verified. The request is stored with the sender's sign-in address. One account can send 5 requests in 15 minutes. The server refuses more and says when to try again.
+- **Send one yourself** from the **Request a change** panel at the top of the page. It goes through the same server checks and the same limit.
+- **Show** picks the requests the list shows: **Open** (new and in progress, the default), **All**, **New**, **In progress**, **Done**, or **Declined**. The choice stays in the page address.
+- **Each row** shows the status as a word, the time the request arrived, the sender's address, the page it is about, and the text. The row's button is the next step: **Mark in progress**, **Mark done**, or **Reopen**. **Decline** closes a new or in-progress request.
+- **Remove** deletes the request and its text. It cannot be undone.
+- **The admin log records every request, status change, and removal**, with the account that did it and the request's record. The log never holds the text of a request.
+
+Only admins can read a request. The sender cannot read it back, and no email is sent. When an account is deleted in Attendees, the change requests it sent are deleted too.
 
 ## Materials
 
@@ -384,6 +398,8 @@ With no milestones and no goal, the Overview shows no milestone panel at all.
 ## Settings → Features
 
 Feature flags, wired to a **whole-document replace** — every known flag is always sent, and an omitted flag means disabled. When a new flag is added to the platform it appears here automatically, because the form's key list comes from the same shared schema the server validates against.
+
+`changeRequests` turns on the change request form in the footer and on the Change requests page. It is off by default. See [Change requests](#change-requests).
 
 ## Settings → Badges
 

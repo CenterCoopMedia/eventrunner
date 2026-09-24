@@ -34,7 +34,8 @@
  *      claims, and writes the audit row — together. After it, the account
  *      is out of the directory.
  *   2. The sweep deletes the sign-in, the saved sessions (lowering each
- *      session's count), the private notes, and the profile photo files.
+ *      session's count), the private notes, the profile photo files, and
+ *      the change requests the account sent with their rate-limit window.
  *      These can outgrow one transaction's 500-write ceiling, which would
  *      strand an account that could never be deleted, so they run after
  *      the commit, each step on its own. The sweep also releases any ticket
@@ -79,9 +80,7 @@ const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
  * Every per-account store an attendee delete clears besides `users/{uid}`
  * itself, in the order the delete runs them. ONE list: the transaction, the
  * sweep, the resume check, the write budget, and the `removed` counts all
- * read it, so a store added later is added HERE and nowhere else. (The
- * change request queue adds `change_requests` and
- * `change_request_rate_limits/{uid}` when it lands.)
+ * read it, so a store added later is added HERE and nowhere else.
  *
  *   phase 'directory' — cleared in the transaction that deletes the account,
  *                       so the person leaves the directory in one commit.
@@ -93,6 +92,8 @@ const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
  *   the record; a resumed delete that finds one does not answer 404.
  *
  *   kind 'doc'        — the document `{collection}/{uid}`.
+ *   kind 'owned'      — every `{collection}` document whose `{field}` is the
+ *                       uid. The documents are deleted.
  *   kind 'claim'      — every `{collection}` document whose `{field}` is the
  *                       uid. The document stays; the claim fields are set
  *                       to null, the shape ticketing/sync.cjs creates.
@@ -117,6 +118,13 @@ const PER_ACCOUNT_STORES = Object.freeze([
   { phase: 'sweep', kind: 'counted', subcollection: 'bookmarks', counter: 'sessionBookmarks', key: 'bookmarks' },
   { phase: 'sweep', kind: 'subcollection', subcollection: 'sessionNotes', key: 'notes' },
   { phase: 'sweep', kind: 'files', prefix: 'profile-photos', key: 'photos' },
+  // The change requests the account sent (issue #188) and its rate-limit
+  // window. A request is free text, so it must not outlive the identity it
+  // was stored against. Sweep, not directory: the account can hold more
+  // requests than one transaction can delete, and a deleted session's token
+  // can still send one for up to an hour, which a retried delete clears.
+  { phase: 'sweep', kind: 'owned', collection: 'change_requests', field: 'uid', key: 'changeRequests' },
+  { phase: 'sweep', kind: 'doc', collection: 'change_request_rate_limits', key: 'changeRequestLimits' },
 ]);
 
 /** Firestore's per-transaction write ceiling. */
@@ -131,6 +139,7 @@ const COUNTED_CHUNK = 200;
 const SUBCOLLECTION_CHUNK = 400;
 const FILES_CHUNK = 500;
 const CLAIMS_CHUNK = 400;
+const OWNED_CHUNK = 400;
 
 const DIRECTORY_STORES = PER_ACCOUNT_STORES.filter((store) => store.phase === 'directory');
 /** What every sweep clears: the sweep stores, and the claims again. */
@@ -463,17 +472,48 @@ async function sweepClaims({ db, uid, store, now }) {
   }
 }
 
+/** The documents a store holds by the account's uid in a field, as a query. */
+function ownedBy(db, uid, store) {
+  return db.collection(store.collection).where(store.field, '==', uid);
+}
+
+/** Delete an owned store's documents, a page at a time, one batch per page. */
+async function sweepOwned({ db, uid, store }) {
+  let removed = 0;
+  for (;;) {
+    const page = (await ownedBy(db, uid, store).limit(OWNED_CHUNK).get()).docs;
+    if (page.length === 0) return removed;
+    const batch = db.batch();
+    for (const doc of page) batch.delete(doc.ref);
+    await batch.commit();
+    removed += page.length;
+  }
+}
+
+/** Delete the document `{collection}/{uid}`, counting it when it was there. */
+async function sweepDoc({ db, uid, store }) {
+  const ref = db.collection(store.collection).doc(uid);
+  const snap = await ref.get();
+  if (!snap.exists) return 0;
+  await ref.delete();
+  return 1;
+}
+
 const SWEEPERS = Object.freeze({
   claim: sweepClaims,
   counted: sweepCounted,
   subcollection: sweepSubcollection,
   files: sweepFiles,
+  owned: sweepOwned,
+  doc: sweepDoc,
 });
 
 /** Whether a sweep store still holds anything for the account. */
 async function holdsAnything({ db, getBucket, uid, store }) {
   if (store.kind === 'claim') return !(await claimsOn(db, uid, store).limit(1).get()).empty;
   if (store.kind === 'files') return (await pageOfFiles(getBucket(), store.prefix, uid, 1)).length > 0;
+  if (store.kind === 'owned') return !(await ownedBy(db, uid, store).limit(1).get()).empty;
+  if (store.kind === 'doc') return (await db.collection(store.collection).doc(uid).get()).exists;
   return (await pageOfMembers(db, uid, store.subcollection, 1)).length > 0;
 }
 

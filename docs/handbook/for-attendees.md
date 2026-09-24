@@ -32,6 +32,10 @@ Session files and links stay closed until the session is over, unless staff rele
 
 Your public profile is the slice other attendees can see. The rest stays on your account. You pick badges from the list the event offers. If the event enables custom badges, you can also enter up to three short badges on your profile. Each is limited to 24 characters. Blocked words and duplicate badges are refused. Staff can remove a custom badge. Organizers keep a list of the past editions you attended on your account, and they can delete your account on request.
 
+## Change requests
+
+If the event turns change requests on, a signed-in attendee can select **Request a change** in the footer to ask for a change to the site. Only the event team reads the request.
+
 ## FAQ and long pages
 
 An FAQ page always shows a filter box and a list of its sections near the top, and any other page with enough content, such as a long travel guide, shows the same tools. Type a keyword to narrow the page to matching content, or select a section in the list to jump straight to it.

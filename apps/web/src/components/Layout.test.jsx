@@ -1072,3 +1072,59 @@ describe('Layout registration action (M7 issue 8)', () => {
     }
   });
 });
+
+// The change request control (issue #188). A public text surface ships off,
+// and a request is stored against the sign-in, so the footer offers it only
+// when the event turns the flag on AND the reader is signed in.
+describe('the footer change request control', () => {
+  const SIGNED_IN = { uid: 'uid-ada', email: 'ada@example.org', getIdToken: async () => 'id-token' };
+  const requestButton = (container) =>
+    within(container.querySelector('footer')).queryByRole('button', { name: 'Request a change' });
+
+  it('is absent while the flag is off, for a signed-in reader too', () => {
+    for (const featureFlags of [FIXTURE_FEATURES, { ...FIXTURE_FEATURES, changeRequests: false }, { ...FIXTURE_FEATURES, changeRequests: 'true' }]) {
+      const { container, unmount } = renderShell({}, { featureFlags, user: SIGNED_IN });
+      expect(requestButton(container)).toBeNull();
+      expect(container.querySelector('dialog')).toBeNull();
+      unmount();
+    }
+  });
+
+  it('is absent for a signed-out reader while the flag is on', () => {
+    const { container } = renderShell({}, { featureFlags: { ...FIXTURE_FEATURES, changeRequests: true } });
+    expect(requestButton(container)).toBeNull();
+  });
+
+  it('opens the dialog on the page the reader is on, and closes it again', () => {
+    const { container } = renderShell({}, {
+      path: '/travel',
+      featureFlags: { ...FIXTURE_FEATURES, changeRequests: true },
+      user: SIGNED_IN,
+    });
+    const button = requestButton(container);
+    expect(button).not.toBeNull();
+    // The public quiet action, never an admin control.
+    expect(button.className).not.toMatch(/admin-/);
+
+    fireEvent.click(button);
+    const dialog = document.querySelector('dialog');
+    expect(dialog).not.toBeNull();
+    expect(within(dialog).getByRole('heading', { name: 'Request a change' })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Page (optional)')).toHaveValue('/travel');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(document.querySelector('dialog')).toBeNull();
+  });
+
+  it('sits beside Share feedback when both are on', () => {
+    const { container } = renderShell({}, {
+      featureFlags: { ...FIXTURE_FEATURES, feedbackInbox: true, changeRequests: true },
+      user: SIGNED_IN,
+    });
+    const footer = within(container.querySelector('footer'));
+    const feedback = footer.getByRole('button', { name: 'Share feedback' });
+    const request = footer.getByRole('button', { name: 'Request a change' });
+    expect(feedback.parentElement).toBe(request.parentElement);
+    expect(feedback.compareDocumentPosition(request) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});

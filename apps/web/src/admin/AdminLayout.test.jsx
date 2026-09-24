@@ -136,9 +136,10 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Two links above the base's sixteen (the Overview, issue #179, and the
-    // Email log, issue #183), every one a word. No icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(18);
+    // Three links above the base's sixteen (the Overview, issue #179, the
+    // Email log, issue #183, and Change requests, issue #188), every one a
+    // word. No icon rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(19);
     expect(nav.querySelector('svg')).toBeNull();
     for (const link of nav.querySelectorAll('a')) {
       expect(link.textContent.trim().length).toBeGreaterThan(0);
@@ -204,7 +205,7 @@ describe('the admin shell', () => {
       'overview',
       'pages', 'sessions', 'content', 'media', 'materials',
       'speakers', 'attendees', 'badges',
-      'live-updates', 'ticketing', 'feedback', 'email-log',
+      'live-updates', 'ticketing', 'feedback', 'email-log', 'change-requests',
       'settings',
     ]);
   });
@@ -215,6 +216,9 @@ describe('the admin shell', () => {
     expect(sectionTier('/admin/pages')).toBe('staff');
     // The email log is staff visible (issue #183).
     expect(sectionTier('/admin/email-log')).toBe('staff');
+    // Change requests are staff work (issue #188). An undeclared item would
+    // fall to the operator and lock staff out of their own queue.
+    expect(sectionTier('/admin/change-requests')).toBe('staff');
     expect(sectionTier('/admin/pages/new')).toBe('staff');
     expect(sectionTier('/admin/sessions/abc')).toBe('staff');
     expect(sectionTier('/admin')).toBeNull();

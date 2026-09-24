@@ -198,7 +198,7 @@ export default function AttendeeRecordPanel({
             busyLabel="Deleting…"
             busy={deleting}
             disabled={Boolean(row.speakerId) || deleting}
-            consequence="This removes the account, its directory profile, its shared schedule, its sign-in, its saved sessions, its private notes, its profile photo, and its ticket claim. The ticket record, sent email records, feedback, session reactions, and the admin log stay."
+            consequence="This removes the account, its directory profile, its shared schedule, its sign-in, its saved sessions, its private notes, its profile photo, its change requests, and its ticket claim. The ticket record, sent email records, feedback, session reactions, and the admin log stay."
             permanence="This cannot be undone."
             onConfirm={deleteAccount}
           />

@@ -146,6 +146,7 @@ const KNOWN_FEATURE_KEYS = [
   'autoApproveTicketHolders', 'publicAttendeeProfiles',
   'webmcpPublic',
   'webmcpAdmin',
+  'changeRequests',
 ];
 
 /** @param {*} v @returns {boolean} */

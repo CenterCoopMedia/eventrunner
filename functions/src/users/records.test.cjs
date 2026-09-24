@@ -268,6 +268,12 @@ async function fullySeeded(overrides = {}) {
     'tickets/tkt-2': { email: 'bo@example.com', status: 'valid', claimedByUid: 'uid-bo', claimedAt: T0 },
     'users/uid-bo': account({ uid: 'uid-bo', email: 'bo@example.com', displayName: 'Bo Reyes' }),
     'users_public/uid-bo': { displayName: 'Bo Reyes', profileVisibility: 'public' },
+    // Two change requests and a rate-limit window each (issue #188).
+    'change_requests/cr-ada-1': { message: 'Fix the map.', status: 'new', uid: 'uid-ada', email: 'ada@example.com' },
+    'change_requests/cr-ada-2': { message: 'Add a room.', status: 'done', uid: 'uid-ada', email: 'ada@example.com' },
+    'change_requests/cr-bo-1': { message: 'Keep me.', status: 'new', uid: 'uid-bo', email: 'bo@example.com' },
+    'change_request_rate_limits/uid-ada': { requests: [T0.getTime()], updatedAt: T0 },
+    'change_request_rate_limits/uid-bo': { requests: [T0.getTime()], updatedAt: T0 },
   });
   await db.collection('users/uid-ada/bookmarks').doc('s1').set({ bookmarkedAt: T0 });
   await db.collection('users/uid-ada/bookmarks').doc('s2').set({ bookmarkedAt: T0 });
@@ -304,6 +310,8 @@ function assertUntouched(d) {
   assert.equal(db.read('tickets', 'tkt-1').claimedByUid, 'uid-ada');
   assert.ok(auth.users.has('uid-ada'));
   assert.ok(bucket.files.has('profile-photos/uid-ada/photo.jpg'));
+  assert.ok(db.read('change_requests', 'cr-ada-1'));
+  assert.ok(db.read('change_request_rate_limits', 'uid-ada'));
   assert.deepEqual(adminLogs(db), []);
 }
 
@@ -316,12 +324,17 @@ function assertNeighbourKept({ db, auth, bucket }) {
   assert.equal(db.read('tickets', 'tkt-2').claimedByUid, 'uid-bo');
   assert.ok(auth.users.has('uid-bo'));
   assert.ok(bucket.files.has('profile-photos/uid-bo/photo.jpg'));
+  assert.ok(db.read('change_requests', 'cr-bo-1'));
+  assert.ok(db.read('change_request_rate_limits', 'uid-bo'));
 }
 
 test('the per-account store list is one named constant the delete reads', () => {
   assert.deepEqual(
     PER_ACCOUNT_STORES.map((store) => store.collection ?? store.subcollection ?? store.prefix),
-    ['users_public', 'schedule_shares', 'tickets', 'bookmarks', 'sessionNotes', 'profile-photos'],
+    [
+      'users_public', 'schedule_shares', 'tickets', 'bookmarks', 'sessionNotes', 'profile-photos',
+      'change_requests', 'change_request_rate_limits',
+    ],
   );
   assert.ok(Object.isFrozen(PER_ACCOUNT_STORES));
   // The account itself, the audit row, and the two directory documents.
@@ -338,7 +351,7 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
   assert.deepEqual(res.body, {
     ok: true,
     uid: 'uid-ada',
-    removed: { tickets: 1, bookmarks: 2, notes: 1, photos: 2 },
+    removed: { tickets: 1, bookmarks: 2, notes: 1, photos: 2, changeRequests: 2, changeRequestLimits: 1 },
   });
   // Out of the directory.
   assert.equal(db.read('users', 'uid-ada'), undefined);
@@ -352,6 +365,8 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
   assert.equal(db.read('sessionBookmarks', 's2').count, 0);
   assert.equal(bucket.files.has('profile-photos/uid-ada/photo.jpg'), false);
   assert.equal(bucket.files.has('profile-photos/uid-ada/photo-small.jpg'), false);
+  assert.deepEqual(db.ids('change_requests'), ['cr-bo-1']);
+  assert.equal(db.read('change_request_rate_limits', 'uid-ada'), undefined);
   // The ticket record stays; its claim is released.
   assert.deepEqual(db.read('tickets', 'tkt-1'), {
     email: 'ada@example.com', status: 'valid', claimedByUid: null, claimedAt: null, updatedAt: T0,
@@ -632,6 +647,7 @@ test('the sweep clears more than one page of every store, a page at a time', asy
   }
   for (let i = 0; i < 450; i += 1) {
     await db.collection('users/uid-ada/sessionNotes').doc(`n${i}`).set({ text: 'x' });
+    await db.collection('change_requests').doc(`cr${i}`).set({ message: 'x', uid: 'uid-ada' });
   }
   const bucket = makeBucket(Array.from({ length: 501 }, (_, i) => `profile-photos/uid-ada/p${i}.jpg`));
   const d = deps(db, { auth: makeAuth({ 'uid-ada': 'ada@example.com' }), bucket });
@@ -639,7 +655,10 @@ test('the sweep clears more than one page of every store, a page at a time', asy
   const res = await remove(d);
 
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
-  assert.deepEqual(res.body.removed, { tickets: 0, bookmarks: 250, notes: 450, photos: 501 });
+  assert.deepEqual(res.body.removed, {
+    tickets: 0, bookmarks: 250, notes: 450, photos: 501, changeRequests: 450, changeRequestLimits: 0,
+  });
+  assert.deepEqual(db.ids('change_requests'), []);
   assert.deepEqual(db.ids('users/uid-ada/bookmarks'), []);
   assert.deepEqual(db.ids('users/uid-ada/sessionNotes'), []);
   assert.equal(bucket.files.size, 0);
@@ -711,6 +730,51 @@ test('a claim made while the sweep runs is released in the same call and counted
   assert.equal(d.db.read('tickets', 'tkt-1').claimedByUid, null);
   assert.equal(d.db.read('tickets', 'tkt-late').claimedByUid, null);
   assert.equal(d.db.read('tickets', 'tkt-2').claimedByUid, 'uid-bo');
+});
+
+// Issue #188: a change request is free text, so it must not outlive the
+// account it was stored against. The requests here go through the real
+// submitChangeRequest endpoint, and one the deleted session sends after the
+// delete (its token stays valid for up to an hour) is cleared by the retry.
+test('a delete clears the account’s change requests and rate-limit window, and a retry clears one sent after the delete', async () => {
+  const { createSubmitChangeRequestHandler } = require('../admin/changeRequests.cjs');
+  const d = deps(await fullySeeded());
+  await d.db.collection('config').doc('features').set({ changeRequests: true });
+  const send = async (submissionKey) => {
+    const res = makeRes();
+    await createSubmitChangeRequestHandler({ db: d.db, auth: d.auth, now: () => T0.getTime(), log: QUIET })(
+      req('ada', { message: 'The map is wrong.', page: '/travel', submissionKey }),
+      res,
+    );
+    return res;
+  };
+  assert.equal((await send('ada-request-1')).statusCode, 201);
+  assert.equal(d.db.read('change_requests', 'ada-request-1').uid, 'uid-ada');
+
+  const res = await remove(d);
+
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(res.body.removed.changeRequests, 3);
+  assert.equal(res.body.removed.changeRequestLimits, 1);
+  assert.deepEqual(d.db.ids('change_requests'), ['cr-bo-1']);
+  assert.equal(d.db.read('change_request_rate_limits', 'uid-ada'), undefined);
+  assertNeighbourKept(d);
+  // The audit rows stay: the submission's row and the delete's.
+  assert.deepEqual(adminLogs(d.db).map((row) => row.action).sort(), ['deleteAttendee', 'submitChangeRequest']);
+
+  // The deleted session, its token still valid, sends one more.
+  assert.equal((await send('ada-request-2')).statusCode, 201);
+
+  const retry = await remove(d);
+
+  assert.equal(retry.statusCode, 200, JSON.stringify(retry.body));
+  assert.equal(retry.body.removed.changeRequests, 1);
+  assert.equal(retry.body.removed.changeRequestLimits, 1);
+  assert.deepEqual(d.db.ids('change_requests'), ['cr-bo-1']);
+  assert.equal(d.db.read('change_request_rate_limits', 'uid-ada'), undefined);
+  assert.deepEqual(adminLogs(d.db).find((row) => row.details)?.details, { resumed: true });
+  // Nothing of the account remains, so the call after that is a 404.
+  assert.equal((await remove(d)).statusCode, 404);
 });
 
 // Review finding: the admin guide is what staff read when a delete is

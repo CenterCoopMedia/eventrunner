@@ -64,6 +64,9 @@ const AdminEmailLog = lazy(() => import('./pages/AdminEmailLog.jsx'));
 // (issues 184 and 185), and with them it pushed the entry chunk past the
 // same ceiling. One screen behind one link, loaded the same way.
 const AdminAttendees = lazy(() => import('./pages/AdminAttendees.jsx'));
+// Change requests (issue #188): one screen behind one link, so it stays out
+// of the entry chunk the same way.
+const AdminChangeRequests = lazy(() => import('./pages/AdminChangeRequests.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -184,6 +187,10 @@ export default function AdminApp() {
           <Route
             path="email-log"
             element={<DeferredAdminPage label="the email log"><AdminEmailLog /></DeferredAdminPage>}
+          />
+          <Route
+            path="change-requests"
+            element={<DeferredAdminPage label="change requests"><AdminChangeRequests /></DeferredAdminPage>}
           />
           <Route path="system-errors" element={<AdminSystemErrors />} />
           <Route path="access" element={<AdminAccess />} />

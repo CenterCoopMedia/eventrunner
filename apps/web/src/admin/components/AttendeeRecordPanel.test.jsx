@@ -146,7 +146,7 @@ describe('AttendeeRecordPanel', () => {
     expect(callMock).not.toHaveBeenCalled();
     // The still surface states what goes, what stays, and that it is final.
     expect(screen.getByRole('heading', { name: 'Delete the account for Ada Quill' })).toBeInTheDocument();
-    expect(screen.getByText(/its sign-in, its saved sessions, its private notes, its profile photo, and its ticket claim/))
+    expect(screen.getByText(/its sign-in, its saved sessions, its private notes, its profile photo, its change requests, and its ticket claim/))
       .toHaveTextContent('The ticket record, sent email records, feedback, session reactions, and the admin log stay. This cannot be undone.');
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete this account' }));

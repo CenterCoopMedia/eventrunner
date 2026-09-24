@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Change requests, off by default behind the `changeRequests` feature flag. With the flag on, a
+  signed-in visitor can select **Request a change** in the footer, and staff can send one from the
+  new Change requests page under Operations. Both reach one store through `submitChangeRequest`,
+  which takes the sender from the ID token, refuses every request while the flag is off, and
+  allows 5 requests per account in 15 minutes. The page lists the requests newest first with a
+  status filter kept in the address, moves each one through New, In progress, Done, or Declined,
+  and removes a request and its text outright. Every request, status change, and removal commits
+  with its admin log row, which never holds the text. Only admins read the store, and deleting an
+  account deletes its change requests (#188).
 - The email log, under Operations, for staff and operators: every message the site sent, newest
   first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
   word. Search looks in the recipient and the subject across the 500 most recent messages at a
