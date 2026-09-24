@@ -712,3 +712,31 @@ test('a claim made while the sweep runs is released in the same call and counted
   assert.equal(d.db.read('tickets', 'tkt-late').claimedByUid, null);
   assert.equal(d.db.read('tickets', 'tkt-2').claimedByUid, 'uid-bo');
 });
+
+// Review finding: the admin guide is what staff read when a delete is
+// refused, so its list of refusals and its account of what goes when must
+// match the handler.
+test('the admin guide names every refusal the delete sends and when the ticket claims go', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const guide = fs.readFileSync(path.join(__dirname, '../../../docs/ADMIN_GUIDE.md'), 'utf8');
+  const start = guide.indexOf('**Delete an account.**');
+  // Through "If a delete stops part way", to the end of the Attendees section.
+  const end = guide.indexOf('\n## ', start);
+  assert.ok(start >= 0 && end > start, 'the guide has the delete section');
+  const section = guide.slice(start, end);
+
+  // own-account, admin-account, speaker-linked, too-many-claims.
+  const refusals = section.split('\n').filter((line) => line.startsWith('- '));
+  assert.equal(refusals.length, 4);
+  assert.match(section, /refuses a delete in four cases/);
+  assert.ok(section.includes(String(MAX_RELEASED_CLAIMS)), 'the claim limit is named');
+
+  // The claims go in the first step, with the account, not in the sweep.
+  const firstStep = section.split('. ').find((sentence) => sentence.includes('in one step'));
+  assert.match(firstStep, /ticket claims?/);
+  const sweep = section.split('. ').find((sentence) => sentence.startsWith('It then removes'));
+  assert.doesNotMatch(sweep, /ticket claim/);
+  // And a retry releases a claim made after the delete.
+  assert.match(section, /retry[^.]*releases[^.]*claim[^.]*after the delete/i);
+});

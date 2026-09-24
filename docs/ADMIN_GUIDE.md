@@ -214,15 +214,16 @@ A cell with more than one entry joins them with a semicolon. The file carries no
 
 **Past attendance.** Select **Edit record** on a row to open that account's record. **Past attendance** takes one edition per line, such as a year: at most 20 editions of up to 40 characters each, with no repeats. Select **Save record** to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.
 
-**Delete an account.** In the record, select **Delete account**, read what the delete removes, and select **Delete this account**. The delete removes the account, its directory profile, and its shared schedule in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session's saved count), the private notes, the profile photo, and the ticket claim. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.
+**Delete an account.** In the record, select **Delete account**, read what the delete removes, and select **Delete this account**. The delete removes the account, its directory profile, and its shared schedule, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session's saved count), the private notes, and the profile photo. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.
 
-The server refuses a delete in three cases, and says why:
+The server refuses a delete in four cases, and says why:
 
 - Your own account.
 - An account with operator or staff access. An operator removes that access on the Access page first.
 - An account linked to a speaker. Delete the speaker record first, in Speakers.
+- An account that holds more than 496 claimed tickets. The refusal names the count, because one delete can release at most 496.
 
-**If a delete stops part way.** When the account has left the directory but some of its data did not clear, the page keeps a notice with **Try the delete again**. The page does the same when the answer does not arrive, for example after a timeout or a dropped connection, because the delete may have started. Select it until the page says the account is deleted. Each retry clears only what is left, and records itself in the admin log. A refusal made before anything was deleted, such as a speaker-linked account, shows in the record itself.
+**If a delete stops part way.** When the account has left the directory but some of its data did not clear, the page keeps a notice with **Try the delete again**. The page does the same when the answer does not arrive, for example after a timeout or a dropped connection, because the delete may have started. Select it until the page says the account is deleted. Each retry clears only what is left, and records itself in the admin log. For up to an hour after the delete, the person's open session can still claim a ticket; a retry also releases a ticket claim made after the delete. A refusal made before anything was deleted, such as a speaker-linked account, shows in the record itself.
 
 ## Ticketing
 
