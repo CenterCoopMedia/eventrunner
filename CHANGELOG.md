@@ -70,9 +70,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version history, under Content, for staff and operators. Pick a collection and a record to read
   every version the record has had, newest first: the time of the publish on the event's clock,
   the account that published it, and a table of each field that changed, with its value before
-  and after. `cmsGetVersionHistory` now compares each version with the one before it on the
-  server, at no extra read, and sends every time as milliseconds. Versions cannot be changed or
-  restored. Every stored value shows as text (#195).
+  and after. Versions cannot be changed or restored. Every stored value shows as text.
+  `cmsGetVersionHistory` now sends named fields only. Each entry holds `id`, `docPath`,
+  `revision`, `visible`, `publishedAt` in milliseconds, `publishedBy`, `publishedByUid`,
+  `previousRevision`, and `changes`: each changed field path with its value before and after, a
+  time as milliseconds, at most 50, with `moreChanges` counting the rest. The server compares
+  each version with the one before it at no extra read. The stored field snapshot is no longer
+  sent (#195).
 - The email log, under Operations, for staff and operators: every message the site sent, newest
   first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
   word. Search looks in the recipient and the subject across the 500 most recent messages at a
