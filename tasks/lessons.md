@@ -36,3 +36,12 @@ Rules written after user corrections. Read at session start.
 - A push of task files turned CI red: `npm run lint` also covers `tasks/`, and a
   copied browser script used a global ESLint did not know. Run lint before any
   push, even one that looks docs-only.
+
+## 2026-09-24: a scratch worktree's Vite cache hides a shared package change
+
+- An E2E run in a scratch worktree failed with "does not provide an export
+  named MAX_MILESTONES": Vite's pre-bundled `node_modules/.vite/deps` still
+  held the `shared` package from before the stack changed it, because no
+  regeneration had moved the lockfile hash. Regenerate (or delete
+  `node_modules/.vite`) before an E2E run in a worktree whose `packages/shared`
+  changed, and read the trace's page errors before calling a failure real.
