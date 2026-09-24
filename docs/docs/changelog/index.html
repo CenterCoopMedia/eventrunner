@@ -174,6 +174,16 @@
           beside the title and opens with the first featured update in the feed&#39;s order under its own
           Featured head, with a dateline and a standfirst. The demo updates carry four categories and one
           featured update (#191).</li>
+          <li>Version history, under Content, for staff and operators. Pick a collection and a record to read
+          every version the record has had, newest first: the time of the publish on the event&#39;s clock,
+          the account that published it, and a table of each field that changed, with its value before
+          and after. Versions cannot be changed or restored. Every stored value shows as text.
+          <code>cmsGetVersionHistory</code> now sends named fields only. Each entry holds <code>id</code>, <code>docPath</code>,
+          <code>revision</code>, <code>visible</code>, <code>publishedAt</code> in milliseconds, <code>publishedBy</code>, <code>publishedByUid</code>,
+          <code>previousRevision</code>, and <code>changes</code>: each changed field path with its value before and after, a
+          time as milliseconds, at most 50, with <code>moreChanges</code> counting the rest. The server compares
+          each version with the one before it at no extra read. The stored field snapshot is no longer
+          sent (#195).</li>
           <li>The email log, under Operations, for staff and operators: every message the site sent, newest
           first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
           word. Search looks in the recipient and the subject across the 500 most recent messages at a

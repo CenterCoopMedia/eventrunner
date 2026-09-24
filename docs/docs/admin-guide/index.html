@@ -131,6 +131,7 @@
               <li><a href="#email-log">Email log</a></li>
               <li><a href="#change-requests">Change requests</a></li>
               <li><a href="#materials">Materials</a></li>
+              <li><a href="#version-history">Version history</a></li>
               <li><a href="#system-errors">System errors</a></li>
               <li><a href="#settings-event-settings">Settings → Event settings</a></li>
               <li><a href="#settings-features">Settings → Features</a></li>
@@ -150,7 +151,7 @@
           </thead>
           <tbody>
           <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, and System errors</td><td>The person who set the site up and answers for the deployment</td></tr>
-          <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings</td><td>The people who run the event day to day</td></tr>
+          <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Version history, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings</td><td>The people who run the event day to day</td></tr>
           </tbody>
           </table>
           </div>
@@ -381,6 +382,14 @@
           <p><strong>Download an archive.</strong> Tick the files you want, or tick the box at the top of the column to select every file row shown, then select <strong>Download as archive</strong>. The browser saves <code>session-materials.zip</code>, with one folder per session (named by the session id) and each file under its own name. Two files with the same name in one folder are saved as, for example, <code>slides.pdf</code> and <code>slides (2).pdf</code>. Two sessions whose ids give the same folder name get a folder each, the second as, for example, <code>talk-one (2)</code>. Links have no checkbox and never go in an archive. One archive holds at most 50 files and 9 MB, because the server sends it as one stream and the hosting platform stops a stream at 10 MB; for more, download in parts. The line above the table counts what is selected. A change to either filter clears the selection. The server builds the archive and sends it straight to your browser: There is no shareable download link, and nothing is stored. If the transfer stops part way, the browser saves nothing and the page says so.</p>
           <p><strong>Every archive is recorded.</strong> The server writes one admin log entry per file in the archive, with your address, before it sends the first byte. If those entries cannot be written, the server refuses the archive. A single-file download writes no entry.</p>
           <p><strong>Coverage.</strong> The <strong>Coverage</strong> panel names the sessions with no materials and the speakers with no materials on any of their sessions. A pending or approved material counts; a rejected one does not. A session counts only when its published record names at least one speaker who is not removed, so a session with no speaker is left out. A speaker added in an unpublished draft does not count until the session is published. The panel reads the same list as the table, before any filter, and states when it read it. When the list passes 2,000 materials, the panel says so and shows no figures.</p>
+          <h2 id="version-history">Version history<a class="heading-anchor" href="#version-history" aria-label="Link to this section">#</a></h2>
+          <p>Every publish keeps a version of the record. A version holds the record&#39;s content as it went live, the time it was published, and the account that published it. Saving a draft adds no version. Staff and operators can open it.</p>
+          <ul>
+          <li><strong>Pick a collection, then a record.</strong> <strong>Collection</strong> picks content blocks, pages, sessions, organizations, updates, or the timeline. The list shows the records that collection holds now, with their state, the live version, and the time of the last publish. A record whose live version is hidden says <strong>Hidden</strong>, and the site shows nothing for it. <strong>Search by name or id</strong> narrows the list as you type. <strong>Order records by</strong> sorts by the most recent publish or by name. The collection, the search, and the order stay in the page address, so a reload or a shared link keeps them.</li>
+          <li><strong>Read a version.</strong> A record&#39;s page lists its versions, newest first, 20 at a time. <strong>Load older versions</strong> reads the next 20. Each version names its number, its time on the event&#39;s clock, and the account that published it. Its table lists each field that changed, with the value before and after the publish. The first version lists its values. A long value shows its first 300 characters, and <strong>Show all</strong> opens the rest. Every value shows as plain text: Rich text shows its tags, and a link is not clickable.</li>
+          <li><strong>A deleted record keeps its versions.</strong> The list does not show it, because the list shows the records that exist now. Its page still opens at <code>/admin/versions/&lt;collection&gt;/&lt;id&gt;</code>.</li>
+          <li><strong>Versions cannot be changed or restored.</strong> The page only reads the history. To go back to an earlier version, copy its values into the record&#39;s editor, then save and publish. A value published by mistake stays in the history. An operator can remove it in the database console.</li>
+          </ul>
           <h2 id="system-errors">System errors<a class="heading-anchor" href="#system-errors" aria-label="Link to this section">#</a></h2>
           <p>Unresolved system-error rows — the operational surface for things like an invalid email-template override falling back to its code default. Each row has a resolve action. If you are chasing down why a template edit &quot;is not working&quot;, check here before assuming it is a bug: A rejected override logs here and silently keeps serving the last-good copy rather than breaking the send.</p>
           <h2 id="settings-event-settings">Settings → Event settings<a class="heading-anchor" href="#settings-event-settings" aria-label="Link to this section">#</a></h2>
