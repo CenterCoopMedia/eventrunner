@@ -12,6 +12,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -25,7 +26,10 @@ import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeRuntime
 import { loadPresetRemaps, presetRemapsLoaded } from '../lib/presetRemaps.js';
 import { startModeSync } from '../lib/modeRuntime.js';
 import { getRouteTitlePart, subscribeRouteTitle } from '../lib/useDocumentTitle.js';
-import { resolveShape } from 'shared/theme';
+import { resolveShape, themePresetId } from 'shared/theme';
+
+/** Pauses before a failed remaps load is tried again, in milliseconds. */
+const REMAPS_RETRY_DELAYS = Object.freeze([2_000, 4_000, 8_000]);
 
 const EventConfigContext = createContext(null);
 
@@ -157,6 +161,22 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   const themeDoc = effectiveDemoTheme || overlay.theme || snapshotTheme;
   const runtimeThemeDoc = effectiveDemoTheme || overlay.theme;
 
+  // THE DOCUMENT THE PAGE SHOWS: the one whose overlay was last written
+  // whole. The root attributes below (data-theme, data-motif-set,
+  // data-texture, data-density) pick the palette and the motif blocks in the
+  // generated stylesheet, and the runtime overlay carries the faces and the
+  // component tokens. Applying the attributes from the live document while
+  // the overlay still waited for the remaps showed the new palette under the
+  // build style's faces — for a moment, or for good when the chunk never
+  // landed (adversarial review, 2026-09-24). So the attributes read this
+  // state, which moves only when the overlay does, and the two change
+  // together.
+  const [appliedThemeDoc, setAppliedThemeDoc] = useState(snapshotTheme);
+  // A failed chunk load is tried again, a bounded number of times; each
+  // tick re-runs the overlay effect below.
+  const [remapsRetry, setRemapsRetry] = useState(0);
+  const remapsAttempts = useRef(0);
+
   // Runtime theme override (spec §7.2). The element exists from mount so the
   // ownership contract holds even before config/theme arrives; its content is
   // only the properties the runtime doc validly overrides — everything else
@@ -166,25 +186,41 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   // and its picked options move, and that data is a lazy chunk (lib/
   // presetRemaps.js) rather than part of the bundle every visitor downloads
   // for a first paint the generated stylesheet already covers. The overlay is
-  // written whole once the chunk is here, never half-resolved before it; a
-  // load that fails leaves the build-time look in place, which is what the
-  // page shows before config/theme arrives anyway.
+  // written whole once the chunk is here, never half-resolved before it. A
+  // document that names no style needs no remaps and is written at once. A
+  // load that fails leaves the look last written in place and is tried
+  // again after a pause (REMAPS_RETRY_DELAYS); a document that changes in
+  // the meantime asks afresh.
   useEffect(() => {
     const styleEl = ensureRuntimeStyleElement();
     if (!runtimeThemeDoc) {
       styleEl.textContent = '';
+      setAppliedThemeDoc(snapshotTheme);
       return undefined;
     }
     let cancelled = false;
+    let timer = null;
     const write = () => {
-      if (!cancelled) styleEl.textContent = buildRuntimeThemeCss(runtimeThemeDoc);
+      if (cancelled) return;
+      styleEl.textContent = buildRuntimeThemeCss(runtimeThemeDoc);
+      remapsAttempts.current = 0;
+      setAppliedThemeDoc(runtimeThemeDoc);
     };
-    if (presetRemapsLoaded()) write();
-    else loadPresetRemaps().then(write, () => {});
+    if (!themePresetId(runtimeThemeDoc) || presetRemapsLoaded()) {
+      write();
+    } else {
+      loadPresetRemaps().then(write, () => {
+        if (cancelled || remapsAttempts.current >= REMAPS_RETRY_DELAYS.length) return;
+        const delay = REMAPS_RETRY_DELAYS[remapsAttempts.current];
+        remapsAttempts.current += 1;
+        timer = setTimeout(() => setRemapsRetry((tick) => tick + 1), delay);
+      });
+    }
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
-  }, [runtimeThemeDoc]);
+  }, [runtimeThemeDoc, remapsRetry]);
 
   // Event-neutral shell title: snapshot name first, runtime name when it
   // lands. A route that names itself (useDocumentTitle) composes in front
@@ -214,7 +250,7 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   // through, the path buildRuntimeThemeCss writes it through, and the path
   // the admin preview writes the attribute through, so all four agree by
   // construction.
-  const texture = resolveShape(themeDoc).texture;
+  const texture = resolveShape(appliedThemeDoc).texture;
   useEffect(() => {
     if (texture) document.documentElement.dataset.texture = texture;
     else delete document.documentElement.dataset.texture;
@@ -225,7 +261,7 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   // page states its own; a page that does writes `data-density` on its own
   // <article> (components/SystemPage.jsx), and the [data-density] block
   // nearest an element is the one that wins for it.
-  const density = resolveShape(themeDoc).density;
+  const density = resolveShape(appliedThemeDoc).density;
   useEffect(() => {
     if (density) document.documentElement.dataset.density = density;
     else delete document.documentElement.dataset.density;
@@ -244,11 +280,11 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   // it rendered before presets existed.
   useEffect(() => {
     const root = document.documentElement;
-    const { theme, motifSet } = resolveRootAttributes(themeDoc);
+    const { theme, motifSet } = resolveRootAttributes(appliedThemeDoc);
     if (theme) root.dataset.theme = theme;
     else delete root.dataset.theme;
     root.dataset.motifSet = motifSet;
-  }, [themeDoc]);
+  }, [appliedThemeDoc]);
 
   // Light or dark (design brief §3.3). config/theme.mode states the policy;
   // this writes data-mode on <html>, which is what picks between the two
