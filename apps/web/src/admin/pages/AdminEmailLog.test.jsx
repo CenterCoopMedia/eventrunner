@@ -542,7 +542,16 @@ describe('AdminEmailLog', () => {
       lists: [serverError(401, 'unauthenticated', 'Your session has expired. Sign in again.')],
     });
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('Your session has expired. Sign in again.');
+    // The instruction is said once, as the link.
+    expect(alert.textContent).toBe('Your session has expired. Sign in again');
+    expect(alert.textContent.match(/Sign in again/g)).toHaveLength(1);
+    expect(within(alert).getByRole('link', { name: 'Sign in again' })).toHaveAttribute('href', '/signin');
+  });
+
+  it('adds the sign-in link to a server 401 that gives no instruction of its own', async () => {
+    await renderPage('/admin/email-log', { lists: [serverError(401, 'unauthorized', 'Authentication required.')] });
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toBe('Authentication required. Sign in again');
     expect(within(alert).getByRole('link', { name: 'Sign in again' })).toHaveAttribute('href', '/signin');
   });
 

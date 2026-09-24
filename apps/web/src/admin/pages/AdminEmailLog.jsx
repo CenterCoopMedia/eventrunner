@@ -460,8 +460,10 @@ export default function AdminEmailLog() {
   let notice = null;
   if (error && !denied) {
     if (error.status === 401) {
+      // The link is the instruction, so a message that already ends with it
+      // (adminApi's "Your session has expired. Sign in again.") drops it.
       notice = (
-        <Notice tone="error" message={error.message}>
+        <Notice tone="error" message={error.message.replace(/\s*Sign in again\.?\s*$/i, '')}>
           {' '}
           <Link to="/signin" className="font-semibold underline underline-offset-2">
             Sign in again
