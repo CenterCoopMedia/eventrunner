@@ -45,6 +45,7 @@ const materialsReview = require('./src/materials/review.cjs');
 const materialsAccess = require('./src/materials/access.cjs');
 const materialsDownload = require('./src/materials/download.cjs');
 const materialsProjection = require('./src/materials/projection.cjs');
+const materialsBulk = require('./src/materials/bulk.cjs');
 const ticketingRegistry = require('./src/ticketing/index.cjs');
 const ticketingWebhook = require('./src/ticketing/webhook.cjs');
 const ticketingSync = require('./src/ticketing/sync.cjs');
@@ -96,6 +97,7 @@ module.exports = {
   ...materialsAccess.handlers,
   ...materialsDownload.handlers,
   ...materialsProjection.handlers,
+  ...materialsBulk.handlers,
   ...ticketingRegistry.handlers,
   ...ticketingWebhook.handlers,
   ...ticketingSync.handlers,

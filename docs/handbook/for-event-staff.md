@@ -41,6 +41,8 @@ Change requests are off by default. An operator turns them on in Features. Then 
 
 Upload or link files on the session. Embargo holds them until the session ends. Prefer a real label ("Slides") over a raw URL as the link text.
 
+The Materials page lists every session's files and links in one table. Tick files and select **Download as archive** to save them as one zip file, at most 50 files and 200 MB at a time. Every archive is recorded in the admin log with your address. The **Coverage** panel names the sessions and speakers that have no materials yet, so you know whom to ask.
+
 ## Tickets
 
 Your operator chose Eventbrite, a spreadsheet import, or no ticketing. Signup email should match that choice. If a new person is told to "buy on Eventbrite" and you are not using Eventbrite, that is a product bug — [file it](https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml).

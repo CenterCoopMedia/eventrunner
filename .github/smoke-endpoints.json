@@ -76,6 +76,8 @@
     "getSessionMaterialUrl",
     "listSessionMaterials",
     "downloadSessionMaterial",
+    "listAllSessionMaterials",
+    "downloadSessionMaterialsArchive",
     "ticketingWebhook",
     "ticketingSync",
     "ticketingVerifyOrder",

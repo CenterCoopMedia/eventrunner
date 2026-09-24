@@ -206,6 +206,20 @@ export async function downloadSessionMaterialFile({ user, materialId, filename }
     });
   }
   const blob = await response.blob();
+  saveBlobAs(blob, filename);
+}
+
+/**
+ * Hand a Blob to the browser's save behavior under `filename`, through a
+ * throwaway `<a download>` and a local object URL. The URL lives for one
+ * tick and is never written anywhere. The admin archive and export save
+ * through this too (admin/materialsArchive.js, admin/downloadFile.js):
+ * public code may not import from admin/, so the one copy lives here.
+ *
+ * @param {Blob} blob
+ * @param {string} filename
+ */
+export function saveBlobAs(blob, filename) {
   const blobUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = blobUrl;

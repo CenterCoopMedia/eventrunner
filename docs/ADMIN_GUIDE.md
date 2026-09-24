@@ -272,7 +272,17 @@ Only admins can read a request. The sender cannot read it back, and no email is 
 
 ## Materials
 
-Session materials review — upload or link files against a session, with an optional embargo that holds the material until the session ends. Prefer a real label ("Slides") over a bare URL as the link text a viewer sees. This collection is fully server-only, even for an admin's direct read, so every action here goes through Cloud Functions.
+Session materials review — upload or link files against a session, with an optional embargo that holds the material until the session ends. Prefer a real label ("Slides") over a bare URL as the link text a viewer sees. This collection is fully server-only, even for an admin's direct read, so every action here goes through Cloud Functions. Staff and operators both use this page.
+
+**The table.** One table lists every material for every session, hidden sessions included. Each row gives the file name, the word **File** or **Link** with its storage path or address, the session, the review state as a word, and when the material last changed. Select **Material**, **Session**, or **Changed** at the top of a column to sort by it; the button states the order in words, such as **A to Z** or **Newest first**. The table opens in schedule order. Under **Show**, the **Session** and **Review** filters narrow the rows. **Add a link** appears when one session is chosen. **Reload** reads the list again.
+
+**Download one file.** Select **Download** on a file row. A link row has **Open link** instead, which opens the address in a new tab. A stored address that is not a web address gets no link, and the row says so.
+
+**Download an archive.** Tick the files you want, or tick the box at the top of the column to select every file row shown, then select **Download as archive**. The browser saves `session-materials.zip`, with one folder per session (named by the session id) and each file under its own name. Two files with the same name in one folder are saved as, for example, `slides.pdf` and `slides (2).pdf`. Links have no checkbox and never go in an archive. One archive holds at most 50 files and 200 MB; for more, download in parts. The line above the table counts what is selected. A change to either filter clears the selection. The server builds the archive and sends it straight to your browser: there is no shareable download link, and nothing is stored. If the transfer stops part way, the browser saves nothing and the page says so.
+
+**Every archive is recorded.** The server writes one admin log entry per file in the archive, with your address, before it sends the first byte. If those entries cannot be written, the server refuses the archive. A single-file download writes no entry.
+
+**Coverage.** The **Coverage** panel names the sessions with no materials and the speakers with no materials on any of their sessions. A pending or approved material counts; a rejected one does not. A session counts only when its published record names at least one speaker who is not removed, so a session with no speaker is left out. A speaker added in an unpublished draft does not count until the session is published. The panel reads the same list as the table, before any filter, and states when it read it. When the list passes 2,000 materials, the panel says so and shows no figures.
 
 ## System errors
 

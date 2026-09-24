@@ -28,7 +28,6 @@ import AdminContentSection from './pages/AdminContentSection.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminMedia from './pages/AdminMedia.jsx';
-import AdminMaterialsTab from './pages/AdminMaterialsTab.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
@@ -67,6 +66,9 @@ const AdminAttendees = lazy(() => import('./pages/AdminAttendees.jsx'));
 // Change requests (issue #188): one screen behind one link, so it stays out
 // of the entry chunk the same way.
 const AdminChangeRequests = lazy(() => import('./pages/AdminChangeRequests.jsx'));
+// Materials gained the table, the archive and the coverage panel (issue
+// 189). One screen behind one link, loaded the same way.
+const AdminMaterialsTab = lazy(() => import('./pages/AdminMaterialsTab.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -176,7 +178,10 @@ export default function AdminApp() {
           <Route path="badges" element={<AdminBadgeSettings />} />
           <Route path="branding" element={<DeferredAdminPage label="branding"><AdminBranding /></DeferredAdminPage>} />
           <Route path="media" element={<AdminMedia />} />
-          <Route path="materials" element={<AdminMaterialsTab />} />
+          <Route
+            path="materials"
+            element={<DeferredAdminPage label="materials"><AdminMaterialsTab /></DeferredAdminPage>}
+          />
           <Route
             path="attendees"
             element={<DeferredAdminPage label="attendees"><AdminAttendees /></DeferredAdminPage>}
