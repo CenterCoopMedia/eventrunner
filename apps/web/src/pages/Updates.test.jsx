@@ -2,7 +2,7 @@
 // somewhere real). No Firebase, no network; context providers only, same
 // pattern as Sponsors.test.jsx / SessionDetail.test.jsx.
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
@@ -155,4 +155,76 @@ describe('Updates', () => {
     const time = container.querySelector('.update-feed__entry time');
     expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  // THE CATEGORY AND THE LEAD (issue #191).
+  it('sets a category as a plain tag in the title row, before Pinned', () => {
+    const { container } = renderUpdates({ updates: [{ ...PINNED, category: ' Travel ' }] });
+    const row = container.querySelector('.update-feed__entry h3').parentElement;
+    const tags = [...row.querySelectorAll('span')].map((tag) => tag.textContent);
+    expect(tags).toEqual(['Travel', 'Pinned']);
+    // The ruled rectangle, never a pill; the word stays in natural case.
+    expect(within(row).getByText('Travel').className).toContain('rounded-brand');
+    expect(within(row).getByText('Travel').className).not.toContain('rounded-full');
+  });
+
+  it('draws no tag for a stored category that breaks the rule, and the page still renders', () => {
+    const bad = [
+      { ...NEWER, id: 'u-long', title: 'Long', category: 'x'.repeat(25) },
+      { ...NEWER, id: 'u-num', title: 'Number', category: 7 },
+      { ...NEWER, id: 'u-lines', title: 'Lines', category: 'Two\nlines' },
+      { ...NEWER, id: 'u-blank', title: 'Blank', category: '   ' },
+    ];
+    const { container } = renderUpdates({ updates: bad });
+    expect(screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/updates/'))).toHaveLength(4);
+    for (const entry of container.querySelectorAll('.update-feed__entry')) {
+      expect(entry.querySelector('h3').parentElement.querySelectorAll('span')).toHaveLength(0);
+    }
+  });
+
+  it('leads the list with the featured update, under its own Featured head, once', () => {
+    const featured = { ...OLDER, id: 'update-featured', title: '[Fixture] Featured', featured: true, category: 'Workshops' };
+    const { container } = renderUpdates({ updates: [OLDER, NEWER, PINNED, featured] });
+    const heads = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent.trim());
+    expect(heads[0]).toBe('Featured');
+    expect(heads[1]).toBe('Pinned');
+    const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/updates/'));
+    // Ahead of a pinned post and a newer one, and listed once.
+    expect(links.map((a) => a.getAttribute('href'))).toEqual([
+      '/updates/update-featured',
+      '/updates/update-pinned',
+      '/updates/update-newer',
+      '/updates/update-older',
+    ]);
+    const lead = container.querySelector('section .update-feed__entry');
+    expect(within(lead).getByRole('heading', { level: 3 }).className).toContain('text-h2');
+    expect(within(lead).getByText('Workshops')).toBeInTheDocument();
+    // The opening is a standfirst, and it is the lead's own text.
+    expect(lead.querySelector('.standfirst')).toHaveTextContent(OLDER.body);
+  });
+
+  it('keeps a second featured update in its own run', () => {
+    const first = { ...NEWER, id: 'f-newer', title: 'First featured', featured: true };
+    const second = { ...OLDER, id: 'f-older', title: 'Second featured', featured: true };
+    renderUpdates({ updates: [second, first] });
+    const sections = screen.getAllByRole('region');
+    expect(within(sections[0]).getByRole('heading', { level: 2 })).toHaveTextContent('Featured');
+    expect(within(sections[0]).getByRole('link', { name: 'First featured' })).toBeInTheDocument();
+    expect(within(sections[0]).queryByRole('link', { name: 'Second featured' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'Second featured' })).toHaveLength(1);
+  });
+
+  it('dates the lead with a dateline on the event’s clock', () => {
+    const featured = { id: 'u-lead', title: 'Late lead', body: 'Body.', publishAt: '2026-10-01T02:30:00Z', featured: true };
+    const { container } = renderUpdates({ updates: [featured], eventConfig: { timezone: 'America/Los_Angeles' } });
+    const dateline = container.querySelector('.update-feed__entry .byline time');
+    expect(dateline).toHaveTextContent('September 30, 2026');
+    expect(dateline).toHaveAttribute('datetime', '2026-10-01T02:30:00.000Z');
+  });
+
+  it('says Undated in the lead’s byline when it has no date', () => {
+    const featured = { id: 'u-lead', title: 'Undated lead', body: 'Body.', publishAt: null, featured: true };
+    const { container } = renderUpdates({ updates: [featured] });
+    expect(container.querySelector('.update-feed__entry .byline')).toHaveTextContent('Undated');
+  });
 });
+

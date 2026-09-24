@@ -58,6 +58,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the future never holds a publish back. A new update's id is made in the browser once per
   form, so a retry after a failed publish rewrites the same draft. A post's picture and content
   blocks are kept as they are on every save (#190).
+- An update category and a featured flag. `cmsSaveUpdate` takes `category` (null, or one line of
+  1 to 24 characters once trimmed, stored trimmed) and `featured` (a boolean), and refuses a bad
+  value by field name; both are optional on the wire and always stored. The rule lives in
+  `shared/update` (`validUpdateCategory`, `UPDATE_CATEGORY_MAX`), which the server and the Updates
+  page both read. The editor has a Category field that suggests the categories in use and a
+  Feature checkbox, and the list shows both. The Updates page sets a category as a plain tag
+  beside the title and opens with the first featured post in the feed's order under its own
+  Featured head, with a dateline and a standfirst. The demo posts carry four categories and one
+  featured post (#191).
 - The email log, under Operations, for staff and operators: every message the site sent, newest
   first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
   word. Search looks in the recipient and the subject across the 500 most recent messages at a

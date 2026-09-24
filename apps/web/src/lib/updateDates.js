@@ -100,8 +100,11 @@ export function publishMonthLabel(publishAt, timeZone) {
  * August sitting above October's would put August's month head at the top
  * of the page. Pinned is not a date, so it is its own named run.
  *
- * Three kinds of run, in this order:
+ * Four kinds of run, in this order:
  *
+ *   'lead'     the first featured post in sorted order (issue #191), alone,
+ *              titled "Featured". Featured is not a date either. Only one
+ *              post leads; another featured post stays in its own place.
  *   'pinned'   the posts the operator held to the top, in their sorted
  *              order. Titled "Pinned", never a month — the whole point of
  *              the group is that it is out of time.
@@ -111,20 +114,26 @@ export function publishMonthLabel(publishAt, timeZone) {
  *              a month they never had.
  *
  * Takes an ALREADY SORTED list and never re-sorts it, so a run can never
- * hold a post the sort would have put elsewhere.
+ * hold a post the sort would have put elsewhere. The lead is the one post
+ * taken out of its place, and it is left out of the runs after it, so no
+ * post is listed twice.
  *
  * @param {Array<object>} sorted output of sortUpdates
  * @param {string} [timeZone] the event's zone, so a month head is the event's month
- * @returns {Array<{ kind: 'pinned'|'month'|'undated', label: string, members: object[] }>}
+ * @returns {Array<{ kind: 'lead'|'pinned'|'month'|'undated', label: string, members: object[] }>}
  */
 export function groupUpdates(sorted, timeZone) {
   const runs = [];
+  // Only a real `true` features a post, the value cmsSaveUpdate stores.
+  const lead = sorted.find((update) => update?.featured === true) ?? null;
+  if (lead) runs.push({ kind: 'lead', label: 'Featured', members: [lead] });
   const push = (kind, label, update) => {
     const last = runs[runs.length - 1];
     if (last && last.kind === kind && last.label === label) last.members.push(update);
     else runs.push({ kind, label, members: [update] });
   };
   for (const update of sorted) {
+    if (update === lead) continue;
     if (update?.pinned === true) {
       push('pinned', 'Pinned', update);
       continue;

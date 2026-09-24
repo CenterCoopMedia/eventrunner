@@ -1,6 +1,8 @@
 // The updates list's rows and the editor's payload (issue #190).
 import { describe, expect, it } from 'vitest';
 import {
+  categoriesIn,
+  categoryOf,
   dayInZone,
   dirtyUpdateIds,
   mergeUpdateRevisions,
@@ -71,6 +73,30 @@ describe('placementOf', () => {
     expect(placementOf({ pinned: false })).toBe('By date');
     expect(placementOf({})).toBe('By date');
   });
+
+  it('names a featured update, pinned or not (issue 191)', () => {
+    expect(placementOf({ featured: true })).toBe('Featured');
+    expect(placementOf({ featured: true, pinned: true })).toBe('Featured and pinned');
+    // Only a real true counts, the rule the public page reads.
+    expect(placementOf({ featured: 'yes' })).toBe('By date');
+  });
+});
+
+describe('the category (issue 191)', () => {
+  it('reads a category the public page would show, trimmed, and nothing else', () => {
+    expect(categoryOf({ category: ' Travel ' })).toBe('Travel');
+    for (const category of [undefined, null, '', '  ', 7, 'x'.repeat(25), 'Two\nlines']) {
+      expect(categoryOf({ category }), JSON.stringify(category)).toBeNull();
+    }
+  });
+
+  it('offers the categories in use once each, in order', () => {
+    const rows = mergeUpdateRevisions(
+      [{ id: 'a', category: 'Travel' }, { id: 'b', category: 'Program' }, { id: 'c', category: 'Travel ' }, { id: 'd' }],
+      [{ id: 'e', category: 'x'.repeat(30), status: 'dirty' }],
+    );
+    expect(categoriesIn(rows)).toEqual(['Program', 'Travel']);
+  });
 });
 
 describe('the editor’s date, on the event’s clock', () => {
@@ -116,9 +142,13 @@ describe('toUpdateForm and toUpdatePayload', () => {
       title: 'Seeded post',
       body: 'Body text.',
       date: '2026-09-12',
+      category: '',
       pinned: true,
+      featured: false,
       visible: true,
     });
+    const tagged = mergeUpdateRevisions([{ ...SEEDED, category: 'Program', featured: true }], [])[0];
+    expect(toUpdateForm(tagged)).toMatchObject({ category: 'Program', featured: true });
     expect(toUpdateForm(mergeUpdateRevisions([], [{ id: 'h', visible: false }])[0]).visible).toBe(false);
   });
 
@@ -132,6 +162,8 @@ describe('toUpdateForm and toUpdatePayload', () => {
       // The day did not change, so the stored instant goes back as it was.
       publishAt: '2026-09-12T13:00:00.000Z',
       pinned: true,
+      category: null,
+      featured: false,
       featuredImage: SEEDED.featuredImage,
       content: SEEDED.content,
     });
@@ -142,6 +174,12 @@ describe('toUpdateForm and toUpdatePayload', () => {
 
   it('sends null for a blank date and leaves out a picture and blocks the record never had', () => {
     const payload = toUpdatePayload({ title: 'T', body: 'B', date: '', pinned: false }, null, 'UTC');
-    expect(payload).toEqual({ title: 'T', body: 'B', publishAt: null, pinned: false });
+    expect(payload).toEqual({ title: 'T', body: 'B', publishAt: null, pinned: false, category: null, featured: false });
+  });
+
+  it('sends the category trimmed, or null when blank, and featured as a boolean (issue 191)', () => {
+    const base = { title: 'T', body: 'B', date: '', pinned: false };
+    expect(toUpdatePayload({ ...base, category: '  Travel  ', featured: true }, null)).toMatchObject({ category: 'Travel', featured: true });
+    expect(toUpdatePayload({ ...base, category: '   ', featured: false }, null)).toMatchObject({ category: null, featured: false });
   });
 });

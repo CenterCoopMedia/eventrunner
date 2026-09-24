@@ -139,15 +139,15 @@ describe('the updates list', () => {
     expect(region).toHaveAttribute('tabindex', '0');
     expect(region).toContainElement(table);
     expect(within(table).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
-      'Update', 'State', 'Date', 'Placement',
+      'Update', 'State', 'Date', 'Category', 'Placement',
     ]);
     const [, ...bodyRows] = within(table).getAllByRole('row');
     const cells = bodyRows.map((tr) => within(tr).getAllByRole('cell').map((td) => td.textContent));
     expect(cells).toEqual([
-      ['New wordingedited', 'Live with unpublished changes', 'September 20, 2026', 'Pinned'],
+      ['New wordingedited', 'Live with unpublished changes', 'September 20, 2026', 'None', 'Pinned'],
       // 02:30 UTC on 1 October is 30 September on the event's clock.
-      ['Doors open at ninepublished', 'Live', 'September 30, 2026', 'By date'],
-      ['Not out yetfresh', 'DraftHidden', 'Undated', 'By date'],
+      ['Doors open at ninepublished', 'Live', 'September 30, 2026', 'None', 'By date'],
+      ['Not out yetfresh', 'DraftHidden', 'Undated', 'None', 'By date'],
     ]);
     // Each title opens its editor.
     expect(screen.getByRole('link', { name: 'New wording' })).toHaveAttribute('href', '/admin/updates/edited');
@@ -199,7 +199,14 @@ describe('the update editor', () => {
     expect(second.id).toBe(first.id);
     expect(second).toEqual({
       id: first.id,
-      update: { title: 'Room change', body: 'The clinic moves to Room B.', publishAt: '2026-10-15T16:00:00.000Z', pinned: false },
+      update: {
+        title: 'Room change',
+        body: 'The clinic moves to Room B.',
+        publishAt: '2026-10-15T16:00:00.000Z',
+        pinned: false,
+        category: null,
+        featured: false,
+      },
       visible: true,
     });
     expect(callsTo('cmsPublish')).toHaveLength(0);
@@ -333,6 +340,8 @@ describe('the update editor', () => {
         body: 'Body.',
         publishAt: '2026-09-12T13:00:00.000Z',
         pinned: true,
+        category: null,
+        featured: false,
         featuredImage: seeded.featuredImage,
         content: seeded.content,
       },
@@ -366,5 +375,77 @@ describe('the update editor', () => {
     await screen.findByRole('heading', { level: 1, name: PUBLISHED.title });
     expect(screen.getByText(/Updates are off for this event/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Preview draft/ })).toBeNull();
+  });
+});
+
+describe('the category and the featured flag (issue 191)', () => {
+  const TAGGED = {
+    id: 'tagged', title: 'Arrival notes', body: 'Trains.', publishAt: '2026-09-08T15:00:00Z',
+    pinned: true, featured: true, category: 'Travel', visible: true, revision: 1,
+  };
+
+  it('lists a category and a featured placement in words', async () => {
+    await renderAt('/admin/updates');
+    pushUpdates([TAGGED, { ...PUBLISHED, featured: true }], [{ ...TAGGED, status: 'clean' }, { ...PUBLISHED_CLEAN, featured: true }]);
+    const [, ...bodyRows] = within(screen.getByRole('table')).getAllByRole('row');
+    const cells = bodyRows.map((tr) => within(tr).getAllByRole('cell').map((td) => td.textContent));
+    expect(cells.map((row) => row.slice(3))).toEqual([
+      ['Travel', 'Featured and pinned'],
+      ['None', 'Featured'],
+    ]);
+  });
+
+  it('round trips a category and the featured flag through the editor', async () => {
+    await renderAt('/admin/updates/tagged');
+    pushUpdates([TAGGED, { ...PUBLISHED, category: 'Program' }], [{ ...TAGGED, status: 'clean' }, { ...PUBLISHED_CLEAN, category: 'Program' }]);
+    await screen.findByRole('heading', { level: 1, name: 'Arrival notes' });
+    const category = screen.getByLabelText('Category');
+    expect(category).toHaveValue('Travel');
+    expect(category).toHaveAttribute('maxlength', '24');
+    expect(category).toHaveAccessibleDescription('One or two words shown as a tag beside the title. Leave it empty for none.');
+    // The categories in use are offered as suggestions.
+    const list = document.getElementById(category.getAttribute('list'));
+    expect([...list.querySelectorAll('option')].map((option) => option.value)).toEqual(['Program', 'Travel']);
+    const featured = screen.getByLabelText('Feature this update at the head of the list');
+    expect(featured).toBeChecked();
+
+    fireEvent.change(category, { target: { value: ' Travel and arrival notes ' } });
+    fireEvent.click(featured);
+    fetch.mockResolvedValueOnce(response({ id: 'tagged', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
+    expect(bodyOf(callsTo('cmsSaveUpdate')[0]).update).toMatchObject({ category: 'Travel and arrival notes', featured: false });
+
+    fireEvent.change(category, { target: { value: '' } });
+    fetch.mockResolvedValueOnce(response({ id: 'tagged', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(2));
+    expect(bodyOf(callsTo('cmsSaveUpdate')[1]).update).toMatchObject({ category: null });
+  });
+
+  it('refuses a category over 24 characters before sending, and focuses the field', async () => {
+    await renderAt('/admin/updates/tagged');
+    pushUpdates([TAGGED], []);
+    await screen.findByRole('heading', { level: 1, name: 'Arrival notes' });
+    // maxLength stops typing; a value set another way is still checked.
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'x'.repeat(25) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Use 24 characters or fewer.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('Category')).toHaveFocus());
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('marks the category field with the server’s refusal', async () => {
+    await renderAt('/admin/updates/tagged');
+    pushUpdates([TAGGED], []);
+    await screen.findByRole('heading', { level: 1, name: 'Arrival notes' });
+    fetch.mockResolvedValueOnce(response({
+      error: { code: 'invalid-argument', message: 'Invalid update: category: must be null or 1 to 24 characters on one line' },
+    }, 400));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('The server rejected this save');
+    expect(screen.getByLabelText('Category')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Category')).toHaveAccessibleDescription(/category: must be null or 1 to 24 characters on one line/);
   });
 });

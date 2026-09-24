@@ -1,12 +1,17 @@
-// The updates editor (issue #190), on the real surface.
+// The updates editor (issue #190) and the update category and featured
+// flag (issue #191), on the real surface.
 //
 // The seeded operator signs in through the real sign-in page and writes an
 // update in the admin: a title, a text, and a date a year ahead. "Save
 // draft" writes the draft only, so the database holds a dirty draft and no
 // live doc, and a second, signed-out browser on the public Updates page
-// sees the seeded posts and not the new one. "Save and publish" then runs
-// cmsPublish from the same editor, and the signed-out browser finds the
-// new update on a reload. The date a year ahead holds nothing back.
+// sees the seeded posts and not the new one. The operator then gives the
+// update a category of the longest length allowed and features it, saves
+// the draft with Enter, and reloads the editor to find both kept. "Save and
+// publish" runs cmsPublish from the same editor, and the signed-out browser
+// finds the new update on a reload, at the head of the page under
+// "Featured", with its category as a tag that stays inside a 320 pixel
+// screen. The date a year ahead holds nothing back.
 //
 // config/features is restored and the update deleted when the file is
 // done, because later specs read the flags and count the collection.
@@ -16,6 +21,8 @@ import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, signIn } from './help
 // A post the demo seed publishes (scripts/lib/demo-updates.json). Waiting
 // for it proves the public page's live listener has reported.
 const SEEDED_TITLE = 'The three-day program is ready';
+// Twenty-four characters, the most a category takes (shared/update).
+const CATEGORY = 'Travel and arrival notes';
 
 test.describe.serial('the updates editor', () => {
   const stamp = Date.now();
@@ -83,6 +90,24 @@ test.describe.serial('the updates editor', () => {
     await expect(publicPage.getByRole('link', { name: title })).toHaveCount(0);
   });
 
+  test('a category and the featured flag survive a save and a reload of the editor', async () => {
+    expect(CATEGORY).toHaveLength(24);
+    const category = page.getByLabel('Category', { exact: true });
+    await category.fill(CATEGORY);
+    await page.getByLabel('Feature this update at the head of the list').check();
+    // Enter in a one-line field saves a draft.
+    await category.press('Enter');
+    const draftRef = adminDb().collection('cmsUpdates_drafts').doc(updateId);
+    await expect.poll(async () => (await draftRef.get()).data()?.category).toBe(CATEGORY);
+    expect((await draftRef.get()).data()).toMatchObject({ featured: true, status: 'dirty' });
+
+    await page.reload();
+    await expect(page.getByLabel('Category', { exact: true })).toHaveValue(CATEGORY);
+    await expect(page.getByLabel('Feature this update at the head of the list')).toBeChecked();
+    await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title);
+    await expect(page.getByLabel('Date', { exact: true })).toHaveValue(day);
+  });
+
   test('the update appears on the public page after the editor publishes it', async () => {
     const publish = page.getByRole('button', { name: 'Save and publish' });
     // A date a year ahead never disables the publish action.
@@ -93,10 +118,27 @@ test.describe.serial('the updates editor', () => {
 
     const live = await adminDb().collection('cmsUpdates').doc(updateId).get();
     expect(live.exists).toBe(true);
-    expect(live.data()).toMatchObject({ title, visible: true });
+    expect(live.data()).toMatchObject({ title, visible: true, category: CATEGORY, featured: true });
 
     await publicPage.reload();
     await expect(publicPage.getByRole('link', { name: SEEDED_TITLE })).toBeVisible();
     await expect(publicPage.getByRole('link', { name: title })).toBeVisible();
+
+    // The featured update leads the list, under the first head, with its
+    // category as its tag.
+    const firstRun = publicPage.locator('.update-feed > section').first();
+    await expect(publicPage.locator('.update-feed h2').first()).toHaveText('Featured');
+    await expect(firstRun.getByRole('link')).toHaveText([title]);
+    const tag = firstRun.locator('.update-feed__entry span', { hasText: CATEGORY });
+    await expect(tag).toHaveCount(1);
+    await expect(publicPage.getByRole('link', { name: title })).toHaveCount(1);
+
+    // The tag never wraps, so at the narrowest screen it must still end
+    // inside the viewport.
+    await publicPage.setViewportSize({ width: 320, height: 800 });
+    await expect(tag).toBeVisible();
+    const box = await tag.boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(320);
   });
 });

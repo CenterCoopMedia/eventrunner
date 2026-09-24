@@ -14,7 +14,8 @@
 // The picture and the content blocks an update may carry are not edited
 // here. They go back to the server unchanged on every save
 // (admin/updatesDoc.js toUpdatePayload), and a panel says so.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { UPDATE_CATEGORY_MAX, validUpdateCategory } from 'shared/update';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -27,6 +28,7 @@ import {
   UPDATES_OFF_MESSAGE,
   UPDATES_ROOT,
   blankUpdateForm,
+  categoriesIn,
   extrasOf,
   toUpdateForm,
   toUpdatePayload,
@@ -51,7 +53,7 @@ import AdminPageHeader, {
 } from '../components/adminChrome.jsx';
 
 /** A server field name → the form field it marks. */
-const SERVER_FIELD = Object.freeze({ title: 'title', body: 'body', publishAt: 'date' });
+const SERVER_FIELD = Object.freeze({ title: 'title', body: 'body', publishAt: 'date', category: 'category' });
 
 /**
  * A new update's id: one per form, resent unchanged on every attempt. The
@@ -68,6 +70,16 @@ export function validateUpdateForm(form) {
   const errors = new Map();
   if (!String(form.title ?? '').trim()) errors.set('title', 'Enter a title.');
   if (!String(form.body ?? '').trim()) errors.set('body', 'Enter the text of the update.');
+  // The rule the server and the public page read (shared/update).
+  const category = String(form.category ?? '');
+  if (category.trim() && !validUpdateCategory(category)) {
+    errors.set(
+      'category',
+      category.trim().length > UPDATE_CATEGORY_MAX
+        ? `Use ${UPDATE_CATEGORY_MAX} characters or fewer.`
+        : 'Use one line of plain text.',
+    );
+  }
   return errors;
 }
 
@@ -88,7 +100,8 @@ export default function AdminUpdateEditor({ mode }) {
   const { showToast } = useToast();
   const { features, eventConfig } = useEventConfig();
   const timeZone = eventConfig?.timezone;
-  const { loading, findRow } = useAdminUpdates();
+  const { rows, loading, findRow } = useAdminUpdates();
+  const categoryListId = useId();
   const row = mode === 'edit' ? findRow(updateId) : null;
 
   const [form, setForm] = useState(blankUpdateForm);
@@ -301,6 +314,23 @@ export default function AdminUpdateEditor({ mode }) {
             error={errorFor('date')}
             className="sm:max-w-[16rem]"
           />
+          <TextField
+            label="Category"
+            hint="One or two words shown as a tag beside the title. Leave it empty for none."
+            value={form.category}
+            onChange={(value) => set({ category: value })}
+            error={errorFor('category')}
+            maxLength={UPDATE_CATEGORY_MAX}
+            list={categoryListId}
+            className="sm:max-w-[20rem]"
+          />
+          {/* The categories other updates use, offered as suggestions so
+              one topic is spelt one way. */}
+          <datalist id={categoryListId}>
+            {categoriesIn(rows).map((category) => (
+              <option key={category} value={category} />
+            ))}
+          </datalist>
         </div>
       </Panel>
 
@@ -310,6 +340,12 @@ export default function AdminUpdateEditor({ mode }) {
             label="Pin this update to the top of the list"
             checked={form.pinned}
             onChange={(value) => set({ pinned: value })}
+          />
+          <CheckboxField
+            label="Feature this update at the head of the list"
+            hint="If more than one update is featured, the one that comes first leads and the others stay in place."
+            checked={form.featured}
+            onChange={(value) => set({ featured: value })}
           />
           <CheckboxField
             label="Show this update when it is published"

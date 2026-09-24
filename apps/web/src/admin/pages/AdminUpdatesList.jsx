@@ -26,6 +26,7 @@ import {
   NEW_UPDATE_PATH,
   UPDATES_OFF_MESSAGE,
   UPDATES_ROOT,
+  categoryOf,
   dirtyUpdateIds,
   placementOf,
 } from '../updatesDoc.js';
@@ -178,13 +179,14 @@ export default function AdminUpdatesList() {
           tabIndex={0}
           className="max-h-[36rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised"
         >
-          <table className="w-full min-w-[36rem] border-collapse text-admin-sm">
+          <table className="w-full min-w-[42rem] border-collapse text-admin-sm">
             <caption className="sr-only">Updates, pinned first, then newest first</caption>
             <thead>
               <tr>
                 <th scope="col" className={HEAD_CLASS}>Update</th>
                 <th scope="col" className={HEAD_CLASS}>State</th>
                 <th scope="col" className={HEAD_CLASS}>Date</th>
+                <th scope="col" className={HEAD_CLASS}>Category</th>
                 <th scope="col" className={HEAD_CLASS}>Placement</th>
               </tr>
             </thead>
@@ -219,6 +221,7 @@ export default function AdminUpdatesList() {
                         'Undated'
                       )}
                     </td>
+                    <td className={`${CELL_CLASS} text-admin-ink-secondary`}>{categoryOf(update) ?? 'None'}</td>
                     <td className={`${CELL_CLASS} text-admin-ink-secondary`}>{placementOf(update)}</td>
                   </tr>
                 );

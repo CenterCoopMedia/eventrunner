@@ -109,3 +109,48 @@ describe('compareUpdates', () => {
     expect(compareUpdates(post('a', null, { pinned: 'yes' }), post('b', null))).toBe(0);
   });
 });
+
+// The lead (issue #191): the first featured post in the feed's order, alone
+// under "Featured", ahead of every other run.
+describe('groupUpdates: the featured lead', () => {
+  it('leads with the first featured post in sorted order, and does not list it again', () => {
+    const sorted = sortUpdates([
+      post('newer', '2026-10-20T12:00:00Z'),
+      post('featured', '2026-10-03T12:00:00Z', { featured: true }),
+      post('pinned', '2026-08-02T12:00:00Z', { pinned: true }),
+    ]);
+    const runs = groupUpdates(sorted);
+    expect(runs.map((run) => [run.kind, run.label, run.members.map((m) => m.id)])).toEqual([
+      ['lead', 'Featured', ['featured']],
+      ['pinned', 'Pinned', ['pinned']],
+      ['month', 'October 2026', ['newer']],
+    ]);
+    const ids = runs.flatMap((run) => run.members.map((m) => m.id));
+    expect(ids.filter((id) => id === 'featured')).toHaveLength(1);
+  });
+
+  it('lets a pinned featured post beat a newer featured one, and leaves the second in its place', () => {
+    const sorted = sortUpdates([
+      post('featured-newer', '2026-10-20T12:00:00Z', { featured: true }),
+      post('featured-pinned', '2026-08-02T12:00:00Z', { featured: true, pinned: true }),
+    ]);
+    expect(groupUpdates(sorted).map((run) => [run.kind, run.members.map((m) => m.id)])).toEqual([
+      ['lead', ['featured-pinned']],
+      ['month', ['featured-newer']],
+    ]);
+  });
+
+  it('features a post only for a real true', () => {
+    const sorted = sortUpdates([post('a', '2026-10-20T12:00:00Z', { featured: 'yes' }), post('b', '2026-10-19T12:00:00Z', { featured: 1 })]);
+    expect(groupUpdates(sorted).map((run) => run.kind)).toEqual(['month']);
+  });
+
+  it('still heads the months on the event’s clock after the lead', () => {
+    const sorted = sortUpdates([
+      post('featured', '2026-10-03T12:00:00Z', { featured: true }),
+      post('late', '2026-11-01T02:30:00Z'),
+    ]);
+    expect(groupUpdates(sorted, 'America/Los_Angeles').map((run) => run.label)).toEqual(['Featured', 'October 2026']);
+    expect(groupUpdates(sorted, 'Pacific/Auckland').map((run) => run.label)).toEqual(['Featured', 'November 2026']);
+  });
+});

@@ -6,6 +6,7 @@
     "publishAt": "2026-09-12T13:00:00.000Z",
     "visible": true,
     "pinned": true,
+    "category": "Program",
     "featuredImage": {
       "url": "demo/summit-gathering.webp",
       "alt": "An illustrated scene of participants meeting at the fictional Harborlight summit",
@@ -53,6 +54,8 @@
     "publishAt": "2026-09-10T14:00:00.000Z",
     "visible": true,
     "pinned": false,
+    "category": "Workshops",
+    "featured": true,
     "content": [
       {
         "type": "image",
@@ -93,6 +96,7 @@
     "publishAt": "2026-09-08T15:00:00.000Z",
     "visible": true,
     "pinned": false,
+    "category": "Travel",
     "content": [
       {
         "type": "columns",
@@ -121,6 +125,7 @@
     "publishAt": "2026-09-04T13:00:00.000Z",
     "visible": true,
     "pinned": false,
+    "category": "Speakers",
     "content": [
       {
         "type": "richtext",

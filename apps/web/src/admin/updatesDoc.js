@@ -15,6 +15,7 @@
 // saving an update never moves its date. A changed day is stored at noon on
 // the event's clock, which reads as the same day on the event's clock and,
 // with no zone configured, as noon UTC.
+import { validUpdateCategory } from 'shared/update';
 import { zonedDateTime } from '../lib/eventTime.js';
 import { compareUpdates, toPublishDate } from '../lib/updateDates.js';
 import { recordStateOf } from './recordState.js';
@@ -92,9 +93,35 @@ export function publishAtFor(day, stored, timeZone) {
   return DAY_RE.test(day) ? `${day}T12:00:00.000Z` : day;
 }
 
-/** Where an update sits in the public feed, as a word. */
+/**
+ * Where an update sits in the public feed, in words. A featured update may
+ * lead the page (issue #191): the first one in the feed's order does.
+ */
 export function placementOf(update) {
-  return update?.pinned === true ? 'Pinned' : 'By date';
+  const pinned = update?.pinned === true;
+  if (update?.featured === true) return pinned ? 'Featured and pinned' : 'Featured';
+  return pinned ? 'Pinned' : 'By date';
+}
+
+/** An update's category as the public page shows it, or null for none. */
+export function categoryOf(update) {
+  return validUpdateCategory(update?.category) ? update.category.trim() : null;
+}
+
+/**
+ * The categories the updates already use, once each and in order, for the
+ * editor's suggestions, so one topic is spelt one way.
+ *
+ * @param {Array<{ current?: object }>} rows
+ * @returns {string[]}
+ */
+export function categoriesIn(rows) {
+  const seen = new Set();
+  for (const row of rows ?? []) {
+    const category = categoryOf(row?.current);
+    if (category) seen.add(category);
+  }
+  return [...seen].sort((a, b) => a.localeCompare(b));
 }
 
 /** The form a new update starts from. It is shown when published. */
@@ -103,7 +130,9 @@ export function blankUpdateForm() {
     title: '',
     body: '',
     date: '',
+    category: '',
     pinned: false,
+    featured: false,
     visible: true,
   };
 }
@@ -121,7 +150,9 @@ export function toUpdateForm(row, timeZone) {
     title: typeof current.title === 'string' ? current.title : '',
     body: typeof current.body === 'string' ? current.body : '',
     date: dayInZone(current.publishAt, timeZone),
+    category: typeof current.category === 'string' ? current.category : '',
     pinned: current.pinned === true,
+    featured: current.featured === true,
     visible: current.visible !== false,
   };
 }
@@ -142,6 +173,8 @@ export function toUpdatePayload(form, row, timeZone) {
     body: String(form.body ?? '').trim(),
     publishAt: publishAtFor(form.date, current.publishAt, timeZone),
     pinned: form.pinned === true,
+    category: String(form.category ?? '').trim() || null,
+    featured: form.featured === true,
   };
   if (current.featuredImage !== undefined) payload.featuredImage = current.featuredImage;
   if (current.content !== undefined) payload.content = current.content;
