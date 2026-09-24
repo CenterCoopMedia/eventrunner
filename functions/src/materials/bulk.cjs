@@ -170,8 +170,11 @@ function fitName(base, extension) {
 }
 
 /**
- * One folder or file name inside the archive. Separators, control
- * characters and the characters Windows refuses become `-`; leading dots
+ * One folder or file name inside the archive. The name is first composed
+ * (Unicode NFC): a Mac upload stores "ä" as "a" plus a combining mark, and
+ * without this the two spellings of one name pass the repeat check as two
+ * names, and APFS or HFS+ then extracts one over the other. Separators,
+ * control characters and the characters Windows refuses become `-`; leading dots
  * and spaces go (so `..` and `.hidden` cannot climb or hide), and so do
  * trailing dots and spaces, which Windows drops on extraction; the name is
  * cut to 150 characters with its extension kept. An empty result is `file`.
@@ -181,6 +184,7 @@ function fitName(base, extension) {
  */
 function cleanNamePart(part) {
   const cleaned = String(part ?? '')
+    .normalize('NFC')
     .replace(UNSAFE_NAME_CHARACTERS, '-')
     .replace(/^[.\s]+/u, '')
     .replace(/[.\s]+$/u, '');

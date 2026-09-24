@@ -420,6 +420,25 @@ test('a repeat name in one folder, compared without case, takes a number before 
   );
 });
 
+test('one name in its composed and decomposed forms is one name: NFC, and the second takes a number', () => {
+  const composed = 'Pr\u00e4sentation.pdf';
+  const decomposed = 'Pra\u0308sentation.pdf';
+  assert.notEqual(composed, decomposed);
+  const names = entryNames([
+    { sessionId: 's1', filename: decomposed },
+    { sessionId: 's1', filename: composed },
+    { sessionId: 'se\u0301ance', filename: 'a.pdf' },
+    { sessionId: 's\u00e9ance', filename: 'a.pdf' },
+  ]);
+  assert.deepEqual(names, [
+    's1/Pr\u00e4sentation.pdf',
+    's1/Pr\u00e4sentation (2).pdf',
+    's\u00e9ance/a.pdf',
+    's\u00e9ance/a (2).pdf',
+  ]);
+  for (const name of names) assert.equal(name, name.normalize('NFC'));
+});
+
 test('a long name is cut to 150 characters and keeps its extension, with or without a number', () => {
   const long = `${'x'.repeat(300)}.pptx`;
   const cleaned = cleanNamePart(long);
