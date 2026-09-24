@@ -22,12 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   material for every session, hidden sessions included, with session and review filters and sortable columns that
   state their order in words. Each file row has **Download** and a checkbox; **Download as archive** saves the
   selected files as `session-materials.zip`, one folder per session, at most 50 files and 200 MB. The archive is
-  not a signed URL, which the issue named: signing needs an IAM grant a fresh client project lacks, so the new
+  not a signed URL, which the issue named: Signing needs an IAM grant a fresh client project lacks, so the new
   staff-tier `downloadSessionMaterialsArchive` endpoint builds a stored zip with `yazl` and streams it through the
   function, as the single-file download already does. No link to a file is written anywhere. The server writes one
   admin log entry per file before the first byte and refuses the archive without them, and a transfer that fails
   part way saves nothing. A **Coverage** panel names the sessions and speakers with no materials, from the same list
-  the table shows: a pending or approved material counts, and only published sessions with a speaker who is not
+  the table shows: A pending or approved material counts, and only published sessions with a speaker who is not
   removed are counted. The new `listAllSessionMaterials` endpoint reads the list (#189).
 - The email log, under Operations, for staff and operators: every message the site sent, newest
   first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
