@@ -5,12 +5,14 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const adminSubscriptions = new Map();
+const adminErrors = new Map();
 // When true, the admin listeners attach but deliver nothing yet: the window
 // in which a page is still loading.
 let holdAdminCollections = false;
 vi.mock('../adminSource.js', () => ({
-  subscribeAdminCollection: (name, onNext) => {
+  subscribeAdminCollection: (name, onNext, onError) => {
     adminSubscriptions.set(name, onNext);
+    adminErrors.set(name, onError);
     if (!holdAdminCollections) onNext([]);
     return () => adminSubscriptions.delete(name);
   },
@@ -109,7 +111,7 @@ const DRAFTS = [
 ];
 
 async function openNewOrganization() {
-  await renderAt('/admin/organizations/_new');
+  await renderAt('/admin/organizations/new/organization');
   await screen.findByRole('heading', { level: 1, name: 'New organization' });
   await waitFor(() => expect(adminSubscriptions.has('cmsOrganizations_drafts')).toBe(true));
 }
@@ -121,6 +123,7 @@ async function fillNewOrganization(name = 'Example Fund') {
 
 beforeEach(() => {
   adminSubscriptions.clear();
+  adminErrors.clear();
   holdAdminCollections = false;
   currentPath = '';
   globalThis.fetch = vi.fn();
@@ -142,7 +145,7 @@ describe('the organizations list', () => {
     expect(await screen.findByRole('heading', { name: 'No organizations yet' })).toBeInTheDocument();
     const add = screen.getAllByRole('link', { name: 'Add an organization' });
     expect(add.length).toBeGreaterThan(0);
-    for (const link of add) expect(link).toHaveAttribute('href', '/admin/organizations/_new');
+    for (const link of add) expect(link).toHaveAttribute('href', '/admin/organizations/new/organization');
     expect(screen.getByText('0 organizations')).toBeInTheDocument();
   });
 
@@ -249,6 +252,34 @@ describe('the organizations list, while a publish runs', () => {
   });
 });
 
+describe('the organizations list, resuming a publish', () => {
+  // Codex review on #281: a resumed run is reported against the ids the
+  // failed run asked for, not the drafts that are dirty now. A draft saved
+  // after the failure was never part of the run.
+  it('reports a resumed publish against the ids the failed run asked for', async () => {
+    await renderAt('/admin/organizations');
+    await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+    pushOrganizations(LIVE, DRAFTS);
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: { code: 'publish-failed', message: 'Publish failed part-way.' }, queueId: 'queue-7' }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' }));
+    const resume = await screen.findByRole('button', { name: 'Resume publish' });
+
+    // A third organization gains a draft after the failed run.
+    pushOrganizations(LIVE, [...DRAFTS, { id: 'hidden-press', name: 'Hidden Press Ltd', tier: 'supporting', order: 2, visible: false, status: 'dirty' }]);
+    fetch.mockResolvedValueOnce(published(['tide-media', 'new-grant']));
+    fireEvent.click(resume);
+    const results = await screen.findAllByText('Published. The public site picks it up live.');
+    expect(results.some((node) => node.getAttribute('role') === 'status')).toBe(true);
+    expect(bodyOf(1)).toEqual({ queueId: 'queue-7' });
+    // The new draft is still waiting, and the list still counts it.
+    expect(screen.getByRole('button', { name: /^Publish all \(\d\)$/ })).toBeInTheDocument();
+  });
+});
+
 describe('the organization editor', () => {
   it('creates a draft at the address the name suggests', async () => {
     holdAdminCollections = true;
@@ -347,7 +378,7 @@ describe('the organization editor', () => {
     );
     // Refused at the save: nothing was published.
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(currentPath).toBe('/admin/organizations/_new');
+    expect(currentPath).toBe('/admin/organizations/new/organization');
   });
 
   it('catches an address a loaded organization holds before any call (issue 193)', async () => {
@@ -397,6 +428,48 @@ describe('the organization editor', () => {
       visible: false,
       fields: { name: 'Tide Media Collective', order: 5 },
     });
+  });
+
+  // Codex review on #281: the two listeners report in no fixed order. A
+  // form filled from the live doc alone, before the draft arrives, would
+  // save the live values over the unpublished draft.
+  it('waits for both revisions before it fills the form, so a save keeps the unpublished draft', async () => {
+    holdAdminCollections = true;
+    await renderAt('/admin/organizations/tide-media');
+    await waitFor(() => expect(adminSubscriptions.has('cmsOrganizations_drafts')).toBe(true));
+    act(() => adminSubscriptions.get('cmsOrganizations')(LIVE));
+    expect(screen.queryByLabelText('Name')).toBeNull();
+    act(() => adminSubscriptions.get('cmsOrganizations_drafts')(DRAFTS));
+    expect(await screen.findByDisplayValue('Tide Media Collective')).toBeInTheDocument();
+
+    fetch.mockResolvedValueOnce(response({ docId: 'tide-media', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields.name).toBe('Tide Media Collective');
+  });
+
+  it('stays closed and says why when the drafts listener fails before it reports', async () => {
+    holdAdminCollections = true;
+    await renderAt('/admin/organizations/tide-media');
+    await waitFor(() => expect(adminErrors.has('cmsOrganizations_drafts')).toBe(true));
+    act(() => adminSubscriptions.get('cmsOrganizations')(LIVE));
+    act(() => adminErrors.get('cmsOrganizations_drafts')(new Error('permission-denied')));
+    expect(await screen.findByText(/could not load this organization and its saved draft/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).toBeNull();
+    // The retried listener reports, and the form opens on the draft.
+    act(() => adminSubscriptions.get('cmsOrganizations_drafts')(DRAFTS));
+    expect(await screen.findByDisplayValue('Tide Media Collective')).toBeInTheDocument();
+  });
+
+  // Codex review on #281: an organization stored before slugs were checked
+  // may have any id, `_new` among them. Its address must open its editor,
+  // not a blank create form.
+  it('opens a stored organization whose id is _new, because the create form has its own two-part address', async () => {
+    await renderAt('/admin/organizations/_new');
+    await waitFor(() => expect(adminSubscriptions.has('cmsOrganizations_drafts')).toBe(true));
+    pushOrganizations([{ id: '_new', name: 'Legacy Fund', tier: 'partner', order: 4, visible: true }], []);
+    expect(await screen.findByDisplayValue('Legacy Fund')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'New organization' })).toBeNull();
   });
 
   it('says so when an address names no organization', async () => {

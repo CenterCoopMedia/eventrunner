@@ -42,7 +42,10 @@ export default function AdminOrganizationsList() {
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [resumeQueueId, setResumeQueueId] = useState(null);
+  // A failed run's queue and the ids it asked for. A resume is reported
+  // against those ids, never the drafts that are dirty now: a draft saved
+  // after the failure was never part of the run.
+  const [resume, setResume] = useState(null);
   // A saved draft is dirty until it is published, new or not: the same
   // count the overview's readiness table and the pending changes page read.
   const dirtyIds = rows.filter((row) => row.draft?.status === 'dirty').map((row) => row.id);
@@ -55,21 +58,21 @@ export default function AdminOrganizationsList() {
     showToast(verdict.message, verdict.ok ? { announce: false } : { tone: 'error', announce: false });
   }
 
-  function reportFailure(err) {
+  function reportFailure(err, ids) {
     setNotice({ tone: 'error', message: err.message });
     showToast(err.message, { tone: 'error', announce: false });
-    if (err?.queueId) setResumeQueueId(err.queueId);
+    if (err?.queueId) setResume({ queueId: err.queueId, ids });
   }
 
   async function publishAll() {
     const ids = dirtyIds;
     setPublishing('all');
     setNotice(null);
-    setResumeQueueId(null);
+    setResume(null);
     try {
       reportPublish(await call('cmsPublish', { collection: 'cmsOrganizations', docIds: ids }), ids);
     } catch (err) {
-      reportFailure(err);
+      reportFailure(err, ids);
     } finally {
       setPublishing(null);
     }
@@ -78,18 +81,18 @@ export default function AdminOrganizationsList() {
   async function resumePublish() {
     setPublishing('resume');
     try {
-      const response = await call('cmsPublish', { queueId: resumeQueueId });
-      setResumeQueueId(null);
-      reportPublish(response, dirtyIds);
+      const response = await call('cmsPublish', { queueId: resume.queueId });
+      setResume(null);
+      reportPublish(response, resume.ids);
     } catch (err) {
-      reportFailure(err);
+      reportFailure(err, resume.ids);
     } finally {
       setPublishing(null);
     }
   }
 
   const addLink = (
-    <Link to="_new" className={primaryButtonClass}>
+    <Link to="new/organization" className={primaryButtonClass}>
       Add an organization
     </Link>
   );
@@ -102,7 +105,7 @@ export default function AdminOrganizationsList() {
         description="The sponsors page draws these in this order. Organizations with the same tier form one group."
         actions={
           <>
-            {resumeQueueId ? (
+            {resume ? (
               <button
                 type="button"
                 className={secondaryButtonClass}

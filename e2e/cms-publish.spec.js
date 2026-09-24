@@ -110,7 +110,7 @@ test.describe.serial('organizations: admin editor -> publish -> sponsor pages', 
 
   test('an organization published from the editor appears in its tier group (issue 192)', async ({ page, browser }) => {
     await signIn(page, ADMIN_EMAIL);
-    await page.goto('/admin/organizations/_new');
+    await page.goto('/admin/organizations/new/organization');
     await expect(page.getByRole('heading', { level: 1, name: 'New organization' })).toBeVisible();
     await page.getByLabel('Name', { exact: true }).fill(name);
     await expect(page.getByLabel(/^Page address/)).toHaveValue(slug);

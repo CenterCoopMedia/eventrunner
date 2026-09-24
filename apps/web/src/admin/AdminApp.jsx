@@ -151,10 +151,11 @@ export default function AdminApp() {
             path="organizations"
             element={<DeferredAdminPage label="organizations"><AdminOrganizationsList /></DeferredAdminPage>}
           />
-          {/* '_new', not 'new': a page address may be 'new', and no address
-              starts with an underscore (functions/src/cms/organizations.cjs). */}
+          {/* Two parts, 'new/organization': a document id holds no slash, so
+              no organization, a legacy one included, can own this address. A
+              single segment such as 'new' or '_new' is a valid id. */}
           <Route
-            path="organizations/_new"
+            path="organizations/new/organization"
             element={<DeferredAdminPage label="organization"><AdminOrganizationEditor mode="create" /></DeferredAdminPage>}
           />
           <Route

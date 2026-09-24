@@ -30,6 +30,7 @@ import ImagePicker from '../components/media/ImagePicker.jsx';
 import {
   CheckboxField,
   DestructiveConfirm,
+  Notice,
   Panel,
   SaveStatus,
   ServerErrorSummary,
@@ -80,7 +81,7 @@ export default function AdminOrganizationEditor({ mode }) {
   const navigate = useNavigate();
   const call = useAdminApi();
   const { showToast } = useToast();
-  const { rows, loading, findRow } = useAdminOrganizations();
+  const { rows, loading, ready, error: listenerError, findRow } = useAdminOrganizations();
   const [form, setForm] = useState(EMPTY);
   const [slugTouched, setSlugTouched] = useState(false);
   // The id this form created, once it has. From then on it only updates.
@@ -101,11 +102,14 @@ export default function AdminOrganizationEditor({ mode }) {
   const docId = mode === 'edit' ? organizationId : createdId;
   const row = docId ? findRow(docId) : null;
 
+  // The form is filled once, and only after BOTH listeners have reported:
+  // a row built before the drafts arrive is the live doc alone, and a form
+  // filled from it and saved would replace the unpublished draft.
   useEffect(() => {
-    if (mode !== 'edit' || adoptedRef.current || !row) return;
+    if (mode !== 'edit' || adoptedRef.current || !ready || !row) return;
     adoptedRef.current = true;
     setForm(toForm(row));
-  }, [mode, row]);
+  }, [mode, ready, row]);
 
   // A new organization joins the end of the wall unless the operator says
   // otherwise.
@@ -204,8 +208,21 @@ export default function AdminOrganizationEditor({ mode }) {
     }
   }
 
-  if (mode === 'edit' && !createdId && loading) return <AdminLoadingState label="Loading organization…" />;
-  if (mode === 'edit' && !createdId && !row && !loading) {
+  if (mode === 'edit' && !createdId && !ready) {
+    // A listener failed before both had reported. The form stays closed
+    // rather than opening on one revision; the listener retries, and the
+    // form opens when both are in.
+    if (listenerError) {
+      return (
+        <Notice
+          tone="caution"
+          message="We could not load this organization and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+        />
+      );
+    }
+    return <AdminLoadingState label="Loading organization…" />;
+  }
+  if (mode === 'edit' && !createdId && !row) {
     return (
       <AdminEmptyState
         title="No such organization"

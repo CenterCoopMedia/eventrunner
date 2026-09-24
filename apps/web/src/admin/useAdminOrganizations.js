@@ -28,6 +28,9 @@ export function useAdminOrganizations() {
 
   return {
     rows,
+    // Both listeners have reported. They report in no fixed order, and a row
+    // built before the drafts arrive is the live doc alone.
+    ready: live !== null && drafts !== null,
     loading: (live === null || drafts === null) && !error,
     error,
     findRow: (id) => rows.find((row) => row.id === id) ?? null,

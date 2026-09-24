@@ -193,6 +193,22 @@ describe('staleFieldDeletions', () => {
 // payload onto the stored draft, so a key the payload leaves out keeps its
 // old value, and a sponsor package's cleared limit went on printing
 // "Open to 3 sponsors".
+// Codex review on #281: the page draws a limit only when it is a whole
+// number of 1 or more, so the editor refuses any other value before a save.
+describe('a sponsor package limit', () => {
+  const values = (limit) => ({ name: 'Supporting', benefits: '<p>x</p>', limit });
+  it('is refused on the field unless it is empty or a whole number of 1 or more', () => {
+    for (const limit of ['-1', '0', '2.5', '1e400', 'three']) {
+      expect(validateRequiredContent({ blockType: 'sponsor_package', values: values(limit) })).toEqual([
+        { field: 'limit', message: 'limit: must be a whole number of 1 or more. Leave it empty for no limit.' },
+      ]);
+    }
+    for (const limit of ['', '1', '12', ' 3 ']) {
+      expect(validateRequiredContent({ blockType: 'sponsor_package', values: values(limit) })).toEqual([]);
+    }
+  });
+});
+
 describe('a cleared number field', () => {
   const STORED = Object.freeze({
     blockType: 'sponsor_package',

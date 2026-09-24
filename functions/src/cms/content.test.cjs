@@ -1286,3 +1286,48 @@ test('a sponsor package limit sent as the deletion sentinel leaves the stored dr
   assert.equal('limit' in draft, false);
   assert.equal(draft.benefits, '<p>Materials.</p>');
 });
+
+// --- Codex review on #281 ------------------------------------------------------
+
+// The page draws "Open to N sponsors" only for a whole number of 1 or more,
+// so any other limit would be saved, published, and then silently not shown.
+test('a sponsor package limit that is not a whole number of 1 or more is refused at save, and nothing is written', async () => {
+  for (const limit of [-1, 0, 2.5, '3', true, Number.MAX_SAFE_INTEGER + 1]) {
+    const db = makeFakeDb();
+    const res = fakeRes();
+    await createCmsCreateContentHandler(deps(db))(
+      req({ body: { section: 'sponsor_packages', field: 'presenting', fields: { blockType: 'sponsor_package', name: 'Presenting', benefits: '<p>x</p>', limit } } }),
+      res,
+    );
+    assert.equal(res.statusCode, 400, `limit ${String(limit)}`);
+    assert.match(res.body.error.message, /^limit: must be a whole number of 1 or more/);
+    assert.equal(db.read('cmsContent_drafts', 'sponsor_packages__presenting'), undefined);
+  }
+  for (const limit of [1, 3, undefined, null]) {
+    const db = makeFakeDb();
+    const res = fakeRes();
+    const fields = { blockType: 'sponsor_package', name: 'Presenting', benefits: '<p>x</p>' };
+    if (limit !== undefined) fields.limit = limit;
+    await createCmsCreateContentHandler(deps(db))(
+      req({ body: { section: 'sponsor_packages', field: 'presenting', fields } }),
+      res,
+    );
+    assert.equal(res.statusCode, 200, `limit ${String(limit)}: ${JSON.stringify(res.body)}`);
+  }
+});
+
+test('an update that sets a bad sponsor package limit is refused, and the stored draft keeps its limit', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/sponsor_packages__supporting': {
+      section: 'sponsor_packages', field: 'supporting', blockType: 'sponsor_package',
+      name: 'Supporting', limit: 3, benefits: '<p>Materials.</p>', status: 'dirty',
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'sponsor_packages', field: 'supporting', fields: { limit: -2 } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.equal(db.read('cmsContent_drafts', 'sponsor_packages__supporting').limit, 3);
+});

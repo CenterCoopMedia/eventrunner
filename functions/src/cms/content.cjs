@@ -262,9 +262,26 @@ async function checkSessionStructure({ db, tx = null, collection, docId, fields 
  * @param {{ collection: string, fields: object }} args
  * @returns {{ ok: true } | { ok: false, message: string }}
  */
+/**
+ * A sponsor package's limit, when set, is a whole number of sponsors (issue
+ * #193): the page draws "Open to N sponsors" only for one, so any other
+ * value would be saved, published, and then silently not shown. The
+ * deletion sentinel clears it.
+ *
+ * @param {object} fields the block's fields as they will be stored
+ * @returns {string[]}
+ */
+function sponsorPackageErrors(fields) {
+  if (!fields || fields.blockType !== 'sponsor_package') return [];
+  const { limit } = fields;
+  if (limit === undefined || limit === null || limit === DELETE_FIELD_SENTINEL) return [];
+  if (Number.isSafeInteger(limit) && limit >= 1) return [];
+  return ['limit: must be a whole number of 1 or more. Leave it empty for no limit.'];
+}
+
 function checkBlockContract({ collection, fields }) {
   if (collection !== 'cmsContent') return { ok: true };
-  const errors = statContractErrors(fields);
+  const errors = [...statContractErrors(fields), ...sponsorPackageErrors(fields)];
   if (errors.length > 0) return { ok: false, message: errors.join('; ') };
   return { ok: true };
 }

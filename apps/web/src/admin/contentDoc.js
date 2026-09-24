@@ -170,5 +170,16 @@ export function validateRequiredContent(content) {
     const isEmpty = raw === undefined || raw === null || String(raw).trim() === '';
     if (isEmpty) errors.push({ field: field.id, message: `${field.id}: is required.` });
   }
+  // The page draws a sponsor package's limit only when it is a whole number
+  // of 1 or more (functions/src/cms/content.cjs sponsorPackageErrors), so the
+  // editor refuses any other value before the save.
+  if (content.blockType === 'sponsor_package') {
+    const raw = content.values?.limit;
+    const text = raw === undefined || raw === null ? '' : String(raw).trim();
+    const limit = Number(text);
+    if (text !== '' && !(Number.isSafeInteger(limit) && limit >= 1)) {
+      errors.push({ field: 'limit', message: 'limit: must be a whole number of 1 or more. Leave it empty for no limit.' });
+    }
+  }
   return errors;
 }

@@ -223,7 +223,7 @@ describe('the admin shell', () => {
     expect(sectionTier('/admin/sessions/abc')).toBe('staff');
     // The organizations list and editor are content, so staff work (#192).
     expect(sectionTier('/admin/organizations')).toBe('staff');
-    expect(sectionTier('/admin/organizations/_new')).toBe('staff');
+    expect(sectionTier('/admin/organizations/new/organization')).toBe('staff');
     expect(sectionTier('/admin')).toBeNull();
     expect(sectionTier('/admin/')).toBeNull();
   });
