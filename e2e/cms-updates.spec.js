@@ -77,7 +77,7 @@ test.describe.serial('the updates editor', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Draft saved. It is not live until you publish it.' })).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/updates\/[A-Za-z0-9_-]{8,}$/);
     updateId = new URL(page.url()).pathname.split('/').pop();
-    await expect(page.locator('[data-record-state]')).toHaveText('Draft');
+    await expect(page.locator('header [data-record-state]')).toHaveText('Draft');
 
     // The database holds a dirty draft and no live doc.
     const draft = await adminDb().collection('cmsUpdates_drafts').doc(updateId).get();
@@ -154,7 +154,7 @@ test.describe.serial('the updates editor', () => {
     await expect(publish).toBeEnabled();
     await publish.click();
     await expect(page.getByRole('status').filter({ hasText: 'Published. The public site picks it up live.' })).toBeVisible();
-    await expect(page.locator('[data-record-state]')).toHaveText('Live');
+    await expect(page.locator('header [data-record-state]')).toHaveText('Live');
 
     const live = await adminDb().collection('cmsUpdates').doc(updateId).get();
     expect(live.exists).toBe(true);
