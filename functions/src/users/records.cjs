@@ -623,7 +623,10 @@ function buildHandlers() {
     updateAttendee: onRequest({ region }, withCors(async (req, res) => {
       await createUpdateAttendeeHandler(buildAdminDeps())(req, res);
     })),
-    deleteAttendee: onRequest({ region }, withCors(async (req, res) => {
+    // The sweep can outlast the 60 second default on a large account, and a
+    // gateway timeout answers the admin with nothing. The page keeps a
+    // retry for any failure that may come after the directory commit.
+    deleteAttendee: onRequest({ region, timeoutSeconds: 540 }, withCors(async (req, res) => {
       await createDeleteAttendeeHandler(buildAdminDeps())(req, res);
     })),
   };

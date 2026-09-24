@@ -1,7 +1,7 @@
 // AdminAttendees — the registration tab (issue #32, spec §3.4). Mocks
 // adminApi and adminSource directly, same convention as AdminFeedback.test.jsx.
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 let rowsCallback;
 vi.mock('../adminSource.js', () => ({
@@ -392,6 +392,76 @@ describe('AdminAttendees record and delete', () => {
 
     expect(screen.getByText('Deleted the account for Ada Lovelace.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Try the delete again' })).toBeNull();
+  });
+
+  // Review finding: phase 1 deletes users/{uid} before the sweep runs, so
+  // the listener drops the row, and the panel with it, while the call is
+  // still running. A failure the server did not shape (a gateway timeout,
+  // a dropped connection) must still leave the retry on the page.
+  for (const [label, error] of [
+    ['a gateway timeout', { code: 'unknown', status: 504, message: 'Something went wrong. Try again.' }],
+    ['a dropped connection', {
+      code: 'network', status: 0, message: 'We could not reach the server. Check your connection and try again.',
+    }],
+  ]) {
+    it(`keeps the retry when the call fails with ${label} after the row has left`, async () => {
+      callMock.mockReset();
+      let fail;
+      callMock.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
+      render(<AdminAttendees />);
+      pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+
+      await deleteFromPanel();
+      // Phase 1 committed: the listener drops the row while the call runs.
+      pushRows([row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+      await act(async () => { fail(Object.assign(new Error(error.message), error)); });
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('Ada Lovelace');
+      expect(alert).toHaveTextContent(error.message);
+      expect(document.activeElement).toBe(alert.parentElement);
+
+      callMock.mockResolvedValueOnce({ ok: true, uid: 'uid-ada', removed: {} });
+      fireEvent.click(screen.getByRole('button', { name: 'Try the delete again' }));
+      await act(async () => { await Promise.resolve(); });
+
+      expect(callMock).toHaveBeenLastCalledWith('deleteAttendee', { uid: 'uid-ada' });
+      expect(screen.getByText('Deleted the account for Ada Lovelace.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Try the delete again' })).toBeNull();
+    });
+  }
+
+  it('states a refusal made before anything was deleted in the row’s own panel, with focus', async () => {
+    callMock.mockReset();
+    callMock.mockRejectedValueOnce(Object.assign(
+      new Error('This account is linked to a speaker. Delete the speaker record first.'),
+      { code: 'speaker-linked', status: 409 },
+    ));
+    render(<AdminAttendees />);
+    pushRows([row()]);
+
+    await deleteFromPanel();
+
+    const panel = screen.getByRole('region', { name: 'Record for Ada Lovelace' });
+    const alert = within(panel).getByRole('alert');
+    expect(alert).toHaveTextContent('This account is linked to a speaker.');
+    expect(document.activeElement).toBe(alert.parentElement);
+    expect(screen.queryByRole('button', { name: 'Try the delete again' })).toBeNull();
+  });
+
+  it('a pre-commit refusal for a row that is no longer listed still reaches the page with a retry', async () => {
+    callMock.mockReset();
+    let fail;
+    callMock.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
+    render(<AdminAttendees />);
+    pushRows([row()]);
+    await deleteFromPanel();
+    pushRows([]);
+    await act(async () => {
+      fail(Object.assign(new Error('Admin access could not be checked. Try again.'), { code: 'internal', status: 500 }));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Admin access could not be checked. Try again.');
+    expect(screen.getByRole('button', { name: 'Try the delete again' })).toBeInTheDocument();
   });
 });
 

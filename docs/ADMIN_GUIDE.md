@@ -222,7 +222,7 @@ The server refuses a delete in three cases, and says why:
 - An account with operator or staff access. An operator removes that access on the Access page first.
 - An account linked to a speaker. Delete the speaker record first, in Speakers.
 
-**If a delete stops part way.** When the account has left the directory but some of its data did not clear, the page keeps a notice with **Try the delete again**. Select it until the page says the account is deleted. Each retry clears only what is left, and records itself in the admin log.
+**If a delete stops part way.** When the account has left the directory but some of its data did not clear, the page keeps a notice with **Try the delete again**. The page does the same when the answer does not arrive, for example after a timeout or a dropped connection, because the delete may have started. Select it until the page says the account is deleted. Each retry clears only what is left, and records itself in the admin log. A refusal made before anything was deleted, such as a speaker-linked account, shows in the record itself.
 
 ## Ticketing
 

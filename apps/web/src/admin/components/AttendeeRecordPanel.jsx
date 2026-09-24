@@ -10,7 +10,11 @@
 // and what stays before it acts, and a speaker-linked account cannot start
 // it: the speaker record owns that link and is deleted first. What happens
 // after a delete lives on the PAGE, not here — the row, and this panel with
-// it, leaves the list the moment the account document is gone.
+// it, leaves the list the moment the account document is gone, which is
+// often before the call answers. So the panel reports every outcome up, and
+// the page decides where it shows: a refusal made before anything was
+// deleted comes back here as `deleteError`; everything else, including a
+// failure the server never shaped, stays on the page with a retry.
 import { useEffect, useRef, useState } from 'react';
 import { useAdminApi } from '../adminApi.js';
 import {
@@ -48,6 +52,28 @@ function toList(lines) {
 
 export const SPEAKER_LINKED_REASON = 'This account is linked to a speaker. Delete the speaker record first.';
 
+/** The 409 codes deleteAttendee answers before its transaction commits. */
+const REFUSED_BEFORE_DELETE_CODES = Object.freeze(['own-account', 'admin-account', 'speaker-linked', 'too-many-claims']);
+
+/**
+ * Whether a failed delete was refused before the server removed anything:
+ * a refusal (409) the delete names, a request the gate or the validation
+ * turned away (400, 401, 403), or one of the server's own 500 answers
+ * (`internal`), which it sends only before the directory commit or on a
+ * resumed delete. Anything else — `delete-incomplete`, a gateway timeout,
+ * a dropped connection, a body that is not the server's — may have come
+ * after the commit, so the page keeps a retry for it.
+ *
+ * @param {{ code?: string, status?: number } | null | undefined} error
+ * @returns {boolean}
+ */
+export function refusedBeforeDelete(error) {
+  const status = error?.status;
+  if (status === 400 || status === 401 || status === 403) return true;
+  if (status === 409) return REFUSED_BEFORE_DELETE_CODES.includes(error.code);
+  return status === 500 && error.code === 'internal';
+}
+
 /**
  * The quiet control on the row face that opens and closes the panel.
  *
@@ -70,11 +96,15 @@ export function AttendeeRecordToggle({ open, uid, onToggle }) {
 /**
  * @param {object} props
  * @param {object} props.row the account, as the page's `users` listener delivers it
+ * @param {Error|null} [props.deleteError] a refusal the page hands back to this row
+ * @param {(uid: string) => void} [props.onDeleteStart]
  * @param {(result: { uid: string, name: string }) => void} props.onDeleted
- * @param {(result: { uid: string, name: string, message: string }) => void} props.onDeleteIncomplete
- *   the account left the directory and some of its data did not clear
+ * @param {(result: { uid: string, name: string, error: Error }) => void} props.onDeleteFailed
+ *   every failure, whatever its shape; the page decides where it shows
  */
-export default function AttendeeRecordPanel({ row, onDeleted, onDeleteIncomplete }) {
+export default function AttendeeRecordPanel({
+  row, deleteError = null, onDeleteStart, onDeleted, onDeleteFailed,
+}) {
   const call = useAdminApi();
   const name = attendeeName(row);
 
@@ -85,7 +115,6 @@ export default function AttendeeRecordPanel({ row, onDeleted, onDeleteIncomplete
   const errorRef = useRef(null);
 
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState(null);
   const deleteErrorRef = useRef(null);
 
   useEffect(() => {
@@ -119,16 +148,12 @@ export default function AttendeeRecordPanel({ row, onDeleted, onDeleteIncomplete
 
   async function deleteAccount() {
     setDeleting(true);
-    setDeleteError(null);
+    onDeleteStart?.(row.id);
     try {
       await call('deleteAttendee', { uid: row.id });
       onDeleted?.({ uid: row.id, name });
     } catch (err) {
-      if (err?.code === 'delete-incomplete') {
-        onDeleteIncomplete?.({ uid: row.id, name, message: err.message });
-      } else {
-        setDeleteError(err);
-      }
+      onDeleteFailed?.({ uid: row.id, name, error: err });
     } finally {
       setDeleting(false);
     }

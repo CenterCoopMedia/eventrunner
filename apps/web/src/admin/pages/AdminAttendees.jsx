@@ -38,10 +38,13 @@
 // The organizer record (issue #185): "Edit record" on a row opens its
 // AttendeeRecordPanel, one at a time — the organizer-owned past attendance
 // list and the account delete. A deleted row leaves through the listener,
-// so a delete's result is stated HERE, at page level: a success line that
-// takes focus, or, when the account left the directory but some of its
-// data did not clear, an error notice that keeps the uid and offers "Try
-// the delete again" until a retry succeeds.
+// often before the call answers, so a delete's result is stated HERE, at
+// page level: a success line that takes focus, or an error notice that
+// keeps the uid and offers "Try the delete again" until a retry succeeds.
+// Only a refusal made before anything was deleted, for a row still listed,
+// goes back to that row's panel (refusedBeforeDelete). Every other failure
+// — delete-incomplete, a gateway timeout, a dropped connection — may have
+// come after the directory commit, and the retry resumes it.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -57,7 +60,10 @@ import {
   rowMetaClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
-import AttendeeRecordPanel, { AttendeeRecordToggle } from '../components/AttendeeRecordPanel.jsx';
+import AttendeeRecordPanel, {
+  AttendeeRecordToggle,
+  refusedBeforeDelete,
+} from '../components/AttendeeRecordPanel.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -121,6 +127,8 @@ export default function AdminAttendees() {
   const { showToast } = useToast();
 
   const [rows, setRows] = useState(null);
+  // The latest listener delivery, for a delete result that arrives after it.
+  const rowsRef = useRef(null);
   const [listError, setListError] = useState(null);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -139,6 +147,9 @@ export default function AdminAttendees() {
   const [deleteResult, setDeleteResult] = useState(null);
   const [retrying, setRetrying] = useState(false);
   const deleteResultRef = useRef(null);
+  // { uid, error }: a refusal made before anything was deleted, shown in
+  // that row's panel while the row is still listed.
+  const [rowDeleteError, setRowDeleteError] = useState(null);
 
   useEffect(() => {
     if (deleteResult) deleteResultRef.current?.focus();
@@ -147,7 +158,7 @@ export default function AdminAttendees() {
   useEffect(() => {
     return subscribeAdminCollection(
       'users',
-      (docs) => { setRows(docs); setListError(null); },
+      (docs) => { rowsRef.current = docs; setRows(docs); setListError(null); },
       setListError,
     );
   }, []);
@@ -202,12 +213,42 @@ export default function AdminAttendees() {
 
   function deleted({ name }) {
     setOpenUid(null);
+    setRowDeleteError(null);
     setDeleteResult({ tone: 'ok', message: `Deleted the account for ${name}.` });
   }
 
-  function deleteIncomplete({ uid, name, message }) {
+  function deleteUnfinished({ uid, name, error }) {
     setOpenUid(null);
-    setDeleteResult({ tone: 'incomplete', uid, name, message });
+    setRowDeleteError(null);
+    setDeleteResult({
+      tone: 'incomplete',
+      uid,
+      name,
+      // The server's own words when it says what happened; otherwise the
+      // call's own failure, with what it may mean.
+      message: error?.code === 'delete-incomplete'
+        ? error.message
+        : `The delete may not have finished. ${error?.message ?? ''}`.trim(),
+    });
+  }
+
+  function deleteStarted(uid) {
+    setRowDeleteError((current) => (current?.uid === uid ? null : current));
+  }
+
+  function deleteFailed({ uid, name, error }) {
+    // A 404 means nothing of the account remains.
+    if (error?.status === 404) {
+      deleted({ name });
+      return;
+    }
+    const stillListed = (rowsRef.current ?? []).some((listed) => listed.id === uid);
+    if (refusedBeforeDelete(error) && stillListed) {
+      setOpenUid(uid);
+      setRowDeleteError({ uid, error });
+      return;
+    }
+    deleteUnfinished({ uid, name, error });
   }
 
   async function retryDelete() {
@@ -221,7 +262,7 @@ export default function AdminAttendees() {
       // A 404 on a retry means nothing of the account remains: the earlier
       // call finished the work after all.
       if (err?.status === 404) deleted({ name });
-      else deleteIncomplete({ uid, name, message: err.message });
+      else deleteUnfinished({ uid, name, error: err });
     } finally {
       setRetrying(false);
     }
@@ -407,15 +448,20 @@ export default function AdminAttendees() {
                     <AttendeeRecordToggle
                       uid={row.id}
                       open={openUid === row.id}
-                      onToggle={() => setOpenUid((current) => (current === row.id ? null : row.id))}
+                      onToggle={() => {
+                        setRowDeleteError(null);
+                        setOpenUid((current) => (current === row.id ? null : row.id));
+                      }}
                     />
                   </div>
                 </div>
                 {openUid === row.id ? (
                   <AttendeeRecordPanel
                     row={row}
+                    deleteError={rowDeleteError?.uid === row.id ? rowDeleteError.error : null}
+                    onDeleteStart={deleteStarted}
                     onDeleted={deleted}
-                    onDeleteIncomplete={deleteIncomplete}
+                    onDeleteFailed={deleteFailed}
                   />
                 ) : null}
               </li>

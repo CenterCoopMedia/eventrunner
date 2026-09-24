@@ -14,6 +14,7 @@ import AttendeeRecordPanel, {
   AttendeeRecordToggle,
   SPEAKER_LINKED_REASON,
   recordPanelId,
+  refusedBeforeDelete,
 } from './AttendeeRecordPanel.jsx';
 
 const row = (overrides = {}) => ({
@@ -26,14 +27,25 @@ const row = (overrides = {}) => ({
   ...overrides,
 });
 
-/** The row face's toggle and the panel, wired the way the page wires them. */
-function Harness({ account = row(), onDeleted = () => {}, onDeleteIncomplete = () => {} }) {
+/**
+ * The row face's toggle and the panel. The page owns a delete's outcome;
+ * this stand-in hands a failure back to the panel as `deleteError`, the
+ * way the page does for a refusal on a row that is still listed.
+ */
+function Harness({ account = row(), onDeleted = () => {}, onDeleteFailed = () => {}, onDeleteStart = () => {} }) {
   const [open, setOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
   return (
     <div>
       <AttendeeRecordToggle uid={account.id} open={open} onToggle={() => setOpen((value) => !value)} />
       {open ? (
-        <AttendeeRecordPanel row={account} onDeleted={onDeleted} onDeleteIncomplete={onDeleteIncomplete} />
+        <AttendeeRecordPanel
+          row={account}
+          deleteError={deleteError}
+          onDeleteStart={onDeleteStart}
+          onDeleted={onDeleted}
+          onDeleteFailed={(result) => { onDeleteFailed(result); setDeleteError(result.error); }}
+        />
       ) : null}
     </div>
   );
@@ -145,20 +157,55 @@ describe('AttendeeRecordPanel', () => {
     expect(onDeleted).toHaveBeenCalledWith({ uid: 'uid-ada', name: 'Ada Quill' });
   });
 
-  it('hands a delete-incomplete result to the page, which outlives the row', async () => {
-    const onDeleteIncomplete = vi.fn();
-    const message = 'The account is out of the directory. Some of its data could not be cleared. Try again.';
-    callMock.mockRejectedValueOnce(new AdminApiError({ code: 'delete-incomplete', status: 500, message }));
-    openPanel({ onDeleteIncomplete });
+  it('hands every failure to the page, whatever its shape, because the row may already be gone', async () => {
+    for (const shape of [
+      { code: 'delete-incomplete', status: 500, message: 'The account is out of the directory. Some of its data could not be cleared. Try again.' },
+      { code: 'unknown', status: 504, message: 'Something went wrong. Try again.' },
+      { code: 'network', status: 0, message: 'We could not reach the server. Check your connection and try again.' },
+    ]) {
+      const onDeleteFailed = vi.fn();
+      const onDeleteStart = vi.fn();
+      const error = new AdminApiError(shape);
+      callMock.mockRejectedValueOnce(error);
+      const { unmount } = render(<Harness onDeleteFailed={onDeleteFailed} onDeleteStart={onDeleteStart} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit record' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete this account' }));
-    await flush();
+      fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete this account' }));
+      await flush();
 
-    expect(onDeleteIncomplete).toHaveBeenCalledWith({ uid: 'uid-ada', name: 'Ada Quill', message });
+      expect(onDeleteStart).toHaveBeenCalledWith('uid-ada');
+      expect(onDeleteFailed).toHaveBeenCalledWith({ uid: 'uid-ada', name: 'Ada Quill', error });
+      unmount();
+    }
   });
 
-  it('states a refused delete in place, in the server’s words, and moves focus to it', async () => {
+  it('knows which failures came before anything was deleted', () => {
+    for (const shape of [
+      { status: 409, code: 'own-account' },
+      { status: 409, code: 'admin-account' },
+      { status: 409, code: 'speaker-linked' },
+      { status: 409, code: 'too-many-claims' },
+      { status: 400, code: 'bad-request' },
+      { status: 401, code: 'unauthorized' },
+      { status: 403, code: 'forbidden' },
+      { status: 500, code: 'internal' },
+    ]) {
+      expect(refusedBeforeDelete(shape), JSON.stringify(shape)).toBe(true);
+    }
+    for (const shape of [
+      { status: 500, code: 'delete-incomplete' },
+      { status: 504, code: 'unknown' },
+      { status: 500, code: 'unknown' },
+      { status: 0, code: 'network' },
+      { status: 409, code: 'something-else' },
+      null,
+    ]) {
+      expect(refusedBeforeDelete(shape), JSON.stringify(shape)).toBe(false);
+    }
+  });
+
+  it('states a refusal the page hands back in place, in the server’s words, and moves focus to it', async () => {
     callMock.mockRejectedValueOnce(new AdminApiError({
       code: 'admin-account',
       status: 409,

@@ -649,3 +649,10 @@ test('the sweep clears more than one page of every store, a page at a time', asy
   assert.ok(bucket.listings.every(({ maxResults, autoPaginate }) => maxResults <= 500 && autoPaginate === false));
 });
 
+
+test('deleteAttendee states its own timeout, long enough for the sweep', () => {
+  // The default HTTP timeout is 60 seconds; a gateway 504 then leaves the
+  // admin guessing. projection.cjs states its budget the same way.
+  const { handlers } = require('./records.cjs');
+  assert.equal(handlers.deleteAttendee.__endpoint.timeoutSeconds, 540);
+});
