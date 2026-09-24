@@ -124,6 +124,23 @@ builder branches first if the container may be reclaimed.
 `joe/confident-gates-gy99ip-4-admin-tiers` (local) holds a4 round 2 on
 `3ccd388`, fully checked. Rebuild it from a4's round 3 commits instead.
 
+### Trial stack, 2026-09-24 03:00 UTC
+
+Local branches, not pushed, with every conflict already resolved:
+
+- `trial/a3-on-tiers` (worktree `/home/user/wt-int`): a3 on #269's tip
+  `0b70221`, plus two director commits: the #247 ProfilePhoto tests now
+  prove the rule through the `.avatar` tokens, and Branding and the block
+  editor load on demand (admin entry chunk 51,756 to 35,297 gzip). Every
+  check passed on it before the lazy-load commit, except the chunk budget.
+- `trial/stack-a3-b3` (worktree `/home/user/wt-int2`): b1, b2 and b3 on the
+  a3 trial, before the lazy-load commit. Unit tests pass after regenerating
+  except b1's `eventStats.test.cjs` seed pin: 100 content blocks must be 101,
+  because a3 adds a key fact. b1 also leaves `getEventStats` out of the
+  staff row in `functions/README.md`.
+- To build the real stack, take review fixes onto these: a3 fixes on the
+  first, then cherry-pick the resolved b1, b2, b3 commits from the second.
+
 ### Resume order
 
 1. Resume the four stopped reviews (the review script is
