@@ -504,9 +504,10 @@ test('the publish-set rule binds cmsSchedule only', async () => {
 // --- the failure record (issue #196) -------------------------------------------
 
 test('a failed publish row stays failed, with its error, through later publishes, and the failed read finds it', async () => {
-  // The Unpublished changes page lists every row still marked failed
-  // (where status == 'failed'), so a run that stopped part-way cannot
-  // scroll out of view behind newer runs before it is resumed.
+  // The Unpublished changes page lists the 20 newest rows still marked
+  // failed (where status == 'failed', newest first), so a run that stopped
+  // part-way cannot scroll out of view behind newer finished runs before it
+  // is resumed.
   const seed = {};
   const ids = [];
   for (let i = 0; i < 134; i += 1) {
@@ -538,7 +539,8 @@ test('a failed publish row stays failed, with its error, through later publishes
   assert.ok(row.error.length > 0);
   assert.equal(row.progress.cmsSchedule.published.length, 133);
 
-  const failed = await db.collection('cmsPublishQueue').where('status', '==', 'failed').get();
+  const failed = await db.collection('cmsPublishQueue')
+    .where('status', '==', 'failed').orderBy('requestedAt', 'desc').limit(20).get();
   assert.deepEqual(failed.docs.map((doc) => doc.id), [failedId]);
   const newest = await db.collection('cmsPublishQueue').orderBy('requestedAt', 'desc').limit(1).get();
   assert.notEqual(newest.docs[0].id, failedId);

@@ -1765,6 +1765,16 @@ describe("organizer-owned account fields stay server-written (issue 185)", () =>
 // (apps/web/src/admin/pendingChangesSource.js): both tiers may run it, and a
 // signed-in non-admin and an anonymous client may not.
 describe("unpublished changes reads (issue 196)", () => {
+  // The failed read, as pendingChangesSource.js subscribeFailedPublishRuns
+  // builds it (its web test pins the same clauses).
+  const failedRuns = (db) =>
+    query(
+      collection(db, "cmsPublishQueue"),
+      where("status", "==", "failed"),
+      orderBy("requestedAt", "desc"),
+      limit(20),
+    );
+
   const shapes = [
     ...PUBLISHABLE.map((c) => [
       `${c}_drafts where status == dirty`,
@@ -1775,8 +1785,8 @@ describe("unpublished changes reads (issue 196)", () => {
       (db) => query(collection(db, "cmsPublishQueue"), orderBy("requestedAt", "desc"), limit(10)),
     ],
     [
-      "cmsPublishQueue where status == failed, limit 20",
-      (db) => query(collection(db, "cmsPublishQueue"), where("status", "==", "failed"), limit(20)),
+      "cmsPublishQueue where status == failed, newest first, limit 20",
+      (db) => failedRuns(db),
     ],
   ];
 
@@ -1791,6 +1801,37 @@ describe("unpublished changes reads (issue 196)", () => {
       await assertFails(getDocs(build(anon())));
     });
   }
+
+  it("the failed read returns the 20 newest failed runs when more than 20 are failed", async () => {
+    // Ids that sort OLDEST first, so a read that took the first 20 by id
+    // would list the oldest runs and drop the newest.
+    const ids = Array.from({ length: 25 }, (_, i) => `failed-run-${String(i).padStart(2, "0")}`);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const [i, id] of ids.entries()) {
+        await setDoc(doc(db, `cmsPublishQueue/${id}`), {
+          status: "failed",
+          error: "stopped",
+          request: { cmsContent: ["a"] },
+          progress: {},
+          requestedBy: ADMIN_EMAIL,
+          requestedAt: new Date(Date.UTC(2026, 8, 1, 12, i)),
+        });
+      }
+    });
+    try {
+      const snap = await getDocs(failedRuns(staff()));
+      const listed = snap.docs.map((d) => d.id);
+      const newest = ids.slice(5).reverse();
+      if (JSON.stringify(listed) !== JSON.stringify(newest)) {
+        throw new Error(`expected the 20 newest failed runs, got ${JSON.stringify(listed)}`);
+      }
+    } finally {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        for (const id of ids) await deleteDoc(doc(ctx.firestore(), `cmsPublishQueue/${id}`));
+      });
+    }
+  });
 
   it("the dirty drafts query returns the seeded dirty draft to staff", async () => {
     const snap = await getDocs(

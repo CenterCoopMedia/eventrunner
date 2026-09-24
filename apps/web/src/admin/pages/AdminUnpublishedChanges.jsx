@@ -383,7 +383,7 @@ export default function AdminUnpublishedChanges() {
 
       <Panel
         title="Recent publishes"
-        description="The last 10 publish runs, and every run still marked Failed, newest first. Running: Still publishing. Done: Finished. Failed: Stopped part-way. A run with no progress for 90 minutes is marked Failed."
+        description="The last 10 publish runs, and the 20 newest runs still marked Failed, newest first. Running: Still publishing. Done: Finished. Failed: Stopped part-way. A run with no progress for 90 minutes is marked Failed."
       >
         {runs.error ? (
           <Notice tone="caution" message="The publish runs could not be refreshed. The list will try again." />

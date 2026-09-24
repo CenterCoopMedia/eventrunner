@@ -83,8 +83,9 @@ export function subscribeRecentPublishRuns(count, onNext, onError) {
 }
 
 /**
- * Publish runs still marked failed, however old, so a failed run stays in
- * view until it is resumed. A single-field filter: no composite index.
+ * The newest publish runs still marked failed, newest first, so a failed
+ * run stays in view until it is resumed however many finished runs follow
+ * it. Needs the (status, requestedAt desc) index in firestore.indexes.json.
  *
  * @param {number} count
  * @param {(rows: Array<object>) => void} onNext
@@ -94,7 +95,13 @@ export function subscribeRecentPublishRuns(count, onNext, onError) {
 export function subscribeFailedPublishRuns(count, onNext, onError) {
   return listen(
     'cmsPublishQueue failed',
-    () => query(collection(db, 'cmsPublishQueue'), where('status', '==', 'failed'), limit(count)),
+    () =>
+      query(
+        collection(db, 'cmsPublishQueue'),
+        where('status', '==', 'failed'),
+        orderBy('requestedAt', 'desc'),
+        limit(count),
+      ),
     onNext,
     onError,
   );

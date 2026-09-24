@@ -1,6 +1,9 @@
 // The unpublished changes seam (issue #196). src/test/setup.js mocks this
 // module for every test file; here the real module runs over setup's
 // firebase/firestore stand-ins, which record the query each read builds.
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { onSnapshot } from 'firebase/firestore';
 
@@ -43,11 +46,24 @@ describe('the unpublished changes reads', () => {
     expect(ref.clauses).toEqual([{ orderBy: ['requestedAt', 'desc'] }, { limit: 10 }]);
   });
 
-  it('reads the runs still marked failed, on one field', () => {
+  it('reads the newest runs still marked failed, newest first', () => {
     source.subscribeFailedPublishRuns(20, vi.fn());
     const { ref } = lastListener();
     expect(ref.ref.path).toBe('cmsPublishQueue');
-    expect(ref.clauses).toEqual([{ where: ['status', '==', 'failed'] }, { limit: 20 }]);
+    expect(ref.clauses).toEqual([
+      { where: ['status', '==', 'failed'] },
+      { orderBy: ['requestedAt', 'desc'] },
+      { limit: 20 },
+    ]);
+  });
+
+  it('has the composite index the failed read needs declared for deploy', () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const declared = JSON.parse(readFileSync(path.join(here, '..', '..', '..', '..', 'firestore.indexes.json'), 'utf8'));
+    const shapes = declared.indexes
+      .filter((index) => index.collectionGroup === 'cmsPublishQueue' && index.queryScope === 'COLLECTION')
+      .map((index) => index.fields.map((field) => `${field.fieldPath} ${field.order}`).join(', '));
+    expect(shapes).toContain('status ASCENDING, requestedAt DESCENDING');
   });
 
   it('reports an error, keeps quiet otherwise, and attaches a fresh listener later', () => {

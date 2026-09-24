@@ -289,7 +289,7 @@ describe('the Unpublished changes page', () => {
     expect(document.activeElement).toBe(within(main()).getByText('Published 3 changes. The public site picks them up live.').parentElement);
   });
 
-  it('(c) keeps a failed run listed as Failed with its error and one Resume, however many runs follow it', async () => {
+  it('(c) keeps a failed run listed as Failed with its error and one Resume, however many finished runs follow it', async () => {
     await renderAt('/admin/unpublished');
     pushDrafts();
     const failed = {
@@ -303,6 +303,9 @@ describe('the Unpublished changes page', () => {
       note: 'Checked by hand.',
     };
     pushRuns([failed], [failed]);
+    expect(screen.getByRole('heading', { name: 'Recent publishes' }).closest('section')).toHaveTextContent(
+      'The last 10 publish runs, and the 20 newest runs still marked Failed, newest first.',
+    );
     const list = screen.getByRole('list', { name: 'Publish runs' });
     let row = list.querySelector('[data-run="q-failed"]');
     expect(within(row).getByText('Failed')).toBeInTheDocument();

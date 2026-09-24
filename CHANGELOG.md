@@ -81,10 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   organization, update, and timeline entry that is saved and not yet on the site, in one ruled
   table per collection with its state, when it was saved, and by whom. **Publish all** and a
   publish per table call `cmsPublish`. Under the tables, **Recent publishes** lists the last 10
-  publish runs and every run still marked Failed, with **Resume publish** on a failed run. A banner
-  above every other admin page states the same count in one sentence and links to the page. The
-  banner and the page read one live source, the dirty drafts of each collection, never the publish
-  run rows, so they always agree. No endpoint or rule changed (#196).
+  publish runs and the 20 newest runs still marked Failed, with **Resume publish** on a failed
+  run. A banner above every other admin page states the same count in one sentence and links to
+  the page. The banner and the page read one live source, the dirty drafts of each collection,
+  never the publish run rows, so they always agree. No endpoint or rule changed; one composite
+  index on `cmsPublishQueue` (`status`, `requestedAt` descending) orders the failed runs (#196).
 - The email log, under Operations, for staff and operators: every message the site sent, newest
   first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
   word. Search looks in the recipient and the subject across the 500 most recent messages at a

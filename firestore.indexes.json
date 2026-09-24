@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "cmsPublishQueue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "requestedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "cmsVersionHistory",
       "queryScope": "COLLECTION",
       "fields": [
