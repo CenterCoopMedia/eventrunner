@@ -88,6 +88,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   time as milliseconds, at most 50, with `moreChanges` counting the rest. The server compares
   each version with the one before it at no extra read. The stored field snapshot is no longer
   sent (#195).
+- An editor tour in the admin panel. On a first visit a short tour opens above the page: a
+  welcome that names the three record words, one step for each rail group the account's tier can
+  open, and a step on the public edit links. **Next**, **Back**, **End tour** and the Escape key
+  work at every step, and each step's heading takes the focus. It is a panel, not an overlay, so
+  the page stays usable. The browser remembers the end per account; **Take the tour** at the foot
+  of the rail opens it again. The tour is its own lazy chunk (#198).
+- Section edit links on the public site. While an admin is signed in, each section a page draws
+  shows **Edit section** beside its heading (after the content where the heading is for screen
+  readers only), and the link opens that section's blocks in the admin panel. Visitors and
+  signed-in accounts that are not admins see nothing. The link reads the admin probe only and
+  imports nothing from the admin, and a bundle test holds that line. No endpoint, rule or stored
+  field changed (#198).
 - Unpublished changes, under Content, for staff and operators: every page, content block, session,
   organization, update, and timeline entry that is saved and not yet on the site, in one ruled
   table per collection with its state, when it was saved, and by whom. **Publish all** and a

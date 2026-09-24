@@ -6,6 +6,12 @@ How to run a client's site from the admin panel, in the order the work happens. 
 
 **The banner above each admin page counts what is saved and not published.** It names the count by kind, such as "2 unpublished changes: 1 content block, 1 page.", and links to **Unpublished changes**, where you publish them. It shows on every admin page except that one, and only while the count is above zero. When the count cannot be read, the banner says so and tries again.
 
+## Find your way: The tour
+
+The first time you open the admin panel, a short tour opens above the page. It has one step for each group on the rail that your tier can open, and one step on the edit links on the public site. Move with **Next** and **Back**. End it at any step with **End tour** or the Escape key. The tour does not block the page: You can open a section it names while it stays on screen.
+
+To take the tour again, select **Take the tour** at the foot of the rail. The browser remembers that you ended the tour, for your account only. A different browser, or another account in the same browser, shows the tour once more.
+
 ## Who can do what: Operator and staff
 
 An admin account holds one of two tiers. The rail shows the tier under your address, and it shows only the sections your tier can open. A link you type or follow to a section outside your tier meets a refusal, not the page. The server and the database rules refuse the same requests, so the tier is not only a matter of what the rail shows.
@@ -173,6 +179,8 @@ Filling in what a page's blocks say is a separate step from shaping the page: Pi
 **The home page's History section is your text, then the timeline.** Write the section's own words and pictures here, as for any other section. Under them the site draws the past editions from the Timeline list, oldest first. You edit the editions under Timeline, not here. Move the section and the list moves with it. Delete the section and the list is gone from the site too.
 
 **A sponsor package is one thing a sponsor can support.** The **sponsor package** block carries a name and what the package includes, both required, and an optional price and limit. Write the price as it should read, with its currency. The limit is how many sponsors can take the package, as a whole number of 1 or more: The page shows "Open to 3 sponsors", and shows nothing for no limit. The save refuses any other number. The Sponsors page seeds one section for packages, **Sponsorship packages**, after the logo wall. It is not shown until it holds a package, so an empty section never reaches a visitor. A site whose Sponsors page was edited before this section existed keeps its own sections; add the section in Pages if you want it.
+
+**Edit a section from the site.** While you are signed in as an admin, each section on a public page shows an **Edit section** link beside its heading. On a section with no visible heading, the link comes after the section's content. The link opens that section's blocks here, the same screen you reach from Content → page → section. Visitors and signed-in accounts that are not admins do not see the link. On the home page, the opening section's link is the last line of the opening. The Sponsors link opens the line of text above the logo wall. You change the wall itself in the Organizations list. A page's own feature, such as the schedule grid or a directory, has no link: Edit it in its own section of the rail. An empty section is not shown on the site, so it has no link either.
 
 **A statistic needs four things**, and the editor will not save one without them: The finding in words ("Two thirds of sessions are workshops", not "Session types"), what the number counts and over what period, where the number came from and the date you read it, and a line describing the finding for a screen reader. A stat block saved before this rule existed keeps working; the next time you edit one, you will be asked to fill the four parts in.
 

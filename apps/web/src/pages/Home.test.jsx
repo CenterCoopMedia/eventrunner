@@ -54,6 +54,7 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
 }));
 
 import Home from './Home.jsx';
+import AuthContext from '../contexts/AuthContext.jsx';
 import { SEED_WHEN_PLACEHOLDER, publicContentDoc } from 'shared/seed';
 import { makeFakeDb } from '../../../../functions/src/cms/firestoreFake.cjs';
 import { createCmsUpdateContentHandler } from '../../../../functions/src/cms/content.cjs';
@@ -735,5 +736,89 @@ describe('Home history section', () => {
     await screen.findByRole('region', { name: 'Details' });
     expect(screen.queryByRole('region', { name: 'History' })).toBeNull();
     expect(screen.queryByText('The first meeting')).toBeNull();
+  });
+});
+
+// The home page's edit links (issue #198): one per section the page draws,
+// each opening that section's blocks in the admin, and only for a signed-in
+// admin. The lead is the core, so its link sits last in the lead.
+describe('Home section edit links', () => {
+  const renderAs = (auth) =>
+    testingRender(
+      <MemoryRouter>
+        <AuthContext.Provider value={auth}>
+          <Home />
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    );
+  const editLinks = (container) =>
+    [...container.querySelectorAll('a')].filter((link) => link.textContent === 'Edit section');
+
+  beforeEach(() => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    features = { sponsors: true };
+    organizationsData = [
+      { id: 'one', name: 'First Supporter', tier: 'Presenting', url: 'https://one.example.org', visible: true },
+    ];
+    heroBlocks = [
+      { section: 'hero', field: 'title', blockType: 'text', value: 'The headline' },
+      { section: 'hero', field: 'subtitle', blockType: 'text', value: 'The line under it' },
+    ];
+    infoBlocks = [{ section: 'info', field: 'where', blockType: 'fact', label: 'Where', value: 'The hall' }];
+    sectionBlocks = {
+      details: [
+        { section: 'details', field: 'one', blockType: 'text', value: 'First paragraph' },
+        { section: 'details', field: 'two', blockType: 'text', value: 'Second paragraph' },
+      ],
+    };
+    pageDoc = {
+      id: 'home',
+      path: '/',
+      label: 'Home',
+      sections: [
+        { id: 'hero', label: 'Hero' },
+        { id: 'info', label: 'Key facts' },
+        { id: 'details', label: 'Details' },
+        { id: 'empty', label: 'Nothing yet' },
+        { id: 'sponsors', label: 'Sponsors' },
+      ],
+    };
+  });
+
+  it('gives the lead, the key facts, a default section and the sponsor strip one link each, never one per block', () => {
+    const { container } = renderAs({ adminStatus: 'admin', adminTier: 'staff' });
+    // Four drawn sections and six blocks: the count is the sections'.
+    expect(editLinks(container).map((link) => link.getAttribute('href'))).toEqual([
+      '/admin/content/home/hero',
+      '/admin/content/home/info',
+      '/admin/content/home/details',
+      '/admin/content/home/sponsors',
+    ]);
+    // The lead's link is its last child, after the action row and the line.
+    const lead = screen.getByRole('heading', { level: 1, name: 'The headline' }).parentElement;
+    expect(lead.lastElementChild).toBe(screen.getByRole('link', { name: 'Edit section: Hero' }));
+    // Every other link sits in its own section's head, after the heading.
+    for (const label of ['Key facts', 'Details', 'Sponsors']) {
+      const head = screen.getByRole('heading', { level: 2, name: label }).parentElement;
+      expect(within(head).getByRole('link', { name: `Edit section: ${label}` })).toBeInTheDocument();
+    }
+    // An empty section is not drawn, so it has no link.
+    expect(screen.queryByRole('link', { name: 'Edit section: Nothing yet' })).toBeNull();
+  });
+
+  it('draws no hero link where the page states no hero section', () => {
+    pageDoc = { ...pageDoc, sections: pageDoc.sections.filter((section) => section.id !== 'hero') };
+    renderAs({ adminStatus: 'admin' });
+    expect(screen.getByRole('heading', { level: 1, name: 'The headline' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Edit section: Hero' })).toBeNull();
+  });
+
+  it('draws no link at all for a signed-out reader or a signed-in non-admin', () => {
+    for (const auth of [null, { adminStatus: 'unknown' }, { adminStatus: 'denied' }]) {
+      const { container, unmount } = renderAs(auth);
+      expect(screen.getByRole('heading', { level: 2, name: 'Details' })).toBeInTheDocument();
+      expect(editLinks(container)).toHaveLength(0);
+      unmount();
+    }
   });
 });

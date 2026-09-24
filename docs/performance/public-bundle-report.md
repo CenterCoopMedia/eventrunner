@@ -96,6 +96,30 @@ Leaflet map library loads only when the map enters the viewport.
 The initial ceiling is 1,080,000 raw bytes and 292,000 gzip bytes to include this
 requested sample content with a small margin. Deferred limits remain unchanged.
 
+## 2026-09-24: section edit links and the editor tour
+
+Issue #198 adds one "Edit section" link per drawn section for a signed-in
+admin. The link component and its call sites join the initial graph; it
+imports nothing under `src/admin`, and `scripts/ci/bundle-budget.test.cjs`
+fails if the first-paint source graph reaches a file there. The editor tour
+is its own deferred chunk, fetched only while the tour is open, so the admin
+entry chunk carries only the stored flag, the rail button, and the line that
+stands in when the tour chunk fails to load.
+
+| Chunk | Before raw | Before gzip | After raw | After gzip |
+| --- | ---: | ---: | ---: | ---: |
+| Initial, normal build | 1,059,326 | 286,743 | 1,060,189 | 286,957 |
+| Initial, demo build | 1,069,780 | 290,736 | 1,070,643 | 291,004 |
+| Admin entry (`AdminApp`), normal build | 129,796 | 35,612 | 130,867 | 36,013 |
+| Admin entry (`AdminApp`), demo build | 129,796 | 35,622 | 130,867 | 36,009 |
+| Content page (deferred), normal build | 11,711 | 4,837 | 11,862 | 4,879 |
+| Editor tour (deferred, new), normal build | none | none | 2,667 | 1,334 |
+
+The link component itself is 444 raw and about 125 gzip bytes of the
+initial growth; the rest is the call sites. Loading the component on demand
+would save about 35 gzip bytes and add a request and a Suspense boundary for
+every link, so it stays in the initial graph. No limit changed.
+
 ## Enforced limits
 
 - The initial graph can use at most 1,080,000 raw bytes and 292,000 gzip bytes.

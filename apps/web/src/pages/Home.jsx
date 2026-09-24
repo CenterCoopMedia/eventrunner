@@ -15,6 +15,7 @@ import RegistrationAction, {
   resolveRegistrationLink,
 } from '../components/RegistrationAction.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import SectionEditLink from '../components/SectionEditLink.jsx';
 import { SponsorStrip } from '../components/SponsorWall.jsx';
 import HistorySection from '../components/HistorySection.jsx';
 import { resolvePageLayout } from '../lib/pageLayout.js';
@@ -39,7 +40,7 @@ import { SEED_WHEN_PLACEHOLDER } from 'shared/seed';
  *   days: object[],
  *   timezone?: string,
  *   eventConfig: object,
- *   facts: { id: string, title: string, cards: object[] } | null,
+ *   facts: { id: string, title: string, cards: object[], action?: import('react').ReactNode } | null,
  *   className?: string,
  * }} props
  */
@@ -74,7 +75,7 @@ export function SummaryRow({ days, timezone, eventConfig, facts, className = '' 
       )}
       {facts ? (
         <section aria-labelledby={facts.id}>
-          <SectionHead level={2} id={facts.id} title={facts.title} />
+          <SectionHead level={2} id={facts.id} title={facts.title} action={facts.action} />
           <div className="mt-sm">
             {/* One cell wide, so the cards run down it rather than across
                 a track that cannot hold three of them. */}
@@ -173,7 +174,9 @@ export default function Home() {
   // place. Every other section gets `undefined` and renders exactly as it
   // did before, and any of these deleted from the page document is simply
   // gone, like any other deleted section.
-  const renderHomeSection = (section, blocks) => {
+  // Each receives the section's edit link (issue #198) and draws it in its
+  // own head, the way the default draw does.
+  const renderHomeSection = (section, blocks, editLink) => {
     if (section.id === 'info') {
       // Grouped before the section is opened, because a section whose
       // blocks are all of some type this arrangement does not draw would
@@ -191,7 +194,7 @@ export default function Home() {
           days={days}
           timezone={eventConfig.timezone}
           eventConfig={eventConfig}
-          facts={cards.length ? { id: `section-${section.id}`, title: section.label, cards } : null}
+          facts={cards.length ? { id: `section-${section.id}`, title: section.label, cards, action: editLink } : null}
         />
       );
     }
@@ -212,6 +215,7 @@ export default function Home() {
           id={`section-${section.id}`}
           title={section.label}
           lede={lede?.value ?? null}
+          action={editLink}
         />
       );
     }
@@ -232,6 +236,9 @@ export default function Home() {
   // One lead image at most. An editor who stores several images in the
   // opening section gets the first one, never a gallery.
   const lead = heroBlocks.find((block) => block.blockType === 'image') ?? null;
+  // The lead is the core, so its section's edit link is drawn here, last in
+  // the lead, and only where the page states a hero section to open.
+  const heroSection = (page?.sections ?? []).find((section) => section?.id === 'hero');
   const plate = buildNameplate(eventConfig);
 
   return (
@@ -271,6 +278,9 @@ export default function Home() {
               <RegistrationAction placement="lead" />
               {heroCtas.map((block) => <CtaBlock key={`${block.section}__${block.field}`} block={block} />)}
             </div>
+          ) : null}
+          {heroSection ? (
+            <SectionEditLink pageId={page.id} sectionId="hero" label={heroSection.label} className="mt-sm" />
           ) : null}
         </EventHero>
       </section>

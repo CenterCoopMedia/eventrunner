@@ -180,7 +180,7 @@ Every collection the site renders can be edited and published from the admin.
 - [x] Add the version history page (#195)
 - [x] Add the pending changes page and banner (#196)
 - [ ] Add rich text editing for rich text fields (#197)
-- [ ] Add an editor tour and section edit links (#198)
+- [x] Add an editor tour and section edit links (#198)
 
 ### M11: Communication, social, and billing
 

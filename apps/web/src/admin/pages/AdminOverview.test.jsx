@@ -41,6 +41,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { markTourDone } from '../tourState.js';
 
 // A distinct value for every figure, so a swapped mapping cannot pass.
 const STATS = {
@@ -133,6 +134,9 @@ async function pushEvent(data) {
 }
 
 beforeEach(() => {
+  // The editor tour (issue #198) opens on a first visit; this file tests
+  // the page, so the account has already ended it.
+  markTourDone('admin-1');
   configSubscriptions.clear();
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});

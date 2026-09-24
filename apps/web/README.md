@@ -53,6 +53,16 @@ that overrides the same custom properties `theme.css` defines, so a live
 `App.jsx` derives it from the `?preview=1` query param — convenience only;
 `firestore.rules` is the actual control on who may read `*_drafts`.
 
+Section edit links (issue #198) are convenience too.
+`components/SectionEditLink.jsx` draws "Edit section" beside each section a
+public page draws, and only while `AuthContext` reports `adminStatus` as
+`'admin'`. The link opens `/admin/content/<page>/<section>`, where
+`AdminGate`, the tier check in the admin shell, `requireAdmin` and
+`firestore.rules` decide every read and write as before. The component
+imports nothing under `src/admin`, so the public first paint carries one link
+and no editor. `scripts/ci/bundle-budget.test.cjs` fails if the first-paint
+source graph reaches a file under `src/admin`.
+
 Every subscription is fail-soft: a listener error is logged and the app
 keeps rendering the last-known (snapshot or previously-live) values rather
 than blanking the page.

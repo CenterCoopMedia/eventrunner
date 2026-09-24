@@ -55,6 +55,25 @@ describe('SectionHead', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Dates' })).toBeInTheDocument();
   });
 
+  // The section's one control (issue #198: the admin's edit link) follows
+  // the heading, the running rule and the folio. It is never above them.
+  it('draws the action last in the head row, after the heading and the folio', () => {
+    const { container } = render(
+      <SectionHead title="Dates" folio="Thursday" action={<a href="/admin">Edit section</a>} />,
+    );
+    const row = container.querySelector('.section-head');
+    const children = [...row.children];
+    expect(children[0].tagName).toBe('H2');
+    expect(children.at(-1)).toBe(screen.getByRole('link', { name: 'Edit section' }));
+    expect(children.at(-2)).toHaveClass('section-head__folio');
+  });
+
+  it('adds no node to the head row when there is no action', () => {
+    const { container } = render(<SectionHead title="Dates" />);
+    // The heading and the running rule, and nothing else.
+    expect(container.querySelector('.section-head').children).toHaveLength(2);
+  });
+
   it('carries no tabindex unless one is given (issue #14 jump-target contract)', () => {
     const { rerender } = render(<SectionHead title="Dates" />);
     expect(screen.getByRole('heading', { name: 'Dates' })).not.toHaveAttribute('tabindex');

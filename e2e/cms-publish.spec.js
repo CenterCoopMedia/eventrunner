@@ -14,7 +14,7 @@
 // history page, in a signed-in browser, reads the publish back as a
 // version with its time, its account, and the one field it changed.
 import { test, expect } from '@playwright/test';
-import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, signIn } from './helpers.mjs';
+import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, signIn } from './helpers.mjs';
 
 test.describe.serial('CMS edit -> publish -> public visibility', () => {
   const newSubtitle = `E2E edited subtitle ${Date.now()}`;
@@ -219,5 +219,108 @@ test.describe.serial('organizations: admin editor -> publish -> sponsor pages', 
     await page.goto('/sponsors');
     const packages = page.getByRole('region', { name: 'Sponsorship packages', exact: true });
     await expect(packages.getByRole('heading', { level: 3 })).toHaveText(['Presenting', 'Supporting', 'Partner']);
+  });
+});
+
+// The editor tour and the section edit links (issue #198), on the real
+// surface: the seeded operator signs in through the sign-in page, and every
+// move below is one a person makes in the browser.
+//
+// The done line: the tour can be completed by keyboard, and a section edit
+// link opens the correct editor. The seeded FAQ page is a deep link, so the
+// profile setup nudge (ProfileSetupRedirect, which fires on / only) never
+// takes the page away mid-test.
+test.describe('editor tour and section edit links', () => {
+  const FAQ_ITEMS = 'Questions and answers';
+
+  test('a section edit link is absent for a visitor and opens that section’s editor for an admin', async ({ page }) => {
+    test.setTimeout(90_000);
+    // Signed out: the page draws its sections and no link.
+    await page.goto('/faq');
+    await expect(page.getByRole('heading', { level: 2, name: FAQ_ITEMS })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Edit section/ })).toHaveCount(0);
+
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/faq');
+    const link = page.getByRole('link', { name: `Edit section: ${FAQ_ITEMS}` });
+    await expect(link).toBeVisible();
+    await expect(link).toHaveText('Edit section');
+    await expect(link).toHaveAttribute('href', '/admin/content/faq/faq_items');
+    // It follows its heading, in the section's head.
+    const headRow = page.getByRole('heading', { level: 2, name: FAQ_ITEMS }).locator('..');
+    await expect(headRow.getByRole('link', { name: `Edit section: ${FAQ_ITEMS}` })).toBeVisible();
+
+    // Enter on the focused link opens the editor that holds the section's
+    // blocks: its title band names the section, the page and the section id.
+    await link.focus();
+    await page.keyboard.press('Enter');
+    await page.waitForURL('**/admin/content/faq/faq_items');
+    await expect(page.getByRole('heading', { level: 1, name: FAQ_ITEMS })).toBeVisible();
+    await expect(page.locator('main header').getByText(/^faq · faq_items · \d+ blocks?$/)).toBeVisible();
+    await expect(page.getByText('No such section')).toHaveCount(0);
+  });
+
+  test('the tour is walked to its end with Tab and Enter alone, and stays ended after a reload', async ({ page }) => {
+    test.setTimeout(90_000);
+    // A fresh browser context: nothing is stored, so this is a first visit.
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin');
+    await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
+    const tour = page.getByRole('complementary', { name: 'Admin tour' });
+    await expect(tour).toBeVisible();
+
+    // It sits above the page's title band and never under it.
+    const tourBox = await tour.boundingBox();
+    const bandBox = await page.locator('main header.admin-job-line').boundingBox();
+    expect(tourBox.y + tourBox.height).toBeLessThanOrEqual(bandBox.y);
+
+    /** Press Tab until the focused control reads one of `names`, at most 80 times. */
+    async function tabTo(names) {
+      for (let presses = 0; presses < 80; presses += 1) {
+        await page.keyboard.press('Tab');
+        const focused = await page.evaluate(() => globalThis.document.activeElement?.textContent?.trim() ?? '');
+        if (names.includes(focused)) return focused;
+      }
+      throw new Error(`Tab did not reach ${names.join(' or ')} within 80 presses`);
+    }
+
+    const stepLine = tour.getByText(/^Step \d+ of \d+$/);
+    await expect(stepLine).toHaveText(/^Step 1 of \d+$/);
+    const total = Number((await stepLine.textContent()).match(/of (\d+)/)[1]);
+    for (let step = 1; step <= total; step += 1) {
+      await expect(stepLine).toHaveText(`Step ${step} of ${total}`);
+      const pressed = await tabTo(['Next', 'Finish tour']);
+      expect(pressed).toBe(step === total ? 'Finish tour' : 'Next');
+      await page.keyboard.press('Enter');
+      if (step < total) {
+        // The new step's heading takes the focus, and shows it.
+        const heading = tour.getByRole('heading', { level: 2 });
+        await expect(heading).toBeFocused();
+        expect(await heading.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+      }
+    }
+
+    // Finished: the tour closes and the focus returns to the rail.
+    await expect(tour).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Take the tour' })).toBeFocused();
+    const uid = await ensureUser(ADMIN_EMAIL);
+    expect(
+      await page.evaluate((key) => globalThis.localStorage.getItem(key), `eventrunner.adminTour.v1:${uid}`),
+    ).toBe('done');
+
+    // A reload keeps it ended. The Overview's figures load after the shell,
+    // so by the time they show, an open tour would have drawn too.
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Event figures' })).toBeVisible();
+    await expect(tour).toHaveCount(0);
+
+    // And Take the tour opens it again at step 1, where Escape ends it.
+    await page.getByRole('button', { name: 'Take the tour' }).click();
+    await expect(tour.getByRole('heading', { level: 2, name: 'Welcome to the admin panel' })).toBeFocused();
+    await expect(stepLine).toHaveText(`Step 1 of ${total}`);
+    await page.keyboard.press('Escape');
+    await expect(tour).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Take the tour' })).toBeFocused();
   });
 });

@@ -41,14 +41,20 @@
 // refusal rather than the page. A page a builder adds declares its tier by
 // its docket entry and nowhere else. The tier comes from AuthContext's
 // probes; the server's requireAdmin and the rules are the enforcement.
-import { useState } from 'react';
+//
+// THE TOUR (issue #198). A first visit opens the editor tour at the head of
+// the stone; "Take the tour" on the rail opens it again. It is its own lazy
+// chunk (components/AdminTour.jsx), and its steps are this docket.
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
 import { AdminEmptyState } from './components/adminChrome.jsx';
 import PendingChangesBanner from './components/PendingChangesBanner.jsx';
+import { linkButtonClass } from './components/formControls.jsx';
 import { PendingChangesProvider } from './PendingChangesContext.jsx';
+import { markTourDone, readTourDone } from './tourState.js';
 
 /** Every docket item is an ABSOLUTE path. A relative `to` resolves against
  * the current LOCATION inside this nested `<Routes>`, so on /admin/branding
@@ -191,7 +197,7 @@ export function sectionTier(pathname) {
 }
 
 /** "A, B and C" from a list of labels; one label stands alone. */
-function listWords(labels) {
+export function listWords(labels) {
   if (labels.length <= 1) return labels.join('');
   return `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`;
 }
@@ -257,6 +263,21 @@ function TierRefusal() {
 }
 
 /**
+ * What a tour chunk that fails to load leaves: a stated line and a way to
+ * close it, so "Take the tour" never becomes a control that does nothing.
+ */
+function TourLoadFailed({ onEnd }) {
+  return (
+    <aside aria-label="Admin tour" className="admin-tour">
+      <p role="status">The tour did not load. Reload the page to try again.</p>
+      <button type="button" className={linkButtonClass} onClick={onEnd}>End tour</button>
+    </aside>
+  );
+}
+
+const AdminTour = lazy(() => import('./components/AdminTour.jsx').catch(() => ({ default: TourLoadFailed })));
+
+/**
  * The shell. One count of unpublished changes (issue #196) is opened here,
  * once, for the banner above the stone and the Unpublished changes page to
  * read; the shell mounts only inside AdminGate, so a non-admin opens none.
@@ -286,6 +307,21 @@ function AdminDesk() {
   const docket = docketForTier(tierKnown ? adminTier : 'staff');
   const required = sectionTier(pathname);
   const refused = tierKnown && required !== null && !tierReaches(adminTier, required);
+  // The editor tour (issue #198): null while closed, else the run number.
+  // Run 0 is the first visit and takes no focus; each "Take the tour" is a
+  // new run, so it starts again at step 1 with the focus on its heading.
+  // Ending it stores the mark and gives the focus back to the rail button.
+  const uid = user?.uid;
+  const [tour, setTour] = useState(null);
+  const takeTourRef = useRef(null);
+  useEffect(() => {
+    setTour(readTourDone(uid) ? null : 0);
+  }, [uid]);
+  const endTour = () => {
+    markTourDone(uid);
+    setTour(null);
+    takeTourRef.current?.focus();
+  };
 
   return (
     <div className="admin-room flex min-h-screen flex-col bg-admin-ground font-admin-ui text-admin-base text-admin-ink lg:flex-row">
@@ -359,6 +395,14 @@ function AdminDesk() {
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-xs">
+            <button
+              type="button"
+              ref={takeTourRef}
+              onClick={() => setTour((run) => (run ?? 0) + 1)}
+              className={railButtonClass}
+            >
+              Take the tour
+            </button>
             <NavLink to="/" className={railButtonClass}>
               View site
             </NavLink>
@@ -374,6 +418,14 @@ function AdminDesk() {
             up by the stone's top padding and would slide over it. */}
         <PendingChangesBanner />
         <div className="admin-stone mx-auto w-full max-w-admin-canvas">
+          {/* The tour is the one thing in the stone before the page:
+              `.admin-tour` (index.css) keeps room under it for the title
+              band's pull, so the band lands below it, never over it. */}
+          {tour === null ? null : (
+            <Suspense fallback={null}>
+              <AdminTour key={tour} docket={docket} takeFocus={tour > 0} onEnd={endTour} />
+            </Suspense>
+          )}
           {refused ? <TierRefusal /> : <Outlet />}
         </div>
       </main>

@@ -29,6 +29,7 @@ import { useContent } from '../contexts/ContentContext.jsx';
 import SectionBlocks from './blocks/SectionBlocks.jsx';
 import { PullQuoteBudget } from './blocks/pullQuoteBudget.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
+import SectionEditLink from './SectionEditLink.jsx';
 import { resolvePageLayout, sectionsBySlot, statedPageLayout } from '../lib/pageLayout.js';
 
 /**
@@ -65,18 +66,25 @@ import { resolvePageLayout, sectionsBySlot, statedPageLayout } from '../lib/page
  * A custom renderer also decides for itself what "empty" means, because the
  * blocks are not where its content comes from.
  *
+ * EVERY DRAWN SECTION CARRIES ONE EDIT LINK (issue #198), which renders only
+ * for a signed-in admin. The default draw puts it in the section's head; a
+ * custom draw receives it as the third argument and puts it in its own head.
+ * A section that draws nothing has no link.
+ *
  * @param {{
+ *   pageId?: string,
  *   sections: object[],
  *   getSectionBlocks: (id: string) => object[],
- *   renderSection?: (section: object, blocks: object[]) => import('react').ReactNode | undefined,
+ *   renderSection?: (section: object, blocks: object[], editLink: import('react').ReactNode) => import('react').ReactNode | undefined,
  *   arrangement: 'grid' | 'list',
  * }} props
  */
-function SlotSections({ sections, getSectionBlocks, renderSection, arrangement }) {
+function SlotSections({ pageId, sections, getSectionBlocks, renderSection, arrangement }) {
   const drawn = sections
     .map((section) => {
       const blocks = getSectionBlocks(section.id);
-      const custom = renderSection ? renderSection(section, blocks) : undefined;
+      const editLink = <SectionEditLink pageId={pageId} sectionId={section.id} label={section.label} />;
+      const custom = renderSection ? renderSection(section, blocks, editLink) : undefined;
       if (custom !== undefined) return { section, node: custom };
       if (blocks.length === 0) return { section, node: null };
       return {
@@ -85,7 +93,7 @@ function SlotSections({ sections, getSectionBlocks, renderSection, arrangement }
           <section aria-labelledby={`section-${section.id}`} className="page-section">
             {/* The head runs to the stage whatever the arrangement: a
                 section boundary is the width of the page it opens. */}
-            <SectionHead level={2} id={`section-${section.id}`} title={section.label} />
+            <SectionHead level={2} id={`section-${section.id}`} title={section.label} action={editLink} />
             {/* THE ARRANGEMENT ON THE STAGE (2026-09-10 vocabulary
                 expansion): `grid` gives the section the stage's own
                 columns, `list` sets it on the text measure — which is what
@@ -110,7 +118,7 @@ function SlotSections({ sections, getSectionBlocks, renderSection, arrangement }
  *   pageId: string | string[],         // the cmsPages id, e.g. 'schedule',
  *                                      // or ids/paths to try in order
  *   exclude?: string[],                // section ids the core renders itself
- *   renderSection?: (section: object, blocks: object[]) => import('react').ReactNode | undefined,
+ *   renderSection?: (section: object, blocks: object[], editLink: import('react').ReactNode) => import('react').ReactNode | undefined,
  *                                      // draw one section differently, in
  *                                      // its own place in the order
  *   children: import('react').ReactNode
@@ -149,6 +157,7 @@ export default function SystemPage({
     <PullQuoteBudget sections={readingOrder} getSectionBlocks={getSectionBlocks}>
       <article {...(stated.density ? { 'data-density': stated.density } : null)} {...articleProps}>
         <SlotSections
+          pageId={page?.id}
           sections={slots.above}
           getSectionBlocks={getSectionBlocks}
           renderSection={renderSection}
@@ -156,12 +165,14 @@ export default function SystemPage({
         />
         {core}
         <SlotSections
+          pageId={page?.id}
           sections={slots.main}
           getSectionBlocks={getSectionBlocks}
           renderSection={renderSection}
           arrangement={layout.arrangement}
         />
         <SlotSections
+          pageId={page?.id}
           sections={slots.below}
           getSectionBlocks={getSectionBlocks}
           renderSection={renderSection}

@@ -239,16 +239,18 @@ export default function SponsorWall({
  * The caller gates on `features.sponsors`; this gates on there being
  * organizations at all.
  *
- * @param {{ id: string, title: string, level?: 2 | 3, lede?: string | null }} props
+ * `action` is the section's edit link (issue #198), drawn in its head.
+ *
+ * @param {{ id: string, title: string, level?: 2 | 3, lede?: string | null, action?: import('react').ReactNode }} props
  */
-export function SponsorStrip({ id, title, level = 2, lede = null }) {
+export function SponsorStrip({ id, title, level = 2, lede = null, action = null }) {
   const { organizationsData } = useContent();
   const visible = visibleOrganizations(organizationsData);
   if (visible.length === 0) return null;
 
   return (
     <section aria-labelledby={id} className="page-section">
-      <SectionHead level={level} id={id} title={title} />
+      <SectionHead level={level} id={id} title={title} action={action} />
       {lede ? (
         <p className="mt-sm max-w-prose text-body text-text-secondary text-pretty">{lede}</p>
       ) : null}

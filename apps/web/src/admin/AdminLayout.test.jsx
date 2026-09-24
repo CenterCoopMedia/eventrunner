@@ -14,7 +14,7 @@
 //   3. The client's two elements are the job mark and the accent, and
 //      nothing else on this surface belongs to the client.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const configSubscriptions = new Map();
@@ -35,10 +35,13 @@ vi.mock('./adminSource.js', () => ({
     return () => {};
   },
 }));
+// The signed-in account. The tour's stored mark is per account, so the one
+// test that ends it with a refusing store signs in as its own account.
+let signedInUid = 'admin-1';
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {},
   onAuthStateChanged: (_auth, next) => {
-    next({ uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' });
+    next({ uid: signedInUid, email: 'admin@example.org', getIdToken: async () => 'id-token' });
     return () => {};
   },
   signInWithCustomToken: vi.fn(),
@@ -56,6 +59,7 @@ import App from '../App.jsx';
 import { ADMIN_TIERS, DOCKET, TIER_SCOPE, docketForTier, sectionTier, tierReaches } from './AdminLayout.jsx';
 // Mocked for every file in src/test/setup.js; steered here for the banner.
 import { subscribeDirtyDrafts } from './pendingChangesSource.js';
+import { markTourDone, readTourDone } from './tourState.js';
 
 async function renderAdmin(path = '/admin/pages') {
   const result = render(
@@ -349,5 +353,108 @@ describe('the admin shell', () => {
     expect(screen.getByRole('button', { name: 'Sign out' }).className).toContain(
       'min-h-admin-control',
     );
+  });
+});
+
+// The editor tour (issue #198) is shell chrome: it opens on a first visit,
+// sits inside the stone above the page, and ends from any step.
+describe('the editor tour in the shell', () => {
+  const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
+  const tourPanel = () => screen.findByRole('complementary', { name: 'Admin tour' });
+  // The tour is a lazy chunk. Before asserting it is ABSENT, let that chunk
+  // load, so an open tour would have had every chance to draw.
+  const settleTourChunk = () =>
+    act(async () => {
+      await import('./components/AdminTour.jsx');
+      await Promise.resolve();
+    });
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    signedInUid = 'admin-1';
+  });
+
+  it('opens on a first visit inside the stone, above the page heading, without taking the focus', async () => {
+    const { container } = await renderAdmin('/admin/pages');
+    const tour = await tourPanel();
+    // After the unpublished changes banner's place (outside the stone) and
+    // before the page: the first thing in the stone.
+    expect(container.querySelector('.admin-stone').firstElementChild).toBe(tour);
+    const heading = within(tour).getByRole('heading', { level: 2, name: 'Welcome to the admin panel' });
+    // An operator reaches five groups: a welcome, five steps, and the last.
+    const stepLine = within(tour).getByText('Step 1 of 7');
+    expect(heading.compareDocumentPosition(stepLine) & FOLLOWING).toBeTruthy();
+    const pageHeading = await screen.findByRole('heading', { level: 1, name: 'Pages' });
+    expect(tour.compareDocumentPosition(pageHeading) & FOLLOWING).toBeTruthy();
+    expect(heading).not.toHaveFocus();
+  });
+
+  it('stays closed for an account that has ended it in this browser', async () => {
+    markTourDone('admin-1');
+    await renderAdmin('/admin/pages');
+    await screen.findByRole('heading', { level: 1, name: 'Pages' });
+    await settleTourChunk();
+    expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+  });
+
+  it('ends from End tour: it stores the mark, closes, and gives the focus to Take the tour', async () => {
+    await renderAdmin('/admin/pages');
+    const tour = await tourPanel();
+    fireEvent.click(within(tour).getByRole('button', { name: 'End tour' }));
+    expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Take the tour' })).toHaveFocus();
+    expect(readTourDone('admin-1')).toBe(true);
+  });
+
+  it('opens again at step 1 from Take the tour, with the focus on its heading, and Escape ends it', async () => {
+    markTourDone('admin-1');
+    await renderAdmin('/admin/pages');
+    const takeTour = screen.getByRole('button', { name: 'Take the tour' });
+    // First in the rail foot's button row, and a rail control like its neighbours.
+    expect(takeTour.parentElement.firstElementChild).toBe(takeTour);
+    expect(takeTour.className).toContain('min-h-admin-control');
+    fireEvent.click(takeTour);
+    const heading = await screen.findByRole('heading', { level: 2, name: 'Welcome to the admin panel' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    fireEvent.keyDown(heading, { key: 'Escape' });
+    expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+    expect(takeTour).toHaveFocus();
+  });
+
+  it('stays on screen, at its step, while the reader opens the section it names', async () => {
+    await renderAdmin('/admin/pages');
+    const tour = await tourPanel();
+    fireEvent.click(within(tour).getByRole('button', { name: 'Next' }));
+    expect(within(tour).getByText('Step 2 of 7')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Content' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Content' })).toBeInTheDocument();
+    expect(within(await tourPanel()).getByText('Step 2 of 7')).toBeInTheDocument();
+  });
+
+  it('still ends, for the life of the tab, when the browser refuses its store', async () => {
+    signedInUid = 'admin-refused-store';
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    try {
+      const first = await renderAdmin('/admin/pages');
+      const tour = await tourPanel();
+      fireEvent.click(within(tour).getByRole('button', { name: 'End tour' }));
+      expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Take the tour' })).toHaveFocus();
+      first.unmount();
+
+      // A fresh shell in the same tab (the reader went to the site and back).
+      await renderAdmin('/admin/pages');
+      await screen.findByRole('heading', { level: 1, name: 'Pages' });
+      await settleTourChunk();
+      expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
   });
 });
