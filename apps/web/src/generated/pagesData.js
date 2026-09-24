@@ -145,7 +145,7 @@ export const pagesData = [
       {
         id: 'history',
         label: 'History',
-        description: 'Background on previous editions of the event.',
+        description: 'Background on previous editions of the event. The editions themselves come from the Timeline list, not from here.',
         allowedBlocks: [
           'richtext',
           'image',
