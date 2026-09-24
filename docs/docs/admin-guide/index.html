@@ -127,6 +127,7 @@
               <li><a href="#live-updates">Live updates</a></li>
               <li><a href="#feedback">Feedback</a></li>
               <li><a href="#email-log">Email log</a></li>
+              <li><a href="#change-requests">Change requests</a></li>
               <li><a href="#materials">Materials</a></li>
               <li><a href="#system-errors">System errors</a></li>
               <li><a href="#settings-event-settings">Settings → Event settings</a></li>
@@ -147,7 +148,7 @@
           </thead>
           <tbody>
           <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, and System errors</td><td>The person who set the site up and answers for the deployment</td></tr>
-          <tr><td>Staff</td><td>Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, and Event settings</td><td>The people who run the event day to day</td></tr>
+          <tr><td>Staff</td><td>Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings</td><td>The people who run the event day to day</td></tr>
           </tbody>
           </table>
           </div>
@@ -308,7 +309,7 @@
           <p><strong>Formulas stay text.</strong> A spreadsheet runs a cell that starts with <code>=</code>, <code>+</code>, <code>-</code>, or <code>@</code> as a formula. In the file, such a cell starts with an apostrophe, and so does a cell that starts with a tab or a carriage return, or with spaces and then one of those four characters. The spreadsheet shows the value as text.</p>
           <p><strong>Every export is recorded.</strong> The server writes an admin log entry with your address, the number of rows, the status filter, and whether a search narrowed the list. It never records the search text, because that text can name a person. If the entry cannot be written, the server refuses the export and makes no file. The server keeps no copy of the file. One export holds at most 10,000 attendees and 10 MB; a larger one is refused before anything is recorded, and the message asks you to narrow the filter.</p>
           <p><strong>Past attendance.</strong> Select <strong>Edit record</strong> on a row to open that account&#39;s record. <strong>Past attendance</strong> takes one edition per line, such as a year: at most 20 editions of up to 40 characters each, with no repeats. Select <strong>Save record</strong> to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.</p>
-          <p><strong>Delete an account.</strong> In the record, select <strong>Delete account</strong>, read what the delete removes, and select <strong>Delete this account</strong>. The delete removes the account, its directory profile, and its shared schedule, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session&#39;s saved count), the private notes, and the profile photo. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.</p>
+          <p><strong>Delete an account.</strong> In the record, select <strong>Delete account</strong>, read what the delete removes, and select <strong>Delete this account</strong>. The delete removes the account, its directory profile, and its shared schedule, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session&#39;s saved count), the private notes, the profile photo, and the change requests the person sent. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.</p>
           <p>The server refuses a delete in four cases, and says why:</p>
           <ul>
           <li>Your own account.</li>
@@ -340,6 +341,18 @@
           <li><strong>Every preview you open is recorded</strong> in the admin log with your account and the message&#39;s record. The record never holds the address or the subject.</li>
           </ul>
           <p>Sent messages are closed to every browser, admins included. The page reads them through two admin-gated endpoints.</p>
+          <h2 id="change-requests">Change requests<a class="heading-anchor" href="#change-requests" aria-label="Link to this section">#</a></h2>
+          <p>Requests for a change to the site, from signed-in visitors and from staff. Both kinds arrive in one list, newest first. Staff and operators can open it.</p>
+          <ul>
+          <li><strong>The feature is off by default.</strong> An operator turns on <code>changeRequests</code> in Settings → Features. While it is off, the footer has no <strong>Request a change</strong> button, this page has no form, and the server refuses every request. The list, the status changes, and <strong>Remove</strong> still work, so you can clear the list after the feature is off.</li>
+          <li><strong>Only a signed-in visitor can send one.</strong> The footer shows <strong>Request a change</strong> only to a visitor who is signed in, and the server refuses a request from an address that is not verified. The request is stored with the sender&#39;s sign-in address. One account can send 5 requests in 15 minutes. The server refuses more, and the refusal says how many minutes to wait.</li>
+          <li><strong>Send one yourself</strong> from the <strong>Request a change</strong> panel at the top of the page. It goes through the same server checks and the same limit.</li>
+          <li><strong>Show</strong> picks the requests the list shows: <strong>Open</strong> (new and in progress, the default), <strong>All</strong>, <strong>New</strong>, <strong>In progress</strong>, <strong>Done</strong>, or <strong>Declined</strong>. The choice stays in the page address.</li>
+          <li><strong>Each row</strong> shows the status as a word, the time the request arrived, the sender&#39;s address, the page it is about, and the text. The row&#39;s button is the next step: <strong>Mark in progress</strong>, <strong>Mark done</strong>, or <strong>Reopen</strong>. <strong>Decline</strong> closes a new or in-progress request.</li>
+          <li><strong>Remove</strong> deletes the request and its text. It cannot be undone.</li>
+          <li><strong>The admin log records every request, status change, and removal</strong>, with the account that did it and the request&#39;s record. The log never holds the text of a request.</li>
+          </ul>
+          <p>Only admins can read a request. The sender cannot read it back, and no email is sent. When an account is deleted in Attendees, the change requests it sent are deleted too, and the server refuses a new request from that account&#39;s open session.</p>
           <h2 id="materials">Materials<a class="heading-anchor" href="#materials" aria-label="Link to this section">#</a></h2>
           <p>Session materials review — upload or link files against a session, with an optional embargo that holds the material until the session ends. Prefer a real label (&quot;Slides&quot;) over a bare URL as the link text a viewer sees. This collection is fully server-only, even for an admin&#39;s direct read, so every action here goes through Cloud Functions.</p>
           <h2 id="system-errors">System errors<a class="heading-anchor" href="#system-errors" aria-label="Link to this section">#</a></h2>
@@ -428,6 +441,7 @@
           <p>With no milestones and no goal, the Overview shows no milestone panel at all.</p>
           <h2 id="settings-features">Settings → Features<a class="heading-anchor" href="#settings-features" aria-label="Link to this section">#</a></h2>
           <p>Feature flags, wired to a <strong>whole-document replace</strong> — every known flag is always sent, and an omitted flag means disabled. When a new flag is added to the platform it appears here automatically, because the form&#39;s key list comes from the same shared schema the server validates against.</p>
+          <p><code>changeRequests</code> turns on the change request form in the footer and on the Change requests page. It is off by default. See <a href="#change-requests">Change requests</a>.</p>
           <h2 id="settings-badges">Settings → Badges<a class="heading-anchor" href="#settings-badges" aria-label="Link to this section">#</a></h2>
           <p>The badge catalog: Categories, each with a max-picks cap and its list of badges, which attendees self-select from on their profile. Also a whole-document replace: editing one badge sends the complete set of categories back and preserves the configured custom-badge block list.</p>
           <p><strong>Custom badges.</strong> The separate feature is off by default. When enabled, attendees can enter up to three badges of 24 characters each. Reserved role words are always blocked; <code>config/badges.customBadgeBlockList</code> adds event-specific words. The owner form and public projection use the same validator. The category editor preserves this list; an operator changes it through the badge configuration API.</p>
