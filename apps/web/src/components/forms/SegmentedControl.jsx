@@ -79,8 +79,10 @@ export default function SegmentedControl({ label, options, value, onChange, hide
     setFocused(null);
   }
 
-  const shown = options[hovered ?? focused ?? -1];
-  const reason = shown?.disabled && shown.hint ? shown.hint : null;
+  // The pointer's reason wins while there is one; an available option under
+  // the pointer has none, and must not hide the focused option's.
+  const reasonOf = (option) => (option?.disabled && option.hint ? option.hint : null);
+  const reason = reasonOf(options[hovered ?? -1]) ?? reasonOf(options[focused ?? -1]);
 
   // `items-start` matters: the row is an inline-flex, and a stretching column
   // would pull its last option out to the full width of the page, which reads

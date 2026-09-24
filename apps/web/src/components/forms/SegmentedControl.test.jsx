@@ -155,4 +155,26 @@ describe('SegmentedControl', () => {
     const rule = indexCss.match(/\.segmented__option\[aria-disabled='true'\] \{[^}]*\}/u)?.[0] ?? '';
     expect(rule).toContain('text-decoration-style: dashed');
   });
+
+  it('keeps showing the focused unavailable option’s reason while the pointer rests on another option', () => {
+    // A reader clicks the first option and arrows onto the unavailable one:
+    // the pointer still rests on the first. The reason is the focused
+    // option's; an available option under the pointer has none to show and
+    // must not hide it (adversarial review, 2026-09-24).
+    render(
+      <SegmentedControl
+        label="Range"
+        options={[OPTIONS[0], { ...OPTIONS[1], disabled: true, hint: 'No sessions this week' }, OPTIONS[2]]}
+        value="day"
+        onChange={() => {}}
+      />,
+    );
+    const options = screen.getAllByRole('radio');
+    fireEvent.mouseEnter(options[0]);
+    fireEvent.click(options[0]);
+    options[0].focus();
+    fireEvent.keyDown(screen.getByRole('radiogroup'), { key: 'ArrowRight' });
+    expect(options[1]).toHaveFocus();
+    expect(document.querySelector('.segmented__reason')).toHaveTextContent('No sessions this week');
+  });
 });
