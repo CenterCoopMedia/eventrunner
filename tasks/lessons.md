@@ -74,3 +74,14 @@ Rules written after user corrections. Read at session start.
 - Two builders wrote the same scratch runner file in the shared scratchpad,
   and one E2E run went to the wrong worktree. Scratch files now go in a
   folder per group id (tasks/builder-brief.md, "Where you work").
+
+## 2026-09-24: check the syntax of every "take both sides" conflict join
+
+- Branch 16's conflicts in `content.test.cjs` and the rules test were
+  resolved by keeping both sides. The two sides had shared a closing
+  `});`, which sat outside the conflict markers, so the join left one test
+  open and the file would not parse. Lint caught the rules test; the unit
+  run caught the other. After every scripted join, run `node --check` (or
+  lint) on the joined files before `cherry-pick --continue`, and fold any
+  fix into the commit that broke it so no commit on the branch fails to
+  parse.

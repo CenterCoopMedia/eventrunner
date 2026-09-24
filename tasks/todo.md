@@ -155,11 +155,17 @@ requests stay stable.
 | #274 | `joe/confident-gates-gy99ip-9-attendees` | #184, #185 | Codex round fixed (`8aebebf` a bookmark re-reads its account in the transaction, `8515ccb` the export is built per chunk with a 10 MB limit), resolved; green locally |
 | #275 | `joe/confident-gates-gy99ip-10-change-requests` | #188 | b4's feature, report and seven review fixes on #274 in `/home/user/wt-int2`. Codex round fixed in `1cb0a0c`: the store reads `users/{uid}` in its transaction (an account delete wins), a changed retry under a used key is 409 and both forms take a new key on an edit (`lib/submissionKey.js`), and a removal the listener delivers first keeps its row |
 | #277 | `joe/confident-gates-gy99ip-11-materials` | #189 | b5's feature and review fixes in `/home/user/wt-int`. Codex round fixed in `ae2f3dd`: the archive holds at most 9 MiB (a streamed 2nd-gen response stops at 10 MB), each session keeps its own folder, and a file that leaves the list leaves the selection |
-| next | `joe/confident-gates-gy99ip-12-organizations` | #192, #193 | c2's feature, report and review round (8 fix commits) on #277 in `/home/user/wt-int3`; conflicts in CHANGELOG, AdminApp.jsx and its test, AdminLayout.test.jsx (rail count 20), ADMIN_GUIDE and functions/README resolved by hand |
+| #281 | `joe/confident-gates-gy99ip-12-organizations` | #192, #193 | c2 in `/home/user/wt-int3`. The change request dialog loads on demand (the demo chunk was 82 bytes over). Codex round fixed in `03e71d7`: the editor waits for both listeners, a resume reports the failed run's ids, the create form moved to `new/organization`, and a package limit must be a whole number of 1 or more |
+| #283 | `joe/confident-gates-gy99ip-13-updates` | #190, #191 | c1 in `/home/user/wt-int4`, plus the same resume fix for the updates list (`c6dd433`); Codex found nothing |
+| #284 | `joe/confident-gates-gy99ip-14-versions` | #195 | c4 in `/home/user/wt-int5`, read-only (the restore became #280) |
+| #286? | `joe/confident-gates-gy99ip-15-unpublished` | #196 | c5 in `/home/user/wt-int6`; the version pages import its collection list; the link tests now test the docket rule |
+| next | `joe/confident-gates-gy99ip-16-timeline` | #194 | c3 in `/home/user/wt-int7`, with the History list on the eager path (spec); the feedback dialog loads on demand to make room |
 
 M10: spec reviews finished for c1 to c7 (specs in `/home/user/specs/`). c1 (#190, #191) and c2 (#192, #193) were dispatched 2026-09-24 05:25 UTC from #274's tip `874976f` in `/home/user/wt-c1` and `/home/user/wt-c2`; c4 (#195) and c5 (#196) from `6a47f70` in `/home/user/wt-c4` and `/home/user/wt-c5`; c6 (#197) at 06:30 UTC from #275's head `5992a68` in `/home/user/wt-c6`. c2 reported done at 06:28 (`93cb0b7`, regenerate `39ab249`); its adversarial review is workflow run `wf_7b4186fd-ba7`. c5 reported done at 06:45 (`1838be3`, regenerate `78fac23`); its review is `wf_e1aebb22-c01`. c3 (#194) was dispatched at 06:47 from c2's unreviewed tip `39ab249` in `/home/user/wt-c3`, to keep four builders busy; c2's review fixes join c2's commits when the stack takes them, before c3's. Order: c5 before c7 (banner, then tour). Next: c7 from c5's tip when a slot frees, then M11 and M12 specs.
 
 PR #277 (branch 11, #189) is open on #275 and completes M9.
+
+State at 09:05 UTC: branches 12 to 15 are pushed (#281, #283, #284, and branch 15's PR). Branch 16 (c3) is next, then c6 (#197; its review is `wf_daa53d9c-da6`, and it also changes `adminSource.js` so admin listeners wait for the server) and c7 (#198; its review confirmed two minor findings, and the director accepted the +71 raw and +37 gzip admin chunk overage). The demo's initial chunk is the tightest budget: about 291,500 of 292,000 gzip bytes before c3.
 
 Review rounds (2026-09-24 07:10 UTC): c2 fixed and stacked as branch 12. c1 (the update editor adopted the live doc before the drafts listener reported, so a save could overwrite the draft; a partial date saved as undated) and c5 (nine minor findings; the director chose the 20 newest failed runs by `requestedAt` desc with a composite index, and accepts up to +3,400 raw bytes on the admin entry chunk) are in their fix rounds. c4's review is `wf_6b43322b-dd2`. Findings files: `scratchpad/cN-findings.json` in the session directory. After c1 and c5 are fixed, they stack as branches 13 and 14; then c3 on c2, c4, c6, c7 on c5.
 
@@ -176,7 +182,10 @@ session folder; fix before #213), #276 (feedback has the same
 changed-retry flaw Codex found in change requests), #278 (a single
 material over 10 MB cannot be downloaded, the same streaming cap) and #279
 (the page and session editors adopt the live doc before the drafts listener
-reports, the race c1's review found).
+reports, the race c1's review found), #280 (a safe restore of a version),
+#282 (the pages list reports a resume against the wrong ids) and #285 (the
+E2E publish check waits on any listener, and a listener retry outlasts its
+timeout).
 
 ### Resume order
 
