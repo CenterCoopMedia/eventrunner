@@ -187,7 +187,7 @@ Choose how the first paragraph of a Long read page opens.
 Choose how a quoted sentence is set.
 
 - **Ruled with an opening mark** *(default)*: Sets the quote between strong rules with a large opening mark in the heading typeface.
-- **Side rule**: Sets the quote beside one strong rule with no rules above or below and no mark.
+- **Side rule**: Sets the quote beside one strong rule with no rules above or below; the quotation marks sit inline around the sentence.
 - **Opening mark only**: Sets the quote with the large opening mark and no rules.
 
 ### Directory style: `directory`
@@ -284,7 +284,7 @@ Choose how the first paragraph of a Long read page opens.
 Choose how a quoted sentence is set.
 
 - **Centred with an opening mark** *(default)*: Centres the quote between hairlines with a large opening mark and a small-capitals attribution.
-- **Column rule**: Sets the quote beside one hairline, like a boxed paragraph in a column, with no mark.
+- **Column rule**: Sets the quote beside one hairline, like a boxed paragraph in a column, with the quotation marks inline around the sentence.
 
 ### Directory style: `directory`
 

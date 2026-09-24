@@ -265,3 +265,19 @@ test('the stamp is Zine only, and Zine ships the flat-block variant beside it', 
     );
   }
 });
+
+test('a quote choice that draws the inline marks does not say it draws none', () => {
+  // The inline pair of quotation marks (--pull-quote-quotes-display) arrived
+  // after the copy for the side-rule and column-rule choices was written,
+  // and that copy still said "no mark" (adversarial review, 2026-09-24).
+  // The copy output is generated from the same JSON, so the check reads it
+  // through the catalog's own two outputs.
+  const { PRESET_COPY } = require('../apps/web/src/admin/presetCopy.js');
+  for (const [presetId, preset] of Object.entries(PRESET_REMAPS.presets)) {
+    for (const [choiceId, body] of Object.entries(preset.options.quote ?? {})) {
+      if (body.tokens?.['--pull-quote-quotes-display'] !== 'inline') continue;
+      const why = PRESET_COPY[presetId].options.quote.choices[choiceId].why;
+      assert.doesNotMatch(why, /no mark/iu, `${presetId} ${choiceId}: "${why}"`);
+    }
+  }
+});

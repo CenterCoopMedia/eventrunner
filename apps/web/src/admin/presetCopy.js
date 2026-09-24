@@ -234,7 +234,7 @@ export const PRESET_COPY = Object.freeze({
           },
           'side-rule': {
             label: 'Side rule',
-            why: 'Sets the quote beside one strong rule with no rules above or below and no mark.',
+            why: 'Sets the quote beside one strong rule with no rules above or below; the quotation marks sit inline around the sentence.',
           },
           'mark-only': {
             label: 'Opening mark only',
@@ -377,7 +377,7 @@ export const PRESET_COPY = Object.freeze({
           },
           'column-rule': {
             label: 'Column rule',
-            why: 'Sets the quote beside one hairline, like a boxed paragraph in a column, with no mark.',
+            why: 'Sets the quote beside one hairline, like a boxed paragraph in a column, with the quotation marks inline around the sentence.',
           },
         },
       },

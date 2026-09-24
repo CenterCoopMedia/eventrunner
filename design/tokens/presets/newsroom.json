@@ -213,7 +213,7 @@
         {
           "id": "side-rule",
           "label": "Side rule",
-          "why": "Sets the quote beside one strong rule with no rules above or below and no mark.",
+          "why": "Sets the quote beside one strong rule with no rules above or below; the quotation marks sit inline around the sentence.",
           "tokens": {
             "--pull-quote-rule-block-width": "0",
             "--pull-quote-rule-inline-width": "var(--rule-strong-width)",

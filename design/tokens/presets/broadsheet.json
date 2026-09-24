@@ -227,7 +227,7 @@
         {
           "id": "column-rule",
           "label": "Column rule",
-          "why": "Sets the quote beside one hairline, like a boxed paragraph in a column, with no mark.",
+          "why": "Sets the quote beside one hairline, like a boxed paragraph in a column, with the quotation marks inline around the sentence.",
           "tokens": {
             "--pull-quote-rule-block-width": "0",
             "--pull-quote-rule-inline-width": "var(--rule-hairline-width)",
