@@ -1266,3 +1266,23 @@ test('every other collection keeps its own already-exists words', async () => {
   assert.equal(res.statusCode, 409);
   assert.equal(res.body.error.message, 'That document already exists; use cmsUpdateContent.');
 });
+
+// --- review round (c2, finding 1) ---------------------------------------------
+
+test('a sponsor package limit sent as the deletion sentinel leaves the stored draft without one', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/sponsor_packages__supporting': {
+      section: 'sponsor_packages', field: 'supporting', blockType: 'sponsor_package',
+      name: 'Supporting', limit: 3, benefits: '<p>Materials.</p>', status: 'dirty',
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'sponsor_packages', field: 'supporting', fields: { name: 'Supporting', limit: DELETE_FIELD_SENTINEL } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsContent_drafts', 'sponsor_packages__supporting');
+  assert.equal('limit' in draft, false);
+  assert.equal(draft.benefits, '<p>Materials.</p>');
+});

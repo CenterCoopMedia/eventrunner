@@ -218,4 +218,50 @@ describe('AdminContentBlockEditor value fields', () => {
       benefits: '<p>Signs</p>',
     });
   });
+
+  // Review round (c2, finding 1): "Leave it empty for no limit" has to hold
+  // on an existing package too. The update merges onto the stored draft, so
+  // the cleared field goes as a deletion.
+  it('clears a stored limit when the field is emptied and saved', async () => {
+    pagesLive = [{
+      id: 'sponsors',
+      label: 'Sponsors',
+      path: '/sponsors',
+      icon: null,
+      order: 3,
+      visible: true,
+      systemPage: true,
+      sections: [{
+        id: 'sponsor_packages',
+        label: 'Sponsorship packages',
+        description: 'What a sponsor can support, one package per block.',
+        allowedBlocks: ['sponsor_package', 'richtext'],
+        maxBlocks: 6,
+        reorderable: true,
+        defaultBlocks: [],
+      }],
+    }];
+    contentLive = [{
+      id: 'sponsor_packages__supporting',
+      section: 'sponsor_packages',
+      field: 'supporting',
+      blockType: 'sponsor_package',
+      name: 'Supporting',
+      price: 'Illustrative figure: 3,000',
+      limit: 3,
+      benefits: '<p>Workshop materials.</p>',
+      order: 1,
+      visible: true,
+    }];
+    await renderAt('/admin/content/sponsors/sponsor_packages/supporting');
+    const limit = await screen.findByLabelText('limit (optional)');
+    expect(limit).toHaveValue(3);
+    fireEvent.change(limit, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
+    expect(call).toBeTruthy();
+    expect(JSON.parse(call[1].body).fields.limit).toBe('__cms_delete_field__');
+  });
 });

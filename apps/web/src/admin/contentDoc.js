@@ -106,7 +106,16 @@ export function toContentFields(content) {
     if (field.type === 'boolean') {
       fields[field.id] = Boolean(raw);
     } else if (field.type === 'number') {
-      if (raw === '' || raw === null || raw === undefined) continue;
+      // A blank number is a deletion, not an omission. cmsUpdateContent
+      // merges the payload onto the stored draft, so a key left out keeps
+      // its old value: a cleared sponsor package limit went on printing
+      // "Open to 3 sponsors", and a cleared focal point kept its crop. A
+      // create drops the sentinel (omitDeletedFields), so a new block
+      // simply has no value for the field.
+      if (raw === '' || raw === null || raw === undefined) {
+        fields[field.id] = DELETE_FIELD_SENTINEL;
+        continue;
+      }
       const n = Number(raw);
       fields[field.id] = Number.isFinite(n) ? n : raw;
     } else {

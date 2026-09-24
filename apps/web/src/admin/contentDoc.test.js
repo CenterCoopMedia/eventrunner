@@ -7,6 +7,7 @@
 // SENTINEL literal staying in lockstep with the backend's.
 import { describe, expect, it } from 'vitest';
 import * as contentCjs from '../../../../functions/src/cms/content.cjs';
+import * as firestoreFakeCjs from '../../../../functions/src/cms/firestoreFake.cjs';
 import {
   DELETE_FIELD_SENTINEL,
   blankContent,
@@ -184,5 +185,68 @@ describe('staleFieldDeletions', () => {
   it('never marks the shared order field for deletion', () => {
     const deletions = staleFieldDeletions('stat', 'text');
     expect(deletions).not.toHaveProperty('order');
+  });
+});
+
+// Review round (c2, finding 1): a blank number field on an existing block
+// has to reach the server as a deletion. cmsUpdateContent merges the
+// payload onto the stored draft, so a key the payload leaves out keeps its
+// old value, and a sponsor package's cleared limit went on printing
+// "Open to 3 sponsors".
+describe('a cleared number field', () => {
+  const STORED = Object.freeze({
+    blockType: 'sponsor_package',
+    section: 'sponsor_packages',
+    field: 'supporting',
+    name: 'Supporting',
+    price: 'Illustrative figure: 3,000',
+    limit: 3,
+    benefits: '<p>Workshop materials.</p>',
+    order: 1,
+    visible: true,
+  });
+
+  function clearedLimit() {
+    const editable = toEditableContent(STORED, STORED.blockType);
+    expect(editable.values.limit).toBe(3);
+    return toContentFields({ ...editable, values: { ...editable.values, limit: '' } });
+  }
+
+  it('is sent as the deletion sentinel, not left out', () => {
+    expect(clearedLimit()).toMatchObject({ blockType: 'sponsor_package', limit: DELETE_FIELD_SENTINEL });
+    // A filled number is still a number.
+    expect(toContentFields({ ...toEditableContent(STORED), values: { ...toEditableContent(STORED).values, limit: '4' } }).limit).toBe(4);
+  });
+
+  it('leaves the stored draft without the key after the server merge', async () => {
+    const { createCmsUpdateContentHandler } = contentCjs.default ?? contentCjs;
+    const { makeFakeDb } = firestoreFakeCjs.default ?? firestoreFakeCjs;
+    const db = makeFakeDb({
+      'config/bootstrap': { adminEmails: ['admin@example.org'] },
+      'cmsContent_drafts/sponsor_packages__supporting': { ...STORED, status: 'dirty' },
+    });
+    const res = { statusCode: null, body: null, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; }, set() { return this; } };
+    await createCmsUpdateContentHandler({
+      db,
+      auth: { verifyIdToken: async () => ({ uid: 'admin-1', email: 'admin@example.org', email_verified: true }) },
+      getConfig: async () => ({ bootstrap: { adminEmails: ['admin@example.org'] } }),
+      now: () => 1_750_000_000_000,
+      log: { warn() {}, error() {} },
+    })({
+      method: 'POST',
+      headers: { authorization: 'Bearer admin-token' },
+      body: { section: 'sponsor_packages', field: 'supporting', fields: clearedLimit() },
+    }, res);
+    expect(res.statusCode, JSON.stringify(res.body)).toBe(200);
+    const draft = db.read('cmsContent_drafts', 'sponsor_packages__supporting');
+    expect('limit' in draft).toBe(false);
+    expect(draft.name).toBe('Supporting');
+  });
+
+  it('is dropped on a create, where there is nothing to delete', () => {
+    const fields = toContentFields(blankContent('image'));
+    expect(fields.focalX).toBe(DELETE_FIELD_SENTINEL);
+    const { internals } = contentCjs.default ?? contentCjs;
+    expect('focalX' in internals.omitDeletedFields(fields)).toBe(false);
   });
 });
