@@ -218,6 +218,12 @@ export function waitForInviteToken(since, email, timeoutMs) {
   }, timeoutMs);
 }
 
+/** Empty the emulator's sign-in rate-limit buckets (auth_rate_limits). */
+export async function clearSignInRateLimits() {
+  const snap = await adminDb().collection('auth_rate_limits').get();
+  await Promise.all(snap.docs.map((doc) => doc.ref.delete()));
+}
+
 /**
  * Sign `email` in through the real sign-in page: request a code, read it from
  * the captured mail, and submit it. Sending the code writes a `sent_emails`
@@ -226,6 +232,12 @@ export function waitForInviteToken(since, email, timeoutMs) {
  * racing that redirect for a brief intermediate home route.
  */
 export async function signIn(page, email) {
+  // The server allows five sign-in codes per address per 15 minutes
+  // (functions/src/auth/challenges.cjs). The whole suite signs the seeded
+  // operator in more often than that, so the last spec to do so was
+  // refused a code. Each sign-in here starts from an empty window, as a
+  // person signing in once would; no spec tests the limit itself.
+  await clearSignInRateLimits();
   const since = mailFileSize();
   await page.goto('/signin');
   await page.locator('#signin-email').fill(email);
