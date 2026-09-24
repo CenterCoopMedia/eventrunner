@@ -18,8 +18,18 @@ describe('the collection words', () => {
       'Sessions',
       'Organizations',
       'Updates',
-      'Timeline entries',
+      'Timeline',
     ]);
+  });
+
+  it('names each collection as the Overview’s readiness table does', () => {
+    const readiness = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'overview', 'ReadinessPanel.jsx'),
+      'utf8',
+    );
+    for (const choice of COLLECTION_CHOICES) {
+      expect(readiness, choice.id).toContain(`['${choice.id}', '${choice.label}']`);
+    }
   });
 
   it('imports nothing, so the banner pulls no formatter into the admin entry chunk', () => {

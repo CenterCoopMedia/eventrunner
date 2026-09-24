@@ -15,7 +15,7 @@ export const COLLECTION_CHOICES = Object.freeze([
   { id: 'cmsSchedule', label: 'Sessions', singular: 'session', plural: 'sessions' },
   { id: 'cmsOrganizations', label: 'Organizations', singular: 'organization', plural: 'organizations' },
   { id: 'cmsUpdates', label: 'Updates', singular: 'update', plural: 'updates' },
-  { id: 'cmsTimeline', label: 'Timeline entries', singular: 'timeline entry', plural: 'timeline entries' },
+  { id: 'cmsTimeline', label: 'Timeline', singular: 'timeline entry', plural: 'timeline entries' },
 ]);
 
 /**
