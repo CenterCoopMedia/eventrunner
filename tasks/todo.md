@@ -118,8 +118,10 @@ builder branches first if the container may be reclaimed.
 | a4 | `/home/user/wt-a4`, `…-b-a4` | opened as #269 | #186, #187. Round 2 review found escalation paths (seo.defaultOgImagePath, speaker headshotPath, sender byte and sub-key compare, staff Media page); the builder is fixing them. Review the round 3 diff before it joins. |
 | a3 | `/home/user/wt-a3`, `…-b-a3` | moved to `trial/a3-on-tiers` | Round 2 review: 18 of 23 confirmed (blocker: the CMS never clears `seeded`, so an edited When card and the seed upgrade both fail). Builder is fixing on the trial base. Then cherry-pick b1 to b3 from `trial/stack-a3-b3` onto it. |
 | b1 | `/home/user/wt-b1`, `…-b-b1` | `bd2ac01` | #178 to #182. Review: 4 of 9 confirmed, minor; the director fixed them on the trial stack (`6d86f81`). |
-| b2 | `/home/user/wt-b2`, `…-b-b2` | `63c1862` | #183. Review stopped: resume `wf_54fd8612-e0b`. |
-| b3 | `/home/user/wt-b3`, `…-b-b3` | `46935c1` | #184, #185. Review: 6 of 9 confirmed (major: a delete failing after phase 1 with a transport error offers no retry; claims made in the token window are never released). Builder is fixing on its old base; cherry-pick the fixes onto the trial stack. |
+| b2 | `/home/user/wt-b2`, `…-b-b2` | `63c1862` | #183. Review: 13 of 17 confirmed (the preview can still navigate its frame by SMIL, declarative shadow DOM, and reparse; a forged cursor throws; Load more drops a pending search). Builder is fixing on its old base; cherry-pick the fixes onto the trial stack. |
+| b3 | `/home/user/wt-b3`, `…-b-b3` | `aab2b49` | #184, #185. Review: 6 of 9 confirmed; fixed by the builder and on `trial/stack-a3-b3` (`ec94446`..`5c2ae53`). |
+| b4 | `/home/user/wt-b4`, `…-b-b4` | cut from `5c2ae53` | #188. Dispatched 2026-09-24 03:30 UTC; adds its stores to b3's `PER_ACCOUNT_STORES`. |
+| b5 | `/home/user/wt-b5`, `…-b-b5` | cut from `4426143` | #189. Dispatched 2026-09-24 03:25 UTC. |
 
 `joe/confident-gates-gy99ip-4-admin-tiers` (local) holds a4 round 2 on
 `3ccd388`, fully checked. Rebuild it from a4's round 3 commits instead.
