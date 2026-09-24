@@ -245,7 +245,11 @@ describe('speaker editor', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Delete this speaker' }));
     });
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // The editor returns to the list, which asks for its invites on mount,
+    // so only the delete call is counted.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Speakers' })).toBeInTheDocument();
+    const deletes = fetch.mock.calls.filter(([url]) => String(url).endsWith('/deleteSpeaker'));
+    expect(deletes).toHaveLength(1);
     expect(urlOf(0)).toMatch(/deleteSpeaker$/);
     expect(bodyOf(0)).toEqual({ speakerId: 'rae-okonkwo', soft: false });
   });
@@ -274,8 +278,36 @@ describe('speaker editor', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Mark this speaker removed' }));
     });
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(bodyOf(1)).toEqual({ speakerId: 'rae-okonkwo', soft: true });
+    // The editor returns to the speaker list, which asks for its invites
+    // on mount, so only the delete calls are counted.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Speakers' })).toBeInTheDocument();
+    const deletes = fetch.mock.calls.filter(([url]) => String(url).endsWith('/deleteSpeaker'));
+    expect(deletes).toHaveLength(2);
+    expect(JSON.parse(deletes[1][1].body)).toEqual({ speakerId: 'rae-okonkwo', soft: true });
+  });
+
+  // `navigate('..')` resolves against the route tree, and the editor's route
+  // is a sibling of the list under the admin layout, so '..' was the admin
+  // index (the Overview) rather than the list. Every exit names the list.
+  it('returns to the speaker list on Cancel', async () => {
+    speakerDocs = [RAE];
+    await renderAt('/admin/speakers/rae-okonkwo');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Speakers' })).toBeInTheDocument();
+  });
+
+  it("opens the new speaker's own editor after a create", async () => {
+    speakerDocs = [RAE];
+    fetch.mockResolvedValueOnce(okResponse({ speakerId: 'rae-okonkwo' }));
+    await renderAt('/admin/speakers/new');
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Rae' } });
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Okonkwo' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create speaker' }));
+    });
+    // Only the edit form offers the delete.
+    expect(await screen.findByRole('button', { name: 'Delete this speaker' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Bio')).toHaveValue('Community reporter.');
   });
 
   it('has no control for the account link, which is server-owned', async () => {

@@ -138,6 +138,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The speaker and session editors now return to their own list after a delete or **Cancel**, and
+  a new speaker opens its own editor. They went to the admin index, which is now the Overview,
+  because a relative link from an editor resolved against the admin layout, not the list.
 - The second wave's devices, after an adversarial review of the branch. The ruled table's scroll
   region carries its own overflow, so a wide table scrolls inside it and the page never scrolls
   sideways; the head no longer claims to stick, because a head pinned inside a region that scrolls

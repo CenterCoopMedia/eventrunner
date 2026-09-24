@@ -230,6 +230,22 @@ describe('admin Sessions workspace', () => {
     expect(bodyOf(1)).toEqual({ queueId: 'queue-42' });
   });
 
+  // The editor's route is a sibling of the list under the admin layout, so
+  // a plain navigate('..') went to the admin index. Cancel names the list.
+  it('returns to the sessions list on Cancel', async () => {
+    await renderAt('/admin/sessions/child');
+    await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
+    pushSessions([], [
+      {
+        id: 'child', dayId: 'day-1', startTime: '09:30', endTime: '10:00',
+        title: 'Child', description: 'Child session.', status: 'dirty',
+      },
+    ]);
+    expect(await screen.findByDisplayValue('Child')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sessions' })).toBeInTheDocument();
+  });
+
   it('publishes a draft-only parent with its child', async () => {
     await renderAt('/admin/sessions/child');
     await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));

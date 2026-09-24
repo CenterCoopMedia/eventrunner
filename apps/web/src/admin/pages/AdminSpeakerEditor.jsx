@@ -132,6 +132,11 @@ function toPayload(form, { includeStatus }) {
   return payload;
 }
 
+// Where every exit from the editor goes. The editor's route is a sibling of
+// the list under the admin layout, so a relative '..' is the admin index,
+// not the list.
+const SPEAKERS_LIST = '/admin/speakers';
+
 export default function AdminSpeakerEditor({ mode }) {
   const { speakerId } = useParams();
   const navigate = useNavigate();
@@ -186,7 +191,7 @@ export default function AdminSpeakerEditor({ mode }) {
           speaker: toPayload(form, { includeStatus: true }),
         });
         showToast('Speaker created.');
-        navigate(`../${response.speakerId}`, { replace: true });
+        navigate(`/admin/speakers/${encodeURIComponent(response.speakerId)}`, { replace: true });
       } else {
         await call('updateSpeaker', {
           speakerId,
@@ -215,7 +220,7 @@ export default function AdminSpeakerEditor({ mode }) {
             response.unlinkedSessions.length + response.unlinkedDrafts.length
           } session document(s).`,
       );
-      navigate('..');
+      navigate(SPEAKERS_LIST);
     } catch (err) {
       setError(err);
       // The server refused a full unlink and named the soft delete as the
@@ -367,7 +372,7 @@ export default function AdminSpeakerEditor({ mode }) {
       </Panel>
 
       <div className="flex flex-wrap items-center gap-xs">
-        <button type="button" className={secondaryButtonClass} onClick={() => navigate('..')}>
+        <button type="button" className={secondaryButtonClass} onClick={() => navigate(SPEAKERS_LIST)}>
           Cancel
         </button>
         {mode === 'edit' ? (
