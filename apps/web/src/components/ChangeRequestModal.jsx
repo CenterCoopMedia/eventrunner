@@ -12,15 +12,17 @@
 // string, imported from there. The fields come from forms/publicForm.jsx,
 // because this is a visitor-facing form and never takes the admin identity.
 //
-// `submissionKey` is made once per dialog and resent unchanged on a retry,
-// so a retry after a dropped response finds the stored request rather than
-// storing it twice.
+// `submissionKey` is made once per dialog and resent unchanged on a retry of
+// the same text, so a retry after a dropped response finds the stored
+// request rather than storing it twice. Edited text takes a new key
+// (lib/submissionKey.js).
 //
 // A field that refuses says so on the field and takes focus; a refusal from
 // the server belongs to the request and stays one urgent line at the head
 // of the form (issue 219).
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitChangeRequest } from '../lib/changeRequestApi.js';
+import { createSubmissionKey } from '../lib/submissionKey.js';
 import { DIALOG_FRAME_CLASS } from './FeedbackModal.jsx';
 import { focusFirstError, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
@@ -29,19 +31,13 @@ import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 export const MAX_MESSAGE_LENGTH = 2000;
 export const MAX_PAGE_LENGTH = 200;
 
-function newSubmissionKey() {
-  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID().replace(/-/g, '')
-    : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
-}
-
 /**
  * @param {{ onClose: () => void, user: object|null, initialPage?: string }} props
  *   `initialPage` is the path the reader was on, offered as the page field.
  */
 export default function ChangeRequestModal({ onClose, user, initialPage = '' }) {
   const titleId = useId();
-  const submissionKeyRef = useRef(newSubmissionKey());
+  const [submissionKey] = useState(createSubmissionKey);
 
   const [message, setMessage] = useState('');
   const [page, setPage] = useState(() => String(initialPage ?? '').slice(0, MAX_PAGE_LENGTH));
@@ -79,12 +75,9 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
     setSubmitting(true);
     setError(null);
     setMessageError(null);
+    const request = { message: message.trim(), page: page.trim() || null };
     const result = await submitChangeRequest(
-      {
-        message: message.trim(),
-        page: page.trim() || null,
-        submissionKey: submissionKeyRef.current,
-      },
+      { ...request, submissionKey: submissionKey.keyFor(request) },
       { user },
     );
     setSubmitting(false);

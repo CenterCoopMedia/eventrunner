@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
+import { createSubmissionKey } from '../../lib/submissionKey.js';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
 import {
@@ -118,12 +119,6 @@ export function countLine(shown, total) {
   return `Showing ${shown} of ${total} ${total === 1 ? 'request' : 'requests'}.`;
 }
 
-function newSubmissionKey() {
-  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID().replace(/-/g, '')
-    : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
-}
-
 /** The form a staff member sends a request from. Rendered only while the flag is on. */
 function RequestForm({ call }) {
   const [message, setMessage] = useState('');
@@ -132,9 +127,10 @@ function RequestForm({ call }) {
   const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState('');
-  // One key per form session, resent unchanged on a retry and replaced
-  // after a success, so a retry after a dropped answer is stored once.
-  const keyRef = useRef(newSubmissionKey());
+  // One key per form session, resent unchanged on a retry of the same text
+  // and replaced after a success or an edit (lib/submissionKey.js), so a
+  // retry after a dropped answer is stored once.
+  const [submissionKey] = useState(createSubmissionKey);
   const formRef = useRef(null);
   const errorRef = useRef(null);
 
@@ -157,12 +153,9 @@ function RequestForm({ call }) {
     setMessageError(null);
     setSending(true);
     try {
-      await call('submitChangeRequest', {
-        message: message.trim(),
-        page: page.trim() || null,
-        submissionKey: keyRef.current,
-      });
-      keyRef.current = newSubmissionKey();
+      const request = { message: message.trim(), page: page.trim() || null };
+      await call('submitChangeRequest', { ...request, submissionKey: submissionKey.keyFor(request) });
+      submissionKey.reset();
       setMessage('');
       setPage('');
       setStatus('Request sent.');
@@ -222,9 +215,11 @@ export default function AdminChangeRequests() {
   const [rows, setRows] = useState(null);
   const [listError, setListError] = useState(null);
   // The action in flight, keyed to the control that was pressed:
-  // { id, control: 'next' | 'decline' | 'remove' }. The listener can deliver
-  // the committed status before the HTTP answer, so the pressed control, not
-  // the status it asked for, carries "Saving…" until the call settles.
+  // { id, control: 'next' | 'decline' | 'remove', row }. The listener can
+  // deliver the committed status, or the removal, before the HTTP answer,
+  // so the pressed control, not the status it asked for, carries "Saving…"
+  // until the call settles, and `row` (the row as pressed) holds a removed
+  // row on screen until then.
   const [pending, setPending] = useState(null);
   // A failed action, stated on its row until the next try.
   const [rowError, setRowError] = useState(null);
@@ -248,15 +243,21 @@ export default function AdminChangeRequests() {
     setListError,
   ), []);
 
+  // The row an action is in flight on stays on screen until the call
+  // settles, even when the listener has already removed it or its new
+  // status leaves the filter, so the pressed control does not vanish from
+  // under the keyboard.
+  const listed = useMemo(() => {
+    if (!rows || !pending || rows.some((row) => row.id === pending.id)) return rows;
+    return [...rows, pending.row];
+  }, [rows, pending]);
+
   const shown = useMemo(() => {
-    if (!rows) return [];
-    // The row an action is in flight on stays on screen until the call
-    // settles, even when its new status leaves the filter, so the pressed
-    // control does not vanish from under the keyboard.
-    return rows
+    if (!listed) return [];
+    return listed
       .filter((row) => matches(row, filter) || row.id === pending?.id)
       .sort((a, b) => (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0));
-  }, [rows, filter, pending]);
+  }, [listed, filter, pending]);
 
   const setFilter = useCallback((value) => {
     const next = new URLSearchParams(searchParams);
@@ -267,7 +268,7 @@ export default function AdminChangeRequests() {
 
   async function changeStatus(row, status, control, pressed) {
     if (pending) return;
-    setPending({ id: row.id, control });
+    setPending({ id: row.id, control, row });
     setRowError(null);
     setResult('');
     try {
@@ -286,7 +287,7 @@ export default function AdminChangeRequests() {
 
   async function remove(row) {
     if (pending) return;
-    setPending({ id: row.id, control: 'remove' });
+    setPending({ id: row.id, control: 'remove', row });
     setRowError(null);
     setResult('');
     try {
@@ -340,7 +341,7 @@ export default function AdminChangeRequests() {
         >
           Requests
         </h2>
-        {rows !== null ? <p role="status" className="text-admin-sm text-admin-ink-secondary">{countLine(shown.length, rows.length)}</p> : null}
+        {listed !== null ? <p role="status" className="text-admin-sm text-admin-ink-secondary">{countLine(shown.length, listed.length)}</p> : null}
         {result ? <SaveStatus message={result} /> : null}
 
         {listError ? (
@@ -350,14 +351,14 @@ export default function AdminChangeRequests() {
           />
         ) : null}
 
-        {rows === null ? (
+        {listed === null ? (
           <AdminLoadingState label="Loading change requests…" />
-        ) : rows.length === 0 ? (
+        ) : listed.length === 0 ? (
           <AdminEmptyState title="No change requests" description="No one has sent a change request yet." />
         ) : shown.length === 0 ? (
           <AdminEmptyState
             title={`No ${filterEntry.empty} requests`}
-            description={`None of the ${rows.length} ${rows.length === 1 ? 'request is' : 'requests are'} ${filterEntry.empty}.`}
+            description={`None of the ${listed.length} ${listed.length === 1 ? 'request is' : 'requests are'} ${filterEntry.empty}.`}
             action={
               <button
                 type="button"

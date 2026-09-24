@@ -774,8 +774,8 @@ test('a delete clears the account’s change requests and rate-limit window, and
   assert.equal(d.db.read('change_request_rate_limits', 'uid-ada'), undefined);
   assert.equal(adminLogs(d.db).length, 2);
 
-  // A request stored just before the sign-in was deleted, and committed
-  // after the sweep passed, is cleared by the retry.
+  // A request that is there when the delete is retried (the store reads the
+  // account, so this is a request written some other way) is cleared too.
   await d.db.collection('change_requests').doc('ada-request-race').set({ message: 'x', uid: 'uid-ada' });
   const retry = await remove(d);
 

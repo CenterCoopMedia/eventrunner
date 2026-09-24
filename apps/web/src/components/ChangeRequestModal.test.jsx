@@ -124,6 +124,32 @@ describe('ChangeRequestModal', () => {
     expect(submitMock.mock.calls[1][0].submissionKey).toBe(submitMock.mock.calls[0][0].submissionKey);
   });
 
+  // Codex review on #275: the server answers changed text under a used key
+  // with 409, so text edited after a failure goes under a new key.
+  it('takes a new key when the message or the page changed after a failure', async () => {
+    submitMock.mockResolvedValue({ ok: false, error: 'We could not reach the server.' });
+    renderModal();
+    const message = screen.getByLabelText('What should change?');
+    const send = () => fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    fireEvent.change(message, { target: { value: 'Hello' } });
+    send();
+    await screen.findByRole('alert');
+    fireEvent.change(message, { target: { value: 'Hello there' } });
+    send();
+    await act(async () => {});
+    fireEvent.change(screen.getByLabelText('Page (optional)'), { target: { value: '/venue' } });
+    send();
+    await act(async () => {});
+    // The same text again keeps the last key.
+    send();
+    await act(async () => {});
+
+    const keys = submitMock.mock.calls.map(([payload]) => payload.submissionKey);
+    expect(keys).toHaveLength(4);
+    expect(new Set(keys.slice(0, 3)).size).toBe(3);
+    expect(keys[3]).toBe(keys[2]);
+  });
+
   it('a new dialog makes a new key', async () => {
     submitMock.mockResolvedValue({ ok: true, id: 'k' });
     const first = renderModal();

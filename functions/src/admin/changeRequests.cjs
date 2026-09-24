@@ -29,8 +29,13 @@
  * check, which asks Firebase Auth for the account: an ID token outlives its
  * sign-in by up to an hour, and an account delete (users/records.cjs)
  * removes the account's change requests, so a deleted account's open
- * session must not store a new one. No mail is sent and no notifier fires, so no
- * personal data leaves the deployment.
+ * session must not store a new one. The revocation check cannot see a delete
+ * that lands after it, so the store transaction also reads `users/{uid}`:
+ * the delete removes that document in one transaction BEFORE it sweeps
+ * change_requests, so a store that commits first is swept, and a store that
+ * reads after it is refused. A bootstrap admin needs no account document,
+ * because an account delete refuses an admin. No mail is sent and no
+ * notifier fires, so no personal data leaves the deployment.
  *
  * ONE TRANSACTION PER WRITE, WITH ITS AUDIT ROW. Every submission, status
  * change, and removal commits together with its `admin_logs` row, so a
@@ -43,12 +48,15 @@
  *
  * RETRY IDEMPOTENCY. The client sends one `submissionKey` per form session
  * and resends it on a retry; it becomes the document id, the same device
- * as submitFeedback. A retry that finds its own stored request writes
- * nothing and answers as the first call did.
+ * as submitFeedback. A retry that finds its own stored request with the
+ * same message and page writes nothing and answers as the first call did.
+ * A key is bound to the text first stored under it: a retry that changed
+ * the text is 409, never a 201 for text that was not stored. The client
+ * takes a new key when the text changes.
  */
 
 const crypto = require('node:crypto');
-const { requireAdmin, internals: { extractBearerToken } } = require('../core/auth.cjs');
+const { requireAdmin, resolveAdminTier, internals: { extractBearerToken } } = require('../core/auth.cjs');
 const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
 } = require('../core/errors.cjs');
@@ -72,6 +80,7 @@ const STATUSES = Object.freeze(['new', 'in_progress', 'done', 'declined']);
 const SUBMISSION_KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
 
 const FLAG_OFF_MESSAGE = 'Change requests are not enabled for this event.';
+const ACCOUNT_GONE_MESSAGE = 'Your account was not found. Sign in again to send a change request.';
 const SAVE_FAILED_MESSAGE = 'Your request could not be saved. Try again.';
 
 /**
@@ -195,19 +204,32 @@ async function changeRequestsEnabled(db) {
  *
  * @returns {Promise<{ outcome: 'stored'|'replayed' } |
  *                   { outcome: 'limited', retryAfterMs: number } |
- *                   { outcome: 'taken' }>}
+ *                   { outcome: 'taken'|'changed'|'account-gone' }>}
  */
 async function storeRequest({ db, id, actor, message, page, nowMs }) {
   const ref = db.collection(COLLECTION).doc(id);
   const limitRef = db.collection(RATE_LIMIT_COLLECTION).doc(actor.uid);
+  const accountRef = db.collection('users').doc(actor.uid);
+  const bootstrapRef = db.collection('config').doc('bootstrap');
   return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
+    // Every read first, as Firestore requires. The account read is what
+    // orders this store against an account delete (see the header).
+    const [snap, limitSnap, accountSnap] = await Promise.all([tx.get(ref), tx.get(limitRef), tx.get(accountRef)]);
+    if (!accountSnap.exists) {
+      const bootstrapSnap = await tx.get(bootstrapRef);
+      const bootstrap = bootstrapSnap.exists ? bootstrapSnap.data() : null;
+      if (resolveAdminTier(bootstrap, actor.email) === null) return { outcome: 'account-gone' };
+    }
     if (snap.exists) {
       // A retry of a request this account already stored writes nothing. A
-      // key another account holds is not this caller's request.
-      return snap.data()?.uid === actor.uid ? { outcome: 'replayed' } : { outcome: 'taken' };
+      // key another account holds is not this caller's request, and a key
+      // under which other text is stored is not this text's.
+      const stored = snap.data() || {};
+      if (stored.uid !== actor.uid) return { outcome: 'taken' };
+      return stored.message === message && (stored.page ?? null) === page
+        ? { outcome: 'replayed' }
+        : { outcome: 'changed' };
     }
-    const limitSnap = await tx.get(limitRef);
     const recent = rateLimitWindow(limitSnap.exists ? limitSnap.data()?.requests : null, nowMs);
     if (recent.limited) return { outcome: 'limited', retryAfterMs: recent.retryAfterMs };
 
@@ -287,7 +309,8 @@ function createSubmitChangeRequestHandler({ db, auth, now = Date.now, log = cons
       });
       return;
     }
-    if (result.outcome === 'taken') {
+    if (result.outcome === 'account-gone') return sendError(res, 403, 'forbidden', ACCOUNT_GONE_MESSAGE);
+    if (result.outcome === 'taken' || result.outcome === 'changed') {
       return sendError(res, 409, 'conflict', 'submissionKey: already used. Open the form again.');
     }
     res.status(201).json({ id, ok: true });

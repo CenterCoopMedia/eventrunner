@@ -404,6 +404,31 @@ describe('AdminChangeRequests: removal', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Requests' })).toHaveFocus();
   });
 
+  // Codex review on #275: the listener can deliver the delete before the
+  // HTTP answer. The row, its confirm, and "Removing…" stay until the call
+  // settles, so focus does not drop and the empty state does not flash.
+  it('keeps the row, Removing…, and focus when the removal arrives before the answer', async () => {
+    let settle;
+    callMock.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve; }));
+    renderPage();
+    pushRows([request('one')]);
+    fireEvent.click(within(rowFor('one')).getByRole('button', { name: 'Remove' }));
+    const confirm = within(rowFor('one')).getByRole('button', { name: 'Remove this request' });
+    confirm.focus();
+    fireEvent.click(confirm);
+
+    pushRows([]);
+    const removing = within(rowFor('one')).getByRole('button', { name: 'Removing…' });
+    expect(removing).toHaveFocus();
+    expect(screen.queryByText('No change requests')).toBeNull();
+
+    await act(async () => { settle({ id: 'one', deleted: true }); });
+    expect(rowFor('one')).toBeUndefined();
+    expect(screen.getByText('No change requests')).toBeInTheDocument();
+    expect(screen.getByText('Request removed.')).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('heading', { level: 2, name: 'Requests' })).toHaveFocus();
+  });
+
   // Review finding 2: an open confirm on one row must not be a live control
   // that silently does nothing while another row's action runs.
   it('an open Remove confirm cannot be pressed while another row saves, and says nothing false', async () => {
@@ -514,6 +539,30 @@ describe('AdminChangeRequests: the form and the flag', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
     await flush();
     expect(callMock.mock.calls[1][1].submissionKey).toBe(callMock.mock.calls[0][1].submissionKey);
+  });
+
+  // Codex review on #275: the server answers changed text under a used key
+  // with 409, so text edited after a failure goes under a new key.
+  it('takes a new key when the text changed after a failure, and keeps it for the same text', async () => {
+    callMock.mockRejectedValue(Object.assign(new Error('We could not reach the server.'), { fieldErrors: [] }));
+    renderPage();
+    pushRows([]);
+    const send = async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+      await flush();
+    };
+    fireEvent.change(screen.getByLabelText('What should change?'), { target: { value: 'Hello' } });
+    await send();
+    fireEvent.change(screen.getByLabelText('What should change?'), { target: { value: 'Hello there' } });
+    await send();
+    fireEvent.change(screen.getByLabelText(/Page \(optional\)/), { target: { value: '/venue' } });
+    await send();
+    await send();
+
+    const keys = callMock.mock.calls.map(([, payload]) => payload.submissionKey);
+    expect(keys).toHaveLength(4);
+    expect(new Set(keys.slice(0, 3)).size).toBe(3);
+    expect(keys[3]).toBe(keys[2]);
   });
 
   it('marks an empty message on the field and sends nothing', () => {

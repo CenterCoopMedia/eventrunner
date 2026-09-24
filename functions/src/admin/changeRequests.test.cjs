@@ -22,10 +22,19 @@ const STAFF = 'staff@example.com';
 const BOOTSTRAP_DOC = { adminEmails: [OPERATOR], staffEmails: [STAFF] };
 const FLAG_ON = { schedule: true, changeRequests: true };
 
-function makeFakeDb({ features = FLAG_ON, seed = {} } = {}) {
+// Every sign-in has its account document (users/lifecycle.cjs seeds it), so
+// the visitors carry one. The staff and operator are admins by the
+// bootstrap list and carry none, as a bootstrap admin may.
+const ACCOUNTS = {
+  'users/uid-ada': { uid: 'uid-ada', email: 'ada@example.com' },
+  'users/uid-bo': { uid: 'uid-bo', email: 'bo@example.com' },
+};
+
+function makeFakeDb({ features = FLAG_ON, seed = {}, accounts = ACCOUNTS } = {}) {
   return makeBareFakeDb({
     'config/bootstrap': BOOTSTRAP_DOC,
     ...(features ? { 'config/features': features } : {}),
+    ...accounts,
     ...seed,
   });
 }
@@ -209,6 +218,40 @@ test('a token whose sign-in was deleted is refused with 401 and stores nothing',
   assert.deepEqual(auth.revocationChecks, [true]);
 });
 
+// Codex review on #275: the token check passes, then an account delete
+// removes users/{uid} and sweeps change_requests, then the store runs. The
+// store must not recreate the request and the rate-limit document after the
+// sweep, so it reads the account inside its own transaction.
+test('an account with no users document is refused with 403 and stores nothing', async () => {
+  const db = makeFakeDb({ accounts: {} });
+  const res = await submit(db);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.code, 'forbidden');
+  assert.deepEqual(written(db), []);
+});
+
+test('an account deleted while the store is in flight is refused with 403 and stores nothing', async () => {
+  const db = makeFakeDb();
+  // deleteAttendee's phase 1 commits between this transaction's reads and
+  // its commit.
+  db.beforeCommit = async () => {
+    await db.collection('users').doc('uid-ada').delete();
+  };
+  const before = written(db).length;
+  const res = await submit(db);
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(requests(db), []);
+  assert.equal(rateLimit(db), undefined);
+  assert.deepEqual(adminLogs(db), []);
+  assert.equal(written(db).length, before + 1, 'only the delete itself');
+});
+
+test('a bootstrap admin with no users document still submits: an admin account is never deleted', async () => {
+  const db = makeFakeDb({ accounts: {} });
+  assert.equal((await submit(db, { token: 'staff' })).statusCode, 201);
+  assert.equal((await submit(db, { token: 'operator', payload: body({ submissionKey: 'key0000000000002' }) })).statusCode, 201);
+});
+
 test('a body over 8 KiB is 413 and writes nothing', async () => {
   const db = makeFakeDb();
   const res = await submit(db, { payload: body({ padding: 'x'.repeat(8 * 1024) }) });
@@ -325,14 +368,35 @@ test('a staff admin submits through the same endpoint and is recorded as themsel
 test('a retry with the same key answers 201 and writes no second request, row, or rate-limit slot', async () => {
   const db = makeFakeDb();
   const first = await submit(db);
-  const second = await submit(db, { payload: body({ message: 'A different text on the retry.' }), now: () => T0 + 5 });
+  // The retry sends the same text; the server trims both, as it stores it.
+  const second = await submit(db, {
+    payload: body({ message: '  The travel page lists the wrong hotel. ', page: ' /travel ' }),
+    now: () => T0 + 5,
+  });
   assert.equal(first.statusCode, 201);
   assert.equal(second.statusCode, 201);
   assert.deepEqual(second.body, first.body);
   assert.equal(requests(db).length, 1);
-  assert.equal(db.read('change_requests', KEY).message, 'The travel page lists the wrong hotel.');
   assert.equal(adminLogs(db).length, 1);
   assert.deepEqual(rateLimit(db).requests, [T0]);
+});
+
+// Codex review on #275: the first answer is lost, the sender edits the text,
+// and the retry resends the key. A 201 would say "sent" for text that was
+// never stored.
+test('a retry that changes the message or the page under a used key is 409, and writes nothing', async () => {
+  for (const change of [{ message: 'A different text on the retry.' }, { page: '/venue' }, { page: null }]) {
+    const db = makeFakeDb();
+    assert.equal((await submit(db)).statusCode, 201);
+    const before = written(db).length;
+    const res = await submit(db, { payload: body(change), now: () => T0 + 5 });
+    assert.equal(res.statusCode, 409, JSON.stringify(change));
+    assert.equal(res.body.error.code, 'conflict');
+    assert.equal(written(db).length, before);
+    assert.equal(db.read('change_requests', KEY).message, 'The travel page lists the wrong hotel.');
+    assert.equal(db.read('change_requests', KEY).page, '/travel');
+    assert.deepEqual(rateLimit(db).requests, [T0]);
+  }
 });
 
 test('a key another account already holds is 409, and nothing is written', async () => {

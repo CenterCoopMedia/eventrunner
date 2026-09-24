@@ -121,8 +121,8 @@ const PER_ACCOUNT_STORES = Object.freeze([
   // The change requests the account sent (issue #188) and its rate-limit
   // window. A request is free text, so it must not outlive the identity it
   // was stored against. Sweep, not directory: the account can hold more
-  // requests than one transaction can delete, and a deleted session's token
-  // can still send one for up to an hour, which a retried delete clears.
+  // requests than one transaction can delete. The store reads users/{uid} in
+  // its transaction, so none lands after the account document goes.
   { phase: 'sweep', kind: 'owned', collection: 'change_requests', field: 'uid', key: 'changeRequests' },
   { phase: 'sweep', kind: 'doc', collection: 'change_request_rate_limits', key: 'changeRequestLimits' },
 ]);
